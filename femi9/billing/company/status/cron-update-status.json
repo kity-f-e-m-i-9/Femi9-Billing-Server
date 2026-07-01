@@ -1,0 +1,11 @@
+{
+    "status": "complete",
+    "last_run": "2025-10-08 05:30:01",
+    "pending_count": 0,
+    "total_updated": 0,
+    "execution_time": 0.0299999999999999988897769753748434595763683319091796875,
+    "message": "All data synchronized",
+    "next_run": "2025-10-08 05:45:01",
+    "timestamp": 1759901401,
+    "readable_time": "2025-10-08 05:30:01"
+}

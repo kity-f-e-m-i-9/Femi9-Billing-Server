@@ -1,0 +1,3 @@
+[2025-11-05 12:11:01] EXCEPTION Unknown column 'to_user_type' in 'where clause' in /home/billing0femi9/public_html/femi9/billing/company/Retail-Report-Details.php on line 663
+Stack: #0 /home/billing0femi9/public_html/femi9/billing/company/Retail-Report-Details.php(663): mysqli_query(Object(mysqli), 'SELECT COALESCE...')
+#1 {main}

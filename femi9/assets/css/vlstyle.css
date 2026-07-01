@@ -1,0 +1,18 @@
+/* CSS for the popup */
+.popup {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;width:80%;
+    transform: translate(-50%, -50%);
+    background-color: #fdff7e;
+    padding: 20px;
+    border: 1px solid #999;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 9999;border-radius:10%;
+}
+.popup-trigger{text-decoration:none;color:blue;font-weight:bold;}
+
+.footerinput1{width:100%;font-size:25px;font-weight:bold;letter-spacing:2px;}
+.footerinput2{width:100%;font-size:25px;font-weight:bold;letter-spacing:2px;color:#333;}
+.footersubact{width:100% !important;}

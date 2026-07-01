@@ -1,0 +1,109 @@
+[02-Jun-2026 06:43:37 UTC] === INVOICE ACTION START ===
+[02-Jun-2026 06:43:37 UTC] Invoice ID: 6456133248CMPSS020626121315
+[02-Jun-2026 06:43:37 UTC] Invoice User Type: super_stockiest
+[02-Jun-2026 06:43:37 UTC] NEW MODE: Using session - user_type: company, user_id: 1
+[02-Jun-2026 06:43:37 UTC] Adding product 9 (Qty: 10) to invoice 6456133248CMPSS020626121315
+[02-Jun-2026 06:43:37 UTC] Item totals - Subtotal: Rs.1350.00, GST: Rs.0, Total: Rs.1350
+[02-Jun-2026 06:43:37 UTC] GST Type: inner, Buyer GST Type: register
+[02-Jun-2026 06:43:37 UTC] Creating new invoice header: 6456133248CMPSS020626121315
+[02-Jun-2026 06:43:37 UTC] Invoice header created successfully
+[02-Jun-2026 06:43:37 UTC] === STOCK CHECK START ===
+[02-Jun-2026 06:43:37 UTC] Product ID: 9
+[02-Jun-2026 06:43:37 UTC] Requested Qty: 10
+[02-Jun-2026 06:43:37 UTC] Query params - user_type: 'company', user_id: '1'
+[02-Jun-2026 06:43:37 UTC] Stock found: closing_qty = 5584
+[02-Jun-2026 06:43:37 UTC] Comparison: 5584 < 10 = FALSE (OK)
+[02-Jun-2026 06:43:37 UTC] === STOCK CHECK PASSED ===
+[02-Jun-2026 06:43:37 UTC] Invoice item added successfully
+[02-Jun-2026 06:43:37 UTC] === INVOICE ACTION SUCCESS ===
+[05-Jun-2026 05:30:36 UTC] === INVOICE ACTION START ===
+[05-Jun-2026 05:30:36 UTC] Invoice ID: 3859879199CMPST050626105900
+[05-Jun-2026 05:30:36 UTC] Invoice User Type: stockiest
+[05-Jun-2026 05:30:36 UTC] NEW MODE: Using session - user_type: company, user_id: 1
+[05-Jun-2026 05:30:36 UTC] Adding product 9 (Qty: 12) to invoice 3859879199CMPST050626105900
+[05-Jun-2026 05:30:36 UTC] Item totals - Subtotal: Rs.1800.00, GST: Rs.0, Total: Rs.1800
+[05-Jun-2026 05:30:36 UTC] GST Type: inner, Buyer GST Type: register
+[05-Jun-2026 05:30:36 UTC] Creating new invoice header: 3859879199CMPST050626105900
+[05-Jun-2026 05:30:36 UTC] Invoice header created successfully
+[05-Jun-2026 05:30:36 UTC] === STOCK CHECK START ===
+[05-Jun-2026 05:30:36 UTC] Product ID: 9
+[05-Jun-2026 05:30:36 UTC] Requested Qty: 12
+[05-Jun-2026 05:30:36 UTC] Query params - user_type: 'company', user_id: '1'
+[05-Jun-2026 05:30:36 UTC] Stock found: closing_qty = 5594
+[05-Jun-2026 05:30:36 UTC] Comparison: 5594 < 12 = FALSE (OK)
+[05-Jun-2026 05:30:36 UTC] === STOCK CHECK PASSED ===
+[05-Jun-2026 05:30:36 UTC] Invoice item added successfully
+[05-Jun-2026 05:30:36 UTC] === INVOICE ACTION SUCCESS ===
+[05-Jun-2026 06:40:18 UTC] === INVOICE ACTION START ===
+[05-Jun-2026 06:40:18 UTC] Invoice ID: 9764668555CMPDST050626115533
+[05-Jun-2026 06:40:18 UTC] Invoice User Type: distributor
+[05-Jun-2026 06:40:18 UTC] NEW MODE: Using session - user_type: company, user_id: 1
+[05-Jun-2026 06:40:18 UTC] Adding product 9 (Qty: 100) to invoice 9764668555CMPDST050626115533
+[05-Jun-2026 06:40:18 UTC] Item totals - Subtotal: Rs.18600.00, GST: Rs.0, Total: Rs.18600
+[05-Jun-2026 06:40:18 UTC] GST Type: outer, Buyer GST Type: unregister
+[05-Jun-2026 06:40:18 UTC] Creating new invoice header: 9764668555CMPDST050626115533
+[05-Jun-2026 06:40:18 UTC] Invoice header created successfully
+[05-Jun-2026 06:40:18 UTC] === STOCK CHECK START ===
+[05-Jun-2026 06:40:18 UTC] Product ID: 9
+[05-Jun-2026 06:40:18 UTC] Requested Qty: 100
+[05-Jun-2026 06:40:18 UTC] Query params - user_type: 'company', user_id: '1'
+[05-Jun-2026 06:40:18 UTC] Stock found: closing_qty = 5582
+[05-Jun-2026 06:40:18 UTC] Comparison: 5582 < 100 = FALSE (OK)
+[05-Jun-2026 06:40:18 UTC] === STOCK CHECK PASSED ===
+[05-Jun-2026 06:40:18 UTC] Invoice item added successfully
+[05-Jun-2026 06:40:18 UTC] === INVOICE ACTION SUCCESS ===
+[05-Jun-2026 07:46:41 UTC] === INVOICE ACTION START ===
+[05-Jun-2026 07:46:41 UTC] Invoice ID: 8879153879CMPDST05062611619
+[05-Jun-2026 07:46:41 UTC] Invoice User Type: distributor
+[05-Jun-2026 07:46:41 UTC] NEW MODE: Using session - user_type: company, user_id: 1
+[05-Jun-2026 07:46:41 UTC] Adding product 9 (Qty: 182) to invoice 8879153879CMPDST05062611619
+[05-Jun-2026 07:46:41 UTC] Item totals - Subtotal: Rs.33852.00, GST: Rs.0, Total: Rs.33852
+[05-Jun-2026 07:46:41 UTC] GST Type: outer, Buyer GST Type: unregister
+[05-Jun-2026 07:46:41 UTC] Creating new invoice header: 8879153879CMPDST05062611619
+[05-Jun-2026 07:46:41 UTC] Invoice header created successfully
+[05-Jun-2026 07:46:41 UTC] === STOCK CHECK START ===
+[05-Jun-2026 07:46:41 UTC] Product ID: 9
+[05-Jun-2026 07:46:41 UTC] Requested Qty: 182
+[05-Jun-2026 07:46:41 UTC] Query params - user_type: 'company', user_id: '1'
+[05-Jun-2026 07:46:41 UTC] Stock found: closing_qty = 5582
+[05-Jun-2026 07:46:41 UTC] Comparison: 5582 < 182 = FALSE (OK)
+[05-Jun-2026 07:46:41 UTC] === STOCK CHECK PASSED ===
+[05-Jun-2026 07:46:41 UTC] Invoice item added successfully
+[05-Jun-2026 07:46:41 UTC] === INVOICE ACTION SUCCESS ===
+[06-Jun-2026 04:40:50 UTC] === INVOICE ACTION START ===
+[06-Jun-2026 04:40:50 UTC] Invoice ID: 6855282663CMPDST060626101033
+[06-Jun-2026 04:40:50 UTC] Invoice User Type: distributor
+[06-Jun-2026 04:40:50 UTC] NEW MODE: Using session - user_type: company, user_id: 1
+[06-Jun-2026 04:40:50 UTC] Adding product 9 (Qty: 1000) to invoice 6855282663CMPDST060626101033
+[06-Jun-2026 04:40:50 UTC] Item totals - Subtotal: Rs.186000.00, GST: Rs.0, Total: Rs.186000
+[06-Jun-2026 04:40:50 UTC] GST Type: outer, Buyer GST Type: unregister
+[06-Jun-2026 04:40:50 UTC] Creating new invoice header: 6855282663CMPDST060626101033
+[06-Jun-2026 04:40:50 UTC] Invoice header created successfully
+[06-Jun-2026 04:40:50 UTC] === STOCK CHECK START ===
+[06-Jun-2026 04:40:50 UTC] Product ID: 9
+[06-Jun-2026 04:40:50 UTC] Requested Qty: 1000
+[06-Jun-2026 04:40:50 UTC] Query params - user_type: 'company', user_id: '1'
+[06-Jun-2026 04:40:50 UTC] Stock found: closing_qty = 5582
+[06-Jun-2026 04:40:50 UTC] Comparison: 5582 < 1000 = FALSE (OK)
+[06-Jun-2026 04:40:50 UTC] === STOCK CHECK PASSED ===
+[06-Jun-2026 04:40:50 UTC] Invoice item added successfully
+[06-Jun-2026 04:40:50 UTC] === INVOICE ACTION SUCCESS ===
+[10-Jun-2026 12:36:59 UTC] === INVOICE ACTION START ===
+[10-Jun-2026 12:36:59 UTC] Invoice ID: 6986422266CMPST10062660645
+[10-Jun-2026 12:36:59 UTC] Invoice User Type: stockiest
+[10-Jun-2026 12:36:59 UTC] NEW MODE: Using session - user_type: company, user_id: 1
+[10-Jun-2026 12:36:59 UTC] Adding product 1 (Qty: 10) to invoice 6986422266CMPST10062660645
+[10-Jun-2026 12:36:59 UTC] Item totals - Subtotal: Rs.1600.00, GST: Rs.0, Total: Rs.1600
+[10-Jun-2026 12:36:59 UTC] GST Type: outer, Buyer GST Type: register
+[10-Jun-2026 12:36:59 UTC] Creating new invoice header: 6986422266CMPST10062660645
+[10-Jun-2026 12:36:59 UTC] Invoice header created successfully
+[10-Jun-2026 12:36:59 UTC] === STOCK CHECK START ===
+[10-Jun-2026 12:36:59 UTC] Product ID: 1
+[10-Jun-2026 12:36:59 UTC] Requested Qty: 10
+[10-Jun-2026 12:36:59 UTC] Query params - user_type: 'company', user_id: '1'
+[10-Jun-2026 12:36:59 UTC] Stock found: closing_qty = 0
+[10-Jun-2026 12:36:59 UTC] Comparison: 0 < 10 = TRUE (INSUFFICIENT)
+[10-Jun-2026 12:36:59 UTC] ERROR: Insufficient stock for product 1
+[10-Jun-2026 12:36:59 UTC] === STOCK CHECK FAILED ===
+[10-Jun-2026 12:36:59 UTC] === INVOICE ACTION FAILED ===
+[10-Jun-2026 12:36:59 UTC] ERROR: INSUFFICIENT_STOCK

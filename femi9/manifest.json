@@ -1,0 +1,17 @@
+{
+  "background_color": "#feb916",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Femi9 Billing",
+  "orientation": "portrait",
+  "scope": "https://mybusinesskit.in/femi9",
+  "short_name": "Femi9 Billing",
+  "start_url": "https://mybusinesskit.in/femi9",
+  "theme_color": "#ffffff",
+  "id": "com.femi9billing.com",
+  "description": "Designed by Women, for Women. To provide women with sustainable, comfortable, and reliable menstrual hygiene solutions. We are driven to promote empowerment, eco-consciousness to make women feel comfortable and confident each day.",
+  "lang": "en",
+  "categories": [
+    "business"
+  ]
+}

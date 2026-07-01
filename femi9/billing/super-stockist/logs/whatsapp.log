@@ -1,0 +1,8 @@
+[2025-10-11 05:17:36] FAILED | Phone: 919952428768 | Template: password_reset_billing | Message ID: N/A
+[2025-10-11 05:19:35] FAILED | Phone: 919952428768 | Template: password_reset_billing | Message ID: N/A
+[2025-10-11 05:24:14] FAILED | Phone: 919952428768 | Template: password_reset_billing | Message ID: N/A
+[2025-10-11 05:40:17] FAILED | Phone: 919952428768 | Template: password_reset_billing | Message ID: N/A
+[2025-10-11 05:45:27] SUCCESS | Phone: 919952428768 | Template: password_reset_billing | Message ID: wamid.HBgMOTE5OTUyNDI4NzY4FQIAERgSNzE4QjExRTI3QTlBRkE4RjhGAA==
+[2025-10-11 05:48:11] SUCCESS | Phone: 919952428768 | Template: password_reset_billing | Message ID: wamid.HBgMOTE5OTUyNDI4NzY4FQIAERgSMzY4RDg2NDZFQkQxNDhBQjc5AA==
+[2025-10-11 06:11:24] SUCCESS | Phone: 919952428768 | Template: password_reset_billing | Message ID: wamid.HBgMOTE5OTUyNDI4NzY4FQIAERgSMDk5QzREN0Q2RjY3NDUwQzJDAA==
+[2025-10-11 06:26:53] SUCCESS | Phone: 919952428768 | Template: password_reset_billing | Message ID: wamid.HBgMOTE5OTUyNDI4NzY4FQIAERgSMjQ3M0VDQkUyRjZCMkUzNjk0AA==

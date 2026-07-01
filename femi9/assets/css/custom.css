@@ -1,0 +1,26 @@
+/* Your Custom CSS Goes here */
+#linkbackvl{text-decoration:none;}
+.margintop10{margin-top:10px;}
+
+#receipttble{width:100%;border-collapse:collapse;margin-bottom:20px;}
+#receipttble tr th{border:1px solid #888 !important;padding:4px;background:#EEE;}
+#receipttble tr td{border:1px solid #888 !important;padding:4px;}
+
+.numberinput{width:80px !important;}
+.prinput{width:300px !important;}
+
+.overviewcontainar{width:100%;height:auto;}
+#searchleftcont{width:auto;height:auto;float:left;margin-right:10px;}
+#searchbuttoncont{width:auto;height:auto;float:left;padding-top:35px;}
+#searchcheckbox{width:auto;height:auto;float:left;margin-right:10px;padding-top:43px;}
+
+@media (max-width:468px)
+{
+.numberinput{width:100% !important;}
+.prinput{width:100% !important;}
+.form-group .country-code {
+            flex: 0 0 35% !important;
+        }
+}
+.form-control{font-weight:bold !important;letter-spacing:1px !important;}
+.form-control:focus{background:#f7f39f !important;}

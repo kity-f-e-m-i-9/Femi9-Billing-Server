@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Femi9</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+  <link rel="manifest" href="/manifest.json">
+
+  <style>
+    body {
+      background-color: #ffff;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 80vh;
+    }
+
+    .heading {
+      text-align: center;
+      color: #ffcc00;
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    .btn-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .btn-group {
+      margin-bottom: 15px;width:280px;
+    }
+
+    .custom-btn {
+      width: 100%;
+      padding: 15px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+
+    .btn-company {
+      background-color: #28a745;
+      color: #ffffff;
+    }
+
+    .btn-ss {
+      background-color: #17a2b8;
+      color: #ffffff;
+    }
+    .btn-sd {
+      background-color: green;
+      color: #ffffff;
+    }
+
+    .btn-stockist {
+      background-color: #ffc107;
+      color: #000000;
+    }
+
+    .btn-distributor {
+      background-color: #007bff;
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+<img src="logo.png" height="150px" alt="Logo"><br>
+    <div class="heading">FEMI 9 BILLING</div>
+
+    <div class="btn-container">
+      <div class="btn-group">
+        <a href="https://femi9billing.com/femi9/billing/super-stockist/" class="btn btn-lg btn-ss custom-btn">
+          <i class="fas fa-store-alt mr-2"></i> SUPER STOCKIST LOGIN
+        </a>
+      </div>
+
+      <div class="btn-group">
+        <a href="https://femi9billing.com/femi9/billing/stockist/" class="btn btn-lg btn-stockist custom-btn">
+          <i class="fas fa-cubes mr-2"></i> STOCKIST LOGIN
+        </a>
+      </div>
+      
+      <div class="btn-group">
+        <a href="https://femi9billing.com/femi9/billing/distributor" class="btn btn-lg btn-distributor custom-btn">
+          <i class="fas fa-truck mr-2"></i> DISTRIBUTOR LOGIN
+        </a>
+      </div>
+      
+       <div class="btn-group">
+        <a href="https://femi9billing.com/femi9/billing/super_distributor/" class="btn btn-lg btn-sd custom-btn">
+          <i class="fas fa-truck mr-2"></i> SUPER DISTRIBUTOR LOGIN
+        </a>
+      </div>
+      
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js')
+    .then(function(registration) {
+      console.log('Service Worker registered with scope:', registration.scope);
+    }).catch(function(error) {
+      console.log('Service Worker registration failed:', error);
+    });
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,219 @@
+[11-Jun-2025 11:02:06 UTC] PHP Warning:  Undefined global variable $_SESSION in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:02:06 UTC] PHP Warning:  Trying to access array offset on value of type null in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:02:06 UTC] PHP Warning:  Undefined variable $db_conn in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:02:06 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_query(): Argument #1 ($mysql) must be of type mysqli, null given in /home/femi9software/public_html/femi9/billing/company/config.php:29
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config.php(29): mysqli_query(NULL, 'select * from a...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:02:13 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:02:13 UTC] PHP Warning:  Undefined global variable $_SESSION in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:02:13 UTC] PHP Warning:  Trying to access array offset on value of type null in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:02:13 UTC] PHP Warning:  Undefined variable $db_conn in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:02:13 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_query(): Argument #1 ($mysql) must be of type mysqli, null given in /home/femi9software/public_html/femi9/billing/company/config.php:29
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config.php(29): mysqli_query(NULL, 'select * from a...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:02:42 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:02:42 UTC] PHP Warning:  Undefined global variable $_SESSION in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:02:42 UTC] PHP Warning:  Trying to access array offset on value of type null in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:02:42 UTC] PHP Warning:  Undefined variable $db_conn in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:02:42 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_query(): Argument #1 ($mysql) must be of type mysqli, null given in /home/femi9software/public_html/femi9/billing/company/config.php:29
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config.php(29): mysqli_query(NULL, 'select * from a...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:03:45 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:03:45 UTC] PHP Warning:  Undefined global variable $_SESSION in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:03:45 UTC] PHP Warning:  Trying to access array offset on value of type null in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:03:45 UTC] PHP Warning:  Undefined variable $db_conn in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:03:45 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_query(): Argument #1 ($mysql) must be of type mysqli, null given in /home/femi9software/public_html/femi9/billing/company/config.php:29
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config.php(29): mysqli_query(NULL, 'select * from a...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:03:53 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:04:57 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:04:57 UTC] PHP Warning:  Undefined global variable $_SESSION in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:04:57 UTC] PHP Warning:  Trying to access array offset on value of type null in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:04:57 UTC] PHP Warning:  Undefined variable $db_conn in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:04:57 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_query(): Argument #1 ($mysql) must be of type mysqli, null given in /home/femi9software/public_html/femi9/billing/company/config.php:29
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config.php(29): mysqli_query(NULL, 'select * from a...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:05:02 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:05:02 UTC] PHP Warning:  Undefined global variable $_SESSION in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:05:02 UTC] PHP Warning:  Trying to access array offset on value of type null in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:05:02 UTC] PHP Warning:  Undefined variable $db_conn in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:05:02 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_query(): Argument #1 ($mysql) must be of type mysqli, null given in /home/femi9software/public_html/femi9/billing/company/config.php:29
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config.php(29): mysqli_query(NULL, 'select * from a...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:08:47 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:08:47 UTC] PHP Warning:  Undefined global variable $_SESSION in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:08:47 UTC] PHP Warning:  Trying to access array offset on value of type null in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:08:47 UTC] PHP Warning:  Undefined variable $db_conn in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:08:47 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_query(): Argument #1 ($mysql) must be of type mysqli, null given in /home/femi9software/public_html/femi9/billing/company/config.php:29
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config.php(29): mysqli_query(NULL, 'select * from a...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:09:36 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:09:55 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:09:56 UTC] PHP Warning:  Undefined global variable $_SESSION in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:09:56 UTC] PHP Warning:  Trying to access array offset on value of type null in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:09:56 UTC] PHP Warning:  Undefined variable $db_conn in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:09:56 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_query(): Argument #1 ($mysql) must be of type mysqli, null given in /home/femi9software/public_html/femi9/billing/company/config.php:29
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config.php(29): mysqli_query(NULL, 'select * from a...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:15:01 UTC] PHP Warning:  Undefined global variable $_SESSION in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:15:01 UTC] PHP Warning:  Trying to access array offset on value of type null in /home/femi9software/public_html/femi9/billing/company/config.php on line 28
+[11-Jun-2025 11:15:01 UTC] PHP Warning:  Undefined variable $db_conn in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:15:01 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_query(): Argument #1 ($mysql) must be of type mysqli, null given in /home/femi9software/public_html/femi9/billing/company/config.php:29
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config.php(29): mysqli_query(NULL, 'select * from a...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config.php on line 29
+[11-Jun-2025 11:27:28 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[11-Jun-2025 11:28:57 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[08-Oct-2025 05:45:01 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Access denied for user 'femi9software_crm24vl'@'localhost' (using password: YES) in /home/femi9software/public_html/femi9/billing/company/config-fixed.php:10
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config-fixed.php(10): mysqli_connect('localhost', 'femi9software_c...', Object(SensitiveParameterValue), 'femi9software_c...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config-fixed.php on line 10
+[08-Oct-2025 06:00:01 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Access denied for user 'femi9software_crm24vl'@'localhost' (using password: YES) in /home/femi9software/public_html/femi9/billing/company/config-fixed.php:10
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config-fixed.php(10): mysqli_connect('localhost', 'femi9software_c...', Object(SensitiveParameterValue), 'femi9software_c...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config-fixed.php on line 10
+[08-Oct-2025 06:15:01 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Access denied for user 'femi9software_crm24vl'@'localhost' (using password: YES) in /home/femi9software/public_html/femi9/billing/company/config-fixed.php:10
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config-fixed.php(10): mysqli_connect('localhost', 'femi9software_c...', Object(SensitiveParameterValue), 'femi9software_c...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config-fixed.php on line 10
+[08-Oct-2025 06:30:01 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Access denied for user 'femi9software_crm24vl'@'localhost' (using password: YES) in /home/femi9software/public_html/femi9/billing/company/config-fixed.php:10
+Stack trace:
+#0 /home/femi9software/public_html/femi9/billing/company/config-fixed.php(10): mysqli_connect('localhost', 'femi9software_c...', Object(SensitiveParameterValue), 'femi9software_c...')
+#1 /home/femi9software/public_html/femi9/billing/company/cron-auto-update.php(22): require_once('/home/femi9soft...')
+#2 {main}
+  thrown in /home/femi9software/public_html/femi9/billing/company/config-fixed.php on line 10
+[09-Oct-2025 13:19:51 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:49:30 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:49:30 UTC] PHP Warning:  require_once(/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php): Failed to open stream: No such file or directory in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_rewards_backfill.php on line 71
+[29-Nov-2025 09:49:30 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php' (include_path='.:/opt/cpanel/ea-php82/root/usr/share/pear') in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_rewards_backfill.php:71
+Stack trace:
+#0 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_rewards_backfill.php on line 71
+[29-Nov-2025 09:49:54 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:50:06 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:50:06 UTC] PHP Warning:  require_once(/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php): Failed to open stream: No such file or directory in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_rewards_backfill.php on line 71
+[29-Nov-2025 09:50:06 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php' (include_path='.:/opt/cpanel/ea-php82/root/usr/share/pear') in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_rewards_backfill.php:71
+Stack trace:
+#0 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_rewards_backfill.php on line 71
+[29-Nov-2025 09:51:53 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:51:53 UTC] PHP Warning:  require_once(/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php): Failed to open stream: No such file or directory in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_rewards_backfill.php on line 71
+[29-Nov-2025 09:51:53 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php' (include_path='.:/opt/cpanel/ea-php82/root/usr/share/pear') in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_rewards_backfill.php:71
+Stack trace:
+#0 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_rewards_backfill.php on line 71
+[29-Nov-2025 09:52:56 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:52:56 UTC] PHP Warning:  require_once(/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php): Failed to open stream: No such file or directory in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 71
+[29-Nov-2025 09:52:56 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php' (include_path='.:/opt/cpanel/ea-php82/root/usr/share/pear') in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php:71
+Stack trace:
+#0 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 71
+[29-Nov-2025 09:54:03 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:54:03 UTC] PHP Warning:  require_once(/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php): Failed to open stream: No such file or directory in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 71
+[29-Nov-2025 09:54:03 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/billing0femi9/public_html/femi9/billing/company/includes/connection.php' (include_path='.:/opt/cpanel/ea-php82/root/usr/share/pear') in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php:71
+Stack trace:
+#0 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 71
+[29-Nov-2025 09:54:53 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:54:53 UTC] PHP Warning:  require_once(/home/billing0femi9/public_html/femi9/billing/company/includes/dbconn.php): Failed to open stream: No such file or directory in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 71
+[29-Nov-2025 09:54:53 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/billing0femi9/public_html/femi9/billing/company/includes/dbconn.php' (include_path='.:/opt/cpanel/ea-php82/root/usr/share/pear') in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php:71
+Stack trace:
+#0 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 71
+[29-Nov-2025 09:55:20 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:55:20 UTC] PHP Warning:  Undefined variable $conn in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 97
+[29-Nov-2025 09:55:20 UTC] PHP Fatal error:  Uncaught TypeError: MonthlyTargetCalculator::__construct(): Argument #1 ($connection) must be of type mysqli, null given, called in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 97 and defined in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php:27
+Stack trace:
+#0 /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php(97): MonthlyTargetCalculator->__construct(NULL)
+#1 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php on line 27
+[29-Nov-2025 09:56:56 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 09:56:56 UTC] PHP Warning:  Undefined variable $conn in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 97
+[29-Nov-2025 09:56:56 UTC] PHP Fatal error:  Uncaught TypeError: MonthlyTargetCalculator::__construct(): Argument #1 ($connection) must be of type mysqli, null given, called in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 97 and defined in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php:27
+Stack trace:
+#0 /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php(97): MonthlyTargetCalculator->__construct(NULL)
+#1 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php on line 27
+[29-Nov-2025 09:59:31 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 10:24:32 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:02:53 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:08:03 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:12:51 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:13:13 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:13:22 UTC] PHP Fatal error:  Uncaught Error: mysqli_stmt::bind_param(): Argument #3 cannot be passed by reference in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php:518
+Stack trace:
+#0 /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php(167): MonthlyTargetCalculator->logAudit('backfill_cli_co...', Array)
+#1 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php on line 518
+[29-Nov-2025 11:16:47 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:17:07 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:18:55 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:18:55 UTC] PHP Warning:  require_once(/home/billing0femi9/public_html/femi9/billing/company/include/db-connect-2.php): Failed to open stream: No such file or directory in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 57
+[29-Nov-2025 11:18:55 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/billing0femi9/public_html/femi9/billing/company/include/db-connect-2.php' (include_path='.:/opt/cpanel/ea-php82/root/usr/share/pear') in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php:57
+Stack trace:
+#0 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php on line 57
+[29-Nov-2025 11:19:12 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:21:14 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:21:14 UTC] PHP Warning:  require_once(include/db-connect-2.php): Failed to open stream: No such file or directory in /home/billing0femi9/public_html/femi9/billing/company/check_audit_table.php on line 4
+[29-Nov-2025 11:21:14 UTC] PHP Fatal error:  Uncaught Error: Failed opening required 'include/db-connect-2.php' (include_path='.:/opt/cpanel/ea-php82/root/usr/share/pear') in /home/billing0femi9/public_html/femi9/billing/company/check_audit_table.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/check_audit_table.php on line 4
+[29-Nov-2025 11:23:46 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:24:45 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:25:33 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:27:10 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:27:19 UTC] PHP Fatal error:  Uncaught ArgumentCountError: The number of elements in the type definition string must match the number of bind variables in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php:529
+Stack trace:
+#0 /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php(529): mysqli_stmt->bind_param('ssssiiisissss', 'backfill_cli_co...', 'CLI backfill ex...', NULL, NULL, NULL, NULL, NULL, 'execute', 28, 'cli_script', NULL, '28 rewards gran...')
+#1 /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php(143): MonthlyTargetCalculator->logAudit('backfill_cli_co...', Array)
+#2 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php on line 529
+[29-Nov-2025 11:28:05 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[29-Nov-2025 11:28:06 UTC] PHP Fatal error:  Uncaught ArgumentCountError: The number of elements in the type definition string must match the number of bind variables in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php:529
+Stack trace:
+#0 /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php(529): mysqli_stmt->bind_param('ssssiiisissss', 'rollback_cli_co...', 'CLI rollback ex...', NULL, NULL, NULL, NULL, NULL, 'rollback', 4941, 'cli_script', NULL, 'Deleted 28 rewa...')
+#1 /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php(303): MonthlyTargetCalculator->logAudit('rollback_cli_co...', Array)
+#2 /home/billing0femi9/public_html/femi9/billing/company/monthly_target_backfill_cli.php(86): performRollback(Object(mysqli), Object(MonthlyTargetCalculator), 7, 11, '')
+#3 {main}
+  thrown in /home/billing0femi9/public_html/femi9/billing/company/include/MonthlyTargetCalculator.class.php on line 529
+[29-Nov-2025 11:28:29 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[01-Dec-2025 04:41:47 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[01-Dec-2025 04:42:03 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[01-Dec-2025 04:42:08 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[01-Dec-2025 04:42:32 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[02-Dec-2025 12:38:36 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+[02-Dec-2025 12:38:44 UTC] PHP Warning:  PHP Startup: Unable to load dynamic library 'grpc.so' (tried: /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so: cannot open shared object file: No such file or directory), /opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so (/opt/cpanel/ea-php82/root/usr/lib64/php/modules/grpc.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0

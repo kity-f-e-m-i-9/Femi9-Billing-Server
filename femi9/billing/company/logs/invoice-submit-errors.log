@@ -1,0 +1,406 @@
+[02-Jun-2026 06:43:59 UTC] ================================================================================
+[02-Jun-2026 06:43:59 UTC] === INVOICE SUBMISSION STARTED ===
+[02-Jun-2026 06:43:59 UTC] Invoice ID: 6456133248CMPSS020626121315
+[02-Jun-2026 06:43:59 UTC] Timestamp: 2026-06-02 06:43:59
+[02-Jun-2026 06:43:59 UTC] ================================================================================
+[02-Jun-2026 06:43:59 UTC] Customer: 31894FSPST19022643115 (super_stockiest)
+[02-Jun-2026 06:43:59 UTC] Company: 1 (company)
+[02-Jun-2026 06:43:59 UTC] Invoice Number: kkk
+[02-Jun-2026 06:43:59 UTC] Requires Advance Payment: YES
+[02-Jun-2026 06:43:59 UTC] Invoice Totals:
+[02-Jun-2026 06:43:59 UTC]   - Subtotal: Rs.1,350.00
+[02-Jun-2026 06:43:59 UTC]   - Discount: Rs.0.00
+[02-Jun-2026 06:43:59 UTC]   - Credit:   Rs.0.00
+[02-Jun-2026 06:43:59 UTC]   - Courier:  Rs.0.00
+[02-Jun-2026 06:43:59 UTC]   - TOTAL:    Rs.1,350.00
+[02-Jun-2026 06:43:59 UTC] Creating receipt(s)...
+[02-Jun-2026 06:43:59 UTC] Receipt Type: AUTO (Advance Payment)
+[02-Jun-2026 06:43:59 UTC]   - Product (advance): Rs.1,350.00
+[02-Jun-2026 06:43:59 UTC]   - Courier (pending): Rs.0.00
+[02-Jun-2026 06:43:59 UTC] Receipt inserted: advance_product Rs.1,350.00
+[02-Jun-2026 06:43:59 UTC] Updating invoice totals...
+[02-Jun-2026 06:43:59 UTC] Invoice totals updated successfully
+[02-Jun-2026 06:43:59 UTC] --------------------------------------------------------------------------------
+[02-Jun-2026 06:43:59 UTC] === ADVANCE PAYMENT ADJUSTMENT START ===
+[02-Jun-2026 06:43:59 UTC] Validating advance balance...
+[02-Jun-2026 06:43:59 UTC] Total invoice:               Rs.1350
+[02-Jun-2026 06:43:59 UTC] Courier charges (separate):  Rs.0
+[02-Jun-2026 06:43:59 UTC] Amount requiring advance:     Rs.1350
+[02-Jun-2026 06:43:59 UTC] Validation Result: PASS
+[02-Jun-2026 06:43:59 UTC]   - Available: Rs.91,950.00
+[02-Jun-2026 06:43:59 UTC]   - Required:  Rs.1,350.00
+[02-Jun-2026 06:43:59 UTC] Processing advance payment deduction (FIFO)...
+[02-Jun-2026 06:43:59 UTC] Total invoice amount:          Rs.1350
+[02-Jun-2026 06:43:59 UTC] Courier charges:               Rs.0
+[02-Jun-2026 06:43:59 UTC] Amount to deduct from advance: Rs.1350
+[02-Jun-2026 06:43:59 UTC] ================================================================================
+[02-Jun-2026 06:43:59 UTC] SUCCESS: ADJUSTMENT COMPLETED
+[02-Jun-2026 06:43:59 UTC]   - Adjusted: Rs.1,350.00
+[02-Jun-2026 06:43:59 UTC]   - Message: Adjusted Rs.1,350.00
+[02-Jun-2026 06:43:59 UTC] ================================================================================
+[02-Jun-2026 06:43:59 UTC] === ADVANCE PAYMENT ADJUSTMENT END ===
+[02-Jun-2026 06:43:59 UTC] --------------------------------------------------------------------------------
+[02-Jun-2026 06:43:59 UTC] ================================================================================
+[02-Jun-2026 06:43:59 UTC] === PROCESSING STOCK UPDATES ===
+[02-Jun-2026 06:43:59 UTC] Submission type: NEW
+[02-Jun-2026 06:43:59 UTC] === STOCK UPDATE (StockService) START === Invoice: 6456133248CMPSS020626121315
+[02-Jun-2026 06:43:59 UTC] PHP Warning:  Undefined variable $is_customer_invoice in /Applications/MAMP/htdocs/channel/femi9/billing/company/invoice-stock-update.php on line 24
+[02-Jun-2026 06:43:59 UTC] PHP Warning:  Undefined variable $is_customer_invoice in /Applications/MAMP/htdocs/channel/femi9/billing/company/invoice-stock-update.php on line 75
+[02-Jun-2026 06:43:59 UTC] Processing product=9 qty=10 seller=company/1 buyer=super_stockiest/31894FSPST19022643115
+[02-Jun-2026 06:43:59 UTC] CRITICAL: Stock update FAILED for 6456133248CMPSS020626121315 — The number of elements in the type definition string must match the number of bind variables
+[02-Jun-2026 06:43:59 UTC] !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+[02-Jun-2026 06:43:59 UTC] CRITICAL: Stock update failed but invoice was created
+[02-Jun-2026 06:43:59 UTC] ERROR: Stock update failed: The number of elements in the type definition string must match the number of bind variables
+[02-Jun-2026 06:43:59 UTC] Action Required: Manual stock adjustment needed for invoice: 6456133248CMPSS020626121315
+[02-Jun-2026 06:43:59 UTC] !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+[02-Jun-2026 06:43:59 UTC] === STOCK UPDATES COMPLETED ===
+[02-Jun-2026 06:43:59 UTC] ================================================================================
+[02-Jun-2026 06:43:59 UTC] ================================================================================
+[02-Jun-2026 06:43:59 UTC] === INVOICE SUBMISSION COMPLETED SUCCESSFULLY ===
+[02-Jun-2026 06:43:59 UTC] Redirecting to invoice print: 6456133248CMPSS020626121315
+[02-Jun-2026 06:43:59 UTC] ================================================================================
+[05-Jun-2026 05:32:53 UTC] ================================================================================
+[05-Jun-2026 05:32:53 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 05:32:53 UTC] Invoice ID: 3859879199CMPST050626105900 | Time: 2026-06-05 05:32:53
+[05-Jun-2026 05:32:53 UTC] ================================================================================
+[05-Jun-2026 05:32:53 UTC] Company: 1 (company)
+[05-Jun-2026 05:32:53 UTC] Customer: 53231FST22082473724 (stockiest)
+[05-Jun-2026 05:32:53 UTC] Requires advance: YES
+[05-Jun-2026 05:32:53 UTC] Mode: NEW
+[05-Jun-2026 05:32:53 UTC] Totals — Sub: 1800  Disc: 0  Credit: 0  Courier: 0  Total: 1800
+[05-Jun-2026 05:32:53 UTC] === ADVANCE PAYMENT START ===
+[05-Jun-2026 05:32:53 UTC] Advance deducted: Rs.1,800.00
+[05-Jun-2026 05:32:53 UTC] === ADVANCE PAYMENT END ===
+[05-Jun-2026 05:32:53 UTC] Outer transaction started
+[05-Jun-2026 05:32:53 UTC] Receipt created: advance_product Rs.1800
+[05-Jun-2026 05:32:53 UTC] Invoice totals updated
+[05-Jun-2026 05:32:53 UTC] === STOCK UPDATE (StockService) START === Invoice: 3859879199CMPST050626105900
+[05-Jun-2026 05:32:53 UTC] Processing product=9 qty=12 seller=company/1 buyer=stockiest/53231FST22082473724
+[05-Jun-2026 05:32:53 UTC] CRITICAL: Stock update FAILED for 3859879199CMPST050626105900 — The number of elements in the type definition string must match the number of bind variables
+[05-Jun-2026 05:32:53 UTC] Outer transaction ROLLED BACK — Stock update failed: The number of elements in the type definition string must match the number of bind variables
+[05-Jun-2026 05:32:53 UTC] Stack: #0 /Applications/MAMP/htdocs/channel/femi9/billing/company/user-invoice-submit.php(328): include()
+#1 {main}
+[05-Jun-2026 05:33:24 UTC] ================================================================================
+[05-Jun-2026 05:33:24 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 05:33:24 UTC] Invoice ID: 3859879199CMPST050626105900 | Time: 2026-06-05 05:33:24
+[05-Jun-2026 05:33:24 UTC] ================================================================================
+[05-Jun-2026 05:33:24 UTC] Company: 1 (company)
+[05-Jun-2026 05:33:24 UTC] Customer: 53231FST22082473724 (stockiest)
+[05-Jun-2026 05:33:24 UTC] Requires advance: YES
+[05-Jun-2026 05:33:24 UTC] Mode: NEW
+[05-Jun-2026 05:33:24 UTC] Totals — Sub: 1800  Disc: 0  Credit: 0  Courier: 0  Total: 1800
+[05-Jun-2026 05:33:24 UTC] === ADVANCE PAYMENT START ===
+[05-Jun-2026 05:33:24 UTC] Advance deducted: Rs.1,800.00
+[05-Jun-2026 05:33:24 UTC] === ADVANCE PAYMENT END ===
+[05-Jun-2026 05:33:24 UTC] Outer transaction started
+[05-Jun-2026 05:33:24 UTC] Receipt created: advance_product Rs.1800
+[05-Jun-2026 05:33:24 UTC] Invoice totals updated
+[05-Jun-2026 05:33:24 UTC] === STOCK UPDATE (StockService) START === Invoice: 3859879199CMPST050626105900
+[05-Jun-2026 05:33:24 UTC] Processing product=9 qty=12 seller=company/1 buyer=stockiest/53231FST22082473724
+[05-Jun-2026 05:33:24 UTC] CRITICAL: Stock update FAILED for 3859879199CMPST050626105900 — The number of elements in the type definition string must match the number of bind variables
+[05-Jun-2026 05:33:24 UTC] Outer transaction ROLLED BACK — Stock update failed: The number of elements in the type definition string must match the number of bind variables
+[05-Jun-2026 05:33:24 UTC] Stack: #0 /Applications/MAMP/htdocs/channel/femi9/billing/company/user-invoice-submit.php(328): include()
+#1 {main}
+[05-Jun-2026 05:36:55 UTC] ================================================================================
+[05-Jun-2026 05:36:55 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 05:36:55 UTC] Invoice ID: 3859879199CMPST050626105900 | Time: 2026-06-05 05:36:55
+[05-Jun-2026 05:36:55 UTC] ================================================================================
+[05-Jun-2026 05:36:55 UTC] Company: 1 (company)
+[05-Jun-2026 05:36:55 UTC] Customer: 53231FST22082473724 (stockiest)
+[05-Jun-2026 05:36:55 UTC] Requires advance: YES
+[05-Jun-2026 05:36:55 UTC] Mode: NEW
+[05-Jun-2026 05:36:55 UTC] Totals — Sub: 1800  Disc: 0  Credit: 0  Courier: 0  Total: 1800
+[05-Jun-2026 05:36:55 UTC] === ADVANCE PAYMENT START ===
+[05-Jun-2026 05:36:55 UTC] Advance deducted: Rs.1,800.00
+[05-Jun-2026 05:36:55 UTC] === ADVANCE PAYMENT END ===
+[05-Jun-2026 05:36:55 UTC] Outer transaction started
+[05-Jun-2026 05:36:55 UTC] Receipt created: advance_product Rs.1800
+[05-Jun-2026 05:36:55 UTC] Invoice totals updated
+[05-Jun-2026 05:36:55 UTC] === STOCK UPDATE (StockService) START === Invoice: 3859879199CMPST050626105900
+[05-Jun-2026 05:36:55 UTC] Processing product=9 qty=12 seller=company/1 buyer=stockiest/53231FST22082473724
+[05-Jun-2026 05:36:55 UTC] === STOCK UPDATE COMPLETED === 1 items processed
+[05-Jun-2026 05:36:55 UTC] Stock update completed
+[05-Jun-2026 05:36:55 UTC] Invoice status set to 'submitted' (1 row)
+[05-Jun-2026 05:36:55 UTC] Outer transaction COMMITTED
+[05-Jun-2026 05:36:55 UTC] === INVOICE SUBMISSION COMPLETED: 3859879199CMPST050626105900 ===
+[05-Jun-2026 05:36:55 UTC] ================================================================================
+[05-Jun-2026 06:43:41 UTC] ================================================================================
+[05-Jun-2026 06:43:41 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 06:43:41 UTC] Invoice ID: 9764668555CMPDST050626115533 | Time: 2026-06-05 06:43:41
+[05-Jun-2026 06:43:41 UTC] ================================================================================
+[05-Jun-2026 06:43:41 UTC] Company: 1 (company)
+[05-Jun-2026 06:43:41 UTC] Customer: 15454FDST030925102054 (distributor)
+[05-Jun-2026 06:43:41 UTC] Requires advance: NO
+[05-Jun-2026 06:43:41 UTC] Mode: NEW
+[05-Jun-2026 06:43:41 UTC] Totals — Sub: 18600  Disc: 0  Credit: 0  Courier: 0  Total: 18600
+[05-Jun-2026 06:43:41 UTC] Outer transaction started
+[05-Jun-2026 06:43:41 UTC] Receipt created: regular Rs.0
+[05-Jun-2026 06:43:41 UTC] Invoice totals updated
+[05-Jun-2026 06:43:41 UTC] === STOCK UPDATE (StockService) START === Invoice: 9764668555CMPDST050626115533
+[05-Jun-2026 06:43:41 UTC] Processing product=9 qty=100 seller=company/1 buyer=distributor/15454FDST030925102054
+[05-Jun-2026 06:43:41 UTC] === STOCK UPDATE COMPLETED === 1 items processed
+[05-Jun-2026 06:43:41 UTC] Stock update completed
+[05-Jun-2026 06:43:41 UTC] Invoice status set to 'submitted' (1 row)
+[05-Jun-2026 06:43:41 UTC] Outer transaction COMMITTED
+[05-Jun-2026 06:43:41 UTC] === INVOICE SUBMISSION COMPLETED: 9764668555CMPDST050626115533 ===
+[05-Jun-2026 06:43:41 UTC] ================================================================================
+[05-Jun-2026 06:45:03 UTC] ================================================================================
+[05-Jun-2026 06:45:03 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 06:45:03 UTC] Invoice ID: 9764668555CMPDST050626115533 | Time: 2026-06-05 06:45:03
+[05-Jun-2026 06:45:03 UTC] ================================================================================
+[05-Jun-2026 06:45:03 UTC] Company: 1 (company)
+[05-Jun-2026 06:45:03 UTC] Customer: 15454FDST030925102054 (distributor)
+[05-Jun-2026 06:45:03 UTC] Requires advance: NO
+[05-Jun-2026 06:45:03 UTC] Mode: EDIT
+[05-Jun-2026 06:45:03 UTC] Totals — Sub: 18600  Disc: 0  Credit: 0  Courier: 0  Total: 18600
+[05-Jun-2026 06:45:03 UTC] Invoice date updated to 2026-06-05
+[05-Jun-2026 06:45:03 UTC] Outer transaction started
+[05-Jun-2026 06:45:03 UTC] Old receipts deleted
+[05-Jun-2026 06:45:03 UTC] Receipt created: regular Rs.18000
+[05-Jun-2026 06:45:03 UTC] Invoice totals updated
+[05-Jun-2026 06:45:03 UTC] Edit mode: reversed 2 ledger entries
+[05-Jun-2026 06:45:03 UTC] === STOCK UPDATE (StockService) START === Invoice: 9764668555CMPDST050626115533
+[05-Jun-2026 06:45:03 UTC] Processing product=9 qty=100 seller=company/1 buyer=distributor/15454FDST030925102054
+[05-Jun-2026 06:45:03 UTC] === STOCK UPDATE COMPLETED === 1 items processed
+[05-Jun-2026 06:45:03 UTC] Stock update completed
+[05-Jun-2026 06:45:03 UTC] Outer transaction ROLLED BACK — Status update matched 0 rows for inv_id=9764668555CMPDST050626115533 from_user_type=company from_user_id=1
+[05-Jun-2026 06:45:03 UTC] Stack: #0 {main}
+[05-Jun-2026 06:46:02 UTC] ================================================================================
+[05-Jun-2026 06:46:02 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 06:46:02 UTC] Invoice ID: 9764668555CMPDST050626115533 | Time: 2026-06-05 06:46:02
+[05-Jun-2026 06:46:02 UTC] ================================================================================
+[05-Jun-2026 06:46:02 UTC] Company: 1 (company)
+[05-Jun-2026 06:46:02 UTC] Customer: 15454FDST030925102054 (distributor)
+[05-Jun-2026 06:46:02 UTC] Requires advance: NO
+[05-Jun-2026 06:46:02 UTC] Mode: EDIT
+[05-Jun-2026 06:46:02 UTC] Totals — Sub: 18600  Disc: 0  Credit: 0  Courier: 0  Total: 18600
+[05-Jun-2026 06:46:02 UTC] Invoice date updated to 2026-06-05
+[05-Jun-2026 06:46:02 UTC] Outer transaction started
+[05-Jun-2026 06:46:02 UTC] Old receipts deleted
+[05-Jun-2026 06:46:02 UTC] Receipt created: regular Rs.600
+[05-Jun-2026 06:46:02 UTC] Invoice totals updated
+[05-Jun-2026 06:46:02 UTC] Edit mode: reversed 0 ledger entries
+[05-Jun-2026 06:46:02 UTC] === STOCK UPDATE (StockService) START === Invoice: 9764668555CMPDST050626115533
+[05-Jun-2026 06:46:02 UTC] INFO: Stock already applied for user_invoice 9764668555CMPDST050626115533 — skipping
+[05-Jun-2026 06:46:02 UTC] Stock update completed
+[05-Jun-2026 06:46:02 UTC] Outer transaction ROLLED BACK — Status update matched 0 rows for inv_id=9764668555CMPDST050626115533 from_user_type=company from_user_id=1
+[05-Jun-2026 06:46:02 UTC] Stack: #0 {main}
+[05-Jun-2026 07:07:58 UTC] ================================================================================
+[05-Jun-2026 07:07:58 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 07:07:58 UTC] Invoice ID: 9764668555CMPDST050626115533 | Time: 2026-06-05 07:07:58
+[05-Jun-2026 07:07:58 UTC] ================================================================================
+[05-Jun-2026 07:07:58 UTC] Company: 1 (company)
+[05-Jun-2026 07:07:58 UTC] Customer: 15454FDST030925102054 (distributor)
+[05-Jun-2026 07:07:58 UTC] Requires advance: NO
+[05-Jun-2026 07:07:58 UTC] Mode: EDIT
+[05-Jun-2026 07:07:58 UTC] Totals — Sub: 18600  Disc: 0  Credit: 0  Courier: 0  Total: 18600
+[05-Jun-2026 07:07:58 UTC] Invoice date updated to 2026-06-05
+[05-Jun-2026 07:07:58 UTC] Outer transaction started
+[05-Jun-2026 07:07:58 UTC] Old receipts deleted
+[05-Jun-2026 07:07:58 UTC] Receipt created: regular Rs.600
+[05-Jun-2026 07:07:58 UTC] Invoice totals updated
+[05-Jun-2026 07:07:58 UTC] Edit mode: reversed 0 ledger entries
+[05-Jun-2026 07:07:58 UTC] === STOCK UPDATE (StockService) START === Invoice: 9764668555CMPDST050626115533
+[05-Jun-2026 07:07:58 UTC] INFO: Stock already applied for user_invoice 9764668555CMPDST050626115533 — skipping
+[05-Jun-2026 07:07:58 UTC] Stock update completed
+[05-Jun-2026 07:07:58 UTC] Outer transaction ROLLED BACK — Status update matched 0 rows for inv_id=9764668555CMPDST050626115533 from_user_type=company from_user_id=1
+[05-Jun-2026 07:07:58 UTC] Stack: #0 {main}
+[05-Jun-2026 07:08:32 UTC] ================================================================================
+[05-Jun-2026 07:08:32 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 07:08:32 UTC] Invoice ID: 9764668555CMPDST050626115533 | Time: 2026-06-05 07:08:32
+[05-Jun-2026 07:08:32 UTC] ================================================================================
+[05-Jun-2026 07:08:32 UTC] Company: 1 (company)
+[05-Jun-2026 07:08:32 UTC] Customer: 15454FDST030925102054 (distributor)
+[05-Jun-2026 07:08:32 UTC] Requires advance: NO
+[05-Jun-2026 07:08:32 UTC] Mode: EDIT
+[05-Jun-2026 07:08:32 UTC] Totals — Sub: 18600  Disc: 0  Credit: 0  Courier: 0  Total: 18600
+[05-Jun-2026 07:08:32 UTC] Invoice date updated to 2026-06-05
+[05-Jun-2026 07:08:32 UTC] Outer transaction started
+[05-Jun-2026 07:08:32 UTC] Old receipts deleted
+[05-Jun-2026 07:08:32 UTC] Receipt created: regular Rs.18000
+[05-Jun-2026 07:08:32 UTC] Invoice totals updated
+[05-Jun-2026 07:08:32 UTC] Edit mode: reversed 0 ledger entries
+[05-Jun-2026 07:08:32 UTC] === STOCK UPDATE (StockService) START === Invoice: 9764668555CMPDST050626115533
+[05-Jun-2026 07:08:32 UTC] INFO: Stock already applied for user_invoice 9764668555CMPDST050626115533 — skipping
+[05-Jun-2026 07:08:32 UTC] Stock update completed
+[05-Jun-2026 07:08:32 UTC] Outer transaction ROLLED BACK — Status update matched 0 rows for inv_id=9764668555CMPDST050626115533 from_user_type=company from_user_id=1
+[05-Jun-2026 07:08:32 UTC] Stack: #0 {main}
+[05-Jun-2026 07:23:18 UTC] ================================================================================
+[05-Jun-2026 07:23:18 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 07:23:18 UTC] Invoice ID: 9764668555CMPDST050626115533 | Time: 2026-06-05 07:23:18
+[05-Jun-2026 07:23:18 UTC] ================================================================================
+[05-Jun-2026 07:23:18 UTC] Company: 1 (company)
+[05-Jun-2026 07:23:18 UTC] Customer: 15454FDST030925102054 (distributor)
+[05-Jun-2026 07:23:18 UTC] Requires advance: NO
+[05-Jun-2026 07:23:18 UTC] Mode: EDIT
+[05-Jun-2026 07:23:18 UTC] Totals — Sub: 18600  Disc: 0  Credit: 0  Courier: 0  Total: 18600
+[05-Jun-2026 07:23:18 UTC] Invoice date updated to 2026-06-05
+[05-Jun-2026 07:23:18 UTC] Outer transaction started
+[05-Jun-2026 07:23:18 UTC] Old receipts deleted
+[05-Jun-2026 07:23:18 UTC] Receipt created: regular Rs.600
+[05-Jun-2026 07:23:18 UTC] Invoice totals updated
+[05-Jun-2026 07:23:18 UTC] Edit mode: reversed 0 ledger entries
+[05-Jun-2026 07:23:18 UTC] === STOCK UPDATE (StockService) START === Invoice: 9764668555CMPDST050626115533
+[05-Jun-2026 07:23:18 UTC] INFO: Stock already applied for user_invoice 9764668555CMPDST050626115533 — skipping
+[05-Jun-2026 07:23:18 UTC] Stock update completed
+[05-Jun-2026 07:23:18 UTC] Outer transaction ROLLED BACK — Status update matched 0 rows for inv_id=9764668555CMPDST050626115533 from_user_type=company from_user_id=1
+[05-Jun-2026 07:23:18 UTC] Stack: #0 {main}
+[05-Jun-2026 07:32:40 UTC] ================================================================================
+[05-Jun-2026 07:32:40 UTC] === INVOICE SUBMISSION STARTED ===
+[05-Jun-2026 07:32:40 UTC] Invoice ID: 9764668555CMPDST050626115533 | Time: 2026-06-05 07:32:40
+[05-Jun-2026 07:32:40 UTC] ================================================================================
+[05-Jun-2026 07:32:40 UTC] Company: 1 (company)
+[05-Jun-2026 07:32:40 UTC] Customer: 15454FDST030925102054 (distributor)
+[05-Jun-2026 07:32:40 UTC] Requires advance: NO
+[05-Jun-2026 07:32:40 UTC] Mode: EDIT
+[05-Jun-2026 07:32:40 UTC] Totals — Sub: 18600  Disc: 0  Credit: 0  Courier: 0  Total: 18600
+[05-Jun-2026 07:32:40 UTC] Invoice date updated to 2026-06-05
+[05-Jun-2026 07:32:40 UTC] Outer transaction started
+[05-Jun-2026 07:32:40 UTC] Old receipts deleted
+[05-Jun-2026 07:32:41 UTC] Receipt created: regular Rs.600
+[05-Jun-2026 07:32:41 UTC] Invoice totals updated
+[05-Jun-2026 07:32:41 UTC] Edit mode: reversed 0 ledger entries
+[05-Jun-2026 07:32:41 UTC] === STOCK UPDATE (StockService) START === Invoice: 9764668555CMPDST050626115533
+[05-Jun-2026 07:32:41 UTC] INFO: Stock already applied for user_invoice 9764668555CMPDST050626115533 — skipping
+[05-Jun-2026 07:32:41 UTC] Stock update completed
+[05-Jun-2026 07:32:41 UTC] Outer transaction ROLLED BACK — Status update matched 0 rows for inv_id=9764668555CMPDST050626115533 from_user_type=company from_user_id=1
+[05-Jun-2026 07:32:41 UTC] Stack: #0 {main}
+[06-Jun-2026 04:41:40 UTC] ================================================================================
+[06-Jun-2026 04:41:40 UTC] === INVOICE SUBMISSION STARTED ===
+[06-Jun-2026 04:41:40 UTC] Invoice ID: 6855282663CMPDST060626101033 | Time: 2026-06-06 04:41:40
+[06-Jun-2026 04:41:40 UTC] ================================================================================
+[06-Jun-2026 04:41:40 UTC] Company: 1 (company)
+[06-Jun-2026 04:41:40 UTC] Customer: 15454FDST030925102054 (distributor)
+[06-Jun-2026 04:41:40 UTC] Requires advance: NO
+[06-Jun-2026 04:41:40 UTC] Mode: NEW
+[06-Jun-2026 04:41:40 UTC] Totals — Sub: 349000  Disc: 0  Credit: 0  Courier: 0  Total: 349000
+[06-Jun-2026 04:41:40 UTC] Outer transaction started
+[06-Jun-2026 04:41:40 UTC] Receipt created: regular Rs.349000
+[06-Jun-2026 04:41:40 UTC] Invoice totals updated
+[06-Jun-2026 04:41:40 UTC] === STOCK UPDATE (StockService) START === Invoice: 6855282663CMPDST060626101033
+[06-Jun-2026 04:41:40 UTC] Processing product=9 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:41:40 UTC] Processing product=11 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:41:40 UTC] === STOCK UPDATE COMPLETED === 2 items processed
+[06-Jun-2026 04:41:40 UTC] Stock update completed
+[06-Jun-2026 04:41:40 UTC] Invoice status set to 'submitted' (1 row)
+[06-Jun-2026 04:41:40 UTC] Outer transaction COMMITTED
+[06-Jun-2026 04:41:40 UTC] === INVOICE SUBMISSION COMPLETED: 6855282663CMPDST060626101033 ===
+[06-Jun-2026 04:41:40 UTC] ================================================================================
+[06-Jun-2026 04:42:17 UTC] ================================================================================
+[06-Jun-2026 04:42:17 UTC] === INVOICE SUBMISSION STARTED ===
+[06-Jun-2026 04:42:17 UTC] Invoice ID: 6855282663CMPDST060626101033 | Time: 2026-06-06 04:42:17
+[06-Jun-2026 04:42:17 UTC] ================================================================================
+[06-Jun-2026 04:42:17 UTC] Company: 1 (company)
+[06-Jun-2026 04:42:17 UTC] Customer: 15454FDST030925102054 (distributor)
+[06-Jun-2026 04:42:17 UTC] Requires advance: NO
+[06-Jun-2026 04:42:17 UTC] Mode: EDIT
+[06-Jun-2026 04:42:17 UTC] Totals — Sub: 349000  Disc: 0  Credit: 0  Courier: 0  Total: 349000
+[06-Jun-2026 04:42:17 UTC] Invoice date updated to 2026-06-06
+[06-Jun-2026 04:42:17 UTC] Outer transaction started
+[06-Jun-2026 04:42:17 UTC] Old receipts deleted
+[06-Jun-2026 04:42:17 UTC] Receipt created: regular Rs.9000
+[06-Jun-2026 04:42:17 UTC] Invoice totals updated
+[06-Jun-2026 04:42:17 UTC] Edit mode: reversed 0 ledger entries
+[06-Jun-2026 04:42:17 UTC] === STOCK UPDATE (StockService) START === Invoice: 6855282663CMPDST060626101033
+[06-Jun-2026 04:42:17 UTC] Processing product=9 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:42:17 UTC] Processing product=11 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:42:17 UTC] === STOCK UPDATE COMPLETED === 2 items processed
+[06-Jun-2026 04:42:17 UTC] Stock update completed
+[06-Jun-2026 04:42:17 UTC] Invoice status set to 'submitted' (0 row)
+[06-Jun-2026 04:42:17 UTC] Outer transaction COMMITTED
+[06-Jun-2026 04:42:17 UTC] === INVOICE SUBMISSION COMPLETED: 6855282663CMPDST060626101033 ===
+[06-Jun-2026 04:42:17 UTC] ================================================================================
+[06-Jun-2026 04:42:39 UTC] ================================================================================
+[06-Jun-2026 04:42:39 UTC] === INVOICE SUBMISSION STARTED ===
+[06-Jun-2026 04:42:39 UTC] Invoice ID: 6855282663CMPDST060626101033 | Time: 2026-06-06 04:42:39
+[06-Jun-2026 04:42:39 UTC] ================================================================================
+[06-Jun-2026 04:42:39 UTC] Company: 1 (company)
+[06-Jun-2026 04:42:39 UTC] Customer: 15454FDST030925102054 (distributor)
+[06-Jun-2026 04:42:39 UTC] Requires advance: NO
+[06-Jun-2026 04:42:39 UTC] Mode: EDIT
+[06-Jun-2026 04:42:39 UTC] Totals — Sub: 349000  Disc: 0  Credit: 0  Courier: 0  Total: 349000
+[06-Jun-2026 04:42:39 UTC] Invoice date updated to 2026-06-06
+[06-Jun-2026 04:42:39 UTC] Outer transaction started
+[06-Jun-2026 04:42:39 UTC] Old receipts deleted
+[06-Jun-2026 04:42:39 UTC] Receipt created: regular Rs.340000
+[06-Jun-2026 04:42:39 UTC] Invoice totals updated
+[06-Jun-2026 04:42:39 UTC] Edit mode: reversed 4 ledger entries
+[06-Jun-2026 04:42:39 UTC] === STOCK UPDATE (StockService) START === Invoice: 6855282663CMPDST060626101033
+[06-Jun-2026 04:42:39 UTC] Processing product=9 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:42:39 UTC] Processing product=11 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:42:39 UTC] === STOCK UPDATE COMPLETED === 2 items processed
+[06-Jun-2026 04:42:39 UTC] Stock update completed
+[06-Jun-2026 04:42:39 UTC] Invoice status set to 'submitted' (0 row)
+[06-Jun-2026 04:42:39 UTC] Outer transaction COMMITTED
+[06-Jun-2026 04:42:39 UTC] === INVOICE SUBMISSION COMPLETED: 6855282663CMPDST060626101033 ===
+[06-Jun-2026 04:42:39 UTC] ================================================================================
+[06-Jun-2026 04:45:25 UTC] ================================================================================
+[06-Jun-2026 04:45:25 UTC] === INVOICE SUBMISSION STARTED ===
+[06-Jun-2026 04:45:25 UTC] Invoice ID: 6855282663CMPDST060626101033 | Time: 2026-06-06 04:45:25
+[06-Jun-2026 04:45:25 UTC] ================================================================================
+[06-Jun-2026 04:45:25 UTC] Company: 1 (company)
+[06-Jun-2026 04:45:25 UTC] Customer: 15454FDST030925102054 (distributor)
+[06-Jun-2026 04:45:25 UTC] Requires advance: NO
+[06-Jun-2026 04:45:25 UTC] Mode: EDIT
+[06-Jun-2026 04:45:25 UTC] Totals — Sub: 186000  Disc: 0  Credit: 0  Courier: 0  Total: 186000
+[06-Jun-2026 04:45:25 UTC] Invoice date updated to 2026-06-06
+[06-Jun-2026 04:45:25 UTC] Outer transaction started
+[06-Jun-2026 04:45:25 UTC] Old receipts deleted
+[06-Jun-2026 04:45:25 UTC] Receipt created: regular Rs.186000
+[06-Jun-2026 04:45:25 UTC] Invoice totals updated
+[06-Jun-2026 04:45:25 UTC] Edit mode: reversed 0 ledger entries
+[06-Jun-2026 04:45:25 UTC] === STOCK UPDATE (StockService) START === Invoice: 6855282663CMPDST060626101033
+[06-Jun-2026 04:45:25 UTC] Processing product=9 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:45:25 UTC] === STOCK UPDATE COMPLETED === 1 items processed
+[06-Jun-2026 04:45:25 UTC] Stock update completed
+[06-Jun-2026 04:45:25 UTC] Invoice status set to 'submitted' (0 row)
+[06-Jun-2026 04:45:25 UTC] Outer transaction COMMITTED
+[06-Jun-2026 04:45:25 UTC] === INVOICE SUBMISSION COMPLETED: 6855282663CMPDST060626101033 ===
+[06-Jun-2026 04:45:25 UTC] ================================================================================
+[06-Jun-2026 04:48:32 UTC] ================================================================================
+[06-Jun-2026 04:48:32 UTC] === INVOICE SUBMISSION STARTED ===
+[06-Jun-2026 04:48:32 UTC] Invoice ID: 6855282663CMPDST060626101033 | Time: 2026-06-06 04:48:32
+[06-Jun-2026 04:48:32 UTC] ================================================================================
+[06-Jun-2026 04:48:32 UTC] Company: 1 (company)
+[06-Jun-2026 04:48:32 UTC] Customer: 15454FDST030925102054 (distributor)
+[06-Jun-2026 04:48:32 UTC] Requires advance: NO
+[06-Jun-2026 04:48:32 UTC] Mode: EDIT
+[06-Jun-2026 04:48:32 UTC] Totals — Sub: 349000  Disc: 0  Credit: 0  Courier: 0  Total: 349000
+[06-Jun-2026 04:48:32 UTC] Invoice date updated to 2026-06-06
+[06-Jun-2026 04:48:32 UTC] Outer transaction started
+[06-Jun-2026 04:48:32 UTC] Old receipts deleted
+[06-Jun-2026 04:48:32 UTC] Receipt created: regular Rs.349000
+[06-Jun-2026 04:48:32 UTC] Invoice totals updated
+[06-Jun-2026 04:48:32 UTC] Edit mode: reversed 0 ledger entries
+[06-Jun-2026 04:48:32 UTC] === STOCK UPDATE (StockService) START === Invoice: 6855282663CMPDST060626101033
+[06-Jun-2026 04:48:32 UTC] Processing product=9 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:48:32 UTC] Processing product=11 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:48:32 UTC] === STOCK UPDATE COMPLETED === 2 items processed
+[06-Jun-2026 04:48:32 UTC] Stock update completed
+[06-Jun-2026 04:48:32 UTC] Invoice status set to 'submitted' (0 row)
+[06-Jun-2026 04:48:32 UTC] Outer transaction COMMITTED
+[06-Jun-2026 04:48:32 UTC] === INVOICE SUBMISSION COMPLETED: 6855282663CMPDST060626101033 ===
+[06-Jun-2026 04:48:32 UTC] ================================================================================
+[06-Jun-2026 04:49:22 UTC] ================================================================================
+[06-Jun-2026 04:49:22 UTC] === INVOICE SUBMISSION STARTED ===
+[06-Jun-2026 04:49:22 UTC] Invoice ID: 6855282663CMPDST060626101033 | Time: 2026-06-06 04:49:22
+[06-Jun-2026 04:49:22 UTC] ================================================================================
+[06-Jun-2026 04:49:22 UTC] Company: 1 (company)
+[06-Jun-2026 04:49:22 UTC] Customer: 15454FDST030925102054 (distributor)
+[06-Jun-2026 04:49:22 UTC] Requires advance: NO
+[06-Jun-2026 04:49:22 UTC] Mode: EDIT
+[06-Jun-2026 04:49:22 UTC] Totals — Sub: 163000  Disc: 0  Credit: 0  Courier: 0  Total: 163000
+[06-Jun-2026 04:49:22 UTC] Invoice date updated to 2026-06-06
+[06-Jun-2026 04:49:22 UTC] Outer transaction started
+[06-Jun-2026 04:49:22 UTC] Old receipts deleted
+[06-Jun-2026 04:49:22 UTC] Receipt created: regular Rs.163000
+[06-Jun-2026 04:49:22 UTC] Invoice totals updated
+[06-Jun-2026 04:49:22 UTC] Edit mode: reversed 0 ledger entries
+[06-Jun-2026 04:49:22 UTC] === STOCK UPDATE (StockService) START === Invoice: 6855282663CMPDST060626101033
+[06-Jun-2026 04:49:22 UTC] Processing product=11 qty=1000 seller=company/1 buyer=distributor/15454FDST030925102054
+[06-Jun-2026 04:49:22 UTC] === STOCK UPDATE COMPLETED === 1 items processed
+[06-Jun-2026 04:49:22 UTC] Stock update completed
+[06-Jun-2026 04:49:22 UTC] Invoice status set to 'submitted' (0 row)
+[06-Jun-2026 04:49:22 UTC] Outer transaction COMMITTED
+[06-Jun-2026 04:49:22 UTC] === INVOICE SUBMISSION COMPLETED: 6855282663CMPDST060626101033 ===
+[06-Jun-2026 04:49:22 UTC] ================================================================================

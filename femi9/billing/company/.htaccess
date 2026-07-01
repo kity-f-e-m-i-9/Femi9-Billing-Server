@@ -1,0 +1,12 @@
+Options +MultiViews
+
+# Override cPanel's ea-php82 handler for local MAMP compatibility
+<IfModule mime_module>
+  AddType application/x-httpd-php .php .php8 .phtml
+</IfModule>
+
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
+
