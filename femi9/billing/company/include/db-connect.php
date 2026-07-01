@@ -2,7 +2,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once __DIR__ . '/../../shared/env-loader.ph';
+require_once __DIR__ . '/../../shared/env-loader.php'; //abhinesh
 
 $servername = $_ENV['DB_HOST'] ?? 'localhost';
 $db_port    = (int)($_ENV['DB_PORT'] ?? 3306);
