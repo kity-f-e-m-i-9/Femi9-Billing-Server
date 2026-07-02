@@ -1,7 +1,9 @@
 <?php
-require '../../../vendor/autoload.php';
+ob_start();
+error_reporting(0);
 
 include("checksession.php");
+require '../../../vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -91,9 +93,9 @@ while ($row = mysqli_fetch_array($result)) {
     $sheet->setCellValue('A'.$rowNum, ++$i);
     $sheet->setCellValue('B'.$rowNum, $user['useridtext']);
     $sheet->setCellValue('C'.$rowNum, ucwords($user['name']));
-    $sheet->setCellValue('D'.$rowNum, $state['state_name'] ?? '');
+    $sheet->setCellValue('D'.$rowNum, $state['st_name'] ?? '');
     $sheet->setCellValue('E'.$rowNum, $district['dist_name'] ?? '');
-    $sheet->setCellValue('F'.$rowNum, $taluk['taluk_name'] ?? '');
+    $sheet->setCellValue('F'.$rowNum, $taluk['taluk'] ?? '');
 
     // TEXT FIELDS (IMPORTANT)
     $sheet->setCellValueExplicit('G'.$rowNum, $user['country_code'].' '.$user['mobile_number'], DataType::TYPE_STRING);
@@ -145,6 +147,7 @@ foreach(range('A','T') as $col) {
 // ================= DOWNLOAD =================
 $filename = "Pending_Withdraw_Report.xlsx";
 
+ob_end_clean();
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header("Content-Disposition: attachment; filename=\"$filename\"");
 
