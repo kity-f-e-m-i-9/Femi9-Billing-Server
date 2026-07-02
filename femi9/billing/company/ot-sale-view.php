@@ -372,6 +372,14 @@ function newPopup(url) {
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
     <script src="../../assets/js/pages/datatables.js"></script>
+    <script>
+        // Remove DataTables' own built-in search box — it only filters rows already
+        // loaded on screen and was getting confused with the From Date/To Date and
+        // Invoice Number search forms above, which do the real server-side search.
+        $(document).ready(function () {
+            $('#datatable1_filter').remove();
+        });
+    </script>
 </body>
 
 </html>
