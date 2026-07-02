@@ -79,6 +79,16 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     </li>
 
 					<li>
+                        <a href="#"><i class="material-icons-two-tone">done</i>Input Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="add-input">Add Input Stock</a></li>
+                        <li><a href="manage-input">Manage Input Stocks</a></li>
+						<li><a href="add-input-users">Add Input Stock Users</a></li>
+                        <li><a href="manage-input-users">Manage Input Stocks Users</a></li>
+                        </ul>
+                    </li>
+
+					<li>
                         <a href="#"><i class="material-icons-two-tone">done</i>OT Channel Sales<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="ot-sale-cat">Category</a></li>
