@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");
@@ -1403,7 +1403,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
             <select required name="godownid" class="form-control" onchange="checkopeningstock(this.value)" id="godown-select">
                 <option value="" hidden>Select Company Profile</option>
                 <?php 
-                $select_Godown="select * from company_godown order by id asc";
+                $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
                 $fetch_Godown=mysqli_query($db_conn,$select_Godown);
                 while($result_Godown=mysqli_fetch_array($fetch_Godown)) {
                 ?>

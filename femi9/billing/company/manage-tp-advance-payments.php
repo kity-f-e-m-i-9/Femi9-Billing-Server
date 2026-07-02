@@ -1,15 +1,21 @@
 <?php
 include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+// Company profiles (receivers of the advance payment)
+$company_profiles = $db_conn->query("SELECT id, gname FROM company_godown WHERE gname LIKE '%Femi%' AND " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC")->fetch_all(MYSQLI_ASSOC);
+$default_company_id = $company_profiles[0]['id'] ?? 0;
+
 // Filter params
 $filter_from = $_GET['from_date'] ?? date('Y-m-01');
 $filter_to   = $_GET['to_date']   ?? date('Y-m-d');
 $filter_tp   = (int)($_GET['tp_id'] ?? 0);
+$filter_company = isset($_GET['company_id']) ? (int)$_GET['company_id'] : $default_company_id;
 $filter_status = $_GET['status'] ?? '';
 
 $allowed_statuses = ['active','partially_adjusted','fully_adjusted',''];
@@ -25,15 +31,23 @@ if ($filter_tp > 0) {
     $params[] = $filter_tp;
     $types .= "i";
 }
+if ($filter_company > 0) {
+    $where[] = "tap.company_id = ?";
+    $params[] = $filter_company;
+    $types .= "i";
+}
 if ($filter_status !== '') {
     $where[] = "tap.status = ?";
     $params[] = $filter_status;
     $types .= "s";
 }
 
-$sql = "SELECT tap.*, tp.name AS tp_name, tp.tp_id AS tp_code
+$where[] = "(tap.company_id IS NULL OR " . godown_finance_filter_sql($db_conn, 'cg') . ")";
+
+$sql = "SELECT tap.*, tp.name AS tp_name, tp.tp_id AS tp_code, cg.gname AS receiver_name
         FROM tp_advance_payments tap
         JOIN territory_partners tp ON tp.id = tap.territory_partner_id
+        LEFT JOIN company_godown cg ON cg.id = tap.company_id
         WHERE " . implode(" AND ", $where) . "
         ORDER BY tap.payment_date DESC, tap.id DESC";
 
@@ -49,7 +63,7 @@ $total_amount = array_sum(array_column($payments, 'amount'));
 $total_balance = array_sum(array_column($payments, 'balance_amount'));
 $total_adjusted = array_sum(array_column($payments, 'adjusted_amount'));
 
-// TPs for filter dropdown
+// TPs for filter dropdown (payers)
 $tps = $db_conn->query("SELECT id, tp_id, name FROM territory_partners ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 
 $i = 0;
@@ -155,12 +169,23 @@ $i = 0;
                                             <input type="date" name="to_date" class="form-control" value="<?php echo htmlspecialchars($filter_to); ?>" max="<?php echo date('Y-m-d'); ?>">
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label">Territory Partner</label>
+                                            <label class="form-label">Payer Name</label>
                                             <select name="tp_id" class="form-control">
-                                                <option value="">All TPs</option>
+                                                <option value="">All Payers</option>
                                                 <?php foreach ($tps as $tp): ?>
                                                 <option value="<?php echo $tp['id']; ?>" <?php echo $filter_tp == $tp['id'] ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars($tp['tp_id']); ?>)
+                                                </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Receiver Name</label>
+                                            <select name="company_id" class="form-control">
+                                                <option value="">All Receivers</option>
+                                                <?php foreach ($company_profiles as $cp): ?>
+                                                <option value="<?php echo $cp['id']; ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($cp['gname']); ?>
                                                 </option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -200,6 +225,7 @@ $i = 0;
                                                     <th>S.No</th>
                                                     <th>TP Name</th>
                                                     <th>TP ID</th>
+                                                    <th>Receiver Name</th>
                                                     <th>Date</th>
                                                     <th>Amount (₹)</th>
                                                     <th>Balance (₹)</th>
@@ -216,6 +242,7 @@ $i = 0;
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo htmlspecialchars($p['tp_name']); ?></td>
                                                     <td><code style="font-size:12px;"><?php echo htmlspecialchars($p['tp_code']); ?></code></td>
+                                                    <td><?php echo htmlspecialchars($p['receiver_name'] ?: '—'); ?></td>
                                                     <td><?php echo htmlspecialchars($p['payment_date']); ?></td>
                                                     <td class="text-right font-weight-bold"><?php echo number_format($p['amount'], 2); ?></td>
                                                     <td class="text-right" style="color:#10b981;font-weight:600;"><?php echo number_format($p['balance_amount'], 2); ?></td>

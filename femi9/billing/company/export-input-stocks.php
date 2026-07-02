@@ -1,15 +1,17 @@
 <?php
 include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 $from_date = !empty($_GET['frdate']) ? $_GET['frdate'] : date("Y-m-d", strtotime("-2 days"));
 $to_date   = !empty($_GET['todate']) ? $_GET['todate'] : date("Y-m-d");
 
-$sql_exp = "SELECT i.*, p.productName, g.gname 
+$sql_exp = "SELECT i.*, p.productName, g.gname
             FROM input_stock i
             LEFT JOIN products p ON p.id = i.product_id
             LEFT JOIN company_godown g ON g.id = i.godownid
             WHERE i.input_date BETWEEN '$from_date' AND '$to_date'
+              AND (g.id IS NULL OR " . godown_finance_filter_sql($db_conn, 'g') . ")
             ORDER BY i.input_date DESC";
 $res_exp = mysqli_query($db_conn, $sql_exp);
 

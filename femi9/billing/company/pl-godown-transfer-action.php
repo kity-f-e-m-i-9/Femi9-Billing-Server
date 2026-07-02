@@ -1,6 +1,7 @@
 <?php
 ob_start();
 include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 if (empty($_POST['csrf_token']) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
@@ -24,6 +25,10 @@ $raw_qtys = $_POST['qty']        ?? [];
 
 if (!$godown_id || !$cp_id || empty($raw_pids)) {
     header("Location: add-godown-to-location?error=missing"); exit;
+}
+
+if (!is_godown_allowed($db_conn, $godown_id)) {
+    header("Location: add-godown-to-location?error=unauthorized"); exit;
 }
 
 // Build validated line items

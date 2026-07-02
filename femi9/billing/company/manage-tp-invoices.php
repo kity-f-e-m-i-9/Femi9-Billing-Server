@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -112,7 +113,7 @@ $sql = "
     LEFT JOIN channel_partner_locations cpl ON cpl.location_id = tpi.source_location_id
     LEFT JOIN channel_partners cp_old      ON cp_old.id = cpl.channel_partner_id
     LEFT JOIN channel_partners cp_src      ON cp_src.id = tpi.source_cp_id
-    LEFT JOIN company_godown gd            ON gd.id = tpi.source_godown_id
+    LEFT JOIN company_godown gd            ON gd.id = tpi.source_godown_id AND (" . godown_finance_filter_sql($db_conn, 'gd') . ")
     LEFT JOIN (
         SELECT tp_invoice_id, SUM(amount) AS collected
         FROM tp_invoice_receipts

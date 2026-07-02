@@ -20,7 +20,7 @@ $html='
                                             </thead>
 											<tbody>';
 											
-				$select_product_list="select * from distributor where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' order by id desc";
+				$select_product_list="select * from distributor where stockiest_id='$onboard_userID' order by id desc";
 $fetch_product_list=mysqli_query($db_conn,$select_product_list);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {											

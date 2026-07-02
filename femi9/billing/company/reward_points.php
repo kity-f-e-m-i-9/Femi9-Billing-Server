@@ -194,7 +194,7 @@ $safe_report_label  = htmlspecialchars($Report_LABLE ?? 'Reward Points Report', 
 
 try {
     $pdo = new PDO(
-        "mysql:host={$servername};dbname={$dbname};charset=utf8mb4",
+        "mysql:host={$servername};port={$db_port};dbname={$dbname};charset=utf8mb4",
         $username,
         $password,
         [

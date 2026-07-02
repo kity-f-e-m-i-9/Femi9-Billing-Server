@@ -9,6 +9,7 @@ ini_set('display_errors', 0);
 // Include files
 @include("checksession.php");
 @include("config.php");
+@require_once("include/GodownAccess.php");
 
 // Clear any output that might have been generated
 ob_clean();
@@ -127,7 +128,7 @@ if($action == 'get_sellers') {
     try {
         // Special handling for COMPANY - show all companies
         if($seller_type == 'company') {
-            $query = "SELECT id, gname as name FROM company_godown ORDER BY gname ASC LIMIT 1000";
+            $query = "SELECT id, gname as name FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY gname ASC LIMIT 1000";
             $result = mysqli_query($db_conn, $query);
             
             if(!$result) {

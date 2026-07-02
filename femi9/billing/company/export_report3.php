@@ -6,6 +6,7 @@ error_reporting(0);
 // Include session check
 include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 
 $Report_LABLE="Channelwise Sales";
 
@@ -31,7 +32,7 @@ if($result_Count_records['numRecords']>0)
 										{
 											
 // Fetch product data from database
-$select_records = "select distinct tempid from ot_sales where date between '$from_date' and '$to_date' order by id asc";
+$select_records = "select distinct tempid from ot_sales where date between '$from_date' and '$to_date' and godownid IN (" . godown_ids_subquery($db_conn) . ") order by id asc";
 $fetch_records = mysqli_query($db_conn, $select_records);
 
 // Initialize CSV content
@@ -52,7 +53,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_records)) {
 											
 											//company profile details
 											$godownid=$resultrecords['godownid'];
-$select_Customers="select * from company_godown where id='$godownid'";
+$select_Customers="select * from company_godown where id='$godownid' AND " . godown_finance_filter_sql($db_conn);
 										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 										

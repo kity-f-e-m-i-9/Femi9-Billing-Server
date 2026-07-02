@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 $tempid=$_REQUEST['tempid'];
@@ -12,13 +13,13 @@ $fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 //SEND FROM
 						$send_from=$result_Invoice_Details['send_from'];
-						$select_godowndetails="select * from company_godown where id='$send_from'";
+						$select_godowndetails="select * from company_godown where id='$send_from' AND " . godown_finance_filter_sql($db_conn);
 						$fetch_godowndetails=mysqli_query($db_conn,$select_godowndetails);
 						$result_godowndetails=mysqli_fetch_array($fetch_godowndetails);
 						
 						//SEND TO
 						$send_to=$result_Invoice_Details['send_to'];
-						$select_godowndetails2="select * from company_godown where id='$send_to'";
+						$select_godowndetails2="select * from company_godown where id='$send_to' AND " . godown_finance_filter_sql($db_conn);
 						$fetch_godowndetails2=mysqli_query($db_conn,$select_godowndetails2);
 						$result_godowndetails2=mysqli_fetch_array($fetch_godowndetails2);
 						

@@ -1,6 +1,7 @@
-<?php 
-include("checksession.php"); 
-date_default_timezone_set("Asia/Kolkata"); 
+<?php
+include("checksession.php");
+require_once("include/GodownAccess.php");
+date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
 
@@ -20,11 +21,14 @@ $stmt->close();
 
 // Godown details
 $from_user_id = $result_Invoice_Details['godownid'];
+$result_Godown = null;
+if (is_godown_allowed($db_conn, (int)$from_user_id)) {
 $stmt = $db_conn->prepare("SELECT * FROM company_godown WHERE id = ?");
 $stmt->bind_param("s", $from_user_id);
 $stmt->execute();
 $result_Godown = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+}
 
 // Delivery note
 $Invoice_ID = $result_Invoice['inv_id'] ?? '';

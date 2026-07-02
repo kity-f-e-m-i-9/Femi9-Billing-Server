@@ -2,6 +2,7 @@
 include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
+require_once("include/GodownAccess.php");
 include("RemoveSpecialChar.php");
 
 error_reporting(0);
@@ -30,6 +31,12 @@ $usertype        = htmlspecialchars(strip_tags(trim($_REQUEST['usertype'] ?? '')
 if ($send_from === '0' || $to = $send_to === '0') {
     $_SESSION['errorMessage'] = "Invalid godown selection.";
     echo "<script>window.location='internal_transfer?invalid';</script>";
+    exit;
+}
+
+if (!is_godown_allowed($db_conn, (int)$send_from) || !is_godown_allowed($db_conn, (int)$send_to)) {
+    $_SESSION['errorMessage'] = "You are not authorized to use this company profile.";
+    echo "<script>window.location='internal_transfer?unauthorized';</script>";
     exit;
 }
 

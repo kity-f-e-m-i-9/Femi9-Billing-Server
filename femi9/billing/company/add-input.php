@@ -16,6 +16,7 @@
 ob_start();
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . "/include/GodownAccess.php";
 
 date_default_timezone_set("Asia/Kolkata");
 
@@ -48,7 +49,7 @@ $tempID = sprintf(
 $godownResult = null;
 $gid = isset($_GET['gid']) ? (int) $_GET['gid'] : 0;
 
-if ($gid > 0) {
+if ($gid > 0 && is_godown_allowed($db_conn, $gid)) {
     $stmtGd = $db_conn->prepare("SELECT * FROM company_godown WHERE id = ?");
     $stmtGd->bind_param('i', $gid);
     $stmtGd->execute();
@@ -62,7 +63,7 @@ $showAlreadyExists   = isset($_GET['alreadyexists']);
 
 // ── Godown list ──────────────────────────────────────────────────────────────
 $godowns = [];
-$resGd = $db_conn->query("SELECT id, gname FROM company_godown ORDER BY id ASC");
+$resGd = $db_conn->query("SELECT id, gname FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC");
 while ($row = $resGd->fetch_assoc()) {
     $godowns[] = $row;
 }

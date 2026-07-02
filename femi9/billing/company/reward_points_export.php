@@ -94,7 +94,7 @@ if (strtotime($from_ex) > strtotime($to_ex)) {
 try {
 
     $pdo_ex = new PDO(
-        "mysql:host={$servername};dbname={$dbname};charset=utf8mb4",
+        "mysql:host={$servername};port={$db_port};dbname={$dbname};charset=utf8mb4",
         $username,
         $password,
         [

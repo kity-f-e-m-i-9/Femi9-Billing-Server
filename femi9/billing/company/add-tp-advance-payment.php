@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) {
@@ -12,7 +13,7 @@ $logged_user_type = $_SESSION['LOGIN_USER_TYPE'] ?? '';
 $tps = $db_conn->query("SELECT id, tp_id, name, mobile FROM territory_partners WHERE is_active=1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 
 $company_profiles = [];
-$stmt_cp = $db_conn->prepare("SELECT id, gname FROM company_godown WHERE gname LIKE '%Femi%' ORDER BY id ASC");
+$stmt_cp = $db_conn->prepare("SELECT id, gname FROM company_godown WHERE gname LIKE '%Femi%' AND " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC");
 if ($stmt_cp) { $stmt_cp->execute(); $company_profiles = $stmt_cp->get_result()->fetch_all(MYSQLI_ASSOC); $stmt_cp->close(); }
 ?>
 <!DOCTYPE html>

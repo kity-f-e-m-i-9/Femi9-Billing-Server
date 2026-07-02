@@ -1,10 +1,11 @@
 <?php
 include("checksession.php");
+require_once("include/GodownAccess.php");
 header('Content-Type: application/json');
 error_reporting(0);
 
 $godown_id = (int)($_GET['godown_id'] ?? 0);
-if (!$godown_id) { echo json_encode([]); exit; }
+if (!$godown_id || !is_godown_allowed($db_conn, $godown_id)) { echo json_encode([]); exit; }
 
 $uid = (string)$godown_id;
 $stmt = $db_conn->prepare("

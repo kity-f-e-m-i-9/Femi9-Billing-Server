@@ -1,4 +1,4 @@
-<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata");
+<?php include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
 
@@ -32,7 +32,7 @@ $stmt = $db_conn->prepare("
     LEFT JOIN channel_partner_locations cpl ON cpl.location_id = tpi.source_location_id
     LEFT JOIN channel_partners cp_old       ON cp_old.id = cpl.channel_partner_id
     LEFT JOIN channel_partners cp_src       ON cp_src.id = tpi.source_cp_id
-    LEFT JOIN company_godown gd             ON gd.id = tpi.source_godown_id
+    LEFT JOIN company_godown gd             ON gd.id = tpi.source_godown_id AND (" . godown_finance_filter_sql($db_conn, 'gd') . ")
     WHERE tpi.id = ?
 ");
 $stmt->bind_param("i", $inv_id);
@@ -43,7 +43,7 @@ if (!$result_Invoice_Details) { header("Location: manage-tp-invoices"); exit; }
 
 // Godown — use the invoice's source_godown_id if set, else fall back to primary godown
 $_gd_id = (int)($result_Invoice_Details['source_godown_id'] ?? 0);
-if ($_gd_id) {
+if ($_gd_id && is_godown_allowed($db_conn, $_gd_id)) {
     $_gd_stmt = $db_conn->prepare("SELECT * FROM company_godown WHERE id = ? LIMIT 1");
     $_gd_stmt->bind_param("i", $_gd_id);
     $_gd_stmt->execute();
@@ -51,7 +51,7 @@ if ($_gd_id) {
     $_gd_stmt->close();
 }
 if (empty($result_Godown)) {
-    $result_Godown = $db_conn->query("SELECT * FROM company_godown LIMIT 1")->fetch_assoc();
+    $result_Godown = $db_conn->query("SELECT * FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " LIMIT 1")->fetch_assoc();
 }
 
 // Line items with product details

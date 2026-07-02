@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 ?>
 <!DOCTYPE html>
@@ -210,10 +211,10 @@ $i= $start_from;
 <?php
 if(empty($se_invoice))
 {
-$select_product_list="select distinct tempid from ot_sales where date between '$se_fromDate' and '$se_toDate'";
+$select_product_list="select distinct tempid from ot_sales where date between '$se_fromDate' and '$se_toDate' and godownid IN (" . godown_ids_subquery($db_conn) . ")";
 }else
 {
-$select_product_list="select distinct ot_sales.tempid from ot_sales join ot_sales_invoice on ot_sales_invoice.tempid=ot_sales.tempid where ot_sales_invoice.inv_number='".mysqli_real_escape_string($db_conn,$se_invoice)."'";	
+$select_product_list="select distinct ot_sales.tempid from ot_sales join ot_sales_invoice on ot_sales_invoice.tempid=ot_sales.tempid where ot_sales_invoice.inv_number='".mysqli_real_escape_string($db_conn,$se_invoice)."' and ot_sales.godownid IN (" . godown_ids_subquery($db_conn) . ")";
 }
 
 
@@ -228,7 +229,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 						
 						//GODOWN DETAILS
 						$godownid=$Result_productDetils['godownid'];
-						$select_godowndetails="select * from company_godown where id='$godownid'";
+						$select_godowndetails="select * from company_godown where id='$godownid' AND " . godown_finance_filter_sql($db_conn);
 						$fetch_godowndetails=mysqli_query($db_conn,$select_godowndetails);
 						$result_godowndetails=mysqli_fetch_array($fetch_godowndetails);
 						

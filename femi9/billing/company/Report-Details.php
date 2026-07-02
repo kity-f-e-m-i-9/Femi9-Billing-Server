@@ -3,6 +3,7 @@ ob_start();
 
 include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1); 
@@ -572,7 +573,7 @@ $qparam = urlencode($search ?? '');
                                                         <?php
                                                             if(!empty($selected_seller_type)) {
                                                                 if($selected_seller_type == 'company') {
-                                                                    $seller_query = "SELECT id, gname as name FROM company_godown ORDER BY gname ASC LIMIT 1000";
+                                                                    $seller_query = "SELECT id, gname as name FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY gname ASC LIMIT 1000";
                                                                     $seller_result = mysqli_query($db_conn, $seller_query);
                                                                     
                                                                     if($seller_result) {
@@ -1001,7 +1002,7 @@ $qparam = urlencode($search ?? '');
                                                 if (empty($selected_district) || $selected_district == 8) {
                                                     $seller_union_parts[] = "
                                                         SELECT CAST(id AS CHAR) $collate AS temp_id, 'company' AS user_type
-                                                        FROM company_godown
+                                                        FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . "
                                                     ";
                                                 }
                                             }
@@ -1054,7 +1055,7 @@ $qparam = urlencode($search ?? '');
                                             // Include company for B2C
                                             if(empty($selected_seller_type) || $selected_seller_type == 'company') {
                                                 if (empty($selected_district) || $selected_district == 8) {
-                                                    $b2c_seller_union_parts[] = "SELECT CAST(id AS CHAR) AS user_id, 'company' AS user_type FROM company_godown WHERE 1=1";
+                                                    $b2c_seller_union_parts[] = "SELECT CAST(id AS CHAR) AS user_id, 'company' AS user_type FROM company_godown WHERE 1=1 AND " . godown_finance_filter_sql($db_conn);
                                                 }
                                             }
                                             
@@ -1123,7 +1124,7 @@ $qparam = urlencode($search ?? '');
                                               SELECT CAST(id AS CHAR) AS id, 'company' AS user_type,
                                                      CONVERT(gname USING utf8mb4) COLLATE utf8mb4_general_ci AS name,
                                                      CONVERT(contact USING utf8mb4) COLLATE utf8mb4_general_ci AS mobile
-                                              FROM company_godown
+                                              FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . "
                                             ";
                                             $seller_meta_union_query = implode(" UNION ALL ", $seller_meta_parts);
                                             $seller_meta_join = " LEFT JOIN ($seller_meta_union_query) seller_meta
@@ -1479,9 +1480,10 @@ $qparam = urlencode($search ?? '');
                                                     if(isset($table_map[$type])) {
                                                         $config = $table_map[$type];
                                                         $id_list = "'" . implode("','", array_map([$db_conn, 'real_escape_string'], array_unique($ids))) . "'";
-                                                        $seller_query2 = "SELECT {$config['id_field']} as id, {$config['name_field']} as name, {$config['mobile_field']} as mobile 
-                                                                         FROM {$config['table']} 
-                                                                         WHERE {$config['id_field']} IN ($id_list)";
+                                                        $extra_filter = ($type === 'company') ? (" AND " . godown_finance_filter_sql($db_conn)) : "";
+                                                        $seller_query2 = "SELECT {$config['id_field']} as id, {$config['name_field']} as name, {$config['mobile_field']} as mobile
+                                                                         FROM {$config['table']}
+                                                                         WHERE {$config['id_field']} IN ($id_list)$extra_filter";
                                                         $seller_result = mysqli_query($db_conn, $seller_query2);
                                                         
                                                         if($seller_result) {

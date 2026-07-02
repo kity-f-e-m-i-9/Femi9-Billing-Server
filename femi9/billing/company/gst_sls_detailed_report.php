@@ -1,5 +1,5 @@
 <?php 
-include("checksession.php");
+include("checksession.php"); require_once("include/GodownAccess.php");
 include("config.php"); 
 error_reporting(0);
 
@@ -8,6 +8,10 @@ $to_date       = mysqli_real_escape_string($db_conn, $_REQUEST['tod']);
 $get_godown_id = mysqli_real_escape_string($db_conn, $_REQUEST['gid']);
 $gst_type      = mysqli_real_escape_string($db_conn, $_REQUEST['data1']); 
 $buyer_gsttype = mysqli_real_escape_string($db_conn, $_REQUEST['data2']); 
+
+if (!empty($get_godown_id) && !is_godown_allowed($db_conn, (int)$get_godown_id)) {
+    header("Location: overall-stock?unauthorized"); exit;
+}
 
 $select_Godown_details = "SELECT * FROM company_godown WHERE id='$get_godown_id'";
 $fetch_Godown_details  = mysqli_query($db_conn, $select_Godown_details);

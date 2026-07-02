@@ -161,7 +161,7 @@ $i= $start_from;
 											
 											<tbody>
 <?php 
-$pdo = new PDO("mysql:host=".$servername.";dbname=".$dbname."", "".$username."", "".$password."");
+$pdo = new PDO("mysql:host=".$servername.";port=".$db_port.";dbname=".$dbname."", "".$username."", "".$password."");
 
 $query_RFR_PRE = "
     SELECT from_user_id, SUM(rwpoints_sls) AS total_points

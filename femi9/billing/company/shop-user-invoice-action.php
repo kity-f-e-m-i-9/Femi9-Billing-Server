@@ -1,13 +1,19 @@
 <?php include("checksession.php");
 include("config.php");
 include("RemoveSpecialChar.php");
+require_once("include/GodownAccess.php");
 
 	$randum_number=$_REQUEST['randum_number'];
 	$inv_id=$_REQUEST['inv_id'];
 	$invuser=$_REQUEST['invuser'];
-	
+
 	$godownid=$_REQUEST['godownid'];
 	$Login_user_IDvl=$godownid;
+
+	if (!is_godown_allowed($db_conn, (int)$godownid)) {
+		echo "<script>alert('You are not authorized to use this company profile'); window.history.back();</script>";
+		exit;
+	}
 	
 	//invoice accept=0
 	if($_REQUEST['invoice_number_accept']==0)

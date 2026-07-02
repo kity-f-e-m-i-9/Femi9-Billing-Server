@@ -2,6 +2,7 @@
 include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 include("RemoveSpecialChar.php");
 
@@ -12,6 +13,11 @@ if (isset($_REQUEST['add-record'])) {
 
     $tempid         = str_replace("'", "&#39;", $_REQUEST['tempid']);
     $godownid       = str_replace("'", "&#39;", $_REQUEST['godownid']);
+
+    if (!is_godown_allowed($db_conn, (int)$godownid)) {
+        echo "<script>alert('You are not authorized to use this company profile'); window.history.back();</script>";
+        exit;
+    }
     $date           = date("Y-m-d", strtotime($_REQUEST['date']));
     $catname        = str_replace("'", "&#39;", $_REQUEST['catname']);
     $inv_number     = RemoveSpecialChar(str_replace("'", "", $_REQUEST['inv_number']));

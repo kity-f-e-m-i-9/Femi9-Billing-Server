@@ -1,5 +1,6 @@
 <?php include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 $get_from_date=$_REQUEST['frdate'];
@@ -9,6 +10,9 @@ $get_to_date=$_REQUEST['todate'];
 if($_REQUEST['godownid']!=NULL)
 {
 $get_company=$_REQUEST['godownid'];
+if (!is_godown_allowed($db_conn, (int)$get_company)) {
+    header("Location: overall-stock?unauthorized"); exit;
+}
 //company details
 $select_Godown="select * from company_godown where id='$get_company'";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);

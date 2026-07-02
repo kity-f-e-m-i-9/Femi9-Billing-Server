@@ -1,8 +1,13 @@
 <?php include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
+
+if (!is_godown_allowed($db_conn, (int)$prid)) {
+	header("Location: godown?unauthorized"); exit;
+}
 
 $select_product_list="select * from company_godown where id='$prid'";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);

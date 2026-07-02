@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 
 error_reporting(0);
 ini_set('log_errors', '1');
@@ -160,7 +161,8 @@ $totalCustomerInvoices = 0;
 
 if ($selectedCategory !== 'customer') {
     $sqlCount = "SELECT COUNT(*) AS cnt FROM user_invoice
-                 WHERE date BETWEEN ? AND ? AND from_user_type = ? AND sub_total > 0";
+                 WHERE date BETWEEN ? AND ? AND from_user_type = ? AND sub_total > 0
+                   AND (from_user_type != 'company' OR from_user_id IN (" . godown_ids_subquery($db_conn) . "))";
     $types    = 'sss';
     $params   = [$fromDate, $toDate, $Login_user_TYPEvl];
     if (!empty($selectedCategory)) {
@@ -212,7 +214,8 @@ $userInvoices = [];
 if ($userLimit > 0) {
     $sql    = "SELECT inv_id, inv_number, date, total, to_user_type, to_user_id, from_user_id
                FROM user_invoice
-               WHERE date BETWEEN ? AND ? AND from_user_type = ? AND sub_total > 0";
+               WHERE date BETWEEN ? AND ? AND from_user_type = ? AND sub_total > 0
+                 AND (from_user_type != 'company' OR from_user_id IN (" . godown_ids_subquery($db_conn) . "))";
     $types  = 'sss';
     $params = [$fromDate, $toDate, $Login_user_TYPEvl];
     if (!empty($selectedCategory)) {
@@ -295,7 +298,7 @@ $companyIds = array_unique(array_merge(
 if (!empty($companyIds)) {
     $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
     $stmt         = $db_conn->prepare(
-        "SELECT id, gname FROM company_godown WHERE id IN ($placeholders)"
+        "SELECT id, gname FROM company_godown WHERE id IN ($placeholders) AND " . godown_finance_filter_sql($db_conn)
     );
     $stmt->bind_param(str_repeat('i', count($companyIds)), ...$companyIds);
     $stmt->execute();
@@ -361,7 +364,8 @@ if (!empty($custIds)) {
 $grandTotal = 0.0;
 if ($selectedCategory !== 'customer') {
     $sqlS = "SELECT COALESCE(SUM(total),0) AS s FROM user_invoice
-             WHERE date BETWEEN ? AND ? AND from_user_type = ? AND sub_total > 0";
+             WHERE date BETWEEN ? AND ? AND from_user_type = ? AND sub_total > 0
+               AND (from_user_type != 'company' OR from_user_id IN (" . godown_ids_subquery($db_conn) . "))";
     $tp   = 'sss'; $pr = [$fromDate, $toDate, $Login_user_TYPEvl];
     if (!empty($selectedCategory)) { $sqlS .= " AND to_user_type = ?"; $pr[] = $selectedCategory; $tp .= 's'; }
     $stmt = $db_conn->prepare($sqlS);

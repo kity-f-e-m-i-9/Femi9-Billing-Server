@@ -1,6 +1,7 @@
 <?php
 ob_start();
 include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
@@ -66,6 +67,8 @@ try {
     $chk_cp->bind_param("i", $company_id); $chk_cp->execute();
     if (!$chk_cp->get_result()->fetch_assoc()) throw new \Exception("Company profile not found.");
     $chk_cp->close();
+
+    if (!is_godown_allowed($db_conn, $company_id)) throw new \Exception("You are not authorized to record payments for this company profile.");
 
     $balance = $amount; // starts equal to amount, no adjustment yet
     $adjusted = 0.00;

@@ -5,6 +5,7 @@ ob_start();
 
 include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 
 error_reporting(E_ALL);          // turn ON during debug — set back to 0 in production
 ini_set('display_errors', '1');  // never display — log only
@@ -334,7 +335,7 @@ if (!empty($tempids)) {
         $gph   = implode(',', array_fill(0, count($godownIds), '?'));
         $gtype = str_repeat('i', count($godownIds));
         $cmpRows = dbQuery($db_conn,
-            "SELECT id, gname FROM company_godown WHERE id IN ($gph)",
+            "SELECT id, gname FROM company_godown WHERE id IN ($gph) AND " . godown_finance_filter_sql($db_conn),
             $gtype, $godownIds
         );
         foreach ($cmpRows as $row) {

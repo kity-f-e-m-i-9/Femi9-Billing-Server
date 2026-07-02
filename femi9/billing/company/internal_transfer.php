@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
 include("config.php"); 
 date_default_timezone_set("Asia/Kolkata");
 ?>
@@ -149,7 +149,7 @@ xmlhttp.send();}
 							   <label for="exampleInputEmail1" class="form-label">Send From</label>
                                <select required="" name="send_from" class="form-control" onchange="checkopeningstock(this.value);">
 							   <option value="" hidden="">Select</option>
-							   <?php $select_Godown="select * from company_godown order by id asc";
+							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
@@ -162,7 +162,7 @@ xmlhttp.send();}
 							   <label for="exampleInputEmail1" class="form-label">Send To</label>
                                <select required="" name="send_to" class="form-control">
 							   <option value="" hidden="">Select</option>
-							   <?php $select_Godown="select * from company_godown order by id asc";
+							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>

@@ -1,4 +1,4 @@
-<?php include("checksession.php");?>
+<?php include("checksession.php"); require_once("include/GodownAccess.php"); ?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -123,7 +123,7 @@ $i= $start_from;
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						//get Godown Details
-$select_Godowndetails="select * from company_godown where id='".$result_product_list['godownid']."'";
+$select_Godowndetails="select * from company_godown where id='".$result_product_list['godownid']."' AND " . godown_finance_filter_sql($db_conn);
 $fetch_Godowndetails=mysqli_query($db_conn,$select_Godowndetails);
 $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 											?>

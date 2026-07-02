@@ -2,6 +2,7 @@
 ob_start();
 include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 // Get parameters
@@ -121,7 +122,7 @@ if($selected_category != 'customer') {
         }
         
         $company_id = $result_product_list['from_user_id'];
-        $select_cmpdetails = "select * from company_godown where id='$company_id'";
+        $select_cmpdetails = "select * from company_godown where id='$company_id' AND " . godown_finance_filter_sql($db_conn);
         $fetch_cmpdetails = mysqli_query($db_conn, $select_cmpdetails);
         $result_cmpdetails = mysqli_fetch_array($fetch_cmpdetails);
         $cmpname = $result_cmpdetails['gname'];
@@ -168,7 +169,7 @@ if(empty($selected_category) || $selected_category == 'customer') {
     
     while($result_product_listCUSTOMER = mysqli_fetch_array($fetch_product_listCUTOMER)) {
         $company_id2 = $result_product_listCUSTOMER['user_id'];
-        $select_cmpdetails2 = "select * from company_godown where id='$company_id2'";
+        $select_cmpdetails2 = "select * from company_godown where id='$company_id2' AND " . godown_finance_filter_sql($db_conn);
         $fetch_cmpdetails2 = mysqli_query($db_conn, $select_cmpdetails2);
         $result_cmpdetails2 = mysqli_fetch_array($fetch_cmpdetails2);
         $cmpname2 = $result_cmpdetails2['gname'];

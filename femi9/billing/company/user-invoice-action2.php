@@ -1,11 +1,16 @@
 <?php include("checksession.php");
 //company - login
 include("config.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 if(isset($_REQUEST['addInvoice2']))
 {
-	 
+	if (!is_godown_allowed($db_conn, (int)($_REQUEST['godownid'] ?? 0))) {
+		echo "<script>alert('You are not authorized to use this company profile'); window.history.back();</script>";
+		exit;
+	}
+
 	$inv_id=$_REQUEST['inv_id'];
 	//
 	$select_INVProductDetails="select * from user_invoice where inv_id='$inv_id'";

@@ -39,9 +39,9 @@ $safe_business_name = htmlspecialchars($business_name ?? 'Femi9', ENT_QUOTES, 'U
 $combined_users = [];
 
 try {
-    // PDO connection (uses $servername/$username/$password/$dbname from config)
+    // PDO connection (uses $servername/$db_port/$username/$password/$dbname from config)
     $pdo = new PDO(
-        "mysql:host={$servername};dbname={$dbname};charset=utf8mb4",
+        "mysql:host={$servername};port={$db_port};dbname={$dbname};charset=utf8mb4",
         $username,
         $password,
         [
@@ -85,7 +85,7 @@ try {
                COALESCE(SUM(r.subtotal) / 100, 0) AS return_points
         FROM user_return_stock_items r
         WHERE r.from_usertype = 'territory_partner'
-          AND r.invnumber IN (
+          AND r.invnumber COLLATE utf8mb4_unicode_ci IN (
               SELECT invoice_number
               FROM tp_invoices
               WHERE invoice_date BETWEEN :from_date AND :to_date

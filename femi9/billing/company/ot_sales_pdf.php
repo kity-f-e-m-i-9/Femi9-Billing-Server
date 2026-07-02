@@ -1,5 +1,6 @@
 <?php include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 $Report_LABLE="Channelwise Sales";
@@ -71,9 +72,9 @@ $catname=base64_decode($_REQUEST['cat']);
 										
 										if($catname==NULL)
 										{
-										$select_product_list="select distinct tempid from ot_sales where date between '$from_date' and '$to_date'";
+										$select_product_list="select distinct tempid from ot_sales where date between '$from_date' and '$to_date' and godownid IN (" . godown_ids_subquery($db_conn) . ")";
 										}else{
-										$select_product_list="select distinct tempid from ot_sales where date between '$from_date' and '$to_date' and cat='$catname'";	
+										$select_product_list="select distinct tempid from ot_sales where date between '$from_date' and '$to_date' and cat='$catname' and godownid IN (" . godown_ids_subquery($db_conn) . ")";
 										}
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
@@ -87,7 +88,7 @@ $catname=base64_decode($_REQUEST['cat']);
 											
 											//company profile details
 											$godownid=$resultrecords['godownid'];
-$select_Customers="select * from company_godown where id='$godownid'";
+$select_Customers="select * from company_godown where id='$godownid' AND " . godown_finance_filter_sql($db_conn);
 										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 ?>

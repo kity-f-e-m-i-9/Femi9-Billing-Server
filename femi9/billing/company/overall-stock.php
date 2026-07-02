@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php include("checksession.php"); require_once("include/GodownAccess.php");
 error_reporting(0);
 $user_type_Loginvl="company";
 ?>
@@ -89,7 +89,7 @@ $user_type_Loginvl="company";
 <label class="form-label">Company Profile</label>
                                <select name="godownid" class="form-control">
 							   <option value="" hidden="">Select</option>
-							   <?php $select_Godown="select * from company_godown order by id asc";
+							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
@@ -125,7 +125,7 @@ $i= $start_from;
 									
 									<?php
 									//get Godown Details
-$select_Godowndetails="select * from company_godown order by id asc";
+$select_Godowndetails="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 $fetch_Godowndetails=mysqli_query($db_conn,$select_Godowndetails);
 while($result_Godown=mysqli_fetch_array($fetch_Godowndetails))
 {

@@ -15,10 +15,10 @@ $tpRow   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM territory_pa
 // Customer (shop) details
 $customer_id = $inv['to_user_id'] ?? '';
 $shop        = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='$customer_id' LIMIT 1"));
-$state_row   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT st_name FROM state WHERE id='{$shop['state_id']}' LIMIT 1"));
-$state_name  = $state_row['st_name'] ?? '';
-$district_row = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='{$shop['district_id']}' LIMIT 1"));
-$district_name = $district_row['dist_name'] ?? '';
+$state_row   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT name FROM partner_location_nodes WHERE id='{$shop['state_id']}' LIMIT 1"));
+$state_name  = $state_row['name'] ?? '';
+$district_row = mysqli_fetch_array(mysqli_query($db_conn, "SELECT name FROM partner_location_nodes WHERE id='{$shop['district_id']}' LIMIT 1"));
+$district_name = $district_row['name'] ?? '';
 
 // Currency
 if (($_REQUEST['crcode'] ?? '') == "Default" || empty($_REQUEST['crcode'])) {

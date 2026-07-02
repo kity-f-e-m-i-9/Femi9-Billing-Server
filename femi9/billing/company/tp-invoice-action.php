@@ -3,6 +3,7 @@ ob_start();
 include("checksession.php");
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
+require_once __DIR__ . '/include/GodownAccess.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
     header("Location: manage-tp-invoices?error=unauthorized"); exit;
@@ -136,6 +137,10 @@ $use_godown = ($source_godown_id > 0 && !$source_cp_id);
 
 if (!$tp_id || (!$source_cp_id && !$source_godown_id) || empty($raw_pids)) {
     header("Location: add-tp-invoice?error=missing"); exit;
+}
+
+if ($use_godown && !is_godown_allowed($db_conn, $source_godown_id)) {
+    header("Location: add-tp-invoice?error=unauthorized"); exit;
 }
 
 // If a source_location_id was submitted, verify it still exists — clear to NULL if deleted

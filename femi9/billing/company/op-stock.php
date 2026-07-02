@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/GodownAccess.php");
 include("config.php");
 error_reporting(0);
 include("RemoveSpecialChar.php");
@@ -37,6 +37,11 @@ if (isset($_REQUEST['update-opstock'])) {
 
     if (!is_array($pr_ids) || count($pr_ids) === 0) {
         header("Location: op-stock?invalid&gid=$godownid");
+        exit;
+    }
+
+    if (!is_godown_allowed($db_conn, (int)$godownid)) {
+        header("Location: op-stock?unauthorized&gid=$godownid");
         exit;
     }
 
@@ -94,7 +99,7 @@ if (isset($_REQUEST['update-opstock'])) {
 // ── Get Godown Details (prepared — no injection) ──────────────────────────────
 $gid = (int)($_REQUEST['gid'] ?? 0);
 $result_Godown = null;
-if ($gid > 0) {
+if ($gid > 0 && is_godown_allowed($db_conn, $gid)) {
     $stmt = $db_conn->prepare("SELECT * FROM company_godown WHERE id = ?");
     $stmt->bind_param('i', $gid);
     $stmt->execute();
@@ -187,7 +192,7 @@ if ($gid > 0) {
 											<label for="exampleInputEmail1" class="form-label">Company Profile</label>
                                <select required="" name="godownid" class="form-control">
 							   <option value="" hidden="">Select</option>
-							   <?php $select_Godown="select * from company_godown order by id asc";
+							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>

@@ -1,10 +1,11 @@
 <?php
 include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
-$godowns   = $db_conn->query("SELECT id, gname, contact FROM company_godown ORDER BY gname")->fetch_all(MYSQLI_ASSOC);
+$godowns   = $db_conn->query("SELECT id, gname, contact FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY gname")->fetch_all(MYSQLI_ASSOC);
 $cp_list = $db_conn->query("SELECT id, cp_id, name FROM channel_partners WHERE is_active=1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata"); 
+<?php include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
 $Invoice_ID=$_REQUEST['invoiceid'];
@@ -266,7 +266,7 @@ while($result_currency=mysqli_fetch_array($fetch_currency))
 <?php
 //get godown details
 $from_user_id=$result_Invoice_Details['from_user_id'];
-$select_Godown="select * from company_godown where id='$from_user_id'";
+$select_Godown="select * from company_godown where id='$from_user_id' AND " . godown_finance_filter_sql($db_conn);
 $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 $result_Godown=mysqli_fetch_array($fetch_Godown);
 ?>

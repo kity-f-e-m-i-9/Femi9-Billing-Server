@@ -16,7 +16,7 @@ $html='
                                             </thead>
 											<tbody>';
 											
-				$select_product_list="select * from customers where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' order by id desc";
+				$select_product_list="select * from customers where user_id='$Login_user_IDvl' order by id asc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{

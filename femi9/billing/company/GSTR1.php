@@ -1,5 +1,5 @@
 <?php 
-include("checksession.php");
+include("checksession.php"); require_once("include/GodownAccess.php");
 include("config.php"); 
 error_reporting(0);
 
@@ -11,6 +11,9 @@ $from_date=date("Y-m-01",strtotime($from_month));
 $to_date=date("Y-m-".$to_month_days."",strtotime($to_month));
 
 $get_godown_id=$_REQUEST['godown_id'];
+if (!empty($get_godown_id) && !is_godown_allowed($db_conn, (int)$get_godown_id)) {
+    header("Location: overall-stock?unauthorized"); exit;
+}
 //
 $select_Godown_details="select * from company_godown where id='$get_godown_id'";
 $fetch_Godown_details=mysqli_query($db_conn,$select_Godown_details);
@@ -113,7 +116,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							   <?php }else{?>
 							   <option value="<?=$get_godown_id;?>" hidden=""><?=$result_Godown_details['gname'];?></option>
 							   <?php }?>
-							   <?php $select_Godown="select * from company_godown order by id asc";
+							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>

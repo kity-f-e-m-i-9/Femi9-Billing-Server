@@ -1,5 +1,6 @@
 <?php include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 $Report_LABLE="Shop Sales";
@@ -247,7 +248,7 @@ $entered_by_name=$result_UserDetails['name'];
 $entered_by_mobile=$result_UserDetails['mobile_number'];
 }else{
 	
-$select_userDetails="select * from company_godown where id='$entered_userid'";
+$select_userDetails="select * from company_godown where id='$entered_userid' AND " . godown_finance_filter_sql($db_conn);
 $fetch_UserDetails=mysqli_query($db_conn,$select_userDetails);
 $result_UserDetails=mysqli_fetch_array($fetch_UserDetails);
 

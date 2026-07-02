@@ -71,7 +71,7 @@ $Coupon_category="Super-Distributor";
 									<tr>
 									<td>Manage Super-Distributor</td>
 									<td><a href="super_Distributor_add" title="Add Super-Distributor">&#10011;</a></td>
-									<!----<td><a href="export_super_distributor" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>---->
+									<td><a href="export_super_distributor" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>

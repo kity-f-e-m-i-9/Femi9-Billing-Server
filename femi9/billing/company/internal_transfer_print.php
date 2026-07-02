@@ -1,4 +1,4 @@
-<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata"); 
+<?php include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
 $tempid=$_REQUEST['tempid'];
@@ -144,7 +144,7 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 <?php
 //get godown details
 $from_user_id=$result_Invoice_Details['send_from'];
-$select_Godown="select * from company_godown where id='$from_user_id'";
+$select_Godown="select * from company_godown where id='$from_user_id' AND " . godown_finance_filter_sql($db_conn);
 $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 $result_Godown=mysqli_fetch_array($fetch_Godown);
 ?>
@@ -169,7 +169,7 @@ $result_Godown=mysqli_fetch_array($fetch_Godown);
 
 <?php
 $send_to=$result_Invoice_Details['send_to'];
-$select_customer="select * from company_godown where id='$send_to'";
+$select_customer="select * from company_godown where id='$send_to' AND " . godown_finance_filter_sql($db_conn);
 $fetch_customer=mysqli_query($db_conn,$select_customer);
 $result_customer=mysqli_fetch_array($fetch_customer);
 ?>

@@ -20,6 +20,7 @@ ob_start();
 include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
+require_once("include/GodownAccess.php");
 
 // ── Helper: safe redirect (no further output after this) ────────────────────
 function redirectTo(string $url): never
@@ -52,6 +53,9 @@ $tempId     = preg_replace('/[^A-Z0-9\/]/', '', strtoupper($_POST['tempid'] ?? '
 
 if (!$godownId || $godownId <= 0) {
     redirectTo('add-input?invalid');
+}
+if (!is_godown_allowed($db_conn, $godownId)) {
+    redirectTo('add-input?unauthorized');
 }
 
 // Validate & normalise date

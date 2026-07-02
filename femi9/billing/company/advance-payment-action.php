@@ -15,6 +15,7 @@ session_start();
 
 include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(E_ALL);
@@ -107,6 +108,8 @@ $errors = [];
 // Validate company ID
 if ($company_id <= 0) {
     $errors[] = "Invalid company selection";
+} elseif (!is_godown_allowed($db_conn, $company_id)) {
+    $errors[] = "You are not authorized to record payments for this company profile";
 }
 
 // Validate payer information

@@ -18,6 +18,7 @@ ini_set('log_errors', 1);
 // Include required files with error suppression
 @include("checksession.php");
 @include("config.php");
+@require_once("include/GodownAccess.php");
 
 // Only proceed if we have a valid session and database connection
 if (!isset($_SESSION) || !isset($db_conn)) {
@@ -206,7 +207,7 @@ if (empty($selected_seller_type) || $selected_seller_type == 'company') {
     if (empty($selected_district) || $selected_district == 8) {
         $seller_union_parts[] = "
             SELECT CAST(id AS CHAR) $collate AS temp_id, 'company' AS user_type
-            FROM company_godown
+            FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . "
         ";
     }
 }
@@ -258,7 +259,7 @@ $b2c_seller_union_parts = [];
 // Include company for B2C
 if (empty($selected_seller_type) || $selected_seller_type == 'company') {
     if (empty($selected_district) || $selected_district == 8) {
-        $b2c_seller_union_parts[] = "SELECT CAST(id AS CHAR) $collate as user_id, 'company' as user_type FROM company_godown WHERE 1=1";
+        $b2c_seller_union_parts[] = "SELECT CAST(id AS CHAR) $collate as user_id, 'company' as user_type FROM company_godown WHERE 1=1 AND " . godown_finance_filter_sql($db_conn);
     }
 }
 
@@ -361,7 +362,7 @@ $seller_meta_union_parts[] = "SELECT
     0 as taluk_id,
     CONVERT(gname USING utf8mb4) COLLATE utf8mb4_general_ci,
     CONVERT(contact USING utf8mb4) COLLATE utf8mb4_general_ci
-    FROM company_godown";
+    FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . "";
 
 $seller_meta_union_query = implode(" UNION ALL ", $seller_meta_union_parts);
 $seller_meta_join = " LEFT JOIN ($seller_meta_union_query) seller_meta 
@@ -684,7 +685,8 @@ if (!empty($invoices)) {
         $ids = array_unique($ids);
         $id_list = "'" . implode("','", array_map([$db_conn,'real_escape_string'], $ids)) . "'";
         $m = $table_map[$type];
-        $sql = "SELECT {$m['id']} AS id, {$m['name']} AS name, {$m['mobile']} AS mobile FROM {$m['table']} WHERE {$m['id']} IN ($id_list)";
+        $extra_filter = ($type === 'company') ? (" AND " . godown_finance_filter_sql($db_conn)) : "";
+        $sql = "SELECT {$m['id']} AS id, {$m['name']} AS name, {$m['mobile']} AS mobile FROM {$m['table']} WHERE {$m['id']} IN ($id_list)$extra_filter";
         $r = mysqli_query($db_conn, $sql);
         if ($r) {
             while ($row = mysqli_fetch_assoc($r)) {

@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 include("config.php");
 date_default_timezone_set("Asia/Kolkata");
@@ -13,7 +14,7 @@ $stmt = $db_conn->prepare("
            g.gstin, g.state, g.state_code, g.contact, g.email, g.logo,
            pln.name AS location_name
     FROM pl_godown_transfers t
-    JOIN company_godown g ON g.id = t.godown_id
+    JOIN company_godown g ON g.id = t.godown_id AND (" . godown_finance_filter_sql($db_conn, 'g') . ")
     JOIN partner_location_nodes pln ON pln.id = t.location_id
     WHERE t.id = ?
     LIMIT 1

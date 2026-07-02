@@ -17,6 +17,7 @@
  */
 
 include("checksession.php");
+require_once("include/GodownAccess.php");
 include("config.php");
 require_once("advance-payment-functions.php");
 
@@ -95,7 +96,7 @@ $is_advance_mandatory = $config['mandatory_advance'];
 // Get Godown Details
 $godown_id = intval($_REQUEST['gid'] ?? 0);
 $result_Godown = null;
-if ($godown_id > 0) {
+if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
     $select_Godowndetails = $db_conn->prepare("SELECT * FROM company_godown WHERE id = ?");
     $select_Godowndetails->bind_param("i", $godown_id);
     $select_Godowndetails->execute();
@@ -212,7 +213,7 @@ if ($godown_id > 0) {
                                                     <select name="godownid" id="godownSelect" class="form-select" required onchange="checkOpeningStock(this.value)">
                                                         <option value="">Select Company Profile</option>
                                                         <?php
-                                                        $select_Godown = "SELECT * FROM company_godown ORDER BY id ASC";
+                                                        $select_Godown = "SELECT * FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC";
                                                         $fetch_Godown = mysqli_query($db_conn, $select_Godown);
                                                         while ($row_Godown = mysqli_fetch_array($fetch_Godown)) {
                                                             $selected = ($godown_id == $row_Godown['id']) ? 'selected' : '';

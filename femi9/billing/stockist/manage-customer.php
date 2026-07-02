@@ -69,6 +69,7 @@ include("config.php");
 									<tr>
 									<td>Manage Customers</td>
 									<td><a href="add-customer.php" title="Add Customer">&#10011;</a></td>
+									<td><a href="export_customer.php" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>

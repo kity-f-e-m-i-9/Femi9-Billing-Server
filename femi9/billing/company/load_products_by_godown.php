@@ -1,10 +1,11 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 $godown_id = (int)($_GET['godown_id'] ?? 0);
-if ($godown_id <= 0) { echo ''; exit; }
+if ($godown_id <= 0 || !is_godown_allowed($db_conn, $godown_id)) { echo ''; exit; }
 
 $godown_id_esc = mysqli_real_escape_string($db_conn, (string)$godown_id);
 

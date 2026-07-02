@@ -11,8 +11,9 @@
  * @date 2025-12-29
  */
 
-include("checksession.php"); 
-include("config.php"); 
+include("checksession.php");
+include("config.php");
+require_once("include/GodownAccess.php");
 
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(E_ALL);
@@ -58,7 +59,7 @@ if (!empty($logged_user_id) && !empty($logged_user_type)) {
 
 // Get company profile for the logged-in user
 $company_profiles = [];
-$stmt_company = $db_conn->prepare("SELECT id, gname FROM company_godown ORDER BY id ASC");
+$stmt_company = $db_conn->prepare("SELECT id, gname FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC");
 if ($stmt_company) {
     $stmt_company->execute();
     $result_company = $stmt_company->get_result();

@@ -48,6 +48,7 @@ $i = 0;
     <link href="../../assets/plugins/datatables/datatables.min.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../../assets/images/neptune.png" />
     <style>
@@ -224,6 +225,9 @@ $i = 0;
                                                             <button type="button" onclick="togglePw(this)" style="border:none;background:none;padding:0 4px;cursor:pointer;vertical-align:middle;" title="Show/Hide">
                                                                 <i class="material-icons-outlined" style="font-size:15px;color:#9ca3af;vertical-align:middle;">visibility</i>
                                                             </button>
+                                                            <button type="button" onclick="copyPw(this)" data-pw="<?php echo htmlspecialchars($plain_pw, ENT_QUOTES); ?>" style="border:none;background:none;padding:0 4px;cursor:pointer;vertical-align:middle;" title="Copy password">
+                                                                <i class="material-icons-outlined" style="font-size:15px;color:#9ca3af;vertical-align:middle;">content_copy</i>
+                                                            </button>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
@@ -299,6 +303,7 @@ $i = 0;
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script src="../../assets/js/pages/datatables.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 var CSRF_TOKEN = '<?php echo $_SESSION['csrf_token']; ?>';
 
@@ -347,6 +352,26 @@ function togglePw(btn) {
         $plain.hide(); $mask.show();
         $icon.text('visibility');
     }
+}
+
+function copyPw(btn) {
+    var password = $(btn).data('pw');
+    function toast() {
+        Swal.fire({ icon: 'success', title: 'Copied!', text: 'Password copied to clipboard', timer: 1500, showConfirmButton: false, toast: true, position: 'top-end' });
+    }
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(password).then(toast, function () {
+            fallbackCopy(password); toast();
+        });
+    } else {
+        fallbackCopy(password); toast();
+    }
+}
+
+function fallbackCopy(text) {
+    var $tmp = $('<input>').val(text).appendTo('body').select();
+    document.execCommand('copy');
+    $tmp.remove();
 }
 
 $(document).on('click', '.loc-view-trigger', function () {

@@ -127,6 +127,7 @@ $errorMessage = $_SESSION['errorMessage'];
 									<tr>
 									<td><?=$displaytitle;?></td>
 									<td><a href="user-invoice-add.php?invuser=<?=$getinvuser;?>" title="Add Invoice">&#10011;</a></td>
+									<td><a href="export_user_invoice.php?invuser=<?=$getinvuser;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>

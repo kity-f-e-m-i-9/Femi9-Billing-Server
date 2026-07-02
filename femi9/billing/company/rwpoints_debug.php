@@ -28,7 +28,7 @@ echo "<hr>";
 // ---- PDO Connect ----
 try {
     $pdo = new PDO(
-        "mysql:host={$servername};dbname={$dbname};charset=utf8mb4",
+        "mysql:host={$servername};port={$db_port};dbname={$dbname};charset=utf8mb4",
         $username,
         $password,
         [

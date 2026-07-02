@@ -69,6 +69,7 @@ include("config.php");
 									<tr>
 									<td>Manage Distributor</td>
 									<td><!-----<a href="add_ss.php" title="Add Distributor">&#10011;</a>----></td>
+									<td><a href="export_distributor" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>

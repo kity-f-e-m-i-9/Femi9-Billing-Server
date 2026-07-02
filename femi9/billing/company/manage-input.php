@@ -1,5 +1,6 @@
-<?php 
-include("checksession.php"); 
+<?php
+include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 // ── Date resolution (needed before export) ────────────────────────────
@@ -14,11 +15,12 @@ if(!empty($_REQUEST['frdate'])){
 // ── Handle Excel Export ───────────────────────────────────────────────
 if(isset($_REQUEST['export_excel']))
 {
-    $sql_exp = "SELECT i.*, p.productName, g.gname 
+    $sql_exp = "SELECT i.*, p.productName, g.gname
                 FROM input_stock i
                 LEFT JOIN products p ON p.id = i.product_id
                 LEFT JOIN company_godown g ON g.id = i.godownid
                 WHERE i.input_date BETWEEN '$from_date' AND '$to_date'
+                  AND (g.id IS NULL OR " . godown_finance_filter_sql($db_conn, 'g') . ")
                 ORDER BY i.input_date DESC";
     $res_exp = mysqli_query($db_conn, $sql_exp);
 
@@ -170,11 +172,12 @@ $i = $start_from;
                                                 </thead>
                                                 <tbody>
                                                 <?php 
-                                                $select_product_list = "SELECT i.*, p.productName, g.gname 
+                                                $select_product_list = "SELECT i.*, p.productName, g.gname
                                                                          FROM input_stock i
                                                                          LEFT JOIN products p ON p.id = i.product_id
                                                                          LEFT JOIN company_godown g ON g.id = i.godownid
                                                                          WHERE i.input_date BETWEEN '$from_date' AND '$to_date'
+                                                                           AND (g.id IS NULL OR " . godown_finance_filter_sql($db_conn, 'g') . ")
                                                                          ORDER BY i.input_date DESC";
                                                 $fetch_product_list = mysqli_query($db_conn, $select_product_list);
                                                 while($result_product_list = mysqli_fetch_array($fetch_product_list)){

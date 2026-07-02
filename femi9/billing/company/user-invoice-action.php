@@ -18,6 +18,7 @@ declare(strict_types=1);
 include("checksession.php");
 include("config.php");
 require_once("advance-payment-functions.php");
+require_once("include/GodownAccess.php");
 
 // Enable proper error handling (log, don't display)
 error_reporting(E_ALL);
@@ -91,6 +92,12 @@ if ($existing_invoice) {
         echo "<script>alert('Company/Godown is required'); window.history.back();</script>";
         exit;
     }
+}
+
+if (!empty($godownid) && !is_godown_allowed($db_conn, (int)$godownid)) {
+    error_log("ERROR: godownid $godownid is finance_only and this session is not a finance login");
+    echo "<script>alert('You are not authorized to use this company profile'); window.history.back();</script>";
+    exit;
 }
 
 // Validate that we have the required values

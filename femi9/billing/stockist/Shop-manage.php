@@ -69,6 +69,7 @@ include("config.php");
 									<tr>
 									<td>Manage Shop (Retailers)</td>
 									<td><a href="Shop-add.php" title="Add Shop (Retailers)">&#10011;</a></td>
+									<td><a href="export_shop" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>

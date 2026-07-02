@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");
@@ -62,7 +62,7 @@ else
 //4.invoice-submit-req.php
 
 //get Godown Details
-$select_Godowndetails="select * from company_godown where id='".$_REQUEST['gid']."'";
+$select_Godowndetails="select * from company_godown where id='".$_REQUEST['gid']."' AND " . godown_finance_filter_sql($db_conn);
 $fetch_Godowndetails=mysqli_query($db_conn,$select_Godowndetails);
 $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 
@@ -276,7 +276,7 @@ $result_countadditems=mysqli_fetch_array($fetch_countadditems);
 				<?php if($result_countadditems['numitems']==0){?>
                                <select required="" autofocus name="godownid" class="form-control" onchange="checkopeningstock(this.value)">
 							   <option value="" hidden="">Select</option>
-							   <?php $select_Godown="select * from company_godown order by id asc";
+							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>

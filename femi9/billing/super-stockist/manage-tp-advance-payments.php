@@ -159,9 +159,9 @@ $i = 0;
                                                    value="<?php echo htmlspecialchars($filter_to); ?>" max="<?php echo date('Y-m-d'); ?>">
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label">Territory Partner</label>
+                                            <label class="form-label">Payer Name</label>
                                             <select name="tp_id" class="form-control">
-                                                <option value="">All TPs</option>
+                                                <option value="">All Payers</option>
                                                 <?php foreach ($tps as $tp): ?>
                                                 <option value="<?php echo $tp['id']; ?>" <?php echo $filter_tp == $tp['id'] ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars($tp['tp_id']); ?>)
@@ -204,6 +204,7 @@ $i = 0;
                                                     <th>S.No</th>
                                                     <th>TP Name</th>
                                                     <th>TP ID</th>
+                                                    <th>Receiver Name</th>
                                                     <th>Date</th>
                                                     <th>Amount (₹)</th>
                                                     <th>Balance (₹)</th>
@@ -220,6 +221,7 @@ $i = 0;
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo htmlspecialchars($p['tp_name']); ?></td>
                                                     <td><code style="font-size:12px;"><?php echo htmlspecialchars($p['tp_code']); ?></code></td>
+                                                    <td><?php echo htmlspecialchars($result_superstock['name'] ?? ''); ?></td>
                                                     <td><?php echo htmlspecialchars($p['payment_date']); ?></td>
                                                     <td class="text-right font-weight-bold"><?php echo number_format($p['amount'], 2); ?></td>
                                                     <td class="text-right" style="color:#10b981;font-weight:600;"><?php echo number_format($p['balance_amount'], 2); ?></td>

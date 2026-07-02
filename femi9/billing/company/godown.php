@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -330,7 +331,7 @@ function validateFileLogo(file) {
 											 <tbody>
 											 
 										<?php 
-										$select_product_list="select * from company_godown order by id desc";
+										$select_product_list="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id desc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{

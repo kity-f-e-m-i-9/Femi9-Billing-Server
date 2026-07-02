@@ -1,6 +1,7 @@
 <?php
 ob_start();
 include("checksession.php");
+require_once("include/GodownAccess.php");
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -132,7 +133,7 @@ $stats_sql = "
         SUM(t.transfer_type = 'location_to_godown') AS to_godown,
         COALESCE(SUM(ti2.qty), 0) AS total_qty
     FROM pl_godown_transfers t
-    JOIN company_godown g ON g.id = t.godown_id
+    JOIN company_godown g ON g.id = t.godown_id AND (" . godown_finance_filter_sql($db_conn, 'g') . ")
     LEFT JOIN partner_location_nodes pln ON pln.id = t.location_id
     LEFT JOIN channel_partners cp ON cp.id = t.cp_id
     LEFT JOIN (SELECT transfer_id, SUM(quantity) AS qty FROM pl_godown_transfer_items GROUP BY transfer_id) ti2
@@ -156,7 +157,7 @@ $list_sql = "
            COUNT(ti.id) AS product_count,
            SUM(ti.quantity) AS total_qty
     FROM pl_godown_transfers t
-    JOIN company_godown g ON g.id = t.godown_id
+    JOIN company_godown g ON g.id = t.godown_id AND (" . godown_finance_filter_sql($db_conn, 'g') . ")
     LEFT JOIN partner_location_nodes pln ON pln.id = t.location_id
     LEFT JOIN channel_partners cp ON cp.id = t.cp_id
     LEFT JOIN pl_godown_transfer_items ti ON ti.transfer_id = t.id
