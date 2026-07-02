@@ -4,6 +4,16 @@
  * Neksomo Hygiene Industries) to sessions logged in as admin_log.usertype='finance'.
  */
 
+// Self-migrating: ensure finance_only column exists (schema may not have been
+// migrated on every environment yet). Cheap SHOW COLUMNS check, safe to repeat.
+if (isset($db_conn) && $db_conn instanceof mysqli) {
+    $_godownAccessCol = $db_conn->query("SHOW COLUMNS FROM company_godown LIKE 'finance_only'");
+    if ($_godownAccessCol && $_godownAccessCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE company_godown ADD COLUMN finance_only TINYINT(1) NOT NULL DEFAULT 0 AFTER gname");
+        $db_conn->query("UPDATE company_godown SET finance_only = 1 WHERE gname IN ('FEMI HEALTH CARE', 'NEKSOMO HYGIENE INDUSTRIES')");
+    }
+}
+
 function get_login_usertype($db_conn) {
     static $cached = null;
     if ($cached !== null) return $cached;
