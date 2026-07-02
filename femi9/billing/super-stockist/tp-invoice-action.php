@@ -66,6 +66,7 @@ if ($col && $col->num_rows === 0) {
 
 // ── Input & validation ────────────────────────────────────────────────────────
 $tp_id            = (int)($_POST['tp_id'] ?? 0);
+$invoice_number   = trim($_POST['invoice_number'] ?? '');
 $invoice_date     = trim($_POST['invoice_date'] ?? date('Y-m-d'));
 $courier_charges  = round((float)($_POST['courier_charges'] ?? 0), 2);
 if ($courier_charges < 0) $courier_charges = 0;
@@ -78,9 +79,19 @@ $raw_pids  = $_POST['product_id'] ?? [];
 $raw_qtys  = $_POST['qty']        ?? [];
 $raw_rates = $_POST['rate']       ?? [];
 
-if (!$tp_id || empty($raw_pids)) {
+if (!$tp_id || empty($raw_pids) || $invoice_number === '') {
     header("Location: add-tp-invoice?error=missing"); exit;
 }
+
+// Manual invoice number — must be unique across all TP invoices
+$dupe_chk = $db_conn->prepare("SELECT id FROM tp_invoices WHERE invoice_number = ? LIMIT 1");
+$dupe_chk->bind_param("s", $invoice_number);
+$dupe_chk->execute();
+if ($dupe_chk->get_result()->num_rows > 0) {
+    $dupe_chk->close();
+    header("Location: add-tp-invoice?error=duplicate&inv=" . urlencode($invoice_number)); exit;
+}
+$dupe_chk->close();
 
 // Verify TP belongs to this SS
 $tp_own = $db_conn->prepare("SELECT id FROM territory_partners WHERE id=? AND onboard_ss_id=? AND is_active=1");
@@ -130,20 +141,8 @@ foreach ($items as $item) {
 // ── Transaction ───────────────────────────────────────────────────────────────
 $db_conn->begin_transaction();
 try {
-    // Generate invoice number
-    $inv_month  = (int)date('n', strtotime($invoice_date));
-    $inv_year   = (int)date('Y', strtotime($invoice_date));
-    $fy_start   = $inv_month >= 4 ? $inv_year : $inv_year - 1;
-    $current_fy = substr($fy_start, 2) . '-' . substr($fy_start + 1, 2);
-
-    $db_conn->query("SELECT last_val, fy FROM tp_inv_sequence WHERE id=1 FOR UPDATE");
-    $seq_row = $db_conn->query("SELECT last_val, fy FROM tp_inv_sequence WHERE id=1")->fetch_assoc();
-    $max_res    = $db_conn->query("SELECT MAX(CAST(SUBSTRING_INDEX(invoice_number,'/',-1) AS UNSIGNED)) AS max_val FROM tp_invoices WHERE invoice_number LIKE 'TP/$current_fy/%'");
-    $actual_max = (int)(($max_res->fetch_assoc())['max_val'] ?? 0);
-    $seq_val    = ($seq_row['fy'] === $current_fy) ? (int)$seq_row['last_val'] : 0;
-    $next_val   = max($seq_val, $actual_max) + 1;
-    $db_conn->query("UPDATE tp_inv_sequence SET last_val=$next_val, fy='$current_fy' WHERE id=1");
-    $inv_num = 'TP/' . $current_fy . '/' . str_pad($next_val, 4, '0', STR_PAD_LEFT);
+    // Manually entered by SS staff (validated + uniqueness-checked above)
+    $inv_num = $invoice_number;
 
     // Invoice header — source fields NULL (stock comes from SS directly)
     $null_src = null;

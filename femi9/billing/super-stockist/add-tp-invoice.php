@@ -135,6 +135,8 @@ $tp_stmt->close();
                         <?php elseif ($err === 'noproducts'): ?>Please add at least one product with a valid quantity.
                         <?php elseif ($err === 'nobalance'): ?>
                             Insufficient advance balance. Required: <strong>₹<?php echo htmlspecialchars($_GET['need'] ?? ''); ?></strong>, Available: <strong>₹<?php echo htmlspecialchars($_GET['have'] ?? '0.00'); ?></strong>.
+                        <?php elseif ($err === 'duplicate'): ?>
+                            Invoice number <strong><?php echo htmlspecialchars($_GET['inv'] ?? ''); ?></strong> already exists. Please enter a different invoice number.
                         <?php else: ?>An error occurred. Please try again.<?php if (!empty($_GET['msg'])): ?> <small>(<?php echo htmlspecialchars(substr($_GET['msg'],0,100)); ?>)</small><?php endif; ?>
                         <?php endif; ?>
                     </div>
@@ -156,7 +158,7 @@ $tp_stmt->close();
                             <div class="section-header"><i class="material-icons">edit_document</i>Invoice Details</div>
                             <div class="row g-4 align-items-start">
 
-                                <div class="col-lg-5 col-md-6">
+                                <div class="col-lg-4 col-md-6">
                                     <label class="form-label">Territory Partner <span class="required">*</span></label>
                                     <select name="tp_id" id="tpSelect" class="form-control" required>
                                         <option value=""></option>
@@ -176,7 +178,14 @@ $tp_stmt->close();
                                     <?php endif; ?>
                                 </div>
 
-                                <div class="col-lg-3 col-md-4">
+                                <div class="col-lg-4 col-md-6">
+                                    <label class="form-label">Invoice Number <span class="required">*</span></label>
+                                    <input type="text" name="invoice_number" id="invoiceNumber" class="form-control"
+                                           placeholder="Enter invoice number" maxlength="30" required>
+                                    <div class="field-hint">Must be unique across all invoices</div>
+                                </div>
+
+                                <div class="col-lg-4 col-md-4">
                                     <label class="form-label">Invoice Date <span class="required">*</span></label>
                                     <input type="date" name="invoice_date" id="invoiceDate" class="form-control"
                                            value="<?php echo date('Y-m-d'); ?>"

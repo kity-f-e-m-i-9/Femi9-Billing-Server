@@ -3,6 +3,7 @@ ob_start();
 include("checksession.php");
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
+require_once __DIR__ . '/../shared/TpInvoiceNumberService.php';
 require_once __DIR__ . '/include/GodownAccess.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
@@ -205,24 +206,8 @@ foreach ($items as $item) {
 
 $db_conn->begin_transaction();
 try {
-    // Atomic sequence → invoice number (financial year aware)
-    $inv_month = (int)date('n', strtotime($invoice_date));
-    $inv_year  = (int)date('Y', strtotime($invoice_date));
-    $fy_start  = $inv_month >= 4 ? $inv_year : $inv_year - 1;
-    $current_fy = substr($fy_start, 2) . '-' . substr($fy_start + 1, 2); // e.g. "26-27"
-
-    $db_conn->query("SELECT last_val, fy FROM tp_inv_sequence WHERE id=1 FOR UPDATE");
-    $seq_row = $db_conn->query("SELECT last_val, fy FROM tp_inv_sequence WHERE id=1")->fetch_assoc();
-
-    // Sync with actual max in tp_invoices to guard against out-of-sync sequence
-    $max_res = $db_conn->query("SELECT MAX(CAST(SUBSTRING_INDEX(invoice_number, '/', -1) AS UNSIGNED)) AS max_val FROM tp_invoices WHERE invoice_number LIKE 'TP/$current_fy/%'");
-    $actual_max = (int)(($max_res->fetch_assoc())['max_val'] ?? 0);
-
-    $seq_val  = ($seq_row['fy'] === $current_fy) ? (int)$seq_row['last_val'] : 0;
-    $next_val = max($seq_val, $actual_max) + 1;
-
-    $db_conn->query("UPDATE tp_inv_sequence SET last_val=$next_val, fy='$current_fy' WHERE id=1");
-    $inv_num = 'TP/' . $current_fy . '/' . str_pad($next_val, 4, '0', STR_PAD_LEFT);
+    // Independent per-login invoice number series (not a connected/shared counter)
+    $inv_num = tpInvoiceNextNumber($db_conn, 'CO', $invoice_date);
 
     // Invoice header
     $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)");
