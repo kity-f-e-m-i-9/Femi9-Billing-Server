@@ -77,8 +77,21 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li class="active-page">
                         <a href="stock_request_pending_accounts" class="active"><i class="material-icons-two-tone">done</i>Stock Request</a>
                     </li>
-					
-					
+
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">done</i>OT Channel Sales<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="ot-sale-cat">Category</a></li>
+						<li><a href="ot-sale-add">Add Sale</a></li>
+						<li><a href="ot-sale-view">Manage Sales</a></li>
+						<li><a href="ot-sale-manage-return">Manage Return</a></li>
+                        </ul>
+                    </li>
+					<li>
+                        <a href="OT-Report-Detail-Page"><i class="material-icons-two-tone">view_agenda</i>Report - OT Channel</a>
+                    </li>
+
+
 					<li>
                         <a href="#"><i class="material-icons-two-tone">sentiment_satisfied_alt</i>Delivery Note(INV)<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
