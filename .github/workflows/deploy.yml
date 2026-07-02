@@ -9,6 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Inject production DB credentials into .env
+        run: |
+          ENV_FILE="femi9/billing/shared/.env"
+          sed -i "s|^DB_HOST=.*|DB_HOST=${{ secrets.PROD_DB_HOST }}|" "$ENV_FILE"
+          sed -i "s|^DB_PORT=.*|DB_PORT=${{ secrets.PROD_DB_PORT }}|" "$ENV_FILE"
+          sed -i "s|^DB_USERNAME=.*|DB_USERNAME=${{ secrets.PROD_DB_USERNAME }}|" "$ENV_FILE"
+          sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}|" "$ENV_FILE"
+          sed -i "s|^DB_NAME=.*|DB_NAME=${{ secrets.PROD_DB_NAME }}|" "$ENV_FILE"
       - name: FTP-Deploy-Action
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
