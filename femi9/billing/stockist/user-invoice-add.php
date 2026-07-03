@@ -1,6 +1,6 @@
-<?php include("checksession.php"); 
-header("Location: dashboard.php"); exit;
-date_default_timezone_set("Asia/Kolkata"); 
+<?php include("checksession.php");
+if (($_REQUEST['action'] ?? '') !== 'edit') { header("Location: dashboard.php"); exit; }
+date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
 

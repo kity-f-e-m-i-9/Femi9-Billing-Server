@@ -171,6 +171,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-tp-invoices">TP Invoices</a></li>
 								<li><a href="tp-cnote-manage">TP Credit Notes</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
+							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
                         </ul>
                     </li>
 					<!----------------------Stock Transfers--------------------------->
@@ -603,6 +604,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-tp-invoices">TP Invoices</a></li>
 								<li><a href="tp-cnote-manage">TP Credit Notes</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
+							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
                         </ul>
                     </li>
 					<!----------------------Stock Transfers--------------------------->
