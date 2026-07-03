@@ -89,6 +89,10 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     </li>
 
 					<li>
+                        <a href="overall-stock"><i class="material-icons-two-tone">done</i>Overall Stock</a>
+                    </li>
+
+					<li>
                         <a href="#"><i class="material-icons-two-tone">done</i>OT Channel Sales<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="ot-sale-cat">Category</a></li>
