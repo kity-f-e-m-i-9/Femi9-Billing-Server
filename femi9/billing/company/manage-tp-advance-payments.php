@@ -234,6 +234,7 @@ $i = 0;
                                                     <th>Reference</th>
                                                     <th>Status</th>
                                                     <th>Recorded By</th>
+                                                    <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -259,6 +260,11 @@ $i = 0;
                                                         <?php endif; ?>
                                                     </td>
                                                     <td><?php echo htmlspecialchars($p['created_by']); ?></td>
+                                                    <td>
+                                                        <button type="button" class="btn btn-sm btn-warning btn-action edit-btn" data-id="<?php echo $p['id']; ?>" title="Edit Payment">
+                                                            <i class="material-icons" style="font-size:16px;vertical-align:middle;">edit</i>
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                             <?php endforeach; ?>
                                             </tbody>
@@ -275,6 +281,30 @@ $i = 0;
     </div>
 </div>
 
+<!-- Edit Payment Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModalLabel">Edit TP Advance Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editPaymentForm" method="POST" action="edit-tp-advance-payment-action.php">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="modal-body" id="editModalContent">
+                    <div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" name="update_advance_payment">
+                        <i class="material-icons" style="vertical-align:middle">save</i> Update Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -284,5 +314,56 @@ $i = 0;
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script src="../../assets/js/pages/datatables.js"></script>
+<script>
+$(document).ready(function () {
+    // Remove DataTables' own built-in search box — this page already has
+    // server-side From/To Date, Payer, Receiver and Status filters above.
+    $('#datatable1_filter').remove();
+
+    $('#datatable1').on('click', '.edit-btn', function () {
+        const id = $(this).data('id');
+        $('#editModalContent').html('<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>');
+        $('#editModal').modal('show');
+
+        $.post('get-tp-advance-payment-edit-form.php', {
+            id: id,
+            csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+        })
+        .done(function (response) {
+            $('#editModalContent').html(response);
+        })
+        .fail(function () {
+            $('#editModalContent').html('<div class="alert alert-danger">Error loading edit form. Please try again.</div>');
+        });
+    });
+
+    $('#editPaymentForm').on('submit', function (e) {
+        e.preventDefault();
+
+        if (!confirm('Are you sure you want to update this payment entry?')) {
+            return;
+        }
+
+        const btn = $(this).find('[type="submit"]');
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Updating...');
+
+        $.post('edit-tp-advance-payment-action.php', $(this).serialize())
+            .done(function (response) {
+                btn.prop('disabled', false).html('<i class="material-icons" style="vertical-align:middle">save</i> Update Payment');
+
+                if (response.success) {
+                    alert(response.message);
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (response.message || 'Failed to update payment'));
+                }
+            })
+            .fail(function () {
+                btn.prop('disabled', false).html('<i class="material-icons" style="vertical-align:middle">save</i> Update Payment');
+                alert('Error updating payment. Please try again.');
+            });
+    });
+});
+</script>
 </body>
 </html>
