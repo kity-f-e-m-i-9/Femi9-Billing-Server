@@ -14,6 +14,12 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+// Self-migrating: ensure deleted_at column exists for TP advance payment soft-delete.
+$_tapDelCol = $db_conn->query("SHOW COLUMNS FROM tp_advance_payments LIKE 'deleted_at'");
+if ($_tapDelCol && $_tapDelCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_advance_payments ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER status");
+}
+
 $payment_id = intval($_POST['id'] ?? 0);
 
 if ($payment_id <= 0) {
@@ -26,7 +32,7 @@ $stmt = $db_conn->prepare("
     FROM tp_advance_payments tap
     JOIN territory_partners tp ON tp.id = tap.territory_partner_id
     LEFT JOIN company_godown cg ON cg.id = tap.company_id
-    WHERE tap.id = ?
+    WHERE tap.id = ? AND tap.deleted_at IS NULL
     LIMIT 1
 ");
 $stmt->bind_param("i", $payment_id);

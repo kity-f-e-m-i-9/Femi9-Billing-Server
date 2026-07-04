@@ -7,6 +7,12 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+// Self-migrating: ensure deleted_at column exists for TP advance payment soft-delete.
+$_tapDelCol = $db_conn->query("SHOW COLUMNS FROM tp_advance_payments LIKE 'deleted_at'");
+if ($_tapDelCol && $_tapDelCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_advance_payments ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER status");
+}
+
 // Company profiles (receivers of the advance payment)
 $company_profiles = $db_conn->query("SELECT id, gname FROM company_godown WHERE gname LIKE '%Femi%' AND " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC")->fetch_all(MYSQLI_ASSOC);
 $default_company_id = $company_profiles[0]['id'] ?? 0;
@@ -22,7 +28,7 @@ $allowed_statuses = ['active','partially_adjusted','fully_adjusted',''];
 if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = '';
 
 // Build query
-$where = ["tap.payment_date BETWEEN ? AND ?"];
+$where = ["tap.deleted_at IS NULL", "tap.payment_date BETWEEN ? AND ?"];
 $params = [$filter_from, $filter_to];
 $types = "ss";
 
@@ -261,8 +267,11 @@ $i = 0;
                                                     </td>
                                                     <td><?php echo htmlspecialchars($p['created_by']); ?></td>
                                                     <td>
-                                                        <button type="button" class="btn btn-sm btn-warning btn-action edit-btn" data-id="<?php echo $p['id']; ?>" title="Edit Payment">
+                                                        <button type="button" class="btn btn-sm btn-warning btn-action edit-btn me-1" data-id="<?php echo $p['id']; ?>" title="Edit Payment">
                                                             <i class="material-icons" style="font-size:16px;vertical-align:middle;">edit</i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-danger btn-action delete-btn" data-id="<?php echo $p['id']; ?>" title="Delete Payment">
+                                                            <i class="material-icons" style="font-size:16px;vertical-align:middle;">delete</i>
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -316,10 +325,6 @@ $i = 0;
 <script src="../../assets/js/pages/datatables.js"></script>
 <script>
 $(document).ready(function () {
-    // Remove DataTables' own built-in search box — this page already has
-    // server-side From/To Date, Payer, Receiver and Status filters above.
-    $('#datatable1_filter').remove();
-
     $('#datatable1').on('click', '.edit-btn', function () {
         const id = $(this).data('id');
         $('#editModalContent').html('<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>');
@@ -362,6 +367,35 @@ $(document).ready(function () {
                 btn.prop('disabled', false).html('<i class="material-icons" style="vertical-align:middle">save</i> Update Payment');
                 alert('Error updating payment. Please try again.');
             });
+    });
+
+    $('#datatable1').on('click', '.delete-btn', function () {
+        const id = $(this).data('id');
+        const btn = $(this);
+
+        if (!confirm('Are you sure you want to delete this payment entry? This action can be undone later.')) {
+            return;
+        }
+
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+        $.post('delete-tp-advance-payment-action.php', {
+            id: id,
+            csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+        })
+        .done(function (response) {
+            if (response.success) {
+                alert(response.message || 'Payment deleted successfully');
+                window.location.reload();
+            } else {
+                alert('Error: ' + (response.message || 'Failed to delete payment'));
+                btn.prop('disabled', false).html('<i class="material-icons" style="font-size:16px;vertical-align:middle;">delete</i>');
+            }
+        })
+        .fail(function () {
+            alert('Error deleting payment. Please try again.');
+            btn.prop('disabled', false).html('<i class="material-icons" style="font-size:16px;vertical-align:middle;">delete</i>');
+        });
     });
 });
 </script>

@@ -87,10 +87,16 @@ try {
         throw new Exception('Invalid adjusted amount');
     }
 
+    // Self-migrating: ensure deleted_at column exists for TP advance payment soft-delete.
+    $_tapDelCol = $db_conn->query("SHOW COLUMNS FROM tp_advance_payments LIKE 'deleted_at'");
+    if ($_tapDelCol && $_tapDelCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE tp_advance_payments ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER status");
+    }
+
     $stmt_check = $db_conn->prepare("
         SELECT company_id
         FROM tp_advance_payments
-        WHERE id = ?
+        WHERE id = ? AND deleted_at IS NULL
         LIMIT 1
     ");
     $stmt_check->bind_param("i", $payment_id);
@@ -137,7 +143,7 @@ try {
             status = ?,
             remarks = ?,
             updated_at = NOW()
-        WHERE id = ?
+        WHERE id = ? AND deleted_at IS NULL
     ");
 
     if (!$stmt_update) {
