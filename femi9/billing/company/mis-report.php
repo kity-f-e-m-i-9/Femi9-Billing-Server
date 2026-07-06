@@ -6,8 +6,7 @@ error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
 // ── MIS Type (only Sales is implemented) ────────────────────────────────────
-$mis_type = $_GET['mis_type'] ?? 'sales';
-if (!in_array($mis_type, ['sales', 'purchase', 'inventory'], true)) $mis_type = 'sales';
+$mis_type = 'sales';
 
 // ── Date range & TP filter ─────────────────────────────────────────────────
 $preset   = $_GET['preset'] ?? 'month';
@@ -31,19 +30,16 @@ $days_diff = (strtotime($to) - strtotime($from)) / 86400;
 $prev_from = date('Y-m-d', strtotime($from) - ($days_diff + 1) * 86400);
 $prev_to   = date('Y-m-d', strtotime($from) - 86400);
 
-// Scope = "invoices actually ISSUED BY this entity", not "transactions this
-// entity appears in on either side":
-//  - the `invoice` table is always company-issued (company is always the
-//    seller there), so it only counts for the 'company' scope. There's no
-//    per-row column to match against for that, so each invoice-table query
-//    below binds $inv_flag ('1' or '0') against a bare `(?='1')` condition
-//    instead of a real column — always-true for company scope, always-false
-//    otherwise, with no operator-precedence risk since it's self-contained.
-//  - the `user_invoice` table's `from_user_type` IS the actual issuer, so it
-//    counts uniformly for every scope via a plain `from_user_type = ?`
-//    match — 'company' maps to from_user_type='company' (company invoicing
-//    through the reseller-chain mechanism), 'tp'/'super_stockiest'/
-//    'stockiest' map to that channel issuing its own invoices.
+// Scope = "invoices actually ISSUED BY this entity", checked identically
+// against both tables:
+//  - `invoice.user_type` is WHICH ENTITY sold to a customer (every row has
+//    a customer_id — this table is <seller type> -> Customer, e.g. a Super
+//    Stockist's or the company's own direct sale to a customer).
+//  - `user_invoice.from_user_type` is WHICH ENTITY billed another business
+//    (company -> SS/S/SD/D/Shop, or those entities reselling to each other).
+// So both tables use the same plain `<type column> = ?` match against the
+// scope's own type — 'company' maps to 'company' in both, 'tp' to
+// 'territory_partner', etc. No special-casing needed between the two tables.
 $scope_types = [
     'company'         => 'company',
     'tp'              => 'territory_partner',
@@ -51,8 +47,6 @@ $scope_types = [
     'stockiest'       => 'stockiest',
 ];
 $utype = $scope_types[$scope] ?? 'territory_partner';
-$inv_flag = ($scope === 'company') ? '1' : '0';
-$inv_active = ($scope === 'company') ? '1=1' : '1=0';
 
 // ── DB helpers ─────────────────────────────────────────────────────────────
 function cq($db, $sql, $types = '', $params = []) {
@@ -104,69 +98,13 @@ $tc_uii = $filter_tp > 0 ? " AND uii.from_user_id={$filter_tp}"  : "";
 $all_tps = call_rows($db_conn,
     "SELECT id, name, tp_id FROM territory_partners WHERE is_active=1 ORDER BY name ASC");
 
-// ── Purchase / Inventory not built yet — show a placeholder and stop ───────
-if ($mis_type !== 'sales') {
-    $mis_type_label = ucfirst($mis_type);
-    ?>
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>MIS Report : <?php echo $business_name; ?></title>
-        <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-        <link href="../../assets/css/main.min.css" rel="stylesheet">
-        <link href="../../assets/css/custom.css" rel="stylesheet">
-        <link rel="icon" type="image/png" href="../../assets/images/neptune.png">
-    </head>
-    <body>
-    <div class="app align-content-stretch d-flex flex-wrap">
-        <div class="app-sidebar">
-            <?php include("logo.php"); ?>
-            <?php include("femi_menu.php"); ?>
-        </div>
-        <div class="app-container">
-            <?php include("app-header.php"); ?>
-            <div class="app-content">
-                <div class="content-wrapper">
-                    <div class="container-fluid">
-                        <div class="mis-filter" style="background:#f5f6fa;border-radius:8px;padding:14px 18px;margin-bottom:22px;">
-                            <form method="get" style="display:flex;gap:10px;align-items:flex-end;">
-                                <div>
-                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">MIS Type</label>
-                                    <select name="mis_type" class="form-control form-control-sm" style="width:200px;" onchange="this.form.submit()">
-                                        <option value="sales">Sales</option>
-                                        <option value="purchase" <?php echo $mis_type==='purchase' ? 'selected' : ''; ?>>Purchase</option>
-                                        <option value="inventory" <?php echo $mis_type==='inventory' ? 'selected' : ''; ?>>Inventory</option>
-                                    </select>
-                                </div>
-                            </form>
-                        </div>
-                        <div class="card">
-                            <div class="card-body text-center py-5">
-                                <i class="material-icons-outlined" style="font-size:48px;color:#bbb;">construction</i>
-                                <h4 class="mt-3"><?php echo $mis_type_label; ?> MIS — Coming Soon</h4>
-                                <p class="text-muted">This report type is not built yet.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    </body>
-    </html>
-    <?php
-    exit;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. KPI — current & previous period
 // ═══════════════════════════════════════════════════════════════════════════
 $cust_row = crow($db_conn,
     "SELECT COUNT(*) cnt, COALESCE(SUM(total),0) rev FROM invoice
-     WHERE (?='1') AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}",
-    'sss', [$inv_flag, $from, $to]);
+     WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}",
+    'sss', [$utype, $from, $to]);
 $shop_row = crow($db_conn,
     "SELECT COUNT(*) cnt, COALESCE(SUM(total),0) rev FROM user_invoice
      WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}",
@@ -178,8 +116,8 @@ $total_revenue  = (float)$cust_row['rev'] + (float)$shop_row['rev'];
 $cust_units = (int)cval($db_conn,
     "SELECT COALESCE(SUM(ii.qty),0) FROM invoice_items ii
      JOIN invoice i ON i.inv_id = ii.inv_id
-     WHERE (?='1') AND i.date BETWEEN ? AND ?".tp_cond_inv($filter_tp),
-    'sss', [$inv_flag, $from, $to]);
+     WHERE i.user_type=? AND i.date BETWEEN ? AND ?".tp_cond_inv($filter_tp),
+    'sss', [$utype, $from, $to]);
 $shop_units = (int)cval($db_conn,
     "SELECT COALESCE(SUM(uii.qty),0) FROM user_invoice_items uii
      JOIN user_invoice ui ON ui.inv_id = uii.inv_id
@@ -194,46 +132,82 @@ $ot_row = ['cnt' => 0, 'rev' => 0];
 $ot_units = 0;
 $ot_prev_rev = 0.0;
 if ($scope === 'company') {
+    // 'ID CONCEPT' rows are internal concept/sample orders, not real OT sales.
     $ot_row = crow($db_conn,
         "SELECT COUNT(DISTINCT tempid) cnt, COALESCE(SUM(total),0) rev FROM ot_sales
-         WHERE date BETWEEN ? AND ?",
+         WHERE cat!='ID CONCEPT' AND date BETWEEN ? AND ?",
         'ss', [$from, $to]);
     $ot_units = (int)cval($db_conn,
-        "SELECT COALESCE(SUM(qty),0) FROM ot_sales WHERE date BETWEEN ? AND ?",
+        "SELECT COALESCE(SUM(qty),0) FROM ot_sales WHERE cat!='ID CONCEPT' AND date BETWEEN ? AND ?",
         'ss', [$from, $to]);
     $ot_prev_rev = (float)cval($db_conn,
-        "SELECT COALESCE(SUM(total),0) FROM ot_sales WHERE date BETWEEN ? AND ?",
+        "SELECT COALESCE(SUM(total),0) FROM ot_sales WHERE cat!='ID CONCEPT' AND date BETWEEN ? AND ?",
         'ss', [$prev_from, $prev_to]);
 }
 $total_invoices += (int)($ot_row['cnt'] ?? 0);
 $total_revenue  += (float)($ot_row['rev'] ?? 0);
 $total_units    += $ot_units;
 
-$total_tps = (int)cval($db_conn,
-    "SELECT COUNT(DISTINCT user_id) FROM invoice WHERE (?='1') AND sub_total>0 AND `date` BETWEEN ? AND ?",
-    'sss', [$inv_flag, $from, $to]);
-$total_tps2 = (int)cval($db_conn,
-    "SELECT COUNT(DISTINCT from_user_id) FROM user_invoice WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?",
-    'sss', [$utype, $from, $to]);
-$active_tps = max($total_tps, $total_tps2);
+// For company scope, `user_id`/`from_user_id` on these rows is the company's
+// own single account, not the counterparty — so count the actual counterparty
+// columns instead (customer_id, and to_user_type+to_user_id combined).
+if ($scope === 'company') {
+    $active_customers = (int)cval($db_conn,
+        "SELECT COUNT(DISTINCT customer_id) FROM invoice WHERE user_type='company' AND sub_total>0 AND `date` BETWEEN ? AND ?",
+        'ss', [$from, $to]);
+    // OT sales have no shared customer_id with `invoice`, so their distinct
+    // buyers (by name — the closest thing to an identity OT rows carry,
+    // excluding 'ID CONCEPT' sample rows) are added on top, not deduped in.
+    $active_customers += (int)cval($db_conn,
+        "SELECT COUNT(DISTINCT customer_name) FROM ot_sales WHERE cat!='ID CONCEPT' AND `date` BETWEEN ? AND ?",
+        'ss', [$from, $to]);
+    $active_businesses = (int)cval($db_conn,
+        "SELECT COUNT(DISTINCT CONCAT(to_user_type,'-',to_user_id)) FROM user_invoice WHERE from_user_type='company' AND sub_total>0 AND `date` BETWEEN ? AND ?",
+        'ss', [$from, $to]);
+    $active_tps = $active_customers + $active_businesses;
+} else {
+    $total_tps = (int)cval($db_conn,
+        "SELECT COUNT(DISTINCT user_id) FROM invoice WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?",
+        'sss', [$utype, $from, $to]);
+    $total_tps2 = (int)cval($db_conn,
+        "SELECT COUNT(DISTINCT from_user_id) FROM user_invoice WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?",
+        'sss', [$utype, $from, $to]);
+    $active_tps = max($total_tps, $total_tps2);
+}
 
+// user_return_stock has one row per line-item but repeats the whole return's
+// total on every row, so it must be deduped by returnid before summing —
+// otherwise a naive SUM(total) multiplies each return by its item count.
 $returns_row = crow($db_conn,
-    "SELECT COUNT(*) cnt, COALESCE(SUM(total),0) amount FROM user_return_stock
-     WHERE to_usertype=?".($filter_tp > 0 ? " AND to_userid={$filter_tp}" : "")." AND `date` BETWEEN ? AND ?",
+    "SELECT COUNT(*) cnt, COALESCE(SUM(total),0) amount FROM (
+        SELECT returnid, MAX(total) total FROM user_return_stock
+        WHERE to_usertype=?".($filter_tp > 0 ? " AND to_userid={$filter_tp}" : "")." AND `date` BETWEEN ? AND ?
+        GROUP BY returnid
+     ) x",
     'sss', [$utype, $from, $to]);
 $total_returns    = (int)$returns_row['cnt'];
 $total_return_amt = (float)$returns_row['amount'];
+// Total Turnover is net of returns received back in the selected period.
+$total_revenue -= $total_return_amt;
 
-// Previous period
+// Previous period (also net of that period's own returns, for a fair growth %)
+$prev_return_amt = (float)cval($db_conn,
+    "SELECT COALESCE(SUM(total),0) FROM (
+        SELECT returnid, MAX(total) total FROM user_return_stock
+        WHERE to_usertype=?".($filter_tp > 0 ? " AND to_userid={$filter_tp}" : "")." AND `date` BETWEEN ? AND ?
+        GROUP BY returnid
+     ) x",
+    'sss', [$utype, $prev_from, $prev_to]);
 $prev_rev = (float)cval($db_conn,
     "SELECT COALESCE(SUM(total),0) FROM invoice
-     WHERE (?='1') AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}",
-    'sss', [$inv_flag, $prev_from, $prev_to])
+     WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}",
+    'sss', [$utype, $prev_from, $prev_to])
   + (float)cval($db_conn,
     "SELECT COALESCE(SUM(total),0) FROM user_invoice
      WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}",
     'sss', [$utype, $prev_from, $prev_to])
-  + $ot_prev_rev;
+  + $ot_prev_rev
+  - $prev_return_amt;
 $revenue_growth = $prev_rev > 0
     ? round((($total_revenue - $prev_rev) / $prev_rev) * 100, 1) : 0;
 
@@ -262,10 +236,10 @@ $gp_case = "CASE d.ctype
 // OT channel sales are retail/direct-to-consumer, same pricing tier as shop
 // sales, so they reuse the 'shop' -> outlet_price mapping. Company scope only.
 $gp_ot_union = '';
-$gp_params = [$inv_flag, $from, $to, $utype, $from, $to];
+$gp_params = [$utype, $from, $to, $utype, $from, $to];
 if ($scope === 'company') {
     $gp_ot_union = "UNION ALL SELECT os.prid, os.qty, 'shop' AS ctype
-         FROM ot_sales os WHERE os.date BETWEEN ? AND ?";
+         FROM ot_sales os WHERE os.cat!='ID CONCEPT' AND os.date BETWEEN ? AND ?";
     $gp_params[] = $from;
     $gp_params[] = $to;
 }
@@ -274,7 +248,7 @@ $gross_profit = (float)cval($db_conn,
      FROM (
          SELECT ii.pr_id, ii.qty, i.user_type AS ctype
          FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
-         WHERE (?='1') AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
+         WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
          UNION ALL
          SELECT uii.pr_id, uii.qty, ui.to_user_type AS ctype
          FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
@@ -310,12 +284,14 @@ $channel_labels = [
 ];
 $channel_breakdown = [];
 if ($scope === 'company') {
-    // Income to Company = every invoice the company itself issued: all of
-    // `invoice` (always company-issued) plus the `user_invoice` rows where
-    // the company is specifically the issuer (from_user_type='company').
+    // Income to Company = company's own direct customer sales (invoice
+    // table, user_type='company' — every invoice row has a customer_id, so
+    // this table is really "<seller type> -> Customer") plus the
+    // user_invoice rows where the company is specifically the issuer
+    // (from_user_type='company', i.e. company billing SS/S/SD/D/Shop).
     $ch_a = call_rows($db_conn,
         "SELECT user_type ch, COUNT(*) cnt, COALESCE(SUM(total),0) rev FROM invoice
-         WHERE sub_total>0 AND `date` BETWEEN ? AND ?
+         WHERE user_type='company' AND sub_total>0 AND `date` BETWEEN ? AND ?
          GROUP BY user_type", 'ss', [$from, $to]);
     $ch_b = call_rows($db_conn,
         "SELECT to_user_type ch, COUNT(*) cnt, COALESCE(SUM(total),0) rev FROM user_invoice
@@ -338,9 +314,9 @@ $channel_total_rev = array_sum(array_column($channel_breakdown, 'rev')) ?: 1;
 // ═══════════════════════════════════════════════════════════════════════════
 $dc = call_rows($db_conn,
     "SELECT `date` d, COALESCE(SUM(total),0) rev FROM invoice
-     WHERE (?='1') AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}
+     WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}
      GROUP BY `date` ORDER BY `date`",
-    'sss', [$inv_flag, $from, $to]);
+    'sss', [$utype, $from, $to]);
 $ds = call_rows($db_conn,
     "SELECT `date` d, COALESCE(SUM(total),0) rev FROM user_invoice
      WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}
@@ -362,13 +338,13 @@ while ($ptr <= $end) {
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. PERIOD BREAKDOWN
 // ═══════════════════════════════════════════════════════════════════════════
-function company_period($db, $utype, $inv_flag, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt) {
+function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt) {
     $cust = call_rows($db,
         "SELECT DATE_FORMAT(`date`,'$gfmt') g, DATE_FORMAT(MIN(`date`),'$lfmt') lbl,
                 COUNT(*) cnt, COALESCE(SUM(total),0) rev
-         FROM invoice WHERE (?='1') AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}
+         FROM invoice WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}
          GROUP BY g ORDER BY g",
-        'sss', [$inv_flag, $from, $to]);
+        'sss', [$utype, $from, $to]);
     $shop = call_rows($db,
         "SELECT DATE_FORMAT(`date`,'$gfmt') g, DATE_FORMAT(MIN(`date`),'$lfmt') lbl,
                 COUNT(*) cnt, COALESCE(SUM(total),0) rev
@@ -380,10 +356,10 @@ function company_period($db, $utype, $inv_flag, $from, $to, $tc_inv, $tc_ui, $gf
     foreach ($shop as $r) { $map[$r['g']]['lbl']=$map[$r['g']]['lbl']??$r['lbl']; $map[$r['g']]['s']=(float)$r['rev']; $map[$r['g']]['sc']=(int)$r['cnt']; }
     ksort($map); return $map;
 }
-$daily_p   = company_period($db_conn,$utype,$inv_flag,$from,$to,$tc_inv,$tc_ui,'%Y-%m-%d','%d %b');
-$weekly_p  = company_period($db_conn,$utype,$inv_flag,$from,$to,$tc_inv,$tc_ui,'%Y-%u','W%u %Y');
-$monthly_p = company_period($db_conn,$utype,$inv_flag,$from,$to,$tc_inv,$tc_ui,'%Y-%m','%b %Y');
-$yearly_p  = company_period($db_conn,$utype,$inv_flag,$from,$to,$tc_inv,$tc_ui,'%Y','%Y');
+$daily_p   = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m-%d','%d %b');
+$weekly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%u','W%u %Y');
+$monthly_p = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m','%b %Y');
+$yearly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y','%Y');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. PRODUCT-WISE SALES
@@ -395,14 +371,14 @@ $product_sales = call_rows($db_conn,
      FROM (
          SELECT ii.pr_id, ii.qty, ii.total
          FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
-         WHERE (?='1') AND i.date BETWEEN ? AND ?{$tc_ii}
+         WHERE i.user_type=? AND i.date BETWEEN ? AND ?{$tc_ii}
          UNION ALL
          SELECT uii.pr_id, uii.qty, uii.total
          FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
          WHERE ui.from_user_type=? AND ui.date BETWEEN ? AND ?{$tc_uii}
      ) d JOIN products p ON p.id=d.pr_id
      GROUP BY p.id, p.productName ORDER BY total_qty DESC LIMIT 25",
-    'ssssss', [$inv_flag, $from, $to, $utype, $from, $to]);
+    'ssssss', [$utype, $from, $to, $utype, $from, $to]);
 $grand_qty = array_sum(array_column($product_sales, 'total_qty')) ?: 1;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -432,14 +408,15 @@ $district_sales = call_rows($db_conn,
 // Only meaningful in the TP-channel scope — always about actual TPs, so it's
 // skipped entirely for the "Income to Company" (direct, non-TP) scope.
 // ═══════════════════════════════════════════════════════════════════════════
-// Revenue/units/count come only from invoices TP itself issued
-// (user_invoice.from_user_type='territory_partner') — not from what company
-// invoiced TO the TP (that's company's own invoice, not TP's).
+// Revenue/units/count = invoices TP itself issued, from BOTH tables:
+// user_invoice (TP reselling to SS/S/SD/D/Shop or another business) plus
+// invoice (TP selling directly to a customer, user_type='territory_partner')
+// — not from what company invoiced TO the TP (that's company's own invoice).
 $tp_perf = ($scope === 'tp') ? call_rows($db_conn,
     "SELECT tp.id tp_id, tp.name tp_name, tp.tp_id tp_code,
-            COALESCE(si.cnt,0) inv_cnt,
-            COALESCE(si.rev,0) revenue,
-            COALESCE(si.units,0) units,
+            COALESCE(si.cnt,0) + COALESCE(ci.cnt,0) inv_cnt,
+            COALESCE(si.rev,0) + COALESCE(ci.rev,0) revenue,
+            COALESCE(si.units,0) + COALESCE(ci.units,0) units,
             COALESCE(tgt.target,0) target
      FROM territory_partners tp
      LEFT JOIN (
@@ -448,6 +425,12 @@ $tp_perf = ($scope === 'tp') ? call_rows($db_conn,
          FROM user_invoice ui WHERE from_user_type='territory_partner' AND sub_total>0 AND `date` BETWEEN '{$from}' AND '{$to}'
          GROUP BY from_user_id
      ) si ON si.from_user_id = tp.id
+     LEFT JOIN (
+         SELECT user_id, COUNT(*) cnt, SUM(total) rev,
+                (SELECT COALESCE(SUM(qty),0) FROM invoice_items ii WHERE ii.user_id=i.user_id AND ii.user_type='territory_partner' AND ii.date BETWEEN '{$from}' AND '{$to}') units
+         FROM invoice i WHERE user_type='territory_partner' AND sub_total>0 AND `date` BETWEEN '{$from}' AND '{$to}'
+         GROUP BY user_id
+     ) ci ON ci.user_id = tp.id
      LEFT JOIN (
          SELECT tpl.territory_partner_id, COALESCE(SUM(pln.target_amount),0) target
          FROM territory_partner_locations tpl
@@ -477,9 +460,9 @@ $tc_inv_i = $filter_tp > 0 ? " AND i.user_id={$filter_tp}" : "";
 $top_custs = call_rows($db_conn,
     "SELECT COALESCE(c.name,'Walking Customer') cust_name, COUNT(*) inv_cnt, COALESCE(SUM(i.total),0) revenue
      FROM invoice i LEFT JOIN customers c ON c.id=i.customer_id
-     WHERE (?='1') AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_inv_i}
+     WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_inv_i}
      GROUP BY i.customer_id ORDER BY revenue DESC LIMIT 10",
-    'sss', [$inv_flag, $from, $to]);
+    'sss', [$utype, $from, $to]);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 8. ORDER STATUS
@@ -487,8 +470,8 @@ $top_custs = call_rows($db_conn,
 $ord_c = call_rows($db_conn,
     "SELECT i.total, COALESCE(r.paid,0) paid
      FROM invoice i LEFT JOIN (SELECT inv_id, SUM(received) paid FROM receipt GROUP BY inv_id) r ON r.inv_id=i.inv_id
-     WHERE (?='1') AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_inv}",
-    'sss', [$inv_flag, $from, $to]);
+     WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_inv}",
+    'sss', [$utype, $from, $to]);
 $ord_s = call_rows($db_conn,
     "SELECT ui.total, COALESCE(r.paid,0) paid
      FROM user_invoice ui LEFT JOIN (SELECT inv_id, SUM(received) paid FROM receipt GROUP BY inv_id) r ON r.inv_id=ui.inv_id
@@ -510,14 +493,14 @@ $six_months = call_rows($db_conn,
             SUM(rev) total_rev, SUM(cnt) total_cnt
      FROM (
          SELECT `date` d, SUM(total) rev, COUNT(*) cnt FROM invoice
-         WHERE (?='1') AND sub_total>0 AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_inv}
+         WHERE user_type=? AND sub_total>0 AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_inv}
          GROUP BY `date`
          UNION ALL
          SELECT `date` d, SUM(total) rev, COUNT(*) cnt FROM user_invoice
          WHERE from_user_type=? AND sub_total>0 AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_ui}
          GROUP BY `date`
      ) z GROUP BY DATE_FORMAT(d,'%Y-%m') ORDER BY mon",
-    'ss', [$inv_flag, $utype]);
+    'ss', [$utype, $utype]);
 $prev_m = null;
 foreach ($six_months as &$m) {
     $m['growth'] = ($prev_m!==null&&$prev_m>0) ? round((($m['total_rev']-$prev_m)/$prev_m)*100,1) : null;
@@ -557,7 +540,7 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MIS Report : <?php echo $business_name; ?></title>
+    <title>Dashboard : <?php echo $business_name; ?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
@@ -676,7 +659,7 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
                             <div class="page-description" style="margin-left:-10px;">
                                 <h1>
                                     <i class="material-icons-outlined" style="vertical-align:middle;margin-right:6px;">assessment</i>
-                                    MIS Report — Sales Overview
+                                    Dashboard — Sales Overview
                                 </h1>
                             </div>
                         </div>
@@ -689,8 +672,6 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">MIS Type</label>
                                 <select name="mis_type" class="form-control form-control-sm" style="width:140px;" onchange="this.form.submit()">
                                     <option value="sales" selected>Sales</option>
-                                    <option value="purchase">Purchase</option>
-                                    <option value="inventory">Inventory</option>
                                 </select>
                             </div>
                             <div>
@@ -784,16 +765,19 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
                         'stockiest'        => ['Active Stockists', 'Stockists'],
                     ];
                     [$active_label, $active_sublabel] = $active_labels[$scope];
+                    $active_sub_text = ($scope === 'company')
+                        ? inr_format($active_customers, 0).' customers · '.inr_format($active_businesses, 0).' businesses'
+                        : $active_sublabel.' with invoices in period';
                     // kpi row: [accent key, icon, label, value, sub-text, sub-text tone ('', 'good', 'bad')]
                     $kpis = [
                         ['blue','payments','Total Turnover','₹'.inr_format($total_revenue, 0),
                          ($revenue_growth>=0?'▲':'▼').' '.abs($revenue_growth).'% vs prev', $revenue_growth>=0?'good':'bad'],
                         ['aqua','receipt_long','Total Invoices',inr_format($total_invoices, 0),
-                         'Cust: '.($cust_row['cnt']??0).' | Shop: '.($shop_row['cnt']??0), ''],
+                         'in selected period', ''],
                         ['green','inventory_2','Units Sold',inr_format($total_units, 0),
-                         'Cust: '.inr_format($cust_units, 0).' | Shop: '.inr_format($shop_units, 0), ''],
+                         'in selected period', ''],
                         ['violet','people',$active_label,inr_format($active_tps, 0),
-                         $active_sublabel.' with invoices in period', ''],
+                         $active_sub_text, ''],
                         ['critical','keyboard_return','Returns',inr_format($total_returns, 0),
                          '₹'.inr_format($total_return_amt, 0).' returned', ''],
                     ];
@@ -805,6 +789,8 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
                     $kpis[] = ['orange','trending_up','Gross Profit','₹'.inr_format($gross_profit, 0),
                          'MRP vs tier price given', ''];
                     if ($scope === 'company') {
+                        $kpis[] = ['critical','receipt','Expenses','₹'.inr_format($total_expenses, 0),
+                         'for selected period', ''];
                         $kpis[] = [$net_profit>=0?'good':'critical','account_balance_wallet','Net Profit','₹'.inr_format($net_profit, 0),
                          'Gross Profit − Expenses (₹'.inr_format($total_expenses, 0).')', $net_profit>=0?'good':'bad'];
                     }

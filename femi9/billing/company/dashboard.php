@@ -34,6 +34,9 @@ if ($resetData) {
 }
 // ========================================
 
+header('Location: mis-report.php');
+exit;
+
 date_default_timezone_set("Asia/Kolkata");
 $today_date=date("Y-m-d");
 
