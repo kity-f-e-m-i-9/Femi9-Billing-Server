@@ -148,10 +148,10 @@ include("config.php");
 <th scope="row"><?php echo $rd=$rd+1;?></th>
 <td><?=$result_ProductDetails123['productName'];?></td>
 <td><?=$result_INVProductDetails['qty'];?></td>
-<td>&#8377;<?php echo number_format($result_INVProductDetails['amount'],2,'.','');?></td>
-<td align="right"><?php echo number_format($result_INVProductDetails['subtotal'],2,'.','');?></td>
-<td><?=number_format($result_INVProductDetails['gstamount_total'],2,'.','');?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
-<td align="right"><?php echo number_format($TotalAMount,2,'.','');?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
+<td align="right"><?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
+<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+<td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
 <a href="cnote_delete.php?returnid=<?=$_REQUEST['returnid'];?>&&rowid=<?=$ItemRowid;?>&&redirurl=cnote_details&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>

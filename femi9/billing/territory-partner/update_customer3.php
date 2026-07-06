@@ -63,7 +63,7 @@ $Cust_Mbile = $resCust['mobile'] ?? '';
                                 <td><?php echo htmlspecialchars($inv['inv_number'] ?? ''); ?></td>
                                 <td><?php echo htmlspecialchars($Cust_Name); ?><br/>M: <?php echo htmlspecialchars($Cust_Mbile); ?></td>
                                 <td><?php echo date("d/M/Y", strtotime($inv['date'] ?? '')); ?></td>
-                                <td><?php echo number_format((float)($inv['total'] ?? 0), 2, '.', ''); ?></td>
+                                <td><?php echo inr_format((float)($inv['total'] ?? 0), 2); ?></td>
                             </tr></tbody>
                         </table>
 

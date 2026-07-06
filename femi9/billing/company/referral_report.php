@@ -264,10 +264,10 @@ if($result_onbaord_user_records['useridtext']!=NULL)
 					<?php echo $result_onbaord_user_records_whom['mobile_number'];?>
 					</td>
 					
-					<td><?=number_format($result_product_list['total_sls_amount'],2);?></td>
+					<td><?=inr_format($result_product_list['total_sls_amount'], 2);?></td>
 					<td>
 					<?php if($result_product_list['target_sls_amount']!=NULL){?>
-					<?=number_format($result_product_list['target_sls_amount'],2); }else{ echo "0.00";}?>
+					<?=inr_format($result_product_list['target_sls_amount'], 2); }else{ echo "0.00";}?>
 					</td>
 					
 					<td>
@@ -275,7 +275,7 @@ if($result_onbaord_user_records['useridtext']!=NULL)
 					<?=$result_product_list['commission_percentage']; }else{ echo "0";}?>%
 					</td>
 					
-					<td><?=number_format($result_product_list['commission_amount'],2);?></td>
+					<td><?=inr_format($result_product_list['commission_amount'], 2);?></td>
 					<td><?=date("M/Y",strtotime($result_product_list['from_date']));?></td>
 					
                                         </tr>

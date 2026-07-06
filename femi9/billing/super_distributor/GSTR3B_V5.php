@@ -145,8 +145,8 @@ if($from_date!=NULL)
 						   </tr>
 						   <tr>
 						   <td>From a supplier under composition scheme, Exempt and Nil rated supply</td>
-						   <td><?=number_format($show_total_inter_register,2);?></td>
-						   <td><?=number_format($show_total_intra_register,2);?></td>
+						   <td><?=inr_format($show_total_inter_register, 2);?></td>
+						   <td><?=inr_format($show_total_intra_register, 2);?></td>
 						   </tr>
 						   <tr>
 						   <td>Non GST Supply</td>

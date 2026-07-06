@@ -209,7 +209,7 @@ $type_label = $is_out ? 'Location → Godown' : 'Godown → Location';
         <tfoot>
             <tr>
                 <td colspan="2" style="text-align:right;">Total Units</td>
-                <td style="text-align:center;"><?= number_format($total_qty); ?></td>
+                <td style="text-align:center;"><?= inr_format($total_qty, 0); ?></td>
             </tr>
         </tfoot>
     </table>

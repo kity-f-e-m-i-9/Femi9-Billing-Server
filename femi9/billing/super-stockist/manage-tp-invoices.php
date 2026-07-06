@@ -177,9 +177,9 @@ $i = 0;
                     <!-- Stats -->
                     <div class="row">
                         <div class="col-lg-3 col-sm-6"><div class="stat-card purple"><div><h3><?php echo $total_count; ?></h3><p>Total Invoices</p></div><i class="material-icons-outlined stat-icon">receipt_long</i></div></div>
-                        <div class="col-lg-3 col-sm-6"><div class="stat-card green"><div><h3>₹<?php echo number_format($total_amount, 0); ?></h3><p>Total Value</p></div><i class="material-icons-outlined stat-icon">currency_rupee</i></div></div>
+                        <div class="col-lg-3 col-sm-6"><div class="stat-card green"><div><h3>₹<?php echo inr_format($total_amount, 0); ?></h3><p>Total Value</p></div><i class="material-icons-outlined stat-icon">currency_rupee</i></div></div>
                         <div class="col-lg-3 col-sm-6"><div class="stat-card blue"><div><h3><?php echo $this_month; ?></h3><p>This Month</p></div><i class="material-icons-outlined stat-icon">calendar_month</i></div></div>
-                        <div class="col-lg-3 col-sm-6"><div class="stat-card amber"><div><h3>₹<?php echo number_format($month_amount, 0); ?></h3><p>Month Value</p></div><i class="material-icons-outlined stat-icon">trending_up</i></div></div>
+                        <div class="col-lg-3 col-sm-6"><div class="stat-card amber"><div><h3>₹<?php echo inr_format($month_amount, 0); ?></h3><p>Month Value</p></div><i class="material-icons-outlined stat-icon">trending_up</i></div></div>
                     </div>
 
                     <!-- Table Card -->
@@ -213,14 +213,14 @@ $i = 0;
                                             </td>
                                             <td style="font-size:13px;color:#6b7280;"><?php echo date('d M Y', strtotime($inv['invoice_date'])); ?></td>
                                             <td>
-                                                <span style="font-weight:700;color:#10b981;font-size:13.5px;">₹<?php echo number_format($subtotal, 2); ?></span>
+                                                <span style="font-weight:700;color:#10b981;font-size:13.5px;">₹<?php echo inr_format($subtotal, 2); ?></span>
                                                 <?php if ($courier > 0): ?>
-                                                    <br><small style="color:#94a3b8;font-size:11px;">+₹<?php echo number_format($courier,2); ?> courier</small>
+                                                    <br><small style="color:#94a3b8;font-size:11px;">+₹<?php echo inr_format($courier, 2); ?> courier</small>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
                                                 <?php if ($courier > 0): ?>
-                                                    <span class="courier-chip">₹<?php echo number_format($courier, 2); ?></span>
+                                                    <span class="courier-chip">₹<?php echo inr_format($courier, 2); ?></span>
                                                 <?php else: ?>
                                                     <span style="color:#d1d5db;font-size:12px;">—</span>
                                                 <?php endif; ?>

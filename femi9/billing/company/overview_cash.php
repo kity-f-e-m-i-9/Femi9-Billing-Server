@@ -283,7 +283,7 @@ $Total_available_stock123_VLSS1+=$Total_available_stock_VLSS1;
 										 <tfoot>
 										 <tr>
 										 <td colspan="8">Grand Total</td>
-				<td align="right"><b><?=number_format($Total_available_stock123_VLSS1,2,'.','');?></b></td>
+				<td align="right"><b><?=inr_format($Total_available_stock123_VLSS1, 2);?></b></td>
 										 </tr>
 										 </tfoot>
                                         </table>

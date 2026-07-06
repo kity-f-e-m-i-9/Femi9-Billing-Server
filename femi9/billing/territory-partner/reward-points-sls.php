@@ -157,12 +157,12 @@ if (mysqli_num_rows($table_exists) > 0) {
 
 $total_points_returns = $user_return_points + $customer_return_points;
 $pointsdeffer = $total_combined_points - $total_points_returns;
-$PointShow = ($pointsdeffer > 0) ? number_format($pointsdeffer, 2) : "0.00";
+$PointShow = ($pointsdeffer > 0) ? inr_format($pointsdeffer, 2) : "0.00";
 
-$formatted_gross           = number_format($total_combined_points, 2);
-$formatted_returns         = number_format($total_points_returns, 2);
-$formatted_user_sales      = number_format($total_points_users, 2);
-$formatted_customer_sales  = number_format($total_points_customers, 2);
+$formatted_gross           = inr_format($total_combined_points, 2);
+$formatted_returns         = inr_format($total_points_returns, 2);
+$formatted_user_sales      = inr_format($total_points_users, 2);
+$formatted_customer_sales  = inr_format($total_points_customers, 2);
 
 $display_from = date('d M', strtotime($current_from_date));
 $display_to   = date('d M Y', strtotime($current_to_date));

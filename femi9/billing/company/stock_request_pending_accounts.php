@@ -154,7 +154,7 @@ $district_name=	$result_district['dist_name'];
 				$fetch_TotalAMont=mysqli_query($db_conn,$select_TotalAMont);
 				$result_TotalAMont=mysqli_fetch_array($fetch_TotalAMont);
 				if($result_TotalAMont[0]!=NULL){
-				$totalAmount=number_format($result_TotalAMont[0],2,'.','');
+				$totalAmount=inr_format($result_TotalAMont[0], 2);
 				}else{$totalAmount="0.00";}
 				
 				if($result_product_list["amount"]!=NULL)
@@ -173,7 +173,7 @@ $district_name=	$result_district['dist_name'];
 								
 <td><?=$totalqty;?></td>	
 <td><?=$totalAmount;?></td>		
-<td><?=number_format($trns_AMount,2,'.','');?></td>						
+<td><?=inr_format($trns_AMount, 2);?></td>						
 													
 													<td>
 			<a href="stock_request_details_account?reqid=<?=base64_encode($reqid);?>" data-bs-toggle="tooltip" data-bs-placement="top" title="View Details">

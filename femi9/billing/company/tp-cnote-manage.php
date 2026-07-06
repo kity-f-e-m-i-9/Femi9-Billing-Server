@@ -119,7 +119,7 @@ $cns = $db_conn->query("
                                         <span class="tp-code"><?php echo htmlspecialchars($cn['tp_code']); ?></span>
                                     </td>
                                     <td style="white-space:nowrap;color:#6b7280;"><?php echo $cn['date'] ? date('d M Y', strtotime($cn['date'])) : '—'; ?></td>
-                                    <td style="text-align:right;"><span class="amount">&#8377;<?php echo number_format($cn['total'], 2); ?></span></td>
+                                    <td style="text-align:right;"><span class="amount">&#8377;<?php echo inr_format($cn['total'], 2); ?></span></td>
                                     <td style="text-align:center;">
                                         <?php if ($cn['status'] === 'accept'): ?>
                                             <span class="badge-accept">Accepted</span>

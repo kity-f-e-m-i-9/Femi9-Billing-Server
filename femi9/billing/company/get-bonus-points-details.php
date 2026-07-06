@@ -75,7 +75,7 @@ if (!$record) {
 
 // Format helper function
 function formatCurrency(float $amount): string {
-    return '₹' . number_format($amount, 2, '.', ',');
+    return '₹' . inr_format($amount, 2);
 }
 
 function formatUserType(string $type): string {
@@ -94,7 +94,7 @@ $category_name = htmlspecialchars($record['category_name'], ENT_QUOTES, 'UTF-8')
 $monthly_target = formatCurrency((float)$record['monthly_target']);
 $total_paid = formatCurrency((float)$record['total_advance_paid']);
 $eligibility = $record['eligibility_status'] === 'eligible' ? 'Eligible ✅' : 'Not Eligible ❌';
-$bonus_points = number_format((float)$record['bonus_points_awarded'], 2);
+$bonus_points = inr_format((float)$record['bonus_points_awarded'], 2);
 $bonus_calculation = htmlspecialchars($record['bonus_calculation'], ENT_QUOTES, 'UTF-8');
 $executed_by = htmlspecialchars($record['executed_by_user_name'], ENT_QUOTES, 'UTF-8');
 $executed_by_type = formatUserType($record['executed_by_user_type']);
@@ -332,7 +332,7 @@ $weeks = [
             <span class="detail-value" style="color: #f59e0b;">
                 <?php 
                 $achievement_pct = ((float)$record['total_advance_paid'] / (float)$record['monthly_target']) * 100;
-                echo number_format($achievement_pct, 2) . '%';
+                echo inr_format($achievement_pct, 2) . '%';
                 ?>
             </span>
         </div>

@@ -72,9 +72,9 @@
     $required = $_REQUEST['required'] ?? '0';
     ?>
     <p class="mb-0 mt-2">
-        Available Balance: <strong>₹<?php echo number_format($available, 2); ?></strong><br>
-        Required Amount: <strong>₹<?php echo number_format($required, 2); ?></strong><br>
-        Shortage: <strong class="text-danger">₹<?php echo number_format($shortage, 2); ?></strong>
+        Available Balance: <strong>₹<?php echo inr_format($available, 2); ?></strong><br>
+        Required Amount: <strong>₹<?php echo inr_format($required, 2); ?></strong><br>
+        Shortage: <strong class="text-danger">₹<?php echo inr_format($shortage, 2); ?></strong>
     </p>
     <a href="add-advance-payment.php" class="btn btn-sm btn-primary mt-2">
         <i class="material-icons-outlined" style="font-size: 16px; vertical-align: middle;">add</i>
@@ -90,8 +90,8 @@
     <strong>Invoice Created!</strong> 
     <?php if($is_advance_mandatory && isset($_REQUEST['deducted_amount'])): ?>
     <p class="mb-0 mt-2">
-        Amount Deducted: <strong>₹<?php echo number_format($_REQUEST['deducted_amount'], 2); ?></strong><br>
-        Remaining Balance: <strong>₹<?php echo number_format($_REQUEST['remaining_balance'] ?? 0, 2); ?></strong>
+        Amount Deducted: <strong>₹<?php echo inr_format($_REQUEST['deducted_amount'], 2); ?></strong><br>
+        Remaining Balance: <strong>₹<?php echo inr_format($_REQUEST['remaining_balance'] ?? 0, 2); ?></strong>
     </p>
     <?php endif; ?>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>

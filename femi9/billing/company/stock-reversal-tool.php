@@ -767,7 +767,7 @@ body {
                 <div class="inv-meta">
                     <span class="inv-num"><?= htmlspecialchars($inv['inv_number']) ?></span>
                     <span class="inv-dt"><?= htmlspecialchars($inv['date']) ?></span>
-                    <span class="inv-amt">₹ <?= number_format((float)$inv['total'], 2) ?></span>
+                    <span class="inv-amt">₹ <?= inr_format((float)$inv['total'], 2) ?></span>
                     <span class="route">
                         <span class="utype"><?= htmlspecialchars($inv['seller_type']) ?></span>
                         <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>

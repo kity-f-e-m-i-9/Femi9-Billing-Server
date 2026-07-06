@@ -131,15 +131,15 @@ while ($row = mysqli_fetch_assoc($fetch_picnode_list)) {
                                                     <td><?= $i ?></td>
                                                     <td><?= date("d/m/Y", strtotime($row['date'])) ?></td>
                                                     <td><?= htmlspecialchars($row['inv_number']) ?></td>
-                                                    <td style="text-align:right;"><?= number_format($row['taxable_amount'], 2, '.', '') ?></td>
+                                                    <td style="text-align:right;"><?= inr_format($row['taxable_amount'], 2) ?></td>
                                                     <td style="text-align:right;">
-                                                        <?php if ($row['gst_type'] == "inner") echo number_format($row['cgst'], 2, '.', ''); ?>
+                                                        <?php if ($row['gst_type'] == "inner") echo inr_format($row['cgst'], 2); ?>
                                                     </td>
                                                     <td style="text-align:right;">
-                                                        <?php if ($row['gst_type'] == "inner") echo number_format($row['sgst'], 2, '.', ''); ?>
+                                                        <?php if ($row['gst_type'] == "inner") echo inr_format($row['sgst'], 2); ?>
                                                     </td>
                                                     <td style="text-align:right;">
-                                                        <?php if ($row['gst_type'] != "inner") echo number_format($row['igst'], 2, '.', ''); ?>
+                                                        <?php if ($row['gst_type'] != "inner") echo inr_format($row['igst'], 2); ?>
                                                     </td>
                                                 </tr>
                                                 <?php endforeach; ?>

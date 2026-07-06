@@ -761,8 +761,8 @@ if ($search !== '') {
                                                     Showing all matches
                                                 <?php elseif ($totalRows > 0): ?>
                                                     Showing
-                                                    <strong><?= number_format($globalOffset + 1) ?></strong>–<strong><?= number_format(min($globalOffset + $recordsPerPage, $totalRows)) ?></strong>
-                                                    of <strong><?= number_format($totalRows) ?></strong>
+                                                    <strong><?= inr_format($globalOffset + 1, 0) ?></strong>–<strong><?= inr_format(min($globalOffset + $recordsPerPage, $totalRows), 0) ?></strong>
+                                                    of <strong><?= inr_format($totalRows, 0) ?></strong>
                                                     &nbsp;|&nbsp; Page <strong><?= $currentPage ?></strong> of <strong><?= $totalPages ?></strong>
                                                 <?php endif; ?>
                                             </div>
@@ -829,7 +829,7 @@ if ($search !== '') {
                                                         <small class="text-muted"><b>M:</b> <?= e($custMob) ?></small>
                                                     </td>
                                                     <td><?= e(date('d/M/Y', strtotime($inv['date']))) ?></td>
-                                                    <td align="right"><strong>₹<?= number_format((float)$inv['total'], 2, '.', '') ?></strong></td>
+                                                    <td align="right"><strong>₹<?= inr_format((float)$inv['total'], 2) ?></strong></td>
                                                     <?php foreach ($productIds as $pid):
                                                         $qty = (int)($invItems[$pid] ?? 0);
                                                         $productPageTotals[$pid] += $qty;
@@ -869,7 +869,7 @@ if ($search !== '') {
                                                         <small class="text-muted"><b>M:</b> <?= e($custMob) ?></small>
                                                     </td>
                                                     <td><?= e(date('d/M/Y', strtotime($inv['date']))) ?></td>
-                                                    <td align="right"><strong>₹<?= number_format((float)$inv['total'], 2, '.', '') ?></strong></td>
+                                                    <td align="right"><strong>₹<?= inr_format((float)$inv['total'], 2) ?></strong></td>
                                                     <?php foreach ($productIds as $pid):
                                                         $qty = (int)($invItems[$pid] ?? 0);
                                                         $productPageTotals[$pid] += $qty;
@@ -899,7 +899,7 @@ if ($search !== '') {
                                                     <!-- Page total row -->
                                                     <tr>
                                                         <th colspan="6" class="text-end">Page Total:</th>
-                                                        <th align="right">₹<?= number_format($pageTotal, 2, '.', '') ?></th>
+                                                        <th align="right">₹<?= inr_format($pageTotal, 2) ?></th>
                                                         <?php foreach ($productPageTotals as $t): ?>
                                                             <th align="center" class="product-col"><?= $t ?: '–' ?></th>
                                                         <?php endforeach; ?>
@@ -909,10 +909,10 @@ if ($search !== '') {
                                                         <th colspan="6" class="text-end">
                                                             Grand Total
                                                             <small class="text-muted fw-normal">
-                                                                (all <?= number_format($totalRows) ?> records)
+                                                                (all <?= inr_format($totalRows, 0) ?> records)
                                                             </small>
                                                         </th>
-                                                        <th align="right">₹<?= number_format($grandTotal, 2, '.', '') ?></th>
+                                                        <th align="right">₹<?= inr_format($grandTotal, 2) ?></th>
                                                         <?php foreach ($productIds as $unused): ?>
                                                             <th class="product-col"></th>
                                                         <?php endforeach; ?>
@@ -986,11 +986,11 @@ if ($search !== '') {
                                         <?php if ($totalRows === 0): ?>
                                             No records found.
                                         <?php elseif ($isSearch): ?>
-                                            Showing all <?= number_format($totalRows) ?> matching entries
+                                            Showing all <?= inr_format($totalRows, 0) ?> matching entries
                                         <?php else: ?>
-                                            Showing <?= number_format($globalOffset + 1) ?>
-                                            to <?= number_format(min($globalOffset + $recordsPerPage, $totalRows)) ?>
-                                            of <?= number_format($totalRows) ?> entries
+                                            Showing <?= inr_format($globalOffset + 1, 0) ?>
+                                            to <?= inr_format(min($globalOffset + $recordsPerPage, $totalRows), 0) ?>
+                                            of <?= inr_format($totalRows, 0) ?> entries
                                         <?php endif; ?>
                                     </p>
 

@@ -130,9 +130,9 @@ try {
     if ($balance > 0) {
         $response['success'] = true;
         $response['can_proceed'] = true;
-        $response['message'] = 'Balance available: Rs.' . number_format($balance, 2);
+        $response['message'] = 'Balance available: Rs.' . inr_format($balance, 2);
         
-        error_log("get-advance-balance: SUCCESS - Balance: Rs." . number_format($balance, 2));
+        error_log("get-advance-balance: SUCCESS - Balance: Rs." . inr_format($balance, 2));
     } else {
         $response['success'] = true;
         $response['can_proceed'] = false;

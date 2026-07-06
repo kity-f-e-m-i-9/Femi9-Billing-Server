@@ -142,19 +142,19 @@ $i = 0;
                         </div>
                         <div class="col-lg-3 col-md-6">
                             <div class="stats-card">
-                                <h3>₹<?php echo number_format($total_amount, 2); ?></h3>
+                                <h3>₹<?php echo inr_format($total_amount, 2); ?></h3>
                                 <p>Total Amount</p>
                             </div>
                         </div>
                         <div class="col-lg-3 col-md-6">
                             <div class="stats-card">
-                                <h3>₹<?php echo number_format($total_balance, 2); ?></h3>
+                                <h3>₹<?php echo inr_format($total_balance, 2); ?></h3>
                                 <p>Total Balance</p>
                             </div>
                         </div>
                         <div class="col-lg-3 col-md-6">
                             <div class="stats-card">
-                                <h3>₹<?php echo number_format($total_adjusted, 2); ?></h3>
+                                <h3>₹<?php echo inr_format($total_adjusted, 2); ?></h3>
                                 <p>Adjusted Amount</p>
                             </div>
                         </div>
@@ -251,9 +251,9 @@ $i = 0;
                                                     <td><code style="font-size:12px;"><?php echo htmlspecialchars($p['tp_code']); ?></code></td>
                                                     <td><?php echo htmlspecialchars($p['receiver_name'] ?: '—'); ?></td>
                                                     <td><?php echo htmlspecialchars($p['payment_date']); ?></td>
-                                                    <td class="text-right font-weight-bold"><?php echo number_format($p['amount'], 2); ?></td>
-                                                    <td class="text-right" style="color:#10b981;font-weight:600;"><?php echo number_format($p['balance_amount'], 2); ?></td>
-                                                    <td class="text-right"><?php echo number_format($p['adjusted_amount'], 2); ?></td>
+                                                    <td class="text-right font-weight-bold"><?php echo inr_format($p['amount'], 2); ?></td>
+                                                    <td class="text-right" style="color:#10b981;font-weight:600;"><?php echo inr_format($p['balance_amount'], 2); ?></td>
+                                                    <td class="text-right"><?php echo inr_format($p['adjusted_amount'], 2); ?></td>
                                                     <td><?php echo htmlspecialchars($p['payment_mode']); ?></td>
                                                     <td><small class="text-muted"><?php echo htmlspecialchars($p['reference_number'] ?: '—'); ?></small></td>
                                                     <td>

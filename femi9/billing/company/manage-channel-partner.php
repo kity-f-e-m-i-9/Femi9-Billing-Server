@@ -198,7 +198,7 @@ $i = 0;
                                                         if ($deposit > 0):
                                                         ?>
                                                             <span style="font-weight:600;color:#1565c0;">
-                                                                ₹<?php echo number_format($deposit, 2); ?>
+                                                                ₹<?php echo inr_format($deposit, 2); ?>
                                                             </span>
                                                         <?php else: ?>
                                                             <span class="text-muted" style="font-size:12px;">—</span>

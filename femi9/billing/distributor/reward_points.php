@@ -199,10 +199,10 @@ $return_count = (int)($return_result['return_count'] ?? 0);
 $total_points = max(0, $purchase_points + $daily_points - $return_points);
 
 // Format numbers for display
-$formatted_total = number_format($total_points, 2);
-$formatted_purchase = number_format($purchase_points, 2);
-$formatted_daily = number_format($daily_points, 2);
-$formatted_return = number_format($return_points, 2);
+$formatted_total = inr_format($total_points, 2);
+$formatted_purchase = inr_format($purchase_points, 2);
+$formatted_daily = inr_format($daily_points, 2);
+$formatted_return = inr_format($return_points, 2);
 
 // Format dates for display
 $display_from = date('d M', strtotime($current_from_date));

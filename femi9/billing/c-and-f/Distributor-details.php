@@ -109,7 +109,7 @@ $taluk_name=$result_taluklist['taluk'];
 				?>
 					<tr>
                     <th scope="col">Category</th>
-                    <td><?php echo number_format($result_referral_records['target_amount'],2);?></td>
+                    <td><?php echo inr_format($result_referral_records['target_amount'], 2);?></td>
                     </tr>
 					
 					<tr>

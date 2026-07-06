@@ -172,7 +172,7 @@ $fetch_sum_total_intra_register=mysqli_query($db_conn,$select_sum_total_intra_re
 						   <tr>
 						   <td>From a supplier under composition scheme, Exempt and Nil rated supply</td>
 						   <td>0.00</td>
-						   <td><?=number_format($show_total_intra_register,2);?></td>
+						   <td><?=inr_format($show_total_intra_register, 2);?></td>
 						   </tr>
 						   <tr>
 						   <td>Non GST Supply</td>

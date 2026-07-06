@@ -245,7 +245,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 	$msgpayment="<span class='badge badge-style-bordered badge-warning'>partially Paid</span>";
 }
 ?>
-				<td><?php echo number_format($result_product_list["total"],2,'.','');?>
+				<td><?php echo inr_format($result_product_list["total"], 2);?>
 				</td>
 				
 				<td>

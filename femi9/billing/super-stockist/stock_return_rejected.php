@@ -149,7 +149,7 @@ $i= $start_from;
 								</td>	
 								
 <td><?=$totalqty;?></td>		
-<td><?=number_format($totalamount,2,'.','');?></td>						
+<td><?=inr_format($totalamount, 2);?></td>						
 													
 													<td>
 			<a href="stock_return_details.php?returnid=<?=base64_encode($returnid);?>&&pagename=stock_return_rejected" data-bs-toggle="tooltip" data-bs-placement="top" title="View Details">

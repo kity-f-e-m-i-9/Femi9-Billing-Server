@@ -131,7 +131,7 @@ $countshp_Overall = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) a
                                             <table id="reportdash">
                                                 <tr><th>Invoice&nbsp;Count</th><td>:&nbsp;<?php echo $sp[3]; ?></td></tr>
                                                 <tr><th>Product&nbsp;Qty</th><td>:&nbsp;<?php echo $sp[4]; ?></td></tr>
-                                                <tr><th>Total&nbsp;Amount</th><td>:&nbsp;&#x20B9;<?php echo number_format($sp[5], 2); ?></td></tr>
+                                                <tr><th>Total&nbsp;Amount</th><td>:&nbsp;&#x20B9;<?php echo inr_format($sp[5], 2); ?></td></tr>
                                             </table>
                                         </div>
                                     </div>
@@ -160,7 +160,7 @@ $countshp_Overall = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) a
                                             <table id="reportdash">
                                                 <tr><th>Invoice&nbsp;Count</th><td>:&nbsp;<?php echo $sp[1]; ?></td></tr>
                                                 <tr><th>Product&nbsp;Qty</th><td>:&nbsp;<?php echo $sp[2]; ?></td></tr>
-                                                <tr><th>Total&nbsp;Amount</th><td>:&nbsp;&#x20B9;<?php echo number_format($sp[3], 2); ?></td></tr>
+                                                <tr><th>Total&nbsp;Amount</th><td>:&nbsp;&#x20B9;<?php echo inr_format($sp[3], 2); ?></td></tr>
                                             </table>
                                         </div>
                                     </div>

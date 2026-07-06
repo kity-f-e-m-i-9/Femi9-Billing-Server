@@ -24,7 +24,7 @@ $fetch_totalamount_today_shop=mysqli_query($db_conn,$select_totalamount_today_sh
 $result_totalamount_today_shop=mysqli_fetch_array($fetch_totalamount_today_shop);
 
 if($result_totalamount_today_shop[0]!=NULL){
-$today_total_amount_shop=number_format($result_totalamount_today_shop[0],2,'.','');
+$today_total_amount_shop=inr_format($result_totalamount_today_shop[0], 2);
 }else{$today_total_amount_shop="0.00";}
 
 
@@ -54,7 +54,7 @@ $fetch_totalamount_yesterday_shop=mysqli_query($db_conn,$select_totalamount_yest
 $result_totalamount_yesterday_shop=mysqli_fetch_array($fetch_totalamount_yesterday_shop);
 
 if($result_totalamount_yesterday_shop[0]!=NULL){
-$yesterday_total_amount_shop=number_format($result_totalamount_yesterday_shop[0],2,'.','');
+$yesterday_total_amount_shop=inr_format($result_totalamount_yesterday_shop[0], 2);
 }else{$yesterday_total_amount_shop="0.00";}
 
 
@@ -83,7 +83,7 @@ $fetch_totalamount_thismonth_shop=mysqli_query($db_conn,$select_totalamount_this
 $result_totalamount_thismonth_shop=mysqli_fetch_array($fetch_totalamount_thismonth_shop);
 
 if($result_totalamount_thismonth_shop[0]!=NULL){
-$thismonth_total_amount_shop=number_format($result_totalamount_thismonth_shop[0],2,'.','');
+$thismonth_total_amount_shop=inr_format($result_totalamount_thismonth_shop[0], 2);
 }else{$thismonth_total_amount_shop="0.00";}
 
 
@@ -113,7 +113,7 @@ $fetch_totalamount_lastmonth_shop=mysqli_query($db_conn,$select_totalamount_last
 $result_totalamount_lastmonth_shop=mysqli_fetch_array($fetch_totalamount_lastmonth_shop);
 
 if($result_totalamount_lastmonth_shop[0]!=NULL){
-$lastmonth_total_amount_shop=number_format($result_totalamount_lastmonth_shop[0],2,'.','');
+$lastmonth_total_amount_shop=inr_format($result_totalamount_lastmonth_shop[0], 2);
 }else{$lastmonth_total_amount_shop="0.00";}
 
 */

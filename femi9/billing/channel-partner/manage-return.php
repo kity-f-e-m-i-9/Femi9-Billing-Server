@@ -122,7 +122,7 @@ while ($result_ret = mysqli_fetch_array($fetch_returns)) {
                                                     <td><?php echo $lablenamedisplay; ?></td>
                                                     <td><?php echo $Cust_Name; ?><br/>M: <?php echo $Cust_Mobile; ?></td>
                                                     <td><?php echo date("d/M/Y", strtotime($result_ret["date"])); ?></td>
-                                                    <td><?php echo number_format($result_ret["total"], 2, '.', '');
+                                                    <td><?php echo inr_format($result_ret["total"], 2);
                                                         if ($result_ret["status"] == "pending") { echo "<br/><span class='badge badge-style-bordered badge-danger'>Incomplete</span>"; }
                                                     ?></td>
                                                     <td><a href="../stockist/cnote_details?returnid=<?php echo base64_encode($result_ret["returnid"]); ?>"><img src="../../assets/images/details-32.png"/></a></td>

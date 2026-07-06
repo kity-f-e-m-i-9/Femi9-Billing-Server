@@ -186,6 +186,6 @@ try {
     header("Location: tp-cnote-new?inv_id=" . $tpInv['id'] . "&returnid=" . base64_encode($returnid)); exit;
 }
 
-$_SESSION['successMessage'] = "Credit Note finalised against Invoice: " . htmlspecialchars($inv_number) . ". CN Total: ₹" . number_format($cn_total, 2);
+$_SESSION['successMessage'] = "Credit Note finalised against Invoice: " . htmlspecialchars($inv_number) . ". CN Total: ₹" . inr_format($cn_total, 2);
 header("Location: tp-cnote-manage?success=1");
 exit;

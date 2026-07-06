@@ -119,22 +119,22 @@ if ($from_date != NULL) {
                                 <tbody>
                                     <tr>
                                         <td>Intra-state supplies to registered person</td>
-                                        <td><?php echo number_format($show_total_intra_register, 2); ?></td>
+                                        <td><?php echo inr_format($show_total_intra_register, 2); ?></td>
                                         <td>0.00</td><td>0.00</td>
                                     </tr>
                                     <tr>
                                         <td>Intra-state supplies to unregistered person</td>
-                                        <td><?php echo number_format($show_total_intra_unregister, 2); ?></td>
+                                        <td><?php echo inr_format($show_total_intra_unregister, 2); ?></td>
                                         <td>0.00</td><td>0.00</td>
                                     </tr>
                                     <tr>
                                         <td>Inter-state supplies to registered person</td>
-                                        <td><?php echo number_format($show_total_inter_register, 2); ?></td>
+                                        <td><?php echo inr_format($show_total_inter_register, 2); ?></td>
                                         <td>0.00</td><td>0.00</td>
                                     </tr>
                                     <tr>
                                         <td>Inter-state supplies to unregistered person</td>
-                                        <td><?php echo number_format($show_total_inter_unregister, 2); ?></td>
+                                        <td><?php echo inr_format($show_total_inter_unregister, 2); ?></td>
                                         <td>0.00</td><td>0.00</td>
                                     </tr>
                                 </tbody>

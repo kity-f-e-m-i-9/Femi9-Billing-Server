@@ -373,7 +373,7 @@ $i = 0;
                         </div>
                         <div class="col-lg-3 col-sm-6">
                             <div class="stat-card green">
-                                <div><h3><?php echo number_format($total_qty); ?></h3><p>Total Units Moved</p></div>
+                                <div><h3><?php echo inr_format($total_qty, 0); ?></h3><p>Total Units Moved</p></div>
                                 <i class="material-icons-outlined stat-icon">inventory_2</i>
                             </div>
                         </div>
@@ -586,7 +586,7 @@ $i = 0;
                                             <td><?php echo htmlspecialchars($t['location_name']); ?></td>
                                             <td style="color:#6b7280;"><?php echo htmlspecialchars($t['transfer_date']); ?></td>
                                             <td style="text-align:center;font-weight:600;"><?php echo (int)$t['product_count']; ?></td>
-                                            <td style="text-align:center;font-weight:600;color:#667eea;"><?php echo number_format((int)$t['total_qty']); ?></td>
+                                            <td style="text-align:center;font-weight:600;color:#667eea;"><?php echo inr_format((int)$t['total_qty'], 0); ?></td>
                                             <td style="color:#6b7280;"><?php echo htmlspecialchars($t['created_by']); ?></td>
                                             <td>
                                                 <button class="btn-view view-transfer" data-id="<?php echo (int)$t['id']; ?>">

@@ -92,10 +92,10 @@ while ($item = mysqli_fetch_array($items)) {
         <th><?php echo ++$rd; ?></th>
         <td><?php echo $product['productName']; ?></td>
         <td><?php echo $item['qty']; ?></td>
-        <td>&#8377;<?php echo number_format($item['amount'], 2, '.', ''); ?></td>
-        <td align="right"><?php echo number_format($item['subtotal'], 2, '.', ''); ?></td>
-        <td><?php echo number_format($item['gstamount_total'], 2, '.', ''); ?> (<?php echo $item['gst_percentage']; ?>%)</td>
-        <td align="right"><?php echo number_format($item['total'], 2, '.', ''); ?></td>
+        <td>&#8377;<?php echo inr_format($item['amount'], 2); ?></td>
+        <td align="right"><?php echo inr_format($item['subtotal'], 2); ?></td>
+        <td><?php echo inr_format($item['gstamount_total'], 2); ?> (<?php echo $item['gst_percentage']; ?>%)</td>
+        <td align="right"><?php echo inr_format($item['total'], 2); ?></td>
         <td>
             <a href="cnote_delete.php?returnid=<?php echo $enc_returnid; ?>&rowid=<?php echo $ItemRowid; ?>&redirurl=cnote_details"
                onclick="return confirm('Delete this item?');">

@@ -151,7 +151,7 @@ $i= $start_from;
 				$fetch_TotalAMont=mysqli_query($db_conn,$select_TotalAMont);
 				$result_TotalAMont=mysqli_fetch_array($fetch_TotalAMont);
 				if($result_TotalAMont[0]!=NULL){
-				$totalAmount=number_format($result_TotalAMont[0],2,'.','');
+				$totalAmount=inr_format($result_TotalAMont[0], 2);
 				}else{$totalAmount="0.00";}
 				
 				if($result_product_list["amount"]!=NULL)
@@ -168,7 +168,7 @@ $i= $start_from;
 								
 <td><?=$totalqty;?></td>	
 <td><?=$totalAmount;?></td>		
-<td><?=number_format($trns_AMount,2,'.','');?></td>			
+<td><?=inr_format($trns_AMount, 2);?></td>			
 <!----<td><?=$result_product_list['reqtype'];?></td>---->							
 													
 													<td>

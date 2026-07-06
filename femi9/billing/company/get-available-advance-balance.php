@@ -127,7 +127,7 @@ try {
     $response['available_balance'] = $total_available;
     $response['advance_payments'] = $advance_payments;
     $response['message'] = count($advance_payments) . ' advance payment(s) found with total balance ₹' . 
-                          number_format($total_available, 2);
+                          inr_format($total_available, 2);
 
 } catch (Exception $e) {
     error_log("get-available-advance-balance.php Error: " . $e->getMessage());

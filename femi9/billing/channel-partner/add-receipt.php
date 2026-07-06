@@ -134,9 +134,9 @@ $receipts    = mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='$invi
                                 <td><?php echo htmlspecialchars($inv['inv_number']); ?></td>
                                 <td><?php echo htmlspecialchars($cust_name); ?><br/><small>M: <?php echo htmlspecialchars($cust_mobile); ?></small></td>
                                 <td><?php echo date("d/M/Y", strtotime($inv['date'])); ?></td>
-                                <td>&#8377;<?php echo number_format($invoice_total, 2); ?></td>
-                                <td style="color:green;font-weight:bold;">&#8377;<?php echo number_format($total_received, 2); ?></td>
-                                <td style="color:<?php echo $balance_due > 0 ? 'red' : 'green'; ?>;font-weight:bold;">&#8377;<?php echo number_format($balance_due, 2); ?></td>
+                                <td>&#8377;<?php echo inr_format($invoice_total, 2); ?></td>
+                                <td style="color:green;font-weight:bold;">&#8377;<?php echo inr_format($total_received, 2); ?></td>
+                                <td style="color:<?php echo $balance_due > 0 ? 'red' : 'green'; ?>;font-weight:bold;">&#8377;<?php echo inr_format($balance_due, 2); ?></td>
                             </tr></tbody>
                         </table>
 
@@ -150,7 +150,7 @@ $receipts    = mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='$invi
                             <tr>
                                 <td><?php echo ++$ri; ?></td>
                                 <td><?php echo date("d/m/Y", strtotime($r['date'])); ?></td>
-                                <td><b>&#8377;<?php echo number_format((float)$r['received'], 2); ?></b></td>
+                                <td><b>&#8377;<?php echo inr_format((float)$r['received'], 2); ?></b></td>
                                 <td><?php echo htmlspecialchars($r['receipt_method']); ?></td>
                                 <td><?php echo htmlspecialchars($r['receipt_remarks']); ?></td>
                                 <td><a href="add-receipt.php?invid=<?php echo urlencode($invid); ?>&invuser=<?php echo $getinvuser; ?>&delreceiptact=1&rcptid=<?php echo base64_encode($r['id']); ?>" onclick="return confirm('Delete this receipt?');" style="color:red;">Remove</a></td>

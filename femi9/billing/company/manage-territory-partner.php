@@ -261,7 +261,7 @@ $i = 0;
                         <div class="col-lg-3 col-sm-6">
                             <div class="stat-card orange">
                                 <div>
-                                    <h3 style="font-size:20px;">₹<?php echo number_format($grand_target, 0); ?></h3>
+                                    <h3 style="font-size:20px;">₹<?php echo inr_format($grand_target, 0); ?></h3>
                                     <p>Total Target</p>
                                 </div>
                                 <i class="material-icons-outlined stat-icon">track_changes</i>
@@ -374,7 +374,7 @@ $i = 0;
                                                 if ($target > 0):
                                                 ?>
                                                     <span style="font-weight:600;color:#b45309;">
-                                                        ₹<?php echo number_format($target, 2); ?>
+                                                        ₹<?php echo inr_format($target, 2); ?>
                                                     </span>
                                                 <?php else: ?>
                                                     <span style="color:#d1d5db;font-size:12px;">—</span>

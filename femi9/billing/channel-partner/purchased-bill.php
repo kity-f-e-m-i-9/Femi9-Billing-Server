@@ -94,9 +94,9 @@ while ($result_bill = mysqli_fetch_array($fetch_bills)) {
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo htmlspecialchars($result_bill["invoice_number"]); ?></td>
                                                     <td><?php echo date("d/M/Y", strtotime($result_bill["invoice_date"])); ?></td>
-                                                    <td><?php echo number_format($subtotal, 2, '.', ''); ?></td>
-                                                    <td><?php echo number_format($discount, 2, '.', ''); ?></td>
-                                                    <td><?php echo number_format($totalamount, 2, '.', ''); ?><br/><?php echo $msgpayment; ?></td>
+                                                    <td><?php echo inr_format($subtotal, 2); ?></td>
+                                                    <td><?php echo inr_format($discount, 2); ?></td>
+                                                    <td><?php echo inr_format($totalamount, 2); ?><br/><?php echo $msgpayment; ?></td>
                                                     <td><a href="../company/tp-invoice-print.php?id=<?php echo base64_encode($result_bill["id"]); ?>" target="_blank" title="Print"><img src="../../assets/images/print32.png"/></a></td>
                                                 </tr>
 <?php } ?>

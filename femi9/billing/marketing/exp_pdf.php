@@ -53,7 +53,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
                     
 					<td>
 					<b><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
-					<td><?=number_format($exp_amount,2,'.','');?></td>
+					<td><?=inr_format($exp_amount, 2);?></td>
 					<td><?=ucwords($result_product_list["remarks"]);?></td>
 	
                                                 </tr>
@@ -64,7 +64,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										 
 										 <tr>
 										 <td colspan="2">Total</td>
-										 <td><?=number_format($exp_amount12,2,'.','');?></td>
+										 <td><?=inr_format($exp_amount12, 2);?></td>
 										 <td></td>
 										 </tr>
 										 

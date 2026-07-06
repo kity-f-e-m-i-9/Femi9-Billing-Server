@@ -252,7 +252,7 @@ if ($WD_user_type === 'territory_partner') {
 
 					<td><?=htmlspecialchars($result_onbaord_user_records["country_code"] ?? '');?>&nbsp;<?=htmlspecialchars($result_onbaord_user_records["mobile_number"] ?? '');?></td>
 					
-					<td><?=number_format($result_product_list['amount'],2,'.','');?></td>
+					<td><?=inr_format($result_product_list['amount'], 2);?></td>
 					<td><?=date("d/m/Y",strtotime($result_product_list['date']));?><br/>
 					<?=date("g:i A",strtotime($result_product_list['time']));?>
 					</td>
@@ -261,8 +261,8 @@ if ($WD_user_type === 'territory_partner') {
 					<?=date("g:i A",strtotime($result_product_list['updated_time']));?>
 					</td>
 					<td><?=$result_product_list['TDS_percentage'];?>%</td>
-					<td><?=number_format($result_product_list['TDS_deduction'],2,'.','');?></td>
-					<td><?=number_format($result_product_list['sent_amount'],2,'.','');?></td>
+					<td><?=inr_format($result_product_list['TDS_deduction'], 2);?></td>
+					<td><?=inr_format($result_product_list['sent_amount'], 2);?></td>
 					<td><?=$result_product_list['remarks'];?></td>
 					
                                                 </tr>

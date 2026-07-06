@@ -176,7 +176,7 @@ $select_sUM_QTY="select sum(total) from ot_sales_return where tempid='$tempid'";
 						  <td><?=$result_ot_invoice['inv_number'];?></td>
 						  <td><?=date("d/m/Y",strtotime($Result_productDetils['date']));?></td>
 						  <td><?=date("d/m/Y",strtotime($result_return_details['return_date']));?></td>
-						  <td align="right"><b><?=number_format($slsamount,2);?></b></td>
+						  <td align="right"><b><?=inr_format($slsamount, 2);?></b></td>
 						  </tr>
 						   
 							   <?php }?>
@@ -190,7 +190,7 @@ $select_sUM_QTY="select sum(total) from ot_sales_return where tempid='$tempid'";
 								   <td></td>
 								   <td></td>
 							   <td align="right">Grand Total</td>
-							    <td align="right"><b><?=number_format($overall_total,2);?></b></td>
+							    <td align="right"><b><?=inr_format($overall_total, 2);?></b></td>
 							   </tr>
 							   </tfoot>
 						   

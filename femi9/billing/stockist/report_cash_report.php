@@ -36,7 +36,7 @@ $fetch_totalamount_today2=mysqli_query($db_conn,$select_totalamount_today2);
 $result_totalamount_today2=mysqli_fetch_array($fetch_totalamount_today2);
 
 $today_total_amountSUM=$result_totalamount_today[0]+$result_totalamount_today2[0];
-if($today_total_amountSUM!=NULL){$today_total_amount=number_format($today_total_amountSUM,2,'.','');}else{$today_total_amount="0.00";}
+if($today_total_amountSUM!=NULL){$today_total_amount=inr_format($today_total_amountSUM, 2);}else{$today_total_amount="0.00";}
 
 
 //-------------------------------------Yesterday-----------------------------------
@@ -76,7 +76,7 @@ $fetch_totalamount_yesterday2=mysqli_query($db_conn,$select_totalamount_yesterda
 $result_totalamount_yesterday2=mysqli_fetch_array($fetch_totalamount_yesterday2);
 
 $yesterday_total_amount=$result_totalamount_yesterday[0]+$result_totalamount_yesterday2[0];
-if($yesterday_total_amount!=NULL){$yesterday_total_amount=number_format($yesterday_total_amount,2,'.','');}
+if($yesterday_total_amount!=NULL){$yesterday_total_amount=inr_format($yesterday_total_amount, 2);}
 else{$yesterday_total_amount="0.00";}
 
 
@@ -116,7 +116,7 @@ $fetch_totalamount_thismonth2=mysqli_query($db_conn,$select_totalamount_thismont
 $result_totalamount_thismonth2=mysqli_fetch_array($fetch_totalamount_thismonth2);
 
 $thismonth_total_amount=$result_totalamount_thismonth[0]+$result_totalamount_thismonth2[0];
-if($thismonth_total_amount!=NULL){$thismonth_total_amount=number_format($thismonth_total_amount,2,'.','');}
+if($thismonth_total_amount!=NULL){$thismonth_total_amount=inr_format($thismonth_total_amount, 2);}
 else{$thismonth_total_amount="0.00";}
 
 
@@ -157,7 +157,7 @@ $fetch_totalamount_lastmonth2=mysqli_query($db_conn,$select_totalamount_lastmont
 $result_totalamount_lastmonth2=mysqli_fetch_array($fetch_totalamount_lastmonth2);
 
 $lastmonth_total_amount=$result_totalamount_lastmonth[0]+$result_totalamount_lastmonth2[0];
-if($lastmonth_total_amount!=NULL){$lastmonth_total_amount=number_format($lastmonth_total_amount,2,'.','');}
+if($lastmonth_total_amount!=NULL){$lastmonth_total_amount=inr_format($lastmonth_total_amount, 2);}
 else{$lastmonth_total_amount="0.00";}
 
 */

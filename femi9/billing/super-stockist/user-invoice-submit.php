@@ -126,11 +126,11 @@ if (isset($_REQUEST['invoice-submit'])) {
     $total_amount = round($total_amount, 2);
     
     error_log("[SS-SUBMIT] Invoice Totals:");
-    error_log("[SS-SUBMIT]   - Subtotal: Rs." . number_format($SubTotal, 2));
-    error_log("[SS-SUBMIT]   - Discount: Rs." . number_format($discount, 2));
-    error_log("[SS-SUBMIT]   - Credit: Rs." . number_format($credit, 2));
-    error_log("[SS-SUBMIT]   - Courier: Rs." . number_format($courier_charges, 2));
-    error_log("[SS-SUBMIT]   - TOTAL: Rs." . number_format($total_amount, 2));
+    error_log("[SS-SUBMIT]   - Subtotal: Rs." . inr_format($SubTotal, 2));
+    error_log("[SS-SUBMIT]   - Discount: Rs." . inr_format($discount, 2));
+    error_log("[SS-SUBMIT]   - Credit: Rs." . inr_format($credit, 2));
+    error_log("[SS-SUBMIT]   - Courier: Rs." . inr_format($courier_charges, 2));
+    error_log("[SS-SUBMIT]   - TOTAL: Rs." . inr_format($total_amount, 2));
     
     // ============================================================================
     // STEP 4: DELETE EXISTING RECEIPT (IF EDIT MODE)
@@ -166,12 +166,12 @@ if (isset($_REQUEST['invoice-submit'])) {
             $receivableamount = $courier_charges;  // Courier charges still need to be paid
             $receipt_method = "Advance Payment";
             $receipt_remarks = "Paid via advance payment adjustment (auto-deducted). Courier charges (Rs." . 
-                              number_format($courier_charges, 2) . ") to be paid separately.";
+                              inr_format($courier_charges, 2) . ") to be paid separately.";
             
             error_log("[SS-SUBMIT] Receipt Type: AUTO (Advance Payment - Stockist)");
-            error_log("[SS-SUBMIT]   - Invoice Amount (advance): Rs." . number_format($receivedamount, 2));
-            error_log("[SS-SUBMIT]   - Courier Charges (separate): Rs." . number_format($courier_charges, 2));
-            error_log("[SS-SUBMIT]   - Receivable (courier only): Rs." . number_format($receivableamount, 2));
+            error_log("[SS-SUBMIT]   - Invoice Amount (advance): Rs." . inr_format($receivedamount, 2));
+            error_log("[SS-SUBMIT]   - Courier Charges (separate): Rs." . inr_format($courier_charges, 2));
+            error_log("[SS-SUBMIT]   - Receivable (courier only): Rs." . inr_format($receivableamount, 2));
         } else {
             // ✅ DISTRIBUTOR/SUPER DISTRIBUTOR: Manual entry
             $receivedamount = !empty($_REQUEST['receivedamount']) ? floatval($_REQUEST['receivedamount']) : 0.00;
@@ -182,8 +182,8 @@ if (isset($_REQUEST['invoice-submit'])) {
             $receipt_remarks = mysqli_real_escape_string($db_conn, str_replace("'", "&#39;", $_REQUEST['receipt_remarks'] ?? ''));
             
             error_log("[SS-SUBMIT] Receipt Type: MANUAL (Distributor/Super Distributor)");
-            error_log("[SS-SUBMIT]   - Received: Rs." . number_format($receivedamount, 2));
-            error_log("[SS-SUBMIT]   - Receivable: Rs." . number_format($receivableamount, 2));
+            error_log("[SS-SUBMIT]   - Received: Rs." . inr_format($receivedamount, 2));
+            error_log("[SS-SUBMIT]   - Receivable: Rs." . inr_format($receivableamount, 2));
         }
         
         $usertype = $resultdetails['to_user_type'];
@@ -292,9 +292,9 @@ if (isset($_REQUEST['invoice-submit'])) {
         if ($stmt->execute()) {
             error_log("[SS-SUBMIT] Receipt created successfully");
             error_log("[SS-SUBMIT]   - Receipt ID: $invoice_id");
-            error_log("[SS-SUBMIT]   - Invoice Amount: Rs." . number_format($total_amount, 2));
-            error_log("[SS-SUBMIT]   - Received: Rs." . number_format($receivedamount, 2));
-            error_log("[SS-SUBMIT]   - Receivable: Rs." . number_format($receivableamount, 2));
+            error_log("[SS-SUBMIT]   - Invoice Amount: Rs." . inr_format($total_amount, 2));
+            error_log("[SS-SUBMIT]   - Received: Rs." . inr_format($receivedamount, 2));
+            error_log("[SS-SUBMIT]   - Receivable: Rs." . inr_format($receivableamount, 2));
             error_log("[SS-SUBMIT]   - Payment Type: $payment_type");
         } else {
             error_log("[SS-SUBMIT] FATAL: Failed to create receipt: " . $stmt->error);
@@ -413,7 +413,7 @@ if (isset($_REQUEST['invoice-submit'])) {
                     error_log("[SS-SUBMIT] WARNING: Failed to restore balance: " . $restoreResult['message']);
                     // Continue anyway - admin can manually fix
                 } else {
-                    error_log("[SS-SUBMIT] SUCCESS: Restored Rs." . number_format($restoreResult['credited_amount'], 2));
+                    error_log("[SS-SUBMIT] SUCCESS: Restored Rs." . inr_format($restoreResult['credited_amount'], 2));
                 }
             }
             
@@ -445,8 +445,8 @@ if (isset($_REQUEST['invoice-submit'])) {
             );
             
             error_log("[SS-SUBMIT] Validation Result: " . ($validation['can_create'] ? 'PASS' : 'FAIL'));
-            error_log("[SS-SUBMIT]   - Available: Rs." . number_format($validation['available_balance'], 2));
-            error_log("[SS-SUBMIT]   - Required: Rs." . number_format($amount_requiring_advance, 2));
+            error_log("[SS-SUBMIT]   - Available: Rs." . inr_format($validation['available_balance'], 2));
+            error_log("[SS-SUBMIT]   - Required: Rs." . inr_format($amount_requiring_advance, 2));
             error_log("[SS-SUBMIT]   - Message: " . $validation['message']);
             
             if (!$validation['can_create']) {
@@ -506,22 +506,22 @@ if (isset($_REQUEST['invoice-submit'])) {
             if ($adjustmentResult['success']) {
                 error_log(str_repeat("=", 80));
                 error_log("[SS-SUBMIT] SUCCESS: ADJUSTMENT COMPLETED");
-                error_log("[SS-SUBMIT]   - Adjusted Amount: Rs." . number_format($adjustmentResult['adjusted_amount'], 2));
+                error_log("[SS-SUBMIT]   - Adjusted Amount: Rs." . inr_format($adjustmentResult['adjusted_amount'], 2));
                 error_log("[SS-SUBMIT]   - Message: " . $adjustmentResult['message']);
                 
                 if (!empty($adjustmentResult['adjustments'])) {
                     error_log("[SS-SUBMIT] Adjustment Details:");
                     foreach ($adjustmentResult['adjustments'] as $adj) {
                         error_log("[SS-SUBMIT]   * Payment ID {$adj['payment_id']}: Rs." . 
-                                 number_format($adj['amount_adjusted'], 2) . 
-                                 " (Balance: Rs." . number_format($adj['new_balance'], 2) . ")");
+                                 inr_format($adj['amount_adjusted'], 2) . 
+                                 " (Balance: Rs." . inr_format($adj['new_balance'], 2) . ")");
                     }
                 }
                 error_log(str_repeat("=", 80));
                 
                 // ✅ SUCCESS: Show confirmation (optional - can be removed in production)
                 // Uncomment below to show success alert
-                // echo "<script>alert('✅ Advance Payment Adjusted Successfully!\\nAmount: Rs." . number_format($adjustmentResult['adjusted_amount'], 2) . "');</script>";
+                // echo "<script>alert('✅ Advance Payment Adjusted Successfully!\\nAmount: Rs." . inr_format($adjustmentResult['adjusted_amount'], 2) . "');</script>";
                 
             } else {
                 // ❌ ADJUSTMENT FAILED - ROLLBACK ENTIRE INVOICE

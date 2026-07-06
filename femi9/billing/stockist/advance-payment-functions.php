@@ -49,14 +49,14 @@ function validateAdvanceBalanceForInvoice(
         $shortage = $invoiceAmount - $availableBalance;
         $result['can_create'] = false;
         $result['message'] =
-            "Insufficient balance. Available: Rs." . number_format($availableBalance, 2) .
-            ", Required: Rs." . number_format($invoiceAmount, 2) .
-            ", Shortage: Rs." . number_format($shortage, 2);
+            "Insufficient balance. Available: Rs." . inr_format($availableBalance, 2) .
+            ", Required: Rs." . inr_format($invoiceAmount, 2) .
+            ", Shortage: Rs." . inr_format($shortage, 2);
         return $result;
     }
 
     $result['can_create'] = true;
-    $result['message'] = "Sufficient balance. Rs." . number_format($invoiceAmount, 2) . " will be deducted";
+    $result['message'] = "Sufficient balance. Rs." . inr_format($invoiceAmount, 2) . " will be deducted";
     return $result;
 }
 
@@ -222,7 +222,7 @@ function processInvoiceAdvancePaymentDeduction(
                 throw new Exception("Prepare failed: " . $dbConn->error);
             }
 
-            $remarks = "Invoice $invNumber - Rs." . number_format($adjustmentAmount, 2) . " deducted";
+            $remarks = "Invoice $invNumber - Rs." . inr_format($adjustmentAmount, 2) . " deducted";
 
             $stmt->bind_param(
                 "issdsddsss",
@@ -262,7 +262,7 @@ function processInvoiceAdvancePaymentDeduction(
 
         $result['success'] = true;
         $result['adjusted_amount'] = $totalAdjusted;
-        $result['message'] = "Adjusted Rs." . number_format($totalAdjusted, 2);
+        $result['message'] = "Adjusted Rs." . inr_format($totalAdjusted, 2);
 
     } catch (Exception $e) {
         $dbConn->rollback();
@@ -359,7 +359,7 @@ function restoreAdvancePaymentOnInvoiceEdit(
         $dbConn->commit();
 
         $result['success'] = true;
-        $result['message'] = "Restored Rs." . number_format($result['credited_amount'], 2);
+        $result['message'] = "Restored Rs." . inr_format($result['credited_amount'], 2);
 
     } catch (Exception $e) {
         $dbConn->rollback();
@@ -417,7 +417,7 @@ function addAdvancePaymentCreditForReturn(
         $toUserName = getUserName($dbConn, $toUserId, $toUserType);
 
         // Build remarks with return info
-        $remarks = "Credit Note - Invoice: $invNumber, Return ID: $returnId, Amount: Rs." . number_format($returnAmount, 2);
+        $remarks = "Credit Note - Invoice: $invNumber, Return ID: $returnId, Amount: Rs." . inr_format($returnAmount, 2);
 
         // Insert advance payment record - matching actual schema
         $stmt = $dbConn->prepare("
@@ -476,7 +476,7 @@ function addAdvancePaymentCreditForReturn(
 
         $result['success'] = true;
         $result['payment_id'] = $paymentId;
-        $result['message'] = "Advance payment credit of Rs." . number_format($returnAmount, 2) . " added successfully";
+        $result['message'] = "Advance payment credit of Rs." . inr_format($returnAmount, 2) . " added successfully";
 
         error_log("RETURN CREDIT SUCCESS: Return ID $returnId, Payment ID $paymentId, Amount: $returnAmount");
 
@@ -643,7 +643,7 @@ function reverseAdvancePaymentCreditForReturn(
         $dbConn->commit();
 
         $result['success'] = true;
-        $result['message'] = "Reversed advance payment credit of Rs." . number_format($result['reversed_amount'], 2);
+        $result['message'] = "Reversed advance payment credit of Rs." . inr_format($result['reversed_amount'], 2);
 
         error_log("RETURN REVERSAL SUCCESS: Return ID $returnId, Reversed Amount: " . $result['reversed_amount']);
 

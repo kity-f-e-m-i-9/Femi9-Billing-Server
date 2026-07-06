@@ -135,7 +135,7 @@ $i= $start_from;
                                                     <td><?php echo ++$i; ?></td>
                                      <td><?php echo date("d-m-Y",strtotime($result_product_list["date"]));?></td>
 													<td><?=$result_totalqty[0];?></td>
-													<td><?=number_format($result_totalAmount[0],2,'.','');?></td>
+													<td><?=inr_format($result_totalAmount[0], 2);?></td>
 													<td><?=$result_product_list["utr"];?></td>
 													<td>
 													<?php if($reqstatus=="pending"){ echo "<span class='badge badge-danger'>Pending</span>";}else{ echo "<span class='badge badge-success'>Billed</span>"; } ?>

@@ -189,7 +189,7 @@ if (!$stk_row || !(int)$stk_row['stock_initialized']) {
 // Pre-validate advance balance (courier charges collected separately, not from advance)
 $avail_balance = getTpAdvanceBalance($db_conn, $tp_id, $use_godown ? $source_godown_id : 0);
 if ($avail_balance < $net_amount) {
-    header("Location: add-tp-invoice?error=nobalance&need=" . urlencode(number_format($net_amount,2)) . "&have=" . urlencode(number_format($avail_balance,2))); exit;
+    header("Location: add-tp-invoice?error=nobalance&need=" . urlencode(inr_format($net_amount, 2)) . "&have=" . urlencode(inr_format($avail_balance, 2))); exit;
 }
 
 // Pre-validate stock (fast fail before transaction)

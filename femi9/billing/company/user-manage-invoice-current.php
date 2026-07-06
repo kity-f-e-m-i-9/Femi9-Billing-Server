@@ -750,12 +750,12 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
                                                     <span class="invoice-date"><?= date('d/m/Y', strtotime($invoice['date'])); ?></span>
                                                 </td>
                                                 <td>
-                                                    <span class="invoice-amount">₹<?= number_format($invoice_total, 2); ?></span>
+                                                    <span class="invoice-amount">₹<?= inr_format($invoice_total, 2); ?></span>
                                                 </td>
                                                 <td>
                                                     <span class="status-badge <?= $status_class; ?>"><?= $status_text; ?></span>
                                                     <?php if ($balance > 0) { ?>
-                                                        <span class="balance-amount">Bal: ₹<?= number_format($balance, 2); ?></span>
+                                                        <span class="balance-amount">Bal: ₹<?= inr_format($balance, 2); ?></span>
                                                     <?php } ?>
                                                 </td>
                                                 <?php if ($show_advance_indicator) { ?>

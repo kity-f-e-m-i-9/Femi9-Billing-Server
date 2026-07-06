@@ -487,10 +487,10 @@ if ($view_type === 'sales') {
                 <?php endif; ?>
             </td>
             <td><?= htmlspecialchars($cat['category_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-            <td class="number"><?= number_format($display_amount, 2); ?></td>
+            <td class="number"><?= inr_format($display_amount, 2); ?></td>
             <?php if ($view_type === 'net'): ?>
-            <td class="number"><?= number_format($cat['sales_amount'], 2); ?></td>
-            <td class="number"><?= number_format($cat['return_amount'], 2); ?></td>
+            <td class="number"><?= inr_format($cat['sales_amount'], 2); ?></td>
+            <td class="number"><?= inr_format($cat['return_amount'], 2); ?></td>
             <?php endif; ?>
             <?php foreach ($products as $pr_id => $pr_name): 
                 $sales_qty = $cat['sales_products'][$pr_id] ?? 0;
@@ -505,7 +505,7 @@ if ($view_type === 'sales') {
                 }
             ?>
             <td class="center">
-                <?= $display_qty != 0 ? number_format($display_qty) : '—'; ?>
+                <?= $display_qty != 0 ? inr_format($display_qty, 0) : '—'; ?>
                 <?php if ($view_type === 'net' && ($sales_qty != 0 || $return_qty != 0)): ?>
                 <br><span class="breakdown">(<?= $sales_qty; ?> - <?= $return_qty; ?>)</span>
                 <?php endif; ?>
@@ -527,10 +527,10 @@ if ($view_type === 'sales') {
         ?>
         <tr class="subtotal-row">
             <td colspan="2">SUBTOTAL - USER TYPES</td>
-            <td class="number"><?= number_format($user_subtotal, 2); ?></td>
+            <td class="number"><?= inr_format($user_subtotal, 2); ?></td>
             <?php if ($view_type === 'net'): ?>
-            <td class="number"><?= number_format($user_type_sales_amount, 2); ?></td>
-            <td class="number"><?= number_format($user_type_return_amount, 2); ?></td>
+            <td class="number"><?= inr_format($user_type_sales_amount, 2); ?></td>
+            <td class="number"><?= inr_format($user_type_return_amount, 2); ?></td>
             <?php endif; ?>
             <?php foreach ($products as $pr_id => $pr_name): 
                 if ($view_type === 'sales') {
@@ -541,7 +541,7 @@ if ($view_type === 'sales') {
                     $user_product_total = $user_type_sales_products[$pr_id] - $user_type_return_products[$pr_id];
                 }
             ?>
-            <td class="center"><?= number_format($user_product_total); ?></td>
+            <td class="center"><?= inr_format($user_product_total, 0); ?></td>
             <?php endforeach; ?>
         </tr>
         <?php 
@@ -559,10 +559,10 @@ if ($view_type === 'sales') {
         ?>
         <tr class="subtotal-row">
             <td colspan="2">SUBTOTAL - OT CHANNELS</td>
-            <td class="number"><?= number_format($ot_subtotal, 2); ?></td>
+            <td class="number"><?= inr_format($ot_subtotal, 2); ?></td>
             <?php if ($view_type === 'net'): ?>
-            <td class="number"><?= number_format($ot_channel_sales_amount, 2); ?></td>
-            <td class="number"><?= number_format($ot_channel_return_amount, 2); ?></td>
+            <td class="number"><?= inr_format($ot_channel_sales_amount, 2); ?></td>
+            <td class="number"><?= inr_format($ot_channel_return_amount, 2); ?></td>
             <?php endif; ?>
             <?php foreach ($products as $pr_id => $pr_name): 
                 if ($view_type === 'sales') {
@@ -573,7 +573,7 @@ if ($view_type === 'sales') {
                     $ot_product_total = $ot_channel_sales_products[$pr_id] - $ot_channel_return_products[$pr_id];
                 }
             ?>
-            <td class="center"><?= number_format($ot_product_total); ?></td>
+            <td class="center"><?= inr_format($ot_product_total, 0); ?></td>
             <?php endforeach; ?>
         </tr>
         <?php 
@@ -596,12 +596,12 @@ if ($view_type === 'sales') {
                 } else {
                     $grand_display = $grand_sales_amount - $grand_return_amount;
                 }
-                echo number_format($grand_display, 2);
+                echo inr_format($grand_display, 2);
                 ?>
             </td>
             <?php if ($view_type === 'net'): ?>
-            <td class="number"><?= number_format($grand_sales_amount, 2); ?></td>
-            <td class="number"><?= number_format($grand_return_amount, 2); ?></td>
+            <td class="number"><?= inr_format($grand_sales_amount, 2); ?></td>
+            <td class="number"><?= inr_format($grand_return_amount, 2); ?></td>
             <?php endif; ?>
             <?php foreach ($products as $pr_id => $pr_name): 
                 if ($view_type === 'sales') {
@@ -612,7 +612,7 @@ if ($view_type === 'sales') {
                     $grand_product_total = $grand_sales_products[$pr_id] - $grand_return_products[$pr_id];
                 }
             ?>
-            <td class="center"><?= number_format($grand_product_total); ?></td>
+            <td class="center"><?= inr_format($grand_product_total, 0); ?></td>
             <?php endforeach; ?>
         </tr>
     </tfoot>
@@ -650,15 +650,15 @@ if ($view_type === 'sales') {
         </tr>
         <tr class="total-row">
             <td><strong>Grand Total Sales Amount:</strong></td>
-            <td class="number"><strong>₹<?= number_format($grand_sales_amount, 2); ?></strong></td>
+            <td class="number"><strong>₹<?= inr_format($grand_sales_amount, 2); ?></strong></td>
         </tr>
         <tr class="total-row">
             <td><strong>Grand Total Returns Amount:</strong></td>
-            <td class="number"><strong>₹<?= number_format($grand_return_amount, 2); ?></strong></td>
+            <td class="number"><strong>₹<?= inr_format($grand_return_amount, 2); ?></strong></td>
         </tr>
         <tr class="total-row">
             <td><strong>Net Amount:</strong></td>
-            <td class="number"><strong>₹<?= number_format($grand_sales_amount - $grand_return_amount, 2); ?></strong></td>
+            <td class="number"><strong>₹<?= inr_format($grand_sales_amount - $grand_return_amount, 2); ?></strong></td>
         </tr>
     </tbody>
 </table>
@@ -683,18 +683,18 @@ if ($view_type === 'sales') {
         ?>
         <tr>
             <td><?= htmlspecialchars($pr_name, ENT_QUOTES, 'UTF-8'); ?></td>
-            <td class="number"><?= number_format($sales_qty); ?></td>
-            <td class="number"><?= number_format($return_qty); ?></td>
-            <td class="number"><strong><?= number_format($net_qty); ?></strong></td>
+            <td class="number"><?= inr_format($sales_qty, 0); ?></td>
+            <td class="number"><?= inr_format($return_qty, 0); ?></td>
+            <td class="number"><strong><?= inr_format($net_qty, 0); ?></strong></td>
         </tr>
         <?php endforeach; ?>
     </tbody>
     <tfoot>
         <tr class="total-row">
             <td><strong>TOTAL</strong></td>
-            <td class="number"><strong><?= number_format(array_sum($grand_sales_products)); ?></strong></td>
-            <td class="number"><strong><?= number_format(array_sum($grand_return_products)); ?></strong></td>
-            <td class="number"><strong><?= number_format(array_sum($grand_sales_products) - array_sum($grand_return_products)); ?></strong></td>
+            <td class="number"><strong><?= inr_format(array_sum($grand_sales_products), 0); ?></strong></td>
+            <td class="number"><strong><?= inr_format(array_sum($grand_return_products), 0); ?></strong></td>
+            <td class="number"><strong><?= inr_format(array_sum($grand_sales_products) - array_sum($grand_return_products), 0); ?></strong></td>
         </tr>
     </tfoot>
 </table>

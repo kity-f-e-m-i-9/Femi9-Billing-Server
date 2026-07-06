@@ -98,7 +98,7 @@ $conn->close();
                             <div class="col-md-12">
                                 <div class="card">
                                    <div class="card-header">
-                                        <h5 class="card-title">Payment of &#8377;<?php echo number_format($row["plan_amount"],2,'.','');?> Successful.</h5>
+                                        <h5 class="card-title">Payment of &#8377;<?php echo inr_format($row["plan_amount"], 2);?> Successful.</h5>
                                     </div>
                                     <div class="card-body">
 									

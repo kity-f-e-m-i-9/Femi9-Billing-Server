@@ -37,7 +37,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
                                                   <td>'.$result_product_list["inv_number"].'</td>
 													<td>'.$customerDetails.'</td>
 													<td>'.date("d/M/Y",strtotime($result_product_list["date"])).'</td>
-													<td>'.number_format($result_product_list["total"],2,'.','').'</td>
+													<td>'.inr_format($result_product_list["total"], 2).'</td>
                                                 </tr>';
 }
 $html=$html.'

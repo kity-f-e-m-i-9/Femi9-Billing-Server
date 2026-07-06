@@ -275,7 +275,7 @@ $entered_by_mobile=$result_UserDetails['contact'];
 				$TotalPrQty=$result_sumprqty[0];
 				$TotalPrQty123+=$TotalPrQty;
 				?>
-				<td align="right"><?php echo number_format($TotalAmount,2,'.','');?></td>
+				<td align="right"><?php echo inr_format($TotalAmount, 2);?></td>
 				
 				
 				<!------------------------PRODUCT WISE SALES QTY------------------------------->
@@ -306,7 +306,7 @@ $entered_by_mobile=$result_UserDetails['contact'];
 										 <tfoot>
 										 <tr>
 										 <td colspan="4">Grand Total</td>
-				<td align="right"><b><?php echo number_format($TotalAmount123,2,'.','');?></b></td>
+				<td align="right"><b><?php echo inr_format($TotalAmount123, 2);?></b></td>
 				<td align="right"><b><?=$TotalPrQty123;?></b></td>
 										 </tr>
 										 </tfoot>

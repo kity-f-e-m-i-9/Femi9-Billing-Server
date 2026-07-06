@@ -362,9 +362,9 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 <td><?=$result_INVProductDetails['qty'];?></td>
 <td><?=$result_INVProductDetails['amount'];?></td>
 <td><?=$result_INVProductDetails['discount_amount'];?>(<?=$result_INVProductDetails['discount_percentage'];?>%)</td>
-<td>&#8377;<?php echo number_format($result_INVProductDetails['subtotal'],2,'.','');?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
 <td><?=$result_INVProductDetails['gstamount_total'];?>(<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
-<td align="right"><?php echo number_format($TotalAMount,2,'.','');?></td>
+<td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 
 <?php if($amount_received_fully==0){?>
 <td>
@@ -559,7 +559,7 @@ flatpickr("#bookingDateu", {
 
 <?php }else{?>
 		<div class="bold">Received Amount<span>
-		 <input type="number" min="0" required="" step="any" max="<?=number_format($roundvalue,2,'.','');?>" id="receivedamount" onkeyup="receiptamount()" name="receivedamount" class="form-control">
+		 <input type="number" min="0" required="" step="any" max="<?=inr_format($roundvalue, 2);?>" id="receivedamount" onkeyup="receiptamount()" name="receivedamount" class="form-control">
 		 </span>
 		 </div>
 		 

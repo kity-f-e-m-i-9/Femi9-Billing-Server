@@ -350,7 +350,7 @@ $seller_type_labels = [
             <td><?= htmlspecialchars($seller_type_display) ?></td>
             <td><?= htmlspecialchars($category_display) ?></td>
             <td><?= htmlspecialchars($seller['seller_mobile']) ?></td>
-            <td class="number"><?= number_format($seller['total_amount'], 2) ?></td>
+            <td class="number"><?= inr_format($seller['total_amount'], 2) ?></td>
             
             <?php foreach ($products as $pr_id => $pr_name): 
                 $qty = $seller_product_quantities[$seller['seller_id']][$pr_id] ?? 0;
@@ -364,7 +364,7 @@ $seller_type_labels = [
         <!-- Total Row -->
         <tr class="total-row">
             <td colspan="5" class="number">Grand Total:</td>
-            <td class="number"><?= number_format($grand_total, 2) ?></td>
+            <td class="number"><?= inr_format($grand_total, 2) ?></td>
             <?php foreach ($product_totals as $pr_id => $total): ?>
             <td class="center"><?= $total ?></td>
             <?php endforeach; ?>

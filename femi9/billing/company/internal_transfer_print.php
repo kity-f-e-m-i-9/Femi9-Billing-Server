@@ -288,12 +288,12 @@ Terms of Delivery<br/>
 <td><b><?=$result_ProductDetails123['productName'];?></b></td>
 <td id="rightlaign"><?=$result_ProductDetails123['hsn'];?></td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
-<td id="rightlaign"><?php echo number_format($result_ProductDetails123['mrp'],2,'.','');?></td>
-<td id="rightlaign"><?php echo number_format($result_INVProductDetails['price'],2,'.','');?></td>
+<td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2);?></td>
+<td id="rightlaign"><?php echo inr_format($result_INVProductDetails['price'], 2);?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?=$result_INVProductDetails['gst'];?>%</td>
-<td id="rightlaign"><?=$discountamount_show;?> (<?=number_format($discountPercentage,2,'.','');?>%)</td>
-<td id="rightlaign"><?php echo number_format($TotalAMount23,2,'.','');?></td>
+<td id="rightlaign"><?=$discountamount_show;?> (<?=inr_format($discountPercentage, 2);?>%)</td>
+<td id="rightlaign"><?php echo inr_format($TotalAMount23, 2);?></td>
 </tr>
 
 	<?php } ?>
@@ -311,7 +311,7 @@ Terms of Delivery<br/>
 <td></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; <?php echo number_format($TotalAMount123,2,'.','');?></b></td>
+<td id="rightlaign"><b>&#8377; <?php echo inr_format($TotalAMount123, 2);?></b></td>
 </tr>
 
 
@@ -323,10 +323,10 @@ $totalgstamount=$result_Invoice_Details['gst_amount'];
 if($totalgstamount>0)
 {	
 $SGST=$totalgstamount/2;
-$SGST=number_format($SGST,2,'.','');
+$SGST=inr_format($SGST, 2);
 
 $CGST=$totalgstamount/2;
-$CGST=number_format($CGST,2,'.','');
+$CGST=inr_format($CGST, 2);
 ?>
 <tr id="bottombordervl">
 <td></td>
@@ -369,7 +369,7 @@ $CGST=number_format($CGST,2,'.','');
 <td></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; <?=number_format($result_Invoice['courier_charges'],2,'.','');?></b></td>
+<td id="rightlaign"><b>&#8377; <?=inr_format($result_Invoice['courier_charges'], 2);?></b></td>
 </tr>
 <?php }else{ $Courier_Charges="0";}  ?>
 
@@ -383,7 +383,7 @@ $CGST=number_format($CGST,2,'.','');
 <td></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; <?=number_format($result_Invoice_Details['roundoff'],2,'.','');?></b></td>
+<td id="rightlaign"><b>&#8377; <?=inr_format($result_Invoice_Details['roundoff'], 2);?></b></td>
 </tr>
 <?php } */ ?>
 
@@ -407,7 +407,7 @@ $Total_amount_show=$TotalSLS_amount+$Courier_Charges;
 <td></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; <?=number_format($Total_amount_show,2,'.','');?></b></td>
+<td id="rightlaign"><b>&#8377; <?=inr_format($Total_amount_show, 2);?></b></td>
 </tr>
 </table>
 <div style="clear:both;"></div>
@@ -488,7 +488,7 @@ $resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
 ?>
 <tr>
 <td><?=$hsncode;?></td>
-<td  align="right"><?=number_format($resulthsnTaxamount[0],2,'.','')?></td>
+<td  align="right"><?=inr_format($resulthsnTaxamount[0], 2)?></td>
 </tr>
 <?php }
 
@@ -498,7 +498,7 @@ $resulthsnTaxamount12=mysqli_fetch_array($fetchhsnTaxamount12);
 ?>
 <tr>
 <td align="right"><b>Total&nbsp;</b></td>
-<td align="right"><b><?=number_format($resulthsnTaxamount12[0],2,'.','')?></b></td>
+<td align="right"><b><?=inr_format($resulthsnTaxamount12[0], 2)?></b></td>
 </tr>
 </table>
 <!---------------------HSN WISE TOTAL----END***------------------------->

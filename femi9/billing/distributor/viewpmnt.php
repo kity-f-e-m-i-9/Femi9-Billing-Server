@@ -106,13 +106,13 @@ $title="Invoice Payment Details";
                                                     <td><?php echo $result_product_list["inv_number"];?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
-				<td><?php echo number_format($result_product_list["sub_total"],2,'.','');?></td>
+				<td><?php echo inr_format($result_product_list["sub_total"], 2);?></td>
 				<td><?php
 $discount=$result_product_list["discount"]+$result_product_list["credit"];
-				echo number_format($discount,2,'.','');?>
+				echo inr_format($discount, 2);?>
 				</td>
 	
-				<td><?php echo number_format($result_product_list["total"],2,'.','');?></td>
+				<td><?php echo inr_format($result_product_list["total"], 2);?></td>
 													
                                         </tr>
 										</tbody>
@@ -141,7 +141,7 @@ if($receiptamount>0){
 									  
                         <td><?=$i=$i+1; ?></td>
 						<td><?=date("d/m/Y",strtotime($result_pincode_list['date']));?></td>
-						<td><?=number_format($receiptamount,2,'.','');?></td>
+						<td><?=inr_format($receiptamount, 2);?></td>
                                       
                                      </tr>
 									<?php }?>
@@ -151,7 +151,7 @@ if($receiptamount>0){
 									<tfoot>
 									<tr>
 									<td colspan="2" style="text-align:right;font-weight:bold;">Total</td>
-									<td style="font-weight:bold;"><?=number_format($receiptamount123,2,'.','');?></td>
+									<td style="font-weight:bold;"><?=inr_format($receiptamount123, 2);?></td>
 									</tr>
 									</tfoot>
                                     </table>

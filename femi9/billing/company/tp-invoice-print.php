@@ -413,33 +413,33 @@ Terms of Delivery<br/>&nbsp;
 <td><?= $invno; ?></td>
 <td><b><?= htmlspecialchars($item['productName']); ?></b><?= $gst_type === 'inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
 <td id="rightlaign"><?= htmlspecialchars($item['hsn']); ?></td>
-<td id="rightlaign"><?= number_format($qty); ?> Packs</td>
-<td id="rightlaign"><?= number_format($mrp, 2, '.', ''); ?></td>
-<td id="rightlaign"><?= number_format($rate, 2, '.', ''); ?></td>
+<td id="rightlaign"><?= inr_format($qty, 0); ?> Packs</td>
+<td id="rightlaign"><?= inr_format($mrp, 2); ?></td>
+<td id="rightlaign"><?= inr_format($rate, 2); ?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?= $gst_pct; ?>%</td>
 <td id="rightlaign">0.00<br/>(0%)</td>
-<td id="rightlaign"><?= number_format($taxable_value, 2, '.', ''); ?></td>
+<td id="rightlaign"><?= inr_format($taxable_value, 2); ?></td>
 </tr>
 <?php endforeach; ?>
 
 <tr>
 <td></td><td></td><td></td>
-<td id="rightlaign"><b><?= number_format($Totalquantity123); ?> Packs</b></td>
+<td id="rightlaign"><b><?= inr_format($Totalquantity123, 0); ?> Packs</b></td>
 <td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= number_format($TotalAMount123, 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 
 <?php if ($discount_amount > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Discount</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= number_format($discount_amount, 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
 </tr>
 <?php endif; ?>
 <?php if ($totalgstamount > 0):
-    $SGST = number_format($totalgstamount / 2, 2, '.', '');
-    $CGST = number_format($totalgstamount / 2, 2, '.', '');
+    $SGST = inr_format($totalgstamount / 2, 2);
+    $CGST = inr_format($totalgstamount / 2, 2);
 ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>SGST</i></b></td>
@@ -457,14 +457,14 @@ Terms of Delivery<br/>&nbsp;
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= number_format($courier_charges, 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Total</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= number_format($grand_total, 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
 </tr>
 </table>
 <div style="clear:both;"></div>
@@ -480,7 +480,7 @@ Terms of Delivery<br/>&nbsp;
 </tr>
 <tr>
 <td style="padding-top:6px;font-size:13px;">Amount Taxable (in words)</td>
-<td align="right" style="font-size:13px;"><?= $Currency_symbol; ?>&nbsp;<?= number_format($TotalAMount123, 2, '.', ''); ?></td>
+<td align="right" style="font-size:13px;"><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></td>
 </tr>
 <tr>
 <td><b><?= $Currency_Name; ?> <?= ucwords($TXBresult); ?> Only</b></td>
@@ -497,12 +497,12 @@ Terms of Delivery<br/>&nbsp;
 <?php foreach ($hsn_totals as $hsncode => $hsnamt): ?>
 <tr>
 <td><?= htmlspecialchars($hsncode); ?></td>
-<td align="right"><?= number_format($hsnamt, 2, '.', ''); ?></td>
+<td align="right"><?= inr_format($hsnamt, 2); ?></td>
 </tr>
 <?php endforeach; ?>
 <tr>
 <td align="right"><b>Total&nbsp;</b></td>
-<td align="right"><b><?= number_format($TotalAMount123, 2, '.', ''); ?></b></td>
+<td align="right"><b><?= inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 </table>
 <!---------------------HSN WISE TOTAL----END***------------------------->

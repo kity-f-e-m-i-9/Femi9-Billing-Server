@@ -34,7 +34,7 @@ $Total_withdraw_amount_ST=$result_wallet_withdraw_amount_ST[0] ?? '0';
 $Average_available_walletAmount_ST=$Total_wallet_amount_ST-$Total_withdraw_amount_ST;
 								?>
 								<li class="nav-item hidden-on-mobile">
-                                    <a class="nav-link" href="wallet-history" style="margin-top:12px;"> <i class="material-icons-outlined">wallet</i>&nbsp;<b><?=number_format($Average_available_walletAmount_ST,2,'.','');?></b></a>
+                                    <a class="nav-link" href="wallet-history" style="margin-top:12px;"> <i class="material-icons-outlined">wallet</i>&nbsp;<b><?=inr_format($Average_available_walletAmount_ST, 2);?></b></a>
                                 </li>
 								
                                 <li class="nav-item hidden-on-mobile">

@@ -3,6 +3,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require_once __DIR__ . '/../../shared/env-loader.php'; //abhinesh correction
+require_once __DIR__ . '/../../shared/number-format-helpers.php';
 
 $servername = $_ENV['DB_HOST'] ?? 'localhost';
 $db_port    = (int)($_ENV['DB_PORT'] ?? 3306);

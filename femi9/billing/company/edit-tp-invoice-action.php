@@ -244,7 +244,7 @@ try {
     $bs->bind_param("i", $tp_id); $bs->execute();
     $avail_balance = round((float)$bs->get_result()->fetch_assoc()['bal'], 2); $bs->close();
     if ($avail_balance < $new_net) {
-        throw new \Exception("Insufficient advance balance. Available: " . number_format($avail_balance, 2) . ", Required: " . number_format($new_net, 2));
+        throw new \Exception("Insufficient advance balance. Available: " . inr_format($avail_balance, 2) . ", Required: " . inr_format($new_net, 2));
     }
 
     // 4. Apply new stock movements

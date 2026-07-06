@@ -640,8 +640,8 @@ function e(mixed $v): string
                                     <td><?= $i + 1 ?></td>
                                     <td><code><?= e($row['receiptid']) ?></code></td>
                                     <td><code><?= e($row['inv_id']) ?></code></td>
-                                    <td>₹<?= number_format((float)$row['invoice_amount'], 2) ?></td>
-                                    <td>₹<?= number_format((float)$row['courier_charges'], 2) ?></td>
+                                    <td>₹<?= inr_format((float)$row['invoice_amount'], 2) ?></td>
+                                    <td>₹<?= inr_format((float)$row['courier_charges'], 2) ?></td>
                                     <td>
                                         <span class="badge badge-blue"><?= e($row['invoice_source']) ?></span>
                                     </td>
@@ -718,8 +718,8 @@ function e(mixed $v): string
                                 <td><?= e($log['run_at']) ?></td>
                                 <td><code><?= e($log['receiptid']) ?></code></td>
                                 <td><code><?= e($log['inv_id']) ?></code></td>
-                                <td>₹<?= number_format((float)$log['invoice_amount'], 2) ?></td>
-                                <td>₹<?= number_format((float)$log['courier_charges'], 2) ?></td>
+                                <td>₹<?= inr_format((float)$log['invoice_amount'], 2) ?></td>
+                                <td>₹<?= inr_format((float)$log['courier_charges'], 2) ?></td>
                                 <td><span class="badge badge-gray"><?= e($log['old_payment_type']) ?></span></td>
                                 <td><span class="badge badge-orange"><?= e($log['new_payment_type']) ?></span></td>
                                 <td><span class="badge badge-blue"><?= e($log['invoice_source']) ?></span></td>

@@ -214,7 +214,7 @@ if($Total_SS_outstanding>0){
 													<th><?=$taluk_name_VLSS2;?></th>
 													<?php }?>
 													
-							<td align="right"><?=number_format($Total_SS_outstanding,2,'.','');?></td>
+							<td align="right"><?=inr_format($Total_SS_outstanding, 2);?></td>
 				
                                         </tr>
                                            
@@ -229,7 +229,7 @@ if($Total_SS_outstanding>0){
 													<td></td>
 													<?php }?>
 													
-				<td align="right"><b><?=number_format($Total_available_stock123_VLSS1,2,'.','');?></b></td>
+				<td align="right"><b><?=inr_format($Total_available_stock123_VLSS1, 2);?></b></td>
 										 </tr>
 										 </tfoot>
                                         </table>

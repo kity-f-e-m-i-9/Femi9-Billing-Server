@@ -234,7 +234,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   </tr>
 						   <tr>
 						   <td>(c) Other outward supplies (Nil rated, exempted)</td>
-						   <td><?=number_format($Nil_rated_total,2);?></td>
+						   <td><?=inr_format($Nil_rated_total, 2);?></td>
 						   <td>0.00</td>
 						   <td>0.00</td>
 						    <td>0.00</td>

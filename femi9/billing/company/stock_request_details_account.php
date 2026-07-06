@@ -173,7 +173,7 @@ else
 				$fetch_TotalAMont=mysqli_query($db_conn,$select_TotalAMont);
 				$result_TotalAMont=mysqli_fetch_array($fetch_TotalAMont);
 				if($result_TotalAMont[0]!=NULL){
-				$totalAmount=number_format($result_TotalAMont[0],2,'.','');
+				$totalAmount=inr_format($result_TotalAMont[0], 2);
 				}else{$totalAmount="0.00";}
 				
 				if($result_requestdetails["amount"]!=NULL)
@@ -192,7 +192,7 @@ else
 								
 <td><?=$totalqty;?></td>		
 <td><b><?=$totalAmount;?></b></td>	
-<td><?=number_format($trns_AMount,2,'.','');?></td>	
+<td><?=inr_format($trns_AMount, 2);?></td>	
 													
 													
                                                 </tr>
@@ -285,7 +285,7 @@ else
 		<td style="display:none;"><?=$result_productCurrentst['amount'];?></td>
 		<td style="display:none;"><?=$result_productCurrentst['subtotal'];?></td>
 		<td style="display:none;"><?=$result_productCurrentst['gsttotal'];?> (<?=$result_productCurrentst['gst'];?>%)</td>
-		<td align="right" style="display:none;"><?=number_format($result_productCurrentst['total'],2,'.','');?></td></td>
+		<td align="right" style="display:none;"><?=inr_format($result_productCurrentst['total'], 2);?></td></td>
 		
                                                 </tr>
                                            

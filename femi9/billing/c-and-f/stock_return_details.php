@@ -160,10 +160,10 @@ $i= $start_from;
 <?php }?>
 </td>
 
-<td>&#8377;<?php echo number_format($result_INVProductDetails['amount'],2,'.','');?></td>
-<td>&#8377;<?php echo number_format($result_INVProductDetails['subtotal'],2,'.','');?></td>
-<td><?=number_format($result_INVProductDetails['gstamount_total'],2,'.','');?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
-<td align="right"><?php echo number_format($TotalAMount,2,'.','');?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
+<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+<td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 
                                                         </tr>
                                                         

@@ -483,7 +483,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                             <div class="kpi-card bg-indigo">
                                 <i class="material-icons-outlined kpi-icon">payments</i>
                                 <div class="kpi-title">Total Revenue</div>
-                                <div class="kpi-value">&#x20B9;<?php echo number_format($total_revenue, 0); ?></div>
+                                <div class="kpi-value">&#x20B9;<?php echo inr_format($total_revenue, 0); ?></div>
                                 <div class="kpi-sub">
                                     <?php if ($revenue_growth != 0): ?>
                                     <span style="<?php echo $revenue_growth >= 0 ? 'color:#b2ff59' : 'color:#ff8a80'; ?>">
@@ -497,7 +497,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                             <div class="kpi-card bg-teal">
                                 <i class="material-icons-outlined kpi-icon">receipt_long</i>
                                 <div class="kpi-title">Invoices</div>
-                                <div class="kpi-value"><?php echo number_format($total_invoices); ?></div>
+                                <div class="kpi-value"><?php echo inr_format($total_invoices, 0); ?></div>
                                 <div class="kpi-sub">Cust: <?php echo $cust_row['cnt'] ?? 0; ?> &nbsp;|&nbsp; Shop: <?php echo $shop_row['cnt'] ?? 0; ?></div>
                             </div>
                         </div>
@@ -505,23 +505,23 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                             <div class="kpi-card bg-orange">
                                 <i class="material-icons-outlined kpi-icon">inventory_2</i>
                                 <div class="kpi-title">Units Sold</div>
-                                <div class="kpi-value"><?php echo number_format($total_units); ?></div>
-                                <div class="kpi-sub">Cust: <?php echo number_format($cust_units); ?> &nbsp;|&nbsp; Shop: <?php echo number_format($shop_units); ?></div>
+                                <div class="kpi-value"><?php echo inr_format($total_units, 0); ?></div>
+                                <div class="kpi-sub">Cust: <?php echo inr_format($cust_units, 0); ?> &nbsp;|&nbsp; Shop: <?php echo inr_format($shop_units, 0); ?></div>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
                             <div class="kpi-card bg-crimson">
                                 <i class="material-icons-outlined kpi-icon">keyboard_return</i>
                                 <div class="kpi-title">Returns</div>
-                                <div class="kpi-value"><?php echo number_format($total_returns); ?></div>
-                                <div class="kpi-sub">&#x20B9;<?php echo number_format($total_return_amt, 0); ?> returned</div>
+                                <div class="kpi-value"><?php echo inr_format($total_returns, 0); ?></div>
+                                <div class="kpi-sub">&#x20B9;<?php echo inr_format($total_return_amt, 0); ?> returned</div>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
                             <div class="kpi-card bg-purple">
                                 <i class="material-icons-outlined kpi-icon">account_balance_wallet</i>
                                 <div class="kpi-title">Advance Balance</div>
-                                <div class="kpi-value">&#x20B9;<?php echo number_format($adv_balance, 0); ?></div>
+                                <div class="kpi-value">&#x20B9;<?php echo inr_format($adv_balance, 0); ?></div>
                                 <div class="kpi-sub">Available advance</div>
                             </div>
                         </div>
@@ -530,7 +530,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                 <i class="material-icons-outlined kpi-icon">flag</i>
                                 <div class="kpi-title">Target vs Achieved</div>
                                 <div class="kpi-value"><?php echo $overall_pct; ?>%</div>
-                                <div class="kpi-sub">&#x20B9;<?php echo number_format($total_achieved,0); ?> / &#x20B9;<?php echo number_format($total_target,0); ?></div>
+                                <div class="kpi-sub">&#x20B9;<?php echo inr_format($total_achieved, 0); ?> / &#x20B9;<?php echo inr_format($total_target, 0); ?></div>
                             </div>
                         </div>
                     </div>
@@ -555,15 +555,15 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                     <div class="mt-3">
                                         <div class="d-flex justify-content-between mb-2">
                                             <span class="status-badge badge-paid">Fully Paid</span>
-                                            <span><?php echo $os_paid; ?> invoices — &#x20B9;<?php echo number_format($os_paid_amt,0); ?></span>
+                                            <span><?php echo $os_paid; ?> invoices — &#x20B9;<?php echo inr_format($os_paid_amt, 0); ?></span>
                                         </div>
                                         <div class="d-flex justify-content-between mb-2">
                                             <span class="status-badge badge-partial">Partially Paid</span>
-                                            <span><?php echo $os_partial; ?> invoices — &#x20B9;<?php echo number_format($os_partial_amt,0); ?></span>
+                                            <span><?php echo $os_partial; ?> invoices — &#x20B9;<?php echo inr_format($os_partial_amt, 0); ?></span>
                                         </div>
                                         <div class="d-flex justify-content-between">
                                             <span class="status-badge badge-unpaid">Unpaid</span>
-                                            <span><?php echo $os_unpaid; ?> invoices — &#x20B9;<?php echo number_format($os_unpaid_amt,0); ?></span>
+                                            <span><?php echo $os_unpaid; ?> invoices — &#x20B9;<?php echo inr_format($os_unpaid_amt, 0); ?></span>
                                         </div>
                                     </div>
                                 </div>
@@ -606,9 +606,9 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             $lbl  = $r['lbl'] ?? $g;
                                             echo "<tr>
                                                 <td><b>$lbl</b></td>
-                                                <td>&#x20B9;" . number_format($r['cust'] ?? 0, 2) . " <small>({$r['cust_cnt']})</small></td>
-                                                <td>&#x20B9;" . number_format($r['shop'] ?? 0, 2) . " <small>({$r['shop_cnt']})</small></td>
-                                                <td><b>&#x20B9;" . number_format($rev, 2) . "</b></td>
+                                                <td>&#x20B9;" . inr_format($r['cust'] ?? 0, 2) . " <small>({$r['cust_cnt']})</small></td>
+                                                <td>&#x20B9;" . inr_format($r['shop'] ?? 0, 2) . " <small>({$r['shop_cnt']})</small></td>
+                                                <td><b>&#x20B9;" . inr_format($rev, 2) . "</b></td>
                                                 <td>$cnt</td>
                                                 <td><div class='d-flex align-items-center gap-2'>
                                                     <div class='progress-bar-mis' style='width:80px'><div class='progress-fill' style='width:{$pct}%;background:#3f51b5'></div></div>
@@ -650,8 +650,8 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             <tr>
                                                 <td><?php echo $i+1; ?></td>
                                                 <td><b><?php echo htmlspecialchars($p['productName']); ?></b></td>
-                                                <td><span class="badge-qty"><?php echo number_format((int)$p['total_qty']); ?> u</span></td>
-                                                <td><span class="badge-rev">&#x20B9;<?php echo number_format($p['total_rev'], 2); ?></span></td>
+                                                <td><span class="badge-qty"><?php echo inr_format((int)$p['total_qty'], 0); ?> u</span></td>
+                                                <td><span class="badge-rev">&#x20B9;<?php echo inr_format($p['total_rev'], 2); ?></span></td>
                                                 <td>
                                                     <div class="d-flex align-items-center gap-2">
                                                         <div class="progress-bar-mis" style="width:70px"><div class="progress-fill" style="width:<?php echo $pct_qty; ?>%;background:<?php echo $bar_color; ?>"></div></div>
@@ -699,7 +699,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($s['state_name']); ?></b></td>
                                                 <td><?php echo $s['cnt']; ?></td>
-                                                <td><span class="badge-rev">&#x20B9;<?php echo number_format($s['revenue'], 2); ?></span></td>
+                                                <td><span class="badge-rev">&#x20B9;<?php echo inr_format($s['revenue'], 2); ?></span></td>
                                                 <td>
                                                     <div class="d-flex align-items-center gap-2">
                                                         <div class="progress-bar-mis" style="width:70px"><div class="progress-fill" style="width:<?php echo $pct; ?>%;background:#00897b"></div></div>
@@ -731,7 +731,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($d['district_name']); ?></b></td>
                                                 <td><?php echo $d['cnt']; ?></td>
-                                                <td><span class="badge-rev">&#x20B9;<?php echo number_format($d['revenue'], 2); ?></span></td>
+                                                <td><span class="badge-rev">&#x20B9;<?php echo inr_format($d['revenue'], 2); ?></span></td>
                                                 <td>
                                                     <div class="d-flex align-items-center gap-2">
                                                         <div class="progress-bar-mis" style="width:70px"><div class="progress-fill" style="width:<?php echo $pct; ?>%;background:#7b1fa2"></div></div>
@@ -769,9 +769,9 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                                 <td><?php echo $i+1; ?></td>
                                                 <td><b><?php echo htmlspecialchars($s['shop_name']); ?></b></td>
                                                 <td><?php echo $s['inv_cnt']; ?></td>
-                                                <td><span class="badge-qty"><?php echo number_format((int)$s['units']); ?></span></td>
+                                                <td><span class="badge-qty"><?php echo inr_format((int)$s['units'], 0); ?></span></td>
                                                 <td>
-                                                    <span class="badge-rev">&#x20B9;<?php echo number_format($s['revenue'], 2); ?></span>
+                                                    <span class="badge-rev">&#x20B9;<?php echo inr_format($s['revenue'], 2); ?></span>
                                                     <div class="progress-bar-mis mt-1"><div class="progress-fill" style="width:<?php echo round($s['revenue']/$max_shop_rev*100,1); ?>%;background:#ef6c00"></div></div>
                                                 </td>
                                             </tr>
@@ -799,9 +799,9 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                                 <td><?php echo $i+1; ?></td>
                                                 <td><b><?php echo htmlspecialchars($c['cust_name']); ?></b></td>
                                                 <td><?php echo $c['inv_cnt']; ?></td>
-                                                <td><span class="badge-qty"><?php echo number_format((int)$c['units']); ?></span></td>
+                                                <td><span class="badge-qty"><?php echo inr_format((int)$c['units'], 0); ?></span></td>
                                                 <td>
-                                                    <span class="badge-rev">&#x20B9;<?php echo number_format($c['revenue'], 2); ?></span>
+                                                    <span class="badge-rev">&#x20B9;<?php echo inr_format($c['revenue'], 2); ?></span>
                                                     <div class="progress-bar-mis mt-1"><div class="progress-fill" style="width:<?php echo round($c['revenue']/$max_cust_rev*100,1); ?>%;background:#3f51b5"></div></div>
                                                 </td>
                                             </tr>
@@ -831,13 +831,13 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                         <div class="col-md-4">
                                             <div style="background:#f5f6fa;padding:14px;border-radius:8px;text-align:center;">
                                                 <div style="font-size:12px;color:#888;text-transform:uppercase;font-weight:600;">Total Target</div>
-                                                <div style="font-size:24px;font-weight:700;color:#1a237e;">&#x20B9;<?php echo number_format($total_target, 0); ?></div>
+                                                <div style="font-size:24px;font-weight:700;color:#1a237e;">&#x20B9;<?php echo inr_format($total_target, 0); ?></div>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
                                             <div style="background:#f5f6fa;padding:14px;border-radius:8px;text-align:center;">
                                                 <div style="font-size:12px;color:#888;text-transform:uppercase;font-weight:600;">Total Achieved</div>
-                                                <div style="font-size:24px;font-weight:700;color:#2e7d32;">&#x20B9;<?php echo number_format($total_achieved, 0); ?></div>
+                                                <div style="font-size:24px;font-weight:700;color:#2e7d32;">&#x20B9;<?php echo inr_format($total_achieved, 0); ?></div>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
@@ -862,10 +862,10 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($tr['loc_name']); ?></b></td>
                                                 <td><span style="font-size:11px;background:#e8eaf6;padding:2px 6px;border-radius:4px;">L<?php echo $tr['depth']; ?></span></td>
-                                                <td>&#x20B9;<?php echo number_format($tr['target'], 2); ?></td>
-                                                <td>&#x20B9;<?php echo number_format($tr['achieved'], 2); ?></td>
+                                                <td>&#x20B9;<?php echo inr_format($tr['target'], 2); ?></td>
+                                                <td>&#x20B9;<?php echo inr_format($tr['achieved'], 2); ?></td>
                                                 <td style="color:<?php echo $gap > 0 ? '#c62828' : '#2e7d32'; ?>">
-                                                    <?php echo $gap > 0 ? '−' : '+'; ?>&#x20B9;<?php echo number_format(abs($gap), 2); ?>
+                                                    <?php echo $gap > 0 ? '−' : '+'; ?>&#x20B9;<?php echo inr_format(abs($gap), 2); ?>
                                                 </td>
                                                 <td>
                                                     <div class="d-flex align-items-center gap-2">
@@ -909,7 +909,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                         <?php foreach ($six_months as $m): ?>
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($m['lbl']); ?></b></td>
-                                                <td>&#x20B9;<?php echo number_format($m['total_rev'], 0); ?></td>
+                                                <td>&#x20B9;<?php echo inr_format($m['total_rev'], 0); ?></td>
                                                 <td><?php echo (int)$m['total_cnt']; ?></td>
                                                 <td>
                                                     <?php if ($m['growth'] === null): ?>
@@ -939,7 +939,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                 <div class="card-header">
                                     <h5 class="card-title">Returns &amp; Credit Notes
                                         <span class="badge badge-style-light badge-danger" style="margin-left:8px;">
-                                            <?php echo $total_returns; ?> returns — &#x20B9;<?php echo number_format($total_return_amt, 2); ?>
+                                            <?php echo $total_returns; ?> returns — &#x20B9;<?php echo inr_format($total_return_amt, 2); ?>
                                         </span>
                                     </h5>
                                 </div>
@@ -957,7 +957,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                                 <td><?php echo htmlspecialchars($r['inv_number'] ?? $r['invnumber']); ?></td>
                                                 <td><?php echo ucfirst(str_replace('_',' ',$r['from_usertype'])); ?></td>
                                                 <td><?php echo date('d M Y', strtotime($r['date'])); ?></td>
-                                                <td><span class="badge-rev">&#x20B9;<?php echo number_format($r['total'], 2); ?></span></td>
+                                                <td><span class="badge-rev">&#x20B9;<?php echo inr_format($r['total'], 2); ?></span></td>
                                                 <td>
                                                     <?php if ($r['status'] === 'pending'): ?>
                                                     <span class="status-badge badge-partial">Pending</span>

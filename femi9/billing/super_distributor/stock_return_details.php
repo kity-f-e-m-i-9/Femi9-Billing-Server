@@ -143,8 +143,8 @@ $i= $start_from;
 <th scope="row"><?php echo $rd=$rd+1;?></th>
 <td><?=$result_ProductDetails123['productName'];?></td>
 <td><?=$result_INVProductDetails['qty'];?></td>
-<td>&#8377;<?php echo number_format($result_INVProductDetails['amount'],2,'.','');?></td>
-<td align="right"><?php echo number_format($TotalAMount,2,'.','');?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
+<td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 
                                                         </tr>
                                                         

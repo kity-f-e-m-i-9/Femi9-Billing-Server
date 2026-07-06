@@ -197,7 +197,7 @@ $filters_active = $filter_tp_id || $filter_date_from || $filter_date_to;
                                                     <td><?php echo htmlspecialchars($inv['tp_name']); ?></td>
                                                     <td><?php echo htmlspecialchars($inv['tp_code']); ?></td>
                                                     <td class="text-right"><?php echo (int)$inv['item_count']; ?></td>
-                                                    <td class="text-right"><b>₹<?php echo number_format((float)$inv['total_amount'], 2); ?></b></td>
+                                                    <td class="text-right"><b>₹<?php echo inr_format((float)$inv['total_amount'], 2); ?></b></td>
                                                     <td>
                                                         <a href="view-tp-invoice.php?id=<?php echo base64_encode($inv['id']); ?>" class="btn btn-sm btn-outline-primary">
                                                             <i class="material-icons" style="font-size:14px;vertical-align:middle;">visibility</i> View
@@ -213,7 +213,7 @@ $filters_active = $filter_tp_id || $filter_date_from || $filter_date_to;
                                             <tfoot>
                                                 <tr>
                                                     <td colspan="5" class="text-right">Grand Total</td>
-                                                    <td class="text-right"><b>₹<?php echo number_format($grand_total, 2); ?></b></td>
+                                                    <td class="text-right"><b>₹<?php echo inr_format($grand_total, 2); ?></b></td>
                                                     <td></td>
                                                 </tr>
                                             </tfoot>

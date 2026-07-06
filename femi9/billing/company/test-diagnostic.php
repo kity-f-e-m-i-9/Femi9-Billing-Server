@@ -56,7 +56,7 @@ while ($row = mysqli_fetch_assoc($result_companies)) {
     echo "<td><strong>" . htmlspecialchars($row['to_user_id']) . "</strong></td>";
     echo "<td>" . htmlspecialchars($row['to_user_type']) . "</td>";
     echo "<td>" . $row['payment_count'] . "</td>";
-    echo "<td>₹" . number_format($row['total_balance'], 2) . "</td>";
+    echo "<td>₹" . inr_format($row['total_balance'], 2) . "</td>";
     echo "</tr>";
 }
 echo "</table>";
@@ -88,7 +88,7 @@ while ($row = mysqli_fetch_assoc($result_ss)) {
     echo "<tr>";
     echo "<td><strong>" . htmlspecialchars($row['to_user_id']) . "</strong></td>";
     echo "<td>" . htmlspecialchars($row['to_user_type']) . "</td>";
-    echo "<td>₹" . number_format($row['balance'], 2) . "</td>";
+    echo "<td>₹" . inr_format($row['balance'], 2) . "</td>";
     echo "</tr>";
     $ss_balances[$row['to_user_id']] = $row['balance'];
 }
@@ -114,7 +114,7 @@ foreach (['1', '11'] as $company_id) {
     
     $color = $balance > 0 ? '#d1fae5' : '#fee2e2';
     echo "<div style='background: $color; padding: 15px; border-radius: 8px; margin-bottom: 10px;'>";
-    echo "<strong>Result:</strong> ₹" . number_format($balance, 2);
+    echo "<strong>Result:</strong> ₹" . inr_format($balance, 2);
     
     if ($balance == 0) {
         echo " ❌ (Wrong! SS didn't pay to this company)";
@@ -148,7 +148,7 @@ $current_company_id = $_SESSION['onboard_userID'] ?? 'NOT SET';
 echo "<p style='font-size: 20px; font-weight: bold; color: #1e293b;'>" . htmlspecialchars($current_company_id) . "</p>";
 
 if (isset($ss_balances[$current_company_id])) {
-    echo "<p style='color: #10b981;'><strong>✅ This SS has balance with YOUR company: ₹" . number_format($ss_balances[$current_company_id], 2) . "</strong></p>";
+    echo "<p style='color: #10b981;'><strong>✅ This SS has balance with YOUR company: ₹" . inr_format($ss_balances[$current_company_id], 2) . "</strong></p>";
 } else {
     echo "<p style='color: #ef4444;'><strong>❌ This SS has NO payments to YOUR company!</strong></p>";
     echo "<p>This SS paid to company: " . implode(', ', array_keys($ss_balances)) . "</p>";

@@ -159,7 +159,7 @@ if($from_date!=NULL)
 						   </tr>
 						   <tr>
 						   <td>(c) Other outward supplies (Nil rated, exempted)</td>
-						   <td><?=number_format($show_total_intra_register,2,'.','');?></td>
+						   <td><?=inr_format($show_total_intra_register, 2);?></td>
 						   <td>0.00</td>
 						   <td>0.00</td>
 						    <td>0.00</td>

@@ -90,7 +90,7 @@ while ($rowLoc = $locResult->fetch_assoc()) {
                                                 <td><?php echo $i; ?></td>
                                                 <td><?php echo htmlspecialchars($rowLoc['node_name'] ?? '---'); ?></td>
                                                 <td><?php echo htmlspecialchars($rowLoc['node_code'] ?? '---'); ?></td>
-                                                <td><?php echo !empty($rowLoc['target_amount']) ? '&#8377;' . number_format($rowLoc['target_amount'], 2) : '---'; ?></td>
+                                                <td><?php echo !empty($rowLoc['target_amount']) ? '&#8377;' . inr_format($rowLoc['target_amount'], 2) : '---'; ?></td>
                                             </tr>
 <?php }
 $stmtLoc->close();

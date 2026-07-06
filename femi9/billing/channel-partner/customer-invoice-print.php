@@ -211,11 +211,11 @@ while ($ri = mysqli_fetch_array($resItems)) {
 <td><b><?php echo htmlspecialchars($ri['productName']); ?></b></td>
 <td id="rightlaign"><?php echo htmlspecialchars($ri['hsn']); ?></td>
 <td id="rightlaign"><?php echo $ri['qty']; ?> Packs</td>
-<td id="rightlaign"><?php echo number_format((float)$ri['amount'], 2, '.', ''); ?></td>
+<td id="rightlaign"><?php echo inr_format((float)$ri['amount'], 2); ?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?php echo $ri['gst_percentage']; ?>%</td>
-<td id="rightlaign"><?php echo number_format((float)$ri['discount_amount'], 2, '.', ''); ?> (<?php echo number_format((float)$ri['discount_percentage']); ?>%)</td>
-<td id="rightlaign"><?php echo number_format($lineAfter, 2, '.', ''); ?></td>
+<td id="rightlaign"><?php echo inr_format((float)$ri['discount_amount'], 2); ?> (<?php echo inr_format((float)$ri['discount_percentage'], 0); ?>%)</td>
+<td id="rightlaign"><?php echo inr_format($lineAfter, 2); ?></td>
 </tr>
 <?php } ?>
 <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
@@ -223,7 +223,7 @@ while ($ri = mysqli_fetch_array($resItems)) {
 <td></td><td></td><td></td>
 <td id="rightlaign"><b><?php echo $Totalquantity123; ?> Packs</b></td>
 <td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($TotalAMount123, 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 
 <?php
@@ -231,21 +231,21 @@ $gsttype      = $inv['gst_type'] ?? 'inner';
 $totalgst     = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(gstamount_total) FROM invoice_items WHERE inv_id='$Invoice_ID'"))[0]);
 if ($totalgst > 0) {
     if ($gsttype == 'inner') {
-        $half = number_format($totalgst / 2, 2, '.', '');
+        $half = inr_format($totalgst / 2, 2);
 ?>
 <tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>SGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo $half; ?></b></td></tr>
 <tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>CGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo $half; ?></b></td></tr>
 <?php } else { ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>IGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($totalgst, 2, '.', ''); ?></b></td></tr>
+<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>IGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($totalgst, 2); ?></b></td></tr>
 <?php } } ?>
 
 <?php if ((float)($inv['discount'] ?? 0) > 0): ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Discount</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format((float)$inv['discount'], 2, '.', ''); ?></b></td></tr>
+<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Discount</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format((float)$inv['discount'], 2); ?></b></td></tr>
 <?php endif; ?>
 <?php if ((float)($inv['roundoff'] ?? 0) != 0): ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Round off</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format((float)$inv['roundoff'], 2, '.', ''); ?></b></td></tr>
+<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Round off</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format((float)$inv['roundoff'], 2); ?></b></td></tr>
 <?php endif; ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Total</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format((float)($inv['total'] ?? 0), 2, '.', ''); ?></b></td></tr>
+<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Total</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format((float)($inv['total'] ?? 0), 2); ?></b></td></tr>
 </table>
 
 <?php
@@ -283,11 +283,11 @@ while ($rh = mysqli_fetch_array($resHSN)) {
     $hc  = $rh['hsn'];
     $hta = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(total) FROM invoice_items WHERE inv_id='$Invoice_ID' AND hsn='$hc'"));
 ?>
-<tr><td><?php echo htmlspecialchars($hc); ?></td><td align="right"><?php echo number_format((float)$hta[0], 2, '.', ''); ?></td></tr>
+<tr><td><?php echo htmlspecialchars($hc); ?></td><td align="right"><?php echo inr_format((float)$hta[0], 2); ?></td></tr>
 <?php }
 $htaTotal = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(total) FROM invoice_items WHERE inv_id='$Invoice_ID'"));
 ?>
-<tr><td align="right"><b>Total&nbsp;</b></td><td align="right"><b><?php echo number_format((float)$htaTotal[0], 2, '.', ''); ?></b></td></tr>
+<tr><td align="right"><b>Total&nbsp;</b></td><td align="right"><b><?php echo inr_format((float)$htaTotal[0], 2); ?></b></td></tr>
 </table>
 
 <table width="100%">

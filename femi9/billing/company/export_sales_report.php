@@ -143,7 +143,7 @@ if($selected_category != 'customer') {
             $district_name,
             $taluk_name,
             date("d/M/Y",strtotime($result_product_list["date"])),
-            number_format($TotalAmount,2,'.','')
+            inr_format($TotalAmount, 2)
         );
         
         // Add product quantities
@@ -202,7 +202,7 @@ if(empty($selected_category) || $selected_category == 'customer') {
             '-',
             '-',
             date("d/M/Y",strtotime($result_product_listCUSTOMER["date"])),
-            number_format($TotalAmountCUS,2,'.','')
+            inr_format($TotalAmountCUS, 2)
         );
         
         // Add product quantities
@@ -223,7 +223,7 @@ fputcsv($output, array(''));
 // Write GRAND TOTAL row
 $total_row = array_fill(0, 10, '');
 $total_row[9] = 'GRAND TOTAL:';
-$total_row[10] = number_format($grand_total,2,'.','');
+$total_row[10] = inr_format($grand_total, 2);
 
 // Add empty cells for products
 foreach($products as $p) {

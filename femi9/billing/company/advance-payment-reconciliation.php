@@ -1615,7 +1615,7 @@ $stmt->close();
                                     <?= htmlspecialchars($exec['execution_id']) ?> - 
                                     <?= date('d/M/Y H:i', strtotime($exec['execution_date'])) ?> - 
                                     <?= $exec['successful_invoices'] ?> invoices - 
-                                    ₹<?= number_format($exec['total_amount'], 2) ?>
+                                    ₹<?= inr_format($exec['total_amount'], 2) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -1742,7 +1742,7 @@ $stmt->close();
             </div>
             <div class="stat-card">
                 <div class="stat-label">Total Amount</div>
-                <div class="stat-value">₹<?= number_format($total_amount_all, 2) ?></div>
+                <div class="stat-value">₹<?= inr_format($total_amount_all, 2) ?></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">All Invoices Paid</div>
@@ -1789,9 +1789,9 @@ $stmt->close();
                                     <?= ucwords(str_replace('_', ' ', $customer['type'])) ?>
                                 </span>
                             </td>
-                            <td>₹<?= number_format($customer['balance_before'], 2) ?></td>
-                            <td><strong>₹<?= number_format($customer['total_invoice_amount'], 2) ?></strong></td>
-                            <td>₹<?= number_format($customer['balance_after'], 2) ?></td>
+                            <td>₹<?= inr_format($customer['balance_before'], 2) ?></td>
+                            <td><strong>₹<?= inr_format($customer['total_invoice_amount'], 2) ?></strong></td>
+                            <td>₹<?= inr_format($customer['balance_after'], 2) ?></td>
                             <td>
                                 <?php if ($customer['fully_paid'] > 0): ?>
                                     <span class="badge badge-success">✓ <?= $customer['fully_paid'] ?> Fully Paid</span>
@@ -1822,12 +1822,12 @@ $stmt->close();
                                                 ($inv['payment_status'] === 'partial' ? '#fffbeb' : '#fef2f2') 
                                             ?>">
                                                 <td style="padding: 5px;"><?= htmlspecialchars($inv['inv_number']) ?></td>
-                                                <td style="padding: 5px;">₹<?= number_format($inv['invoice_amount'], 2) ?></td>
+                                                <td style="padding: 5px;">₹<?= inr_format($inv['invoice_amount'], 2) ?></td>
                                                 <td style="padding: 5px; color: #10b981; font-weight: 600;">
-                                                    ₹<?= number_format($inv['amount_paid'], 2) ?>
+                                                    ₹<?= inr_format($inv['amount_paid'], 2) ?>
                                                 </td>
                                                 <td style="padding: 5px; color: #ef4444;">
-                                                    ₹<?= number_format($inv['remaining'], 2) ?>
+                                                    ₹<?= inr_format($inv['remaining'], 2) ?>
                                                 </td>
                                                 <td style="padding: 5px;">
                                                     <?php if ($inv['payment_status'] === 'full'): ?>
@@ -1912,7 +1912,7 @@ $stmt->close();
                     
                     <div class="stat-card">
                         <div class="stat-label">Total Processed</div>
-                        <div class="stat-value">₹<?= number_format($total_amount + $total_partial_amount, 2) ?></div>
+                        <div class="stat-value">₹<?= inr_format($total_amount + $total_partial_amount, 2) ?></div>
                     </div>
                 </div>
                 
@@ -1947,9 +1947,9 @@ $stmt->close();
                                                 <?= ucwords(str_replace('_', ' ', $inv['customer_type'])) ?>
                                             </span>
                                         </td>
-                                        <td>₹<?= number_format($inv['invoice_amount'], 2) ?></td>
-                                        <td>₹<?= number_format($balance_before, 2) ?></td>
-                                        <td>₹<?= number_format($balance_after, 2) ?></td>
+                                        <td>₹<?= inr_format($inv['invoice_amount'], 2) ?></td>
+                                        <td>₹<?= inr_format($balance_before, 2) ?></td>
+                                        <td>₹<?= inr_format($balance_after, 2) ?></td>
                                         <td><?= $inv['receipt_count'] ?> receipts</td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -1993,11 +1993,11 @@ $stmt->close();
                                                 <?= ucwords(str_replace('_', ' ', $inv['customer_type'])) ?>
                                             </span>
                                         </td>
-                                        <td>₹<?= number_format($inv['invoice_amount'], 2) ?></td>
-                                        <td style="color: #10b981; font-weight: 600;">₹<?= number_format($inv['amount_paid'], 2) ?></td>
-                                        <td style="color: #ef4444; font-weight: 600;">₹<?= number_format($inv['remaining_amount'], 2) ?></td>
-                                        <td>₹<?= number_format($inv['balance_before'], 2) ?></td>
-                                        <td>₹<?= number_format($inv['balance_after'], 2) ?></td>
+                                        <td>₹<?= inr_format($inv['invoice_amount'], 2) ?></td>
+                                        <td style="color: #10b981; font-weight: 600;">₹<?= inr_format($inv['amount_paid'], 2) ?></td>
+                                        <td style="color: #ef4444; font-weight: 600;">₹<?= inr_format($inv['remaining_amount'], 2) ?></td>
+                                        <td>₹<?= inr_format($inv['balance_before'], 2) ?></td>
+                                        <td>₹<?= inr_format($inv['balance_after'], 2) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -2034,9 +2034,9 @@ $stmt->close();
                                                 <?= ucwords(str_replace('_', ' ', $inv['customer_type'])) ?>
                                             </span>
                                         </td>
-                                        <td>₹<?= number_format($inv['invoice_amount'], 2) ?></td>
-                                        <td>₹<?= number_format($inv['current_balance'], 2) ?></td>
-                                        <td><strong style="color: #ef4444;">-₹<?= number_format($shortfall, 2) ?></strong></td>
+                                        <td>₹<?= inr_format($inv['invoice_amount'], 2) ?></td>
+                                        <td>₹<?= inr_format($inv['current_balance'], 2) ?></td>
+                                        <td><strong style="color: #ef4444;">-₹<?= inr_format($shortfall, 2) ?></strong></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -2063,7 +2063,7 @@ $stmt->close();
                                         <td><?= $i++ ?></td>
                                         <td><strong><?= htmlspecialchars($fail['invoice']['inv_number']) ?></strong></td>
                                         <td><?= htmlspecialchars($fail['invoice']['customer_name']) ?></td>
-                                        <td>₹<?= number_format($fail['invoice']['invoice_amount'], 2) ?></td>
+                                        <td>₹<?= inr_format($fail['invoice']['invoice_amount'], 2) ?></td>
                                         <td><?= htmlspecialchars($fail['error']) ?></td>
                                     </tr>
                                 <?php endforeach; ?>

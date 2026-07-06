@@ -244,9 +244,9 @@ $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 	?>
 				<tr class="item">
 					<td><?=$result_ProductDetails123['productName'];?></td>
-					<td align="right">&#8377;<?php echo number_format($result_INVProductDetails['amount'],2,'.','');?></td>
+					<td align="right">&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td align="right"><?=$result_INVProductDetails['qty'];?></td>
-<td align="right">&#8377;<?php echo number_format($TotalAMount,2,'.','');?></td>
+<td align="right">&#8377;<?php echo inr_format($TotalAMount, 2);?></td>
 				</tr>
 
 	<?php }?>
@@ -254,7 +254,7 @@ $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 	
 	<tr class="topborder">
 					<td align="right" colspan="3">Sub Total</td>
-					<td align="right">&#8377;<?php echo number_format($TotalAMount123,2,'.','');?></td>
+					<td align="right">&#8377;<?php echo inr_format($TotalAMount123, 2);?></td>
 				</tr>
 				<tr class="topborder">
 					<td align="right" colspan="3">GST(0%)</td>
@@ -263,11 +263,11 @@ $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 			
 				<tr class="topborder">
 					<td align="right" colspan="3">Discount</td>
-					<td align="right">&#8377;<?php echo number_format($result_Invoice_Details['discount'],2,'.','');?></td>
+					<td align="right">&#8377;<?php echo inr_format($result_Invoice_Details['discount'], 2);?></td>
 				</tr>
 				<tr class="topborder">
 					<td align="right" colspan="3">Total</td>
-					<td align="right">&#8377;<?php echo number_format($result_Invoice_Details['total'],2,'.','');?></td>
+					<td align="right">&#8377;<?php echo inr_format($result_Invoice_Details['total'], 2);?></td>
 				</tr>
 				
 			</table>

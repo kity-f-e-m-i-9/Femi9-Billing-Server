@@ -169,7 +169,7 @@ $overall_total = $total1 + $total2;
                                         <td><?= htmlspecialchars($row['cust_gstin']) ?></td>
                                         <td><?= htmlspecialchars($row['inv_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['date'])) ?></td>
-                                        <td align="right"><b><?= number_format($row['total_sls_amount'], 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($row['total_sls_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
@@ -182,7 +182,7 @@ $overall_total = $total1 + $total2;
                                         <td><?= htmlspecialchars($row['cust_gstin']) ?></td>
                                         <td><?= htmlspecialchars($row['inv_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['date'])) ?></td>
-                                        <td align="right"><b><?= number_format($row['total_sls_amount'], 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($row['total_sls_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
@@ -195,7 +195,7 @@ $overall_total = $total1 + $total2;
                                 <tfoot>
                                     <tr>
                                         <td colspan="7" align="right"><b>Grand Total</b></td>
-                                        <td align="right"><b><?= number_format($overall_total, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($overall_total, 2) ?></b></td>
                                     </tr>
                                 </tfoot>
                             </table>

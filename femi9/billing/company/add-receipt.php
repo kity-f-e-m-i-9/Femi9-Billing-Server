@@ -768,9 +768,9 @@ $temp_time = date('gis');
                                             <td><?= e($result_product_list['inv_number']) ?></td>
                                             <td><?= e($Cust_Name) ?><br><small style="color:#64748b">M: <?= e($Cust_Mbile) ?></small></td>
                                             <td><?= e(date('d/M/Y', strtotime($result_product_list['date']))) ?></td>
-                                            <td>₹<?= number_format($invoice_amount_only, 2) ?></td>
-                                            <td>₹<?= number_format($courier_charges, 2) ?></td>
-                                            <td><strong>₹<?= number_format($invoice_total, 2) ?></strong></td>
+                                            <td>₹<?= inr_format($invoice_amount_only, 2) ?></td>
+                                            <td>₹<?= inr_format($courier_charges, 2) ?></td>
+                                            <td><strong>₹<?= inr_format($invoice_total, 2) ?></strong></td>
                                         </tr></tbody>
                                     </table>
 
@@ -784,27 +784,27 @@ $temp_time = date('gis');
                                     <div class="summary-grid">
                                         <div class="summary-box blue">
                                             <div class="s-label">Invoice Amount</div>
-                                            <div class="s-value">₹<?= number_format($invoice_amount_only, 2) ?></div>
+                                            <div class="s-value">₹<?= inr_format($invoice_amount_only, 2) ?></div>
                                         </div>
                                         <div class="summary-box green">
                                             <div class="s-label">Invoice Received</div>
-                                            <div class="s-value">₹<?= number_format($invoice_amount_received, 2) ?></div>
+                                            <div class="s-value">₹<?= inr_format($invoice_amount_received, 2) ?></div>
                                         </div>
                                         <div class="summary-box <?= $invoice_amount_pending > 0.01 ? 'red' : 'green' ?>">
                                             <div class="s-label">Invoice Pending</div>
-                                            <div class="s-value">₹<?= number_format($invoice_amount_pending, 2) ?></div>
+                                            <div class="s-value">₹<?= inr_format($invoice_amount_pending, 2) ?></div>
                                         </div>
                                         <div class="summary-box blue">
                                             <div class="s-label">Courier Charges</div>
-                                            <div class="s-value">₹<?= number_format($courier_charges, 2) ?></div>
+                                            <div class="s-value">₹<?= inr_format($courier_charges, 2) ?></div>
                                         </div>
                                         <div class="summary-box green">
                                             <div class="s-label">Courier Received</div>
-                                            <div class="s-value">₹<?= number_format($courier_amount_received, 2) ?></div>
+                                            <div class="s-value">₹<?= inr_format($courier_amount_received, 2) ?></div>
                                         </div>
                                         <div class="summary-box <?= $courier_amount_pending > 0.01 ? 'orange' : 'green' ?>">
                                             <div class="s-label">Courier Pending</div>
-                                            <div class="s-value">₹<?= number_format($courier_amount_pending, 2) ?></div>
+                                            <div class="s-value">₹<?= inr_format($courier_amount_pending, 2) ?></div>
                                         </div>
                                     </div>
 
@@ -814,15 +814,15 @@ $temp_time = date('gis');
                                     <div class="summary-grid">
                                         <div class="summary-box blue">
                                             <div class="s-label">Courier Charges</div>
-                                            <div class="s-value">₹<?= number_format($courier_charges, 2) ?></div>
+                                            <div class="s-value">₹<?= inr_format($courier_charges, 2) ?></div>
                                         </div>
                                         <div class="summary-box green">
                                             <div class="s-label">Courier Received</div>
-                                            <div class="s-value">₹<?= number_format($courier_amount_received, 2) ?></div>
+                                            <div class="s-value">₹<?= inr_format($courier_amount_received, 2) ?></div>
                                         </div>
                                         <div class="summary-box <?= $courier_amount_pending > 0.01 ? 'orange' : 'green' ?>">
                                             <div class="s-label">Courier Pending</div>
-                                            <div class="s-value">₹<?= number_format($courier_amount_pending, 2) ?></div>
+                                            <div class="s-value">₹<?= inr_format($courier_amount_pending, 2) ?></div>
                                         </div>
                                     </div>
                                     <?php else: ?>
@@ -887,10 +887,10 @@ $temp_time = date('gis');
                                                     <?= e($badgeLabel) ?>
                                                 </span>
                                             </td>
-                                            <td><strong>₹<?= number_format((float)$r['received'], 2) ?></strong></td>
+                                            <td><strong>₹<?= inr_format((float)$r['received'], 2) ?></strong></td>
                                             <td>
                                                 <strong style="color:<?= $balance_color ?>">
-                                                    ₹<?= number_format($balance_after, 2) ?>
+                                                    ₹<?= inr_format($balance_after, 2) ?>
                                                 </strong>
                                                 <?php if ($balance_after < 0.01): ?>
                                                 <span style="font-size:11px;color:#065f46;margin-left:4px">✓ Cleared</span>
@@ -918,7 +918,7 @@ $temp_time = date('gis');
                                         <tfoot>
                                             <tr>
                                                 <td colspan="3" style="text-align:right">Total Received</td>
-                                                <td>₹<?= number_format($total_received, 2) ?></td>
+                                                <td>₹<?= inr_format($total_received, 2) ?></td>
                                                 <td colspan="4"></td>
                                             </tr>
                                         </tfoot>
@@ -969,11 +969,11 @@ $temp_time = date('gis');
                                             Pay Invoice Amount via Advance Payment
                                         </h4>
                                         <p style="font-size:13px;color:#5b21b6;margin-bottom:14px">
-                                            Amount pending: <strong>₹<?= number_format($invoice_amount_pending, 2) ?></strong>
+                                            Amount pending: <strong>₹<?= inr_format($invoice_amount_pending, 2) ?></strong>
                                             &nbsp;·&nbsp; Will be auto-deducted from advance balance.
                                         </p>
 
-                                        <form method="POST" onsubmit="return confirm('Deduct ₹<?= number_format($invoice_amount_pending, 2) ?> from advance balance?')">
+                                        <form method="POST" onsubmit="return confirm('Deduct ₹<?= inr_format($invoice_amount_pending, 2) ?> from advance balance?')">
                                             <input type="hidden" name="csrf_token"      value="<?= e($csrfToken) ?>">
                                             <input type="hidden" name="invid"           value="<?= e($invid) ?>">
                                             <input type="hidden" name="invuser"         value="<?= e($getinvuser) ?>">
@@ -983,7 +983,7 @@ $temp_time = date('gis');
                                             <input type="hidden" name="receivedamount"  value="<?= $invoice_amount_pending ?>">
                                             <button type="submit" name="addreceipt" class="btn-submit purple">
                                                 <i class="material-icons">account_balance_wallet</i>
-                                                Pay ₹<?= number_format($invoice_amount_pending, 2) ?> from Advance
+                                                Pay ₹<?= inr_format($invoice_amount_pending, 2) ?> from Advance
                                             </button>
                                         </form>
                                     </div>
@@ -999,7 +999,7 @@ $temp_time = date('gis');
                                             Pay Courier Charges (Manual)
                                         </h4>
                                         <p style="font-size:13px;color:#1d4ed8;margin-bottom:14px">
-                                            Amount pending: <strong>₹<?= number_format($courier_amount_pending, 2) ?></strong>
+                                            Amount pending: <strong>₹<?= inr_format($courier_amount_pending, 2) ?></strong>
                                             &nbsp;·&nbsp; Paid separately via Cash / UPI / Bank Transfer.
                                         </p>
 
@@ -1071,7 +1071,7 @@ $temp_time = date('gis');
                                             Record Product Payment
                                         </h4>
                                         <p style="font-size:13px;color:#065f46;margin-bottom:14px">
-                                            Amount pending: <strong>₹<?= number_format($invoice_amount_pending, 2) ?></strong>
+                                            Amount pending: <strong>₹<?= inr_format($invoice_amount_pending, 2) ?></strong>
                                         </p>
 
                                         <form method="POST" onsubmit="return confirm('Submit payment receipt?')">
@@ -1127,7 +1127,7 @@ $temp_time = date('gis');
                                             Pay Courier Charges
                                         </h4>
                                         <p style="font-size:13px;color:#1d4ed8;margin-bottom:14px">
-                                            Amount pending: <strong>₹<?= number_format($courier_amount_pending, 2) ?></strong>
+                                            Amount pending: <strong>₹<?= inr_format($courier_amount_pending, 2) ?></strong>
                                         </p>
 
                                         <form method="POST" onsubmit="return confirm('Submit courier charge receipt?')">

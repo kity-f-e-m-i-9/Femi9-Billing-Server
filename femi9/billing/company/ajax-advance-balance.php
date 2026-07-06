@@ -105,12 +105,12 @@ try {
             sendJsonResponse(true, 'Balance retrieved successfully', [
                 'is_mandatory' => true,
                 'available_balance' => $balance,
-                'formatted_balance' => '₹' . number_format($balance, 2),
+                'formatted_balance' => '₹' . inr_format($balance, 2),
                 'summary' => [
                     'total_paid' => $summary['total_paid'],
-                    'formatted_total_paid' => '₹' . number_format($summary['total_paid'], 2),
+                    'formatted_total_paid' => '₹' . inr_format($summary['total_paid'], 2),
                     'total_adjusted' => $summary['total_adjusted'],
-                    'formatted_total_adjusted' => '₹' . number_format($summary['total_adjusted'], 2),
+                    'formatted_total_adjusted' => '₹' . inr_format($summary['total_adjusted'], 2),
                     'payment_count' => $summary['payment_count']
                 ],
                 'user_type_label' => ucwords(str_replace('_', ' ', $customerType))
@@ -141,16 +141,16 @@ try {
                 'can_create' => $validation['can_create'],
                 'is_mandatory' => $validation['is_mandatory'],
                 'available_balance' => $validation['available_balance'],
-                'formatted_balance' => '₹' . number_format($validation['available_balance'], 2),
+                'formatted_balance' => '₹' . inr_format($validation['available_balance'], 2),
                 'required_amount' => $invoiceAmount,
-                'formatted_required' => '₹' . number_format($invoiceAmount, 2),
+                'formatted_required' => '₹' . inr_format($invoiceAmount, 2),
                 'user_type_label' => ucwords(str_replace('_', ' ', $customerType))
             ];
 
             if (!$validation['can_create'] && $validation['is_mandatory']) {
                 $shortage = $invoiceAmount - $validation['available_balance'];
                 $responseData['shortage'] = $shortage;
-                $responseData['formatted_shortage'] = '₹' . number_format($shortage, 2);
+                $responseData['formatted_shortage'] = '₹' . inr_format($shortage, 2);
             }
 
             sendJsonResponse(
@@ -204,11 +204,11 @@ try {
                     'id' => $row['id'],
                     'payment_date' => date('d-M-Y', strtotime($row['payment_date'])),
                     'amount' => floatval($row['amount']),
-                    'formatted_amount' => '₹' . number_format($row['amount'], 2),
+                    'formatted_amount' => '₹' . inr_format($row['amount'], 2),
                     'balance_amount' => floatval($row['balance_amount']),
-                    'formatted_balance' => '₹' . number_format($row['balance_amount'], 2),
+                    'formatted_balance' => '₹' . inr_format($row['balance_amount'], 2),
                     'adjusted_amount' => floatval($row['adjusted_amount']),
-                    'formatted_adjusted' => '₹' . number_format($row['adjusted_amount'], 2),
+                    'formatted_adjusted' => '₹' . inr_format($row['adjusted_amount'], 2),
                     'payment_mode' => $row['payment_mode'],
                     'status' => $row['status'],
                     'reference_number' => $row['reference_number']

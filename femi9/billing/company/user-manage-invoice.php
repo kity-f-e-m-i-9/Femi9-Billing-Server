@@ -286,10 +286,10 @@ $select_Customers="select * from ".$tablename." where temp_id='$CuSTID'";
 													
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
-				<?php /* ?><td><?php echo number_format($result_product_list["sub_total"],2,'.','');?></td>
+				<?php /* ?><td><?php echo inr_format($result_product_list["sub_total"], 2);?></td>
 				<td><?php
 $discount=$result_product_list["discount"]+$result_product_list["credit"];
-				echo number_format($discount,2,'.','');?>
+				echo inr_format($discount, 2);?>
 				</td><?php */ ?>
 	
 	
@@ -311,7 +311,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 	$msgpayment="<span class='badge badge-style-bordered badge-warning'>partially Paid</span>";
 }
 ?>
-				<td><?php echo number_format($result_product_list["total"],2,'.','');?>
+				<td><?php echo inr_format($result_product_list["total"], 2);?>
 				<br/><a href="add-receipt?invid=<?=$result_product_list["inv_id"];?>&&invuser=<?=$getinvuser;?>"><?=$msgpayment;?></a>
 				</td>
 				

@@ -533,7 +533,7 @@ $business_name        = $business_name ?? 'Femi9 Billing';
                                                             <?php
                                                             echo htmlspecialchars(
                                                                 $exec['month_year'] . ' | ' .
-                                                                number_format((float)$exec['total_bonus_points_awarded'], 2) . ' pts | ' .
+                                                                inr_format((float)$exec['total_bonus_points_awarded'], 2) . ' pts | ' .
                                                                 date('d M Y', strtotime($exec['executed_at'])),
                                                                 ENT_QUOTES,
                                                                 'UTF-8'

@@ -998,19 +998,19 @@ if (empty($products)) {
                 <td><strong><?= htmlspecialchars($channel['name'], ENT_QUOTES, 'UTF-8'); ?></strong></td>
                 <td style="text-align: right;">
                     <span class="breakdown-value">
-                        <?= number_format($net_qty); ?>
+                        <?= inr_format($net_qty, 0); ?>
                         <i class="material-icons info-icon">info</i>
                         <span class="breakdown-tooltip">
-                            (<?= number_format($channel['sales_qty']); ?> - <?= number_format($channel['return_qty']); ?>)
+                            (<?= inr_format($channel['sales_qty'], 0); ?> - <?= inr_format($channel['return_qty'], 0); ?>)
                         </span>
                     </span>
                 </td>
                 <td style="text-align: right;">
                     <span class="breakdown-value">
-                        ₹<?= number_format($net_amount, 2); ?>
+                        ₹<?= inr_format($net_amount, 2); ?>
                         <i class="material-icons info-icon">info</i>
                         <span class="breakdown-tooltip">
-                            (₹<?= number_format($channel['sales_amount'], 2); ?> - ₹<?= number_format($channel['return_amount'], 2); ?>)
+                            (₹<?= inr_format($channel['sales_amount'], 2); ?> - ₹<?= inr_format($channel['return_amount'], 2); ?>)
                         </span>
                     </span>
                 </td>
@@ -1022,10 +1022,10 @@ if (empty($products)) {
                 <td class="product-col" style="text-align: center;">
                     <?php if ($pr_net != 0 || $pr_sales != 0): ?>
                     <span class="breakdown-value">
-                        <?= number_format($pr_net); ?>
+                        <?= inr_format($pr_net, 0); ?>
                         <i class="material-icons info-icon">info</i>
                         <span class="breakdown-tooltip">
-                            (<?= number_format($pr_sales); ?> - <?= number_format($pr_returns); ?>)
+                            (<?= inr_format($pr_sales, 0); ?> - <?= inr_format($pr_returns, 0); ?>)
                         </span>
                     </span>
                     <?php else: ?>
@@ -1041,19 +1041,19 @@ if (empty($products)) {
                 <th>GRAND TOTAL</th>
                 <th style="text-align: right;">
                     <span class="breakdown-value">
-                        <?= number_format($grand_sales_qty - $grand_return_qty); ?>
+                        <?= inr_format($grand_sales_qty - $grand_return_qty, 0); ?>
                         <i class="material-icons info-icon">info</i>
                         <span class="breakdown-tooltip">
-                            (<?= number_format($grand_sales_qty); ?> - <?= number_format($grand_return_qty); ?>)
+                            (<?= inr_format($grand_sales_qty, 0); ?> - <?= inr_format($grand_return_qty, 0); ?>)
                         </span>
                     </span>
                 </th>
                 <th style="text-align: right;">
                     <span class="breakdown-value">
-                        ₹<?= number_format($grand_sales_amount - $grand_return_amount, 2); ?>
+                        ₹<?= inr_format($grand_sales_amount - $grand_return_amount, 2); ?>
                         <i class="material-icons info-icon">info</i>
                         <span class="breakdown-tooltip">
-                            (₹<?= number_format($grand_sales_amount, 2); ?> - ₹<?= number_format($grand_return_amount, 2); ?>)
+                            (₹<?= inr_format($grand_sales_amount, 2); ?> - ₹<?= inr_format($grand_return_amount, 2); ?>)
                         </span>
                     </span>
                 </th>
@@ -1062,10 +1062,10 @@ if (empty($products)) {
                 ?>
                 <th class="product-col" style="text-align: center;">
                     <span class="breakdown-value">
-                        <?= number_format($grand_pr_net); ?>
+                        <?= inr_format($grand_pr_net, 0); ?>
                         <i class="material-icons info-icon">info</i>
                         <span class="breakdown-tooltip">
-                            (<?= number_format($grand_product_sales[$pr_id]); ?> - <?= number_format($grand_product_returns[$pr_id]); ?>)
+                            (<?= inr_format($grand_product_sales[$pr_id], 0); ?> - <?= inr_format($grand_product_returns[$pr_id], 0); ?>)
                         </span>
                     </span>
                 </th>

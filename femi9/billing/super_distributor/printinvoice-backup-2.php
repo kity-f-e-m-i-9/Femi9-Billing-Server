@@ -229,9 +229,9 @@ $select_INVProductDetails="select * from user_invoice_items where inv_id='$Invoi
 <td><b>'.$result_ProductDetails123['productName'].'</b></td>
 <td id="rightlaign">961900</td>
 <td id="rightlaign">'.$Totalquantity.' Packs</td>
-<td id="rightlaign">'.number_format($result_INVProductDetails['amount'],2,'.','').'</td>
+<td id="rightlaign">'.inr_format($result_INVProductDetails['amount'], 2).'</td>
 <td id="rightlaign">Packs</td>
-<td id="rightlaign">'.number_format($TotalAMount,2,'.','').'</td>
+<td id="rightlaign">'.inr_format($TotalAMount, 2).'</td>
 </tr>';
 
 	}
@@ -248,7 +248,7 @@ $select_INVProductDetails="select * from user_invoice_items where inv_id='$Invoi
 <td id="rightlaign"><b>'.$Totalquantity123.' Packs</b></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; '.number_format($TotalAMount123,2,'.','').'</b></td>
+<td id="rightlaign"><b>&#8377; '.inr_format($TotalAMount123, 2).'</b></td>
 </tr>';
 
 
@@ -262,7 +262,7 @@ if($result_Invoice_Details['discount']>0){
 <td id="rightlaign"></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; '.number_format($result_Invoice_Details['discount'],2,'.','').'</b></td>
+<td id="rightlaign"><b>&#8377; '.inr_format($result_Invoice_Details['discount'], 2).'</b></td>
 </tr>
 ';
 
@@ -276,7 +276,7 @@ if($result_Invoice_Details['discount']>0){
 <td id="rightlaign"></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; '.number_format($result_Invoice_Details['total'],2,'.','').'</b></td>
+<td id="rightlaign"><b>&#8377; '.inr_format($result_Invoice_Details['total'], 2).'</b></td>
 </tr>
 </table>
 <div style="clear:both;"></div>
@@ -329,7 +329,7 @@ $hundreds = array(
 "Quardrillion" 
 ); 
 
-$num = number_format($num,2,".",","); 
+$num = inr_format($num, 2); 
 $num_arr = explode(".",$num); 
 $wholenum = $num_arr[0]; 
 $decnum = $num_arr[1]; 
@@ -368,7 +368,7 @@ $rettxt .=" Paise";
 }
 return $rettxt;
 }
-//$num=number_format($TotalAMount123,2,'.','');
+//$num=inr_format($TotalAMount123, 2);
 
 $html=$html.'
 <table width="100%">
@@ -389,11 +389,11 @@ $html=$html.'
 </tr>
 <tr>
 <td>961900</td>
-<td  align="right">'.number_format($result_Invoice_Details['total'],2,'.','').'</td>
+<td  align="right">'.inr_format($result_Invoice_Details['total'], 2).'</td>
 </tr>
 <tr>
 <td align="right"><b>Total&nbsp;</b></td>
-<td align="right"><b>'.number_format($result_Invoice_Details['total'],2,'.','').'</b></td>
+<td align="right"><b>'.inr_format($result_Invoice_Details['total'], 2).'</b></td>
 </tr>
 </table>
 

@@ -104,7 +104,7 @@ if ($payment['company_id'] && !is_godown_allowed($db_conn, (int)$payment['compan
             <input type="number" name="amount" class="form-control"
                    value="<?php echo $payment['amount']; ?>"
                    min="1" step="0.01" required>
-            <small class="text-muted">Current: ₹<?php echo number_format($payment['amount'], 2); ?></small>
+            <small class="text-muted">Current: ₹<?php echo inr_format($payment['amount'], 2); ?></small>
         </div>
 
         <!-- Payment Date -->

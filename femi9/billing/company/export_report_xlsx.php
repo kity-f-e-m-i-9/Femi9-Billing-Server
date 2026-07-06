@@ -1034,7 +1034,7 @@ if (!empty($returns_by_invoice[$inv_id])) {
     
     $row++;
     $sheet->setCellValue("A{$row}", 'Total Product Revenue:');
-    $sheet->setCellValue("C{$row}", '₹ ' . number_format(array_sum($product_totals_amount), 2));
+    $sheet->setCellValue("C{$row}", '₹ ' . inr_format(array_sum($product_totals_amount), 2));
     
     $summaryStartRow = $row - 1;
     for ($i = $summaryStartRow; $i <= $row; $i++) {

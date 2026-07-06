@@ -57,7 +57,7 @@ if (isset($_REQUEST['sent_money_request'])) {
 
     if ($request_amount > $walletBalance) {
         mysqli_rollback($db_conn);
-        $_SESSION['errorMessage'] = "Requested amount ₹" . number_format($request_amount, 2) . " exceeds your available balance ₹" . number_format(max(0, $walletBalance), 2) . ".";
+        $_SESSION['errorMessage'] = "Requested amount ₹" . inr_format($request_amount, 2) . " exceeds your available balance ₹" . inr_format(max(0, $walletBalance), 2) . ".";
         header("Location: wallet-history.php");
         exit;
     }

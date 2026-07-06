@@ -694,23 +694,23 @@ if (!empty($combined_users)) {
                                                         <?php if($getinvuser === "stockiest"): ?>
                                                         <td><?php echo $category; ?></td>
                                                         <?php endif; ?>
-                                                        <td><?php echo number_format($product_purchase_points, 2); ?></td>
-                                                        <td><?php echo number_format($daily_login_pts, 2); ?></td>
+                                                        <td><?php echo inr_format($product_purchase_points, 2); ?></td>
+                                                        <td><?php echo inr_format($daily_login_pts, 2); ?></td>
                                                         <td class="advance-bonus">
-                                                            <?php echo number_format($advance_bonus_pts, 2); ?>
+                                                            <?php echo inr_format($advance_bonus_pts, 2); ?>
                                                         </td>
                                                         <td class="deducted-points">
                                                             <?php echo $deducted_points > 0
-                                                                ? '-' . number_format($deducted_points, 2)
+                                                                ? '-' . inr_format($deducted_points, 2)
                                                                 : '0.00'; ?>
                                                         </td>
                                                         <td class="total-points">
-                                                            <strong><?php echo number_format($total_purchase_points, 2); ?></strong>
+                                                            <strong><?php echo inr_format($total_purchase_points, 2); ?></strong>
                                                         </td>
-                                                        <td class="sales-points"><?php echo number_format($sales_points_final, 2); ?></td>
+                                                        <td class="sales-points"><?php echo inr_format($sales_points_final, 2); ?></td>
                                                         <td class="deducted-points">
                                                             <?php echo $sales_deducted > 0
-                                                                ? '-' . number_format($sales_deducted, 2)
+                                                                ? '-' . inr_format($sales_deducted, 2)
                                                                 : '0.00'; ?>
                                                         </td>
                                                     </tr>

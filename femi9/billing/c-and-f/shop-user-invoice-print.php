@@ -364,20 +364,20 @@ Terms of Delivery<br/>
 		$Totalquantity=$result_INVProductDetails['qty'];
 		$Totalquantity123+=$Totalquantity;
 		
-		$discountamount_show=number_format($result_INVProductDetails['discount_amount'],2,'.','');
-		$discountpercentage_show=number_format($result_INVProductDetails['discount_percentage']);
+		$discountamount_show=inr_format($result_INVProductDetails['discount_amount'], 2);
+		$discountpercentage_show=inr_format($result_INVProductDetails['discount_percentage'], 0);
 	?>
 <tr>
 <td><?=$invno=$invno+1;?></td>
 <td><b><?=$result_ProductDetails123['productName'];?></b></td>
 <td id="rightlaign"><?=$result_ProductDetails123['hsn'];?></td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
-<td id="rightlaign"><?php echo number_format($result_ProductDetails123['mrp'],2,'.','');?></td>
-<td id="rightlaign"><?php echo number_format($result_INVProductDetails['amount'],2,'.','');?></td>
+<td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2);?></td>
+<td id="rightlaign"><?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?=$result_INVProductDetails['gst_percentage'];?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=$discountpercentage_show;?>%)</td>
-<td id="rightlaign"><?php echo number_format($TotalAMount23,2,'.','');?></td>
+<td id="rightlaign"><?php echo inr_format($TotalAMount23, 2);?></td>
 </tr>
 
 	<?php } ?>
@@ -395,7 +395,7 @@ Terms of Delivery<br/>
 <td></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo number_format($TotalAMount123,2,'.','');?></b></td>
+<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($TotalAMount123, 2);?></b></td>
 </tr>
 
 <!------------------------------------------------------------------>
@@ -413,10 +413,10 @@ if($totalgstamount>0)
 if($gsttype=="inner"){
 	
 $SGST=$totalgstamount/2;
-$SGST=number_format($SGST,2,'.','');
+$SGST=inr_format($SGST, 2);
 
 $CGST=$totalgstamount/2;
-$CGST=number_format($CGST,2,'.','');
+$CGST=inr_format($CGST, 2);
 ?>
 <tr id="bottombordervl">
 <td></td>
@@ -450,7 +450,7 @@ $CGST=number_format($CGST,2,'.','');
 <td></td>
 <td></td><td></td>
 <td></td>
-<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=number_format($totalgstamount,2,'.','');?></b></td>
+<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=inr_format($totalgstamount, 2);?></b></td>
 </tr>
 <?php }} ?>
 <!------------------------------------------------------------------>
@@ -467,7 +467,7 @@ $CGST=number_format($CGST,2,'.','');
 <td></td><td></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo number_format($result_Invoice_Details['discount'],2,'.','');?></b></td>
+<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($result_Invoice_Details['discount'], 2);?></b></td>
 </tr>
 <?php }?>
 
@@ -481,7 +481,7 @@ $CGST=number_format($CGST,2,'.','');
 <td></td><td></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=number_format($result_Invoice_Details['roundoff'],2,'.','');?></b></td>
+<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=inr_format($result_Invoice_Details['roundoff'], 2);?></b></td>
 </tr>
 <?php }?>
 
@@ -495,7 +495,7 @@ $CGST=number_format($CGST,2,'.','');
 <td></td><td></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=number_format($result_Invoice_Details['courier_charges'],2,'.','');?></b></td>
+<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=inr_format($result_Invoice_Details['courier_charges'], 2);?></b></td>
 </tr>
 <?php }?>
 
@@ -508,7 +508,7 @@ $CGST=number_format($CGST,2,'.','');
 <td></td><td></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo number_format($result_Invoice_Details['total'],2,'.','');?></b></td>
+<td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($result_Invoice_Details['total'], 2);?></b></td>
 </tr>
 </table>
 <div style="clear:both;"></div>
@@ -588,7 +588,7 @@ $resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
 ?>
 <tr>
 <td><?=$hsncode;?></td>
-<td  align="right"><?=number_format($resulthsnTaxamount[0],2,'.','')?></td>
+<td  align="right"><?=inr_format($resulthsnTaxamount[0], 2)?></td>
 </tr>
 <?php }
 
@@ -599,7 +599,7 @@ $resulthsnTaxamount12=mysqli_fetch_array($fetchhsnTaxamount12);
 ?>
 <tr>
 <td align="right"><b>Total&nbsp;</b></td>
-<td align="right"><b><?=number_format($resulthsnTaxamount12[0],2,'.','')?></b></td>
+<td align="right"><b><?=inr_format($resulthsnTaxamount12[0], 2)?></b></td>
 </tr>
 </table>
 <?php */?>
@@ -625,7 +625,7 @@ $resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
 ?>
 <tr>
 <td><?=$hsncode;?></td>
-<td  align="right"><?=number_format($resulthsnTaxamount[0],2,'.','')?></td>
+<td  align="right"><?=inr_format($resulthsnTaxamount[0], 2)?></td>
 </tr>
 <?php }
 
@@ -637,7 +637,7 @@ $resulthsnTaxamount12=mysqli_fetch_array($fetchhsnTaxamount12);
 ?>
 <tr>
 <td align="right"><b>Total&nbsp;</b></td>
-<td align="right"><b><?=number_format($resulthsnTaxamount12[0],2,'.','')?></b></td>
+<td align="right"><b><?=inr_format($resulthsnTaxamount12[0], 2)?></b></td>
 </tr>
 </table>
 <!---------------------HSN WISE TOTAL----END***------------------------->

@@ -734,10 +734,10 @@ $pdfUrl = 'ot_sales_pdf?' . http_build_query([
                                                     Showing all matches
                                                 <?php elseif ($totalRows > 0): ?>
                                                     Showing
-                                                    <strong><?= number_format($offset + 1) ?></strong>
+                                                    <strong><?= inr_format($offset + 1, 0) ?></strong>
                                                     –
-                                                    <strong><?= number_format(min($offset + $recordsPerPage, $totalRows)) ?></strong>
-                                                    of <strong><?= number_format($totalRows) ?></strong>
+                                                    <strong><?= inr_format(min($offset + $recordsPerPage, $totalRows), 0) ?></strong>
+                                                    of <strong><?= inr_format($totalRows, 0) ?></strong>
                                                     &nbsp;|&nbsp; Page
                                                     <strong><?= $currentPage ?></strong>
                                                     of <strong><?= $totalPages ?></strong>
@@ -810,7 +810,7 @@ $pdfUrl = 'ot_sales_pdf?' . http_build_query([
                                                     <td><?= esc($hdr['customer_mobile'] ?? '') ?></td>
                                                     <td><?= esc($hdr['customer_address'] ?? '') ?></td>
                                                     <td align="right">
-                                                        <strong><?= number_format($total, 2, '.', '') ?></strong>
+                                                        <strong><?= inr_format($total, 2) ?></strong>
                                                     </td>
                                                     <?php foreach ($productIds as $pid):
                                                         $qty = (int)($qtyMap[$pid] ?? 0);
@@ -836,7 +836,7 @@ $pdfUrl = 'ot_sales_pdf?' . http_build_query([
                                                         Page Total:
                                                     </th>
                                                     <th align="right">
-                                                        <?= number_format($pageTotal, 2, '.', '') ?>
+                                                        <?= inr_format($pageTotal, 2) ?>
                                                     </th>
                                                     <?php foreach ($productPageTotals as $t): ?>
                                                         <th align="center" class="product-col">
@@ -849,11 +849,11 @@ $pdfUrl = 'ot_sales_pdf?' . http_build_query([
                                                     <th colspan="8" class="text-end">
                                                         Grand Total
                                                         <small class="text-muted fw-normal">
-                                                            (all <?= number_format($totalRows) ?> orders)
+                                                            (all <?= inr_format($totalRows, 0) ?> orders)
                                                         </small>
                                                     </th>
                                                     <th align="right">
-                                                        <?= number_format($grandTotal, 2, '.', '') ?>
+                                                        <?= inr_format($grandTotal, 2) ?>
                                                     </th>
                                                     <?php foreach ($productIds as $unused): ?>
                                                         <th class="product-col"></th>
@@ -938,11 +938,11 @@ $pdfUrl = 'ot_sales_pdf?' . http_build_query([
                                         <?php if ($totalRows === 0): ?>
                                             No records found.
                                         <?php elseif ($isSearch): ?>
-                                            Showing all <?= number_format($totalRows) ?> matching orders
+                                            Showing all <?= inr_format($totalRows, 0) ?> matching orders
                                         <?php else: ?>
-                                            Showing <?= number_format($offset + 1) ?>
-                                            to <?= number_format(min($offset + $recordsPerPage, $totalRows)) ?>
-                                            of <?= number_format($totalRows) ?> orders
+                                            Showing <?= inr_format($offset + 1, 0) ?>
+                                            to <?= inr_format(min($offset + $recordsPerPage, $totalRows), 0) ?>
+                                            of <?= inr_format($totalRows, 0) ?> orders
                                         <?php endif; ?>
                                     </p>
 

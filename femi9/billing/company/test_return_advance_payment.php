@@ -328,12 +328,12 @@ if($step == 2) {
         $final_amount = $total_before_discount - $discount;
         
         $debug_logs[] = "=== CALCULATIONS ===";
-        $debug_logs[] = "MRP: Rs. " . number_format($pr_mrp, 2);
-        $debug_logs[] = "Subtotal: Rs. " . number_format($subtotal, 2);
-        $debug_logs[] = "GST ($gst_percentage%): Rs. " . number_format($gst_amount, 2);
-        $debug_logs[] = "Total before discount: Rs. " . number_format($total_before_discount, 2);
-        $debug_logs[] = "Discount: Rs. " . number_format($discount, 2);
-        $debug_logs[] = "FINAL AMOUNT: Rs. " . number_format($final_amount, 2);
+        $debug_logs[] = "MRP: Rs. " . inr_format($pr_mrp, 2);
+        $debug_logs[] = "Subtotal: Rs. " . inr_format($subtotal, 2);
+        $debug_logs[] = "GST ($gst_percentage%): Rs. " . inr_format($gst_amount, 2);
+        $debug_logs[] = "Total before discount: Rs. " . inr_format($total_before_discount, 2);
+        $debug_logs[] = "Discount: Rs. " . inr_format($discount, 2);
+        $debug_logs[] = "FINAL AMOUNT: Rs. " . inr_format($final_amount, 2);
         
         // Generate return ID
         $return_id = "RET" . date("YmdHis") . rand(100, 999);
@@ -434,7 +434,7 @@ if($step == 2) {
         
         if($is_mandatory && $final_amount > 0) {
             $debug_logs[] = "Processing advance payment credit...";
-            $debug_logs[] = "Amount: Rs. " . number_format($final_amount, 2);
+            $debug_logs[] = "Amount: Rs. " . inr_format($final_amount, 2);
             
             try {
                 $credit_result = addAdvancePaymentCreditForReturn(
@@ -659,7 +659,7 @@ error_log("About to render HTML. Step: $step, Logs: " . count($debug_logs));
             <div class="alert alert-success">
                 <h3>✓ Return Processed Successfully!</h3>
                 <p>Return ID: <?= $return_id ?></p>
-                <p>Amount: Rs. <?= number_format($final_amount, 2) ?></p>
+                <p>Amount: Rs. <?= inr_format($final_amount, 2) ?></p>
             </div>
             <?php else: ?>
             <div class="alert alert-error">

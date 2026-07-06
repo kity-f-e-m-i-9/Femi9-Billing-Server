@@ -314,19 +314,19 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 		
 		$ItemRowid=base64_encode($result_INVProductDetails['id']);
 		
-		$discountamount_show=number_format($result_INVProductDetails['discount_amount'],2,'.','');
-		$discountpercentage_show=number_format($result_INVProductDetails['discount_percentage']);
+		$discountamount_show=inr_format($result_INVProductDetails['discount_amount'], 2);
+		$discountpercentage_show=inr_format($result_INVProductDetails['discount_percentage'], 0);
 	?>
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
 <td><?=$result_ProductDetails123['productName'];?></td>
 <td><?=$result_ProductDetails123['hsn'];?></td>
 <td><?=$result_INVProductDetails['qty'];?></td>
-<td>&#8377;<?php echo number_format($result_INVProductDetails['amount'],2,'.','');?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td><?=$discountamount_show;?>(<?=$discountpercentage_show;?>%)</td>
-<td>&#8377;<?php echo number_format($result_INVProductDetails['subtotal'],2,'.','');?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
 <td><?=$result_INVProductDetails['gstamount_total'];?>(<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
-<td align="right"><?php echo number_format($TotalAMount,2,'.','');?></td>
+<td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 
 <?php if($amount_received_fully==0){?>
 <td>

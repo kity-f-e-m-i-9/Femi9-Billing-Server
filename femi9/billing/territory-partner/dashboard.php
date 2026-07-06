@@ -249,7 +249,7 @@ mysqli_stmt_close($stockListStmt);
                                                             </div>
                                                             <div class="widget-stats-content flex-fill">
                                                                 <span class="widget-stats-title">Advance Balance</span>
-                                                                <span class="widget-stats-amount">₹<?php echo number_format($advBalance, 2); ?></span>
+                                                                <span class="widget-stats-amount">₹<?php echo inr_format($advBalance, 2); ?></span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -265,7 +265,7 @@ mysqli_stmt_close($stockListStmt);
                                                             </div>
                                                             <div class="widget-stats-content flex-fill">
                                                                 <span class="widget-stats-title">Total Target</span>
-                                                                <span class="widget-stats-amount">₹<?php echo number_format($totalTarget, 2); ?></span>
+                                                                <span class="widget-stats-amount">₹<?php echo inr_format($totalTarget, 2); ?></span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -287,7 +287,7 @@ mysqli_stmt_close($stockListStmt);
                                                             </div>
                                                             <div class="widget-stats-content flex-fill">
                                                                 <span class="widget-stats-title">Products Sold (Units)</span>
-                                                                <span class="widget-stats-amount"><?php echo number_format($productsSold); ?></span>
+                                                                <span class="widget-stats-amount"><?php echo inr_format($productsSold, 0); ?></span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -303,7 +303,7 @@ mysqli_stmt_close($stockListStmt);
                                                             </div>
                                                             <div class="widget-stats-content flex-fill">
                                                                 <span class="widget-stats-title">Paid Invoice Revenue</span>
-                                                                <span class="widget-stats-amount">₹<?php echo number_format($paidRevenue, 2); ?></span>
+                                                                <span class="widget-stats-amount">₹<?php echo inr_format($paidRevenue, 2); ?></span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -357,10 +357,10 @@ mysqli_stmt_close($stockListStmt);
                                                         <td><b><?php echo htmlspecialchars($item['productName']); ?></b></td>
                                                         <td class="text-center">
                                                             <span class="badge <?php echo $badgeClass; ?> badge-style-light" style="font-size:13px;padding:4px 10px;">
-                                                                <?php echo number_format((int)$item['sold_qty']); ?> units
+                                                                <?php echo inr_format((int)$item['sold_qty'], 0); ?> units
                                                             </span>
                                                         </td>
-                                                        <td class="text-center"><?php echo number_format((int)$item['closing_qty']); ?></td>
+                                                        <td class="text-center"><?php echo inr_format((int)$item['closing_qty'], 0); ?></td>
                                                         <td style="min-width:140px;">
                                                             <div class="progress" style="height:8px;">
                                                                 <div class="progress-bar <?php echo $rank===1 ? 'bg-warning' : ''; ?>"

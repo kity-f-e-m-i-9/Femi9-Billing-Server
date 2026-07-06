@@ -108,7 +108,7 @@ include("config.php");
         <td><a href="#" class="popup-trigger"><?php echo $result_pramount["productName"];?></a></td>
 		<td><?=$result_productCurrentst['qty'];?></td>
 		<td style="display:none;"><?=$result_productCurrentst['amount'];?></td>
-		<td align="right" style="display:none;"><?=number_format($result_productCurrentst['total'],2,'.','');?></td>
+		<td align="right" style="display:none;"><?=inr_format($result_productCurrentst['total'], 2);?></td>
 		
 		
                                                 </tr>

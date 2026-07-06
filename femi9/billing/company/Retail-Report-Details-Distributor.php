@@ -851,9 +851,9 @@ if (!empty($sellers_paginated)) {
                 <td><?= h($seller_type_display) ?></td>
                 <td><?= $category_display ?></td>
                 <td><?= h($seller['seller_mobile']) ?></td>
-                <td align="right"><strong>₹<?= number_format($seller['sub_total'], 2) ?></strong></td>
-                <td align="right"><strong>₹<?= number_format($seller['courier_charges'], 2) ?></strong></td>
-                <td align="right"><strong>₹<?= number_format($seller['total_amount'], 2) ?></strong></td>
+                <td align="right"><strong>₹<?= inr_format($seller['sub_total'], 2) ?></strong></td>
+                <td align="right"><strong>₹<?= inr_format($seller['courier_charges'], 2) ?></strong></td>
+                <td align="right"><strong>₹<?= inr_format($seller['total_amount'], 2) ?></strong></td>
                 
                 <?php foreach ($products as $pr_id => $pr_name): 
                     $qty = $seller_product_quantities[$seller['seller_id']][$pr_id] ?? 0;
@@ -873,9 +873,9 @@ if (!empty($sellers_paginated)) {
         <tfoot>
             <tr style="background:#e9ecef; font-weight:bold;">
                 <th colspan="5" align="right">Page Total:</th>
-                <th align="right">₹<?= number_format($grand_subtotal, 2) ?></th>
-                <th align="right">₹<?= number_format($grand_courier, 2) ?></th>
-                <th align="right">₹<?= number_format($grand_total, 2) ?></th>
+                <th align="right">₹<?= inr_format($grand_subtotal, 2) ?></th>
+                <th align="right">₹<?= inr_format($grand_courier, 2) ?></th>
+                <th align="right">₹<?= inr_format($grand_total, 2) ?></th>
                 <?php foreach ($product_totals as $pr_id => $total): ?>
                 <th align="center" class="product-col"><?= $total ?></th>
                 <?php endforeach; ?>

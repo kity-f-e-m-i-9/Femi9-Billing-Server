@@ -110,7 +110,7 @@ include("config.php");
 		<td style="display:none;"><?=$result_productCurrentst['amount'];?></td>
 		<td style="display:none;"><?=$result_productCurrentst['subtotal'];?></td>
 		<td style="display:none;"><?=$result_productCurrentst['gsttotal'];?> (<?=$result_productCurrentst['gst'];?>%)</td>
-		<td align="right" style="display:none;"><?=number_format($result_productCurrentst['total'],2,'.','');?></td></td>
+		<td align="right" style="display:none;"><?=inr_format($result_productCurrentst['total'], 2);?></td></td>
 		
 		
                                                 </tr>

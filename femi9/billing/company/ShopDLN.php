@@ -242,7 +242,7 @@ $Result_DLDetails=mysqli_fetch_array($Fetch_DLDetails);
 													<td><?php echo $Cust_Name;?><br/>M: <?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
-				<td><?php echo number_format($result_product_list["total"],2,'.','');?>
+				<td><?php echo inr_format($result_product_list["total"], 2);?>
 				</td>
 				
 				<td>

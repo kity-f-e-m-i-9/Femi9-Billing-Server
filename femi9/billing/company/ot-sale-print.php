@@ -290,15 +290,15 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
             <td><b><?= htmlspecialchars($row['productName'], ENT_QUOTES) ?></b></td>
             <td id="rightlaign"><?= htmlspecialchars($row['hsn'], ENT_QUOTES) ?></td>
             <td id="rightlaign"><?= (int)$row['qty'] ?> Packs</td>
-            <td id="rightlaign"><?= number_format($row['mrp'], 2, '.', '') ?></td>
-            <td id="rightlaign"><?= number_format($row['price'], 2, '.', '') ?></td>
+            <td id="rightlaign"><?= inr_format($row['mrp'], 2) ?></td>
+            <td id="rightlaign"><?= inr_format($row['price'], 2) ?></td>
             <td id="rightlaign">Packs</td>
             <td id="rightlaign"><?= $row['gst'] ?>%</td>
             <td id="rightlaign">
-                <?= number_format($row['discount'], 2, '.', '') ?>
-                (<?= number_format($discountPercentage, 2, '.', '') ?>%)
+                <?= inr_format($row['discount'], 2) ?>
+                (<?= inr_format($discountPercentage, 2) ?>%)
             </td>
-            <td id="rightlaign"><?= number_format($TotalAMount, 2, '.', '') ?></td>
+            <td id="rightlaign"><?= inr_format($TotalAMount, 2) ?></td>
         </tr>
         <?php endwhile; $stmt->close(); ?>
 
@@ -312,15 +312,15 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
             <td></td>
             <td id="rightlaign"><b><?= $Totalquantity123 ?> Packs</b></td>
             <td></td><td></td><td></td><td></td><td></td>
-            <td id="rightlaign"><b>&#8377; <?= number_format($TotalAMount123, 2, '.', '') ?></b></td>
+            <td id="rightlaign"><b>&#8377; <?= inr_format($TotalAMount123, 2) ?></b></td>
         </tr>
 
         <!-- GST rows -->
         <?php
         $totalgstamount = (float) ($result_Invoice_Details['gst_amount'] ?? 0);
         if ($totalgstamount > 0):
-            $SGST = number_format($totalgstamount / 2, 2, '.', '');
-            $CGST = number_format($totalgstamount / 2, 2, '.', '');
+            $SGST = inr_format($totalgstamount / 2, 2);
+            $CGST = inr_format($totalgstamount / 2, 2);
         ?>
         <tr id="bottombordervl">
             <td></td><td id="rightlaign"><b><i>SGST</i></b></td>
@@ -342,7 +342,7 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
             <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
             <td></td><td id="rightlaign"></td>
             <td></td><td></td><td></td><td></td><td></td>
-            <td id="rightlaign"><b>&#8377; <?= number_format($Courier_Charges, 2, '.', '') ?></b></td>
+            <td id="rightlaign"><b>&#8377; <?= inr_format($Courier_Charges, 2) ?></b></td>
         </tr>
         <?php endif; ?>
 
@@ -352,7 +352,7 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
             <td></td><td id="rightlaign"><b><i>Round off</i></b></td>
             <td></td><td id="rightlaign"></td>
             <td></td><td></td><td></td><td></td><td></td>
-            <td id="rightlaign"><b>&#8377; <?= number_format($result_Invoice['round_off'], 2, '.', '') ?></b></td>
+            <td id="rightlaign"><b>&#8377; <?= inr_format($result_Invoice['round_off'], 2) ?></b></td>
         </tr>
         <?php endif; ?>
 
@@ -362,7 +362,7 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
             <td></td><td id="rightlaign"><b><i>Gross Total</i></b></td>
             <td></td><td id="rightlaign"></td>
             <td></td><td></td><td></td><td></td><td></td>
-            <td id="rightlaign"><b>&#8377; <?= number_format($gross_before_wallet, 2, '.', '') ?></b></td>
+            <td id="rightlaign"><b>&#8377; <?= inr_format($gross_before_wallet, 2) ?></b></td>
         </tr>
 
         <!-- Wallet Deduction row -->
@@ -371,7 +371,7 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
             <td id="rightlaign"><b><i class="wallet-deduction">Wallet Deduction</i></b></td>
             <td></td><td id="rightlaign"></td>
             <td></td><td></td><td></td><td></td><td></td>
-            <td id="rightlaign" class="wallet-deduction"><b>- &#8377; <?= number_format($wallet_amount_show, 2, '.', '') ?></b></td>
+            <td id="rightlaign" class="wallet-deduction"><b>- &#8377; <?= inr_format($wallet_amount_show, 2) ?></b></td>
         </tr>
         <?php endif; ?>
 
@@ -380,7 +380,7 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
             <td></td><td id="rightlaign"><b><i>Total</i></b></td>
             <td></td><td id="rightlaign"></td>
             <td></td><td></td><td></td><td></td><td></td>
-            <td id="rightlaign"><b>&#8377; <?= number_format($Total_amount_show, 2, '.', '') ?></b></td>
+            <td id="rightlaign"><b>&#8377; <?= inr_format($Total_amount_show, 2) ?></b></td>
         </tr>
 
     </table>
@@ -456,7 +456,7 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
         ?>
         <tr>
             <td><?= htmlspecialchars($hsncode, ENT_QUOTES) ?></td>
-            <td align="right"><?= number_format($hsn_total, 2, '.', '') ?></td>
+            <td align="right"><?= inr_format($hsn_total, 2) ?></td>
         </tr>
         <?php endforeach; $stmt_hsn_sum->close(); ?>
 
@@ -469,7 +469,7 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
         ?>
         <tr>
             <td align="right"><b>Total&nbsp;</b></td>
-            <td align="right"><b><?= number_format($hsn_grand, 2, '.', '') ?></b></td>
+            <td align="right"><b><?= inr_format($hsn_grand, 2) ?></b></td>
         </tr>
     </table>
 

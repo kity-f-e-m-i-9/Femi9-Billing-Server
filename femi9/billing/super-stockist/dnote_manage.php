@@ -157,7 +157,7 @@ $i= $start_from;
                                                     <td><?php echo $result_userinvoice["inv_number"];?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 
-				<td><?php echo number_format($result_product_list["total"],2,'.','');?></td>
+				<td><?php echo inr_format($result_product_list["total"], 2);?></td>
 													
 													<td>
 <a href="dnote_details?returnid=<?php echo base64_encode($result_product_list["returnid"]);?>" title="Print">

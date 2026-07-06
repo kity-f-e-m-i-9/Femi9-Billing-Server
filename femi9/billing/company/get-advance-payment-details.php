@@ -83,19 +83,19 @@ $stmt->close();
         <div class="col-md-4 text-center">
             <div class="p-3" style="background: #f8f9fa; border-radius: 8px;">
                 <small class="text-muted d-block mb-1">Total Amount</small>
-                <span class="amount-highlight">₹<?php echo number_format($payment['amount'], 2); ?></span>
+                <span class="amount-highlight">₹<?php echo inr_format($payment['amount'], 2); ?></span>
             </div>
         </div>
         <div class="col-md-4 text-center">
             <div class="p-3" style="background: #d4edda; border-radius: 8px;">
                 <small class="text-muted d-block mb-1">Balance</small>
-                <span class="amount-highlight text-success">₹<?php echo number_format($payment['balance_amount'], 2); ?></span>
+                <span class="amount-highlight text-success">₹<?php echo inr_format($payment['balance_amount'], 2); ?></span>
             </div>
         </div>
         <div class="col-md-4 text-center">
             <div class="p-3" style="background: #fff3cd; border-radius: 8px;">
                 <small class="text-muted d-block mb-1">Adjusted</small>
-                <span class="amount-highlight text-warning">₹<?php echo number_format($payment['adjusted_amount'], 2); ?></span>
+                <span class="amount-highlight text-warning">₹<?php echo inr_format($payment['adjusted_amount'], 2); ?></span>
             </div>
         </div>
     </div>

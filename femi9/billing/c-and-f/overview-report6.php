@@ -197,10 +197,10 @@ $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 													<td><?php echo $Cust_Name;?><br/><b>M:</b>&nbsp;<?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
-				<!------<td><?php echo number_format($result_product_list["sub_total"],2,'.','');?></td>
+				<!------<td><?php echo inr_format($result_product_list["sub_total"], 2);?></td>
 				<td><?php
 $discount=$result_product_list["discount"]+$result_product_list["credit"];
-				echo number_format($discount,2,'.','');?>
+				echo inr_format($discount, 2);?>
 				</td>---->
 				
 				<?php
@@ -210,7 +210,7 @@ $discount=$result_product_list["discount"]+$result_product_list["credit"];
 				$TotalPrQty=$result_sumprqty[0];
 				$TotalPrQty123+=$TotalPrQty;
 				?>
-				<td align="right"><?php echo number_format($TotalAmount,2,'.','');?></td>
+				<td align="right"><?php echo inr_format($TotalAmount, 2);?></td>
 				<td align="right"><?=$TotalPrQty;?></td>
 													
 													
@@ -258,10 +258,10 @@ $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 													<td><?php echo $Cust_Name123;?><br/><b>M:</b>&nbsp;<?php echo $Cust_Mbile123;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_listCUSTOMER["date"]));?></td>
 													
-				<!------<td><?php echo number_format($result_product_listCUSTOMER["sub_total"],2,'.','');?></td>
+				<!------<td><?php echo inr_format($result_product_listCUSTOMER["sub_total"], 2);?></td>
 				<td><?php
 $discount=$result_product_listCUSTOMER["discount"]+$result_product_listCUSTOMER["credit"];
-				echo number_format($discount,2,'.','');?>
+				echo inr_format($discount, 2);?>
 				</td>---->
 				
 				<?php
@@ -271,7 +271,7 @@ $discount=$result_product_listCUSTOMER["discount"]+$result_product_listCUSTOMER[
 				$TotalPrQtyCUS=$result_sumprqty[0];
 				$TotalPrQty123CUS+=$TotalPrQtyCUS;
 				?>
-				<td align="right"><?php echo number_format($TotalAmountCUS,2,'.','');?></td>
+				<td align="right"><?php echo inr_format($TotalAmountCUS, 2);?></td>
 				<td align="right"><?=$TotalPrQtyCUS;?></td>
 													
 													
@@ -288,7 +288,7 @@ $discount=$result_product_listCUSTOMER["discount"]+$result_product_listCUSTOMER[
 										 <tfoot>
 										 <tr>
 										 <td colspan="5">Grand Total</td>
-				<td align="right"><b><?php echo number_format($GrandTotal_amount,2,'.','');?></b></td>
+				<td align="right"><b><?php echo inr_format($GrandTotal_amount, 2);?></b></td>
 				<td align="right"><b><?=$GrandTotal_Qty;?></b></td>
 										 </tr>
 										 </tfoot>

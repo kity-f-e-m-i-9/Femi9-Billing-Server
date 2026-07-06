@@ -253,10 +253,10 @@ try {
                                             <td><?php echo htmlspecialchars($d['tp_id'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo htmlspecialchars($d['name'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo htmlspecialchars($d['mobile'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <td><span class="badge-purchase"><?php echo number_format($u['purchase_points'], 2); ?></span></td>
-                                            <td><span class="badge-daily"><?php echo number_format($u['daily_points'], 2); ?></span></td>
-                                            <td><?php if ($u['return_points'] > 0): ?><span class="badge-return"><?php echo number_format($u['return_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
-                                            <td><span class="badge-total"><?php echo number_format($u['total_points'], 2); ?></span></td>
+                                            <td><span class="badge-purchase"><?php echo inr_format($u['purchase_points'], 2); ?></span></td>
+                                            <td><span class="badge-daily"><?php echo inr_format($u['daily_points'], 2); ?></span></td>
+                                            <td><?php if ($u['return_points'] > 0): ?><span class="badge-return"><?php echo inr_format($u['return_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
+                                            <td><span class="badge-total"><?php echo inr_format($u['total_points'], 2); ?></span></td>
                                         </tr>
                                         <?php endforeach; ?>
                                     </tbody>

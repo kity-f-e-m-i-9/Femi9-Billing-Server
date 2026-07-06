@@ -86,7 +86,7 @@ if ($res_list->num_rows > 0):
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo htmlspecialchars($row['productName'] ?? ''); ?></td>
-                                                    <td><?php echo number_format($row['qty'], 1, '.', ''); ?></td>
+                                                    <td><?php echo inr_format($row['qty'], 1); ?></td>
                                                     <td>
                                                         <a href="demofree_delete.php?Roowid=<?php echo urlencode($rowid); ?>&tempid=<?php echo urlencode($tempid); ?>"
                                                            onclick="return confirm('Delete this product entry?');">

@@ -649,7 +649,7 @@ mysqli_query($db_conn,$updatenonusers);
 						<a href="overview_outstanding?modelval=usr1&&out1=<?=base64_encode($Total_SS_outstanding)?>" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">S_Stockist</span>
-                                                <span class="widget-stats-amount" style="font-size:16px;"><?=number_format($Total_SS_outstanding,2,'.','')?></span>
+                                                <span class="widget-stats-amount" style="font-size:16px;"><?=inr_format($Total_SS_outstanding, 2)?></span>
                                             </div>
 											</a>
                                         </div>
@@ -667,7 +667,7 @@ mysqli_query($db_conn,$updatenonusers);
 						<a href="overview_outstanding?modelval=usr2&&out1=<?=base64_encode($Total_ST_outstanding)?>" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">Stockist</span>
-                                                <span class="widget-stats-amount" style="font-size:16px;"><?=number_format($Total_ST_outstanding,2,'.','')?></span>
+                                                <span class="widget-stats-amount" style="font-size:16px;"><?=inr_format($Total_ST_outstanding, 2)?></span>
                                             </div>
 											</a>
                                         </div>
@@ -685,7 +685,7 @@ mysqli_query($db_conn,$updatenonusers);
 						<a href="overview_outstanding?modelval=usr3&&out1=<?=base64_encode($Total_DT_outstanding)?>" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">Distributors</span>
-                                                <span class="widget-stats-amount" style="font-size:16px;"><?=number_format($Total_DT_outstanding,2,'.','')?></span>
+                                                <span class="widget-stats-amount" style="font-size:16px;"><?=inr_format($Total_DT_outstanding, 2)?></span>
                                             </div>
 											</a>
                                         </div>
@@ -704,7 +704,7 @@ mysqli_query($db_conn,$updatenonusers);
 						<a href="overview_outstanding?modelval=usr5&&out1=<?=base64_encode($Total_SDT_outstanding)?>" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">S_Distributors</span>
-                                                <span class="widget-stats-amount" style="font-size:16px;"><?=number_format($Total_SDT_outstanding,2,'.','')?></span>
+                                                <span class="widget-stats-amount" style="font-size:16px;"><?=inr_format($Total_SDT_outstanding, 2)?></span>
                                             </div>
 											</a>
                                         </div>
@@ -723,7 +723,7 @@ mysqli_query($db_conn,$updatenonusers);
 						<a href="overview_outstanding?modelval=usr4&&out1=<?=base64_encode($Total_SHP_outstanding);?>" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">Shop</span>
-                                                <span class="widget-stats-amount" style="font-size:16px;"><?=number_format($Total_SHP_outstanding,2,'.','')?></span>
+                                                <span class="widget-stats-amount" style="font-size:16px;"><?=inr_format($Total_SHP_outstanding, 2)?></span>
                                             </div>
 											</a>
                                         </div>

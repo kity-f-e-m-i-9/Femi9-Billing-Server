@@ -39,7 +39,7 @@ if (($_REQUEST['discount_percentage'] ?? 0) > 0) {
     $discount_amount     = number_format($totalamount * $discount_percentage / 100, 2, '.', '');
 } else {
     $discount_amount     = (float)($_REQUEST['discount_amount'] ?? 0);
-    $discount_percentage = $totalamount > 0 ? number_format($discount_amount * 100 / $totalamount, 2, '.', '') : 0;
+    $discount_percentage = $totalamount > 0 ? inr_format($discount_amount * 100 / $totalamount, 2) : 0;
 }
 
 $subtotal        = number_format($totalamount - $discount_amount, 2, '.', '');

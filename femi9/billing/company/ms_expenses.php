@@ -201,7 +201,7 @@ $result_msDetails=mysqli_fetch_array($fetch_msDetails);
 					</td>
 					<td>
 					<b><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
-					<td><?=number_format($exp_amount,2,'.','');?></td>
+					<td><?=inr_format($exp_amount, 2);?></td>
 					<td><?=ucwords($result_product_list["remarks"]);?></td>
 					
 					<td>
@@ -219,7 +219,7 @@ $result_msDetails=mysqli_fetch_array($fetch_msDetails);
 										 <tfoot>
 										<tr>
 										 <td colspan="3">Total</td>
-										 <td><?=number_format($exp_amount123,2,'.','');?></td>
+										 <td><?=inr_format($exp_amount123, 2);?></td>
 										 <td></td>
 										  <td></td>
 										 </tr>

@@ -207,7 +207,7 @@ $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 				}else{$TotalPrQty="0";}
 				$TotalPrQty123+=$TotalPrQty;
 				?>
-				<td align="right"><?php echo number_format($TotalAmount,2,'.','');?></td>
+				<td align="right"><?php echo inr_format($TotalAmount, 2);?></td>
 				<td align="right"><?=$TotalPrQty;?></td>
 													
 													
@@ -221,7 +221,7 @@ $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 										 <tfoot>
 										 <tr>
 										 <td colspan="3">Grand Total</td>
-										 <td align="right"><b><?=number_format($TotalAmount123,2,'.','');?></b></td>
+										 <td align="right"><b><?=inr_format($TotalAmount123, 2);?></b></td>
 				<td align="right"><b><?=$TotalPrQty123;?></b></td>
 										 </tr>
 										 </tfoot>

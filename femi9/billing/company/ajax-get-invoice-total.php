@@ -74,7 +74,7 @@ try {
 
     sendResponse(true, 'Invoice total retrieved', [
         'total' => $total,
-        'formatted_total' => '₹' . number_format($total, 2),
+        'formatted_total' => '₹' . inr_format($total, 2),
         'item_count' => $itemCount
     ]);
 

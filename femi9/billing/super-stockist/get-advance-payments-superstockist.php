@@ -182,13 +182,13 @@ try {
             'to_user_id' => htmlspecialchars($row['to_user_id'], ENT_QUOTES, 'UTF-8'),
             'to_user_type' => htmlspecialchars($row['to_user_type'], ENT_QUOTES, 'UTF-8'),
             'to_user_name' => htmlspecialchars($row['to_user_name'], ENT_QUOTES, 'UTF-8'),
-            'amount' => number_format((float)$row['amount'], 2, '.', ''),
+            'amount' => inr_format((float)$row['amount'], 2),
             'payment_date' => $row['payment_date'],
             'payment_mode' => htmlspecialchars($row['payment_mode'], ENT_QUOTES, 'UTF-8'),
             'reference_number' => htmlspecialchars($row['reference_number'] ?? '', ENT_QUOTES, 'UTF-8'),
             'bank_name' => htmlspecialchars($row['bank_name'] ?? '', ENT_QUOTES, 'UTF-8'),
-            'adjusted_amount' => number_format((float)$row['adjusted_amount'], 2, '.', ''),
-            'balance_amount' => number_format((float)$row['balance_amount'], 2, '.', ''),
+            'adjusted_amount' => inr_format((float)$row['adjusted_amount'], 2),
+            'balance_amount' => inr_format((float)$row['balance_amount'], 2),
             'status' => $row['status'],
             'remarks' => htmlspecialchars($row['remarks'] ?? '', ENT_QUOTES, 'UTF-8'),
             'created_at' => $row['created_at'],
@@ -207,9 +207,9 @@ try {
     // Prepare statistics
     $statistics = [
         'total_count' => $total_count,
-        'total_amount' => number_format($total_amount, 2, '.', ''),
-        'total_adjusted' => number_format($total_adjusted, 2, '.', ''),
-        'total_balance' => number_format($total_balance, 2, '.', '')
+        'total_amount' => inr_format($total_amount, 2),
+        'total_adjusted' => inr_format($total_adjusted, 2),
+        'total_balance' => inr_format($total_balance, 2)
     ];
     
     // Log successful fetch

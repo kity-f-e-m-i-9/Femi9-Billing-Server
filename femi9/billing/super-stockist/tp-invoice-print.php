@@ -151,8 +151,8 @@ $discount = (float)($inv['discount_amount'] ?? 0);
                 <td><strong><?php echo htmlspecialchars($item['productName']); ?></strong></td>
                 <td style="color:#64748b;"><?php echo htmlspecialchars($item['hsn'] ?? ''); ?></td>
                 <td class="text-right"><?php echo (int)$item['quantity']; ?></td>
-                <td class="text-right">₹<?php echo number_format((float)$item['rate'], 2); ?></td>
-                <td class="text-right"><strong>₹<?php echo number_format((float)$item['amount'], 2); ?></strong></td>
+                <td class="text-right">₹<?php echo inr_format((float)$item['rate'], 2); ?></td>
+                <td class="text-right"><strong>₹<?php echo inr_format((float)$item['amount'], 2); ?></strong></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
@@ -161,23 +161,23 @@ $discount = (float)($inv['discount_amount'] ?? 0);
     <div class="totals-section">
         <div class="totals-row">
             <span style="color:#64748b;">Subtotal</span>
-            <span>₹<?php echo number_format($subtotal, 2); ?></span>
+            <span>₹<?php echo inr_format($subtotal, 2); ?></span>
         </div>
         <?php if ($discount > 0): ?>
         <div class="totals-row">
             <span style="color:#64748b;">Discount</span>
-            <span style="color:#10b981;">−₹<?php echo number_format($discount, 2); ?></span>
+            <span style="color:#10b981;">−₹<?php echo inr_format($discount, 2); ?></span>
         </div>
         <?php endif; ?>
         <?php if ($courier > 0): ?>
         <div class="totals-row">
             <span style="color:#64748b;">Courier Charges</span>
-            <span>₹<?php echo number_format($courier, 2); ?></span>
+            <span>₹<?php echo inr_format($courier, 2); ?></span>
         </div>
         <?php endif; ?>
         <div class="totals-row grand-total">
             <span>Grand Total</span>
-            <span>₹<?php echo number_format((float)$inv['total_amount'], 2); ?></span>
+            <span>₹<?php echo inr_format((float)$inv['total_amount'], 2); ?></span>
         </div>
     </div>
 

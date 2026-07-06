@@ -455,7 +455,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						$fetch_countSS_SLS=mysqli_query($db_conn,$select_countSS_SLS);
 						$result_countSS_SLS=mysqli_fetch_array($fetch_countSS_SLS);
 						if($result_countSS_SLS[0]!=NULL)
-						{$SHOW_SLS_SS=number_format($result_countSS_SLS[0],2,'.','');}
+						{$SHOW_SLS_SS=inr_format($result_countSS_SLS[0], 2);}
 						else{$SHOW_SLS_SS="0.00";}
 						?>
 						<a href="#" style="text-decoration:none;">
@@ -481,7 +481,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						$fetch_countST_SLS=mysqli_query($db_conn,$select_countST_SLS);
 						$result_countST_SLS=mysqli_fetch_array($fetch_countST_SLS);
 						if($result_countST_SLS[0]!=NULL)
-						{$SHOW_SLS_ST=number_format($result_countST_SLS[0],2,'.','');}
+						{$SHOW_SLS_ST=inr_format($result_countST_SLS[0], 2);}
 						else{$SHOW_SLS_ST="0.00";}
 						?>
 						<a href="#" style="text-decoration:none;">
@@ -508,7 +508,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						$fetch_countDT_SLS=mysqli_query($db_conn,$select_countDT_SLS);
 						$result_countDT_SLS=mysqli_fetch_array($fetch_countDT_SLS);
 						if($result_countDT_SLS[0]!=NULL)
-						{$SHOW_SLS_DT=number_format($result_countDT_SLS[0],2,'.','');}
+						{$SHOW_SLS_DT=inr_format($result_countDT_SLS[0], 2);}
 						else{$SHOW_SLS_DT="0.00";}
 						?>
 						<a href="#" style="text-decoration:none;">
@@ -536,7 +536,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						$fetch_countDT_SLS12=mysqli_query($db_conn,$select_countDT_SLS12);
 						$result_countDT_SLS12=mysqli_fetch_array($fetch_countDT_SLS12);
 						if($result_countDT_SLS12[0]!=NULL)
-						{$SHOW_SLS_DT12=number_format($result_countDT_SLS12[0],2,'.','');}
+						{$SHOW_SLS_DT12=inr_format($result_countDT_SLS12[0], 2);}
 						else{$SHOW_SLS_DT12="0.00";}
 						?>
 						<a href="#" style="text-decoration:none;">

@@ -84,7 +84,7 @@ while ($result_debit = mysqli_fetch_array($fetch_debit)) {
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo $result_inv["inv_number"] ?? '---'; ?></td>
                                                     <td><?php echo date("d/M/Y", strtotime($result_debit["date"])); ?></td>
-                                                    <td><?php echo number_format($result_debit["total"], 2, '.', ''); ?></td>
+                                                    <td><?php echo inr_format($result_debit["total"], 2); ?></td>
                                                     <td><a href="dnote_details.php?returnid=<?php echo base64_encode($result_debit["returnid"]); ?>"><img src="../../assets/images/details-32.png"/></a></td>
                                                 </tr>
 <?php } ?>

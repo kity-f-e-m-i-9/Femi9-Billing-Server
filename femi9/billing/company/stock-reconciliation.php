@@ -395,7 +395,7 @@ tbody tr:hover td{background:#faf9f8}
                         <span class="chip c-warn"><?= htmlspecialchars($r['buyer_type']) ?></span>
                         <span class="mono" style="font-size:.71rem;color:var(--mid);margin-left:4px"><?= htmlspecialchars($r['buyer_id']) ?></span>
                     </td>
-                    <td class="mono">₹<?= number_format((float)$r['total'], 2) ?></td>
+                    <td class="mono">₹<?= inr_format((float)$r['total'], 2) ?></td>
                     <td><span class="chip c-warn"><?= htmlspecialchars($r['status']) ?></span></td>
                 </tr>
                 <?php endforeach; ?>

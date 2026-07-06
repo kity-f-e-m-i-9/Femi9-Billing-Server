@@ -398,11 +398,11 @@ if (isset($_REQUEST['updateprofile'])) {
                                         <div class="lbl">Locations</div>
                                     </div>
                                     <div class="loc-summary-item">
-                                        <div class="val">&#8377;<?php echo number_format($total_deposit, 0); ?></div>
+                                        <div class="val">&#8377;<?php echo inr_format($total_deposit, 0); ?></div>
                                         <div class="lbl">Total Deposit</div>
                                     </div>
                                     <div class="loc-summary-item">
-                                        <div class="val">&#8377;<?php echo number_format($total_target, 0); ?></div>
+                                        <div class="val">&#8377;<?php echo inr_format($total_target, 0); ?></div>
                                         <div class="lbl">Total Target</div>
                                     </div>
                                 </div>
@@ -445,13 +445,13 @@ if (isset($_REQUEST['updateprofile'])) {
                                                 <?php if (!empty($loc['deposit_amount'])): ?>
                                                 <div class="loc-meta-item">
                                                     <i class="material-icons-outlined">account_balance_wallet</i>
-                                                    Deposit: <strong>&#8377;<?php echo number_format((float)$loc['deposit_amount'], 0); ?></strong>
+                                                    Deposit: <strong>&#8377;<?php echo inr_format((float)$loc['deposit_amount'], 0); ?></strong>
                                                 </div>
                                                 <?php endif; ?>
                                                 <?php if (!empty($loc['target_amount'])): ?>
                                                 <div class="loc-meta-item">
                                                     <i class="material-icons-outlined">flag</i>
-                                                    Target: <strong>&#8377;<?php echo number_format((float)$loc['target_amount'], 0); ?></strong>
+                                                    Target: <strong>&#8377;<?php echo inr_format((float)$loc['target_amount'], 0); ?></strong>
                                                 </div>
                                                 <?php endif; ?>
                                             </div>

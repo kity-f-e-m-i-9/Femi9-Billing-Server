@@ -127,7 +127,7 @@ $invoice_total = round($net_amount + $courier_charges, 2);
 // Pre-validate advance balance
 $avail_balance = getTpAdvanceBalance($db_conn, $tp_id);
 if ($avail_balance < $net_amount) {
-    header("Location: add-tp-invoice?error=nobalance&need=" . urlencode(number_format($net_amount,2)) . "&have=" . urlencode(number_format($avail_balance,2))); exit;
+    header("Location: add-tp-invoice?error=nobalance&need=" . urlencode(inr_format($net_amount, 2)) . "&have=" . urlencode(inr_format($avail_balance, 2))); exit;
 }
 
 // Pre-validate SS stock

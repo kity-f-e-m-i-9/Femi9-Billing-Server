@@ -136,7 +136,7 @@ include("config.php");
 		<td style="display:none;"><?=$result_productCurrentst['amount'];?></td>
 		<td style="display:none;"><?=$result_productCurrentst['subtotal'];?></td>
 		<td style="display:none;"><?=$result_productCurrentst['gsttotal'];?> (<?=$result_productCurrentst['gst'];?>%)</td>
-		<td align="right" style="display:none;"><?=number_format($result_productCurrentst['total'],2,'.','');?></td></td>
+		<td align="right" style="display:none;"><?=inr_format($result_productCurrentst['total'], 2);?></td></td>
 		
 		<td>
 		<?php 
@@ -243,8 +243,8 @@ $select_InvoieDetails="select * from user_invoice where inv_id='$get_req_id_DECO
 <th scope="row"><?php echo $rd=$rd+1;?></th>
 <td><?=$result_ProductDetails123['productName'];?></td>
 <td><?=$result_INVProductDetails['qty'];?></td>
-<td>&#8377;<?php echo number_format($result_INVProductDetails['amount'],2,'.','');?></td>
-<td align="right"><?php echo number_format($TotalAMount,2,'.','');?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
+<td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
 <a href="del-inv-product2?rowid=<?=$ItemRowid;?>&&reqid=<?=$get_req_id;?>&&truncate"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>

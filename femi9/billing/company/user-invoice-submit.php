@@ -147,7 +147,7 @@ if ($requires_advance) {
         if (!$restoreResult['success']) {
             error_log("WARNING: Balance restore failed: " . $restoreResult['message']);
         } else {
-            error_log("Balance restored: Rs." . number_format($restoreResult['credited_amount'], 2));
+            error_log("Balance restored: Rs." . inr_format($restoreResult['credited_amount'], 2));
         }
     }
 
@@ -180,7 +180,7 @@ if ($requires_advance) {
     );
 
     if ($adjustmentResult['success']) {
-        error_log("Advance deducted: Rs." . number_format($adjustmentResult['adjusted_amount'], 2));
+        error_log("Advance deducted: Rs." . inr_format($adjustmentResult['adjusted_amount'], 2));
     } else {
         error_log("Advance deduction failed (non-blocking): " . $adjustmentResult['message']);
     }
@@ -253,7 +253,7 @@ try {
                 $invoice_id, $total_amount,
                 $receivedamount, $receivableamount,
                 'Advance Payment',
-                'Paid via advance payment. Courier Rs.' . number_format($courier_charges, 2) . ' pending.',
+                'Paid via advance payment. Courier Rs.' . inr_format($courier_charges, 2) . ' pending.',
                 'advance_product'
             );
             error_log("Receipt created: advance_product Rs.$receivedamount");

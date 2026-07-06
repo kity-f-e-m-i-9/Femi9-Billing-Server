@@ -129,7 +129,7 @@ if(isset($_REQUEST['delreceiptact']))
 			);
 			
 			if ($restoreResult['success']) {
-				error_log("SUCCESS: Restored Rs." . number_format($receipt_amount, 2) . " to advance balance");
+				error_log("SUCCESS: Restored Rs." . inr_format($receipt_amount, 2) . " to advance balance");
 			} else {
 				error_log("ERROR: Failed to restore balance: " . $restoreResult['message']);
 			}
@@ -391,9 +391,9 @@ if(isset($_REQUEST['delreceiptact']))
                                                     <td><?php echo $result_product_list["inv_number"];?></td>
                                                     <td><?php echo $Cust_Name;?><br/>M: <?php echo $Cust_Mbile;?></td>
                                                     <td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
-                                                    <td>₹<?php echo number_format($invoice_amount_only, 2, '.', '');?></td>
-                                                    <td>₹<?php echo number_format($courier_charges, 2, '.', '');?></td>
-                                                    <td><strong>₹<?php echo number_format($invoice_total, 2, '.', '');?></strong></td>
+                                                    <td>₹<?php echo inr_format($invoice_amount_only, 2);?></td>
+                                                    <td>₹<?php echo inr_format($courier_charges, 2);?></td>
+                                                    <td><strong>₹<?php echo inr_format($invoice_total, 2);?></strong></td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -503,7 +503,7 @@ if(isset($_REQUEST['delreceiptact']))
                                                     <td><?=$i=$i+1; ?></td>
                                                     <td><?=date("d/m/Y",strtotime($result_pincode_list['date']));?></td>
                                                     <td><span class="<?=$badge_class?>"><?=$receipt_type?></span></td>
-                                                    <td>₹<?=number_format($receiptamount,2,'.','');?></td>
+                                                    <td>₹<?=inr_format($receiptamount, 2);?></td>
                                                     <td><?=$result_pincode_list['receipt_method'];?></td>
                                                     <td><?=$result_pincode_list['receipt_remarks'];?></td>
                                                     <td>
@@ -524,7 +524,7 @@ if(isset($_REQUEST['delreceiptact']))
                                             <tfoot>
                                                 <tr>
                                                     <td colspan="3" style="text-align:right;font-weight:bold;">Total Received</td>
-                                                    <td style="font-weight:bold;">₹<?=number_format($total_received,2,'.','');?></td>
+                                                    <td style="font-weight:bold;">₹<?=inr_format($total_received, 2);?></td>
                                                     <td></td>
                                                     <td></td>
                                                     <td></td>
@@ -627,7 +627,7 @@ if(isset($_REQUEST['delreceiptact']))
                                         <div class="alert alert-warning" style="margin-top: 20px;">
                                             <i class="material-icons" style="vertical-align: middle; font-size: 20px;">warning</i>
                                             <strong>Invoice Amount Pending</strong>
-                                            <br/><small>The invoice amount (₹<?=number_format($invoice_amount_pending, 2)?>) needs to be paid via advance payment.</small>
+                                            <br/><small>The invoice amount (₹<?=inr_format($invoice_amount_pending, 2)?>) needs to be paid via advance payment.</small>
                                         </div>
                                         
                                         <form action="<?=$_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data" onsubmit="return confirm('Pay invoice amount from advance balance?')">
@@ -650,7 +650,7 @@ if(isset($_REQUEST['delreceiptact']))
                                                 Pay Invoice Amount (Advance Payment)
                                             </h3>
                                             <div class="example-content">
-                                                <p><strong>Amount to Pay:</strong> ₹<?=number_format($invoice_amount_pending, 2)?></p>
+                                                <p><strong>Amount to Pay:</strong> ₹<?=inr_format($invoice_amount_pending, 2)?></p>
                                                 <p><strong>Payment Method:</strong> Advance Payment (Auto-deducted)</p>
                                                 <button type="submit" name="addreceipt" class="btn btn-primary">
                                                     <i class="material-icons">account_balance_wallet</i> Pay from Advance Balance
@@ -663,7 +663,7 @@ if(isset($_REQUEST['delreceiptact']))
                                         <div class="alert alert-info" style="margin-top: 20px;">
                                             <i class="material-icons" style="vertical-align: middle; font-size: 20px;">receipt</i>
                                             <strong>Invoice Amount Pending</strong>
-                                            <br/><small>Please add receipt for invoice amount: ₹<?=number_format($invoice_amount_pending, 2)?></small>
+                                            <br/><small>Please add receipt for invoice amount: ₹<?=inr_format($invoice_amount_pending, 2)?></small>
                                         </div>
                                         
                                         <form action="<?=$_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data" onsubmit="return confirm('Confirm receipt submission?')">
@@ -733,7 +733,7 @@ if(isset($_REQUEST['delreceiptact']))
                                         <div class="alert alert-info" style="margin-top: 20px;">
                                             <i class="material-icons" style="vertical-align: middle; font-size: 20px;">local_shipping</i>
                                             <strong>Courier Charges Payment Required</strong>
-                                            <br/><small>Courier charges (₹<?=number_format($courier_amount_pending, 2)?>) must be paid separately via cash/UPI/bank transfer.</small>
+                                            <br/><small>Courier charges (₹<?=inr_format($courier_amount_pending, 2)?>) must be paid separately via cash/UPI/bank transfer.</small>
                                         </div>
                                         <?php endif; ?>
                                         

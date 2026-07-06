@@ -206,7 +206,7 @@ $district_name=	$result_district['dist_name'];
 					
 					<td><?=$result_onbaord_user_records["country_code"];?>&nbsp;<?=$result_onbaord_user_records["mobile_number"];?></td>
 					
-					<td><?=number_format($result_product_list['amount'],2,'.','');?></td>
+					<td><?=inr_format($result_product_list['amount'], 2);?></td>
 					<td><?=date("d/m/Y",strtotime($result_product_list['date']));?><br/>
 					<?=date("g:i A",strtotime($result_product_list['time']));?>
 					</td>
@@ -238,7 +238,7 @@ $tds_deduction=$result_product_list['amount']*$tds_percentage/100;
 $tds_deduction=number_format($tds_deduction,2,'.','');
 
 $sent_amount=$result_product_list['amount']-$tds_deduction;
-$sent_amount=number_format($sent_amount,2,'.','');
+$sent_amount=inr_format($sent_amount, 2);
 ?>
 
 <div class="table">
@@ -249,7 +249,7 @@ $sent_amount=number_format($sent_amount,2,'.','');
   </div>
   <div class="table-row">
     <div class="table-cell">Request&nbsp;Amount</div>
-    <div class="table-cell"><?=number_format($result_product_list['amount'],2,'.','');?></div>
+    <div class="table-cell"><?=inr_format($result_product_list['amount'], 2);?></div>
   </div>
    <div class="table-row">
     <div class="table-cell">TDS(%)</div>

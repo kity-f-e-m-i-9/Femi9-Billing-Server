@@ -202,7 +202,7 @@ $Average_available_walletAmount_ST=$Total_wallet_amount_ST-$Total_withdraw_amoun
                                                 <h5 class="todo-menu-title">Wallet - Available Amount</h5>
                                                 <ul class="list-unstyled todo-status-filter">
                                                     
-                                                    <li><a><i class="material-icons-outlined">wallet</i> <b>&#8377;<?=number_format($Average_available_walletAmount_ST,2,'.','');?></b></a></li>
+                                                    <li><a><i class="material-icons-outlined">wallet</i> <b>&#8377;<?=inr_format($Average_available_walletAmount_ST, 2);?></b></a></li>
                                                    
                                                 </ul>
 											
@@ -225,7 +225,7 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 													
 													<?php if($result_wallet_History1234['commission_type']=="Refferral"){?>
                                                         <div class="todo-item-content">
-                                                            <span class="todo-item-title">&#8377;<?=number_format($result_wallet_History1234['commission_amount'],2,'.','');?><span class="badge badge-style-light rounded-pill badge-success">Credit</span></span>
+                                                            <span class="todo-item-title">&#8377;<?=inr_format($result_wallet_History1234['commission_amount'], 2);?><span class="badge badge-style-light rounded-pill badge-success">Credit</span></span>
 															<span>Refferral (<?=$result_wallet_History1234['commission_percentage'];?>%)</span><br/>
 															<span class="todo-item-subtitle"><?=$result_wallet_History1234['month'];?>, <?=$result_wallet_History1234['year'];?></span>
                                                         </div>
@@ -236,7 +236,7 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 													else{
 														?>
 													<div class="todo-item-content">
-                                                            <span class="todo-item-title">&#8377;<?=number_format($result_wallet_History1234['commission_amount'],2,'.','');?><span class="badge badge-style-light rounded-pill badge-success">Credit</span></span>
+                                                            <span class="todo-item-title">&#8377;<?=inr_format($result_wallet_History1234['commission_amount'], 2);?><span class="badge badge-style-light rounded-pill badge-success">Credit</span></span>
                                                             <span>Cashback (<?=$result_wallet_History1234['commission_percentage'];?>%)</span><br/>
 															<span><?=$result_wallet_History1234['remarks'];?></span>
 															<span class="todo-item-subtitle"><?=$result_wallet_History1234['month'];?>, <?=$result_wallet_History1234['year'];?></span>
@@ -267,7 +267,7 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 ?>
 												 <li class="todo-item">
                                                         <div class="todo-item-content">
-                                                            <span class="todo-item-title">&#8377;<?=number_format($result_wallet_History1234['amount'],2,'.','');?>
+                                                            <span class="todo-item-title">&#8377;<?=inr_format($result_wallet_History1234['amount'], 2);?>
 
 <?php if($result_wallet_History1234['req_status']=='pending'){?>
 <span class="badge badge-style-light rounded-pill badge-danger">Pending</span>

@@ -369,9 +369,9 @@ try {
     $response['data']    = $payments;
     $response['stats']   = [
         'total_payments'  => count($payments),
-        'total_amount'    => number_format($total_amount,   2, '.', ''),
-        'total_balance'   => number_format($total_balance,  2, '.', ''),
-        'adjusted_amount' => number_format($adjusted_total, 2, '.', ''),
+        'total_amount'    => inr_format($total_amount, 2),
+        'total_balance'   => inr_format($total_balance, 2),
+        'adjusted_amount' => inr_format($adjusted_total, 2),
     ];
     $response['success'] = true;
 

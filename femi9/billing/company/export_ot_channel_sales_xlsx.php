@@ -419,11 +419,11 @@ try {
         xlsx_set($sheet, 1, $row, $channel['name']);
         
         // Total Sales Qty with breakdown
-        $qty_text = number_format($net_qty) . "\n(" . number_format($channel['sales_qty']) . " - " . number_format($channel['return_qty']) . ")";
+        $qty_text = inr_format($net_qty, 0) . "\n(" . inr_format($channel['sales_qty'], 0) . " - " . inr_format($channel['return_qty'], 0) . ")";
         xlsx_set($sheet, 2, $row, $qty_text);
         
         // Total Amount with breakdown
-        $amount_text = "₹" . number_format($net_amount, 2) . "\n(₹" . number_format($channel['sales_amount'], 2) . " - ₹" . number_format($channel['return_amount'], 2) . ")";
+        $amount_text = "₹" . inr_format($net_amount, 2) . "\n(₹" . inr_format($channel['sales_amount'], 2) . " - ₹" . inr_format($channel['return_amount'], 2) . ")";
         xlsx_set($sheet, 3, $row, $amount_text);
 
         // Product quantities
@@ -434,7 +434,7 @@ try {
             $pr_net = $pr_sales - $pr_returns;
             
             if ($pr_net != 0 || $pr_sales != 0) {
-                $pr_text = number_format($pr_net) . "\n(" . number_format($pr_sales) . " - " . number_format($pr_returns) . ")";
+                $pr_text = inr_format($pr_net, 0) . "\n(" . inr_format($pr_sales, 0) . " - " . inr_format($pr_returns, 0) . ")";
             } else {
                 $pr_text = "—";
             }
@@ -487,18 +487,18 @@ try {
     xlsx_set($sheet, 1, $totalsRow, 'GRAND TOTAL');
     
     // Grand Total Sales Qty
-    $grand_qty_text = number_format($grand_sales_qty - $grand_return_qty) . "\n(" . number_format($grand_sales_qty) . " - " . number_format($grand_return_qty) . ")";
+    $grand_qty_text = inr_format($grand_sales_qty - $grand_return_qty, 0) . "\n(" . inr_format($grand_sales_qty, 0) . " - " . inr_format($grand_return_qty, 0) . ")";
     xlsx_set($sheet, 2, $totalsRow, $grand_qty_text);
     
     // Grand Total Amount
-    $grand_amount_text = "₹" . number_format($grand_sales_amount - $grand_return_amount, 2) . "\n(₹" . number_format($grand_sales_amount, 2) . " - ₹" . number_format($grand_return_amount, 2) . ")";
+    $grand_amount_text = "₹" . inr_format($grand_sales_amount - $grand_return_amount, 2) . "\n(₹" . inr_format($grand_sales_amount, 2) . " - ₹" . inr_format($grand_return_amount, 2) . ")";
     xlsx_set($sheet, 3, $totalsRow, $grand_amount_text);
 
     // Grand Total Products
     $col = 4;
     foreach ($products as $pr_id => $pr_name) {
         $grand_pr_net = $grand_product_sales[$pr_id] - $grand_product_returns[$pr_id];
-        $grand_pr_text = number_format($grand_pr_net) . "\n(" . number_format($grand_product_sales[$pr_id]) . " - " . number_format($grand_product_returns[$pr_id]) . ")";
+        $grand_pr_text = inr_format($grand_pr_net, 0) . "\n(" . inr_format($grand_product_sales[$pr_id], 0) . " - " . inr_format($grand_product_returns[$pr_id], 0) . ")";
         xlsx_set($sheet, $col, $totalsRow, $grand_pr_text);
         $col++;
     }

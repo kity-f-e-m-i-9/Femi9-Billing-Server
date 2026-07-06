@@ -112,7 +112,7 @@ if ($from_date != NULL) {
                                     </tr>
                                     <tr>
                                         <td>(c) Other outward supplies (Nil rated, exempted)</td>
-                                        <td><?php echo number_format($show_total_outward, 2, '.', ''); ?></td>
+                                        <td><?php echo inr_format($show_total_outward, 2); ?></td>
                                         <td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td>
                                     </tr>
                                     <tr>

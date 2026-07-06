@@ -162,8 +162,8 @@ $stmt2->close();
                                                 <td><strong><?php echo htmlspecialchars($item['productName']); ?></strong></td>
                                                 <td class="text-muted"><?php echo htmlspecialchars($item['hsn'] ?? ''); ?></td>
                                                 <td class="text-right"><?php echo (int)$item['quantity']; ?></td>
-                                                <td class="text-right">₹<?php echo number_format((float)$item['rate'], 2); ?></td>
-                                                <td class="text-right"><strong>₹<?php echo number_format((float)$item['amount'], 2); ?></strong></td>
+                                                <td class="text-right">₹<?php echo inr_format((float)$item['rate'], 2); ?></td>
+                                                <td class="text-right"><strong>₹<?php echo inr_format((float)$item['amount'], 2); ?></strong></td>
                                             </tr>
                                         <?php endforeach; ?>
                                         </tbody>
@@ -174,7 +174,7 @@ $stmt2->close();
                                             ?>
                                             <tr>
                                                 <td colspan="5" class="text-right" style="color:#64748b;">Subtotal</td>
-                                                <td class="text-right" style="color:#64748b;">₹<?php echo number_format($subtotal, 2); ?></td>
+                                                <td class="text-right" style="color:#64748b;">₹<?php echo inr_format($subtotal, 2); ?></td>
                                             </tr>
                                             <?php if ($courier > 0): ?>
                                             <tr>
@@ -182,12 +182,12 @@ $stmt2->close();
                                                     <i class="material-icons" style="font-size:14px;vertical-align:middle;">local_shipping</i>
                                                     Courier Charges
                                                 </td>
-                                                <td class="text-right" style="color:#64748b;">₹<?php echo number_format($courier, 2); ?></td>
+                                                <td class="text-right" style="color:#64748b;">₹<?php echo inr_format($courier, 2); ?></td>
                                             </tr>
                                             <?php endif; ?>
                                             <tr style="border-top:2px solid #e5e7eb;">
                                                 <td colspan="5" class="text-right" style="font-weight:700;font-size:14px;">Grand Total</td>
-                                                <td class="text-right" style="font-weight:700;font-size:16px;color:#1a237e;">₹<?php echo number_format((float)$inv['total_amount'], 2); ?></td>
+                                                <td class="text-right" style="font-weight:700;font-size:16px;color:#1a237e;">₹<?php echo inr_format((float)$inv['total_amount'], 2); ?></td>
                                             </tr>
                                         </tfoot>
                                     </table>

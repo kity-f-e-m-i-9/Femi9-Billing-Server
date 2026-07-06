@@ -440,10 +440,10 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                     <th scope="row"><?php echo ++$rd;?></th>
                                                                     <td><?=htmlspecialchars($result_ProductDetails123['productName']);?></td>
                                                                     <td><?=$result_INVProductDetails['qty'];?></td>
-                                                                    <td>&#8377;<?php echo number_format($result_INVProductDetails['amount'], 2, '.', '');?></td>
-                                                                    <td align="right"><?php echo number_format($result_INVProductDetails['subtotal'], 2, '.', '');?></td>
-                                                                    <td><?=number_format($result_INVProductDetails['gstamount_total'], 2, '.', '');?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
-                                                                    <td align="right"><?php echo number_format($TotalAMount, 2, '.', '');?></td>
+                                                                    <td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
+                                                                    <td align="right"><?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
+                                                                    <td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+                                                                    <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
                                                                     <td>
                                                                         <a href="cnote_delete.php?returnid=<?=$_REQUEST['returnid'];?>&&rowid=<?=$ItemRowid;?>&&InvoiceID=<?=$InvoiceID;?>&&redirurl=cnote_new&&ActionDel" 
                                                                            onclick="return confirm('Are you sure you want to remove this item?');">

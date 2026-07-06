@@ -140,7 +140,7 @@ try {
                     $monthName,
                     $achievement['achieved_subordinates'],
                     $achievement['total_subordinates'],
-                    number_format($achievement['achievement_percentage'], 2),
+                    inr_format($achievement['achievement_percentage'], 2),
                     $achievement['reward_tier'],
                     $achievement['points_awarded']
                 );

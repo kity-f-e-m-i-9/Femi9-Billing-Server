@@ -333,9 +333,9 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 <td><?=$result_INVProductDetails['qty'];?></td>
 <td><?=$result_INVProductDetails['amount'];?></td>
 <td><?=$result_INVProductDetails['discount_amount'];?>(<?=$result_INVProductDetails['discount_percentage'];?>%)</td>
-<td>&#8377;<?php echo number_format($result_INVProductDetails['subtotal'],2,'.','');?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
 <td><?=$result_INVProductDetails['gstamount_total'];?>(<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
-<td align="right"><?php echo number_format($TotalAMount,2,'.','');?></td>
+<td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 
 <?php if($amount_received_fully==0){?>
 <td>
@@ -525,10 +525,10 @@ function receiptamount(){
 
 <p><b>Received Amount</b>
     <input type="number" min="0" required="" step="any"
-           max="<?= number_format($balance_due, 2, '.', '') ?>"
+           max="<?= inr_format($balance_due, 2) ?>"
            id="receivedamount" class="form-control" style="width:100%;"
            onkeyup="receiptamount()" name="receivedamount"
-           placeholder="Max: <?= number_format($balance_due, 2, '.', '') ?>">
+           placeholder="Max: <?= inr_format($balance_due, 2) ?>">
 </p>
 
 <p><b>Receivable Amount</b>

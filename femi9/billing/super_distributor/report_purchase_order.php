@@ -24,7 +24,7 @@ $fetch_totalamount_today_purchaseorder=mysqli_query($db_conn,$select_totalamount
 $result_totalamount_today_purchaseorder=mysqli_fetch_array($fetch_totalamount_today_purchaseorder);
 
 if($result_totalamount_today_purchaseorder[0]!=NULL){
-$today_total_amount_purchaseorder=number_format($result_totalamount_today_purchaseorder[0],2,'.','');
+$today_total_amount_purchaseorder=inr_format($result_totalamount_today_purchaseorder[0], 2);
 }else{$today_total_amount_purchaseorder="0.00";}
 
 
@@ -54,7 +54,7 @@ $fetch_totalamount_yesterday_purchaseorder=mysqli_query($db_conn,$select_totalam
 $result_totalamount_yesterday_purchaseorder=mysqli_fetch_array($fetch_totalamount_yesterday_purchaseorder);
 
 if($result_totalamount_yesterday_purchaseorder[0]!=NULL){
-$yesterday_total_amount_purchaseorder=number_format($result_totalamount_yesterday_purchaseorder[0],2,'.','');
+$yesterday_total_amount_purchaseorder=inr_format($result_totalamount_yesterday_purchaseorder[0], 2);
 }else{$yesterday_total_amount_purchaseorder="0.00";}
 
 
@@ -83,7 +83,7 @@ $fetch_totalamount_thismonth_purchaseorder=mysqli_query($db_conn,$select_totalam
 $result_totalamount_thismonth_purchaseorder=mysqli_fetch_array($fetch_totalamount_thismonth_purchaseorder);
 
 if($result_totalamount_thismonth_purchaseorder[0]!=NULL){
-$thismonth_total_amount_purchaseorder=number_format($result_totalamount_thismonth_purchaseorder[0],2,'.','');
+$thismonth_total_amount_purchaseorder=inr_format($result_totalamount_thismonth_purchaseorder[0], 2);
 }else{$thismonth_total_amount_purchaseorder="0.00";}
 
 
@@ -113,7 +113,7 @@ $fetch_totalamount_lastmonth_purchaseorder=mysqli_query($db_conn,$select_totalam
 $result_totalamount_lastmonth_purchaseorder=mysqli_fetch_array($fetch_totalamount_lastmonth_purchaseorder);
 
 if($result_totalamount_lastmonth_purchaseorder[0]!=NULL){
-$lastmonth_total_amount_purchaseorder=number_format($result_totalamount_lastmonth_purchaseorder[0],2,'.','');
+$lastmonth_total_amount_purchaseorder=inr_format($result_totalamount_lastmonth_purchaseorder[0], 2);
 }else{$lastmonth_total_amount_purchaseorder="0.00";}
 
 ?>

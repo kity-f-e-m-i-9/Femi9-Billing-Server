@@ -323,7 +323,7 @@ try {
         $successMessage = "Invoice $invNumber has been returned successfully. Stock has been reversed.";
         
         if ($advanceCredited > 0) {
-            $successMessage .= " Advance payment of ₹" . number_format($advanceCredited, 2) . 
+            $successMessage .= " Advance payment of ₹" . inr_format($advanceCredited, 2) . 
                               " has been credited back.";
         }
 

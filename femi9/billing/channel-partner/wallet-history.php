@@ -82,7 +82,7 @@ $tempID = GeraHash_tp(20) . date("dmyHis");
                                             <ul class="list-unstyled todo-status-filter">
                                                 <li>
                                                     <a><i class="material-icons-outlined">wallet</i>
-                                                    <b>&#8377;<?php echo number_format($walletBalance, 2, '.', ''); ?></b></a>
+                                                    <b>&#8377;<?php echo inr_format($walletBalance, 2); ?></b></a>
                                                 </li>
                                             </ul>
 
@@ -177,7 +177,7 @@ while ($credit = mysqli_fetch_array($creditRes)):
                                                 <li class="todo-item">
                                                     <div class="todo-item-content">
                                                         <span class="todo-item-title">
-                                                            &#8377;<?php echo number_format($credit['commission_amount'], 2, '.', ''); ?>
+                                                            &#8377;<?php echo inr_format($credit['commission_amount'], 2); ?>
                                                             <span class="badge badge-style-light rounded-pill badge-success">Credit (<?php echo htmlspecialchars($commType); ?>)</span>
                                                         </span>
                                                         <?php if ($commType === 'Refferral' && $whomName): ?>
@@ -219,7 +219,7 @@ while ($debit = mysqli_fetch_array($debitRes)):
                                                 <li class="todo-item">
                                                     <div class="todo-item-content">
                                                         <span class="todo-item-title">
-                                                            &#8377;<?php echo number_format($debit['amount'], 2, '.', ''); ?>
+                                                            &#8377;<?php echo inr_format($debit['amount'], 2); ?>
                                                             <?php if ($debit['req_status'] === 'pending'): ?>
                                                             <span class="badge badge-style-light rounded-pill badge-danger">Pending</span>
                                                             <?php else: ?>

@@ -11,7 +11,7 @@ $result_market_SSCASH_VLSS_TODAY=mysqli_fetch_array($fetch_market_SSCASH_VLSS_TO
 $Total_SSCASH_VLSS_TODAY=$result_market_SSCASH_VLSS_TODAY[0];
 
 if($Total_SSCASH_VLSS_TODAY!=NULL)
-{$Total_SSCASH_VLSS_Show_TODAY=number_format($Total_SSCASH_VLSS_TODAY,2,'.','');}
+{$Total_SSCASH_VLSS_Show_TODAY=inr_format($Total_SSCASH_VLSS_TODAY, 2);}
 else
 {$Total_SSCASH_VLSS_Show_TODAY="0.00";}
 
@@ -25,7 +25,7 @@ $result_market_SSCASH_VLSS_YSTRDY=mysqli_fetch_array($fetch_market_SSCASH_VLSS_Y
 $Total_SSCASH_VLSS_YSTRDY=$result_market_SSCASH_VLSS_YSTRDY[0];
 
 if($Total_SSCASH_VLSS_YSTRDY!=NULL)
-{$Total_SSCASH_VLSS_Show_YSTRDY=number_format($Total_SSCASH_VLSS_YSTRDY,2,'.','');}
+{$Total_SSCASH_VLSS_Show_YSTRDY=inr_format($Total_SSCASH_VLSS_YSTRDY, 2);}
 else
 {$Total_SSCASH_VLSS_Show_YSTRDY="0.00";}
 
@@ -38,7 +38,7 @@ $result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLS
 $Total_SSCASH_VLSS_THISMONTH=$result_market_SSCASH_VLSS_THISMONTH[0];
 
 if($Total_SSCASH_VLSS_THISMONTH!=NULL)
-{$Total_SSCASH_VLSS_Show_THISMONTH=number_format($Total_SSCASH_VLSS_THISMONTH,2,'.','');}
+{$Total_SSCASH_VLSS_Show_THISMONTH=inr_format($Total_SSCASH_VLSS_THISMONTH, 2);}
 else
 {$Total_SSCASH_VLSS_Show_THISMONTH="0.00";}
 
@@ -51,7 +51,7 @@ $result_market_SSCASH_VLSS_TLLDTE=mysqli_fetch_array($fetch_market_SSCASH_VLSS_T
 $Total_SSCASH_VLSS_TLLDTE=$result_market_SSCASH_VLSS_TLLDTE[0];
 
 if($Total_SSCASH_VLSS_TLLDTE!=NULL)
-{$Total_SSCASH_VLSS_Show_TLLDTE=number_format($Total_SSCASH_VLSS_TLLDTE,2,'.','');}
+{$Total_SSCASH_VLSS_Show_TLLDTE=inr_format($Total_SSCASH_VLSS_TLLDTE, 2);}
 else
 {$Total_SSCASH_VLSS_Show_TLLDTE="0.00";}
 
@@ -70,7 +70,7 @@ $result_market_STCASH_VLSS_TODAY=mysqli_fetch_array($fetch_market_STCASH_VLSS_TO
 $Total_STCASH_VLSS_TODAY=$result_market_STCASH_VLSS_TODAY[0];
 
 if($Total_STCASH_VLSS_TODAY!=NULL)
-{$Total_STCASH_VLSS_Show_TODAY=number_format($Total_STCASH_VLSS_TODAY,2,'.','');}
+{$Total_STCASH_VLSS_Show_TODAY=inr_format($Total_STCASH_VLSS_TODAY, 2);}
 else
 {$Total_STCASH_VLSS_Show_TODAY="0.00";}
 
@@ -86,7 +86,7 @@ $result_market_STCASH_VLSS_YSTRDY=mysqli_fetch_array($fetch_market_STCASH_VLSS_Y
 $Total_STCASH_VLSS_YSTRDY=$result_market_STCASH_VLSS_YSTRDY[0];
 
 if($Total_STCASH_VLSS_YSTRDY!=NULL)
-{$Total_STCASH_VLSS_Show_YSTRDY=number_format($Total_STCASH_VLSS_YSTRDY,2,'.','');}
+{$Total_STCASH_VLSS_Show_YSTRDY=inr_format($Total_STCASH_VLSS_YSTRDY, 2);}
 else
 {$Total_STCASH_VLSS_Show_YSTRDY="0.00";}
 
@@ -100,7 +100,7 @@ $result_market_STCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_STCASH_VLS
 $Total_STCASH_VLSS_THISMONTH=$result_market_STCASH_VLSS_THISMONTH[0];
 
 if($Total_STCASH_VLSS_THISMONTH!=NULL)
-{$Total_STCASH_VLSS_Show_THISMONTH=number_format($Total_STCASH_VLSS_THISMONTH,2,'.','');}
+{$Total_STCASH_VLSS_Show_THISMONTH=inr_format($Total_STCASH_VLSS_THISMONTH, 2);}
 else
 {$Total_STCASH_VLSS_Show_THISMONTH="0.00";}
 
@@ -114,7 +114,7 @@ $result_market_STCASH_VLSS_TLLDTE=mysqli_fetch_array($fetch_market_STCASH_VLSS_T
 $Total_STCASH_VLSS_TLLDTE=$result_market_STCASH_VLSS_TLLDTE[0];
 
 if($Total_STCASH_VLSS_TLLDTE!=NULL)
-{$Total_STCASH_VLSS_Show_TLLDTE=number_format($Total_STCASH_VLSS_TLLDTE,2,'.','');}
+{$Total_STCASH_VLSS_Show_TLLDTE=inr_format($Total_STCASH_VLSS_TLLDTE, 2);}
 else
 {$Total_STCASH_VLSS_Show_TLLDTE="0.00";}
 
@@ -131,7 +131,7 @@ $result_market_DTCASH_VLSS_TODAY=mysqli_fetch_array($fetch_market_DTCASH_VLSS_TO
 $Total_DTCASH_VLSS_TODAY=$result_market_DTCASH_VLSS_TODAY[0];
 
 if($Total_DTCASH_VLSS_TODAY!=NULL)
-{$Total_DTCASH_VLSS_Show_TODAY=number_format($Total_DTCASH_VLSS_TODAY,2,'.','');}
+{$Total_DTCASH_VLSS_Show_TODAY=inr_format($Total_DTCASH_VLSS_TODAY, 2);}
 else
 {$Total_DTCASH_VLSS_Show_TODAY="0.00";}
 
@@ -145,7 +145,7 @@ $result_market_DTCASH_VLSS_YSTRDY=mysqli_fetch_array($fetch_market_DTCASH_VLSS_Y
 $Total_DTCASH_VLSS_YSTRDY=$result_market_DTCASH_VLSS_YSTRDY[0];
 
 if($Total_DTCASH_VLSS_YSTRDY!=NULL)
-{$Total_DTCASH_VLSS_Show_YSTRDY=number_format($Total_DTCASH_VLSS_YSTRDY,2,'.','');}
+{$Total_DTCASH_VLSS_Show_YSTRDY=inr_format($Total_DTCASH_VLSS_YSTRDY, 2);}
 else
 {$Total_DTCASH_VLSS_Show_YSTRDY="0.00";}
 
@@ -158,7 +158,7 @@ $result_market_DTCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_DTCASH_VLS
 $Total_DTCASH_VLSS_THISMONTH=$result_market_DTCASH_VLSS_THISMONTH[0];
 
 if($Total_DTCASH_VLSS_THISMONTH!=NULL)
-{$Total_DTCASH_VLSS_Show_THISMONTH=number_format($Total_DTCASH_VLSS_THISMONTH,2,'.','');}
+{$Total_DTCASH_VLSS_Show_THISMONTH=inr_format($Total_DTCASH_VLSS_THISMONTH, 2);}
 else
 {$Total_DTCASH_VLSS_Show_THISMONTH="0.00";}
 
@@ -171,7 +171,7 @@ $result_market_DTCASH_VLSS_TLLDTE=mysqli_fetch_array($fetch_market_DTCASH_VLSS_T
 $Total_DTCASH_VLSS_TLLDTE=$result_market_DTCASH_VLSS_TLLDTE[0];
 
 if($Total_DTCASH_VLSS_TLLDTE!=NULL)
-{$Total_DTCASH_VLSS_Show_TLLDTE=number_format($Total_DTCASH_VLSS_TLLDTE,2,'.','');}
+{$Total_DTCASH_VLSS_Show_TLLDTE=inr_format($Total_DTCASH_VLSS_TLLDTE, 2);}
 else
 {$Total_DTCASH_VLSS_Show_TLLDTE="0.00";}
 
@@ -189,7 +189,7 @@ $result_market_SDTCASH_VLSS_TODAY=mysqli_fetch_array($fetch_market_SDTCASH_VLSS_
 $Total_SDTCASH_VLSS_TODAY=$result_market_SDTCASH_VLSS_TODAY[0];
 
 if($Total_SDTCASH_VLSS_TODAY!=NULL)
-{$Total_SDTCASH_VLSS_Show_TODAY=number_format($Total_SDTCASH_VLSS_TODAY,2,'.','');}
+{$Total_SDTCASH_VLSS_Show_TODAY=inr_format($Total_SDTCASH_VLSS_TODAY, 2);}
 else
 {$Total_SDTCASH_VLSS_Show_TODAY="0.00";}
 ?>

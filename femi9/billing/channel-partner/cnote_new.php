@@ -245,10 +245,10 @@ $TotalAMount123 = 0; $rd = 0;
         <th><?php echo ++$rd; ?></th>
         <td><?php echo $pr2['productName']; ?></td>
         <td><?php echo $ri['qty']; ?></td>
-        <td>&#8377;<?php echo number_format($ri['amount'],2,'.',''); ?></td>
-        <td><?php echo number_format($ri['subtotal'],2,'.',''); ?></td>
-        <td><?php echo number_format($ri['gstamount_total'],2,'.',''); ?> (<?php echo $ri['gst_percentage']; ?>%)</td>
-        <td><?php echo number_format($ri['total'],2,'.',''); ?></td>
+        <td>&#8377;<?php echo inr_format($ri['amount'], 2); ?></td>
+        <td><?php echo inr_format($ri['subtotal'], 2); ?></td>
+        <td><?php echo inr_format($ri['gstamount_total'], 2); ?> (<?php echo $ri['gst_percentage']; ?>%)</td>
+        <td><?php echo inr_format($ri['total'], 2); ?></td>
         <td>
             <a href="cnote_delete.php?returnid=<?php echo $_REQUEST['returnid']; ?>&rowid=<?php echo $ItemRowid; ?>&InvoiceID=<?php echo $InvoiceID; ?>&redirurl=cnote_new"
                onclick="return confirm('Remove this item?');">

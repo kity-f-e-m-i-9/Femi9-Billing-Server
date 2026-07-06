@@ -401,19 +401,19 @@ if (!empty($invoice_ids) && !empty($return_invnumbers)) {
         
         echo "<table>";
         echo "<tr><th>Metric</th><th>Value</th><th>Status</th></tr>";
-        echo "<tr><td>Invoice Points</td><td>" . number_format($row['invoice_points'], 2) . "</td><td>✓</td></tr>";
-        echo "<tr><td>Return Points (deducted)</td><td>" . number_format($row['return_points'], 2) . "</td><td>" . 
+        echo "<tr><td>Invoice Points</td><td>" . inr_format($row['invoice_points'], 2) . "</td><td>✓</td></tr>";
+        echo "<tr><td>Return Points (deducted)</td><td>" . inr_format($row['return_points'], 2) . "</td><td>" . 
              ($row['return_points'] > 0 ? '<span style="color:#16a34a;">✓ WORKING!</span>' : '<span style="color:#dc2626;">✗ Still 0</span>') . "</td></tr>";
         echo "<tr style='background:#dbeafe;font-weight:bold;'>";
-        echo "<td>Net Points</td><td>" . number_format($row['net_points'], 2) . "</td><td>-</td>";
+        echo "<td>Net Points</td><td>" . inr_format($row['net_points'], 2) . "</td><td>-</td>";
         echo "</tr>";
         echo "</table>";
         
         if ($row['return_points'] > 0) {
             echo "<div class='box success'>";
             echo "<h3>🎉 SUCCESS! The fix works!</h3>";
-            echo "<p>Return points are now being deducted: <strong>" . number_format($row['return_points'], 2) . "</strong></p>";
-            echo "<p>Net purchase points: <strong>" . number_format($row['net_points'], 2) . "</strong></p>";
+            echo "<p>Return points are now being deducted: <strong>" . inr_format($row['return_points'], 2) . "</strong></p>";
+            echo "<p>Net purchase points: <strong>" . inr_format($row['net_points'], 2) . "</strong></p>";
             echo "<p><strong>Next step:</strong> Apply this fix to your admin report file (Document 2)</p>";
             echo "</div>";
         } else {

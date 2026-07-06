@@ -241,11 +241,11 @@ $i= $start_from;
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
                    <td><?php echo $Result_productDetils["productName"];?></td>
-					<td><?php echo number_format($PR_qty,1,'.','');?></td>
-					<td><?php echo number_format($PR_rate,2,'.','');?></td>
-					<td><?php echo number_format($SubTotal,2,'.','');?></td>
-					<td><?php echo number_format($PR_discount,2,'.','');?></td>
-					<td><?php echo number_format($PR_total,2,'.','');?></td>
+					<td><?php echo inr_format($PR_qty, 1);?></td>
+					<td><?php echo inr_format($PR_rate, 2);?></td>
+					<td><?php echo inr_format($SubTotal, 2);?></td>
+					<td><?php echo inr_format($PR_discount, 2);?></td>
+					<td><?php echo inr_format($PR_total, 2);?></td>
 													
 																										<td>
 													    <div class="actions-group">

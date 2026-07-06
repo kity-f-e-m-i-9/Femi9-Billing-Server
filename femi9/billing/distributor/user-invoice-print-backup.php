@@ -256,9 +256,9 @@ Terms of Delivery<br/>
 <td><b><?=$result_ProductDetails123['productName'];?></b></td>
 <td id="rightlaign">961900</td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
-<td id="rightlaign"><?php echo number_format($result_INVProductDetails['amount'],2,'.','');?></td>
+<td id="rightlaign"><?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td id="rightlaign">Packs</td>
-<td id="rightlaign"><?php echo number_format($TotalAMount,2,'.','');?></td>
+<td id="rightlaign"><?php echo inr_format($TotalAMount, 2);?></td>
 </tr>
 
 	<?php } ?>
@@ -273,7 +273,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"><b><?=$Totalquantity123;?> Packs</b></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; <?php echo number_format($TotalAMount123,2,'.','');?></b></td>
+<td id="rightlaign"><b>&#8377; <?php echo inr_format($TotalAMount123, 2);?></b></td>
 </tr>
 <?php if($result_Invoice_Details['discount']>0){?>
 <tr id="bottombordervl">
@@ -283,7 +283,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; <?php echo number_format($result_Invoice_Details['discount'],2,'.','');?></b></td>
+<td id="rightlaign"><b>&#8377; <?php echo inr_format($result_Invoice_Details['discount'], 2);?></b></td>
 </tr>
 <?php }?>
 <tr id="bottombordervl">
@@ -293,7 +293,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"></td>
 <td></td>
 <td></td>
-<td id="rightlaign"><b>&#8377; <?php echo number_format($result_Invoice_Details['total'],2,'.','');?></b></td>
+<td id="rightlaign"><b>&#8377; <?php echo inr_format($result_Invoice_Details['total'], 2);?></b></td>
 </tr>
 </table>
 <div style="clear:both;"></div>
@@ -346,7 +346,7 @@ $hundreds = array(
 "Trillion", 
 "Quardrillion" 
 );
-$num = number_format($num,2,".",","); 
+$num = inr_format($num, 2); 
 $num_arr = explode(".",$num); 
 $wholenum = $num_arr[0]; 
 $decnum = $num_arr[1]; 
@@ -385,7 +385,7 @@ $rettxt .=" Paise";
 }
 return $rettxt;
 }
-//$num=number_format($TotalAMount123,2,'.','');
+//$num=inr_format($TotalAMount123, 2);
 ?>
 
 <table width="100%">
@@ -406,11 +406,11 @@ return $rettxt;
 </tr>
 <tr>
 <td>961900</td>
-<td  align="right"><?=number_format($result_Invoice_Details['total'],2,'.','')?></td>
+<td  align="right"><?=inr_format($result_Invoice_Details['total'], 2)?></td>
 </tr>
 <tr>
 <td align="right"><b>Total&nbsp;</b></td>
-<td align="right"><b><?=number_format($result_Invoice_Details['total'],2,'.','')?></b></td>
+<td align="right"><b><?=inr_format($result_Invoice_Details['total'], 2)?></b></td>
 </tr>
 </table>
 

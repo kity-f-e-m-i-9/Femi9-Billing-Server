@@ -61,7 +61,7 @@ $shopRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE t
                                             <td><?php echo $inv['inv_number']; ?></td>
                                             <td><?php echo $shopRow['name']; ?><br/>M:&nbsp;<?php echo $shopRow['mobile_number']; ?></td>
                                             <td><?php echo date("d/M/Y", strtotime($inv['date'])); ?></td>
-                                            <td><?php echo number_format($inv['total'], 2, '.', ''); ?></td>
+                                            <td><?php echo inr_format($inv['total'], 2); ?></td>
                                         </tr>
                                         </tbody>
                                     </table>

@@ -185,19 +185,19 @@ while ($ri = mysqli_fetch_array($items)) {
 <td><b><?php echo $pr['productName']; ?></b></td>
 <td id="rightlaign"><?php echo $pr['hsn']; ?></td>
 <td id="rightlaign"><?php echo $ri['qty']; ?> Packs</td>
-<td id="rightlaign"><?php echo number_format($pr['mrp'],2,'.',''); ?></td>
-<td id="rightlaign"><?php echo number_format($ri['amount'],2,'.',''); ?></td>
+<td id="rightlaign"><?php echo inr_format($pr['mrp'], 2); ?></td>
+<td id="rightlaign"><?php echo inr_format($ri['amount'], 2); ?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?php echo $ri['gst_percentage']; ?>%</td>
-<td id="rightlaign"><?php echo number_format($ri['discount_amount'],2,'.',''); ?> (<?php echo number_format($ri['discount_percentage']); ?>%)</td>
-<td id="rightlaign"><?php echo number_format($lineTotal,2,'.',''); ?></td>
+<td id="rightlaign"><?php echo inr_format($ri['discount_amount'], 2); ?> (<?php echo inr_format($ri['discount_percentage'], 0); ?>%)</td>
+<td id="rightlaign"><?php echo inr_format($lineTotal, 2); ?></td>
 </tr>
 <?php } ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b></b></td><td></td>
 <td id="rightlaign"><b><?php echo $Totalquantity123; ?> Packs</b></td>
 <td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($TotalAMount123,2,'.',''); ?></b></td>
+<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 
 <!-- GST -->
@@ -205,20 +205,20 @@ while ($ri = mysqli_fetch_array($items)) {
 $gsttype = $inv['gst_type'];
 $totalgst = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id='$Invoice_ID'"))[0];
 if ($totalgst > 0):
-    if ($gsttype === 'inner'): $half = number_format($totalgst/2,2,'.',''); ?>
+    if ($gsttype === 'inner'): $half = inr_format($totalgst/2, 2); ?>
 <tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>SGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo $half; ?></b></td></tr>
 <tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>CGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo $half; ?></b></td></tr>
 <?php else: ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>IGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($totalgst,2,'.',''); ?></b></td></tr>
+<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>IGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($totalgst, 2); ?></b></td></tr>
 <?php endif; endif; ?>
 
 <?php if ($inv['discount'] > 0): ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Discount</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($inv['discount'],2,'.',''); ?></b></td></tr>
+<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Discount</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['discount'], 2); ?></b></td></tr>
 <?php endif; ?>
 <?php if ($inv['courier_charges'] > 0): ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($inv['courier_charges'],2,'.',''); ?></b></td></tr>
+<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['courier_charges'], 2); ?></b></td></tr>
 <?php endif; ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Total</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($inv['total'],2,'.',''); ?></b></td></tr>
+<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Total</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['total'], 2); ?></b></td></tr>
 </table>
 
 <?php if (!empty($profile['acname'])): ?>

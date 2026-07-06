@@ -151,7 +151,7 @@ $imgshow="<img src='screenshot/".$result_reqdetaiis['screenshot5']."' style='wid
 <?php if($result_reqdetaiis['amount']!=NULL){?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>Transaction Amount(Rs.)</b></label><br/>
-<?=number_format($result_reqdetaiis['amount'],2,'.','');?>
+<?=inr_format($result_reqdetaiis['amount'], 2);?>
 </br>
 </div>
 <?php }?>
@@ -200,7 +200,7 @@ $imgshow="<img src='screenshot/".$result_reqdetaiis['screenshot5']."' style='wid
 		<td style="display:none;"><?=$result_productCurrentst['amount'];?></td>
 		<td style="display:none;"><?=$result_productCurrentst['subtotal'];?></td>
 		<td style="display:none;"><?=$result_productCurrentst['gsttotal'];?> (<?=$result_productCurrentst['gst'];?>%)</td>
-		<td align="right" style="display:none;"><?=number_format($result_productCurrentst['total'],2,'.','');?></td>
+		<td align="right" style="display:none;"><?=inr_format($result_productCurrentst['total'], 2);?></td>
                                                 </tr>
                                            
 										<?php }?>

@@ -524,12 +524,12 @@ if ($action === 'home'):
 <div class="stat-grid">
     <div class="sc c-blue">
         <div class="sc-lbl">Missing Rewards</div>
-        <div class="sc-val"><?= number_format($missing_count) ?></div>
+        <div class="sc-val"><?= inr_format($missing_count, 0) ?></div>
         <div class="sc-sub">User-days with invoices but no reward entry</div>
     </div>
     <div class="sc c-yellow">
         <div class="sc-lbl">Points to Award</div>
-        <div class="sc-val"><?= number_format($missing_pts_total) ?></div>
+        <div class="sc-val"><?= inr_format($missing_pts_total, 0) ?></div>
         <div class="sc-sub">
             <?php if ($missing_date_min): ?>
             <?= $missing_date_min ?> → <?= $missing_date_max ?>
@@ -538,12 +538,12 @@ if ($action === 'home'):
     </div>
     <div class="sc c-green">
         <div class="sc-lbl">Already Rewarded</div>
-        <div class="sc-val"><?= number_format((int)($stat['cnt'] ?? 0)) ?></div>
-        <div class="sc-sub"><?= number_format((int)($stat['pts'] ?? 0)) ?> pts in daily_login_rewards since Jan 2025</div>
+        <div class="sc-val"><?= inr_format((int)($stat['cnt'] ?? 0), 0) ?></div>
+        <div class="sc-sub"><?= inr_format((int)($stat['pts'] ?? 0), 0) ?> pts in daily_login_rewards since Jan 2025</div>
     </div>
     <div class="sc c-red">
         <div class="sc-lbl">Backfill Records</div>
-        <div class="sc-val"><?= number_format($backfill_count) ?></div>
+        <div class="sc-val"><?= inr_format($backfill_count, 0) ?></div>
         <div class="sc-sub">Rows inserted by this tool (rollback-safe)</div>
     </div>
 </div>

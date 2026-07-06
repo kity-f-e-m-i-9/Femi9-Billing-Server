@@ -127,7 +127,7 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                             <tr><td>Invoice</td><td><?php echo htmlspecialchars($inv_number); ?></td>
                                 <td style="padding-left:30px;">TP</td><td><?php echo htmlspecialchars($invoice['tp_code'] . ' — ' . $invoice['tp_name']); ?></td></tr>
                             <tr><td>Date</td><td><?php echo date('d/m/Y', strtotime($invoice['invoice_date'])); ?></td>
-                                <td style="padding-left:30px;">Invoice Total</td><td>&#8377;<?php echo number_format($invoice['total_amount'], 2); ?></td></tr>
+                                <td style="padding-left:30px;">Invoice Total</td><td>&#8377;<?php echo inr_format($invoice['total_amount'], 2); ?></td></tr>
                         </tbody></table>
                         <?php if ($returnid): ?>
                         <div style="margin-top:8px;">
@@ -170,7 +170,7 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                                         <td><?php echo $orig_qty; ?></td>
                                         <td><?php echo $ret_qty; ?></td>
                                         <td><span class="max-badge"><?php echo $available; ?></span></td>
-                                        <td>&#8377;<?php echo number_format($item['rate'], 2); ?></td>
+                                        <td>&#8377;<?php echo inr_format($item['rate'], 2); ?></td>
                                         <td>
                                             <input type="hidden" name="prid[]" value="<?php echo $pid; ?>">
                                             <input type="hidden" name="rate[]" value="<?php echo $item['rate']; ?>">
@@ -200,7 +200,7 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                             <?php
                             $draft_total = array_sum(array_column($draftItems, 'total'));
                             ?>
-                            <span style="margin-left:auto;font-weight:700;">Total: &#8377;<?php echo number_format($draft_total, 2); ?></span>
+                            <span style="margin-left:auto;font-weight:700;">Total: &#8377;<?php echo inr_format($draft_total, 2); ?></span>
                         </div>
                         <div class="card-body p-0">
                             <table class="table table-bordered draft-table mb-0">
@@ -214,8 +214,8 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                                     <td><?php echo ++$n; ?></td>
                                     <td><?php echo htmlspecialchars($pname); ?></td>
                                     <td><?php echo $di['qty']; ?></td>
-                                    <td>&#8377;<?php echo number_format($di['amount'], 2); ?></td>
-                                    <td>&#8377;<?php echo number_format($di['total'], 2); ?></td>
+                                    <td>&#8377;<?php echo inr_format($di['amount'], 2); ?></td>
+                                    <td>&#8377;<?php echo inr_format($di['total'], 2); ?></td>
                                     <td><a href="tp-cnote-item-del?itemid=<?php echo base64_encode($di['id']); ?>&returnid=<?php echo base64_encode($returnid); ?>&inv_id=<?php echo $inv_id; ?>" style="color:red;" onclick="return confirm('Remove item?')">&#10005;</a></td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -263,8 +263,8 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                                     <td><?php echo ++$n; ?></td>
                                     <td><?php echo htmlspecialchars($pname); ?></td>
                                     <td><?php echo $di['qty']; ?></td>
-                                    <td>&#8377;<?php echo number_format($di['amount'], 2); ?></td>
-                                    <td>&#8377;<?php echo number_format($di['total'], 2); ?></td>
+                                    <td>&#8377;<?php echo inr_format($di['amount'], 2); ?></td>
+                                    <td>&#8377;<?php echo inr_format($di['total'], 2); ?></td>
                                     <td>
                                         <a href="tp-cnote-item-del?itemid=<?php echo $enc_item; ?>&returnid=<?php echo base64_encode($returnid); ?>&inv_id=<?php echo $inv_id; ?>"
                                            style="color:#dc2626;"
@@ -278,7 +278,7 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                                 </tbody>
                                 <tfoot><tr>
                                     <td colspan="5" style="text-align:right;font-weight:700;">CN Total</td>
-                                    <td style="font-weight:700;">&#8377;<?php echo number_format($cn_total, 2); ?></td>
+                                    <td style="font-weight:700;">&#8377;<?php echo inr_format($cn_total, 2); ?></td>
                                 </tr></tfoot>
                             </table>
                         <?php endif; ?>

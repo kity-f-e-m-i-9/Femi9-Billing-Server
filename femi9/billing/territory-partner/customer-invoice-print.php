@@ -253,20 +253,20 @@ while ($result_INVProductDetails = mysqli_fetch_array($fetch_INVProductDetails))
     $TotalAMount23  = $TotalAMount - $result_INVProductDetails['discount_amount'];
     $TotalAMount123 += $TotalAMount23;
     $Totalquantity123 += $result_INVProductDetails['qty'];
-    $discountamount_show    = number_format($result_INVProductDetails['discount_amount'], 2, '.', '');
-    $discountpercentage_show = number_format($result_INVProductDetails['discount_percentage']);
+    $discountamount_show    = inr_format($result_INVProductDetails['discount_amount'], 2);
+    $discountpercentage_show = inr_format($result_INVProductDetails['discount_percentage'], 0);
 ?>
 <tr>
 <td><?php echo ++$invno; ?></td>
 <td><b><?php echo htmlspecialchars($result_ProductDetails123['productName']); ?></b></td>
 <td id="rightlaign"><?php echo htmlspecialchars($result_ProductDetails123['hsn']); ?></td>
 <td id="rightlaign"><?php echo $result_INVProductDetails['qty']; ?> Packs</td>
-<td id="rightlaign"><?php echo number_format($result_ProductDetails123['mrp'], 2, '.', ''); ?></td>
-<td id="rightlaign"><?php echo number_format($result_INVProductDetails['amount'], 2, '.', ''); ?></td>
+<td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2); ?></td>
+<td id="rightlaign"><?php echo inr_format($result_INVProductDetails['amount'], 2); ?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?php echo $result_INVProductDetails['gst_percentage']; ?>%</td>
 <td id="rightlaign"><?php echo $discountamount_show; ?> (<?php echo $discountpercentage_show; ?>%)</td>
-<td id="rightlaign"><?php echo number_format($TotalAMount23, 2, '.', ''); ?></td>
+<td id="rightlaign"><?php echo inr_format($TotalAMount23, 2); ?></td>
 </tr>
 <?php } ?>
 
@@ -280,7 +280,7 @@ while ($result_INVProductDetails = mysqli_fetch_array($fetch_INVProductDetails))
 <td></td>
 <td id="rightlaign"><b><?php echo $Totalquantity123; ?> Packs</b></td>
 <td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($TotalAMount123, 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 
 <?php
@@ -290,8 +290,8 @@ $totalgstamount = mysqli_fetch_array(mysqli_query($db_conn, $select_sum_gstamoun
 
 if ($totalgstamount > 0) {
     if ($gsttype == "inner") {
-        $SGST = number_format($totalgstamount / 2, 2, '.', '');
-        $CGST = number_format($totalgstamount / 2, 2, '.', '');
+        $SGST = inr_format($totalgstamount / 2, 2);
+        $CGST = inr_format($totalgstamount / 2, 2);
 ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>SGST</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
@@ -304,34 +304,34 @@ if ($totalgstamount > 0) {
 <?php } else { ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>IGST</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($totalgstamount, 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($totalgstamount, 2); ?></b></td>
 </tr>
 <?php } } ?>
 
 <?php if (!empty($inv['discount']) && $inv['discount'] > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Discount</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($inv['discount'], 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['discount'], 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <?php if (!empty($inv['roundoff']) && $inv['roundoff'] != 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Round off</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($inv['roundoff'], 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['roundoff'], 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <?php if (!empty($inv['courier_charges']) && $inv['courier_charges'] != 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($inv['courier_charges'], 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['courier_charges'], 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Total</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo number_format($inv['total'] ?? 0, 2, '.', ''); ?></b></td>
+<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['total'] ?? 0, 2); ?></b></td>
 </tr>
 </table>
 <div style="clear:both;"></div>
@@ -408,14 +408,14 @@ while ($resulthsn = mysqli_fetch_array($fetchhsn)) {
 ?>
 <tr>
 <td><?php echo htmlspecialchars($hsncode); ?></td>
-<td align="right"><?php echo number_format($resulthsnTaxamount[0], 2, '.', ''); ?></td>
+<td align="right"><?php echo inr_format($resulthsnTaxamount[0], 2); ?></td>
 </tr>
 <?php }
 $resulthsnTaxamount12 = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(total) FROM invoice_items WHERE inv_id='$Invoice_ID'"));
 ?>
 <tr>
 <td align="right"><b>Total&nbsp;</b></td>
-<td align="right"><b><?php echo number_format($resulthsnTaxamount12[0], 2, '.', ''); ?></b></td>
+<td align="right"><b><?php echo inr_format($resulthsnTaxamount12[0], 2); ?></b></td>
 </tr>
 </table>
 <!---------------------HSN WISE TOTAL END------------------------------>

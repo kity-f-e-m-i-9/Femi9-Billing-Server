@@ -123,9 +123,9 @@ $i= $start_from;
 					<td><?=$result_product_list['invnumber'];?></td>
 					<td><?=date("d/m/Y",strtotime($result_product_list['date']));?></td>
 					<td><?=$TotalReturnqty;?></td>
-					<td><?=number_format($result_product_list['subtotal'],2,'.','');?></td>
-					<td><?=number_format($result_product_list['discount'],2,'.','');?></td>
-					<td><?=number_format($result_product_list['total'],2,'.','');?></td>
+					<td><?=inr_format($result_product_list['subtotal'], 2);?></td>
+					<td><?=inr_format($result_product_list['discount'], 2);?></td>
+					<td><?=inr_format($result_product_list['total'], 2);?></td>
 					
 					<td>
 			<?php 

@@ -113,7 +113,7 @@ mysqli_stmt_close($s);
                                                             </div>
                                                             <div class="widget-stats-content flex-fill">
                                                                 <span class="widget-stats-title">Total Stock Units</span>
-                                                                <span class="widget-stats-amount"><?php echo number_format($totalStock); ?></span>
+                                                                <span class="widget-stats-amount"><?php echo inr_format($totalStock, 0); ?></span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -156,8 +156,8 @@ mysqli_stmt_close($s);
                                                     <tr>
                                                         <td><?php echo $n++; ?></td>
                                                         <td><b><?php echo htmlspecialchars($item['productName']); ?></b></td>
-                                                        <td class="text-center"><?php echo number_format((int)$item['input_qty']); ?></td>
-                                                        <td class="text-center"><?php echo number_format((int)$item['closing_qty']); ?></td>
+                                                        <td class="text-center"><?php echo inr_format((int)$item['input_qty'], 0); ?></td>
+                                                        <td class="text-center"><?php echo inr_format((int)$item['closing_qty'], 0); ?></td>
                                                     </tr>
                                                 <?php endforeach; ?>
                                                 </tbody>

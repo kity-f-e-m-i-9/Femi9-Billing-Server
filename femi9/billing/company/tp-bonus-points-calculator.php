@@ -200,8 +200,8 @@ function getTpDeactivationReason(array $result, string $currentAccountStatus): s
     if ($week4Cumulative < $threshold) {
         return sprintf(
             'Total paid ₹%s is below 100%% target threshold ₹%s',
-            number_format($week4Cumulative, 2),
-            number_format($threshold, 2)
+            inr_format($week4Cumulative, 2),
+            inr_format($threshold, 2)
         );
     }
 
@@ -480,8 +480,8 @@ function processTpBonusCalculation(
                     $description = sprintf(
                         'Monthly Target Achievement Bonus - %s (Target: Rs.%s, Paid: Rs.%s)',
                         $monthYear,
-                        number_format($userResult['monthly_target'], 2),
-                        number_format($userResult['total_advance_paid'], 2)
+                        inr_format($userResult['monthly_target'], 2),
+                        inr_format($userResult['total_advance_paid'], 2)
                     );
 
                     $stmt = $dbConn->prepare("
@@ -1109,7 +1109,7 @@ $availableExecutions = getAvailableTpExecutions($dbConn);
                                                                 echo htmlspecialchars(sprintf(
                                                                     '%s | %s pts | %s deact. | %s',
                                                                     $exec['month_year'],
-                                                                    number_format((float)$exec['total_bonus_points_awarded'], 2),
+                                                                    inr_format((float)$exec['total_bonus_points_awarded'], 2),
                                                                     $exec['total_accounts_deactivated'] ?? 0,
                                                                     date('d M Y H:i', strtotime($exec['executed_at']))
                                                                 ), ENT_QUOTES, 'UTF-8');
@@ -1143,7 +1143,7 @@ $availableExecutions = getAvailableTpExecutions($dbConn);
                                                             </div>
                                                             <small class="text-muted">
                                                                 👤 <?php echo (int)$exec['total_eligible_users']; ?> eligible &nbsp;|&nbsp;
-                                                                ⭐ <?php echo number_format((float)$exec['total_bonus_points_awarded'], 2); ?> pts
+                                                                ⭐ <?php echo inr_format((float)$exec['total_bonus_points_awarded'], 2); ?> pts
                                                                 <?php if (($exec['total_accounts_deactivated'] ?? 0) > 0): ?>
                                                                     &nbsp;|&nbsp; 🔴 <?php echo (int)$exec['total_accounts_deactivated']; ?> deactivated
                                                                 <?php endif; ?>
@@ -1194,7 +1194,7 @@ $availableExecutions = getAvailableTpExecutions($dbConn);
                                 <div class="col-md-2 col-sm-6 mb-3">
                                     <div class="stat-card warning">
                                         <div class="stat-label">🎁 Bonus Points</div>
-                                        <div class="stat-value"><?php echo number_format((float)$summary['total_bonus_points'], 2); ?></div>
+                                        <div class="stat-value"><?php echo inr_format((float)$summary['total_bonus_points'], 2); ?></div>
                                         <small class="text-muted">Total awarded</small>
                                     </div>
                                 </div>
@@ -1258,14 +1258,14 @@ $availableExecutions = getAvailableTpExecutions($dbConn);
                                                                     <strong style="color:#111827"><?php echo htmlspecialchars($detail['user_name'], ENT_QUOTES, 'UTF-8'); ?></strong><br>
                                                                     <small class="text-muted"><?php echo htmlspecialchars($detail['user_id'], ENT_QUOTES, 'UTF-8'); ?></small>
                                                                 </td>
-                                                                <td><strong>₹<?php echo number_format((float)$detail['monthly_target'], 0); ?></strong></td>
-                                                                <td><strong style="color:#059669">₹<?php echo number_format((float)$detail['total_advance_paid'], 0); ?></strong></td>
+                                                                <td><strong>₹<?php echo inr_format((float)$detail['monthly_target'], 0); ?></strong></td>
+                                                                <td><strong style="color:#059669">₹<?php echo inr_format((float)$detail['total_advance_paid'], 0); ?></strong></td>
                                                                 <?php foreach ([1, 2, 3, 4] as $w): ?>
                                                                     <td>
                                                                         <span class="week-status <?php echo $detail["week{$w}_status"]; ?>">
                                                                             <?php echo $detail["week{$w}_status"] === 'pass' ? '✅' : '❌'; ?>
                                                                         </span><br>
-                                                                        <small class="text-muted">₹<?php echo number_format((float)$detail["week{$w}_cumulative"], 0); ?></small>
+                                                                        <small class="text-muted">₹<?php echo inr_format((float)$detail["week{$w}_cumulative"], 0); ?></small>
                                                                     </td>
                                                                 <?php endforeach; ?>
                                                                 <td>
@@ -1276,7 +1276,7 @@ $availableExecutions = getAvailableTpExecutions($dbConn);
                                                                     <?php endif; ?>
                                                                 </td>
                                                                 <td>
-                                                                    <strong style="color:#f59e0b;font-size:1.1rem"><?php echo number_format((float)$detail['bonus_points_awarded'], 2); ?></strong>
+                                                                    <strong style="color:#f59e0b;font-size:1.1rem"><?php echo inr_format((float)$detail['bonus_points_awarded'], 2); ?></strong>
                                                                     <?php if ($detail['bonus_points_awarded'] > 0): ?>
                                                                         <br><small class="text-muted"><?php echo htmlspecialchars($detail['bonus_calculation'], ENT_QUOTES, 'UTF-8'); ?></small>
                                                                     <?php endif; ?>

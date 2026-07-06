@@ -198,9 +198,9 @@ $rd = 0;
             <td><?php echo $ri['qty']; ?></td>
             <td><?php echo $ri['amount']; ?></td>
             <td><?php echo $ri['discount_amount']; ?> (<?php echo $ri['discount_percentage']; ?>%)</td>
-            <td>&#8377;<?php echo number_format((float)$ri['subtotal'], 2, '.', ''); ?></td>
+            <td>&#8377;<?php echo inr_format((float)$ri['subtotal'], 2); ?></td>
             <td><?php echo $ri['gstamount_total']; ?> (<?php echo $ri['gst_percentage']; ?>%)</td>
-            <td><?php echo number_format((float)$ri['total'], 2, '.', ''); ?></td>
+            <td><?php echo inr_format((float)$ri['total'], 2); ?></td>
             <?php if ($amount_received_fully == 0): ?>
             <td>
             <?php
@@ -301,7 +301,7 @@ function receiptamount() {
 </script>
 
 <p><b>Received Amount</b>
-<input type="number" min="0" required step="any" max="<?php echo number_format($balance_due, 2, '.', ''); ?>" id="receivedamount" class="form-control" style="width:100%;" onkeyup="receiptamount()" name="receivedamount" placeholder="Max: <?php echo number_format($balance_due, 2, '.', ''); ?>">
+<input type="number" min="0" required step="any" max="<?php echo inr_format($balance_due, 2); ?>" id="receivedamount" class="form-control" style="width:100%;" onkeyup="receiptamount()" name="receivedamount" placeholder="Max: <?php echo inr_format($balance_due, 2); ?>">
 </p>
 <p><b>Receivable Amount</b>
 <input type="number" min="0" id="receivableamount" class="form-control" readonly required style="width:100%;">

@@ -123,7 +123,7 @@ $invtable_name="user_invoice";
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
 	
-				<td><?php echo number_format($result_product_list["total"],2,'.','');?></td>
+				<td><?php echo inr_format($result_product_list["total"], 2);?></td>
 													
                                         </tr>
 										</tbody>

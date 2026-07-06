@@ -225,9 +225,9 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
 <td><?=$result_ProductDetails123['productName'];?></td>
-<td>&#8377;<?php echo number_format($result_INVProductDetails['amount'],2,'.','');?></td>
+<td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td><?=$result_INVProductDetails['qty'];?></td>
-<td align="right"><?php echo number_format($TotalAMount,2,'.','');?></td>
+<td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
 <a href="del-inv-product?inv_id=<?php echo $Invoice_ID_encode;?>&&rowid=<?php echo $ItemRowid;?>"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>

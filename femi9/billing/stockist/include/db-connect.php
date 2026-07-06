@@ -2,6 +2,7 @@
 error_reporting(0);
 
 require_once __DIR__ . '/../../shared/env-loader.php';
+require_once __DIR__ . '/../../shared/number-format-helpers.php';
 
 $servername = $_ENV['DB_HOST']     ?? 'localhost';
 $db_port    = (int)($_ENV['DB_PORT'] ?? 3306);

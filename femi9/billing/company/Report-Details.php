@@ -1560,9 +1560,9 @@ $qparam = urlencode($search ?? '');
                                                             <small><b>M:</b> <?=htmlspecialchars($invoice['buyer_mobile']);?></small>
                                                         </td>
                                                         <td><?=date("d/M/Y", strtotime($invoice['date']));?></td>
-                                                        <td align="right"><strong>₹<?=number_format($invoice['sub_total'], 2);?></strong></td>
-                                                        <td align="right"><strong>₹<?=number_format($invoice['courier_charges'], 2);?></strong></td>
-                                                        <td align="right"><strong>₹<?=number_format($invoice['total'], 2);?></strong></td>
+                                                        <td align="right"><strong>₹<?=inr_format($invoice['sub_total'], 2);?></strong></td>
+                                                        <td align="right"><strong>₹<?=inr_format($invoice['courier_charges'], 2);?></strong></td>
+                                                        <td align="right"><strong>₹<?=inr_format($invoice['total'], 2);?></strong></td>
                                                         
                                                         <?php foreach($products as $pr_id => $pr_name): 
                                                             $qty = $product_quantities[$inv_id][$pr_id] ?? 0;
@@ -1595,11 +1595,11 @@ $qparam = urlencode($search ?? '');
                                                             </td>
                                                             <td></td><td></td><td></td>
                                                             <td align="right">
-                                                                <strong>₹<?=number_format($invoice['total'],2);?></strong>
+                                                                <strong>₹<?=inr_format($invoice['total'], 2);?></strong>
                                                                 <?php if(!empty($returns_by_invoice[$inv_id])): 
                                                                     $inv_ret = array_sum(array_column($returns_by_invoice[$inv_id], 'return_total')); ?>
-                                                                <br/><small style="color:#c0392b;">-₹<?=number_format($inv_ret,2);?></small>
-                                                                <br/><small style="color:#1b5e20;font-weight:600;">Net: ₹<?=number_format($invoice['total']-$inv_ret,2);?></small>
+                                                                <br/><small style="color:#c0392b;">-₹<?=inr_format($inv_ret, 2);?></small>
+                                                                <br/><small style="color:#1b5e20;font-weight:600;">Net: ₹<?=inr_format($invoice['total']-$inv_ret, 2);?></small>
                                                                 <?php endif; ?>
                                                             </td>
                                                             <?php foreach($products as $pr_id => $pr_name):
@@ -1618,7 +1618,7 @@ $qparam = urlencode($search ?? '');
                                                     <?php if($grand_return_total > 0): ?>
                                                     <tr style="background:#fff5f5; color:#c0392b; font-weight:bold;">
                                                         <th colspan="8" align="right">Total Returns (–):</th>
-                                                        <th align="right">-₹<?=number_format($grand_return_total,2);?></th>
+                                                        <th align="right">-₹<?=inr_format($grand_return_total, 2);?></th>
                                                         <?php foreach($product_return_totals as $rt): ?>
                                                         <th align="center" class="product-col"><?= $rt > 0 ? '<span style="color:#c0392b;">-'.$rt.'</span>' : '-' ?></th>
                                                         <?php endforeach; ?>
@@ -1627,9 +1627,9 @@ $qparam = urlencode($search ?? '');
                                                 
                                                     <tr style="background:#e9ecef; font-weight:bold;">
                                                         <th colspan="6" align="right">Page Total (Sales):</th>
-                                                        <th align="right">₹<?=number_format($grand_subtotal,2);?></th>
-                                                        <th align="right">₹<?=number_format($grand_courier,2);?></th>
-                                                        <th align="right">₹<?=number_format($grand_total,2);?></th>
+                                                        <th align="right">₹<?=inr_format($grand_subtotal, 2);?></th>
+                                                        <th align="right">₹<?=inr_format($grand_courier, 2);?></th>
+                                                        <th align="right">₹<?=inr_format($grand_total, 2);?></th>
                                                         <?php foreach($product_totals as $total): ?>
                                                         <th align="center" class="product-col"><?=$total;?></th>
                                                         <?php endforeach; ?>
@@ -1638,9 +1638,9 @@ $qparam = urlencode($search ?? '');
                                                     <?php if($grand_return_total > 0): ?>
                                                     <tr style="background:#e8f5e9; font-weight:bold; color:#1b5e20;">
                                                         <th colspan="6" align="right">Net Total (Sales – Returns):</th>
-                                                        <th align="right">₹<?=number_format($grand_subtotal - $grand_return_total,2);?></th>
-                                                        <th align="right">₹<?=number_format($grand_courier,2);?></th>
-                                                        <th align="right">₹<?=number_format($grand_total - $grand_return_total,2);?></th>
+                                                        <th align="right">₹<?=inr_format($grand_subtotal - $grand_return_total, 2);?></th>
+                                                        <th align="right">₹<?=inr_format($grand_courier, 2);?></th>
+                                                        <th align="right">₹<?=inr_format($grand_total - $grand_return_total, 2);?></th>
                                                         <?php foreach($products as $pr_id => $pr_name): ?>
                                                         <th align="center" class="product-col">
                                                             <?= $product_totals[$pr_id] - ($product_return_totals[$pr_id] ?? 0) ?>

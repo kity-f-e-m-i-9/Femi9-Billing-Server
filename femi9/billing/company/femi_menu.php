@@ -189,6 +189,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <a href="#"><i class="material-icons-two-tone">wallet</i>Reports<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="mis-report"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">assessment</i>MIS Report</a></li>
+						<li><a href="expense-tracker"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">receipt_long</i>Expense Tracker</a></li>
 						<li><a href="Report_company">Company</a></li>
 						<li><a href="Report-First-Page">B2B</a></li>
 						<li><a href="Retail-Report-First-Page">Retail</a></li>
@@ -623,6 +624,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <a href="#"><i class="material-icons-two-tone">wallet</i>Reports<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="mis-report"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">assessment</i>MIS Report</a></li>
+						<li><a href="expense-tracker"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">receipt_long</i>Expense Tracker</a></li>
 						<li><a href="Report_company">Company</a></li>
 						<li><a href="Report-First-Page">B2B</a></li>
 						<li><a href="Retail-Report-First-Page">Retail</a></li>

@@ -174,7 +174,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
 
                                                 <td><?php echo date("d/M/Y", strtotime($result_product_list["date"])); ?></td>
 
-                                                <td><?php echo number_format($result_product_list["total"], 2, '.', ''); ?>
+                                                <td><?php echo inr_format($result_product_list["total"], 2); ?>
                                                 <br/><a href="add-receipt.php?invid=<?php echo $result_product_list["inv_id"]; ?>&&invuser=<?php echo $getinvuser; ?>"><?php echo $msgpayment; ?></a>
                                                 </td>
 

@@ -193,7 +193,7 @@ if($Total_available_stock_VLSS2>0){
 										 <tfoot>
 										 <tr>
 										 <td colspan="6">Grand Total</td>
-				<td align="right"><b><?=number_format($Total_available_stock123_VLSS2,2,'.','');?></b></td>
+				<td align="right"><b><?=inr_format($Total_available_stock123_VLSS2, 2);?></b></td>
 										 </tr>
 										 </tfoot>
                                         </table>
@@ -267,7 +267,7 @@ if($Total_available_stock_VLSS3>0)
 										 <tfoot>
 										 <tr>
 										 <td colspan="6">Grand Total</td>
-				<td align="right"><b><?=number_format($Total_available_stock123_VLSS3,2,'.','');?></b></td>
+				<td align="right"><b><?=inr_format($Total_available_stock123_VLSS3, 2);?></b></td>
 										 </tr>
 										 </tfoot>
                                         </table>
@@ -342,7 +342,7 @@ if($Total_available_stock_VLSS4>0)
 										 <tfoot>
 										 <tr>
 										 <td colspan="6">Grand Total</td>
-				<td align="right"><b><?=number_format($Total_available_stock123_VLSS4,2,'.','');?></b></td>
+				<td align="right"><b><?=inr_format($Total_available_stock123_VLSS4, 2);?></b></td>
 										 </tr>
 										 </tfoot>
                                         </table>

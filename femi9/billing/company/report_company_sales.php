@@ -36,7 +36,7 @@ $fetch_totalamount_today2=mysqli_query($db_conn,$select_totalamount_today2);
 $result_totalamount_today2=mysqli_fetch_array($fetch_totalamount_today2);
 
 $today_total_amountSUM = ($result_totalamount_today['total_amount'] ?? 0) + ($result_totalamount_today2['total_amount'] ?? 0);
-$today_total_amount = $today_total_amountSUM > 0 ? number_format($today_total_amountSUM, 2, '.', '') : "0.00";
+$today_total_amount = $today_total_amountSUM > 0 ? inr_format($today_total_amountSUM, 2) : "0.00";
 
 //-------------------------------------Yesterday-----------------------------------
 //---------------------------------------------------------------------------------
@@ -72,7 +72,7 @@ $fetch_totalamount_yesterday2=mysqli_query($db_conn,$select_totalamount_yesterda
 $result_totalamount_yesterday2=mysqli_fetch_array($fetch_totalamount_yesterday2);
 
 $yesterday_total_amountSUM = ($result_totalamount_yesterday['total_amount'] ?? 0) + ($result_totalamount_yesterday2['total_amount'] ?? 0);
-$yesterday_total_amount = $yesterday_total_amountSUM > 0 ? number_format($yesterday_total_amountSUM, 2, '.', '') : "0.00";
+$yesterday_total_amount = $yesterday_total_amountSUM > 0 ? inr_format($yesterday_total_amountSUM, 2) : "0.00";
 
 //-------------------------------------This Month----------------------------------
 //---------------------------------------------------------------------------------
@@ -108,7 +108,7 @@ $fetch_totalamount_thismonth2=mysqli_query($db_conn,$select_totalamount_thismont
 $result_totalamount_thismonth2=mysqli_fetch_array($fetch_totalamount_thismonth2);
 
 $thismonth_total_amountSUM = ($result_totalamount_thismonth['total_amount'] ?? 0) + ($result_totalamount_thismonth2['total_amount'] ?? 0);
-$thismonth_total_amount = $thismonth_total_amountSUM > 0 ? number_format($thismonth_total_amountSUM, 2, '.', '') : "0.00";
+$thismonth_total_amount = $thismonth_total_amountSUM > 0 ? inr_format($thismonth_total_amountSUM, 2) : "0.00";
 
 //-------------------------------------Last Month----------------------------------
 //---------------------------------------------------------------------------------
@@ -144,7 +144,7 @@ $fetch_totalamount_lastmonth2=mysqli_query($db_conn,$select_totalamount_lastmont
 $result_totalamount_lastmonth2=mysqli_fetch_array($fetch_totalamount_lastmonth2);
 
 $lastmonth_total_amountSUM = ($result_totalamount_lastmonth['total_amount'] ?? 0) + ($result_totalamount_lastmonth2['total_amount'] ?? 0);
-$lastmonth_total_amount = $lastmonth_total_amountSUM > 0 ? number_format($lastmonth_total_amountSUM, 2, '.', '') : "0.00";
+$lastmonth_total_amount = $lastmonth_total_amountSUM > 0 ? inr_format($lastmonth_total_amountSUM, 2) : "0.00";
 
 // Optional: Debug output (add ?debug_company=1 to URL to see)
 if (isset($_GET['debug_company'])) {

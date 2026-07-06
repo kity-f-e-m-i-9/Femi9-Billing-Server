@@ -116,7 +116,7 @@ $_hLocCount = count($_hLocs);
                 <ul class="navbar-nav">
                     <li class="nav-item hidden-on-mobile">
                         <a class="nav-link" href="wallet-history.php" style="margin-top:12px;">
-                            <i class="material-icons-outlined">wallet</i>&nbsp;<b>₹<?php echo number_format($walletBalance, 2); ?></b>
+                            <i class="material-icons-outlined">wallet</i>&nbsp;<b>₹<?php echo inr_format($walletBalance, 2); ?></b>
                         </a>
                     </li>
 

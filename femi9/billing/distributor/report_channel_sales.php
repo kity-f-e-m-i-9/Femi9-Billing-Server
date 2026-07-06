@@ -24,7 +24,7 @@ $fetch_totalamount_today_channel=mysqli_query($db_conn,$select_totalamount_today
 $result_totalamount_today_channel=mysqli_fetch_array($fetch_totalamount_today_channel);
 
 if($result_totalamount_today_channel[0]!=NULL){
-$today_total_amount_channel=number_format($result_totalamount_today_channel[0],2,'.','');
+$today_total_amount_channel=inr_format($result_totalamount_today_channel[0], 2);
 }else{$today_total_amount_channel="0.00";}
 
 
@@ -53,7 +53,7 @@ $fetch_totalamount_yesterday_channel=mysqli_query($db_conn,$select_totalamount_y
 $result_totalamount_yesterday_channel=mysqli_fetch_array($fetch_totalamount_yesterday_channel);
 
 if($result_totalamount_yesterday_channel[0]!=NULL){
-$yesterday_total_amount_channel=number_format($result_totalamount_yesterday_channel[0],2,'.','');
+$yesterday_total_amount_channel=inr_format($result_totalamount_yesterday_channel[0], 2);
 }else{$yesterday_total_amount_channel="0.00";}
 
 
@@ -82,7 +82,7 @@ $fetch_totalamount_thismonth_channel=mysqli_query($db_conn,$select_totalamount_t
 $result_totalamount_thismonth_channel=mysqli_fetch_array($fetch_totalamount_thismonth_channel);
 
 if($result_totalamount_thismonth_channel[0]!=NULL){
-$thismonth_total_amount_channel=number_format($result_totalamount_thismonth_channel[0],2,'.','');
+$thismonth_total_amount_channel=inr_format($result_totalamount_thismonth_channel[0], 2);
 }else{$thismonth_total_amount_channel="0.00";}
 
 
@@ -112,7 +112,7 @@ $fetch_totalamount_lastmonth_channel=mysqli_query($db_conn,$select_totalamount_l
 $result_totalamount_lastmonth_channel=mysqli_fetch_array($fetch_totalamount_lastmonth_channel);
 
 if($result_totalamount_lastmonth_channel[0]!=NULL){
-$lastmonth_total_amount_channel=number_format($result_totalamount_lastmonth_channel[0],2,'.','');
+$lastmonth_total_amount_channel=inr_format($result_totalamount_lastmonth_channel[0], 2);
 }else{$lastmonth_total_amount_channel="0.00";}
 
 ?>

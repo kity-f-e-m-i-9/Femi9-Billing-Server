@@ -159,7 +159,7 @@ while ($row = mysqli_fetch_assoc($fetch_Report)) {
                                         <?php endif; ?>
                                         <td><?= htmlspecialchars($row['inv_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['date'])) ?></td>
-                                        <td align="right"><b><?= number_format($row['total_sls_amount'], 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($row['total_sls_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
                                     <?php endif; ?>
@@ -172,7 +172,7 @@ while ($row = mysqli_fetch_assoc($fetch_Report)) {
                                         <?php if ($buyer_gsttype == "register"): ?><td></td><?php endif; ?>
                                         <td></td>
                                         <td><b>Grand Total</b></td>
-                                        <td align="right"><b><?= number_format($overall_total, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($overall_total, 2) ?></b></td>
                                     </tr>
                                 </tfoot>
                             </table>

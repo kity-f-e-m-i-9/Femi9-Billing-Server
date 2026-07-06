@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_receipt'])) {
         header("Location: add-tp-receipt?id=" . urlencode($enc_id) . "&error=invalid"); exit;
     }
     if ($amount > $pending + 0.01) {
-        header("Location: add-tp-receipt?id=" . urlencode($enc_id) . "&error=overpayment&pending=" . urlencode(number_format($pending, 2))); exit;
+        header("Location: add-tp-receipt?id=" . urlencode($enc_id) . "&error=overpayment&pending=" . urlencode(inr_format($pending, 2))); exit;
     }
     $amount = min($amount, $pending); // clamp floating point edge case only
     $ins = $db_conn->prepare("
@@ -252,12 +252,12 @@ body { font-family: 'Poppins', sans-serif; }
                                         </div>
                                         <div class="inv-meta-box purple">
                                             <div class="label">Product Amount</div>
-                                            <div class="value">₹<?php echo number_format($invoice_subtotal, 2); ?></div>
+                                            <div class="value">₹<?php echo inr_format($invoice_subtotal, 2); ?></div>
                                             <div style="font-size:11px;color:#7c3aed;margin-top:2px;">Paid via Advance</div>
                                         </div>
                                         <div class="inv-meta-box blue">
                                             <div class="label">Courier Charges</div>
-                                            <div class="value">₹<?php echo number_format($courier_charges, 2); ?></div>
+                                            <div class="value">₹<?php echo inr_format($courier_charges, 2); ?></div>
                                         </div>
                                     </div>
 
@@ -265,7 +265,7 @@ body { font-family: 'Poppins', sans-serif; }
                                     <!-- No courier charges on this invoice -->
                                     <div class="alert alert-info">
                                         <i class="material-icons-outlined">info</i>
-                                        <div>This invoice has no courier charges. The product amount of <strong>₹<?php echo number_format($invoice_subtotal, 2); ?></strong> was settled via advance payment at the time of invoicing.</div>
+                                        <div>This invoice has no courier charges. The product amount of <strong>₹<?php echo inr_format($invoice_subtotal, 2); ?></strong> was settled via advance payment at the time of invoicing.</div>
                                     </div>
 
                                     <?php else: ?>
@@ -276,15 +276,15 @@ body { font-family: 'Poppins', sans-serif; }
                                     <div class="inv-meta">
                                         <div class="inv-meta-box blue">
                                             <div class="label">Courier Due</div>
-                                            <div class="value">₹<?php echo number_format($courier_charges, 2); ?></div>
+                                            <div class="value">₹<?php echo inr_format($courier_charges, 2); ?></div>
                                         </div>
                                         <div class="inv-meta-box green">
                                             <div class="label">Collected</div>
-                                            <div class="value">₹<?php echo number_format($collected, 2); ?></div>
+                                            <div class="value">₹<?php echo inr_format($collected, 2); ?></div>
                                         </div>
                                         <div class="inv-meta-box <?php echo $pending > 0.01 ? 'red' : 'green'; ?>">
                                             <div class="label">Balance Pending</div>
-                                            <div class="value">₹<?php echo number_format($pending, 2); ?></div>
+                                            <div class="value">₹<?php echo inr_format($pending, 2); ?></div>
                                         </div>
                                     </div>
 
@@ -316,10 +316,10 @@ body { font-family: 'Poppins', sans-serif; }
                                         <tr>
                                             <td style="color:#9ca3af;"><?php echo $idx + 1; ?></td>
                                             <td><?php echo date('d M Y', strtotime($r['receipt_date'])); ?></td>
-                                            <td><strong>₹<?php echo number_format((float)$r['amount'], 2); ?></strong></td>
+                                            <td><strong>₹<?php echo inr_format((float)$r['amount'], 2); ?></strong></td>
                                             <td>
                                                 <strong style="color:<?php echo $running < 0.01 ? '#065f46' : '#b45309'; ?>">
-                                                    ₹<?php echo number_format(max(0, $running), 2); ?>
+                                                    ₹<?php echo inr_format(max(0, $running), 2); ?>
                                                 </strong>
                                                 <?php if ($running < 0.01): ?>
                                                 <span style="font-size:11px;color:#065f46;margin-left:3px;">✓ Cleared</span>
@@ -349,7 +349,7 @@ body { font-family: 'Poppins', sans-serif; }
                                         <tfoot>
                                             <tr>
                                                 <td colspan="2" style="text-align:right;font-size:13px;">Total Collected</td>
-                                                <td>₹<?php echo number_format($collected, 2); ?></td>
+                                                <td>₹<?php echo inr_format($collected, 2); ?></td>
                                                 <td colspan="5"></td>
                                             </tr>
                                         </tfoot>
@@ -361,7 +361,7 @@ body { font-family: 'Poppins', sans-serif; }
                                     <?php if (!$needs_payment): ?>
                                     <div class="paid-banner" style="margin-top:16px;">
                                         <i class="material-icons-outlined">check_circle</i>
-                                        Courier charges fully collected — ₹<?php echo number_format($courier_charges, 2); ?> received.
+                                        Courier charges fully collected — ₹<?php echo inr_format($courier_charges, 2); ?> received.
                                     </div>
 
                                     <?php else: ?>
@@ -374,7 +374,7 @@ body { font-family: 'Poppins', sans-serif; }
                                             Record Courier Payment
                                         </h4>
                                         <p style="font-size:13px;color:#1d4ed8;margin-bottom:18px;">
-                                            Amount pending: <strong>₹<?php echo number_format($pending, 2); ?></strong>
+                                            Amount pending: <strong>₹<?php echo inr_format($pending, 2); ?></strong>
                                             &nbsp;·&nbsp; Paid via Cash / UPI / Bank Transfer.
                                         </p>
                                         <form method="POST" id="receiptForm">

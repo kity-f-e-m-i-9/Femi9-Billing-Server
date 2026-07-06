@@ -871,11 +871,11 @@ if($CountProducts>0){
                 <td><?php echo $sno;?></td>
                 <td class="product-name"><?php echo $result_pr_details['productName'];?></td>
                 <td class="text-right"><?php echo $result_product_list['qty'];?></td>
-                <td class="text-right">₹<?php echo number_format($result_product_list['amount'],2);?></td>
-                <td class="text-right">₹<?php echo number_format($result_product_list['subtotal'],2);?></td>
+                <td class="text-right">₹<?php echo inr_format($result_product_list['amount'], 2);?></td>
+                <td class="text-right">₹<?php echo inr_format($result_product_list['subtotal'], 2);?></td>
                 <td class="text-right"><?php echo $result_product_list['discount_percentage'];?>%</td>
-                <td class="text-right">₹<?php echo number_format($result_product_list['discount_amount'],2);?></td>
-                <td class="text-right"><strong>₹<?php echo number_format($finalamount,2);?></strong></td>
+                <td class="text-right">₹<?php echo inr_format($result_product_list['discount_amount'], 2);?></td>
+                <td class="text-right"><strong>₹<?php echo inr_format($finalamount, 2);?></strong></td>
                 <?php if($amount_received_fully==0){?>
                 <td class="text-right">
                     <a href="user-del-inv-product?inv_id=<?php echo $Invoice_ID_encode;?>&&rowid=<?php echo $ItemRowid;?>&&&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove" 
@@ -1121,10 +1121,10 @@ function receiptamount(){
 
 <p><b>Received Amount</b>
     <input type="number" min="0" required="" step="any"
-           max="<?= number_format($balance_due, 2, '.', '') ?>"
+           max="<?= inr_format($balance_due, 2) ?>"
            id="receivedamount" class="form-control" style="width:100%;"
            onkeyup="receiptamount()" name="receivedamount"
-           placeholder="Max: <?= number_format($balance_due, 2, '.', '') ?>">
+           placeholder="Max: <?= inr_format($balance_due, 2) ?>">
 </p>
 
 <p><b>Receivable Amount</b>

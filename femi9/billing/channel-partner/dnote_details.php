@@ -82,10 +82,10 @@ $inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHE
         <th><?php echo ++$rd; ?></th>
         <td><?php echo htmlspecialchars($product['productName']); ?></td>
         <td><?php echo $item['qty']; ?></td>
-        <td>&#8377;<?php echo number_format($item['amount'], 2, '.', ''); ?></td>
-        <td align="right"><?php echo number_format($item['subtotal'], 2, '.', ''); ?></td>
-        <td><?php echo number_format($item['gstamount_total'], 2, '.', ''); ?> (<?php echo $item['gst_percentage']; ?>%)</td>
-        <td align="right"><?php echo number_format($item['total'], 2, '.', ''); ?></td>
+        <td>&#8377;<?php echo inr_format($item['amount'], 2); ?></td>
+        <td align="right"><?php echo inr_format($item['subtotal'], 2); ?></td>
+        <td><?php echo inr_format($item['gstamount_total'], 2); ?> (<?php echo $item['gst_percentage']; ?>%)</td>
+        <td align="right"><?php echo inr_format($item['total'], 2); ?></td>
     </tr>
     <?php } ?>
     </tbody>

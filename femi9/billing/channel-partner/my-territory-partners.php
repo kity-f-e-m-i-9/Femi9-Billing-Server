@@ -283,7 +283,7 @@ $total_sales   = array_sum(array_column($tps, 'total_sales'));
                         <div class="col-xl-3 col-md-6">
                             <div class="stat-card blue">
                                 <div>
-                                    <h3><?php echo number_format($total_invoices); ?></h3>
+                                    <h3><?php echo inr_format($total_invoices, 0); ?></h3>
                                     <p>Total Invoices</p>
                                 </div>
                                 <div class="stat-icon-wrap">
@@ -294,7 +294,7 @@ $total_sales   = array_sum(array_column($tps, 'total_sales'));
                         <div class="col-xl-3 col-md-6">
                             <div class="stat-card orange">
                                 <div>
-                                    <h3>&#8377;<?php echo number_format($total_sales, 0); ?></h3>
+                                    <h3>&#8377;<?php echo inr_format($total_sales, 0); ?></h3>
                                     <p>Total Sales</p>
                                 </div>
                                 <div class="stat-icon-wrap">
@@ -378,11 +378,11 @@ $total_sales   = array_sum(array_column($tps, 'total_sales'));
                                                     </div>
                                                 </td>
                                                 <td style="text-align:center;">
-                                                    <span class="inv-badge"><?php echo number_format((int)$tp['invoice_count']); ?></span>
+                                                    <span class="inv-badge"><?php echo inr_format((int)$tp['invoice_count'], 0); ?></span>
                                                 </td>
                                                 <td style="text-align:right;">
                                                     <span class="sales-amount">
-                                                        <span class="sales-currency">&#8377;</span><?php echo number_format((float)$tp['total_sales'], 2); ?>
+                                                        <span class="sales-currency">&#8377;</span><?php echo inr_format((float)$tp['total_sales'], 2); ?>
                                                     </span>
                                                 </td>
                                                 <td>

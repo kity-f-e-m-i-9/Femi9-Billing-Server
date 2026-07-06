@@ -142,16 +142,16 @@ $se_cpID = isset($_REQUEST['cp_id']) ? (int)base64_decode($_REQUEST['cp_id']) : 
                                 <ul class="list-unstyled todo-status-filter">
                                     <li>
                                         <a><i class="material-icons-outlined">wallet</i>
-                                            <b>&#8377;<?php echo number_format($available_balance, 2, '.', ''); ?></b>
+                                            <b>&#8377;<?php echo inr_format($available_balance, 2); ?></b>
                                         </a>
                                     </li>
                                 </ul>
                                 <hr/>
                                 <ul class="list-unstyled todo-status-filter" style="font-size:13px;">
                                     <li><span class="text-muted">Total Credited</span><br/>
-                                        <b>&#8377;<?php echo number_format($total_credits, 2, '.', ''); ?></b></li>
+                                        <b>&#8377;<?php echo inr_format($total_credits, 2); ?></b></li>
                                     <li class="mt-1"><span class="text-muted">Total Withdrawn</span><br/>
-                                        <b>&#8377;<?php echo number_format($total_debits, 2, '.', ''); ?></b></li>
+                                        <b>&#8377;<?php echo inr_format($total_debits, 2); ?></b></li>
                                 </ul>
                             </div>
                         </div>
@@ -171,7 +171,7 @@ while ($cr = mysqli_fetch_array($credits_q)):
                                     <li class="todo-item">
                                         <div class="todo-item-content">
                                             <span class="todo-item-title">
-                                                &#8377;<?php echo number_format($cr['commission_amount'], 2, '.', ''); ?>
+                                                &#8377;<?php echo inr_format($cr['commission_amount'], 2); ?>
                                                 <span class="badge badge-style-light rounded-pill badge-success">Credit</span>
                                             </span>
                                             <span><?php echo htmlspecialchars($cr['commission_type']); ?>
@@ -204,7 +204,7 @@ while ($dr = mysqli_fetch_array($debits_q)):
                                     <li class="todo-item">
                                         <div class="todo-item-content">
                                             <span class="todo-item-title">
-                                                &#8377;<?php echo number_format($dr['amount'], 2, '.', ''); ?>
+                                                &#8377;<?php echo inr_format($dr['amount'], 2); ?>
 <?php if ($dr['req_status'] == 'pending'): ?>
                                                 <span class="badge badge-style-light rounded-pill badge-danger">Pending</span>
 <?php else: ?>

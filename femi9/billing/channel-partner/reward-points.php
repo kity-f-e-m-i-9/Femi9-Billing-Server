@@ -105,7 +105,7 @@ $isAdvanceEligibleType   = false;
 // 5. Grand Total
 $totalPoints = max(0, $purchasePoints + $dailyPoints - $returnPoints);
 
-$fmt = static fn(float $v): string => number_format($v, 2);
+$fmt = static fn(float $v): string => inr_format($v, 2);
 $formattedTotal    = $fmt($totalPoints);
 $formattedPurchase = $fmt($purchasePoints);
 $formattedDaily    = $fmt($dailyPoints);

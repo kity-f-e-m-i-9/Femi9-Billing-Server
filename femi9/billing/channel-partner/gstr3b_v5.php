@@ -99,8 +99,8 @@ if ($from_date != NULL) {
                                 <tbody>
                                     <tr>
                                         <td>From a supplier under composition scheme, Exempt and Nil rated supply</td>
-                                        <td><?php echo number_format($show_total_inter, 2); ?></td>
-                                        <td><?php echo number_format($show_total_intra, 2); ?></td>
+                                        <td><?php echo inr_format($show_total_inter, 2); ?></td>
+                                        <td><?php echo inr_format($show_total_intra, 2); ?></td>
                                     </tr>
                                     <tr>
                                         <td>Non GST Supply</td>
