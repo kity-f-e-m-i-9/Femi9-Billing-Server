@@ -62,6 +62,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="internal_transfer">Add Internal Stock Transfer</a></li>
 						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
+						<li><a href="purchase-bills-hc-to-llp">Purchase Bills (Health Care → LLP)</a></li>
                         </ul>
                     </li>
 					
@@ -181,6 +182,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="add-godown-to-location">Godown → Location</a></li>
 							<li><a href="add-location-to-godown">Location → Godown</a></li>
 							<li><a href="manage-pl-godown-transfers">All Transfers</a></li>
+							<li><a href="purchase-bills-hc-to-llp">Purchase Bills (Health Care → LLP)</a></li>
                         </ul>
                     </li>
 					<li><span class="divider"></span></li>

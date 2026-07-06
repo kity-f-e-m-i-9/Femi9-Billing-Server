@@ -6797,3 +6797,8 @@
 [2026-07-04 10:05:50] SUCCESS | Mobile: 9585711510 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
 [2026-07-06 02:40:17] SUCCESS | Mobile: 9585711510 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15
 [2026-07-06 04:13:45] SUCCESS | Mobile: 9585711510 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15
+[2026-07-06 06:38:33] SUCCESS | Mobile: 9585711510 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15
+[2026-07-06 07:15:24] FAILED | Mobile: 9585711510 | IP: ::1 | Reason: User not found | User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15
+[2026-07-06 07:22:49] FAILED | Mobile: 9585711510 | IP: ::1 | Reason: Invalid password | User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15
+[2026-07-06 07:22:56] FAILED | Mobile: 9585711510 | IP: ::1 | Reason: Invalid password | User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15
+[2026-07-06 07:23:25] SUCCESS | Mobile: 9585711510 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15
