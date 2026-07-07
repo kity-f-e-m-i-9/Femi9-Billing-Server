@@ -1,0 +1,4 @@
+# User-uploaded files — real data, must never be touched by git
+# checkout/reset/clean, or committed as part of a code change.
+femi9/billing/company/expense_uploads/*
+!femi9/billing/company/expense_uploads/.gitkeep
