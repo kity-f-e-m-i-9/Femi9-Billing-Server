@@ -65,6 +65,19 @@ mysqli_stmt_close($s);
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" href="../../assets/images/neptune.png">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Femi9 Channel Partner">
+    <meta name="theme-color" content="#f5b400">
+    <link rel="apple-touch-icon" href="../../assets/images/pwa-icon-apple-touch.png">
+    <script>
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+            navigator.serviceWorker.register("service-worker.js");
+        });
+    }
+    </script>
 </head>
 <body>
     <div class="app align-content-stretch d-flex flex-wrap">

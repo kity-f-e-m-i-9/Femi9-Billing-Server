@@ -640,6 +640,19 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
         .stackbar { display:flex; height:14px; border-radius:7px; overflow:hidden; background:var(--gridline); margin-bottom:4px; }
         .stackbar > div { height:100%; }
     </style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Femi9 Company">
+    <meta name="theme-color" content="#f5b400">
+    <link rel="apple-touch-icon" href="../../assets/images/pwa-icon-apple-touch.png">
+    <script>
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+            navigator.serviceWorker.register("service-worker.js");
+        });
+    }
+    </script>
 </head>
 <body>
 <div class="app align-content-stretch d-flex flex-wrap">

@@ -34,6 +34,19 @@
     <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
     <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
     <![endif]-->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Femi9 C and F">
+    <meta name="theme-color" content="#f5b400">
+    <link rel="apple-touch-icon" href="../../assets/images/pwa-icon-apple-touch.png">
+    <script>
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+            navigator.serviceWorker.register("service-worker.js");
+        });
+    }
+    </script>
 </head>
 <body on contextmenu="return false;" onselectstart="return false;" ondragstart="return false;">
     <div class="app app-auth-sign-in align-content-stretch d-flex flex-wrap justify-content-end">
