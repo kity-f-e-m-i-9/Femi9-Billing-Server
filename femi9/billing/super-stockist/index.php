@@ -57,6 +57,23 @@ if (!isset($_SESSION['csrf_token'])) {
     </script>
 </head>
 <body>
+    <div id="app-preloader" style="position:fixed;inset:0;z-index:99999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .25s ease;">
+        <img src="../../assets/images/pwa-icon-192.png" alt="" style="width:72px;height:72px;border-radius:50%;margin-bottom:18px;">
+        <div style="width:34px;height:34px;border:3px solid #f0e2b9;border-top-color:#f5b400;border-radius:50%;animation:app-preloader-spin .8s linear infinite;"></div>
+    </div>
+    <style>@keyframes app-preloader-spin{to{transform:rotate(360deg)}}</style>
+    <script>
+    (function(){
+        var el = document.getElementById('app-preloader');
+        function hide(){
+            if (!el) return;
+            el.style.opacity = '0';
+            setTimeout(function(){ el && el.remove(); }, 300);
+        }
+        window.addEventListener('load', hide);
+        setTimeout(hide, 8000);
+    })();
+    </script>
     <div class="app app-auth-sign-in align-content-stretch d-flex flex-wrap justify-content-end">
         <div class="app-auth-background"></div>
         <div class="app-auth-container">

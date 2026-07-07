@@ -94,6 +94,18 @@ $tc_ui  = $filter_tp > 0 ? " AND from_user_id={$filter_tp}"      : "";
 $tc_ii  = $filter_tp > 0 ? " AND ii.user_id={$filter_tp}"        : "";
 $tc_uii = $filter_tp > 0 ? " AND uii.from_user_id={$filter_tp}"  : "";
 
+// tp_invoices = company or a super-stockist billing a TP (there is no
+// from/to-type column — the issuer is inferred from source_cp_id/
+// source_godown_id, which only company invoices ever populate; a
+// super-stockist's TP invoices always leave both at 0, see
+// super-stockist/tp-invoice-action.php). TP itself never issues one of
+// these — a tp_invoice is always billed TO a TP — so only 'company' and
+// 'super_stockiest' scopes ever pick any of them up.
+$tpinv_source_sql = null;
+if ($scope === 'company') $tpinv_source_sql = "(source_cp_id>0 OR source_godown_id>0)";
+elseif ($scope === 'super_stockiest') $tpinv_source_sql = "(source_cp_id=0 AND source_godown_id=0)";
+$tc_tpi = $filter_tp > 0 ? " AND territory_partner_id={$filter_tp}" : "";
+
 // ── Load all TPs for filter dropdown ──────────────────────────────────────
 $all_tps = call_rows($db_conn,
     "SELECT id, name, tp_id FROM territory_partners WHERE is_active=1 ORDER BY name ASC");
@@ -110,8 +122,16 @@ $shop_row = crow($db_conn,
      WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}",
     'sss', [$utype, $from, $to]);
 
-$total_invoices = (int)$cust_row['cnt'] + (int)$shop_row['cnt'];
-$total_revenue  = (float)$cust_row['rev'] + (float)$shop_row['rev'];
+$tpi_row = ['cnt' => 0, 'rev' => 0];
+if ($tpinv_source_sql) {
+    $tpi_row = crow($db_conn,
+        "SELECT COUNT(*) cnt, COALESCE(SUM(total_amount),0) rev FROM tp_invoices
+         WHERE {$tpinv_source_sql} AND invoice_date BETWEEN ? AND ?{$tc_tpi}",
+        'ss', [$from, $to]);
+}
+
+$total_invoices = (int)$cust_row['cnt'] + (int)$shop_row['cnt'] + (int)$tpi_row['cnt'];
+$total_revenue  = (float)$cust_row['rev'] + (float)$shop_row['rev'] + (float)$tpi_row['rev'];
 
 $cust_units = (int)cval($db_conn,
     "SELECT COALESCE(SUM(ii.qty),0) FROM invoice_items ii
@@ -123,7 +143,15 @@ $shop_units = (int)cval($db_conn,
      JOIN user_invoice ui ON ui.inv_id = uii.inv_id
      WHERE ui.from_user_type=? AND ui.date BETWEEN ? AND ?".tp_cond_ui($filter_tp),
     'sss', [$utype, $from, $to]);
-$total_units = $cust_units + $shop_units;
+$tpi_units = 0;
+if ($tpinv_source_sql) {
+    $tpi_units = (int)cval($db_conn,
+        "SELECT COALESCE(SUM(tii.quantity),0) FROM tp_invoice_items tii
+         JOIN tp_invoices ti ON ti.id=tii.tp_invoice_id
+         WHERE {$tpinv_source_sql} AND ti.invoice_date BETWEEN ? AND ?{$tc_tpi}",
+        'ss', [$from, $to]);
+}
+$total_units = $cust_units + $shop_units + $tpi_units;
 
 // OT Channel sales (Amazon/Flipkart/Website/etc.) — folded only into the
 // broad "Income to Company" view; it isn't a TP/Super-Stockist/Stockist
@@ -198,6 +226,13 @@ $prev_return_amt = (float)cval($db_conn,
         GROUP BY returnid
      ) x",
     'sss', [$utype, $prev_from, $prev_to]);
+$tpi_prev_rev = 0.0;
+if ($tpinv_source_sql) {
+    $tpi_prev_rev = (float)cval($db_conn,
+        "SELECT COALESCE(SUM(total_amount),0) FROM tp_invoices
+         WHERE {$tpinv_source_sql} AND invoice_date BETWEEN ? AND ?{$tc_tpi}",
+        'ss', [$prev_from, $prev_to]);
+}
 $prev_rev = (float)cval($db_conn,
     "SELECT COALESCE(SUM(total),0) FROM invoice
      WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}",
@@ -207,6 +242,7 @@ $prev_rev = (float)cval($db_conn,
      WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}",
     'sss', [$utype, $prev_from, $prev_to])
   + $ot_prev_rev
+  + $tpi_prev_rev
   - $prev_return_amt;
 $revenue_growth = $prev_rev > 0
     ? round((($total_revenue - $prev_rev) / $prev_rev) * 100, 1) : 0;
@@ -304,6 +340,12 @@ if ($scope === 'company') {
         $channel_breakdown[$key]['cnt'] += (int)$r['cnt'];
         $channel_breakdown[$key]['rev'] += (float)$r['rev'];
     }
+    // Territory Partner channel — the dedicated tp_invoices table (company's
+    // own invoices to a TP; distinct from user_invoice, which TP billing no
+    // longer uses at all).
+    if (!isset($channel_breakdown['territory_partner'])) $channel_breakdown['territory_partner'] = ['cnt' => 0, 'rev' => 0.0];
+    $channel_breakdown['territory_partner']['cnt'] += (int)($tpi_row['cnt'] ?? 0);
+    $channel_breakdown['territory_partner']['rev'] += (float)($tpi_row['rev'] ?? 0);
     $channel_breakdown['ot'] = ['cnt' => (int)($ot_row['cnt'] ?? 0), 'rev' => (float)($ot_row['rev'] ?? 0)];
     $channel_labels['ot'] = 'OT Channel';
 }
@@ -322,23 +364,33 @@ $ds = call_rows($db_conn,
      WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}
      GROUP BY `date` ORDER BY `date`",
     'sss', [$utype, $from, $to]);
+$dt = [];
+if ($tpinv_source_sql) {
+    $dt = call_rows($db_conn,
+        "SELECT invoice_date d, COALESCE(SUM(total_amount),0) rev FROM tp_invoices
+         WHERE {$tpinv_source_sql} AND invoice_date BETWEEN ? AND ?{$tc_tpi}
+         GROUP BY invoice_date ORDER BY invoice_date",
+        'ss', [$from, $to]);
+}
 $dm = [];
 foreach ($dc as $r) $dm[$r['d']]['c'] = (float)$r['rev'];
 foreach ($ds as $r) $dm[$r['d']]['s'] = (float)$r['rev'];
-$chart_labels = $chart_cust = $chart_shop = [];
+foreach ($dt as $r) $dm[$r['d']]['t'] = (float)$r['rev'];
+$chart_labels = $chart_cust = $chart_shop = $chart_tp = [];
 $ptr = strtotime($from); $end = strtotime($to);
 while ($ptr <= $end) {
     $d = date('Y-m-d', $ptr);
     $chart_labels[] = date('d M', $ptr);
     $chart_cust[]   = $dm[$d]['c'] ?? 0;
     $chart_shop[]   = $dm[$d]['s'] ?? 0;
+    $chart_tp[]     = $dm[$d]['t'] ?? 0;
     $ptr = strtotime('+1 day', $ptr);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. PERIOD BREAKDOWN
 // ═══════════════════════════════════════════════════════════════════════════
-function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt) {
+function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt, $tpinv_source_sql, $tc_tpi) {
     $cust = call_rows($db,
         "SELECT DATE_FORMAT(`date`,'$gfmt') g, DATE_FORMAT(MIN(`date`),'$lfmt') lbl,
                 COUNT(*) cnt, COALESCE(SUM(total),0) rev
@@ -351,15 +403,25 @@ function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt) 
          FROM user_invoice WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}
          GROUP BY g ORDER BY g",
         'sss', [$utype, $from, $to]);
+    $tp = [];
+    if ($tpinv_source_sql) {
+        $tp = call_rows($db,
+            "SELECT DATE_FORMAT(invoice_date,'$gfmt') g, DATE_FORMAT(MIN(invoice_date),'$lfmt') lbl,
+                    COUNT(*) cnt, COALESCE(SUM(total_amount),0) rev
+             FROM tp_invoices WHERE {$tpinv_source_sql} AND invoice_date BETWEEN ? AND ?{$tc_tpi}
+             GROUP BY g ORDER BY g",
+            'ss', [$from, $to]);
+    }
     $map = [];
     foreach ($cust as $r) { $map[$r['g']]['lbl']=$r['lbl']; $map[$r['g']]['c']=(float)$r['rev']; $map[$r['g']]['cc']=(int)$r['cnt']; }
     foreach ($shop as $r) { $map[$r['g']]['lbl']=$map[$r['g']]['lbl']??$r['lbl']; $map[$r['g']]['s']=(float)$r['rev']; $map[$r['g']]['sc']=(int)$r['cnt']; }
+    foreach ($tp as $r) { $map[$r['g']]['lbl']=$map[$r['g']]['lbl']??$r['lbl']; $map[$r['g']]['t']=(float)$r['rev']; $map[$r['g']]['tc']=(int)$r['cnt']; }
     ksort($map); return $map;
 }
-$daily_p   = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m-%d','%d %b');
-$weekly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%u','W%u %Y');
-$monthly_p = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m','%b %Y');
-$yearly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y','%Y');
+$daily_p   = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m-%d','%d %b',$tpinv_source_sql,$tc_tpi);
+$weekly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%u','W%u %Y',$tpinv_source_sql,$tc_tpi);
+$monthly_p = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m','%b %Y',$tpinv_source_sql,$tc_tpi);
+$yearly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y','%Y',$tpinv_source_sql,$tc_tpi);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. PRODUCT-WISE SALES
@@ -383,24 +445,46 @@ $grand_qty = array_sum(array_column($product_sales, 'total_qty')) ?: 1;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. STATE / DISTRICT-WISE (shop invoices → shop → partner_location_nodes)
+//
+// `shop.state_id` is unreliable legacy data — for most shops it holds a
+// district's node id (or free text like "Tamilnadu " / "தமிழ்நாடு" / blank),
+// not a real state-depth node, which is why the State breakdown could show a
+// district name. `shop.district_id` is comparatively trustworthy, so both
+// State and District are derived by walking the location tree up from
+// district_id to its depth-2 (state) / depth-3 (district) ancestor, with
+// state_id used only as a fallback when district_id itself doesn't resolve.
 // ═══════════════════════════════════════════════════════════════════════════
 $tc_ui_plain = $filter_tp > 0 ? " AND ui.from_user_id={$filter_tp}" : "";
+$state_anc_cte = "WITH RECURSIVE anc AS (
+    SELECT id AS node_id, id AS anc_id, name AS anc_name FROM partner_location_nodes WHERE depth=2
+    UNION ALL
+    SELECT c.id, a.anc_id, a.anc_name FROM partner_location_nodes c JOIN anc a ON c.parent_id=a.node_id
+)";
 $state_sales = call_rows($db_conn,
-    "SELECT pln.name state_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
+    "{$state_anc_cte}
+     SELECT COALESCE(a1.anc_name, a2.anc_name) state_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
      FROM user_invoice ui
      JOIN shop s ON s.temp_id=ui.to_user_id
-     JOIN partner_location_nodes pln ON pln.id=s.state_id
+     LEFT JOIN anc a1 ON a1.node_id=s.district_id
+     LEFT JOIN anc a2 ON a2.node_id=s.state_id
      WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
-     GROUP BY pln.id, pln.name ORDER BY revenue DESC",
+       AND COALESCE(a1.anc_name, a2.anc_name) IS NOT NULL
+     GROUP BY COALESCE(a1.anc_id, a2.anc_id), state_name ORDER BY revenue DESC",
     'sss', [$utype, $from, $to]);
 
+$dist_anc_cte = "WITH RECURSIVE danc AS (
+    SELECT id AS node_id, id AS anc_id, name AS anc_name FROM partner_location_nodes WHERE depth=3
+    UNION ALL
+    SELECT c.id, a.anc_id, a.anc_name FROM partner_location_nodes c JOIN danc a ON c.parent_id=a.node_id
+)";
 $district_sales = call_rows($db_conn,
-    "SELECT pln.name district_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
+    "{$dist_anc_cte}
+     SELECT danc.anc_name district_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
      FROM user_invoice ui
      JOIN shop s ON s.temp_id=ui.to_user_id
-     JOIN partner_location_nodes pln ON pln.id=s.district_id
+     JOIN danc ON danc.node_id=s.district_id
      WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
-     GROUP BY pln.id, pln.name ORDER BY revenue DESC LIMIT 20",
+     GROUP BY danc.anc_id, danc.anc_name ORDER BY revenue DESC LIMIT 20",
     'sss', [$utype, $from, $to]);
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -526,6 +610,7 @@ $returns_list = call_rows($db_conn,
 $j_labels  = json_encode($chart_labels);
 $j_cust    = json_encode($chart_cust);
 $j_shop    = json_encode($chart_shop);
+$j_tp      = json_encode($chart_tp);
 $j_glabels = json_encode(array_column($six_months,'lbl'));
 $j_gvals   = json_encode(array_map('floatval', array_column($six_months,'total_rev')));
 $j_plabels = json_encode(array_column($product_sales,'productName'));
@@ -655,6 +740,23 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
     </script>
 </head>
 <body>
+    <div id="app-preloader" style="position:fixed;inset:0;z-index:99999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .25s ease;">
+        <img src="../../assets/images/pwa-icon-192.png" alt="" style="width:72px;height:72px;border-radius:50%;margin-bottom:18px;">
+        <div style="width:34px;height:34px;border:3px solid #f0e2b9;border-top-color:#f5b400;border-radius:50%;animation:app-preloader-spin .8s linear infinite;"></div>
+    </div>
+    <style>@keyframes app-preloader-spin{to{transform:rotate(360deg)}}</style>
+    <script>
+    (function(){
+        var el = document.getElementById('app-preloader');
+        function hide(){
+            if (!el) return;
+            el.style.opacity = '0';
+            setTimeout(function(){ el && el.remove(); }, 300);
+        }
+        window.addEventListener('load', hide);
+        setTimeout(hide, 8000);
+    })();
+    </script>
 <div class="app align-content-stretch d-flex flex-wrap">
     <div class="app-sidebar">
         <?php include("logo.php"); ?>
@@ -913,17 +1015,18 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
                                         $active = $id === 'daily' ? 'active' : '';
                                         echo "<div class='tab-content {$active}' id='tab-{$id}'>";
                                         if (empty($data)) { echo "<p class='text-muted text-center py-3'>No data.</p></div>"; return; }
-                                        $gr = array_sum(array_map(fn($r)=>($r['c']??0)+($r['s']??0), $data)) ?: 1;
+                                        $gr = array_sum(array_map(fn($r)=>($r['c']??0)+($r['s']??0)+($r['t']??0), $data)) ?: 1;
                                         echo "<div style='overflow-x:auto'><table class='mt'>";
-                                        echo "<thead><tr><th>Period</th><th>Customer</th><th>Shop</th><th>Total</th><th>Invoices</th><th>Share</th></tr></thead><tbody>";
+                                        echo "<thead><tr><th>Period</th><th>Customer</th><th>Shop</th><th>TP</th><th>Total</th><th>Invoices</th><th>Share</th></tr></thead><tbody>";
                                         foreach ($data as $g => $r) {
-                                            $rev = ($r['c']??0)+($r['s']??0);
-                                            $cnt = ($r['cc']??0)+($r['sc']??0);
+                                            $rev = ($r['c']??0)+($r['s']??0)+($r['t']??0);
+                                            $cnt = ($r['cc']??0)+($r['sc']??0)+($r['tc']??0);
                                             $pct = round($rev/$gr*100,1);
                                             echo "<tr>
                                                 <td><b>".htmlspecialchars($r['lbl']??$g)."</b></td>
                                                 <td>₹".inr_format($r['c']??0, 2)." <small>({$r['cc']})</small></td>
                                                 <td>₹".inr_format($r['s']??0, 2)." <small>({$r['sc']})</small></td>
+                                                <td>₹".inr_format($r['t']??0, 2)." <small>({$r['tc']})</small></td>
                                                 <td><b>₹".inr_format($rev, 2)."</b></td>
                                                 <td>{$cnt}</td>
                                                 <td><div style='display:flex;align-items:center;gap:6px'>
@@ -1337,7 +1440,8 @@ document.querySelectorAll('.tab-item').forEach(function(t) {
             labels: <?php echo $j_labels; ?>,
             datasets: [
                 { label: 'Customer', data: <?php echo $j_cust; ?>,  borderColor:'#2a78d6', backgroundColor:'rgba(42,120,214,.10)', borderWidth:2, tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#2a78d6' },
-                { label: 'Shop',     data: <?php echo $j_shop; ?>,  borderColor:'#1baf7a', backgroundColor:'rgba(27,175,122,.10)', borderWidth:2, tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#1baf7a' }
+                { label: 'Shop',     data: <?php echo $j_shop; ?>,  borderColor:'#1baf7a', backgroundColor:'rgba(27,175,122,.10)', borderWidth:2, tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#1baf7a' },
+                { label: 'Territory Partner', data: <?php echo $j_tp; ?>,  borderColor:'#4a3aa7', backgroundColor:'rgba(74,58,167,.10)', borderWidth:2, tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#4a3aa7' }
             ]
         },
         options: { responsive:true, maintainAspectRatio:false,

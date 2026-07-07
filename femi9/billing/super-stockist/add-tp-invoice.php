@@ -178,13 +178,6 @@ $tp_stmt->close();
                                     <?php endif; ?>
                                 </div>
 
-                                <div class="col-lg-4 col-md-6">
-                                    <label class="form-label">Invoice Number <span class="required">*</span></label>
-                                    <input type="text" name="invoice_number" id="invoiceNumber" class="form-control"
-                                           placeholder="Enter invoice number" maxlength="30" required>
-                                    <div class="field-hint">Must be unique across all invoices</div>
-                                </div>
-
                                 <div class="col-lg-4 col-md-4">
                                     <label class="form-label">Invoice Date <span class="required">*</span></label>
                                     <input type="date" name="invoice_date" id="invoiceDate" class="form-control"

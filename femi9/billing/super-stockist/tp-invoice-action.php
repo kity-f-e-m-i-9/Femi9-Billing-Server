@@ -3,6 +3,7 @@ ob_start();
 include("checksession.php");
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
+require_once __DIR__ . '/../shared/TpInvoiceNumberService.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
     header("Location: manage-tp-invoices?error=unauthorized"); exit;
@@ -66,7 +67,6 @@ if ($col && $col->num_rows === 0) {
 
 // ── Input & validation ────────────────────────────────────────────────────────
 $tp_id            = (int)($_POST['tp_id'] ?? 0);
-$invoice_number   = trim($_POST['invoice_number'] ?? '');
 $invoice_date     = trim($_POST['invoice_date'] ?? date('Y-m-d'));
 $courier_charges  = round((float)($_POST['courier_charges'] ?? 0), 2);
 if ($courier_charges < 0) $courier_charges = 0;
@@ -74,24 +74,17 @@ $discount_amount  = round((float)($_POST['discount_amount'] ?? 0), 2);
 if ($discount_amount < 0) $discount_amount = 0;
 $created_by       = $_SESSION['LOGIN_USER'] ?? '';
 $ss_id            = $Login_user_IDvl;
+// This SS account's own numeric id — the invoice-number series is scoped to
+// this one account, never shared with any other Super Stockist.
+$ss_account_id    = (int)($result_LoGuserDtails['id'] ?? 0);
 
 $raw_pids  = $_POST['product_id'] ?? [];
 $raw_qtys  = $_POST['qty']        ?? [];
 $raw_rates = $_POST['rate']       ?? [];
 
-if (!$tp_id || empty($raw_pids) || $invoice_number === '') {
+if (!$tp_id || empty($raw_pids) || $ss_account_id < 1) {
     header("Location: add-tp-invoice?error=missing"); exit;
 }
-
-// Manual invoice number — must be unique across all TP invoices
-$dupe_chk = $db_conn->prepare("SELECT id FROM tp_invoices WHERE invoice_number = ? LIMIT 1");
-$dupe_chk->bind_param("s", $invoice_number);
-$dupe_chk->execute();
-if ($dupe_chk->get_result()->num_rows > 0) {
-    $dupe_chk->close();
-    header("Location: add-tp-invoice?error=duplicate&inv=" . urlencode($invoice_number)); exit;
-}
-$dupe_chk->close();
 
 // Verify TP belongs to this SS
 $tp_own = $db_conn->prepare("SELECT id FROM territory_partners WHERE id=? AND onboard_ss_id=? AND is_active=1");
@@ -141,8 +134,8 @@ foreach ($items as $item) {
 // ── Transaction ───────────────────────────────────────────────────────────────
 $db_conn->begin_transaction();
 try {
-    // Manually entered by SS staff (validated + uniqueness-checked above)
-    $inv_num = $invoice_number;
+    // Own independent series per SS account (never shared with other SS logins)
+    $inv_num = tpInvoiceNextNumber($db_conn, 'SS' . $ss_account_id, $invoice_date);
 
     // Invoice header — source fields NULL (stock comes from SS directly)
     $null_src = null;
