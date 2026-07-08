@@ -26,9 +26,10 @@ $s->bind_param("i", $inv_id); $s->execute();
 $inv = $s->get_result()->fetch_assoc(); $s->close();
 if (!$inv) { header("Location: manage-tp-invoices?error=notfound"); exit; }
 
-$tp_id         = (int)$inv['territory_partner_id'];
-$source_loc_id = (int)$inv['source_location_id'];
-$inv_num       = $inv['invoice_number'];
+$tp_id            = (int)$inv['territory_partner_id'];
+$source_cp_id     = (int)$inv['source_cp_id'];
+$source_godown_id = (int)$inv['source_godown_id'];
+$inv_num          = $inv['invoice_number'];
 $subtotal      = round((float)$inv['total_amount'] - (float)($inv['courier_charges'] ?? 0), 2);
 $created_by    = $_SESSION['LOGIN_USER'] ?? '';
 
@@ -53,28 +54,39 @@ try {
         $pid = (int)$item['product_id'];
         $qty = (int)$item['quantity'];
 
-        // Restore stock to partner location (only if invoice has a real source location that still exists)
-        if ($source_loc_id > 0) {
-            $lchk = $db_conn->prepare("SELECT id FROM partner_location_nodes WHERE id=? LIMIT 1");
-            $lchk->bind_param("i", $source_loc_id); $lchk->execute();
-            $loc_exists = $lchk->get_result()->num_rows > 0; $lchk->close();
+        // Restore stock to whichever source actually got debited at creation
+        // time (see tp-invoice-action.php: godown via `stock`, or a channel
+        // partner via `channel_partner_stock` — source_location_id is only a
+        // label on the invoice, it was never itself an inventory table).
+        if ($source_godown_id > 0) {
+            $uid = (string)$source_godown_id;
+            $u = $db_conn->prepare("UPDATE stock SET sent_qty=GREATEST(0,sent_qty-?), closing_qty=closing_qty+? WHERE user_type='company' AND user_id=? AND product_id=?");
+            $u->bind_param("iisi", $qty, $qty, $uid, $pid); $u->execute(); $u->close();
 
-            if ($loc_exists) {
-                $u = $db_conn->prepare("UPDATE partner_location_stock SET transfer_out_qty=GREATEST(0,transfer_out_qty-?), closing_qty=closing_qty+? WHERE partner_location_id=? AND product_id=?");
-                $u->bind_param("iiii", $qty, $qty, $source_loc_id, $pid); $u->execute(); $u->close();
+            $r = $db_conn->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=?");
+            $r->bind_param("si", $uid, $pid); $r->execute();
+            $row = $r->get_result()->fetch_assoc(); $r->close();
+            $after_gd  = $row ? (int)$row['closing_qty'] : 0;
+            $before_gd = $after_gd - $qty;
+            $utype_c = 'company'; $action_gd = 'transfer_in'; $ref_gd = 'transfer';
+            $ins = $db_conn->prepare("INSERT INTO stock_ledger (product_id,user_type,user_id,action,qty,qty_before,qty_after,ref_type,ref_id,note,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+            $note_gd = 'Reversal: ' . $inv_num;
+            $ins->bind_param("isssiiissss", $pid, $utype_c, $uid, $action_gd, $qty, $before_gd, $after_gd, $ref_gd, $inv_num, $note_gd, $created_by);
+            $ins->execute(); $ins->close();
+        } elseif ($source_cp_id > 0) {
+            $u = $db_conn->prepare("UPDATE channel_partner_stock SET closing_qty=closing_qty+? WHERE channel_partner_id=? AND product_id=?");
+            $u->bind_param("iii", $qty, $source_cp_id, $pid); $u->execute(); $u->close();
 
-                // Location ledger: reversal entry
-                $r = $db_conn->prepare("SELECT closing_qty FROM partner_location_stock WHERE partner_location_id=? AND product_id=?");
-                $r->bind_param("ii", $source_loc_id, $pid); $r->execute();
-                $row = $r->get_result()->fetch_assoc(); $r->close();
-                $before_loc     = $row ? (int)$row['closing_qty'] : 0;
-                $before_loc_was = $before_loc - $qty;
-                $action_loc = 'transfer_in'; $ref_loc = 'tp_invoice';
-                $ins = $db_conn->prepare("INSERT INTO partner_location_stock_ledger (partner_location_id,product_id,action,qty,qty_before,qty_after,ref_type,ref_id,note,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)");
-                $note_loc = 'Reversal: ' . $inv_num;
-                $ins->bind_param("iisiisssss", $source_loc_id, $pid, $action_loc, $qty, $before_loc_was, $before_loc, $ref_loc, $inv_num, $note_loc, $created_by);
-                $ins->execute(); $ins->close();
-            }
+            $r = $db_conn->prepare("SELECT closing_qty FROM channel_partner_stock WHERE channel_partner_id=? AND product_id=?");
+            $r->bind_param("ii", $source_cp_id, $pid); $r->execute();
+            $row = $r->get_result()->fetch_assoc(); $r->close();
+            $after_cp  = $row ? (int)$row['closing_qty'] : 0;
+            $before_cp = $after_cp - $qty;
+            $action_cp = 'transfer_in'; $ref_cp = 'tp_invoice';
+            $ins = $db_conn->prepare("INSERT INTO channel_partner_stock_ledger (channel_partner_id,product_id,action,qty,qty_before,qty_after,ref_type,ref_id,note,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)");
+            $note_cp = 'Reversal: ' . $inv_num;
+            $ins->bind_param("iisiiissss", $source_cp_id, $pid, $action_cp, $qty, $before_cp, $after_cp, $ref_cp, $inv_num, $note_cp, $created_by);
+            $ins->execute(); $ins->close();
         }
 
         // Debit TP stock

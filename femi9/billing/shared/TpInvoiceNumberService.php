@@ -2,14 +2,15 @@
 /**
  * TpInvoiceNumberService — auto-generated TP invoice number series.
  *
- * Company auto-generates from one system-wide series (source 'CO', format
- * TP/CO/{fiscal-year}/{seq} — there is only one company). Super-stockist
- * auto-generates too, but each SS account gets its OWN independent series —
- * source is 'SS{ss_id}' (e.g. 'SS8'), so two different Super Stockists both
- * issuing their "first" TP invoice each get .../001, not a shared counter,
- * and one SS's insert never lock-contends with another's (see
- * super-stockist/tp-invoice-action.php). Cross-source/account uniqueness is
- * additionally enforced by tp_invoices' uk_tp_inv_number key.
+ * Company auto-generates from one system-wide series (source 'CO', displayed
+ * as plain TP/{fiscal-year}/{seq} — there is only one company, so no source
+ * tag is needed on the number itself). Super-stockist auto-generates too, but
+ * each SS account gets its OWN independent series — source is 'SS{ss_id}'
+ * (e.g. 'SS8'), and its number is displayed as TP/SS{ss_id}/{fy}/{seq} so
+ * that two different Super Stockists' "first" invoice numbers never collide
+ * (tp_invoices.invoice_number is UNIQUE across every source/account). One
+ * SS's insert never lock-contends with another's, or with company's (see
+ * super-stockist/tp-invoice-action.php).
  *
  * Must be called inside an active transaction (caller locks the sequence row
  * via FOR UPDATE for the duration of the invoice insert).
@@ -44,8 +45,12 @@ function tpInvoiceNextNumber(mysqli $db, string $source, string $invoiceDate, in
     $db->query("SELECT last_val, fy FROM tp_inv_sequence WHERE source='$source_esc' FOR UPDATE");
     $seq_row = $db->query("SELECT last_val, fy FROM tp_inv_sequence WHERE source='$source_esc'")->fetch_assoc();
 
+    // Company's plain format has no source tag; every other source (each SS
+    // account) tags its number so different accounts' numbers never collide.
+    $like_pattern = $source === 'CO' ? "TP/$current_fy/%" : "TP/$source_esc/$current_fy/%";
+
     // Sync with actual max for this source+FY to guard against an out-of-sync sequence
-    $max_res = $db->query("SELECT MAX(CAST(SUBSTRING_INDEX(invoice_number, '/', -1) AS UNSIGNED)) AS max_val FROM tp_invoices WHERE invoice_number LIKE 'TP/$source_esc/$current_fy/%'");
+    $max_res = $db->query("SELECT MAX(CAST(SUBSTRING_INDEX(invoice_number, '/', -1) AS UNSIGNED)) AS max_val FROM tp_invoices WHERE invoice_number LIKE '$like_pattern'");
     $actual_max = (int)(($max_res->fetch_assoc())['max_val'] ?? 0);
 
     $seq_val  = ($seq_row && $seq_row['fy'] === $current_fy) ? (int)$seq_row['last_val'] : 0;
@@ -53,5 +58,6 @@ function tpInvoiceNextNumber(mysqli $db, string $source, string $invoiceDate, in
 
     $db->query("UPDATE tp_inv_sequence SET last_val=$next_val, fy='$current_fy' WHERE source='$source_esc'");
 
-    return 'TP/' . $source . '/' . $current_fy . '/' . str_pad((string)$next_val, $padDigits, '0', STR_PAD_LEFT);
+    $seq_str = str_pad((string)$next_val, $padDigits, '0', STR_PAD_LEFT);
+    return $source === 'CO' ? "TP/$current_fy/$seq_str" : "TP/$source/$current_fy/$seq_str";
 }
