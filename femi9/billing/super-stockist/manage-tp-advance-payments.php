@@ -20,8 +20,10 @@ $filter_status = $_GET['status'] ?? '';
 $allowed_statuses = ['active','partially_adjusted','fully_adjusted',''];
 if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = '';
 
-// Only TPs belonging to this SS
-$where  = ["tp.onboard_ss_id = ?", "tap.payment_date BETWEEN ? AND ?"];
+// Only TPs belonging to this SS, and only payments this SS itself recorded —
+// company_id is set exclusively by company's tp-advance-payment-action.php
+// (SS's own insert never sets it), so IS NULL means "created by this SS".
+$where  = ["tp.onboard_ss_id = ?", "tap.company_id IS NULL", "tap.payment_date BETWEEN ? AND ?"];
 $params = [$ss_id, $filter_from, $filter_to];
 $types  = "sss";
 

@@ -102,6 +102,7 @@ $i = 0;
         table#datatable1 thead th { font-size:11.5px !important; font-weight:600 !important; color:#6b7280 !important; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
         .action-btn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; transition:background .15s; text-decoration:none; }
         .action-btn.view   { color:#667eea; } .action-btn.view:hover   { background:#ede9fe; }
+        .action-btn.edit   { color:#d97706; } .action-btn.edit:hover   { background:#fef3c7; }
         .action-btn.print  { color:#0369a1; } .action-btn.print:hover  { background:#e0f2fe; }
         .action-btn.delete { color:#dc2626; } .action-btn.delete:hover { background:#fee2e2; }
         .courier-chip { display:inline-block; background:#fef3c7; color:#92400e; border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600; }
@@ -229,6 +230,9 @@ $i = 0;
                                             <td style="white-space:nowrap;">
                                                 <a href="view-tp-invoice?id=<?php echo $enc; ?>" class="action-btn view" title="View">
                                                     <i class="material-icons-outlined" style="font-size:19px;">visibility</i>
+                                                </a>
+                                                <a href="edit-tp-invoice?id=<?php echo $enc; ?>" class="action-btn edit" title="Edit">
+                                                    <i class="material-icons-outlined" style="font-size:19px;">edit</i>
                                                 </a>
                                                 <a href="tp-invoice-print?id=<?php echo $enc; ?>" class="action-btn print" title="Print" target="_blank">
                                                     <i class="material-icons-outlined" style="font-size:19px;">print</i>
