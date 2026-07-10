@@ -142,8 +142,12 @@ if(isset($_REQUEST['add-users']))
     if(isset($_REQUEST['consolidated_payment_entry']) && $_REQUEST['consolidated_payment_entry']==1){$consolidated_payment_entry="1";}else{$consolidated_payment_entry="0";}
     if(isset($_REQUEST['bonus_calculator']) && $_REQUEST['bonus_calculator']==1){$bonus_calculator="1";}else{$bonus_calculator="0";}
     if(isset($_REQUEST['manage_bonus_points']) && $_REQUEST['manage_bonus_points']==1){$manage_bonus_points="1";}else{$manage_bonus_points="0";}
-	
-	
+    if(isset($_REQUEST['partner_location']) && $_REQUEST['partner_location']==1){$partner_location="1";}else{$partner_location="0";}
+    if(isset($_REQUEST['channel_partner']) && $_REQUEST['channel_partner']==1){$channel_partner="1";}else{$channel_partner="0";}
+    if(isset($_REQUEST['territory_partner']) && $_REQUEST['territory_partner']==1){$territory_partner="1";}else{$territory_partner="0";}
+    if(isset($_REQUEST['stock_transfers']) && $_REQUEST['stock_transfers']==1){$stock_transfers="1";}else{$stock_transfers="0";}
+
+
 	$select_count_users="select count(*) as numusers from admin_log where username='$username'";
 	$fetch_count_users=mysqli_query($db_conn,$select_count_users);
 	$result_count_users=mysqli_fetch_array($fetch_count_users);
@@ -153,8 +157,8 @@ if(isset($_REQUEST['add-users']))
 	    exit;
 	}
 	
-		$insert_users="INSERT INTO admin_log (username,password,usertype,state,dash,report,company_profile,users_demo,reward_points,demo_free,manage_return,debit_note,stock_request,products,ot_channels,location,ss,st,dt,sdt,shop,cus,ms,unassigned,remap,users_network,payment_entry, manage_payment_entry, consolidated_payment_entry, bonus_calculator ,manage_bonus_points, add_input_stock,manage_input_stock ,add_input_stock_users, manage_input_stock_users) values ('$username','$encryptedPassword','$usertype','$state','$dash','$report','$company_profile','$users_demo',
-		'$reward_points','$demo_free','$manage_return','$debit_note','$stock_request','$products','$ot_channels','$location','$ss','$st','$dt','$sdt','$shop','$cus','$ms','$unassigned','$remap','$users_network','$add_payment_entry','$manage_payment_entry','$consolidated_payment_entry','$bonus_calculator','$manage_bonus_points','$add_input_stock','$manage_input_stock','$add_input_stock_users','$manage_input_stock_users')";
+		$insert_users="INSERT INTO admin_log (username,password,usertype,state,dash,report,company_profile,users_demo,reward_points,demo_free,manage_return,debit_note,stock_request,products,ot_channels,location,ss,st,dt,sdt,shop,cus,ms,unassigned,remap,users_network,payment_entry, manage_payment_entry, consolidated_payment_entry, bonus_calculator ,manage_bonus_points, add_input_stock,manage_input_stock ,add_input_stock_users, manage_input_stock_users, partner_location, channel_partner, territory_partner, stock_transfers) values ('$username','$encryptedPassword','$usertype','$state','$dash','$report','$company_profile','$users_demo',
+		'$reward_points','$demo_free','$manage_return','$debit_note','$stock_request','$products','$ot_channels','$location','$ss','$st','$dt','$sdt','$shop','$cus','$ms','$unassigned','$remap','$users_network','$add_payment_entry','$manage_payment_entry','$consolidated_payment_entry','$bonus_calculator','$manage_bonus_points','$add_input_stock','$manage_input_stock','$add_input_stock_users','$manage_input_stock_users','$partner_location','$channel_partner','$territory_partner','$stock_transfers')";
 		mysqli_query($db_conn,$insert_users);
 		
 		
@@ -259,8 +263,12 @@ if(isset($_REQUEST['add-users']))
 				
 				<tr>
 				    <td><label><input type="checkbox" value="1" name="st">&nbsp;Stockist</label></td>
+				    <td><label><input type="checkbox" value="1" name="partner_location">&nbsp;Partner Location</label></td>
+				    <td><label><input type="checkbox" value="1" name="channel_partner">&nbsp;Channel Partner</label></td>
+				    <td><label><input type="checkbox" value="1" name="territory_partner">&nbsp;Territory Partner</label></td>
+				    <td><label><input type="checkbox" value="1" name="stock_transfers">&nbsp;Stock Transfers</label></td>
 				</tr>
-				
+
 				</table>
 				
 				<br/>

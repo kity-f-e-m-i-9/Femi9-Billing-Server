@@ -157,15 +157,20 @@ if(isset($_REQUEST['add-users']))
     if(isset($_REQUEST['consolidated_payment_entry']) && $_REQUEST['consolidated_payment_entry']==1){$consolidated_payment_entry="1";}else{$consolidated_payment_entry="0";}
     if(isset($_REQUEST['bonus_calculator']) && $_REQUEST['bonus_calculator']==1){$bonus_calculator="1";}else{$bonus_calculator="0";}
     if(isset($_REQUEST['manage_bonus_points']) && $_REQUEST['manage_bonus_points']==1){$manage_bonus_points="1";}else{$manage_bonus_points="0";}
-	
-	
+    if(isset($_REQUEST['partner_location']) && $_REQUEST['partner_location']==1){$partner_location="1";}else{$partner_location="0";}
+    if(isset($_REQUEST['channel_partner']) && $_REQUEST['channel_partner']==1){$channel_partner="1";}else{$channel_partner="0";}
+    if(isset($_REQUEST['territory_partner']) && $_REQUEST['territory_partner']==1){$territory_partner="1";}else{$territory_partner="0";}
+    if(isset($_REQUEST['stock_transfers']) && $_REQUEST['stock_transfers']==1){$stock_transfers="1";}else{$stock_transfers="0";}
+
+
 		$insert_users="update admin_log set password='$encryptedPassword',dash='$dash',report='$report',
         company_profile='$company_profile',users_demo='$users_demo',reward_points='$reward_points',
         demo_free='$demo_free',manage_return='$manage_return',debit_note='$debit_note',stock_request='$stock_request',
         products='$products',ot_channels='$ot_channels',location='$location',
         ss='$ss',st='$st',dt='$dt',sdt='$sdt',shop='$shop',cus='$cus',ms='$ms',unassigned='$unassigned',remap='$remap',
-        users_network='$users_network',payment_entry='$add_payment_entry',manage_payment_entry='$manage_payment_entry',consolidated_payment_entry='$consolidated_payment_entry',bonus_calculator='$bonus_calculator',manage_bonus_points='$manage_bonus_points', 
-        add_input_stock='$add_input_stock',manage_input_stock='$manage_input_stock',add_input_stock_users='$add_input_stock_users',manage_input_stock_users='$manage_input_stock_users' where id='$update_id'";
+        users_network='$users_network',payment_entry='$add_payment_entry',manage_payment_entry='$manage_payment_entry',consolidated_payment_entry='$consolidated_payment_entry',bonus_calculator='$bonus_calculator',manage_bonus_points='$manage_bonus_points',
+        add_input_stock='$add_input_stock',manage_input_stock='$manage_input_stock',add_input_stock_users='$add_input_stock_users',manage_input_stock_users='$manage_input_stock_users',
+        partner_location='$partner_location',channel_partner='$channel_partner',territory_partner='$territory_partner',stock_transfers='$stock_transfers' where id='$update_id'";
 		mysqli_query($db_conn,$insert_users);
 		
 		
@@ -549,8 +554,44 @@ $ex_catid = array_filter(explode("#", $catid));
         				<?php }?>
         				stockist</label>
 				    </td>
+				    <td>
+        				<label>
+        				<?php if($result_count_users['partner_location']==1){?>
+        				<input type="checkbox" value="1" checked name="partner_location">
+        				<?php }else{?>
+        				<input type="checkbox" value="1" name="partner_location">
+        				<?php }?>
+        				Partner Location</label>
+				    </td>
+				    <td>
+        				<label>
+        				<?php if($result_count_users['channel_partner']==1){?>
+        				<input type="checkbox" value="1" checked name="channel_partner">
+        				<?php }else{?>
+        				<input type="checkbox" value="1" name="channel_partner">
+        				<?php }?>
+        				Channel Partner</label>
+				    </td>
+				    <td>
+        				<label>
+        				<?php if($result_count_users['territory_partner']==1){?>
+        				<input type="checkbox" value="1" checked name="territory_partner">
+        				<?php }else{?>
+        				<input type="checkbox" value="1" name="territory_partner">
+        				<?php }?>
+        				Territory Partner</label>
+				    </td>
+				    <td>
+        				<label>
+        				<?php if($result_count_users['stock_transfers']==1){?>
+        				<input type="checkbox" value="1" checked name="stock_transfers">
+        				<?php }else{?>
+        				<input type="checkbox" value="1" name="stock_transfers">
+        				<?php }?>
+        				Stock Transfers</label>
+				    </td>
 				</tr>
-				
+
 				</table>
 				
 				

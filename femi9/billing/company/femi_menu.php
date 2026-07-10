@@ -580,14 +580,19 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     <?php }?>
 
 					<!----------------------New section (users)--------------------------->
+					<?php if(($resultusertypeGET['partner_location']??0)==1 || ($resultusertypeGET['channel_partner']??0)==1 || ($resultusertypeGET['territory_partner']??0)==1 || ($resultusertypeGET['stock_transfers']??0)==1){?>
 					<li style="padding:10px 30px 4px;font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:1px;cursor:default;pointer-events:none;">New</li>
+					<?php }?>
+					<?php if(($resultusertypeGET['partner_location']??0)==1){?>
 					<li>
                         <a href="manage-partner-location"><i class="material-icons-two-tone">place</i>Partner Location</a>
                     </li>
 					<li>
                         <a href="manage-partner-location-layers"><i class="material-icons-two-tone">layers</i>Location Layers</a>
                     </li>
+					<?php }?>
 					<!----------------------Channel Partner--------------------------->
+					<?php if(($resultusertypeGET['channel_partner']??0)==1){?>
 					<li>
                         <a href="#"><i class="material-icons-two-tone">handshake</i>Channel Partner<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
@@ -596,7 +601,9 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="cp-stock">CP Stock</a></li>
                         </ul>
                     </li>
+					<?php }?>
 					<!----------------------Territory Partner--------------------------->
+					<?php if(($resultusertypeGET['territory_partner']??0)==1){?>
 					<li>
                         <a href="#"><i class="material-icons-two-tone">map</i>Territory Partner<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
@@ -610,7 +617,9 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
                         </ul>
                     </li>
+					<?php }?>
 					<!----------------------Stock Transfers--------------------------->
+					<?php if(($resultusertypeGET['stock_transfers']??0)==1){?>
 					<li>
                         <a href="#"><i class="material-icons-two-tone">swap_horiz</i>Stock Transfers<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
@@ -619,6 +628,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-pl-godown-transfers">All Transfers</a></li>
                         </ul>
                     </li>
+					<?php }?>
 					<li><span class="divider"></span></li>
 
 					<?php if($resultusertypeGET['report']==1){?>

@@ -49,7 +49,8 @@
                                                 </div>
                                             </a>
 											<?php }?>
-											
+
+											<?php if($LoginusertypeGET=="admin" || $LoginusertypeGET=="finance" || ($resultusertypeGET['ot_channels']??0)==1){?>
 											<a href="web-commission">
                                                 <div class="notifications-dropdown-item">
                                                     <div class="notifications-dropdown-item-text">
@@ -57,7 +58,8 @@
                                                     </div>
                                                 </div>
                                             </a>
-											
+											<?php }?>
+
                                             <a href="logout" onclick="return confirm('You want to logout confirm?');">
                                                 <div class="notifications-dropdown-item">
                                                     <div class="notifications-dropdown-item-text">

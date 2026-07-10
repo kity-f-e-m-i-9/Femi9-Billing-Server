@@ -1167,13 +1167,14 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
                                         <p class="text-muted text-center py-3">No data.</p>
                                     <?php else: ?>
                                     <table class="mt">
-                                        <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Revenue</th><th>Returned Qty</th><th>Returned Amount</th><th>Share</th></tr></thead>
+                                        <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Revenue</th><th>Returned Qty</th><th>Returned Amount</th><th>Total Qty</th><th>Share</th></tr></thead>
                                         <tbody>
                                         <?php foreach ($product_sales as $i => $p): ?>
                                             <?php
                                             $pct = $grand_qty>0 ? round($p['total_qty']/$grand_qty*100,1) : 0;
                                             $bc  = '#2a78d6';
                                             $ret = $returns_by_pid[(int)$p['pid']] ?? ['qty' => 0, 'amt' => 0];
+                                            $net_qty = (int)$p['total_qty'] - (int)$ret['qty'];
                                             ?>
                                             <tr>
                                                 <td><?php echo $i+1; ?></td>
@@ -1182,6 +1183,7 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
                                                 <td><span class="br">₹<?php echo inr_format($p['total_rev'], 2); ?></span></td>
                                                 <td><?php echo inr_format((int)$ret['qty'], 0); ?></td>
                                                 <td>₹<?php echo inr_format($ret['amt'], 2); ?></td>
+                                                <td><b><?php echo inr_format($net_qty, 0); ?></b></td>
                                                 <td><div style="display:flex;align-items:center;gap:5px">
                                                     <div class="pbar" style="width:70px"><div class="pf" style="width:<?php echo $pct; ?>%;background:<?php echo $bc; ?>"></div></div>
                                                     <span style="font-size:12px"><?php echo $pct; ?>%</span>
