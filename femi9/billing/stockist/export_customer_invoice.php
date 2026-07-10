@@ -3,19 +3,13 @@ include("config.php");
 error_reporting(0);
 
 $tablename="customers";
-$file="customer-invoice-list.xls";
+$file="customer-invoice-list.csv";
 
-$html='
-<table style="width:100%;" border="1">
-                                            <thead>
-                                                <tr>
-													<th>Invoice Number</th>
-													<th>Customer Name</th>
-													<th>Invoice Date</th>
-													<th>Invoice Amount</th>
-                                                </tr>
-                                            </thead>
-											<tbody>';
+header("Content-Type: text/csv; charset=UTF-8");
+header("Content-Disposition: attachment; filename=$file");
+
+$output = fopen("php://output", "w");
+fputcsv($output, ['Invoice Number', 'Customer Name', 'Invoice Date', 'Invoice Amount']);
 
 $select_product_list="select * from invoice where user_id='$Login_user_IDvl' order by id desc";
 $fetch_product_list=mysqli_query($db_conn,$select_product_list);
@@ -32,19 +26,13 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 		$customerDetails="Walking Customer";
 	}
 
-	$html=$html.'
-                                                <tr>
-                                                  <td>'.$result_product_list["inv_number"].'</td>
-													<td>'.$customerDetails.'</td>
-													<td>'.date("d/M/Y",strtotime($result_product_list["date"])).'</td>
-													<td>'.inr_format($result_product_list["total"], 2).'</td>
-                                                </tr>';
+	fputcsv($output, [
+		$result_product_list["inv_number"],
+		$customerDetails,
+		date("d/M/Y",strtotime($result_product_list["date"])),
+		inr_format($result_product_list["total"], 2),
+	]);
 }
-$html=$html.'
-										 </tbody>
-                                        </table>';
 
-header("Content-type: application/vnd.ms-excel");
-header("Content-Disposition: attachment; filename=$file");
-echo $html;
+fclose($output);
 ?>

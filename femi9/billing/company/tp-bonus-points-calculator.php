@@ -301,7 +301,8 @@ function calculateTpBonusPoints(
 function processTpBonusCalculation(
     mysqli $dbConn,
     string $monthYear,
-    string $mode = 'dry_run'
+    string $mode = 'dry_run',
+    bool   $applyDeactivation = true
 ): array {
     error_log("=== Starting processTpBonusCalculation v1.0 ===");
     error_log("Month: $monthYear, Mode: $mode");
@@ -509,8 +510,8 @@ function processTpBonusCalculation(
                     $stmt->close();
                 }
 
-                // ── 3. Deactivation logic ─────────────────────────────────
-                if ($userResult['will_be_deactivated']) {
+                // ── 3. Deactivation logic (optional) ───────────────────────
+                if ($applyDeactivation && $userResult['will_be_deactivated']) {
                     error_log("Deactivating TP: {$userId} — {$userResult['deactivation_reason']}");
 
                     $stmt = $dbConn->prepare("
@@ -601,14 +602,16 @@ function processTpBonusCalculation(
             $results['summary']['total_deactivated'] = $actualDeactivated;
 
             error_log("Transaction committed. Deactivated: $actualDeactivated TPs.");
-            $results['message'] = sprintf(
-                'Bonus points calculated and awarded successfully! %d account(s) deactivated.',
-                $actualDeactivated
-            );
+            $results['message'] = $applyDeactivation
+                ? sprintf(
+                    'Bonus points calculated and awarded successfully! %d account(s) deactivated.',
+                    $actualDeactivated
+                )
+                : 'Bonus points calculated and awarded successfully! Account deactivation was skipped (not applied for this execution).';
 
         } else {
             $results['message'] = sprintf(
-                'Dry run completed. No database changes made. %d account(s) would be deactivated.',
+                'Dry run completed. No database changes made. %d account(s) would be deactivated if deactivation is applied.',
                 $totalWillDeactivate
             );
         }
@@ -823,7 +826,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($monthYear) || !preg_match('/^\d{4}-\d{2}$/', $monthYear)) {
                 $actionResult = ['success' => false, 'message' => 'Invalid month/year format. Please select a valid month.'];
             } else {
-                $actionResult = processTpBonusCalculation($dbConn, $monthYear, $action);
+                $applyDeactivation = isset($_POST['apply_deactivation']);
+                $actionResult = processTpBonusCalculation($dbConn, $monthYear, $action, $applyDeactivation);
             }
         } elseif ($action === 'rollback') {
             $executionId = $_POST['execution_id'] ?? '';
@@ -1069,6 +1073,21 @@ $availableExecutions = getAvailableTpExecutions($dbConn);
                                                 </ul>
                                                 <br>
                                                 <strong>📍 Monthly Target:</strong> sum of target_amount across all locations assigned to the TP.
+                                            </div>
+
+                                            <div class="form-check mb-3">
+                                                <input
+                                                    type="checkbox"
+                                                    class="form-check-input"
+                                                    id="apply_deactivation"
+                                                    name="apply_deactivation"
+                                                    value="1"
+                                                    checked
+                                                >
+                                                <label class="form-check-label" for="apply_deactivation">
+                                                    Deactivate accounts that did not meet target (applies only to Execute)
+                                                </label>
+                                                <div><small class="text-muted">Uncheck to award bonus points only, without deactivating any accounts.</small></div>
                                             </div>
 
                                             <div class="d-flex gap-3">
@@ -1318,7 +1337,11 @@ $availableExecutions = getAvailableTpExecutions($dbConn);
     <script>
     function submitForm(action) {
         if (action === 'execute') {
-            if (!confirm('⚠️ Are you sure you want to EXECUTE and award bonus points?\n\nThis will:\n• Calculate bonus points for all territory partners\n• Award reward points to eligible TPs\n• Deactivate accounts that did not meet targets\n\nThis action can be rolled back later.')) {
+            const willDeactivate = document.getElementById('apply_deactivation').checked;
+            const deactivationLine = willDeactivate
+                ? '• Deactivate accounts that did not meet targets\n'
+                : '';
+            if (!confirm('⚠️ Are you sure you want to EXECUTE and award bonus points?\n\nThis will:\n• Calculate bonus points for all territory partners\n• Award reward points to eligible TPs\n' + deactivationLine + '\nThis action can be rolled back later.')) {
                 return;
             }
         }

@@ -45,10 +45,12 @@ $locations_res = $db_conn->query("
 $locations = $locations_res ? $locations_res->fetch_all(MYSQLI_ASSOC) : [];
 
 // TPs with invoices — collect all location_ids per TP for cascade
+// (company-issued only — see $where below for why)
 $tp_rows_res = $db_conn->query("
     SELECT DISTINCT tp.id, tp.name, tp.tp_id AS tp_code, tpi.source_location_id
     FROM tp_invoices tpi
     JOIN territory_partners tp ON tp.id = tpi.territory_partner_id
+    WHERE (tpi.source_cp_id > 0 OR tpi.source_godown_id > 0)
     ORDER BY tp.name
 ");
 $tp_rows = $tp_rows_res ? $tp_rows_res->fetch_all(MYSQLI_ASSOC) : [];
@@ -74,7 +76,10 @@ foreach ($tp_rows as $row) {
 }
 
 // ── Build main query with filters ─────────────────────────────────────────────
-$where  = [];
+// Company only — a super-stockist's own TP invoices never populate
+// source_cp_id/source_godown_id (see super-stockist/tp-invoice-action.php),
+// so this excludes every SS-issued invoice from this company-side listing.
+$where  = ['(tpi.source_cp_id > 0 OR tpi.source_godown_id > 0)'];
 $params = [];
 $types  = '';
 

@@ -42,6 +42,7 @@ $advBalance = 0;
                                 <h1><table class="headertble"><tr>
                                     <td>Manage Shop (Retailers)</td>
                                     <td><a href="shop-add.php" title="Add Shop">&#10011;</a></td>
+                                    <td><a href="shop-import.php" title="Import CSV"><i class="material-icons-outlined" style="vertical-align:middle">upload_file</i></a></td>
                                 </tr></table></h1>
                             </div>
                         </div>

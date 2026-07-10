@@ -42,6 +42,7 @@ $advBalance = 0;
                                 <h1><table class="headertble"><tr>
                                     <td>Manage Customers</td>
                                     <td><a href="customer-add.php" title="Add Customer">&#10011;</a></td>
+                                    <td><a href="customer-import.php" title="Import CSV"><i class="material-icons-outlined" style="vertical-align:middle">upload_file</i></a></td>
                                 </tr></table></h1>
                             </div>
                         </div>
