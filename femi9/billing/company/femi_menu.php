@@ -646,10 +646,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<?php }?>
 					
 					
+					<?php if($resultusertypeGET['payment_entry']==1 || $resultusertypeGET['manage_payment_entry']==1 || $resultusertypeGET['consolidated_payment_entry']==1 || $resultusertypeGET['bonus_calculator']==1 || $resultusertypeGET['manage_bonus_points']==1){?>
 					<li>
                         <a href="#"><i class="material-icons-two-tone">money</i>Payment Entry<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
-                        <?php if($resultusertypeGET['payment_entry']==1){?>    
+                        <?php if($resultusertypeGET['payment_entry']==1){?>
 						    <li><a href="add-advance-payment">Add Payment Entry</a></li>
 						<?php }?>
 						<?php if($resultusertypeGET['manage_payment_entry']==1){?>
@@ -663,9 +664,10 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<?php }?>
 						<?php if($resultusertypeGET['manage_bonus_points']==1){?>
 						    <li><a href="bonus-advance-payments">Manage Bonus Points</a></li>
-						<?php }?>    
+						<?php }?>
                         </ul>
                     </li>
+					<?php }?>
                     
 					
 					<?php if($resultusertypeGET['company_profile']==1){?>
@@ -746,23 +748,25 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<?php }?>
 					
 										
+					<?php if($resultusertypeGET['add_input_stock']==1 || $resultusertypeGET['manage_input_stock']==1 || $resultusertypeGET['add_input_stock_users']==1 || $resultusertypeGET['manage_input_stock_users']==1){?>
 					<li>
                         <a href="#"><i class="material-icons-two-tone">done</i>Input Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
-                        <?php if($resultusertypeGET['add_input_stock']==1){?>    
+                        <?php if($resultusertypeGET['add_input_stock']==1){?>
 						    <li><a href="add-input">Add Input Stock</a></li>
 						<?php }?>
-						<?php if($resultusertypeGET['manage_input_stock']==1){?> 
+						<?php if($resultusertypeGET['manage_input_stock']==1){?>
                             <li><a href="manage-input">Manage Input Stocks</a></li>
                         <?php }?>
-                        <?php if($resultusertypeGET['add_input_stock_users']==1){?> 
+                        <?php if($resultusertypeGET['add_input_stock_users']==1){?>
                             <li><a href="add-input-users">Add Input Stock Users</a></li>
                         <?php }?>
-                        <?php if($resultusertypeGET['manage_input_stock_users']==1){?> 
+                        <?php if($resultusertypeGET['manage_input_stock_users']==1){?>
                             <li><a href="manage-input-users">Manage Input Stocks Users</a></li>
                         <?php }?>
                         </ul>
                     </li>
+					<?php }?>
 					
 					
 					<?php if($resultusertypeGET['ot_channels']==1){?>					
