@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
 include("config.php");
 date_default_timezone_set("Asia/Kolkata");
 

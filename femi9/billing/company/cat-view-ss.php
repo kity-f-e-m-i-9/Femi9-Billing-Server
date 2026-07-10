@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('ss');
 
 $title="Manage Category (Super Stockist)";
 $add_url="cat-add-ss";

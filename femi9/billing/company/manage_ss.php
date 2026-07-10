@@ -1,5 +1,6 @@
 <?php 
 include("checksession.php"); 
+require_once("include/PermissionCheck.php"); requirePermission('ss');
 error_reporting(0);
 include("config.php");
 ?>

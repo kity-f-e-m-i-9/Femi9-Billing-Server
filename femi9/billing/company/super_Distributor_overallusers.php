@@ -4,6 +4,7 @@ require_once __DIR__ . '/../shared/env-loader.php';
 
 // Then include session check
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('sdt');
 
 // Now load encryption service
 require_once __DIR__ . '/../shared/EncryptionService.php';

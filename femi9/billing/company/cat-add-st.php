@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('st');
 
 // Generate CSRF token if not exists
 if (!isset($_SESSION['csrf_token'])) {

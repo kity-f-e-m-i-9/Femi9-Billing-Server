@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('report');
 $title="Report - B2B Sales";
 ?>
 <!DOCTYPE html>

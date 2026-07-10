@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('shop');
 include("config.php");
 
 $title="Add Shop (Retailers)";

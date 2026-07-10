@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
 error_reporting(1);
 ini_set('display_error','1');
 

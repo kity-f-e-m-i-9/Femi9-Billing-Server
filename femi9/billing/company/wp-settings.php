@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requireAdminOnly();
 $title="Whatsapp Settings";
 
 $select_wp_settings="select * from admin_whatsapp_configuration";

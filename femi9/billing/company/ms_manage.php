@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('ms');
 include("config.php");
 
 require_once __DIR__ . '/../shared/env-loader.php';

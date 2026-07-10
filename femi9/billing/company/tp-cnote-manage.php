@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 include("config.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");

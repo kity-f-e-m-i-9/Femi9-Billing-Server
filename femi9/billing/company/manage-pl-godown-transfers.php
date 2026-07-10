@@ -1,6 +1,7 @@
 <?php
 ob_start();
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('stock_transfers');
 require_once("include/GodownAccess.php");
 error_reporting(0);
 

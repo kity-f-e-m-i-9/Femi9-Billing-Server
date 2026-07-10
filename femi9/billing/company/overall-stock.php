@@ -1,4 +1,5 @@
 <?php include("checksession.php"); require_once("include/GodownAccess.php");
+require_once("include/PermissionCheck.php"); requirePermission('products');
 error_reporting(0);
 $user_type_Loginvl="company";
 ?>

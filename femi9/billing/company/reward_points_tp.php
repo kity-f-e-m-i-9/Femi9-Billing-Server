@@ -8,6 +8,7 @@ header("X-Frame-Options: SAMEORIGIN");
 header("X-XSS-Protection: 1; mode=block");
 
 require_once("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('reward_points');
 require_once("config.php");
 
 ini_set('display_errors', 0);

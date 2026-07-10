@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 error_reporting(0);
 require_once __DIR__ . '/../shared/EncryptionService.php';
 $_enc = new EncryptionService();

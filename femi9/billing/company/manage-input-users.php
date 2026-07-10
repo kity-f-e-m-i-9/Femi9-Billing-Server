@@ -1,4 +1,5 @@
 <?php include("checksession.php"); error_reporting(0);?>
+require_once("include/PermissionCheck.php"); requirePermission('manage_input_stock_users');
 <!DOCTYPE html>
 <html lang="en">
 <head>

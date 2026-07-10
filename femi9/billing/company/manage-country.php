@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('location');
 
 $title="Manage Country";
 $add_url="add-country";

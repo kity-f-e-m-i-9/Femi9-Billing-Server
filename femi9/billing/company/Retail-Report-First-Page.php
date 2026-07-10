@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('report');
 $title="Report - Retail";
 ?>
 <!DOCTYPE html>

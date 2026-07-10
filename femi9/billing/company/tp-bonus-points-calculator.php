@@ -35,6 +35,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
 require_once("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 require_once('config.php');
 
 $logged_user_id   = (string)($_SESSION['LOGIN_USER_ID']   ?? '');

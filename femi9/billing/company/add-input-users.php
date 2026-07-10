@@ -17,6 +17,7 @@
 
 ob_start();
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('add_input_stock_users');
 include("config.php");
 
 date_default_timezone_set("Asia/Kolkata");

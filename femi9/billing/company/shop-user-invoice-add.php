@@ -1,4 +1,5 @@
 <?php include("checksession.php"); require_once("include/GodownAccess.php"); 
+require_once("include/PermissionCheck.php"); requirePermission('shop');
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");

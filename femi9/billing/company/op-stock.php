@@ -1,5 +1,6 @@
 <?php
 include("checksession.php"); require_once("include/GodownAccess.php");
+require_once("include/PermissionCheck.php"); requirePermission('products');
 include("config.php");
 error_reporting(0);
 include("RemoveSpecialChar.php");

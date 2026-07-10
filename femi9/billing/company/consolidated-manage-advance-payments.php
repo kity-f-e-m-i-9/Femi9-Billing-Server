@@ -21,6 +21,7 @@ header("Referrer-Policy: strict-origin-when-cross-origin");
 header("Content-Security-Policy: default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.datatables.net https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdn.datatables.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.datatables.net;");
 
 require_once("checksession.php"); 
+require_once("include/PermissionCheck.php"); requirePermission('consolidated_payment_entry');
 require_once("config.php"); 
 
 date_default_timezone_set("Asia/Kolkata");

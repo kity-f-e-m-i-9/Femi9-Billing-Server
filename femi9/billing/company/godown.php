@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('company_profile');
 require_once("include/GodownAccess.php");
 error_reporting(0);
 

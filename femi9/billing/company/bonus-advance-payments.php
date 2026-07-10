@@ -21,6 +21,7 @@ header("X-XSS-Protection: 1; mode=block");
 header("Referrer-Policy: strict-origin-when-cross-origin");
 
 require_once("checksession.php"); 
+require_once("include/PermissionCheck.php"); requirePermission('manage_bonus_points');
 require_once("config.php"); 
 
 date_default_timezone_set("Asia/Kolkata");

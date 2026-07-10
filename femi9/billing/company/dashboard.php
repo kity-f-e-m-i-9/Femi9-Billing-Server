@@ -1,5 +1,6 @@
 <?php 
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('dash');
 include("config.php"); 
 
 ini_set('display_errors', 0);

@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('partner_location');
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) {

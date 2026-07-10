@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('dt');
 include("config.php");
 
 $title="Add Distributor";

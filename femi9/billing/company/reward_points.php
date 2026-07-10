@@ -21,6 +21,7 @@ header("X-XSS-Protection: 1; mode=block");
 
 // Session and Configuration
 require_once("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('reward_points');
 require_once("config.php");
 
 // Error Reporting (disable display_errors in production)

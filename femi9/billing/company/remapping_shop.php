@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('remap');
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");

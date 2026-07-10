@@ -1,4 +1,5 @@
 <?php include("checksession.php"); require_once("include/GodownAccess.php"); ?>
+require_once("include/PermissionCheck.php"); requirePermission('debit_note');
 <!DOCTYPE html>
 <html lang="en">
 

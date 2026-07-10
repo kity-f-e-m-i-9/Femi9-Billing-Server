@@ -22,6 +22,7 @@ ob_start();
 
 // Session and config
 require_once("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('report');
 require_once("config.php");
 
 // Set UTF-8 charset for proper character handling

@@ -1,4 +1,5 @@
 <?php include("checksession.php"); error_reporting(0); include("config.php");?>
+require_once("include/PermissionCheck.php"); requirePermission('users_demo');
 <!DOCTYPE html>
 <html lang="en">
 

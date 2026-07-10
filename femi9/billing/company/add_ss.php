@@ -1,5 +1,6 @@
 <?php 
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('ss');
 
 // Page Configuration
 $title = "Add Super Stockist";

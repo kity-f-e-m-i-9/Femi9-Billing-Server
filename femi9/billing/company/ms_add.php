@@ -1,4 +1,5 @@
 <?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata");?>
+require_once("include/PermissionCheck.php"); requirePermission('ms');
 <!DOCTYPE html>
 <html lang="en">
 

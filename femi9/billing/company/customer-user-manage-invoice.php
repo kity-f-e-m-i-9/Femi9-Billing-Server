@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('cus');
 include("config.php");
 error_reporting(0);
 

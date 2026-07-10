@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('users_network');
 $title="Users Network";
 ?>
 <!DOCTYPE html>

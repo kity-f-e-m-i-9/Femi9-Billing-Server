@@ -1,4 +1,14 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php");
+$__perm_map = array (
+  'super_stockiest' => 'ss',
+  'stockiest' => 'st',
+  'super_distributor' => 'sdt',
+  'distributor' => 'dt',
+);
+$__invuser = $_REQUEST['invuser'] ?? '';
+if (!isset($__perm_map[$__invuser])) { http_response_code(400); die('Invalid request.'); }
+requirePermission($__perm_map[$__invuser]);
 include("config.php");
 error_reporting(0);
 

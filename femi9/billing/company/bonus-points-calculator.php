@@ -22,6 +22,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
 require_once("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('bonus_calculator');
 require_once('config.php');
 require_once('advance-payment-functions.php');
 

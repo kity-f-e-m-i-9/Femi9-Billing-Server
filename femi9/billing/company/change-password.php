@@ -1,5 +1,6 @@
 <?php 
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requireAdminOnly();
 $title = "Change Password";
 include("config.php");
 

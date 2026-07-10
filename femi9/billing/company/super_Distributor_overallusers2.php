@@ -1,4 +1,5 @@
 <?php include("checksession.php"); error_reporting(0);
+require_once("include/PermissionCheck.php"); requirePermission('sdt');
 $getinvuser=$_REQUEST['invuser'];
 
 	$displaytitle="Onboard userwise Overall - Super Distributors";

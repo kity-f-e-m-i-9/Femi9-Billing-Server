@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('manage_input_stock');
 require_once("include/GodownAccess.php");
 error_reporting(0);
 

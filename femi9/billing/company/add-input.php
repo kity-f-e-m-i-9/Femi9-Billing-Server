@@ -15,6 +15,7 @@
 
 ob_start();
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('add_input_stock');
 include("config.php");
 require_once __DIR__ . "/include/GodownAccess.php";
 

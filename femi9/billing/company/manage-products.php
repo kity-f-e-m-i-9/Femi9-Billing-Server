@@ -1,4 +1,5 @@
 <?php include("checksession.php");?>
+require_once("include/PermissionCheck.php"); requirePermission('products');
 <!DOCTYPE html>
 <html lang="en">
 
