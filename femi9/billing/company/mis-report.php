@@ -160,16 +160,17 @@ $ot_row = ['cnt' => 0, 'rev' => 0];
 $ot_units = 0;
 $ot_prev_rev = 0.0;
 if ($scope === 'company') {
-    // 'ID CONCEPT' rows are internal concept/sample orders, not real OT sales.
+    // 'ID CONCEPT' rows (internal concept/sample orders) are counted as real
+    // OT sales throughout this report, per request.
     $ot_row = crow($db_conn,
         "SELECT COUNT(DISTINCT tempid) cnt, COALESCE(SUM(total),0) rev FROM ot_sales
-         WHERE cat!='ID CONCEPT' AND date BETWEEN ? AND ?",
+         WHERE date BETWEEN ? AND ?",
         'ss', [$from, $to]);
     $ot_units = (int)cval($db_conn,
-        "SELECT COALESCE(SUM(qty),0) FROM ot_sales WHERE cat!='ID CONCEPT' AND date BETWEEN ? AND ?",
+        "SELECT COALESCE(SUM(qty),0) FROM ot_sales WHERE date BETWEEN ? AND ?",
         'ss', [$from, $to]);
     $ot_prev_rev = (float)cval($db_conn,
-        "SELECT COALESCE(SUM(total),0) FROM ot_sales WHERE cat!='ID CONCEPT' AND date BETWEEN ? AND ?",
+        "SELECT COALESCE(SUM(total),0) FROM ot_sales WHERE date BETWEEN ? AND ?",
         'ss', [$prev_from, $prev_to]);
 }
 $total_invoices += (int)($ot_row['cnt'] ?? 0);
@@ -184,10 +185,10 @@ if ($scope === 'company') {
         "SELECT COUNT(DISTINCT customer_id) FROM invoice WHERE user_type='company' AND sub_total>0 AND `date` BETWEEN ? AND ?",
         'ss', [$from, $to]);
     // OT sales have no shared customer_id with `invoice`, so their distinct
-    // buyers (by name — the closest thing to an identity OT rows carry,
-    // excluding 'ID CONCEPT' sample rows) are added on top, not deduped in.
+    // buyers (by name — the closest thing to an identity OT rows carry) are
+    // added on top, not deduped in.
     $active_customers += (int)cval($db_conn,
-        "SELECT COUNT(DISTINCT customer_name) FROM ot_sales WHERE cat!='ID CONCEPT' AND `date` BETWEEN ? AND ?",
+        "SELECT COUNT(DISTINCT customer_name) FROM ot_sales WHERE `date` BETWEEN ? AND ?",
         'ss', [$from, $to]);
     $active_businesses = (int)cval($db_conn,
         "SELECT COUNT(DISTINCT CONCAT(to_user_type,'-',to_user_id)) FROM user_invoice WHERE from_user_type='company' AND sub_total>0 AND `date` BETWEEN ? AND ?",
@@ -275,7 +276,7 @@ $gp_ot_union = '';
 $gp_params = [$utype, $from, $to, $utype, $from, $to];
 if ($scope === 'company') {
     $gp_ot_union = "UNION ALL SELECT os.prid, os.qty, 'shop' AS ctype
-         FROM ot_sales os WHERE os.cat!='ID CONCEPT' AND os.date BETWEEN ? AND ?";
+         FROM ot_sales os WHERE os.date BETWEEN ? AND ?";
     $gp_params[] = $from;
     $gp_params[] = $to;
 }
@@ -426,8 +427,20 @@ $yearly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y','%Y',$
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. PRODUCT-WISE SALES
 // ═══════════════════════════════════════════════════════════════════════════
+// OT channel (Amazon/Flipkart/Website/etc.) is folded in for company scope
+// only, same as the Gross Profit union above. 'ID CONCEPT' rows are counted
+// as real sales here, consistent with every other OT query on this report.
+$ps_ot_union  = '';
+$ps_params    = [$utype, $from, $to, $utype, $from, $to];
+if ($scope === 'company') {
+    $ps_ot_union = "UNION ALL
+         SELECT os.prid, os.qty, os.total
+         FROM ot_sales os WHERE os.date BETWEEN ? AND ?";
+    $ps_params[] = $from;
+    $ps_params[] = $to;
+}
 $product_sales = call_rows($db_conn,
-    "SELECT p.productName,
+    "SELECT p.id pid, p.productName,
             COALESCE(SUM(d.qty),0) total_qty,
             COALESCE(SUM(d.total),0) total_rev
      FROM (
@@ -438,10 +451,39 @@ $product_sales = call_rows($db_conn,
          SELECT uii.pr_id, uii.qty, uii.total
          FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
          WHERE ui.from_user_type=? AND ui.date BETWEEN ? AND ?{$tc_uii}
+         {$ps_ot_union}
      ) d JOIN products p ON p.id=d.pr_id
      GROUP BY p.id, p.productName ORDER BY total_qty DESC LIMIT 25",
-    'ssssss', [$utype, $from, $to, $utype, $from, $to]);
+    str_repeat('s', count($ps_params)), $ps_params);
 $grand_qty = array_sum(array_column($product_sales, 'total_qty')) ?: 1;
+
+// Per-product returns, scoped the same way as the Returns KPI above (same
+// to_usertype/to_userid/date filters, no status filter — matches every
+// return regardless of accept/pending/reject, for consistency with $total_returns).
+// OT returns (ot_sales_return) are folded in for company scope only, same
+// gating as OT sales above.
+$pr_ot_union  = '';
+$pr_params    = [$utype, $from, $to];
+if ($scope === 'company') {
+    $pr_ot_union = "UNION ALL
+         SELECT osr.prid pid, osr.qty ret_qty, osr.total ret_amt
+         FROM ot_sales_return osr
+         WHERE osr.return_date BETWEEN ? AND ?";
+    $pr_params[] = $from;
+    $pr_params[] = $to;
+}
+$product_returns = call_rows($db_conn,
+    "SELECT pid, COALESCE(SUM(ret_qty),0) ret_qty, COALESCE(SUM(ret_amt),0) ret_amt FROM (
+        SELECT ri.prid pid, ri.qty ret_qty, ri.total ret_amt
+        FROM user_return_stock_items ri
+        WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+        {$pr_ot_union}
+     ) x GROUP BY pid",
+    str_repeat('s', count($pr_params)), $pr_params);
+$returns_by_pid = [];
+foreach ($product_returns as $r) {
+    $returns_by_pid[(int)$r['pid']] = ['qty' => (float)$r['ret_qty'], 'amt' => (float)$r['ret_amt']];
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. STATE / DISTRICT-WISE (shop invoices → shop → partner_location_nodes)
@@ -1125,18 +1167,21 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
                                         <p class="text-muted text-center py-3">No data.</p>
                                     <?php else: ?>
                                     <table class="mt">
-                                        <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Revenue</th><th>Share</th></tr></thead>
+                                        <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Revenue</th><th>Returned Qty</th><th>Returned Amount</th><th>Share</th></tr></thead>
                                         <tbody>
                                         <?php foreach ($product_sales as $i => $p): ?>
                                             <?php
                                             $pct = $grand_qty>0 ? round($p['total_qty']/$grand_qty*100,1) : 0;
                                             $bc  = '#2a78d6';
+                                            $ret = $returns_by_pid[(int)$p['pid']] ?? ['qty' => 0, 'amt' => 0];
                                             ?>
                                             <tr>
                                                 <td><?php echo $i+1; ?></td>
                                                 <td><b><?php echo htmlspecialchars($p['productName']); ?></b></td>
                                                 <td><span class="bq"><?php echo inr_format((int)$p['total_qty'], 0); ?></span></td>
                                                 <td><span class="br">₹<?php echo inr_format($p['total_rev'], 2); ?></span></td>
+                                                <td><?php echo inr_format((int)$ret['qty'], 0); ?></td>
+                                                <td>₹<?php echo inr_format($ret['amt'], 2); ?></td>
                                                 <td><div style="display:flex;align-items:center;gap:5px">
                                                     <div class="pbar" style="width:70px"><div class="pf" style="width:<?php echo $pct; ?>%;background:<?php echo $bc; ?>"></div></div>
                                                     <span style="font-size:12px"><?php echo $pct; ?>%</span>
