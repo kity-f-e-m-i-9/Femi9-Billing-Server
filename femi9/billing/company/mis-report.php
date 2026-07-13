@@ -13,10 +13,45 @@ $mis_type = 'sales';
 $preset   = $_GET['preset'] ?? 'month';
 $today    = date('Y-m-d');
 
+// A 'neksomo' login only ever sees the entity-scoped Pieces Sold report (see
+// below) — every other section on this page (KPIs, channel breakdown,
+// product-wise revenue, state/district, TP performance) aggregates ALL three
+// company entities together with no per-entity filter, so showing them to a
+// neksomo login would leak Femi Health Care / Femi Nayan LLP figures.
+$__viewerType   = get_login_usertype($db_conn);
+$is_neksomo_view = ($__viewerType === 'neksomo');
+
 // ── Scope: company (direct, all-channel) vs a single channel's transactions ─
-$scope = $_GET['scope'] ?? 'tp';
+$scope = $is_neksomo_view ? 'company' : ($_GET['scope'] ?? 'tp');
 if (!in_array($scope, ['company', 'tp', 'super_stockiest', 'stockiest'], true)) $scope = 'tp';
 $filter_tp = ($scope === 'tp') ? (int)($_GET['tp_id'] ?? 0) : 0;   // 0 = all TPs, only meaningful in tp scope
+
+// ── Entity filter (company scope only) — which company_godown "sold" the
+// goods (invoice/user_invoice/ot_sales all carry the godown id as the seller
+// id when user_type='company'). Dropdown is pre-scoped by GodownAccess.php,
+// so e.g. a regular admin/user only ever sees Femi Nayan LLP (the one
+// non-finance-only entity), finance sees all three, and neksomo sees only
+// Neksomo Hygiene Industries.
+$all_entities = ($scope === 'company')
+    ? call_rows($db_conn, "SELECT id, gname FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY gname ASC")
+    : [];
+$filter_entity = ($scope === 'company') ? (int)($_GET['entity_id'] ?? 0) : 0;
+if ($filter_entity > 0 && !is_godown_allowed($db_conn, $filter_entity)) $filter_entity = 0;
+if ($filter_entity === 0 && count($all_entities) === 1) $filter_entity = (int)$all_entities[0]['id'];
+$entity_ids_subq = ($scope === 'company') ? godown_ids_subquery($db_conn) : '';
+
+// The neksomo dashboard report specifically shows FEMI NAYAN LLP's sales
+// (per explicit request), not the neksomo login's own GodownAccess.php data
+// scope (NEKSOMO HYGIENE INDUSTRIES) — general godown access for this login
+// elsewhere in the app is intentionally left untouched, this override is
+// local to this report only.
+if ($is_neksomo_view) {
+    $__llpRow = crow($db_conn, "SELECT id, gname FROM company_godown WHERE gname = 'FEMI NAYAN LLP' LIMIT 1");
+    if (!empty($__llpRow['id'])) {
+        $filter_entity = (int)$__llpRow['id'];
+        $all_entities  = [$__llpRow];
+    }
+}
 
 switch ($preset) {
     case 'today':  $df = $today; $dt = $today; break;
@@ -458,6 +493,72 @@ $product_sales = call_rows($db_conn,
     str_repeat('s', count($ps_params)), $ps_params);
 $grand_qty = array_sum(array_column($product_sales, 'total_qty')) ?: 1;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PIECES SOLD — company-scope sales converted from pack qty to individual
+// pieces (qty × products.pieces_per_pack), attributed to a single legal
+// entity (company_godown) since invoice/user_invoice/ot_sales all carry the
+// godown id as the seller id when user_type='company'. Products with no
+// pieces_per_pack set fall back to 1 (pieces == pack qty), flagged in the UI.
+// Entity-scoped by GodownAccess.php: $filter_entity picks one allowed
+// godown, or falls back to every godown this login is allowed to see.
+// ═══════════════════════════════════════════════════════════════════════════
+$pieces_sold = [];
+$grand_total_pieces = 0;
+$grand_total_pack_qty = 0;
+$grand_total_value = 0.0;
+$grand_total_unrated_pieces = 0;
+$selected_entity_name = 'All Visible Entities';
+if ($scope === 'company') {
+    $pcs_ii_cond  = $filter_entity > 0 ? " AND ii.user_id={$filter_entity}"       : " AND ii.user_id IN ({$entity_ids_subq})";
+    $pcs_uii_cond = $filter_entity > 0 ? " AND uii.from_user_id={$filter_entity}" : " AND uii.from_user_id IN ({$entity_ids_subq})";
+    $pcs_ot_cond  = $filter_entity > 0 ? " AND os.godownid={$filter_entity}"      : " AND os.godownid IN ({$entity_ids_subq})";
+
+    // Per-day granularity is kept through the first aggregation (d.pr_id,
+    // d.date) so each day's pieces can be valued against whichever
+    // neksomo_llp_piece_rates row was effective ON THAT DATE (the latest
+    // effective_date <= the sale date) — a rate takes effect the day it's
+    // entered and holds until a later effective_date for the same product
+    // supersedes it. Only then is everything rolled up to one row per product.
+    $pieces_sold = call_rows($db_conn,
+        "SELECT p.id pid, p.productName, p.pieces_per_pack,
+                COALESCE(SUM(dp.day_qty),0) total_qty,
+                COALESCE(SUM(dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1)),0) total_pieces,
+                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.rate ELSE 0 END),0) total_value,
+                COALESCE(SUM(CASE WHEN dp.rate IS NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) ELSE 0 END),0) unrated_pieces
+         FROM (
+             SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
+                    (SELECT r.rate_per_piece FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = d.pr_id AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) rate
+             FROM (
+                 SELECT ii.pr_id, ii.qty, i.date
+                 FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+                 WHERE i.user_type=? AND i.date BETWEEN ? AND ?{$pcs_ii_cond}
+                 UNION ALL
+                 SELECT uii.pr_id, uii.qty, ui.date
+                 FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+                 WHERE ui.from_user_type=? AND ui.date BETWEEN ? AND ?{$pcs_uii_cond}
+                 UNION ALL
+                 SELECT os.prid, os.qty, os.date
+                 FROM ot_sales os
+                 WHERE os.date BETWEEN ? AND ?{$pcs_ot_cond}
+             ) d
+             GROUP BY d.pr_id, d.date
+         ) dp JOIN products p ON p.id = dp.pr_id
+         GROUP BY p.id, p.productName, p.pieces_per_pack
+         ORDER BY total_pieces DESC",
+        'ssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to]);
+
+    $grand_total_pieces         = (int) array_sum(array_column($pieces_sold, 'total_pieces'));
+    $grand_total_pack_qty       = (int) array_sum(array_column($pieces_sold, 'total_qty'));
+    $grand_total_value          = (float) array_sum(array_column($pieces_sold, 'total_value'));
+    $grand_total_unrated_pieces = (int) array_sum(array_column($pieces_sold, 'unrated_pieces'));
+    if ($filter_entity > 0) {
+        $entity_names = array_column($all_entities, 'gname', 'id');
+        $selected_entity_name = $entity_names[$filter_entity] ?? 'Selected Entity';
+    }
+}
+
 // Per-product returns, scoped the same way as the Returns KPI above (same
 // to_usertype/to_userid/date filters, no status filter — matches every
 // return regardless of accept/pending/reject, for consistency with $total_returns).
@@ -661,6 +762,140 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales,'total_
 $j_tplabels= json_encode(array_column($tp_perf,'tp_name'));
 $j_tprevs  = json_encode(array_map(fn($r)=>round($r['revenue'],0), $tp_perf));
 $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NEKSOMO STANDALONE VIEW — a self-contained page showing only the
+// entity-scoped Pieces Sold report, then exits before the full report below
+// (which aggregates all company entities together with no per-entity filter)
+// ever renders. See $is_neksomo_view comment near the top of this file.
+// ═══════════════════════════════════════════════════════════════════════════
+if ($is_neksomo_view) {
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pieces Sold Report : <?php echo $business_name; ?></title>
+    <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
+    <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
+    <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
+    <link href="../../assets/css/main.min.css" rel="stylesheet">
+    <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="../../assets/images/neptune.png">
+    <style>
+        body { background:#f7f7f6; }
+        .mt { width:100%; border-collapse:collapse; font-size:13px; }
+        .mt th { background:#f7f7f6; font-weight:600; color:#52514e; padding:8px 11px; text-align:left; border-bottom:1px solid #e1e0d9; white-space:nowrap; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px; }
+        .mt td { padding:7px 11px; border-bottom:1px solid #e1e0d9; vertical-align:middle; }
+        .mt tr:hover td { background:#f7f7f6; }
+        .kpi-card { background:#fff; border:1px solid rgba(11,11,11,0.10); border-radius:10px; padding:16px 18px; height:100%; }
+        .kpi-t { font-size:11px; text-transform:uppercase; letter-spacing:.5px; font-weight:600; color:#52514e; }
+        .kpi-v { font-size:24px; font-weight:700; margin-top:6px; color:#0b0b0b; }
+    </style>
+</head>
+<body>
+<div class="app align-content-stretch d-flex flex-wrap">
+    <div class="app-sidebar">
+        <?php include("logo.php"); ?>
+        <?php include("femi_menu.php"); ?>
+    </div>
+    <div class="app-container">
+        <?php include("app-header.php"); ?>
+        <div class="app-content">
+            <div class="content-wrapper">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col">
+                            <h1>
+                                <i class="material-icons-outlined" style="vertical-align:middle;margin-right:6px;">inventory_2</i>
+                                Pieces Sold Report — <?php echo htmlspecialchars($selected_entity_name); ?>
+                            </h1>
+                        </div>
+                    </div>
+
+                    <div style="background:#fff;border:1px solid rgba(11,11,11,.1);border-radius:10px;padding:14px 18px;margin-bottom:14px;">
+                        <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+                            <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">From</label>
+                                <input type="date" name="from" value="<?php echo htmlspecialchars($from); ?>" class="form-control form-control-sm">
+                            </div>
+                            <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">To</label>
+                                <input type="date" name="to" value="<?php echo htmlspecialchars($to); ?>" class="form-control form-control-sm">
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty Sold</div><div class="kpi-v"><?php echo number_format($grand_total_pack_qty); ?></div></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo number_format($grand_total_pieces); ?></div></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Total Value</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_value, 2); ?></div></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Period</div><div class="kpi-v" style="font-size:15px;"><?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></div></div>
+                        </div>
+                    </div>
+
+                    <?php if ($grand_total_unrated_pieces > 0): ?>
+                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unrated_pieces); ?> pieces sold before any rate was set for their product — excluded from Total Value. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
+                    <?php endif; ?>
+
+                    <div class="card">
+                        <div class="card-header"><h5 class="card-title">Product-wise Pieces Sold</h5></div>
+                        <div class="card-body">
+                            <div style="overflow-x:auto;">
+                            <table class="mt">
+                                <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Pieces/Pack</th><th>Total Pieces Sold</th><th>Value &#8377;</th></tr></thead>
+                                <tbody>
+                                <?php if (empty($pieces_sold)): ?>
+                                    <tr><td colspan="5" style="text-align:center;color:#898781;">No sales in this period.</td></tr>
+                                <?php else: foreach ($pieces_sold as $row): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($row['productName']); ?></td>
+                                        <td><?php echo number_format((int)$row['total_qty']); ?></td>
+                                        <td><?php echo $row['pieces_per_pack'] !== null ? (int)$row['pieces_per_pack'] : '1 *'; ?></td>
+                                        <td><strong><?php echo number_format((int)$row['total_pieces']); ?></strong></td>
+                                        <td>
+                                            &#8377;<?php echo number_format((float)$row['total_value'], 2); ?>
+                                            <?php if ((float)$row['unrated_pieces'] > 0): ?>
+                                            <div style="font-size:11px;color:#dc2626;"><?php echo number_format((int)$row['unrated_pieces']); ?> pcs unrated</div>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                                </tbody>
+                            </table>
+                            </div>
+                            <p style="font-size:11.5px;color:#898781;margin-top:10px;">* Pack size not set for this product — pieces shown equal pack quantity. Value uses whichever Femi9 LLP rate was effective on each sale's actual date.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
+<script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+<script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
+<script src="../../assets/plugins/pace/pace.min.js"></script>
+<script src="../../assets/js/main.min.js"></script>
+<script src="../../assets/js/custom.js"></script>
+</body>
+</html>
+<?php
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1210,6 +1445,73 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
                             </div>
                         </div>
                     </div>
+
+                    <?php if ($scope === 'company'): ?>
+                    <!-- ══ PIECES SOLD (BY ENTITY) ═══════════════════════════ -->
+                    <div class="row mis-section" id="sec-pieces">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                                    <h5 class="card-title">Pieces Sold — <?php echo htmlspecialchars($selected_entity_name); ?></h5>
+                                    <?php if (count($all_entities) > 1): ?>
+                                    <form method="get" style="display:flex;gap:8px;align-items:center;">
+                                        <input type="hidden" name="scope" value="company">
+                                        <input type="hidden" name="preset" value="<?php echo htmlspecialchars($preset); ?>">
+                                        <input type="hidden" name="from" value="<?php echo htmlspecialchars($from); ?>">
+                                        <input type="hidden" name="to" value="<?php echo htmlspecialchars($to); ?>">
+                                        <select name="entity_id" class="form-control form-control-sm" onchange="this.form.submit()">
+                                            <option value="0" <?php echo $filter_entity === 0 ? 'selected' : ''; ?>>All Visible Entities</option>
+                                            <?php foreach ($all_entities as $ent): ?>
+                                            <option value="<?php echo (int)$ent['id']; ?>" <?php echo $filter_entity === (int)$ent['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($ent['gname']); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </form>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto">
+                                    <div class="row mb-3">
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty</div><div class="kpi-v"><?php echo number_format($grand_total_pack_qty); ?></div></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo number_format($grand_total_pieces); ?></div></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Total Value</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_value, 2); ?></div></div>
+                                        </div>
+                                    </div>
+                                    <?php if ($grand_total_unrated_pieces > 0): ?>
+                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unrated_pieces); ?> pieces sold before any Femi9 LLP rate was set for their product — excluded from Total Value.</div>
+                                    <?php endif; ?>
+                                    <?php if (empty($pieces_sold)): ?>
+                                        <p class="text-muted text-center py-3">No data.</p>
+                                    <?php else: ?>
+                                    <table class="mt">
+                                        <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Pieces/Pack</th><th>Total Pieces Sold</th><th>Value &#8377;</th></tr></thead>
+                                        <tbody>
+                                        <?php foreach ($pieces_sold as $row): ?>
+                                            <tr>
+                                                <td><b><?php echo htmlspecialchars($row['productName']); ?></b></td>
+                                                <td><span class="bq"><?php echo number_format((int)$row['total_qty']); ?></span></td>
+                                                <td><?php echo $row['pieces_per_pack'] !== null ? (int)$row['pieces_per_pack'] : '1 *'; ?></td>
+                                                <td><b><?php echo number_format((int)$row['total_pieces']); ?></b></td>
+                                                <td>
+                                                    &#8377;<?php echo number_format((float)$row['total_value'], 2); ?>
+                                                    <?php if ((float)$row['unrated_pieces'] > 0): ?>
+                                                    <div style="font-size:11px;color:#dc2626;"><?php echo number_format((int)$row['unrated_pieces']); ?> pcs unrated</div>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                    <p class="snote" style="margin-top:8px;">* Pack size not set for this product — pieces shown equal pack quantity. Value uses whichever Femi9 LLP rate was effective on each sale's actual date.</p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
                     <!-- ══ STATE / DISTRICT ══════════════════════════════════ -->
                     <div class="row mis-section" id="sec-geo">

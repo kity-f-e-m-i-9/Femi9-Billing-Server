@@ -102,7 +102,13 @@ $tempID="".$randum_number."/".$temp_date."/".$temp_time."";?>
                                             <div class="example-content">
                                                 <label for="exampleInputEmail1" class="form-label">Product Name</label>
                                                 <input type="text" required="" name="productName" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
-												
+
+												<label for="exampleInputEmail1" class="form-label">Pieces per Pack <small class="text-muted">(optional)</small></label>
+                                                <input type="number" min="0" name="pieces_per_pack" class="form-control" onkeypress="restrictnumber(event)" placeholder="e.g. 12">
+
+												<label for="exampleInputEmail1" class="form-label">Purchase Price (per Pack) <small class="text-muted">(optional)</small></label>
+                                                <input type="number" min="0" step="0.01" name="purchase_price" class="form-control" placeholder="Cost price you pay per pack">
+
 												 <label for="exampleInputEmail1" class="form-label">MRP</label>
                                                 <input type="number" min="0" max="999" required="" name="mrp" class="form-control" onkeypress="restrictnumber(event)" id="exampleInputEmail1" aria-describedby="emailHelp">
 												

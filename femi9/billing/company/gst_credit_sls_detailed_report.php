@@ -91,7 +91,19 @@ while ($row = mysqli_fetch_assoc($fetch_Report2)) {
     $rows2[] = $row;
 }
 
-$overall_total = $total1 + $total2;
+// ✅ BLOCK 3: TP sales returns (credit notes), godown-sourced only.
+require_once "include/TpGstHelper.php";
+$tp_lines = tp_credit_gst_lines($db_conn, $from_date, $to_date, "tpi.source_godown_id = '$get_godown_id'");
+$want_intra = ($gst_type == 'inner');
+$want_register = ($buyer_gsttype == 'register');
+$tp_lines = array_filter($tp_lines, function ($l) use ($want_intra, $want_register) {
+    return $l['is_intra'] === $want_intra && $l['is_registered'] === $want_register;
+});
+$rows3 = tp_group_lines($tp_lines, 'returnid');
+$total3 = 0;
+foreach ($rows3 as $row) { $total3 += $row['taxable_value']; }
+
+$overall_total = $total1 + $total2 + $total3;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -141,7 +153,7 @@ $overall_total = $total1 + $total2;
                                         <tr>
                                             <td>
                                                 <h1>GSTR1 &gt; Detailed Sales Report &gt; <span style="color:red;">Credit</span> Note</h1>
-                                                <h4>(SS, ST, DT, SHP, CUS)</h4>
+                                                <h4>(SS, ST, DT, SHP, CUS, TP)</h4>
                                                 <h5><?= htmlspecialchars($lable_header) ?></h5>
                                             </td>
                                         </tr>
@@ -193,6 +205,20 @@ $overall_total = $total1 + $total2;
                                         <td><?= date("d/m/Y", strtotime($row['invoice_date'])) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['return_date'])) ?></td>
                                         <td align="right"><b><?= inr_format($row['total_sls_amount'], 2) ?></b></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+
+                                    <?php foreach ($rows3 as $row): $sn++; ?>
+                                    <tr>
+                                        <td><?= $sn ?></td>
+                                        <td>Territory Partner</td>
+                                        <td><?= htmlspecialchars($row['tp_name']) ?></td>
+                                        <td><?= htmlspecialchars($row['tp_mobile']) ?></td>
+                                        <td><?= htmlspecialchars($row['tp_gstin']) ?></td>
+                                        <td><?= htmlspecialchars($row['invoice_number']) ?></td>
+                                        <td><?= date("d/m/Y", strtotime($row['invoice_date'])) ?></td>
+                                        <td><?= date("d/m/Y", strtotime($row['return_date'])) ?></td>
+                                        <td align="right"><b><?= inr_format($row['taxable_value'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 

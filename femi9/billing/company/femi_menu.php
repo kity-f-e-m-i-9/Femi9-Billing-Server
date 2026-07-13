@@ -127,8 +127,108 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         </ul>
                     </li>
 					<?php }?>
-					
-					
+
+
+<!-------------------------------------------------------------------------------------------------->
+<!--------------------------------------------NEKSOMO------------------------------------------------>
+<!-------------------------------------------------------------------------------------------------->
+					<?php if($LoginusertypeGET=="neksomo"){?>
+
+					<li>
+                        <a href="dashboard"><i class="material-icons-two-tone">dashboard</i>Dashboard</a>
+                    </li>
+
+					<li>
+                        <a href="expense-tracker"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">receipt_long</i>Expense Tracker</a>
+                    </li>
+
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">sell</i>Sale to Femi9 LLP<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="neksomo-llp-piece-sale.php">Add Entry</a></li>
+						<li><a href="neksomo-llp-piece-sale-manage.php">Manage Entries</a></li>
+                        </ul>
+                    </li>
+
+					<li>
+                        <a href="Report_company" class="active"><i class="material-icons-two-tone">view_agenda</i>Report - Company</a>
+                    </li>
+					<li>
+                        <a href="Report-First-Page" <?php if($current_page == 'Report-First-Page' || $current_page == 'Report-Details') echo 'class="active"'; ?>>
+                            <i class="material-icons-two-tone">view_agenda</i>Report - B2B
+                        </a>
+                    </li>
+
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">analytics</i>GST Reports<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="GSTR1">GSTR1</a></li>
+						<li><a href="GSTR3B">GSTR3B</a></li>
+                        </ul>
+                    </li>
+
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">done</i>Internal Stock Transfer<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="internal_transfer">Add Internal Stock Transfer</a></li>
+						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
+                        </ul>
+                    </li>
+
+					<li class="active-page">
+                        <a href="stock_request_pending_accounts" class="active"><i class="material-icons-two-tone">done</i>Stock Request</a>
+                    </li>
+
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">done</i>Input Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="add-input">Add Input Stock</a></li>
+                        <li><a href="manage-input">Manage Input Stocks</a></li>
+						<li><a href="add-input-users">Add Input Stock Users</a></li>
+                        <li><a href="manage-input-users">Manage Input Stocks Users</a></li>
+                        </ul>
+                    </li>
+
+					<li>
+                        <a href="overall-stock"><i class="material-icons-two-tone">done</i>Overall Stock</a>
+                    </li>
+
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">done</i>OT Channel Sales<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="ot-sale-cat">Category</a></li>
+						<li><a href="ot-sale-add">Add Sale</a></li>
+						<li><a href="ot-sale-view">Manage Sales</a></li>
+						<li><a href="ot-sale-manage-return">Manage Return</a></li>
+                        </ul>
+                    </li>
+					<li>
+                        <a href="OT-Report-Detail-Page"><i class="material-icons-two-tone">view_agenda</i>Report - OT Channel</a>
+                    </li>
+
+
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">sentiment_satisfied_alt</i>Delivery Note(INV)<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+                            <li><a href="invoiceDLN?invuser=super_stockiest">SS Invoice</a></li>
+							<li><a href="invoiceDLN?invuser=stockiest">Stockist Invoice</a></li>
+							<li><a href="invoiceDLN?invuser=distributor">Distributor Invoice</a></li>
+							<li><a href="ShopDLN">Shop Invoice</a></li>
+							<li><a href="CustomerDLN">Customer Invoice</a></li>
+                        </ul>
+                    </li>
+
+					<li>
+                        <a href=""><i class="material-icons-two-tone">security</i>Security<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+                            <li>
+                                <a href="logout" onclick="return confirm('You want to logout confirm?');">Logout (Neksomo)</a>
+                            </li>
+                        </ul>
+                    </li>
+					<?php }?>
+
+
 <!-------------------------------------------------------------------------------------------------->
 <!--------------------------------------------ADMIN------------------------------------------------->
 <!-------------------------------------------------------------------------------------------------->

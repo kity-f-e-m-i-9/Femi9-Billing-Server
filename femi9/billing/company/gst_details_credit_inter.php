@@ -36,4 +36,12 @@ $result_TOT_inter_unregister_creditOT=mysqli_fetch_array($fetch_TOT_inter_unregi
 							   {$total_inter_unregister_creditOT=$result_TOT_inter_unregister_creditOT[0];
 							   }else{$total_inter_unregister_creditOT="0";}
 
+	// TP sales returns (credit notes), godown-sourced only, inter-state.
+	require_once __DIR__ . '/include/TpGstHelper.php';
+	$tp_credit_lines_inter = tp_credit_gst_lines($db_conn, $from_date, $to_date, "tpi.source_godown_id = '$get_godown_id'");
+	$tp_credit_totals_inter = tp_gst_bucket_totals($tp_credit_lines_inter);
+	$total_reg_TP_credit_inter = $tp_credit_totals_inter['reg_inter'];
+	$total_unreg_TP_credit_inter = $tp_credit_totals_inter['unreg_inter'];
+
+
 ?>

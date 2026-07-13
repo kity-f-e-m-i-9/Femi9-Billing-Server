@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/GodownAccess.php");
 include("config.php");
 $title = "GST Report";
 date_default_timezone_set("Asia/Kolkata");
@@ -25,6 +26,8 @@ $select_picnode_list = "
     FROM user_invoice ui
     LEFT JOIN user_invoice_items ii ON ii.inv_id = ui.inv_id
     WHERE ui.date BETWEEN '$get_from_date' AND '$get_to_date'
+      AND ui.from_user_type = 'company'
+      AND ui.from_user_id IN (" . godown_ids_subquery($db_conn) . ")
     GROUP BY ui.inv_id, ui.inv_number, ui.date, ui.gst_type
     ORDER BY ui.id ASC
 ";
@@ -40,6 +43,36 @@ while ($row = mysqli_fetch_assoc($fetch_picnode_list)) {
     $row['igst']  = $gst_amount;
     $rows[] = $row;
 }
+
+// TP invoices (company -> territory partner stock transfers), godown-sourced only.
+// Intra/inter determined from the TP's branch_state vs the source godown's state.
+require_once "include/TpGstHelper.php";
+$tp_lines = tp_sales_gst_lines($db_conn, $get_from_date, $get_to_date, "tpi.source_godown_id IN (" . godown_ids_subquery($db_conn) . ")");
+
+$tp_invoices = [];
+foreach ($tp_lines as $line) {
+    $id = $line['tp_invoice_id'];
+    if (!isset($tp_invoices[$id])) {
+        $tp_invoices[$id] = [
+            'inv_number' => $line['invoice_number'], 'date' => $line['invoice_date'],
+            'is_intra' => $line['is_intra'], 'taxable_amount' => 0, 'gst_amount' => 0,
+        ];
+    }
+    $tp_invoices[$id]['taxable_amount'] += $line['taxable_value'];
+    $tp_invoices[$id]['gst_amount']     += $line['gst_amount'];
+}
+foreach ($tp_invoices as $tp_row) {
+    $rows[] = [
+        'inv_number'     => $tp_row['inv_number'],
+        'date'           => $tp_row['date'],
+        'gst_type'       => $tp_row['is_intra'] ? 'inner' : 'outer',
+        'taxable_amount' => $tp_row['taxable_amount'],
+        'cgst'           => $tp_row['gst_amount'] / 2,
+        'sgst'           => $tp_row['gst_amount'] / 2,
+        'igst'           => $tp_row['gst_amount'],
+    ];
+}
+usort($rows, fn($a, $b) => strcmp($a['date'], $b['date']));
 ?>
 <!DOCTYPE html>
 <html lang="en">

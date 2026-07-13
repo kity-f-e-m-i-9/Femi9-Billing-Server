@@ -35,8 +35,26 @@ if ($resetData) {
 }
 // ========================================
 
-header('Location: mis-report.php');
-exit;
+// MIS Report is only a valid landing page for accounts that can actually
+// view it (admin/finance/neksomo bypass all permission checks, matching
+// PermissionCheck.php's requirePermission(); 'users' accounts need
+// report=1). Redirecting everyone unconditionally locked out any 'users'
+// account without report access right after login.
+$__dashUsertype = $result_LoGuserDtails['usertype'] ?? '';
+$__canViewReport = ($__dashUsertype === 'admin' || $__dashUsertype === 'finance' || $__dashUsertype === 'neksomo');
+if (!$__canViewReport) {
+    $__repStmt = mysqli_prepare($db_conn, "SELECT report FROM admin_log WHERE username = ? LIMIT 1");
+    mysqli_stmt_bind_param($__repStmt, "s", $log_username);
+    mysqli_stmt_execute($__repStmt);
+    $__repRow = mysqli_stmt_get_result($__repStmt)->fetch_assoc();
+    mysqli_stmt_close($__repStmt);
+    $__canViewReport = ((int)($__repRow['report'] ?? 0) === 1);
+}
+
+if ($__canViewReport) {
+    include("mis-report.php");
+    exit;
+}
 
 date_default_timezone_set("Asia/Kolkata");
 $today_date=date("Y-m-d");

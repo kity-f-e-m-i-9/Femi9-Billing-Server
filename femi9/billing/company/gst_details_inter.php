@@ -57,4 +57,12 @@ $select_sum_total_inter_OTSLSUN="select sum(total) from ot_sales where buyer_gst
 							   {$total_reg_OTSLSUN_inter=$result_sum_total_inter_OTSLSUN[0];
 							   }else{$total_reg_OTSLSUN_inter="0";}
 
+	// TP sales (company -> territory partner stock transfers), godown-sourced only, inter-state.
+	require_once __DIR__ . '/include/TpGstHelper.php';
+	$tp_sls_lines_inter = tp_sales_gst_lines($db_conn, $from_date, $to_date, "tpi.source_godown_id = '$get_godown_id'");
+	$tp_sls_totals_inter = tp_gst_bucket_totals($tp_sls_lines_inter);
+	$total_reg_TP_inter = $tp_sls_totals_inter['reg_inter'];
+	$total_unreg_TP_inter = $tp_sls_totals_inter['unreg_inter'];
+
+
 							   ?>

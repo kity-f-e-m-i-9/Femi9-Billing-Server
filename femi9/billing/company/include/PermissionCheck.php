@@ -8,8 +8,10 @@
  * checksession.php + config.php on every permission-mapped page — it
  * enforces the exact same admin_log boolean column the menu already checks.
  *
- * Company owner (usertype='admin') and 'finance' always pass, matching
- * femi_menu.php where those two roles' menu blocks have no per-item checks.
+ * Company owner (usertype='admin'), 'finance', and 'neksomo' always pass,
+ * matching femi_menu.php where those roles' menu blocks have no per-item
+ * checks. 'neksomo' is instead scoped at the data level via GodownAccess.php
+ * (restricted to the NEKSOMO HYGIENE INDUSTRIES godown only).
  */
 
 function requirePermission(string $perm): void
@@ -51,7 +53,7 @@ function requirePermission(string $perm): void
         exit;
     }
 
-    if ($row['usertype'] === 'admin' || $row['usertype'] === 'finance') {
+    if ($row['usertype'] === 'admin' || $row['usertype'] === 'finance' || $row['usertype'] === 'neksomo') {
         return;
     }
 

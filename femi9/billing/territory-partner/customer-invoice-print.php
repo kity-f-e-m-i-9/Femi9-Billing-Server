@@ -1,6 +1,11 @@
 <?php
 include("checksession.php");
 include("config.php");
+if (isset($_SESSION['reward_notification'])) {
+    require_once 'include/invoice-reward-integration.php';
+    displayRewardNotification($_SESSION['reward_notification']);
+    unset($_SESSION['reward_notification']);
+}
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 

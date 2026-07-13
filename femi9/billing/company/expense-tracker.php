@@ -38,8 +38,11 @@ $db_conn->query("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// Company profiles (finance-only restricted, same pattern as TP Advance Payments)
-$company_profiles = $db_conn->query("SELECT id, gname FROM company_godown WHERE gname LIKE '%Femi%' AND " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC")->fetch_all(MYSQLI_ASSOC);
+// Company profiles (finance-only restricted, same pattern as TP Advance Payments).
+// Not filtered by name — godown_finance_filter_sql() already encodes the full
+// access rule per login type (finance sees all, neksomo sees only its own
+// entity, everyone else sees only the non-finance-only entity).
+$company_profiles = $db_conn->query("SELECT id, gname FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC")->fetch_all(MYSQLI_ASSOC);
 $default_company_id = $company_profiles[0]['id'] ?? 0;
 
 $filter_company = isset($_GET['company_id']) ? (int)$_GET['company_id'] : $default_company_id;

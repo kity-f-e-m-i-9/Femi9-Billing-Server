@@ -70,6 +70,11 @@ if (isset($_POST['add-product'])) {
     $gst_type = in_array($_POST['gst_type'] ?? '', ['inclusive', 'exclusive']) ? $_POST['gst_type'] : 'exclusive';
     $rwpoints = sanitizeInput($_POST['rwpoints'] ?? '0');
     $hsn = sanitizeInput($_POST['hsn'] ?? '');
+    $pieces_per_pack = trim($_POST['pieces_per_pack'] ?? '');
+    $pieces_per_pack = ($pieces_per_pack === '') ? null : (int) $pieces_per_pack;
+    $purchase_price = trim($_POST['purchase_price'] ?? '');
+    $purchase_price = ($purchase_price === '') ? null : (float) $purchase_price;
+    $purchase_price_per_piece = ($purchase_price !== null && $pieces_per_pack) ? round($purchase_price / $pieces_per_pack, 4) : null;
 
     // Check if product already exists
     $stmt = $db_conn->prepare("SELECT COUNT(*) as numProducts FROM products WHERE temp_id = ?");
@@ -77,18 +82,18 @@ if (isset($_POST['add-product'])) {
     $stmt->execute();
     $result = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    
+
     if ($result['numProducts'] == 0) {
         // Insert new product
         $stmt = $db_conn->prepare(
-            "INSERT INTO products (temp_id, productName, mrp, supersstock_price, super_distributor_price,
+            "INSERT INTO products (temp_id, productName, pieces_per_pack, purchase_price, purchase_price_per_piece, mrp, supersstock_price, super_distributor_price,
             stockist_price, distributor_price, outlet_price, gst, gst_type, hsn, rwpoints, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
         );
 
         $stmt->bind_param(
-            "ssdddddddssd",
-            $temp_id, $productName, $mrp, $supersstock_price, $super_distributor_price,
+            "ssidddddddddssd",
+            $temp_id, $productName, $pieces_per_pack, $purchase_price, $purchase_price_per_piece, $mrp, $supersstock_price, $super_distributor_price,
             $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints
         );
         
@@ -132,18 +137,23 @@ if (isset($_POST['update-product'])) {
     $gst_type = in_array($_POST['gst_type'] ?? '', ['inclusive', 'exclusive']) ? $_POST['gst_type'] : 'exclusive';
     $rwpoints = sanitizeInput($_POST['rwpoints'] ?? '0');
     $hsn = sanitizeInput($_POST['hsn'] ?? '');
+    $pieces_per_pack = trim($_POST['pieces_per_pack'] ?? '');
+    $pieces_per_pack = ($pieces_per_pack === '') ? null : (int) $pieces_per_pack;
+    $purchase_price = trim($_POST['purchase_price'] ?? '');
+    $purchase_price = ($purchase_price === '') ? null : (float) $purchase_price;
+    $purchase_price_per_piece = ($purchase_price !== null && $pieces_per_pack) ? round($purchase_price / $pieces_per_pack, 4) : null;
 
     // Update product
     $stmt = $db_conn->prepare(
-        "UPDATE products SET productName = ?, mrp = ?, supersstock_price = ?,
+        "UPDATE products SET productName = ?, pieces_per_pack = ?, purchase_price = ?, purchase_price_per_piece = ?, mrp = ?, supersstock_price = ?,
         super_distributor_price = ?, stockist_price = ?, distributor_price = ?,
         outlet_price = ?, gst = ?, gst_type = ?, hsn = ?, rwpoints = ?, updated_at = NOW()
         WHERE id = ?"
     );
 
     $stmt->bind_param(
-        "sdddddddssdi",
-        $productName, $mrp, $supersstock_price, $super_distributor_price,
+        "sidddddddddssdi",
+        $productName, $pieces_per_pack, $purchase_price, $purchase_price_per_piece, $mrp, $supersstock_price, $super_distributor_price,
         $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $update_id
     );
     

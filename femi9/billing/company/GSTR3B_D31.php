@@ -100,37 +100,37 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   
 						   
 						   //
-						   $Total_intra_register_sales=$total_intra_register+$total_intra_register2+$total_reg_OTSLS_intra+$total_reg_INTR;
-						   
-						   $Total_intra_unregister_sales=$total_intra_unregister+$total_intra_unregister2+$total_reg_OTSLSUN_intra;
+						   $Total_intra_register_sales=$total_intra_register+$total_intra_register2+$total_reg_OTSLS_intra+$total_reg_INTR+$total_reg_TP;
+
+						   $Total_intra_unregister_sales=$total_intra_unregister+$total_intra_unregister2+$total_reg_OTSLSUN_intra+$total_unreg_TP;
 						   
 						   
 						   include('gst_details_credit.php');
-						   
-						   
+
+
 						   //
 						   // intra-state (register) credit note
-							$total_intra_register_credit_note=$total_intra_register_credit+$total_intra_register_creditOT;
+							$total_intra_register_credit_note=$total_intra_register_credit+$total_intra_register_creditOT+$total_reg_TP_credit;
 							// intra-state (unregister) credit note
-							$total_intra_unregister_credit_note=$total_intra_unregister_credit+$total_intra_unregister_creditOT;
-							
+							$total_intra_unregister_credit_note=$total_intra_unregister_credit+$total_intra_unregister_creditOT+$total_unreg_TP_credit;
+
 							//
-							 $Total_sls_register_inter=$total_inter_register+$total_inter_register2;
-						   $Total_sls_unregister_inter=$total_inter_unregister+$total_inter_unregister2;
-						   
-						   
+							 $Total_sls_register_inter=$total_inter_register+$total_inter_register2+$total_reg_TP_inter;
+						   $Total_sls_unregister_inter=$total_inter_unregister+$total_inter_unregister2+$total_unreg_TP_inter;
+
+
 						   //
 						  $Total_inter_register_sales=$Total_sls_register_inter+$total_reg_OTSLS_inter;
 						   $Total_inter_unregister_sales=$Total_sls_unregister_inter+$total_reg_OTSLSUN_inter;
-						   
-						   
+
+
 						   include('gst_details_credit_inter.php');
-						   
-						   
+
+
 						   // inter-state (register) credit note
-							$total_inter_register_credit_note=$total_inter_register_credit+$total_inter_register_creditOT;
+							$total_inter_register_credit_note=$total_inter_register_credit+$total_inter_register_creditOT+$total_reg_TP_credit_inter;
 							// inter-state (unregister) credit note
-							$total_inter_unregister_credit_note=$total_inter_unregister_credit+$total_inter_unregister_creditOT;
+							$total_inter_unregister_credit_note=$total_inter_unregister_credit+$total_inter_unregister_creditOT+$total_unreg_TP_credit_inter;
 							
 							
 							

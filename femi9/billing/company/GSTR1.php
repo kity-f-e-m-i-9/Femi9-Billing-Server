@@ -166,13 +166,13 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   <th width="25%">unregistered person</th>
 						   </tr>
 						   
-						   <?php 
-						   $Total_sls_register_intra=$total_intra_register+$total_intra_register2;
-						   $Total_sls_unregister_intra=$total_intra_unregister+$total_intra_unregister2;
+						   <?php
+						   $Total_sls_register_intra=$total_intra_register+$total_intra_register2+$total_reg_TP;
+						   $Total_sls_unregister_intra=$total_intra_unregister+$total_intra_unregister2+$total_unreg_TP;
 						   ?>
-						   
+
 						   <tr>
-						   <th>Total Sales (SS,ST, DT, SHP, CUS)</th>
+						   <th>Total Sales (SS,ST, DT, SHP, CUS, TP)</th>
 						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_register_intra, 2);?></a></td>
 						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_unregister_intra, 2);?></a></td>
 						   </tr>
@@ -186,10 +186,10 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						    <td><a href="gst_intrsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_INTR, 2);?></a></td>
 							 <td>0.00</td>
 						   </tr>
-						   <?php 
-						   $Total_intra_register_sales=$total_intra_register+$total_intra_register2+$total_reg_OTSLS_intra+$total_reg_INTR;
-						   
-						   $Total_intra_unregister_sales=$total_intra_unregister+$total_intra_unregister2+$total_reg_OTSLSUN_intra;
+						   <?php
+						   $Total_intra_register_sales=$total_intra_register+$total_intra_register2+$total_reg_OTSLS_intra+$total_reg_INTR+$total_reg_TP;
+
+						   $Total_intra_unregister_sales=$total_intra_unregister+$total_intra_unregister2+$total_reg_OTSLSUN_intra+$total_unreg_TP;
 						   ?>
 						   <tfoot>
 						   <tr>
@@ -209,14 +209,18 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   <th width="25%">registered person</th>
 						   <th width="25%">unregistered person</th>
 						   </tr>
+						   <?php
+						   $Total_sls_register_intra_credit=$total_intra_register_credit+$total_reg_TP_credit;
+						   $Total_sls_unregister_intra_credit=$total_intra_unregister_credit+$total_unreg_TP_credit;
+						   ?>
 						   <tr>
-						   <th>Sales Return<br/>(SS,ST, DT, SHP, CUS)</th>
+						   <th>Sales Return<br/>(SS,ST, DT, SHP, CUS, TP)</th>
 						   <td><a href="gst_credit_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
-						   <?=inr_format($total_intra_register_credit, 2);?></a>
+						   <?=inr_format($Total_sls_register_intra_credit, 2);?></a>
 						   </td>
 						   <td>
 						   <a href="gst_credit_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
-						   <?=inr_format($total_intra_unregister_credit, 2);?></a>
+						   <?=inr_format($Total_sls_unregister_intra_credit, 2);?></a>
 						   </td>
 						   </tr>
 						   <tr>
@@ -229,12 +233,12 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						  <?=inr_format($total_intra_unregister_creditOT, 2);?></a>
 						  </td>
 						   </tr>
-						   
+
 						   <?php
 							// intra-state (register) credit note
-							$total_intra_register_credit_note=$total_intra_register_credit+$total_intra_register_creditOT;
+							$total_intra_register_credit_note=$total_intra_register_credit+$total_intra_register_creditOT+$total_reg_TP_credit;
 							// intra-state (unregister) credit note
-							$total_intra_unregister_credit_note=$total_intra_unregister_credit+$total_intra_unregister_creditOT;
+							$total_intra_unregister_credit_note=$total_intra_unregister_credit+$total_intra_unregister_creditOT+$total_unreg_TP_credit;
 						   ?>
 						   
 						    <tfoot>
@@ -263,24 +267,24 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   <th width="25%">unregistered person</th>
 						   </tr>
 						   
-						   <?php 
-						   $Total_sls_register_inter=$total_inter_register+$total_inter_register2;
-						   $Total_sls_unregister_inter=$total_inter_unregister+$total_inter_unregister2;
+						   <?php
+						   $Total_sls_register_inter=$total_inter_register+$total_inter_register2+$total_reg_TP_inter;
+						   $Total_sls_unregister_inter=$total_inter_unregister+$total_inter_unregister2+$total_unreg_TP_inter;
 						   ?>
-						   
+
 						   <tr>
-						   <th>Total Sales (SS,ST, DT, SHP, CUS)</th>
+						   <th>Total Sales (SS,ST, DT, SHP, CUS, TP)</th>
 						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_register_inter, 2);?></a></td>
 						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_unregister_inter, 2);?></a></td>
 						   </tr>
-						   
+
 						   <tr>
 						   <th>Total OT Sales</th>
 						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLS_inter, 2);?></a></td>
 						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLSUN_inter, 2);?></a></td>
 						   </tr>
-						   
-						   <?php 
+
+						   <?php
 						   $Total_inter_register_sales=$Total_sls_register_inter+$total_reg_OTSLS_inter;
 						   $Total_inter_unregister_sales=$Total_sls_unregister_inter+$total_reg_OTSLSUN_inter;
 						   ?>
@@ -302,17 +306,21 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   <th width="25%">registered person</th>
 						   <th width="25%">unregistered person</th>
 						   </tr>
+						   <?php
+						   $Total_sls_register_inter_credit=$total_inter_register_credit+$total_reg_TP_credit_inter;
+						   $Total_sls_unregister_inter_credit=$total_inter_unregister_credit+$total_unreg_TP_credit_inter;
+						   ?>
 						   <tr>
-						   <th>Sales Return<br/>(SS,ST, DT, SHP, CUS)</th>
+						   <th>Sales Return<br/>(SS,ST, DT, SHP, CUS, TP)</th>
 						   <td>
 						   <a href="gst_credit_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
-						   <?=inr_format($total_inter_register_credit, 2);?></a>
+						   <?=inr_format($Total_sls_register_inter_credit, 2);?></a>
 						   </td>
 						   <td><a href="gst_credit_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
-						   <?=inr_format($total_inter_unregister_credit, 2);?></a>
+						   <?=inr_format($Total_sls_unregister_inter_credit, 2);?></a>
 						   </td>
 						   </tr>
-						   
+
 						   <tr>
 						   <th>OT Sales Return</th>
 						   <td>
@@ -322,12 +330,12 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   <a href="gst_credit_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_inter_unregister_creditOT, 2);?></a>
 						   </td>
 						   </tr>
-						   
+
 						   <?php
 							// inter-state (register) credit note
-							$total_inter_register_credit_note=$total_inter_register_credit+$total_inter_register_creditOT;
+							$total_inter_register_credit_note=$total_inter_register_credit+$total_inter_register_creditOT+$total_reg_TP_credit_inter;
 							// inter-state (unregister) credit note
-							$total_inter_unregister_credit_note=$total_inter_unregister_credit+$total_inter_unregister_creditOT;
+							$total_inter_unregister_credit_note=$total_inter_unregister_credit+$total_inter_unregister_creditOT+$total_unreg_TP_credit_inter;
 						   ?>
 						   
 						    <tfoot>
@@ -466,8 +474,15 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								$result_HSN_sls_inter=mysqli_fetch_array($fetch_HSN_sls_inter);
 								if($result_HSN_sls_inter[0]!=NULL){ $show_HSN_sls_qty_inter=$result_HSN_sls_inter[0];}
 								else{$show_HSN_sls_qty_inter="0";}
-								
-								$overall_HSN_sls_qty=$Net_HSN_sls_qty+$Net_HSN_sls_qty_OT+$show_HSN_sls_qty_inter;
+
+								//Total TP sls qty (company -> territory partner transfers, godown-sourced only)
+								$Total_HSN_sls_TP="select sum(tpii.quantity) from tp_invoices tpi join tp_invoice_items tpii on tpii.tp_invoice_id=tpi.id join products p on p.id=tpii.product_id where p.hsn='$hsn_code' and tpi.invoice_date between '$from_date' and '$to_date' and tpi.source_godown_id='$get_godown_id'";
+								$fetch_HSN_sls_TP=mysqli_query($db_conn,$Total_HSN_sls_TP);
+								$result_HSN_sls_TP=mysqli_fetch_array($fetch_HSN_sls_TP);
+								if($result_HSN_sls_TP[0]!=NULL){ $show_HSN_sls_qty_TP=$result_HSN_sls_TP[0];}
+								else{$show_HSN_sls_qty_TP="0";}
+
+								$overall_HSN_sls_qty=$Net_HSN_sls_qty+$Net_HSN_sls_qty_OT+$show_HSN_sls_qty_inter+$show_HSN_sls_qty_TP;
 								
 								?>
 							

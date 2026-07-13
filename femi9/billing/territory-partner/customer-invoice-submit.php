@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once 'include/invoice-reward-integration.php';
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -148,6 +149,23 @@ try {
     $_SESSION['errorMessage'] = "An error occurred while submitting the invoice. Please try again.";
     header("Location: customer-manage-invoice.php?submiterror");
     exit;
+}
+
+if (!isset($_SESSION['ACTIONEDIT']) || $_SESSION['ACTIONEDIT'] !== 'edit') {
+    $invoice_number = $inv['inv_number'] ?? '';
+    $rewardResult = checkAndAwardDailyReward(
+        $db_conn,
+        $Login_user_TYPEvl,
+        $Login_user_IDvl,
+        $invoice_id,
+        $invoice_number
+    );
+    if (isset($rewardResult['success']) && $rewardResult['success']) {
+        $_SESSION['reward_notification'] = $rewardResult;
+    }
+    if (!$rewardResult['success'] && !isset($rewardResult['already_rewarded'])) {
+        error_log("Daily Reward Error: " . ($rewardResult['message'] ?? 'Unknown error'));
+    }
 }
 
 unset($_SESSION['ACTIONEDIT']);
