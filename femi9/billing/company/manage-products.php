@@ -104,8 +104,6 @@ $i= $start_from;
                                                     <th>S.No</th>
                                                     <th>Product Name</th>
 													<th>Pieces/Pack</th>
-													<th>Purchase Price &#8377;</th>
-													<th>Per Piece &#8377;</th>
 													<th>MRP &#8377;</th>
 													
 													<th>SS Price &#8377;</th>
@@ -135,8 +133,6 @@ $i= $start_from;
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo $result_product_list["productName"];?></td>
 													<td><?php echo $result_product_list["pieces_per_pack"] !== null ? $result_product_list["pieces_per_pack"] : '—';?></td>
-													<td><?php echo $result_product_list["purchase_price"] !== null ? '&#8377;'.$result_product_list["purchase_price"] : '—';?></td>
-													<td><?php echo $result_product_list["purchase_price_per_piece"] !== null ? '&#8377;'.$result_product_list["purchase_price_per_piece"] : '—';?></td>
 													<td>&#8377;<?php echo $result_product_list["mrp"];?>.00</td>
 													
 							<td>&#8377;<?php echo $result_product_list["supersstock_price"];?>.00</td>

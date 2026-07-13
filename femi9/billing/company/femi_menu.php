@@ -151,6 +151,14 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     </li>
 
 					<li>
+                        <a href="#"><i class="material-icons-two-tone">shopping_cart</i>Purchase Rate (Femi9 LLP)<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="neksomo-llp-piece-purchase-rate.php">Add Entry</a></li>
+						<li><a href="neksomo-llp-piece-purchase-rate-manage.php">Manage Entries</a></li>
+                        </ul>
+                    </li>
+
+					<li>
                         <a href="Report_company" class="active"><i class="material-icons-two-tone">view_agenda</i>Report - Company</a>
                     </li>
 					<li>

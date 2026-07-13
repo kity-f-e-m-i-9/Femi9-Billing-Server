@@ -507,6 +507,11 @@ $grand_total_pieces = 0;
 $grand_total_pack_qty = 0;
 $grand_total_value = 0.0;
 $grand_total_unrated_pieces = 0;
+$grand_total_purchase_value = 0.0;
+$grand_total_unpriced_pieces = 0;
+$grand_gross_profit = 0.0;
+$grand_total_expense = 0.0;
+$grand_net_profit = 0.0;
 $selected_entity_name = 'All Visible Entities';
 if ($scope === 'company') {
     $pcs_ii_cond  = $filter_entity > 0 ? " AND ii.user_id={$filter_entity}"       : " AND ii.user_id IN ({$entity_ids_subq})";
@@ -515,21 +520,27 @@ if ($scope === 'company') {
 
     // Per-day granularity is kept through the first aggregation (d.pr_id,
     // d.date) so each day's pieces can be valued against whichever
-    // neksomo_llp_piece_rates row was effective ON THAT DATE (the latest
-    // effective_date <= the sale date) — a rate takes effect the day it's
-    // entered and holds until a later effective_date for the same product
+    // neksomo_llp_piece_rates / neksomo_llp_piece_purchase_rates row was
+    // effective ON THAT DATE (the latest effective_date <= the sale date) —
+    // both the sale rate and the purchase rate take effect the day they're
+    // entered and hold until a later effective_date for the same product
     // supersedes it. Only then is everything rolled up to one row per product.
     $pieces_sold = call_rows($db_conn,
         "SELECT p.id pid, p.productName, p.pieces_per_pack,
                 COALESCE(SUM(dp.day_qty),0) total_qty,
                 COALESCE(SUM(dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1)),0) total_pieces,
                 COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.rate ELSE 0 END),0) total_value,
-                COALESCE(SUM(CASE WHEN dp.rate IS NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) ELSE 0 END),0) unrated_pieces
+                COALESCE(SUM(CASE WHEN dp.rate IS NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) ELSE 0 END),0) unrated_pieces,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.purchase_rate ELSE 0 END),0) total_purchase_value,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) ELSE 0 END),0) unpriced_pieces
          FROM (
              SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
                     (SELECT r.rate_per_piece FROM neksomo_llp_piece_rates r
                      WHERE r.product_id = d.pr_id AND r.effective_date <= d.date
-                     ORDER BY r.effective_date DESC LIMIT 1) rate
+                     ORDER BY r.effective_date DESC LIMIT 1) rate,
+                    (SELECT pr.rate_per_piece FROM neksomo_llp_piece_purchase_rates pr
+                     WHERE pr.product_id = d.pr_id AND pr.effective_date <= d.date
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate
              FROM (
                  SELECT ii.pr_id, ii.qty, i.date
                  FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
@@ -549,10 +560,27 @@ if ($scope === 'company') {
          ORDER BY total_pieces DESC",
         'ssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to]);
 
-    $grand_total_pieces         = (int) array_sum(array_column($pieces_sold, 'total_pieces'));
-    $grand_total_pack_qty       = (int) array_sum(array_column($pieces_sold, 'total_qty'));
-    $grand_total_value          = (float) array_sum(array_column($pieces_sold, 'total_value'));
-    $grand_total_unrated_pieces = (int) array_sum(array_column($pieces_sold, 'unrated_pieces'));
+    $grand_total_pieces          = (int) array_sum(array_column($pieces_sold, 'total_pieces'));
+    $grand_total_pack_qty        = (int) array_sum(array_column($pieces_sold, 'total_qty'));
+    $grand_total_value           = (float) array_sum(array_column($pieces_sold, 'total_value'));
+    $grand_total_unrated_pieces  = (int) array_sum(array_column($pieces_sold, 'unrated_pieces'));
+    $grand_total_purchase_value  = (float) array_sum(array_column($pieces_sold, 'total_purchase_value'));
+    $grand_total_unpriced_pieces = (int) array_sum(array_column($pieces_sold, 'unpriced_pieces'));
+    $grand_gross_profit          = $grand_total_value - $grand_total_purchase_value;
+
+    // Expense — same company_id/expense_month pattern as the overall MIS
+    // net-profit KPI, but scoped to this section's own entity filter
+    // ($filter_entity or every entity this login can see) rather than a
+    // hardcoded 'Femi%' name match, so it stays consistent with whichever
+    // entity the Pieces Sold table above is showing.
+    $pcs_expense_cond = $filter_entity > 0 ? "company_id = {$filter_entity}" : "company_id IN ({$entity_ids_subq})";
+    $grand_total_expense = (float) cval($db_conn,
+        "SELECT COALESCE(SUM(net_amount),0) FROM expense_imports
+         WHERE {$pcs_expense_cond}
+         AND expense_month BETWEEN DATE_FORMAT(?, '%Y-%m-01') AND DATE_FORMAT(?, '%Y-%m-01')",
+        'ss', [$from, $to]);
+    $grand_net_profit = $grand_gross_profit - $grand_total_expense;
+
     if ($filter_entity > 0) {
         $entity_names = array_column($all_entities, 'gname', 'id');
         $selected_entity_name = $entity_names[$filter_entity] ?? 'Selected Entity';
@@ -832,22 +860,38 @@ if ($is_neksomo_view) {
                     </div>
 
                     <div class="row mb-3">
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="kpi-card"><div class="kpi-t">Total Pack Qty Sold</div><div class="kpi-v"><?php echo number_format($grand_total_pack_qty); ?></div></div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo number_format($grand_total_pieces); ?></div></div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Total Value</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_value, 2); ?></div></div>
-                        </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="kpi-card"><div class="kpi-t">Period</div><div class="kpi-v" style="font-size:15px;"><?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></div></div>
                         </div>
                     </div>
 
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_value, 2); ?></div></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_gross_profit, 2); ?></div></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_expense, 2); ?></div></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_net_profit, 2); ?></div></div>
+                        </div>
+                    </div>
+                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Sold Price − Purchase Value = Gross Profit. Gross Profit − Expense (Femi9 LLP, this period) = Net Profit.</p>
+
                     <?php if ($grand_total_unrated_pieces > 0): ?>
-                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unrated_pieces); ?> pieces sold before any rate was set for their product — excluded from Total Value. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
+                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unrated_pieces); ?> pieces sold before any rate was set for their product — excluded from Sold Price. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
+                    <?php endif; ?>
+                    <?php if ($grand_total_unpriced_pieces > 0): ?>
+                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unpriced_pieces); ?> pieces sold before any purchase rate was set for their product — treated as ₹0 cost, so Gross Profit may be overstated. <a href="neksomo-llp-piece-purchase-rate.php">Add a purchase rate</a> covering that period.</div>
                     <?php endif; ?>
 
                     <div class="card">
@@ -1470,18 +1514,36 @@ if ($is_neksomo_view) {
                                 </div>
                                 <div class="card-body" style="overflow-x:auto">
                                     <div class="row mb-3">
-                                        <div class="col-md-3">
+                                        <div class="col-md-4">
                                             <div class="kpi-card"><div class="kpi-t">Total Pack Qty</div><div class="kpi-v"><?php echo number_format($grand_total_pack_qty); ?></div></div>
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-4">
                                             <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo number_format($grand_total_pieces); ?></div></div>
                                         </div>
-                                        <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Total Value</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_value, 2); ?></div></div>
+                                        <div class="col-md-4">
+                                            <div class="kpi-card"><div class="kpi-t">Period</div><div class="kpi-v" style="font-size:15px;"><?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></div></div>
                                         </div>
                                     </div>
+                                    <div class="row mb-3">
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_value, 2); ?></div></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_gross_profit, 2); ?></div></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_expense, 2); ?></div></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_net_profit, 2); ?></div></div>
+                                        </div>
+                                    </div>
+                                    <p class="snote">Sold Price − Purchase Value = Gross Profit. Gross Profit − Expense (this entity, this period) = Net Profit.</p>
                                     <?php if ($grand_total_unrated_pieces > 0): ?>
-                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unrated_pieces); ?> pieces sold before any Femi9 LLP rate was set for their product — excluded from Total Value.</div>
+                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unrated_pieces); ?> pieces sold before any Femi9 LLP rate was set for their product — excluded from Sold Price.</div>
+                                    <?php endif; ?>
+                                    <?php if ($grand_total_unpriced_pieces > 0): ?>
+                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unpriced_pieces); ?> pieces sold before any purchase rate was set for their product — treated as ₹0 cost, so Gross Profit may be overstated.</div>
                                     <?php endif; ?>
                                     <?php if (empty($pieces_sold)): ?>
                                         <p class="text-muted text-center py-3">No data.</p>

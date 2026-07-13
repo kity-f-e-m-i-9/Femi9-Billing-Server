@@ -98,12 +98,6 @@ $select_product_list="select * from products where id='$prid'";
 												<label for="exampleInputEmail1" class="form-label">Pieces per Pack <small class="text-muted">(optional)</small></label>
                                                 <input type="number" min="0" name="pieces_per_pack" class="form-control" value="<?=$result_product_list["pieces_per_pack"]?>" onkeypress="restrictnumber(event)" placeholder="e.g. 12">
 
-												<label for="exampleInputEmail1" class="form-label">Purchase Price (per Pack) <small class="text-muted">(optional)</small></label>
-                                                <input type="number" min="0" step="0.01" name="purchase_price" class="form-control" value="<?=$result_product_list["purchase_price"]?>" placeholder="Cost price you pay per pack">
-												<?php if ($result_product_list["purchase_price_per_piece"] !== null) { ?>
-												<small class="text-muted">Per piece: &#8377;<?=$result_product_list["purchase_price_per_piece"]?></small>
-												<?php } ?>
-
 												 <label for="exampleInputEmail1" class="form-label">MRP</label>
                                                 <input value="<?php echo $result_product_list["mrp"]?>" type="number" min="0" max="999" required="" name="mrp" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictnumber(event)">
 												
