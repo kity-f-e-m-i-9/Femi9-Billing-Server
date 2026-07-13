@@ -94,7 +94,7 @@ $successMessage = $_SESSION['successMessage'];
 									<tr>
 									<td>Manage Orders <font size="3">(Product Orders)</font></td>
 									<td>
-									<a href="manager_order_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
+									<a href="manager_order_csv?frd=<?=$from_date;?>&&tod=<?=$to_date;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
 									</td>
 									</tr>
 									</table>
