@@ -56,6 +56,7 @@ $invidprefix       = "CMPSHP";
 <?php if (isset($_REQUEST['DeleteSuccess'])): ?><div class="alert alert-danger">Deleted ! one product deleted success.</div><?php endif; ?>
 <?php if (isset($_REQUEST['invoicealready'])): ?><div class="alert alert-danger">Invoice Number already exists!</div><?php endif; ?>
 <?php if (isset($_REQUEST['InvoiceUpdatedSuccess'])): ?><div class="alert alert-success">Invoice Number Updated Success!.</div><?php endif; ?>
+<?php if (isset($_SESSION['errorMessage'])): ?><div class="alert alert-danger"><?php echo htmlspecialchars($_SESSION['errorMessage']); unset($_SESSION['errorMessage']); ?></div><?php endif; ?>
 
 <h1><table class="headertble"><tr>
     <td><?php if ($get_action == "edit") { echo "Update >"; } ?><?php echo $displaytitle; ?></td>
@@ -112,6 +113,27 @@ select:focus, input[type=number]:focus { background:#fffa8f; }
     $totalamount = $result_InvoieDetails["total"];
     $Total_Receipt_amount = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(received) FROM receipt WHERE inv_id='$Invoice_ID'"))[0];
     $amount_received_fully = ($Total_Receipt_amount > 0 && $totalamount == $Total_Receipt_amount) ? "1" : "0";
+
+    // order-to-invoice.php (the "Invoice" button on manage-orders.php) creates
+    // invoices straight from a field visit with no manually-typed invoice
+    // number yet. Until such an invoice is actually submitted (has a receipt —
+    // same check manage-orders.php uses for "Continue" vs "Completed"), force
+    // a blank, retype-and-duplicate-check Invoice Number field every time the
+    // TP reopens it via "Continue Invoice", instead of remembering whatever
+    // was typed on a previous visit.
+    $stmtOrig = $db_conn->prepare("SELECT 1 FROM tp_orders WHERE invoiced_inv_id=? LIMIT 1");
+    $stmtOrig->bind_param('s', $Invoice_ID);
+    $stmtOrig->execute();
+    $isFromFieldOrder = (bool)$stmtOrig->get_result()->fetch_assoc();
+    $stmtOrig->close();
+
+    $stmtRct = $db_conn->prepare("SELECT 1 FROM receipt WHERE inv_id=? LIMIT 1");
+    $stmtRct->bind_param('s', $Invoice_ID);
+    $stmtRct->execute();
+    $hasReceipt = (bool)$stmtRct->get_result()->fetch_assoc();
+    $stmtRct->close();
+
+    $needs_inv_number = $isFromFieldOrder && !$hasReceipt;
 
     $CustomerID = $result_InvoieDetails['to_user_id'];
     $result_CUSTDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='$CustomerID'"));
@@ -212,6 +234,27 @@ while ($ri = mysqli_fetch_array($res_items)) {
 </table>
 </div></div>
 
+<?php if ($needs_inv_number): ?>
+<script>
+// Live duplicate check only — no separate save step and no page reload while
+// typing. The number is just a normal field on the Submit Invoice form below;
+// it gets validated and saved together with everything else on final submit.
+function showInvoiceDuplicateReal(str) {
+    var hint = document.getElementById('txtHintInvoiceReal');
+    if (str == "") { hint.innerHTML = ""; return; }
+    if (window.XMLHttpRequest) { xmlhttp = new XMLHttpRequest(); }
+    else { xmlhttp = new ActiveXObject("Microsoft.XMLHTTP"); }
+    xmlhttp.onreadystatechange = function() {
+        if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+            hint.innerHTML = xmlhttp.responseText;
+        }
+    };
+    xmlhttp.open("GET", "loadInvoiceNumberUSER.php?q=" + str + "&exclude=<?php echo urlencode($Invoice_ID); ?>", true);
+    xmlhttp.send();
+}
+</script>
+<?php endif; ?>
+
 <!-- Submit form -->
 <div><div>
 <script>
@@ -234,6 +277,18 @@ function validateForm() {
 <div><div class="invoice-info">
 <hr/>
 <table style="width:100%;">
+<?php if ($needs_inv_number): ?>
+<tr>
+    <td style="white-space:nowrap;">Invoice Number *</td>
+    <td>
+        <input type="text" name="invnumber" id="realInvNumber" onkeyup="showInvoiceDuplicateReal(this.value)"
+               onkeypress="restrictSpecialChars(event);"
+               autofocus required class="form-control" style="background:#fffa8f;display:inline-block;width:auto;"
+               placeholder="Enter a unique invoice number">
+        <span id="txtHintInvoiceReal"></span>
+    </td>
+</tr>
+<?php else: ?>
 <tr>
     <td>Inv Num</td>
     <td style="color:#bd2b0e;">:&nbsp;
@@ -244,6 +299,7 @@ function validateForm() {
     <?php } ?>
     </td>
 </tr>
+<?php endif; ?>
 <tr>
     <td>Date</td>
     <td style="color:#bd2b0e;">:&nbsp;<b><?php echo date("d/M/Y", strtotime($result_InvoieDetails['date'])); ?></b></td>

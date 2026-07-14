@@ -141,36 +141,51 @@ $result_sum_OTSLSrtn_qty=mysqli_fetch_array($fetch_sum_OTSLSrtn_qty);
 if($result_sum_OTSLSrtn_qty[0]!=NULL){ $Total_OTSLSrtn_qty=$result_sum_OTSLSrtn_qty[0];}else{ $Total_OTSLSrtn_qty="0";}
 
 
-//SALES-1
+//SALES-1 — every channel's sales (company, TP, SS, stockiest, distributor, ...)
+// count toward "Overall" stock movement, not just whichever type is logged in.
 if($_REQUEST['godownid']==NULL)
 {
-$select_sum_SLS1_qty="select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid' and from_user_type='$Login_user_TYPEvl'";
+$select_sum_SLS1_qty="select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid'";
 }else{
-$select_sum_SLS1_qty="select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid' and from_user_type='$Login_user_TYPEvl' and from_user_id='$get_company'";
+$select_sum_SLS1_qty="select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid' and from_user_id='$get_company'";
 }
 
 $fetch_sum_SLS1_qty=mysqli_query($db_conn,$select_sum_SLS1_qty);
 $result_sum_SLS1_qty=mysqli_fetch_array($fetch_sum_SLS1_qty);
 if($result_sum_SLS1_qty[0]!=NULL){ $Total_SLS1_qty=$result_sum_SLS1_qty[0];}else{ $Total_SLS1_qty="0";}
 
-//SALES-2
+//SALES-2 — same "all channels" scope as SALES-1 above.
 if($_REQUEST['godownid']==NULL)
 {
-$select_sum_SLS2_qty="select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid' and user_type='$Login_user_TYPEvl'";
+$select_sum_SLS2_qty="select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid'";
 }else{
-$select_sum_SLS2_qty="select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid' and user_type='$Login_user_TYPEvl' and user_id='$get_company'";
+$select_sum_SLS2_qty="select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid' and user_id='$get_company'";
 }
 
 $fetch_sum_SLS2_qty=mysqli_query($db_conn,$select_sum_SLS2_qty);
 $result_sum_SLS2_qty=mysqli_fetch_array($fetch_sum_SLS2_qty);
-if($result_sum_SLS2_qty[0]!=NULL){ $Total_SLS2_qty=$result_sum_SLS2_qty[0];}else{ $Total_SLS2_qty="0";}	
+if($result_sum_SLS2_qty[0]!=NULL){ $Total_SLS2_qty=$result_sum_SLS2_qty[0];}else{ $Total_SLS2_qty="0";}
 
-//SALES-RETURN
+//SALES-3 — company-to-Territory-Partner invoices (Add TP Invoice / tp-invoice-action.php).
+// These land in their own dedicated tp_invoices/tp_invoice_items tables, not
+// user_invoice_items/invoice_items, so SALES-1/2 above never see them.
 if($_REQUEST['godownid']==NULL)
 {
-$select_sum_SLSreturn_qty="select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid' and to_usertype='$Login_user_TYPEvl'";
+$select_sum_SLS3_qty="select sum(tpi.quantity) from tp_invoice_items tpi inner join tp_invoices ti on ti.id=tpi.tp_invoice_id where ti.invoice_date='$report_date' and tpi.product_id='$report_prid'";
 }else{
-$select_sum_SLSreturn_qty="select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid' and to_usertype='$Login_user_TYPEvl' and to_userid='$get_company'";
+$select_sum_SLS3_qty="select sum(tpi.quantity) from tp_invoice_items tpi inner join tp_invoices ti on ti.id=tpi.tp_invoice_id where ti.invoice_date='$report_date' and tpi.product_id='$report_prid' and ti.source_godown_id='$get_company'";
+}
+
+$fetch_sum_SLS3_qty=mysqli_query($db_conn,$select_sum_SLS3_qty);
+$result_sum_SLS3_qty=mysqli_fetch_array($fetch_sum_SLS3_qty);
+if($result_sum_SLS3_qty[0]!=NULL){ $Total_SLS3_qty=$result_sum_SLS3_qty[0];}else{ $Total_SLS3_qty="0";}
+
+//SALES-RETURN — same "all channels" scope as SALES-1/2 above.
+if($_REQUEST['godownid']==NULL)
+{
+$select_sum_SLSreturn_qty="select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid'";
+}else{
+$select_sum_SLSreturn_qty="select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid' and to_userid='$get_company'";
 }
 
 $fetch_sum_SLSreturn_qty=mysqli_query($db_conn,$select_sum_SLSreturn_qty);
@@ -178,7 +193,7 @@ $result_sum_SLSreturn_qty=mysqli_fetch_array($fetch_sum_SLSreturn_qty);
 if($result_sum_SLSreturn_qty[0]!=NULL){ $Total_SLSreturn_qty=$result_sum_SLSreturn_qty[0];}else{ $Total_SLSreturn_qty="0";}
 
 //AVERAGE SALES
-$Average_total_sales=$Total_OTSLS_qty+$Total_SLS1_qty+$Total_SLS2_qty;
+$Average_total_sales=$Total_OTSLS_qty+$Total_SLS1_qty+$Total_SLS2_qty+$Total_SLS3_qty;
 $Average_total_salesReturn=$Total_OTSLSrtn_qty+$Total_SLSreturn_qty;
 
 //Total sales qty
@@ -186,12 +201,12 @@ $Total_slsQTY=$Average_total_sales-$Average_total_salesReturn;
 
 
 
-//DEMO/FREE/DAMAGE
+//DEMO/FREE/DAMAGE — same "all channels" scope as SALES-1/2 above.
 if($_REQUEST['godownid']==NULL)
 {
-$select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_date' and product_id='$report_prid' and usertype='$Login_user_TYPEvl'";
+$select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_date' and product_id='$report_prid'";
 }else{
-$select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_date' and product_id='$report_prid' and usertype='$Login_user_TYPEvl' and userid='$get_company'";
+$select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_date' and product_id='$report_prid' and userid='$get_company'";
 }
 $fetch_sum_DFD_qty=mysqli_query($db_conn,$select_sum_DFD_qty);
 $result_sum_DFD_qty=mysqli_fetch_array($fetch_sum_DFD_qty);

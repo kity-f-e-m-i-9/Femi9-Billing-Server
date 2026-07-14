@@ -62,7 +62,10 @@ function lockAndGetGodownQtyForTp(mysqli $db, int $godown_id, int $pid): int {
 
 function debitGodownForTp(mysqli $db, int $godown_id, int $pid, int $qty): void {
     $uid = (string)$godown_id;
-    $s = $db->prepare("UPDATE stock SET sent_qty=sent_qty+?, closing_qty=closing_qty-? WHERE user_type='company' AND user_id=? AND product_id=?");
+    // Counted as a sale (not an internal transfer) — an "Add TP Invoice" is a
+    // billed transaction to the TP, so it belongs in sales_qty alongside the
+    // company's other channel-partner invoices, matching overstock_datewise.php.
+    $s = $db->prepare("UPDATE stock SET sales_qty=sales_qty+?, closing_qty=closing_qty-? WHERE user_type='company' AND user_id=? AND product_id=?");
     $s->bind_param("iisi", $qty, $qty, $uid, $pid); $s->execute(); $s->close();
 }
 

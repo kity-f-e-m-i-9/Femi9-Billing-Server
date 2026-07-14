@@ -60,7 +60,7 @@ try {
         // label on the invoice, it was never itself an inventory table).
         if ($source_godown_id > 0) {
             $uid = (string)$source_godown_id;
-            $u = $db_conn->prepare("UPDATE stock SET sent_qty=GREATEST(0,sent_qty-?), closing_qty=closing_qty+? WHERE user_type='company' AND user_id=? AND product_id=?");
+            $u = $db_conn->prepare("UPDATE stock SET sales_qty=GREATEST(0,sales_qty-?), closing_qty=closing_qty+? WHERE user_type='company' AND user_id=? AND product_id=?");
             $u->bind_param("iisi", $qty, $qty, $uid, $pid); $u->execute(); $u->close();
 
             $r = $db_conn->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=?");
