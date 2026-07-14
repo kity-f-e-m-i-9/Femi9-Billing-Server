@@ -6,6 +6,10 @@ date_default_timezone_set("Asia/Kolkata");
 
 if (!isset($_REQUEST['invoice-submit'])) { header("Location: shop-manage-invoice.php"); exit; }
 
+// Distinguishes an expected "fix your input" failure (bad invoice number)
+// from an unexpected DB/system error — the two need different redirects.
+class InvoiceNumberError extends \Exception {}
+
 $invoice_id     = $_REQUEST['invoice_id'] ?? '';
 $SubTotal       = (float)($_REQUEST['SubTotal']       ?? 0);
 $discount       = (float)($_REQUEST['discount']       ?? 0);
@@ -34,6 +38,33 @@ try {
     $s->execute();
     $inv = $s->get_result()->fetch_assoc();
     $s->close();
+
+    // order-to-invoice.php creates invoices with inv_number stamped equal to
+    // inv_id as a placeholder — shop-invoice-add.php shows a real "Invoice
+    // Number *" field for those, submitted as part of this same form. Validate
+    // and save it here, before anything else, so a duplicate/missing number
+    // blocks the whole submit (no stock deduction, no receipt) rather than
+    // silently going through with the placeholder.
+    if ($inv && $inv['inv_number'] === $inv['inv_id']) {
+        $new_inv_number = trim($_REQUEST['invnumber'] ?? '');
+        if ($new_inv_number === '') {
+            throw new InvoiceNumberError('Enter an invoice number before submitting.');
+        }
+        $s = $db_conn->prepare(
+            "SELECT COUNT(*) AS n FROM user_invoice WHERE inv_number=? AND from_user_type=? AND from_user_id=? AND inv_id<>?"
+        );
+        $s->bind_param('ssss', $new_inv_number, $Login_user_TYPEvl, $tp_id, $invoice_id);
+        $s->execute();
+        $dupCount = (int)$s->get_result()->fetch_assoc()['n'];
+        $s->close();
+        if ($dupCount > 0) {
+            throw new InvoiceNumberError('That invoice number already exists. Choose a different one.');
+        }
+        $s = $db_conn->prepare("UPDATE user_invoice SET inv_number=? WHERE inv_id=?");
+        $s->bind_param('ss', $new_inv_number, $invoice_id);
+        $s->execute(); $s->close();
+        $inv['inv_number'] = $new_inv_number;
+    }
 
     // Reverse any existing ledger entries before deducting fresh.
     // Idempotent: correct on first submit, re-submit, and edit.
@@ -142,6 +173,11 @@ try {
 
     $db_conn->commit();
 
+} catch (InvoiceNumberError $e) {
+    $db_conn->rollback();
+    $_SESSION['errorMessage'] = $e->getMessage();
+    header("Location: shop-invoice-add.php?InvoiceID=" . base64_encode($invoice_id) . "&invuser=shop&action=edit");
+    exit;
 } catch (\Throwable $e) {
     $db_conn->rollback();
     error_log('[TP shop-invoice-submit] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());

@@ -119,26 +119,37 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
     // Delivery note data
     $Result_DLDetails = mysqli_fetch_array(mysqli_query($db_conn,
         "SELECT * FROM delivery_note WHERE inv_id='" . $result_product_list["inv_id"] . "'"));
+
+    // order-to-invoice.php stamps inv_number = inv_id as a placeholder until
+    // the TP types a real number on shop-invoice-add.php's Submit Invoice
+    // form. Never show that internal placeholder here as if it were the
+    // invoice number — it would look auto-generated to the TP.
+    $isPendingInvNumber = ($result_product_list["inv_number"] === $result_product_list["inv_id"]);
+    $invNumberDisplay   = $isPendingInvNumber ? "Pending" : htmlspecialchars($result_product_list["inv_number"]);
 ?>
                                             <tr>
                                                 <td><?php echo ++$i; ?></td>
 
                                                 <!-- Invoice number → opens delivery note modal -->
                                                 <td>
+                                                <?php if ($isPendingInvNumber) { ?>
+                                                <span class="badge badge-style-bordered badge-warning">Pending</span>
+                                                <?php } else { ?>
                                                 <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#dlModal<?php echo $result_product_list["id"]; ?>">
-                                                <?php echo htmlspecialchars($result_product_list["inv_number"]); ?></a>
+                                                <?php echo $invNumberDisplay; ?></a>
+                                                <?php } ?>
                                                 </td>
 
                                                 <!-- Delivery note modal -->
                                                 <div class="modal fade" id="dlModal<?php echo $result_product_list["id"]; ?>" tabindex="-1" aria-hidden="true">
                                                 <div class="modal-dialog"><div class="modal-content">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title">Update Delivery Note<br/><?php echo htmlspecialchars($result_product_list["inv_number"]); ?></h5>
+                                                        <h5 class="modal-title">Update Delivery Note<br/><?php echo $invNumberDisplay; ?></h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="dlnote_action.php">
                                                     <input type="hidden" name="inv_id"     value="<?php echo $result_product_list["inv_id"]; ?>">
-                                                    <input type="hidden" name="inv_number" value="<?php echo $result_product_list["inv_number"]; ?>">
+                                                    <input type="hidden" name="inv_number" value="<?php echo $invNumberDisplay; ?>">
                                                     <input type="hidden" name="inv_table"  value="shop">
                                                     <div class="example-content" style="padding:20px;">
                                                         <div class="form-floating mb-3"><input type="text"  name="dl_note"          class="form-control" value="<?php echo htmlspecialchars($Result_DLDetails['dl_note'] ?? ''); ?>"><label>Delivery Note</label></div>

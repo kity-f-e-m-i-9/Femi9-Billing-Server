@@ -130,12 +130,12 @@ function lockGodownQtyE(mysqli $db, int $godown_id, int $pid): int {
 }
 function creditGodownForTpE(mysqli $db, int $godown_id, int $pid, int $qty): void {
     $uid = (string)$godown_id;
-    $s = $db->prepare("UPDATE stock SET sent_qty=GREATEST(0,sent_qty-?), closing_qty=closing_qty+? WHERE user_type='company' AND user_id=? AND product_id=?");
+    $s = $db->prepare("UPDATE stock SET sales_qty=GREATEST(0,sales_qty-?), closing_qty=closing_qty+? WHERE user_type='company' AND user_id=? AND product_id=?");
     $s->bind_param("iisi", $qty, $qty, $uid, $pid); $s->execute(); $s->close();
 }
 function debitGodownForTpE(mysqli $db, int $godown_id, int $pid, int $qty): void {
     $uid = (string)$godown_id;
-    $s = $db->prepare("UPDATE stock SET sent_qty=sent_qty+?, closing_qty=closing_qty-? WHERE user_type='company' AND user_id=? AND product_id=?");
+    $s = $db->prepare("UPDATE stock SET sales_qty=sales_qty+?, closing_qty=closing_qty-? WHERE user_type='company' AND user_id=? AND product_id=?");
     $s->bind_param("iisi", $qty, $qty, $uid, $pid); $s->execute(); $s->close();
 }
 function insertGodownLedgerE(mysqli $db, int $godown_id, int $pid, string $action, int $qty, int $before, int $after, string $inv_num, string $note, string $by): void {
