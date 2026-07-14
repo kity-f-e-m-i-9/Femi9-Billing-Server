@@ -159,6 +159,14 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     </li>
 
 					<li>
+                        <a href="#"><i class="material-icons-two-tone">local_shipping</i>Purchase from Manufacturer<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="neksomo-manufacturer-purchase.php">Add Purchase</a></li>
+						<li><a href="neksomo-manufacturer-purchase-manage.php">Manage Purchases</a></li>
+                        </ul>
+                    </li>
+
+					<li>
                         <a href="Report_company" class="active"><i class="material-icons-two-tone">view_agenda</i>Report - Company</a>
                     </li>
 					<li>
