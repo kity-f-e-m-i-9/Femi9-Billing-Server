@@ -3,7 +3,6 @@ ob_start();
 include("checksession.php");
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
-require_once __DIR__ . '/../shared/TpInvoiceNumberService.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
     header("Location: manage-tp-invoices?error=unauthorized"); exit;
@@ -65,8 +64,26 @@ if ($col && $col->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN courier_charges DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER invoice_date");
 }
 
+// Invoice number is now manually typed per SS account instead of
+// auto-generated, and duplicate checking is scoped to the creating account
+// instead of the whole tp_invoices table — see
+// db_migrations/2026_07_14_tp_invoice_manual_number_ss.sql
+$col2 = $db_conn->query("SHOW COLUMNS FROM tp_invoices LIKE 'created_by_user_type'");
+if ($col2 && $col2->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN created_by_user_type VARCHAR(30) NOT NULL DEFAULT '' AFTER created_by");
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN created_by_user_id VARCHAR(30) NOT NULL DEFAULT '' AFTER created_by_user_type");
+    $db_conn->query("ALTER TABLE tp_invoices ADD INDEX idx_tpi_creator (created_by_user_type, created_by_user_id, invoice_number)");
+    $db_conn->query("UPDATE tp_invoices SET created_by_user_type='super_stockiest', created_by_user_id=SUBSTRING_INDEX(SUBSTRING(invoice_number,6),'/',1) WHERE invoice_number LIKE 'TP/SS%'");
+    $db_conn->query("UPDATE tp_invoices SET created_by_user_type='company' WHERE created_by_user_type=''");
+    $idx = $db_conn->query("SHOW INDEX FROM tp_invoices WHERE Key_name='uk_tp_inv_number'");
+    if ($idx && $idx->num_rows > 0) {
+        $db_conn->query("ALTER TABLE tp_invoices DROP INDEX uk_tp_inv_number");
+    }
+}
+
 // ── Input & validation ────────────────────────────────────────────────────────
 $tp_id            = (int)($_POST['tp_id'] ?? 0);
+$inv_num          = trim(str_replace("'", "", $_POST['inv_number'] ?? ''));
 $invoice_date     = trim($_POST['invoice_date'] ?? date('Y-m-d'));
 $courier_charges  = round((float)($_POST['courier_charges'] ?? 0), 2);
 if ($courier_charges < 0) $courier_charges = 0;
@@ -74,15 +91,16 @@ $discount_amount  = round((float)($_POST['discount_amount'] ?? 0), 2);
 if ($discount_amount < 0) $discount_amount = 0;
 $created_by       = $_SESSION['LOGIN_USER'] ?? '';
 $ss_id            = $Login_user_IDvl;
-// This SS account's own numeric id — the invoice-number series is scoped to
-// this one account, never shared with any other Super Stockist.
+// This SS account's own numeric id — the manual invoice number is scoped to
+// this one account for duplicate checking, never checked against any other
+// Super Stockist's invoices.
 $ss_account_id    = (int)($result_LoGuserDtails['id'] ?? 0);
 
 $raw_pids  = $_POST['product_id'] ?? [];
 $raw_qtys  = $_POST['qty']        ?? [];
 $raw_rates = $_POST['rate']       ?? [];
 
-if (!$tp_id || empty($raw_pids) || $ss_account_id < 1) {
+if (!$tp_id || $inv_num === '' || empty($raw_pids) || $ss_account_id < 1) {
     header("Location: add-tp-invoice?error=missing"); exit;
 }
 
@@ -95,6 +113,16 @@ if ($tp_own->get_result()->num_rows === 0) {
     header("Location: add-tp-invoice?error=unauthorized"); exit;
 }
 $tp_own->close();
+
+// Duplicate check scoped to this SS account only (not other SS accounts or company)
+$dup = $db_conn->prepare("SELECT id FROM tp_invoices WHERE invoice_number=? AND created_by_user_type='super_stockiest' AND created_by_user_id=?");
+$dup->bind_param("ss", $inv_num, $ss_account_id);
+$dup->execute();
+if ($dup->get_result()->num_rows > 0) {
+    $dup->close();
+    header("Location: add-tp-invoice?error=duplicate&inv=" . urlencode($inv_num)); exit;
+}
+$dup->close();
 
 // Build line items
 $items = []; $seen = [];
@@ -134,14 +162,24 @@ foreach ($items as $item) {
 // ── Transaction ───────────────────────────────────────────────────────────────
 $db_conn->begin_transaction();
 try {
-    // Own independent series per SS account (never shared with other SS logins)
-    $inv_num = tpInvoiceNextNumber($db_conn, 'SS' . $ss_account_id, $invoice_date);
+    // Re-check duplicate inside the transaction (row lock guards the race
+    // between the pre-check above and this insert) — scoped to this SS
+    // account only, same as the pre-check.
+    $dupTx = $db_conn->prepare("SELECT id FROM tp_invoices WHERE invoice_number=? AND created_by_user_type='super_stockiest' AND created_by_user_id=? FOR UPDATE");
+    $dupTx->bind_param("ss", $inv_num, $ss_account_id);
+    $dupTx->execute();
+    if ($dupTx->get_result()->num_rows > 0) {
+        $dupTx->close();
+        throw new Exception("DUPLICATE_INVOICE_NUMBER");
+    }
+    $dupTx->close();
 
     // Invoice header — source fields NULL (stock comes from SS directly)
     $null_src = null;
     $zero_src = 0;
-    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("siiiisddds", $inv_num, $tp_id, $null_src, $zero_src, $zero_src, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by);
+    $created_by_user_type = 'super_stockiest';
+    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by,created_by_user_type,created_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+    $s->bind_param("siiiisdddsss", $inv_num, $tp_id, $null_src, $zero_src, $zero_src, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type, $ss_account_id);
     $s->execute();
     $invoice_id = $db_conn->insert_id;
     $s->close();
@@ -178,6 +216,9 @@ try {
 
 } catch (\Throwable $e) {
     $db_conn->rollback();
+    if ($e->getMessage() === 'DUPLICATE_INVOICE_NUMBER') {
+        header("Location: add-tp-invoice?error=duplicate&inv=" . urlencode($inv_num)); exit;
+    }
     error_log("[SS TP Invoice] Transaction failed: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
     header("Location: add-tp-invoice?error=db&msg=" . urlencode(substr($e->getMessage(), 0, 100))); exit;
 }

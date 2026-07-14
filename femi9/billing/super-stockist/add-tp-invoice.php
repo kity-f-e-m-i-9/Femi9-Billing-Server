@@ -122,6 +122,7 @@ $tp_stmt->close();
     </div>
     <div class="app-container">
         <?php include("app-header.php"); ?>
+        <?php include("validate-scripts.php"); ?>
         <div class="app-content">
             <div class="content-wrapper">
                 <div class="container-fluid">
@@ -184,6 +185,15 @@ $tp_stmt->close();
                                            value="<?php echo date('Y-m-d'); ?>"
                                            max="<?php echo date('Y-m-d'); ?>" required>
                                     <div class="field-hint">Cannot be a future date</div>
+                                </div>
+
+                                <div class="col-lg-4 col-md-4">
+                                    <label class="form-label">Invoice Number <span class="required">*</span></label>
+                                    <input type="text" name="inv_number" id="invNumberInput" class="form-control"
+                                           autocomplete="off" required onkeypress="restrictSpecialChars(event)"
+                                           value="<?php echo (isset($_GET['error']) && $_GET['error'] === 'duplicate') ? htmlspecialchars($_GET['inv'] ?? '') : ''; ?>"
+                                           placeholder="Enter invoice number">
+                                    <div id="invNumberHint" style="margin-top:6px;font-size:12.5px;"></div>
                                 </div>
 
                             </div>
@@ -367,6 +377,32 @@ $(document).ready(function() {
     var invoiceItems      = [];
     var currentTpId       = null;
     var advanceBalance    = 0;
+    var invNumberOk       = false;
+    var invNumberTimer    = null;
+
+    $('#invNumberInput').on('input', function () {
+        var val = $(this).val().trim();
+        invNumberOk = false;
+        clearTimeout(invNumberTimer);
+        if (!val) { $('#invNumberHint').html(''); updateSummary(); return; }
+        $('#invNumberHint').html('<span style="color:#94a3b8;">Checking…</span>');
+        invNumberTimer = setTimeout(function () {
+            $.getJSON('loadInvoiceNumberTP.php', { q: val }, function (res) {
+                if (res.duplicate) {
+                    invNumberOk = false;
+                    $('#invNumberHint').html('<span style="color:#dc2626;"><i class="material-icons" style="font-size:14px;vertical-align:middle;">error</i> Invoice number already exists in your account.</span>');
+                } else {
+                    invNumberOk = true;
+                    $('#invNumberHint').html('<span style="color:#059669;"><i class="material-icons" style="font-size:14px;vertical-align:middle;">check_circle</i> Available</span>');
+                }
+                updateSummary();
+            }).fail(function () {
+                invNumberOk = true;
+                updateSummary();
+            });
+        }, 400);
+    });
+    if ($('#invNumberInput').val().trim()) { $('#invNumberInput').trigger('input'); }
 
     function fetchBalance(tp_id) {
         $('#balancePanel').show();
@@ -531,7 +567,8 @@ $(document).ready(function() {
             }
         }
 
-        $('#submitBtn').prop('disabled', invoiceItems.length === 0);
+        var invNumberFilled = $('#invNumberInput').val().trim() !== '';
+        $('#submitBtn').prop('disabled', invoiceItems.length === 0 || !invNumberFilled || !invNumberOk);
         var insufficient = advanceBalance > 0 && currentTpId && (advanceBalance < (subtotal - discount));
         $('#submitHint').toggle(insufficient && invoiceItems.length > 0);
     }
@@ -548,6 +585,8 @@ $(document).ready(function() {
 
     $('#invoiceForm').on('submit', function (e) {
         if (!invoiceItems.length) { e.preventDefault(); alert('Please add at least one product.'); return; }
+        if (!$('#invNumberInput').val().trim()) { e.preventDefault(); alert('Please enter an invoice number.'); return; }
+        if (!invNumberOk) { e.preventDefault(); alert('This invoice number already exists in your account. Please enter a different one.'); return; }
         buildHiddenInputs();
         $('#submitBtn').prop('disabled', true).html('<i class="material-icons" style="animation:spin 1s linear infinite;font-size:18px;">refresh</i> Submitting…');
     });
