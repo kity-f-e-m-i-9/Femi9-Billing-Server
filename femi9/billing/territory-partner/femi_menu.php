@@ -22,6 +22,14 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
             </ul>
         </li>
 
+        <li>
+            <a href="#"><i class="material-icons-two-tone">shopping_cart</i>Product Order<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+            <ul class="sub-menu">
+                <li><a href="add-purchase-order.php">Purchase Order</a></li>
+                <li><a href="manage-purchase-orders.php">My Purchase Orders</a></li>
+            </ul>
+        </li>
+
         <!-- Reward Points -->
         <li>
             <a href="reward-points.php"><i class="material-icons-two-tone">analytics</i>Reward Points: Pur</a>

@@ -10,6 +10,29 @@ $tps = $tp_result ? $tp_result->fetch_all(MYSQLI_ASSOC) : [];
 
 $gd_result = $db_conn->query("SELECT id, gname FROM company_godown WHERE gname LIKE '%Femi%' AND " . godown_finance_filter_sql($db_conn) . " ORDER BY gname");
 $godowns_list = $gd_result ? $gd_result->fetch_all(MYSQLI_ASSOC) : [];
+
+// ── Prefill from a TP purchase order (tp-today-orders.php "Invoice" button) ──
+$prefill_po_id = (int)($_GET['po_id'] ?? 0);
+$prefill_tp_id = 0;
+$prefill_items = [];
+if ($prefill_po_id > 0) {
+    $poStmt = $db_conn->prepare("SELECT territory_partner_id FROM tp_purchase_orders WHERE id=? AND status='waiting'");
+    $poStmt->bind_param("i", $prefill_po_id);
+    $poStmt->execute();
+    $poRow = $poStmt->get_result()->fetch_assoc();
+    $poStmt->close();
+    if ($poRow) {
+        $prefill_tp_id = (int)$poRow['territory_partner_id'];
+        $itStmt = $db_conn->prepare("SELECT product_id, qty FROM tp_purchase_order_items WHERE po_id=?");
+        $itStmt->bind_param("i", $prefill_po_id);
+        $itStmt->execute();
+        $itRes = $itStmt->get_result();
+        while ($ir = $itRes->fetch_assoc()) { $prefill_items[] = ['product_id' => (int)$ir['product_id'], 'qty' => (int)$ir['qty']]; }
+        $itStmt->close();
+    } else {
+        $prefill_po_id = 0; // already actioned or invalid — ignore
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -263,6 +286,7 @@ $godowns_list = $gd_result ? $gd_result->fetch_all(MYSQLI_ASSOC) : [];
                     <form action="tp-invoice-action" method="post" id="invoiceForm">
                         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         <input type="hidden" name="action" value="insert-tp-invoice">
+                        <input type="hidden" name="po_id" value="<?php echo (int)$prefill_po_id; ?>">
                         <input type="hidden" name="source_location_id" id="sourceLocationId">
                         <input type="hidden" name="source_cp_id" id="sourceCpId">
                         <input type="hidden" name="source_godown_id" id="sourceGodownId">
@@ -533,6 +557,30 @@ $(document).ready(function() {
     /* ── Godown list (pre-loaded from PHP) ── */
     var godownsList = <?php echo json_encode($godowns_list); ?>;
 
+    /* ── Prefill from a TP purchase order (tp-today-orders.php "Invoice" button) ── */
+    var prefillTpId  = <?php echo (int)$prefill_tp_id; ?>;
+    var prefillItems = <?php echo json_encode($prefill_items); ?>;
+    var prefillDone  = false;
+
+    function tryAutoAddPrefill() {
+        if (prefillDone || !prefillItems.length || !availableProducts.length) return;
+        prefillDone = true;
+        var skipped = [];
+        prefillItems.forEach(function (pi) {
+            var match = availableProducts.find(function (p) { return parseInt(p.product_id) === pi.product_id; });
+            if (!match) { skipped.push(pi.product_id); return; }
+            var avail = parseInt(match.available_qty) || 0;
+            var qty   = Math.min(pi.qty, avail);
+            if (qty < 1) { skipped.push(pi.product_id); return; }
+            $('#productSelect').val(match.product_id).trigger('change');
+            $('#qtyInput').val(qty);
+            addProduct();
+        });
+        if (skipped.length) {
+            showAddError('Some requested products from the purchase order were skipped (not available at this source).');
+        }
+    }
+
     /* ── Balance helpers ── */
     function fetchBalance(tp_id, godown_id) {
         var url = 'get-tp-advance-balance.php?tp_id=' + tp_id;
@@ -729,6 +777,7 @@ $(document).ready(function() {
             } else {
                 hideAddError();
                 $('#productAddWrapper').show();
+                tryAutoAddPrefill();
             }
         }).fail(function () {
             $('#productSelect').html('<option value="">Error loading products</option>');
@@ -751,6 +800,7 @@ $(document).ready(function() {
             } else {
                 hideAddError();
                 $('#productAddWrapper').show();
+                tryAutoAddPrefill();
             }
         }).fail(function () {
             $('#productSelect').html('<option value="">Error loading</option>');
@@ -955,6 +1005,11 @@ $(document).ready(function() {
     function hideAddError() { $('#addError').hide().empty(); }
 
     function escHtml(str) { return $('<div>').text(str).html(); }
+
+    /* ── Kick off prefill (from a TP purchase order) once select2 is ready ── */
+    if (prefillTpId) {
+        $('#tpSelect').val(prefillTpId).trigger('change');
+    }
 
 }(jQuery));
 </script>
