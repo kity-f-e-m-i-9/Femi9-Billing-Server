@@ -18,6 +18,14 @@ $select_Godown="select * from company_godown where id='$get_company'";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   $result_Godown=mysqli_fetch_array($fetch_Godown);
 }
+
+// Manufacturer purchases (Neksomo "Purchase from Manufacturer") always credit
+// into Neksomo's own godown, tracked separately from the legacy input_stock
+// table — only relevant when viewing that godown specifically, or all godowns.
+$neksomoGodownId = (int) (mysqli_fetch_row(mysqli_query($db_conn,
+    "SELECT id FROM company_godown WHERE gname = 'NEKSOMO HYGIENE INDUSTRIES' LIMIT 1"
+))[0] ?? 0);
+$showManufPurchases = empty($_REQUEST['godownid']) || (int)$_REQUEST['godownid'] === $neksomoGodownId;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -123,6 +131,8 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Return Qty (Pieces)</th><?php endif; ?>
 											<th style="text-align:right;">Sent Qty</th>
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sent Qty (Pieces)</th><?php endif; ?>
+<?php if ($showManufPurchases): ?><th style="text-align:right;">Manufacturer Purchase Qty</th><?php endif; ?>
+<?php if ($showManufPurchases && is_neksomo_login($db_conn)): ?><th style="text-align:right;">Manufacturer Purchase Qty (Pieces)</th><?php endif; ?>
 											</tr>
                                             </thead>
 											
@@ -255,8 +265,18 @@ $fetch_sum_INTRN_qty=mysqli_query($db_conn,$select_sum_INTRN_qty);
 $result_sum_INTRN_qty=mysqli_fetch_array($fetch_sum_INTRN_qty);
 if($result_sum_INTRN_qty[0]!=NULL){ $Total_INTRN_qty=$result_sum_INTRN_qty[0];}else{ $Total_INTRN_qty="0";}
 
-$Average_sent_qty=$Total_DFD_qty+$Total_INTRN_qty;						
+$Average_sent_qty=$Total_DFD_qty+$Total_INTRN_qty;
 $PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
+
+//MANUFACTURER PURCHASE QTY — Neksomo "Purchase from Manufacturer" (StockService/
+// stock_ledger based), tracked separately from the legacy input_stock table above.
+$Total_manuf_qty=0;
+if ($showManufPurchases) {
+    $select_sum_manuf_qty="select sum(npi.quantity_packs) from neksomo_purchase_items npi inner join neksomo_manufacturer_purchases mp on mp.id=npi.purchase_id where mp.purchase_date='$report_date' and npi.product_id='$report_prid'";
+    $fetch_sum_manuf_qty=mysqli_query($db_conn,$select_sum_manuf_qty);
+    $result_sum_manuf_qty=mysqli_fetch_array($fetch_sum_manuf_qty);
+    if($result_sum_manuf_qty[0]!=NULL){ $Total_manuf_qty=$result_sum_manuf_qty[0];}
+}
 						?>
                         <tr>
                         <td><?php echo $Result_productDetils["productName"];?></td>
@@ -268,6 +288,8 @@ $PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $Average_total_salesReturn*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $Average_sent_qty;?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $Average_sent_qty*$PiecesPerPack;?></td><?php endif; ?>
+						<?php if ($showManufPurchases): ?><td align="right"><?php echo $Total_manuf_qty;?></td><?php endif; ?>
+						<?php if ($showManufPurchases && is_neksomo_login($db_conn)): ?><td align="right"><?php echo $Total_manuf_qty*$PiecesPerPack;?></td><?php endif; ?>
                         </tr>
 						<?php }?>
 										
