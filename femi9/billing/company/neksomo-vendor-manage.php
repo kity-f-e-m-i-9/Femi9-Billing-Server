@@ -8,21 +8,11 @@ if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
     exit;
 }
 
-$entries = $db_conn->query(
-    "SELECT mp.id, mp.invoice_number, mp.purchase_date, mp.total_amount, v.vendor_name,
-            (SELECT COUNT(*) FROM neksomo_purchase_items npi WHERE npi.purchase_id = mp.id) AS item_count,
-            (SELECT SUM(quantity_pieces) FROM neksomo_purchase_items npi WHERE npi.purchase_id = mp.id) AS total_pieces
-     FROM neksomo_manufacturer_purchases mp
-     JOIN neksomo_vendors v ON v.id = mp.vendor_id
-     ORDER BY mp.purchase_date DESC, mp.id DESC"
+$vendors = $db_conn->query(
+    "SELECT id, vendor_name, address, gstin, phone, email, is_active
+     FROM neksomo_vendors
+     ORDER BY vendor_name ASC"
 )->fetch_all(MYSQLI_ASSOC);
-
-$grand_total_pieces = 0;
-$grand_total_cost = 0.0;
-foreach ($entries as $e) {
-    $grand_total_pieces += (int)$e['total_pieces'];
-    $grand_total_cost += (float)$e['total_amount'];
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -31,7 +21,7 @@ foreach ($entries as $e) {
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Manage Manufacturer Purchases : <?php echo $business_name; ?></title>
+    <title>Manage Vendors : <?php echo $business_name; ?></title>
 
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -51,6 +41,9 @@ foreach ($entries as $e) {
         .action-link:hover { background:#f3f4f6;border-color:#d1d5db; }
         .action-link.delete:hover { background:#fef2f2;border-color:#fecaca; }
         .actions-group { display:inline-flex;align-items:center;gap:5px;white-space:nowrap; }
+        .status-badge { display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600; }
+        .status-badge.active { background:#d1fae5;color:#065f46; }
+        .status-badge.inactive { background:#f1f5f9;color:#64748b; }
     </style>
 </head>
 
@@ -68,14 +61,16 @@ foreach ($entries as $e) {
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
-                                    <?php if (isset($_REQUEST['deletedDone'])) { ?><div class="alert alert-warning">Purchase deleted and stock reversed.</div><?php } ?>
+                                    <?php if (isset($_REQUEST['addsuccess'])) { ?><div class="alert alert-success">Vendor added.</div><?php } ?>
+                                    <?php if (isset($_REQUEST['updatesuccess'])) { ?><div class="alert alert-success">Vendor updated.</div><?php } ?>
+                                    <?php if (isset($_REQUEST['statuschanged'])) { ?><div class="alert alert-success">Vendor status updated.</div><?php } ?>
                                     <?php if (isset($_REQUEST['error'])) { ?><div class="alert alert-danger">Something went wrong. Please try again.</div><?php } ?>
 
                                     <h1>
                                         <table class="headertble">
                                         <tr>
-                                        <td>Purchases from Manufacturer</td>
-                                        <td><a href="neksomo-manufacturer-purchase.php" title="Add Purchase">&#10011;</a></td>
+                                        <td>Vendors</td>
+                                        <td><a href="neksomo-vendor-add" title="Add Vendor">&#10011;</a></td>
                                         </tr>
                                         </table>
                                     </h1>
@@ -87,52 +82,50 @@ foreach ($entries as $e) {
                             <div class="col">
                                 <div class="card">
                                     <div class="card-body">
-                                        <p class="text-muted" style="font-size:13px;">Each purchase credited stock directly to Neksomo's on-hand balance, per product, when added. Deleting a purchase reverses stock for every product in it.</p>
                                         <div style="overflow-x:scroll;">
                                         <table id="datatable1" style="width:100%;">
                                             <thead>
                                                 <tr>
-                                                    <th>Date</th>
-                                                    <th>Invoice Number</th>
-                                                    <th>Vendor</th>
-                                                    <th>Items</th>
-                                                    <th>Qty (Pieces)</th>
-                                                    <th>Total Amount &#8377;</th>
+                                                    <th>Vendor Name</th>
+                                                    <th>Address</th>
+                                                    <th>GSTIN</th>
+                                                    <th>Phone</th>
+                                                    <th>Email</th>
+                                                    <th>Status</th>
                                                     <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                            <?php foreach ($entries as $e): $eid = base64_encode((string)$e['id']); ?>
+                                            <?php foreach ($vendors as $v): $vid = base64_encode((string)$v['id']); ?>
                                                 <tr>
-                                                    <td><?php echo date('d M Y', strtotime($e['purchase_date'])); ?></td>
-                                                    <td><?php echo htmlspecialchars($e['invoice_number']); ?></td>
-                                                    <td><?php echo htmlspecialchars($e['vendor_name']); ?></td>
-                                                    <td><?php echo number_format((int)$e['item_count']); ?></td>
-                                                    <td><?php echo number_format((int)$e['total_pieces']); ?></td>
-                                                    <td>&#8377;<?php echo number_format((float)$e['total_amount'], 2); ?></td>
+                                                    <td><?php echo htmlspecialchars($v['vendor_name']); ?></td>
+                                                    <td><?php echo nl2br(htmlspecialchars($v['address'] ?? '')); ?></td>
+                                                    <td><?php echo htmlspecialchars($v['gstin'] ?? ''); ?></td>
+                                                    <td><?php echo htmlspecialchars($v['phone'] ?? ''); ?></td>
+                                                    <td><?php echo htmlspecialchars($v['email'] ?? ''); ?></td>
+                                                    <td>
+                                                        <?php if ((int)$v['is_active'] === 1): ?>
+                                                            <span class="status-badge active">Active</span>
+                                                        <?php else: ?>
+                                                            <span class="status-badge inactive">Inactive</span>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td>
                                                         <div class="actions-group">
-                                                            <a href="view-neksomo-manufacturer-purchase.php?id=<?php echo $eid; ?>" class="action-link" title="View Details"><i class="material-icons-outlined" style="font-size:17px;color:#2563eb;">visibility</i></a>
-                                                            <a href="neksomo-manufacturer-purchase-print.php?id=<?php echo $eid; ?>" class="action-link" title="Print"><i class="material-icons-outlined" style="font-size:17px;color:#475569;">print</i></a>
-                                                            <a href="delete-neksomo-manufacturer-purchase.php?id=<?php echo $eid; ?>" class="action-link delete" title="Delete (reverses stock)" onclick="return confirm('Delete this purchase and reverse the stock for every product in it?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+                                                            <a href="neksomo-vendor-edit.php?id=<?php echo (int)$v['id']; ?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#2563eb;">edit</i></a>
+                                                            <?php if ((int)$v['is_active'] === 1): ?>
+                                                                <a href="toggle-neksomo-vendor-status.php?id=<?php echo $vid; ?>" class="action-link delete" title="Deactivate" onclick="return confirm('Deactivate this vendor? It will no longer appear in the purchase form.');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">block</i></a>
+                                                            <?php else: ?>
+                                                                <a href="toggle-neksomo-vendor-status.php?id=<?php echo $vid; ?>" class="action-link" title="Reactivate" onclick="return confirm('Reactivate this vendor?');"><i class="material-icons-outlined" style="font-size:17px;color:#10b981;">check_circle</i></a>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
-                                            <?php if (empty($entries)): ?>
-                                                <tr><td colspan="7" style="text-align:center;color:#898781;">No purchases recorded yet.</td></tr>
+                                            <?php if (empty($vendors)): ?>
+                                                <tr><td colspan="7" style="text-align:center;color:#898781;">No vendors added yet.</td></tr>
                                             <?php endif; ?>
                                             </tbody>
-                                            <?php if (!empty($entries)): ?>
-                                            <tfoot>
-                                                <tr>
-                                                    <th colspan="4">Grand Total</th>
-                                                    <th><?php echo number_format($grand_total_pieces); ?></th>
-                                                    <th>&#8377;<?php echo number_format($grand_total_cost, 2); ?></th>
-                                                    <th></th>
-                                                </tr>
-                                            </tfoot>
-                                            <?php endif; ?>
                                         </table>
                                         </div>
                                     </div>

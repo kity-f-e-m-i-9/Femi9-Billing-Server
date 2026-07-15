@@ -740,7 +740,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
          * Format number for Indian currency
          */
         function formatNumber(num) {
-            if (isNaN(num) || num === null) return '0.00';
+            // Server sends stats.* as comma-formatted strings (e.g. "6,45,15,987.00")
+            // — strip commas before parsing, otherwise Number()/isNaN() treat the
+            // string as NaN and this bails out to '0.00' regardless of the real value.
+            if (typeof num === 'string') num = num.replace(/,/g, '');
+            if (num === null || num === '' || isNaN(num)) return '0.00';
             return parseFloat(num).toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2

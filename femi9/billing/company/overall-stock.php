@@ -143,12 +143,16 @@ while($result_Godown=mysqli_fetch_array($fetch_Godowndetails))
 											<th style="text-align:right;">Sales Qty</th>
 											<th style="text-align:right;">Sent Qty</th>
 											<th style="text-align:right;">Closing Qty</th>
+											<?php if (is_neksomo_login($db_conn)): ?>
+											<th style="text-align:right;">Closing Qty (Pieces)</th>
+											<?php endif; ?>
 											</tr>
                                             </thead>
 											
 											<tbody>
-			<?php 
+			<?php
 $user_id_Loginvl=$result_Godown['id'];
+$total_closing_pieces=0;
 
 $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
 										$Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
@@ -165,6 +169,10 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 										if($Result_productDetils["productName"]!=NULL){
 											
 						$ClosingStock=$Result_OPStock['closing_qty'];
+						$PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
+						$ExtraPieces=(int)($Result_OPStock['extra_pieces'] ?? 0);
+						$ClosingStockPieces=($ClosingStock*$PiecesPerPack)+$ExtraPieces;
+						$total_closing_pieces+=$ClosingStockPieces;
 										?>
                                                 <tr>
                                                     <td><?php echo $Result_productDetils["productName"];?></td>
@@ -181,7 +189,10 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 						<td align="right"><?php echo $Result_OPStock['sent_qty'];?></td>
 						
 						<td align="right"><b><?php echo $ClosingStock;?></b></td>
-													
+						<?php if (is_neksomo_login($db_conn)): ?>
+						<td align="right"><b><?php echo $ClosingStockPieces;?></b></td>
+						<?php endif; ?>
+
                                                 </tr>
                                            
 										<?php }?>
@@ -201,6 +212,9 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 										 <tr>
 										<td colspan="6" style="text-align:right;">Total Stock Qty</td>
 										<td align="right"><b><?=$Result_sumclosing[0];?></b></td>
+										<?php if (is_neksomo_login($db_conn)): ?>
+										<td align="right"><b><?=$total_closing_pieces;?></b></td>
+										<?php endif; ?>
 										</tr>
 										 </tfoot>
 										 

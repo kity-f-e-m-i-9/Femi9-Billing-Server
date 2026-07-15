@@ -116,9 +116,13 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
                                                <tr>
 											<th>Product Name</th>
 											<th style="text-align:right;">Input Stock Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Input Stock Qty (Pieces)</th><?php endif; ?>
 											<th style="text-align:right;">Sales Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sales Qty (Pieces)</th><?php endif; ?>
 											<th style="text-align:right;">Return Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Return Qty (Pieces)</th><?php endif; ?>
 											<th style="text-align:right;">Sent Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sent Qty (Pieces)</th><?php endif; ?>
 											</tr>
                                             </thead>
 											
@@ -252,13 +256,18 @@ $result_sum_INTRN_qty=mysqli_fetch_array($fetch_sum_INTRN_qty);
 if($result_sum_INTRN_qty[0]!=NULL){ $Total_INTRN_qty=$result_sum_INTRN_qty[0];}else{ $Total_INTRN_qty="0";}
 
 $Average_sent_qty=$Total_DFD_qty+$Total_INTRN_qty;						
+$PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
 						?>
                         <tr>
                         <td><?php echo $Result_productDetils["productName"];?></td>
 						<td align="right"><?php echo $Total_input_qty;?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $Total_input_qty*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $Average_total_sales;?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $Average_total_sales*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $Average_total_salesReturn;?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $Average_total_salesReturn*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $Average_sent_qty;?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $Average_sent_qty*$PiecesPerPack;?></td><?php endif; ?>
                         </tr>
 						<?php }?>
 										
