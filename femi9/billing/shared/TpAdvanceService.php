@@ -27,14 +27,14 @@ function tpAdvanceDeduct(
         $s = $db->prepare(
             "SELECT id, balance_amount FROM tp_advance_payments
               WHERE territory_partner_id=? AND company_id=?
-                AND balance_amount>0 AND status!='fully_adjusted'
+                AND balance_amount>0 AND status!='fully_adjusted' AND deleted_at IS NULL
               ORDER BY payment_date ASC, id ASC FOR UPDATE"
         );
         $s->bind_param("ii", $tp_id, $godown_id);
     } else {
         $s = $db->prepare(
             "SELECT id, balance_amount FROM tp_advance_payments
-              WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted'
+              WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted' AND deleted_at IS NULL
               ORDER BY payment_date ASC, id ASC FOR UPDATE"
         );
         $s->bind_param("i", $tp_id);

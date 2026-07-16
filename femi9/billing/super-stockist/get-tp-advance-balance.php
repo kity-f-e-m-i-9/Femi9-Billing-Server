@@ -20,7 +20,7 @@ $chk->close();
 $stmt = $db_conn->prepare("
     SELECT COALESCE(SUM(balance_amount), 0) AS balance, COUNT(*) AS cnt
     FROM tp_advance_payments
-    WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted'
+    WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
 ");
 $stmt->bind_param("i", $tp_id);
 $stmt->execute();
