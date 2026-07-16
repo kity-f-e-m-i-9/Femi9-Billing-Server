@@ -88,7 +88,8 @@ $i = 0;
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
     <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
-    <link href="../../assets/plugins/datatables/datatables.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
@@ -320,12 +321,25 @@ $i = 0;
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
 <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
 <script src="../../assets/plugins/pace/pace.min.js"></script>
-<script src="../../assets/plugins/datatables/datatables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
-<script src="../../assets/js/pages/datatables.js"></script>
 <script>
 $(document).ready(function () {
+    $('#datatable1').DataTable({
+        dom: '<"row"<"col-sm-6"l><"col-sm-6"f>><"row"<"col-sm-12"B>><"row"<"col-sm-12"tr>><"row"<"col-sm-5"i><"col-sm-7"p>>',
+        buttons: [
+            { extend: 'excel', text: '<i class="material-icons" style="vertical-align:middle">download</i> Excel', className: 'btn btn-success' },
+            { extend: 'print', text: '<i class="material-icons" style="vertical-align:middle">print</i> Print', className: 'btn btn-info' }
+        ]
+    });
+
     $('#datatable1').on('click', '.edit-btn', function () {
         const id = $(this).data('id');
         $('#editModalContent').html('<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>');

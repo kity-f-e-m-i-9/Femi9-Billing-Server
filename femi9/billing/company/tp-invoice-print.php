@@ -10,8 +10,8 @@ if (!$inv_id) { header("Location: manage-tp-invoices"); exit; }
 $stmt = $db_conn->prepare("
     SELECT tpi.*,
            tp.name AS tp_name, tp.company_name AS tp_company_name, tp.tp_id AS tp_code, tp.mobile AS tp_mobile, tp.gstin AS tp_gstin,
-           tp.branch_line1, tp.branch_line2, tp.branch_city, tp.branch_district, tp.branch_state, tp.branch_country,
-           tp.delivery_line1, tp.delivery_line2, tp.delivery_city, tp.delivery_district, tp.delivery_state, tp.delivery_country,
+           tp.branch_line1, tp.branch_line2, tp.branch_city, tp.branch_district, tp.branch_state, tp.branch_country, tp.branch_pincode,
+           tp.delivery_line1, tp.delivery_line2, tp.delivery_city, tp.delivery_district, tp.delivery_state, tp.delivery_country, tp.delivery_pincode,
            COALESCE(cp_src.name, gd.gname, pln.name) AS source_location,
            COALESCE(cp_src.name, cp_old.name) AS cp_name,
            COALESCE(cp_src.cp_id, cp_old.cp_id) AS cp_code,
@@ -322,6 +322,7 @@ $delivery_parts = array_filter([
     $d['delivery_line2'],
     implode(', ', array_filter([$d['delivery_city'], $d['delivery_district']])),
     implode(', ', array_filter([$d['delivery_state'], $d['delivery_country']])),
+    !empty($d['delivery_pincode']) ? 'Pincode: ' . $d['delivery_pincode'] : '',
 ]);
 // Build billing address lines
 $branch_parts = array_filter([
@@ -329,6 +330,7 @@ $branch_parts = array_filter([
     $d['branch_line2'],
     implode(', ', array_filter([$d['branch_city'], $d['branch_district']])),
     implode(', ', array_filter([$d['branch_state'], $d['branch_country']])),
+    !empty($d['branch_pincode']) ? 'Pincode: ' . $d['branch_pincode'] : '',
 ]);
 ?>
 <p class="cusdetaiis">

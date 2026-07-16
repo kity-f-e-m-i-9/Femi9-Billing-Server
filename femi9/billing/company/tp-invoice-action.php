@@ -122,6 +122,7 @@ if ($col && $col->num_rows === 0) {
 
 // ── Input & validation ─────────────────────────────────────────────────────────
 
+$po_id            = (int)($_POST['po_id'] ?? 0);
 $tp_id            = (int)($_POST['tp_id'] ?? 0);
 $source_loc_id    = (int)($_POST['source_location_id'] ?? 0) ?: null;
 $source_cp_id     = (int)($_POST['source_cp_id'] ?? 0);
@@ -251,6 +252,15 @@ try {
 
     // Deduct net amount (after discount) from advance; courier is collected separately via receipt
     deductTpAdvance($db_conn, $tp_id, $net_amount, $inv_num, $use_godown ? $source_godown_id : 0, $invoice_id);
+
+    // Mark the originating purchase order (if this invoice was raised from
+    // tp-today-orders.php's "Invoice" button) as completed and link it.
+    if ($po_id > 0) {
+        $s_po = $db_conn->prepare("UPDATE tp_purchase_orders SET status='completed', tp_invoice_id=? WHERE id=? AND territory_partner_id=? AND status='waiting'");
+        $s_po->bind_param("iii", $invoice_id, $po_id, $tp_id);
+        $s_po->execute();
+        $s_po->close();
+    }
 
     $db_conn->commit();
     header("Location: manage-tp-invoices?success=1&inv=" . urlencode($inv_num)); exit;

@@ -44,9 +44,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <a href="Report_company" class="active"><i class="material-icons-two-tone">view_agenda</i>Report - Company</a>
                     </li>
 					<li>
-                        <a href="Report-First-Page" <?php if($current_page == 'Report-First-Page' || $current_page == 'Report-Details') echo 'class="active"'; ?>>
-                            <i class="material-icons-two-tone">view_agenda</i>Report - B2B
-                        </a>
+                        <a href="#"><i class="material-icons-two-tone">view_agenda</i>Report - B2B<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+                            <li><a href="Report-First-Page" <?php if($current_page == 'Report-First-Page' || $current_page == 'Report-Details') echo 'class="active"'; ?>>Company to Distributor</a></li>
+                            <li><a href="Report-TP-First-Page" <?php if($current_page == 'Report-TP-First-Page' || $current_page == 'Report-TP-Details') echo 'class="active"'; ?>>Territory Partner</a></li>
+                        </ul>
                     </li>
 					
 					<li>
@@ -90,7 +92,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     </li>
 
 					<li>
-                        <a href="overall-stock"><i class="material-icons-two-tone">done</i>Overall Stock</a>
+                        <a href="#"><i class="material-icons-two-tone">done</i>Overall Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+                            <li><a href="overall-stock">Company Overall Stock</a></li>
+                            <li><a href="overall-stock-users">Overall Stock - Users</a></li>
+                        </ul>
                     </li>
 
 					<li>
@@ -172,9 +178,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <a href="Report_company" class="active"><i class="material-icons-two-tone">view_agenda</i>Report - Company</a>
                     </li>
 					<li>
-                        <a href="Report-First-Page" <?php if($current_page == 'Report-First-Page' || $current_page == 'Report-Details') echo 'class="active"'; ?>>
-                            <i class="material-icons-two-tone">view_agenda</i>Report - B2B
-                        </a>
+                        <a href="#"><i class="material-icons-two-tone">view_agenda</i>Report - B2B<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+                            <li><a href="Report-First-Page" <?php if($current_page == 'Report-First-Page' || $current_page == 'Report-Details') echo 'class="active"'; ?>>Company to Distributor</a></li>
+                            <li><a href="Report-TP-First-Page" <?php if($current_page == 'Report-TP-First-Page' || $current_page == 'Report-TP-Details') echo 'class="active"'; ?>>Territory Partner</a></li>
+                        </ul>
                     </li>
 
 					<li>
@@ -208,7 +216,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     </li>
 
 					<li>
-                        <a href="overall-stock"><i class="material-icons-two-tone">done</i>Overall Stock</a>
+                        <a href="#"><i class="material-icons-two-tone">done</i>Overall Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+                            <li><a href="overall-stock">Company Overall Stock</a></li>
+                            <li><a href="overall-stock-users">Overall Stock - Users</a></li>
+                        </ul>
                     </li>
 
 					<li>
@@ -312,7 +324,13 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="mis-report"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">assessment</i>MIS Report</a></li>
 						<li><a href="expense-tracker"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">receipt_long</i>Expense Tracker</a></li>
 						<li><a href="Report_company">Company</a></li>
-						<li><a href="Report-First-Page">B2B</a></li>
+						<li>
+							<a href="#">B2B<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+							<ul class="sub-menu">
+								<li><a href="Report-First-Page">Company to Distributor</a></li>
+								<li><a href="Report-TP-First-Page">Territory Partner</a></li>
+							</ul>
+						</li>
 						<li><a href="Retail-Report-First-Page">Retail</a></li>
 						<li><a href="Retail-Report-Details-Distributor.php">Retail (D/SD)</a></li>
 						<li><a href="OT-Report-Detail-Page">OT Channel</a></li>
@@ -417,7 +435,13 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="Products">Add Product</a></li>
                         <li><a href="manage-products">Manage Products</a></li>
 						<li><a href="op-stock">Set Opening Stock</a></li>
-						<li><a href="overall-stock">Overall Stock</a></li>
+						<li>
+							<a href="#">Overall Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+							<ul class="sub-menu">
+								<li><a href="overall-stock">Company Overall Stock</a></li>
+								<li><a href="overall-stock-users">Overall Stock - Users</a></li>
+							</ul>
+						</li>
 						<li><a href="Stock-First-Page">User Stock</a></li>
 						<li><a href="Competitor-brand">Add Competitor Brand</a></li>
                         <li><a href="Competitor-brand-manage">Manage Competitor Brand</a></li>
@@ -758,7 +782,13 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="mis-report"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">assessment</i>MIS Report</a></li>
 						<li><a href="expense-tracker"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">receipt_long</i>Expense Tracker</a></li>
 						<li><a href="Report_company">Company</a></li>
-						<li><a href="Report-First-Page">B2B</a></li>
+						<li>
+							<a href="#">B2B<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+							<ul class="sub-menu">
+								<li><a href="Report-First-Page">Company to Distributor</a></li>
+								<li><a href="Report-TP-First-Page">Territory Partner</a></li>
+							</ul>
+						</li>
 						<li><a href="Retail-Report-First-Page">Retail</a></li>
 						<li><a href="OT-Report-Detail-Page">OT Channel</a></li>
                         </ul>
@@ -860,7 +890,13 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="Products">Add Product</a></li>
                         <li><a href="manage-products">Manage Products</a></li>
 						<li><a href="op-stock">Set Opening Stock</a></li>
-						<li><a href="overall-stock">Overall Stock</a></li>
+						<li>
+							<a href="#">Overall Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+							<ul class="sub-menu">
+								<li><a href="overall-stock">Company Overall Stock</a></li>
+								<li><a href="overall-stock-users">Overall Stock - Users</a></li>
+							</ul>
+						</li>
 						<li><a href="Competitor-brand">Add Competitor Brand</a></li>
                         <li><a href="Competitor-brand-manage">Manage Competitor Brand</a></li>
                         </ul>
