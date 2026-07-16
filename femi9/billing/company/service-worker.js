@@ -10,7 +10,10 @@ self.addEventListener('activate', (e) => {
   self.clients.claim();
 });
 
-// Pass every request straight to the network — no offline cache.
-self.addEventListener('fetch', (e) => {
-  e.respondWith(fetch(e.request));
-});
+// No fetch handler: this worker only exists so the browser treats the app
+// as installable. Registering a fetch listener here previously caused
+// "Failed to fetch" errors on the browser's own speculative/preload
+// requests (e.g. Chrome's "preload pages" feature) whenever fetch(request)
+// was called on a request the browser hadn't fully formed yet — omitting
+// the handler entirely means every request goes straight to the network,
+// untouched.

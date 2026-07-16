@@ -7,16 +7,31 @@ $get_from_date=$_REQUEST['frdate'];
 //$get_from_date=date ("Y-m-d", strtotime("-1 day", strtotime($get_from_date1)));
 $get_to_date=$_REQUEST['todate'];
 
+// Mirrors overstock_datewise.php — multiple company profiles combined via
+// "IN (...)", and every from_user_id/user_id/to_userid match is scoped by
+// its matching *_type='company' too (from_user_id etc. are plain ints/
+// varchars re-used across every channel's own table, e.g.
+// territory_partners.id=1 collides with company_godown.id=1).
+$get_company_ids = [];
 if($_REQUEST['godownid']!=NULL)
 {
-$get_company=$_REQUEST['godownid'];
-if (!is_godown_allowed($db_conn, (int)$get_company)) {
-    header("Location: overall-stock?unauthorized"); exit;
+$raw_godownids = is_array($_REQUEST['godownid']) ? $_REQUEST['godownid'] : [$_REQUEST['godownid']];
+foreach ($raw_godownids as $gid) {
+    $gid = (int)$gid;
+    if ($gid < 1) continue;
+    if (!is_godown_allowed($db_conn, $gid)) {
+        header("Location: overall-stock?unauthorized"); exit;
+    }
+    $get_company_ids[] = $gid;
 }
-//company details
-$select_Godown="select * from company_godown where id='$get_company'";
+}
+$get_company_ids_sql = implode(',', $get_company_ids ?: [0]);
+//company details (all selected)
+$selected_godown_names = [];
+if (!empty($get_company_ids)) {
+    $select_Godown="select gname from company_godown where id IN ($get_company_ids_sql) order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
-							   $result_Godown=mysqli_fetch_array($fetch_Godown);
+							   while($result_Godown=mysqli_fetch_array($fetch_Godown)) { $selected_godown_names[] = $result_Godown['gname']; }
 }
 ?>
 <!DOCTYPE html>
@@ -61,8 +76,8 @@ $select_Godown="select * from company_godown where id='$get_company'";
 									<tr>
 									<td><h1>Datewise Overall stock</h1>
 									<h5><?=date("d-m-Y",strtotime($get_from_date));?> (to) <?=date("d-m-Y",strtotime($get_to_date));?>
-									<?php if($result_Godown['gname']!=NULL){?>
-									<br/>Company Profile : <b><?=$result_Godown['gname'];?></b>
+									<?php if(!empty($selected_godown_names)){?>
+									<br/>Company Profile : <b><?=htmlspecialchars(implode(', ', $selected_godown_names));?></b>
 									<?php }?>
 									</h5>
 									</td>
@@ -108,7 +123,7 @@ if($_REQUEST['godownid']==NULL)
 {
 $select_sum_input_qty="select sum(input_qty) from input_stock where input_date='$report_date' and product_id='$report_prid'";
 }else{
-$select_sum_input_qty="select sum(input_qty) from input_stock where input_date='$report_date' and product_id='$report_prid' and godownid='$get_company'";
+$select_sum_input_qty="select sum(input_qty) from input_stock where input_date='$report_date' and product_id='$report_prid' and godownid IN ($get_company_ids_sql)";
 }
 $fetch_sum_input_qty=mysqli_query($db_conn,$select_sum_input_qty);
 $result_sum_input_qty=mysqli_fetch_array($fetch_sum_input_qty);
@@ -121,7 +136,7 @@ if($_REQUEST['godownid']==NULL)
 {
 $select_sum_OTSLS_qty="select sum(qty) from ot_sales where date='$report_date' and prid='$report_prid'";
 }else{
-$select_sum_OTSLS_qty="select sum(qty) from ot_sales where date='$report_date' and prid='$report_prid' and godownid='$get_company'";
+$select_sum_OTSLS_qty="select sum(qty) from ot_sales where date='$report_date' and prid='$report_prid' and godownid IN ($get_company_ids_sql)";
 }
 
 $fetch_sum_OTSLS_qty=mysqli_query($db_conn,$select_sum_OTSLS_qty);
@@ -133,7 +148,7 @@ if($_REQUEST['godownid']==NULL)
 {
 $select_sum_OTSLSrtn_qty="select sum(qty) from ot_sales_return where return_date='$report_date' and prid='$report_prid'";
 }else{
-$select_sum_OTSLSrtn_qty="select sum(qty) from ot_sales_return where return_date='$report_date' and prid='$report_prid' and godownid='$get_company'";
+$select_sum_OTSLSrtn_qty="select sum(qty) from ot_sales_return where return_date='$report_date' and prid='$report_prid' and godownid IN ($get_company_ids_sql)";
 }
 
 $fetch_sum_OTSLSrtn_qty=mysqli_query($db_conn,$select_sum_OTSLSrtn_qty);
@@ -147,7 +162,7 @@ if($_REQUEST['godownid']==NULL)
 {
 $select_sum_SLS1_qty="select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid'";
 }else{
-$select_sum_SLS1_qty="select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid' and from_user_id='$get_company'";
+$select_sum_SLS1_qty="select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid' and from_user_id IN ($get_company_ids_sql) and from_user_type='company'";
 }
 
 $fetch_sum_SLS1_qty=mysqli_query($db_conn,$select_sum_SLS1_qty);
@@ -159,7 +174,7 @@ if($_REQUEST['godownid']==NULL)
 {
 $select_sum_SLS2_qty="select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid'";
 }else{
-$select_sum_SLS2_qty="select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid' and user_id='$get_company'";
+$select_sum_SLS2_qty="select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid' and user_id IN ($get_company_ids_sql) and user_type='company'";
 }
 
 $fetch_sum_SLS2_qty=mysqli_query($db_conn,$select_sum_SLS2_qty);
@@ -173,7 +188,7 @@ if($_REQUEST['godownid']==NULL)
 {
 $select_sum_SLS3_qty="select sum(tpi.quantity) from tp_invoice_items tpi inner join tp_invoices ti on ti.id=tpi.tp_invoice_id where ti.invoice_date='$report_date' and tpi.product_id='$report_prid'";
 }else{
-$select_sum_SLS3_qty="select sum(tpi.quantity) from tp_invoice_items tpi inner join tp_invoices ti on ti.id=tpi.tp_invoice_id where ti.invoice_date='$report_date' and tpi.product_id='$report_prid' and ti.source_godown_id='$get_company'";
+$select_sum_SLS3_qty="select sum(tpi.quantity) from tp_invoice_items tpi inner join tp_invoices ti on ti.id=tpi.tp_invoice_id where ti.invoice_date='$report_date' and tpi.product_id='$report_prid' and ti.source_godown_id IN ($get_company_ids_sql)";
 }
 
 $fetch_sum_SLS3_qty=mysqli_query($db_conn,$select_sum_SLS3_qty);
@@ -185,7 +200,7 @@ if($_REQUEST['godownid']==NULL)
 {
 $select_sum_SLSreturn_qty="select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid'";
 }else{
-$select_sum_SLSreturn_qty="select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid' and to_userid='$get_company'";
+$select_sum_SLSreturn_qty="select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid' and to_userid IN ($get_company_ids_sql) and to_usertype='company'";
 }
 
 $fetch_sum_SLSreturn_qty=mysqli_query($db_conn,$select_sum_SLSreturn_qty);
@@ -206,7 +221,7 @@ if($_REQUEST['godownid']==NULL)
 {
 $select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_date' and product_id='$report_prid'";
 }else{
-$select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_date' and product_id='$report_prid' and userid='$get_company'";
+$select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_date' and product_id='$report_prid' and userid IN ($get_company_ids_sql)";
 }
 $fetch_sum_DFD_qty=mysqli_query($db_conn,$select_sum_DFD_qty);
 $result_sum_DFD_qty=mysqli_fetch_array($fetch_sum_DFD_qty);
@@ -217,7 +232,7 @@ if($_REQUEST['godownid']==NULL)
 {
 $select_sum_INTRN_qty="select sum(qty) from internal_transfer where date='$report_date' and product_id='$report_prid'";
 }else{
-$select_sum_INTRN_qty="select sum(qty) from internal_transfer where date='$report_date' and product_id='$report_prid' and send_from='$get_company'";
+$select_sum_INTRN_qty="select sum(qty) from internal_transfer where date='$report_date' and product_id='$report_prid' and send_from IN ($get_company_ids_sql)";
 }
 $fetch_sum_INTRN_qty=mysqli_query($db_conn,$select_sum_INTRN_qty);
 $result_sum_INTRN_qty=mysqli_fetch_array($fetch_sum_INTRN_qty);

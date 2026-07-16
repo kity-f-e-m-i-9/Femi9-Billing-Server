@@ -75,7 +75,7 @@ $user_type_Loginvl="company";
                             </div>
                         </div>
 						
-						<form method="post" enctype="multipart/form-data" action="overstock_datewise">
+						<form method="post" enctype="multipart/form-data" action="overstock_datewise" id="datewiseFilterForm" onsubmit="return validateGodownChecks();">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -87,16 +87,23 @@ $user_type_Loginvl="company";
 <input type="date" required="" name="todate" class="form-control">
 </div>
 <div id="searchleftcont">
-<label class="form-label">Company Profile</label>
-                               <select name="godownid" class="form-control">
-							   <option value="" hidden="">Select</option>
+<label class="form-label">Company Profile <span style="color:red;">*</span></label>
+							   <div class="ms-dropdown" style="position:relative;">
+							   <div class="form-control" id="godownDropdownToggle" onclick="toggleGodownDropdown(event)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+							   <span id="godownDropdownLabel" style="color:#6c757d;">Select</span>
+							   <i class="material-icons" style="font-size:20px;">arrow_drop_down</i>
+							   </div>
+							   <div id="godownDropdownPanel" style="display:none;position:absolute;z-index:20;background:#fff;border:1px solid #ced4da;border-radius:4px;padding:8px 12px;margin-top:2px;min-width:100%;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
 							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						   <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+						   <label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
+						   <input type="checkbox" name="godownid[]" value="<?=$result_Godown['id'];?>" class="godown-check" onchange="updateGodownDropdownLabel()"> <?=$result_Godown['gname'];?>
+						   </label>
 							   <?php }?>
-							   </select>
+							   </div>
+							   </div>
 </div>
 
 <div id="searchbuttoncont">
@@ -245,6 +252,48 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
     <script src="../../assets/js/pages/datatables.js"></script>
+    <script>
+    function validateGodownChecks() {
+        var checked = document.querySelectorAll('.godown-check:checked');
+        if (checked.length === 0) {
+            alert('Select at least one Company Profile.');
+            return false;
+        }
+        return true;
+    }
+
+    function toggleGodownDropdown(e) {
+        e.stopPropagation();
+        var panel = document.getElementById('godownDropdownPanel');
+        panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+    }
+
+    function updateGodownDropdownLabel() {
+        var checked = document.querySelectorAll('.godown-check:checked');
+        var label = document.getElementById('godownDropdownLabel');
+        if (checked.length === 0) {
+            label.textContent = 'Select';
+            label.style.color = '#6c757d';
+        } else if (checked.length === 1) {
+            label.textContent = checked[0].closest('label').textContent.trim();
+            label.style.color = '#000';
+        } else {
+            label.textContent = checked.length + ' companies selected';
+            label.style.color = '#000';
+        }
+    }
+
+    document.addEventListener('click', function (e) {
+        var dropdown = document.querySelector('.ms-dropdown');
+        if (dropdown && !dropdown.contains(e.target)) {
+            document.getElementById('godownDropdownPanel').style.display = 'none';
+        }
+    });
+
+    document.getElementById('godownDropdownPanel').addEventListener('click', function (e) {
+        e.stopPropagation();
+    });
+    </script>
 </body>
 
 </html>
