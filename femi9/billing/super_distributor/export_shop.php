@@ -2,12 +2,7 @@
 include("config.php");
 error_reporting(0);
 
-//login user details
-$log_username=$_SESSION['LOGIN_USER'];
-$select_superstock="select * from super_distributor where username='$log_username'";
-$fetch_superstock=mysqli_query($db_conn,$select_superstock);
-$result_superstock=mysqli_fetch_array($fetch_superstock);
-$loguser_tempid=$result_superstock['temp_id'];
+$loguser_tempid=$result_LoGuserDtails['temp_id'];
 
 $file = "Shop-list.csv";
 
