@@ -79,8 +79,8 @@ $tp_stmt->close();
         .btn-add-product { background:#10b981; color:white; border:none; padding:11px 20px; border-radius:8px; font-weight:500; display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-family:'Poppins',sans-serif; font-size:14px; white-space:nowrap; }
         .btn-add-product:hover { background:#059669; }
         .btn-add-product:disabled { opacity:0.5; cursor:not-allowed; }
-        .table-modern { background:white; border-radius:12px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-top:20px; border:1px solid #f1f5f9; }
-        .table-modern table { margin:0; width:100%; }
+        .table-modern { background:white; border-radius:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-top:20px; border:1px solid #f1f5f9; }
+        .table-modern table { margin:0; width:100%; min-width:720px; }
         .table-modern thead { background:#f8fafc; }
         .table-modern thead th { color:#475569; font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; padding:14px 16px; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
         .table-modern tbody td { padding:13px 16px; vertical-align:middle; border-bottom:1px solid #f1f5f9; color:#1e293b; font-size:14px; }
@@ -216,56 +216,27 @@ $tp_stmt->close();
 
                         <!-- Add Product section — shown after TP selected -->
                         <div id="productAddWrapper" style="display:none;">
-                            <div class="product-add-section">
-                                <div class="section-header" style="border:none;padding-bottom:15px;">
-                                    <i class="material-icons">add_shopping_cart</i>
-                                    Add Product to Invoice
-                                </div>
-                                <div class="product-add-grid">
-                                    <div class="input-group-modern">
-                                        <label>Product <span style="color:#ef4444;">*</span></label>
-                                        <select id="productSelect" class="form-control">
-                                            <option value="">— Select Product —</option>
-                                        </select>
-                                    </div>
-                                    <div class="input-group-modern">
-                                        <label>Available</label>
-                                        <input type="number" id="availQty" class="form-control" readonly placeholder="—">
-                                    </div>
-                                    <div class="input-group-modern">
-                                        <label>Qty <span style="color:#ef4444;">*</span></label>
-                                        <input type="number" id="qtyInput" class="form-control" min="1" placeholder="0">
-                                    </div>
-                                    <div class="input-group-modern">
-                                        <label>Rate (₹) <span style="color:#ef4444;">*</span></label>
-                                        <input type="number" id="rateInput" class="form-control" min="0" step="0.01" placeholder="0.00">
-                                    </div>
-                                    <div class="input-group-modern" style="align-items:flex-end;">
-                                        <button type="button" class="btn-add-product" id="addProductBtn" onclick="addProduct()">
-                                            <i class="material-icons">add</i> Add
-                                        </button>
-                                    </div>
-                                </div>
-                                <div id="addError" style="margin-top:10px;display:none;"></div>
+                            <div class="section-header" style="padding-bottom:15px;">
+                                <i class="material-icons">add_shopping_cart</i>
+                                Add Products to Invoice
                             </div>
+                            <div id="addError" style="margin-bottom:10px;display:none;"></div>
 
                             <div class="table-modern">
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>#</th><th>Product</th><th>Available</th>
-                                            <th>Qty</th><th>Rate (₹)</th><th>Amount (₹)</th><th></th>
+                                            <th>#</th><th style="min-width:260px;">Product</th><th>Available</th>
+                                            <th>Qty</th><th>Rate (₹)</th><th>Disc(%)</th><th>Disc(₹)</th><th>Amount (₹)</th><th></th>
                                         </tr>
                                     </thead>
-                                    <tbody id="productBody">
-                                        <tr class="empty-row" id="emptyRow">
-                                            <td colspan="7">
-                                                <i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>
-                                                No products added yet
-                                            </td>
-                                        </tr>
-                                    </tbody>
+                                    <tbody id="productBody"></tbody>
                                 </table>
+                            </div>
+                            <div style="margin-top:16px;">
+                                <button type="button" class="btn-add-product" id="addRowBtn" onclick="addProductRow()">
+                                    <i class="material-icons">add</i> Add Product Row
+                                </button>
                             </div>
 
                             <div class="invoice-summary-card">
@@ -284,6 +255,10 @@ $tp_stmt->close();
                                             <span class="summary-value" id="summarySubtotal">₹0.00</span>
                                         </div>
                                         <div class="summary-row">
+                                            <span class="summary-label">Item Discount</span>
+                                            <span class="summary-value" id="summaryItemDiscount">₹0.00</span>
+                                        </div>
+                                        <div class="summary-row">
                                             <span class="summary-label">
                                                 <i class="material-icons" style="font-size:17px;color:#64748b;vertical-align:middle;">local_shipping</i>
                                                 Courier Charges (₹)
@@ -297,7 +272,7 @@ $tp_stmt->close();
                                         <div class="summary-row">
                                             <span class="summary-label">
                                                 <i class="material-icons" style="font-size:17px;color:#64748b;vertical-align:middle;">discount</i>
-                                                Discount (₹)
+                                                Additional Discount (₹)
                                             </span>
                                             <span class="summary-value">
                                                 <input type="number" id="discountInput" name="discount_amount" min="0" step="0.01" value="0"
@@ -374,11 +349,11 @@ $(document).ready(function() {
 <script>
 (function ($) {
     var availableProducts = [];
-    var invoiceItems      = [];
     var currentTpId       = null;
     var advanceBalance    = 0;
     var invNumberOk       = false;
     var invNumberTimer    = null;
+    var rowSeq             = 0;
 
     $('#invNumberInput').on('input', function () {
         var val = $(this).val().trim();
@@ -450,102 +425,178 @@ $(document).ready(function() {
     });
 
     function loadSsProducts() {
-        $('#productSelect').html('<option value="">Loading…</option>').prop('disabled', true);
         $.getJSON('get-ss-tp-products.php?tp_id=' + currentTpId, function (data) {
-            if (!data.length) {
-                $('#productSelect').html('<option value="">No stock available</option>');
+            availableProducts = data || [];
+            $('#productBody').empty();
+            if (!availableProducts.length) {
                 showAddError('No products in stock for this Super Stockist.');
+                renumberRows();
                 return;
             }
-            var opts = '<option value="">— Select Product —</option>';
-            $.each(data, function (i, p) {
-                opts += '<option value="' + p.product_id + '" data-avail="' + p.available_qty + '" data-rate="' + p.rate + '">'
-                      + p.productName + (p.hsn ? ' [HSN: ' + p.hsn + ']' : '') + ' (Avail: ' + p.available_qty + ')'
-                      + '</option>';
-            });
-            $('#productSelect').html(opts).prop('disabled', false);
-        }).fail(function (jqXHR) {
+            addProductRow();
+        }).fail(function () {
             showAddError('Error loading products. Please refresh.');
         });
         $('#productAddWrapper').show();
     }
 
-    $('#productSelect').on('change', function () {
-        var $opt  = $(this).find('option:selected');
-        var avail = parseInt($opt.data('avail')) || 0;
-        var rate  = parseFloat($opt.data('rate')) || 0;
-        $('#availQty').val(avail > 0 ? avail : '');
-        $('#rateInput').val(rate > 0 ? rate.toFixed(2) : '0.00');
-        $('#qtyInput').val('').attr('max', avail);
+    function productOptionsHtml(selectedId) {
+        var opts = '<option value="">— Select Product —</option>';
+        $.each(availableProducts, function (i, p) {
+            opts += '<option value="' + p.product_id + '" data-avail="' + p.available_qty + '" data-rate="' + p.rate + '"'
+                  + (String(p.product_id) === String(selectedId) ? ' selected' : '') + '>'
+                  + p.productName + (p.hsn ? ' [HSN: ' + p.hsn + ']' : '') + ' (Avail: ' + p.available_qty + ')'
+                  + '</option>';
+        });
+        return opts;
+    }
+
+    window.addProductRow = function () {
         hideAddError();
+        var rowId = ++rowSeq;
+        var $tr = $(
+            '<tr class="product-row" data-row-id="' + rowId + '">' +
+            '<td><span class="row-num"></span></td>' +
+            '<td><select class="form-control row-product-select">' + productOptionsHtml() + '</select></td>' +
+            '<td><span class="avail-chip none row-avail">—</span></td>' +
+            '<td><input type="number" class="form-control row-qty" min="1" placeholder="0" style="width:90px;"></td>' +
+            '<td><input type="number" class="form-control row-rate" min="0" step="0.01" placeholder="0.00" style="width:110px;"></td>' +
+            '<td><input type="number" class="form-control row-disc-pct" min="0" max="100" step="0.01" placeholder="0" style="width:80px;"></td>' +
+            '<td><input type="number" class="form-control row-disc-amt" min="0" step="0.01" placeholder="0.00" style="width:100px;"></td>' +
+            '<td><strong class="row-amount">₹0.00</strong></td>' +
+            '<td><button type="button" class="badge-remove row-remove-btn"><i class="material-icons" style="font-size:14px;vertical-align:middle;">delete</i></button></td>' +
+            '</tr>'
+        );
+        $('#productBody').append($tr);
+        renumberRows();
+    };
+
+    $('#productBody').on('click', '.row-remove-btn', function () {
+        $(this).closest('tr').remove();
+        renumberRows();
+        updateSummary();
     });
 
-    window.addProduct = function () {
+    $('#productBody').on('change', '.row-product-select', function () {
+        var $tr   = $(this).closest('tr');
+        var $opt  = $(this).find('option:selected');
+        var product_id = $(this).val();
+        var avail = parseInt($opt.data('avail')) || 0;
+        var rate  = parseFloat($opt.data('rate')) || 0;
+
         hideAddError();
-        var $opt      = $('#productSelect').find('option:selected');
-        var product_id = parseInt($('#productSelect').val());
-        var name      = $opt.text().trim();
-        var avail     = parseInt($('#availQty').val()) || 0;
-        var qty       = parseInt($('#qtyInput').val()) || 0;
-        var rate      = parseFloat($('#rateInput').val()) || 0;
-
-        if (!product_id) { showAddError('Please select a product.'); return; }
-        if (qty < 1)     { showAddError('Quantity must be at least 1.'); return; }
-        if (rate <= 0)   { showAddError('Please enter a valid rate.'); return; }
-        if (qty > avail) { showAddError('Quantity exceeds available stock (' + avail + ').'); return; }
-        if (invoiceItems.find(function(i){ return i.product_id === product_id; })) {
-            showAddError('This product is already added.'); return;
+        if (product_id) {
+            var dup = false;
+            $('#productBody .row-product-select').not(this).each(function () {
+                if ($(this).val() === product_id) dup = true;
+            });
+            if (dup) {
+                showAddError('This product is already added in another row.');
+                $(this).val('');
+                $tr.find('.row-avail').text('—').removeClass().addClass('avail-chip none row-avail');
+                $tr.find('.row-qty, .row-rate, .row-disc-pct, .row-disc-amt').val('');
+                updateRowAmount($tr);
+                return;
+            }
         }
 
-        var amount = parseFloat((qty * rate).toFixed(2));
-        invoiceItems.push({ product_id: product_id, name: name, avail: avail, qty: qty, rate: rate, amount: amount });
-        renderTable();
-        resetAddForm();
-    };
+        $tr.find('.row-avail').text(product_id ? avail : '—').removeClass().addClass('avail-chip row-avail' + (avail > 0 ? '' : ' none'));
+        $tr.find('.row-rate').val(product_id && rate > 0 ? rate.toFixed(2) : '');
+        $tr.find('.row-qty').val('').attr('max', avail || '');
+        $tr.find('.row-disc-pct, .row-disc-amt').val('');
+        updateRowAmount($tr);
+    });
 
-    window.removeProduct = function (idx) {
-        invoiceItems.splice(idx, 1);
-        renderTable();
-    };
+    $('#productBody').on('input change', '.row-qty, .row-rate', function () {
+        updateRowAmount($(this).closest('tr'));
+    });
 
-    function renderTable() {
-        var $body = $('#productBody').empty();
-        if (!invoiceItems.length) {
-            $body.html('<tr class="empty-row"><td colspan="7"><i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>No products added yet</td></tr>');
-            updateSummary(); return;
-        }
-        $.each(invoiceItems, function (i, item) {
-            $body.append(
-                '<tr>' +
-                '<td><span class="row-num">' + (i+1) + '</span></td>' +
-                '<td><strong>' + escHtml(item.name) + '</strong></td>' +
-                '<td><span class="avail-chip' + (item.avail>0?'':' none') + '">' + item.avail + '</span></td>' +
-                '<td>' + item.qty + '</td>' +
-                '<td>₹' + item.rate.toFixed(2) + '</td>' +
-                '<td><strong>₹' + item.amount.toFixed(2) + '</strong></td>' +
-                '<td><button type="button" class="badge-remove" onclick="removeProduct(' + i + ')"><i class="material-icons" style="font-size:14px;vertical-align:middle;">delete</i> Remove</button></td>' +
-                '</tr>'
-            );
-        });
+    // Disc(%) -> Disc(₹): typing a percentage computes the rupee discount
+    // off this row's gross (qty × rate), same relationship as
+    // territory-partner/shop-invoice-add.php's discamount().
+    $('#productBody').on('input', '.row-disc-pct', function () {
+        var $tr = $(this).closest('tr');
+        var qty  = parseFloat($tr.find('.row-qty').val()) || 0;
+        var rate = parseFloat($tr.find('.row-rate').val()) || 0;
+        var pct  = parseFloat($(this).val()) || 0;
+        $tr.find('.row-disc-amt').val(((qty * rate) * pct / 100).toFixed(2));
+        updateRowAmount($tr);
+    });
+
+    // Disc(₹) -> Disc(%): typing a rupee discount directly back-computes the
+    // percentage, so either field can be the one the user fills in.
+    $('#productBody').on('input', '.row-disc-amt', function () {
+        var $tr = $(this).closest('tr');
+        var qty  = parseFloat($tr.find('.row-qty').val()) || 0;
+        var rate = parseFloat($tr.find('.row-rate').val()) || 0;
+        var gross = qty * rate;
+        var amt  = parseFloat($(this).val()) || 0;
+        $tr.find('.row-disc-pct').val(gross > 0 ? (amt / gross * 100).toFixed(2) : '');
+        updateRowAmount($tr);
+    });
+
+    function updateRowAmount($tr) {
+        var qty     = parseFloat($tr.find('.row-qty').val()) || 0;
+        var rate    = parseFloat($tr.find('.row-rate').val()) || 0;
+        var discAmt = parseFloat($tr.find('.row-disc-amt').val()) || 0;
+        var net     = Math.max(0, (qty * rate) - discAmt);
+        $tr.find('.row-amount').text('₹' + net.toFixed(2));
         updateSummary();
-        buildHiddenInputs();
+    }
+
+    function renumberRows() {
+        $('#productBody .product-row').each(function (i) {
+            $(this).find('.row-num').text(i + 1);
+        });
+    }
+
+    // A "row" only counts toward the invoice once a product is picked —
+    // half-filled draft rows are silently ignored everywhere (summary,
+    // submit, hidden inputs) so users can add several blank rows up front
+    // without validation errors until they actually fill each one in.
+    function filledRows() {
+        var rows = [];
+        $('#productBody .product-row').each(function () {
+            var $tr = $(this);
+            var product_id = $tr.find('.row-product-select').val();
+            if (!product_id) return;
+            rows.push({
+                $tr: $tr,
+                product_id: parseInt(product_id),
+                name: $tr.find('.row-product-select option:selected').text().trim(),
+                avail: parseInt($tr.find('.row-avail').text()) || 0,
+                qty: parseInt($tr.find('.row-qty').val()) || 0,
+                rate: parseFloat($tr.find('.row-rate').val()) || 0,
+                discPct: parseFloat($tr.find('.row-disc-pct').val()) || 0,
+                discAmt: parseFloat($tr.find('.row-disc-amt').val()) || 0
+            });
+        });
+        return rows;
     }
 
     $('#courierInput, #discountInput').on('input change', function () { updateSummary(); });
 
     function updateSummary() {
-        var subtotal = 0, qty = 0;
-        $.each(invoiceItems, function (_, item) { subtotal += item.amount; qty += item.qty; });
+        var rows = filledRows();
+        var subtotal = 0, qty = 0, itemDiscTotal = 0;
+        $.each(rows, function (_, item) {
+            subtotal += item.qty * item.rate;
+            itemDiscTotal += item.discAmt;
+            qty += item.qty;
+        });
         subtotal = parseFloat(subtotal.toFixed(2));
+        itemDiscTotal = parseFloat(itemDiscTotal.toFixed(2));
+        var afterItemDisc = Math.max(0, parseFloat((subtotal - itemDiscTotal).toFixed(2)));
         var discount  = Math.max(0, parseFloat($('#discountInput').val()) || 0);
-        discount      = parseFloat(Math.min(discount, subtotal).toFixed(2));
+        discount      = parseFloat(Math.min(discount, afterItemDisc).toFixed(2));
         var courier   = Math.max(0, parseFloat($('#courierInput').val()) || 0);
-        var netAmount = parseFloat((subtotal - discount).toFixed(2));
+        var netAmount = parseFloat((afterItemDisc - discount).toFixed(2));
         var total     = parseFloat((netAmount + courier).toFixed(2));
 
-        $('#summaryItems').text(invoiceItems.length);
+        $('#summaryItems').text(rows.length);
         $('#summaryQty').text(qty);
         $('#summarySubtotal').text('₹' + fmtAmt(subtotal));
+        $('#summaryItemDiscount').text('₹' + fmtAmt(itemDiscTotal));
         $('#grandTotal').text('₹' + fmtAmt(total));
 
         if (currentTpId && advanceBalance > 0) {
@@ -568,23 +619,33 @@ $(document).ready(function() {
         }
 
         var invNumberFilled = $('#invNumberInput').val().trim() !== '';
-        $('#submitBtn').prop('disabled', invoiceItems.length === 0 || !invNumberFilled || !invNumberOk);
-        var insufficient = advanceBalance > 0 && currentTpId && (advanceBalance < (subtotal - discount));
-        $('#submitHint').toggle(insufficient && invoiceItems.length > 0);
+        $('#submitBtn').prop('disabled', rows.length === 0 || !invNumberFilled || !invNumberOk);
+        var insufficient = advanceBalance > 0 && currentTpId && (advanceBalance < netAmount);
+        $('#submitHint').toggle(insufficient && rows.length > 0);
     }
 
     function buildHiddenInputs() {
         var html = '';
-        $.each(invoiceItems, function (_, item) {
+        $.each(filledRows(), function (_, item) {
             html += '<input type="hidden" name="product_id[]" value="' + item.product_id + '">';
             html += '<input type="hidden" name="qty[]"        value="' + item.qty + '">';
             html += '<input type="hidden" name="rate[]"       value="' + item.rate + '">';
+            html += '<input type="hidden" name="item_discount_percentage[]" value="' + item.discPct + '">';
+            html += '<input type="hidden" name="item_discount_amount[]"     value="' + item.discAmt + '">';
         });
         $('#hiddenProductInputs').html(html);
     }
 
     $('#invoiceForm').on('submit', function (e) {
-        if (!invoiceItems.length) { e.preventDefault(); alert('Please add at least one product.'); return; }
+        var rows = filledRows();
+        if (!rows.length) { e.preventDefault(); alert('Please add at least one product.'); return; }
+        for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            if (r.qty < 1)     { e.preventDefault(); alert('Row ' + (i+1) + ': quantity must be at least 1.'); return; }
+            if (r.rate <= 0)   { e.preventDefault(); alert('Row ' + (i+1) + ': please enter a valid rate.'); return; }
+            if (r.qty > r.avail) { e.preventDefault(); alert('Row ' + (i+1) + ': quantity exceeds available stock (' + r.avail + ').'); return; }
+            if (r.discAmt > r.qty * r.rate) { e.preventDefault(); alert('Row ' + (i+1) + ': discount cannot exceed the line amount.'); return; }
+        }
         if (!$('#invNumberInput').val().trim()) { e.preventDefault(); alert('Please enter an invoice number.'); return; }
         if (!invNumberOk) { e.preventDefault(); alert('This invoice number already exists in your account. Please enter a different one.'); return; }
         buildHiddenInputs();
@@ -595,20 +656,12 @@ $(document).ready(function() {
         currentTpId    = null;
         advanceBalance = 0;
         availableProducts = [];
-        invoiceItems   = [];
+        rowSeq = 0;
         $('#balancePanel').hide();
         $('#productAddWrapper').hide();
         $('#productBody').empty();
         $('#hiddenProductInputs').empty();
         updateSummary();
-    }
-
-    function resetAddForm() {
-        $('#productSelect').val('').trigger('change.select2');
-        $('#availQty').val('');
-        $('#qtyInput').val('');
-        $('#rateInput').val('');
-        hideAddError();
     }
 
     function showAddError(msg) {

@@ -81,6 +81,14 @@ if ($col2 && $col2->num_rows === 0) {
     }
 }
 
+// Per-product Disc(%)/Disc(₹) on the invoice line items — see
+// db_migrations/2026_07_20_tp_invoice_items_discount.sql
+$col3 = $db_conn->query("SHOW COLUMNS FROM tp_invoice_items LIKE 'discount_amount'");
+if ($col3 && $col3->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_invoice_items ADD COLUMN discount_percentage DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER amount");
+    $db_conn->query("ALTER TABLE tp_invoice_items ADD COLUMN discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER discount_percentage");
+}
+
 // ── Input & validation ────────────────────────────────────────────────────────
 $tp_id            = (int)($_POST['tp_id'] ?? 0);
 $inv_num          = trim(str_replace("'", "", $_POST['inv_number'] ?? ''));
@@ -96,9 +104,11 @@ $ss_id            = $Login_user_IDvl;
 // Super Stockist's invoices.
 $ss_account_id    = (int)($result_LoGuserDtails['id'] ?? 0);
 
-$raw_pids  = $_POST['product_id'] ?? [];
-$raw_qtys  = $_POST['qty']        ?? [];
-$raw_rates = $_POST['rate']       ?? [];
+$raw_pids       = $_POST['product_id']          ?? [];
+$raw_qtys       = $_POST['qty']                 ?? [];
+$raw_rates      = $_POST['rate']                ?? [];
+$raw_disc_pcts  = $_POST['item_discount_percentage'] ?? [];
+$raw_disc_amts  = $_POST['item_discount_amount']     ?? [];
 
 if (!$tp_id || $inv_num === '' || empty($raw_pids) || $ss_account_id < 1) {
     header("Location: add-tp-invoice?error=missing"); exit;
@@ -133,14 +143,24 @@ foreach ($raw_pids as $i => $rpid) {
     if ($pid < 1 || $qty < 1) continue;
     if (isset($seen[$pid])) continue;
     $seen[$pid] = true;
-    $items[] = ['pid' => $pid, 'qty' => $qty, 'rate' => $rate, 'amount' => round($qty * $rate, 2)];
+    $amount      = round($qty * $rate, 2);
+    $disc_pct    = round((float)($raw_disc_pcts[$i] ?? 0), 2);
+    $disc_amt    = round((float)($raw_disc_amts[$i] ?? 0), 2);
+    if ($disc_amt < 0) $disc_amt = 0;
+    if ($disc_amt > $amount) $disc_amt = $amount;
+    $items[] = ['pid' => $pid, 'qty' => $qty, 'rate' => $rate, 'amount' => $amount, 'disc_pct' => $disc_pct, 'disc_amt' => $disc_amt];
 }
 
 if (empty($items)) {
     header("Location: add-tp-invoice?error=noproducts"); exit;
 }
 
-$subtotal      = round(array_sum(array_column($items, 'amount')), 2);
+// Gross subtotal minus each line's own discount, then the invoice-level
+// "Additional Discount" field on top of that.
+$gross_subtotal   = round(array_sum(array_column($items, 'amount')), 2);
+$item_discount_total = round(array_sum(array_column($items, 'disc_amt')), 2);
+$subtotal      = round($gross_subtotal - $item_discount_total, 2);
+if ($subtotal < 0) $subtotal = 0;
 $net_amount    = round($subtotal - $discount_amount, 2);
 if ($net_amount < 0) $net_amount = 0;
 $invoice_total = round($net_amount + $courier_charges, 2);
@@ -185,7 +205,7 @@ try {
     $s->close();
 
     // Line items + stock movements
-    $s_item = $db_conn->prepare("INSERT INTO tp_invoice_items (tp_invoice_id,product_id,quantity,rate,amount) VALUES (?,?,?,?,?)");
+    $s_item = $db_conn->prepare("INSERT INTO tp_invoice_items (tp_invoice_id,product_id,quantity,rate,amount,discount_percentage,discount_amount) VALUES (?,?,?,?,?,?,?)");
     foreach ($items as $item) {
         // Deduct from SS stock with row lock
         $ss_before = lockAndGetSsQty($db_conn, $ss_id, $item['pid']);
@@ -203,7 +223,7 @@ try {
         $tp_after = $tp_before + $item['qty'];
         insertTpLedger($db_conn, $tp_id, $item['pid'], $item['qty'], $tp_before, $tp_after, $inv_num, $created_by);
 
-        $s_item->bind_param("iiidd", $invoice_id, $item['pid'], $item['qty'], $item['rate'], $item['amount']);
+        $s_item->bind_param("iiidddd", $invoice_id, $item['pid'], $item['qty'], $item['rate'], $item['amount'], $item['disc_pct'], $item['disc_amt']);
         $s_item->execute();
     }
     $s_item->close();
