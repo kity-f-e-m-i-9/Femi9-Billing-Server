@@ -179,6 +179,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="neksomo-product-add.php">Add Product</a></li>
 						<li><a href="neksomo-manage-products.php">Manage Products</a></li>
+						<li><a href="neksomo-product-map-list.php">Map Products</a></li>
                         </ul>
                     </li>
 

@@ -13,7 +13,7 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-$products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM products WHERE deleted_at IS NULL ORDER BY productName ASC")->fetch_all(MYSQLI_ASSOC);
+$products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM products WHERE deleted_at IS NULL AND temp_id LIKE 'NKS-%' ORDER BY productName ASC")->fetch_all(MYSQLI_ASSOC);
 $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE is_active = 1 ORDER BY vendor_name ASC")->fetch_all(MYSQLI_ASSOC);
 ?>
 
