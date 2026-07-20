@@ -568,12 +568,18 @@ if ($scope === 'company') {
     $grand_total_unpriced_pieces = (int) array_sum(array_column($pieces_sold, 'unpriced_pieces'));
     $grand_gross_profit          = $grand_total_value - $grand_total_purchase_value;
 
-    // Expense — same company_id/expense_month pattern as the overall MIS
-    // net-profit KPI, but scoped to this section's own entity filter
-    // ($filter_entity or every entity this login can see) rather than a
-    // hardcoded 'Femi%' name match, so it stays consistent with whichever
-    // entity the Pieces Sold table above is showing.
-    $pcs_expense_cond = $filter_entity > 0 ? "company_id = {$filter_entity}" : "company_id IN ({$entity_ids_subq})";
+    // Expense — for a neksomo login specifically, always Neksomo's own
+    // expense uploads, NOT LLP's — even though $filter_entity above is
+    // deliberately overridden to LLP for the Pieces Sold table (LLP is who
+    // actually issues the sales this report tracks; Neksomo's own godown
+    // doesn't). Every other login keeps the prior behavior: this section's
+    // own entity filter ($filter_entity or every entity it can see).
+    if ($is_neksomo_view) {
+        $__neksomoGodown = crow($db_conn, "SELECT id FROM company_godown WHERE gname = 'NEKSOMO HYGIENE INDUSTRIES' LIMIT 1");
+        $pcs_expense_cond = "company_id = " . (int)($__neksomoGodown['id'] ?? 0);
+    } else {
+        $pcs_expense_cond = $filter_entity > 0 ? "company_id = {$filter_entity}" : "company_id IN ({$entity_ids_subq})";
+    }
     $grand_total_expense = (float) cval($db_conn,
         "SELECT COALESCE(SUM(net_amount),0) FROM expense_imports
          WHERE {$pcs_expense_cond}
@@ -861,10 +867,10 @@ if ($is_neksomo_view) {
 
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty Sold</div><div class="kpi-v"><?php echo number_format($grand_total_pack_qty); ?></div></div>
+                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty Sold</div><div class="kpi-v"><?php echo inr_format($grand_total_pack_qty, 0); ?></div></div>
                         </div>
                         <div class="col-md-4">
-                            <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo number_format($grand_total_pieces); ?></div></div>
+                            <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo inr_format($grand_total_pieces, 0); ?></div></div>
                         </div>
                         <div class="col-md-4">
                             <div class="kpi-card"><div class="kpi-t">Period</div><div class="kpi-v" style="font-size:15px;"><?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></div></div>
@@ -873,16 +879,16 @@ if ($is_neksomo_view) {
 
                     <div class="row mb-3">
                         <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_value, 2); ?></div></div>
+                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_value, 2); ?></div></div>
                         </div>
                         <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_gross_profit, 2); ?></div></div>
+                            <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
                         </div>
                         <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_expense, 2); ?></div></div>
+                            <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_expense, 2); ?></div></div>
                         </div>
                         <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_net_profit, 2); ?></div></div>
+                            <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
                         </div>
                     </div>
                     <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Sold Price − Purchase Value = Gross Profit. Gross Profit − Expense (Femi9 LLP, this period) = Net Profit.</p>
@@ -903,17 +909,17 @@ if ($is_neksomo_view) {
                         <div class="col-md-4">
                             <div class="kpi-card">
                                 <div class="kpi-t"><?php echo htmlspecialchars($partner_name); ?> (<?php echo (int)round($partner_pct * 100); ?>%)</div>
-                                <div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_net_profit * $partner_pct, 2); ?></div>
+                                <div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit * $partner_pct, 2); ?></div>
                             </div>
                         </div>
                         <?php endforeach; ?>
                     </div>
 
                     <?php if ($grand_total_unrated_pieces > 0): ?>
-                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unrated_pieces); ?> pieces sold before any rate was set for their product — excluded from Sold Price. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
+                    <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_total_unrated_pieces, 0); ?> pieces sold before any rate was set for their product — excluded from Sold Price. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
                     <?php endif; ?>
                     <?php if ($grand_total_unpriced_pieces > 0): ?>
-                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unpriced_pieces); ?> pieces sold before any purchase rate was set for their product — treated as ₹0 cost, so Gross Profit may be overstated. <a href="neksomo-llp-piece-purchase-rate.php">Add a purchase rate</a> covering that period.</div>
+                    <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_total_unpriced_pieces, 0); ?> pieces sold before any purchase rate was set for their product — treated as ₹0 cost, so Gross Profit may be overstated. <a href="neksomo-llp-piece-purchase-rate.php">Add a purchase rate</a> covering that period.</div>
                     <?php endif; ?>
 
                     <div class="card">
@@ -928,13 +934,13 @@ if ($is_neksomo_view) {
                                 <?php else: foreach ($pieces_sold as $row): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($row['productName']); ?></td>
-                                        <td><?php echo number_format((int)$row['total_qty']); ?></td>
+                                        <td><?php echo inr_format((int)$row['total_qty'], 0); ?></td>
                                         <td><?php echo $row['pieces_per_pack'] !== null ? (int)$row['pieces_per_pack'] : '1 *'; ?></td>
-                                        <td><strong><?php echo number_format((int)$row['total_pieces']); ?></strong></td>
+                                        <td><strong><?php echo inr_format((int)$row['total_pieces'], 0); ?></strong></td>
                                         <td>
-                                            &#8377;<?php echo number_format((float)$row['total_value'], 2); ?>
+                                            &#8377;<?php echo inr_format((float)$row['total_value'], 2); ?>
                                             <?php if ((float)$row['unrated_pieces'] > 0): ?>
-                                            <div style="font-size:11px;color:#dc2626;"><?php echo number_format((int)$row['unrated_pieces']); ?> pcs unrated</div>
+                                            <div style="font-size:11px;color:#dc2626;"><?php echo inr_format((int)$row['unrated_pieces'], 0); ?> pcs unrated</div>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -1537,10 +1543,10 @@ if ($is_neksomo_view) {
                                 <div class="card-body" style="overflow-x:auto">
                                     <div class="row mb-3">
                                         <div class="col-md-4">
-                                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty</div><div class="kpi-v"><?php echo number_format($grand_total_pack_qty); ?></div></div>
+                                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_pack_qty, 0); ?></div></div>
                                         </div>
                                         <div class="col-md-4">
-                                            <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo number_format($grand_total_pieces); ?></div></div>
+                                            <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo inr_format($grand_total_pieces, 0); ?></div></div>
                                         </div>
                                         <div class="col-md-4">
                                             <div class="kpi-card"><div class="kpi-t">Period</div><div class="kpi-v" style="font-size:15px;"><?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></div></div>
@@ -1548,24 +1554,24 @@ if ($is_neksomo_view) {
                                     </div>
                                     <div class="row mb-3">
                                         <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_value, 2); ?></div></div>
+                                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_value, 2); ?></div></div>
                                         </div>
                                         <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_gross_profit, 2); ?></div></div>
+                                            <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
                                         </div>
                                         <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo number_format($grand_total_expense, 2); ?></div></div>
+                                            <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_expense, 2); ?></div></div>
                                         </div>
                                         <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_net_profit, 2); ?></div></div>
+                                            <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
                                         </div>
                                     </div>
                                     <p class="snote">Sold Price − Purchase Value = Gross Profit. Gross Profit − Expense (this entity, this period) = Net Profit.</p>
                                     <?php if ($grand_total_unrated_pieces > 0): ?>
-                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unrated_pieces); ?> pieces sold before any Femi9 LLP rate was set for their product — excluded from Sold Price.</div>
+                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_total_unrated_pieces, 0); ?> pieces sold before any Femi9 LLP rate was set for their product — excluded from Sold Price.</div>
                                     <?php endif; ?>
                                     <?php if ($grand_total_unpriced_pieces > 0): ?>
-                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unpriced_pieces); ?> pieces sold before any purchase rate was set for their product — treated as ₹0 cost, so Gross Profit may be overstated.</div>
+                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_total_unpriced_pieces, 0); ?> pieces sold before any purchase rate was set for their product — treated as ₹0 cost, so Gross Profit may be overstated.</div>
                                     <?php endif; ?>
                                     <?php if (empty($pieces_sold)): ?>
                                         <p class="text-muted text-center py-3">No data.</p>
@@ -1576,13 +1582,13 @@ if ($is_neksomo_view) {
                                         <?php foreach ($pieces_sold as $row): ?>
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($row['productName']); ?></b></td>
-                                                <td><span class="bq"><?php echo number_format((int)$row['total_qty']); ?></span></td>
+                                                <td><span class="bq"><?php echo inr_format((int)$row['total_qty'], 0); ?></span></td>
                                                 <td><?php echo $row['pieces_per_pack'] !== null ? (int)$row['pieces_per_pack'] : '1 *'; ?></td>
-                                                <td><b><?php echo number_format((int)$row['total_pieces']); ?></b></td>
+                                                <td><b><?php echo inr_format((int)$row['total_pieces'], 0); ?></b></td>
                                                 <td>
-                                                    &#8377;<?php echo number_format((float)$row['total_value'], 2); ?>
+                                                    &#8377;<?php echo inr_format((float)$row['total_value'], 2); ?>
                                                     <?php if ((float)$row['unrated_pieces'] > 0): ?>
-                                                    <div style="font-size:11px;color:#dc2626;"><?php echo number_format((int)$row['unrated_pieces']); ?> pcs unrated</div>
+                                                    <div style="font-size:11px;color:#dc2626;"><?php echo inr_format((int)$row['unrated_pieces'], 0); ?> pcs unrated</div>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>

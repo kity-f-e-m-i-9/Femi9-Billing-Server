@@ -38,6 +38,17 @@ $db_conn->query("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+// Self-migrating: add the exact period each upload covers (Tally exports are
+// often for a custom accounting period, not a calendar month — e.g. 16th to
+// 15th). expense_month is kept in sync (= period_from's month) so the
+// existing month-bucketed queries here and in mis-report.php's net profit
+// calc keep working unchanged.
+$period_cols = $db_conn->query("SHOW COLUMNS FROM expense_imports LIKE 'period_from'");
+if ($period_cols && $period_cols->num_rows === 0) {
+    $db_conn->query("ALTER TABLE expense_imports ADD COLUMN period_from DATE DEFAULT NULL AFTER expense_month");
+    $db_conn->query("ALTER TABLE expense_imports ADD COLUMN period_to DATE DEFAULT NULL AFTER period_from");
+}
+
 // Company profiles (finance-only restricted, same pattern as TP Advance Payments).
 // Not filtered by name — godown_finance_filter_sql() already encodes the full
 // access rule per login type (finance sees all, neksomo sees only its own
@@ -50,22 +61,50 @@ if (!is_godown_allowed($db_conn, $filter_company)) {
     $filter_company = $default_company_id;
 }
 
-$filter_month = $_GET['expense_month'] ?? date('Y-m');
-if (!preg_match('/^\d{4}-\d{2}$/', $filter_month)) {
-    $filter_month = date('Y-m');
+// From Date / To Date range filter. Falls back to the legacy single-month
+// param (still sent by expense-tracker-upload-action.php's post-upload
+// redirect, so the view lands back on the month just uploaded) or, failing
+// that, the current month.
+$filter_from_date = $_GET['from_date'] ?? '';
+$filter_to_date   = $_GET['to_date'] ?? '';
+if ($filter_from_date === '' && $filter_to_date === '') {
+    $legacy_month = $_GET['expense_month'] ?? date('Y-m');
+    if (!preg_match('/^\d{4}-\d{2}$/', $legacy_month)) {
+        $legacy_month = date('Y-m');
+    }
+    $filter_from_date = $legacy_month . '-01';
+    $filter_to_date   = date('Y-m-t', strtotime($legacy_month . '-01'));
 }
-$expense_month_date = $filter_month . '-01';
+
+$from_ts = strtotime($filter_from_date);
+$to_ts   = strtotime($filter_to_date);
+if (!$from_ts || !$to_ts) {
+    $filter_from_date = date('Y-m-01');
+    $filter_to_date   = date('Y-m-d');
+    $from_ts = strtotime($filter_from_date);
+    $to_ts   = strtotime($filter_to_date);
+}
+if ($to_ts < $from_ts) {
+    [$filter_from_date, $filter_to_date] = [$filter_to_date, $filter_from_date];
+    [$from_ts, $to_ts] = [$to_ts, $from_ts];
+}
+
+// expense_imports.expense_month is always the 1st of a calendar month (one
+// row per Tally upload = one month), so the day-level date range picked
+// above is widened to the months it spans.
+$from_month_date = date('Y-m-01', $from_ts);
+$to_month_date   = date('Y-m-01', $to_ts);
 
 $upload_msg = $_GET['msg'] ?? '';
 $upload_err = $_GET['err'] ?? '';
 
-// Uploaded batches for this company + month
+// Uploaded batches for this company within the selected date range
 $stmt = $db_conn->prepare("
     SELECT * FROM expense_imports
-    WHERE company_id = ? AND expense_month = ?
-    ORDER BY created_at DESC
+    WHERE company_id = ? AND expense_month BETWEEN ? AND ?
+    ORDER BY expense_month DESC, created_at DESC
 ");
-$stmt->bind_param("is", $filter_company, $expense_month_date);
+$stmt->bind_param("iss", $filter_company, $from_month_date, $to_month_date);
 $stmt->execute();
 $batches = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
@@ -194,9 +233,13 @@ $i = 0;
                             <div class="filter-card">
                                 <form method="GET" action="">
                                     <div class="row g-2 align-items-end">
-                                        <div class="col-md-3">
-                                            <label class="form-label">Month</label>
-                                            <input type="month" name="expense_month" class="form-control" value="<?php echo htmlspecialchars($filter_month); ?>" max="<?php echo date('Y-m'); ?>">
+                                        <div class="col-md-2">
+                                            <label class="form-label">From Date</label>
+                                            <input type="date" name="from_date" class="form-control" value="<?php echo htmlspecialchars($filter_from_date); ?>" max="<?php echo date('Y-m-d'); ?>">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">To Date</label>
+                                            <input type="date" name="to_date" class="form-control" value="<?php echo htmlspecialchars($filter_to_date); ?>" max="<?php echo date('Y-m-d'); ?>">
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label">Company Profile</label>
@@ -217,6 +260,7 @@ $i = 0;
                                             </a>
                                         </div>
                                     </div>
+                                    <small class="d-block mt-2" style="opacity:.85;">Expense data is uploaded per calendar month, so this range is widened to cover every month it touches.</small>
                                 </form>
                             </div>
                         </div>
@@ -231,8 +275,12 @@ $i = 0;
                                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
                                     <div class="row g-2 align-items-end">
                                         <div class="col-md-2">
-                                            <label class="form-label">Month</label>
-                                            <input type="month" name="expense_month" class="form-control" value="<?php echo htmlspecialchars($filter_month); ?>" max="<?php echo date('Y-m'); ?>" required>
+                                            <label class="form-label">From Date</label>
+                                            <input type="date" name="from_date" class="form-control" value="<?php echo htmlspecialchars($filter_from_date); ?>" max="<?php echo date('Y-m-d'); ?>" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">To Date</label>
+                                            <input type="date" name="to_date" class="form-control" value="<?php echo htmlspecialchars($filter_to_date); ?>" max="<?php echo date('Y-m-d'); ?>" required>
                                         </div>
                                         <div class="col-md-3">
                                             <label class="form-label">Company Profile</label>
@@ -244,17 +292,17 @@ $i = 0;
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <label class="form-label">Tally Excel File (.xlsx/.xls)</label>
                                             <input type="file" name="tally_file" class="form-control" accept=".xlsx,.xls" required>
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-2">
                                             <button type="submit" class="btn btn-success">
                                                 <i class="material-icons" style="vertical-align:middle;">cloud_upload</i> Upload
                                             </button>
                                         </div>
                                     </div>
-                                    <small class="text-muted d-block mt-2">Export a "Group Summary" report from Tally (e.g. Indirect Expenses) as Excel and upload it here. Re-uploading for the same month adds to existing totals — it does not replace them.</small>
+                                    <small class="text-muted d-block mt-2">Export a "Group Summary" report from Tally (e.g. Indirect Expenses) as Excel and upload it here, matching whatever period the export covers (needn't be a full calendar month). Re-uploading for a period that falls in the same month adds to existing totals — it does not replace them.</small>
                                 </form>
                             </div>
                         </div>
@@ -282,13 +330,17 @@ $i = 0;
                                             </thead>
                                             <tbody>
                                             <?php if (empty($batches)): ?>
-                                                <tr><td colspan="8" class="text-center text-muted">No files uploaded for this month yet.</td></tr>
+                                                <tr><td colspan="8" class="text-center text-muted">No files uploaded for this period yet.</td></tr>
                                             <?php endif; ?>
                                             <?php foreach ($batches as $b): $i++; ?>
                                                 <tr>
                                                     <td><?php echo $i; ?></td>
                                                     <td><?php echo htmlspecialchars($b['source_filename']); ?>
-                                                        <?php if ($b['period_label']): ?><br><small class="text-muted"><?php echo htmlspecialchars($b['period_label']); ?></small><?php endif; ?>
+                                                        <?php if (!empty($b['period_from']) && !empty($b['period_to'])): ?>
+                                                        <br><small class="text-muted"><?php echo date('d M Y', strtotime($b['period_from'])); ?> &ndash; <?php echo date('d M Y', strtotime($b['period_to'])); ?></small>
+                                                        <?php elseif ($b['period_label']): ?>
+                                                        <br><small class="text-muted"><?php echo htmlspecialchars($b['period_label']); ?></small>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td class="text-right"><?php echo inr_format($b['total_debit'], 2); ?></td>
                                                     <td class="text-right"><?php echo inr_format($b['total_credit'], 2); ?></td>
@@ -314,7 +366,7 @@ $i = 0;
                     <div class="row">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">Expense Breakdown (this month, all uploads combined)</h5></div>
+                                <div class="card-header"><h5 class="card-title">Expense Breakdown (selected period, all uploads combined)</h5></div>
                                 <div class="card-body">
                                     <div style="overflow-x:auto;">
                                         <table id="datatable2" style="width:100%;">
@@ -328,7 +380,7 @@ $i = 0;
                                             </thead>
                                             <tbody>
                                             <?php if (empty($breakdown)): ?>
-                                                <tr><td colspan="4" class="text-center text-muted">No expense data for this month yet.</td></tr>
+                                                <tr><td colspan="4" class="text-center text-muted">No expense data for this period yet.</td></tr>
                                             <?php endif; ?>
                                             <?php foreach ($breakdown as $row): ?>
                                                 <tr>
