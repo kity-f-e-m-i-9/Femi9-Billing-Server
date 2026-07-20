@@ -887,6 +887,28 @@ if ($is_neksomo_view) {
                     </div>
                     <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Sold Price − Purchase Value = Gross Profit. Gross Profit − Expense (Femi9 LLP, this period) = Net Profit.</p>
 
+                    <?php
+                    // Fixed partner split of Net Profit — Anand 50%, Saravana Shankar 40%, Tamil Selvan 10%.
+                    $profit_shares = [
+                        'Anand'            => 0.50,
+                        'Saravana Shankar' => 0.40,
+                        'Tamil Selvan'     => 0.10,
+                    ];
+                    ?>
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <p class="text-muted" style="font-size:11.5px;margin-bottom:6px;">Net Profit Share (this period)</p>
+                        </div>
+                        <?php foreach ($profit_shares as $partner_name => $partner_pct): ?>
+                        <div class="col-md-4">
+                            <div class="kpi-card">
+                                <div class="kpi-t"><?php echo htmlspecialchars($partner_name); ?> (<?php echo (int)round($partner_pct * 100); ?>%)</div>
+                                <div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo number_format($grand_net_profit * $partner_pct, 2); ?></div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+
                     <?php if ($grand_total_unrated_pieces > 0): ?>
                     <div class="alert alert-warning" style="font-size:13px;"><?php echo number_format($grand_total_unrated_pieces); ?> pieces sold before any rate was set for their product — excluded from Sold Price. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
                     <?php endif; ?>

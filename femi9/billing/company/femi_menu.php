@@ -175,6 +175,14 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     </li>
 
 					<li>
+                        <a href="#"><i class="material-icons-two-tone">inventory_2</i>Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="neksomo-purchase-stock.php">Purchase Stock</a></li>
+						<li><a href="neksomo-company-stock.php">Company Stock</a></li>
+                        </ul>
+                    </li>
+
+					<li>
                         <a href="#"><i class="material-icons-two-tone">add_box</i>Products<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="neksomo-product-add.php">Add Product</a></li>
@@ -221,14 +229,6 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <li><a href="manage-input">Manage Input Stocks</a></li>
 						<li><a href="add-input-users">Add Input Stock Users</a></li>
                         <li><a href="manage-input-users">Manage Input Stocks Users</a></li>
-                        </ul>
-                    </li>
-
-					<li>
-                        <a href="#"><i class="material-icons-two-tone">done</i>Overall Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
-                        <ul class="sub-menu">
-                            <li><a href="overall-stock">Company Overall Stock</a></li>
-                            <li><a href="overall-stock-users">Overall Stock - Users</a></li>
                         </ul>
                     </li>
 
