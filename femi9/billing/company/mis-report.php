@@ -316,6 +316,17 @@ if ($scope === 'company') {
     $gp_params[] = $from;
     $gp_params[] = $to;
 }
+// tp_invoices: a tp_invoice is always billed TO a TP, so ctype is always
+// 'territory_partner' (stockist_price tier, same as the CASE above already
+// does for user_invoice/invoice TP rows). See memory "neksomo-sold-by-company-calc".
+$gp_tp_union = '';
+if ($tpinv_source_sql) {
+    $gp_tp_union = "UNION ALL SELECT tpii.product_id, tpii.quantity, 'territory_partner' AS ctype
+         FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
+         WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}";
+    $gp_params[] = $from;
+    $gp_params[] = $to;
+}
 $gross_profit = (float)cval($db_conn,
     "SELECT COALESCE(SUM((p.mrp - {$gp_case}) * d.qty), 0)
      FROM (
@@ -327,6 +338,7 @@ $gross_profit = (float)cval($db_conn,
          FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
          WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii}
          {$gp_ot_union}
+         {$gp_tp_union}
      ) d JOIN products p ON p.id = d.pr_id",
     str_repeat('s', count($gp_params)), $gp_params);
 
@@ -475,6 +487,17 @@ if ($scope === 'company') {
     $ps_params[] = $from;
     $ps_params[] = $to;
 }
+// tp_invoices: see memory "neksomo-sold-by-company-calc" — a company sale can
+// land in invoice / user_invoice / tp_invoices, all three must be summed.
+$ps_tp_union = '';
+if ($tpinv_source_sql) {
+    $ps_tp_union = "UNION ALL
+         SELECT tpii.product_id, tpii.quantity, tpii.amount
+         FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
+         WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}";
+    $ps_params[] = $from;
+    $ps_params[] = $to;
+}
 $product_sales = call_rows($db_conn,
     "SELECT p.id pid, p.productName,
             COALESCE(SUM(d.qty),0) total_qty,
@@ -488,6 +511,7 @@ $product_sales = call_rows($db_conn,
          FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
          WHERE ui.from_user_type=? AND ui.date BETWEEN ? AND ?{$tc_uii}
          {$ps_ot_union}
+         {$ps_tp_union}
      ) d JOIN products p ON p.id=d.pr_id
      GROUP BY p.id, p.productName ORDER BY total_qty DESC LIMIT 25",
     str_repeat('s', count($ps_params)), $ps_params);
@@ -512,11 +536,22 @@ $grand_total_unpriced_pieces = 0;
 $grand_gross_profit = 0.0;
 $grand_total_expense = 0.0;
 $grand_net_profit = 0.0;
+$grand_total_return_qty = 0;
+$grand_total_return_pieces = 0;
+$grand_total_return_value = 0.0;
+$grand_total_return_purchase_value = 0.0;
+$grand_total_net_qty = 0;
+$grand_total_net_pieces = 0;
 $selected_entity_name = 'All Visible Entities';
 if ($scope === 'company') {
     $pcs_ii_cond  = $filter_entity > 0 ? " AND ii.user_id={$filter_entity}"       : " AND ii.user_id IN ({$entity_ids_subq})";
     $pcs_uii_cond = $filter_entity > 0 ? " AND uii.from_user_id={$filter_entity}" : " AND uii.from_user_id IN ({$entity_ids_subq})";
     $pcs_ot_cond  = $filter_entity > 0 ? " AND os.godownid={$filter_entity}"      : " AND os.godownid IN ({$entity_ids_subq})";
+    // tp_invoices: territory partner invoices, godown-sourced only (source_cp_id=0
+    // excludes channel-partner-sourced TP invoices — not the company's own sale).
+    // See memory "neksomo-sold-by-company-calc" — a company sale can land in any
+    // of invoice / user_invoice / tp_invoices, all three must be summed.
+    $pcs_tpi_cond = $filter_entity > 0 ? " AND tpi.source_godown_id={$filter_entity}" : " AND tpi.source_godown_id IN ({$entity_ids_subq})";
 
     // Per-day granularity is kept through the first aggregation (d.pr_id,
     // d.date) so each day's pieces can be valued against whichever
@@ -525,6 +560,22 @@ if ($scope === 'company') {
     // both the sale rate and the purchase rate take effect the day they're
     // entered and hold until a later effective_date for the same product
     // supersedes it. Only then is everything rolled up to one row per product.
+    //
+    // Rates are entered against the Neksomo piece-product (products.temp_id
+    // LIKE 'NKS-%'), never against the company pack SKU that actually shows
+    // up in invoice_items.pr_id (d.pr_id here) — see NeksomoProductMapping.php.
+    // So every rate lookup must translate d.pr_id -> its mapped
+    // neksomo_product_id via neksomo_product_mapping before hitting the rate
+    // tables, the same way NeksomoStockHelper::get_neksomo_pieces_sold_via_llp_healthcare()
+    // does it. Comparing r.product_id straight to d.pr_id compares two
+    // different id spaces and silently matches nothing.
+    //
+    // Every card in this section is scoped to mapped products only: the
+    // WHERE d.pr_id IN (SELECT company_product_id FROM neksomo_product_mapping)
+    // filter below drops sold/returned pack SKUs that have no Neksomo mapping
+    // at all before they're ever summed, so an unmapped product can't inflate
+    // Total Pack Qty Sold / Return Qty / Consolidated Qty while still reading
+    // ₹0 for Sold Price and Gross Profit.
     $pieces_sold = call_rows($db_conn,
         "SELECT p.id pid, p.productName, p.pieces_per_pack,
                 COALESCE(SUM(dp.day_qty),0) total_qty,
@@ -536,10 +587,12 @@ if ($scope === 'company') {
          FROM (
              SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
                     (SELECT r.rate_per_piece FROM neksomo_llp_piece_rates r
-                     WHERE r.product_id = d.pr_id AND r.effective_date <= d.date
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
                      ORDER BY r.effective_date DESC LIMIT 1) rate,
                     (SELECT pr.rate_per_piece FROM neksomo_llp_piece_purchase_rates pr
-                     WHERE pr.product_id = d.pr_id AND pr.effective_date <= d.date
+                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND pr.effective_date <= d.date
                      ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate
              FROM (
                  SELECT ii.pr_id, ii.qty, i.date
@@ -553,12 +606,17 @@ if ($scope === 'company') {
                  SELECT os.prid, os.qty, os.date
                  FROM ot_sales os
                  WHERE os.date BETWEEN ? AND ?{$pcs_ot_cond}
+                 UNION ALL
+                 SELECT tpii.product_id, tpii.quantity, tpi.invoice_date
+                 FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
+                 WHERE tpi.source_cp_id=0 AND tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
              ) d
+             WHERE d.pr_id IN (SELECT company_product_id FROM neksomo_product_mapping)
              GROUP BY d.pr_id, d.date
          ) dp JOIN products p ON p.id = dp.pr_id
          GROUP BY p.id, p.productName, p.pieces_per_pack
          ORDER BY total_pieces DESC",
-        'ssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to]);
+        'ssssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to, $from, $to]);
 
     $grand_total_pieces          = (int) array_sum(array_column($pieces_sold, 'total_pieces'));
     $grand_total_pack_qty        = (int) array_sum(array_column($pieces_sold, 'total_qty'));
@@ -566,7 +624,6 @@ if ($scope === 'company') {
     $grand_total_unrated_pieces  = (int) array_sum(array_column($pieces_sold, 'unrated_pieces'));
     $grand_total_purchase_value  = (float) array_sum(array_column($pieces_sold, 'total_purchase_value'));
     $grand_total_unpriced_pieces = (int) array_sum(array_column($pieces_sold, 'unpriced_pieces'));
-    $grand_gross_profit          = $grand_total_value - $grand_total_purchase_value;
 
     // Expense — for a neksomo login specifically, always Neksomo's own
     // expense uploads, NOT LLP's — even though $filter_entity above is
@@ -585,12 +642,71 @@ if ($scope === 'company') {
          WHERE {$pcs_expense_cond}
          AND expense_month BETWEEN DATE_FORMAT(?, '%Y-%m-01') AND DATE_FORMAT(?, '%Y-%m-01')",
         'ss', [$from, $to]);
-    $grand_net_profit = $grand_gross_profit - $grand_total_expense;
 
     if ($filter_entity > 0) {
         $entity_names = array_column($all_entities, 'gname', 'id');
         $selected_entity_name = $entity_names[$filter_entity] ?? 'Selected Entity';
     }
+
+    // Return Qty/Pieces for the Pieces Sold card — same entity scope as the
+    // sales figures above, same period. Mirrors overstock_datewise.php's
+    // Return Qty formula (user_return_stock_items + ot_sales_return only —
+    // TP credit notes aren't counted there either, kept consistent here).
+    // Return value uses the same "rate effective on the transaction's own
+    // date" lookup as sold value above — a return row doesn't record which
+    // original sale it came from, so it's valued at whatever rate_per_piece
+    // was in effect on the return date itself, not the original sale's rate.
+    $pcs_uret_cond  = $filter_entity > 0 ? " AND ri.to_userid={$filter_entity}"  : " AND ri.to_userid IN ({$entity_ids_subq})";
+    $pcs_otret_cond = $filter_entity > 0 ? " AND osr.godownid={$filter_entity}"  : " AND osr.godownid IN ({$entity_ids_subq})";
+    $pieces_returned = call_rows($db_conn,
+        "SELECT p.id pid,
+                COALESCE(SUM(dp.day_qty),0) total_qty,
+                COALESCE(SUM(dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1)),0) total_pieces,
+                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.rate ELSE 0 END),0) total_value,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.purchase_rate ELSE 0 END),0) total_purchase_value
+         FROM (
+             SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
+                    (SELECT r.rate_per_piece FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) rate,
+                    (SELECT pr.rate_per_piece FROM neksomo_llp_piece_purchase_rates pr
+                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND pr.effective_date <= d.date
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate
+             FROM (
+                 SELECT ri.prid pr_id, ri.qty, ri.date
+                 FROM user_return_stock_items ri
+                 WHERE ri.to_usertype=? AND ri.date BETWEEN ? AND ?{$pcs_uret_cond}
+                 UNION ALL
+                 SELECT osr.prid pr_id, osr.qty, osr.return_date date
+                 FROM ot_sales_return osr
+                 WHERE osr.return_date BETWEEN ? AND ?{$pcs_otret_cond}
+             ) d
+             WHERE d.pr_id IN (SELECT company_product_id FROM neksomo_product_mapping)
+             GROUP BY d.pr_id, d.date
+         ) dp JOIN products p ON p.id = dp.pr_id
+         GROUP BY p.id",
+        'sssss', [$utype, $from, $to, $from, $to]);
+    $grand_total_return_qty            = (int) array_sum(array_column($pieces_returned, 'total_qty'));
+    $grand_total_return_pieces         = (int) array_sum(array_column($pieces_returned, 'total_pieces'));
+    $grand_total_return_value          = (float) array_sum(array_column($pieces_returned, 'total_value'));
+    $grand_total_return_purchase_value = (float) array_sum(array_column($pieces_returned, 'total_purchase_value'));
+
+    // Consolidated (net) qty — sold minus returned, same entity/period scope.
+    $grand_total_net_qty    = $grand_total_pack_qty - $grand_total_return_qty;
+    $grand_total_net_pieces = $grand_total_pieces - $grand_total_return_pieces;
+
+    // Gross Profit nets returns on both sides: a returned piece is revenue
+    // that never really landed (subtract it from Sold Value) and cost that
+    // was never really incurred by this sale (subtract it from Purchase
+    // Value too) — otherwise a return would look like pure loss instead of
+    // a wash. Valued at whatever rate/purchase_rate was effective on the
+    // return's own date (see $pieces_returned query above), not the
+    // original sale's rate.
+    $grand_gross_profit = ($grand_total_value - $grand_total_return_value)
+                        - ($grand_total_purchase_value - $grand_total_return_purchase_value);
+    $grand_net_profit   = $grand_gross_profit - $grand_total_expense;
 }
 
 // Per-product returns, scoped the same way as the Returns KPI above (same
@@ -866,20 +982,23 @@ if ($is_neksomo_view) {
                     </div>
 
                     <div class="row mb-3">
-                        <div class="col-md-4">
-                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty Sold</div><div class="kpi-v"><?php echo inr_format($grand_total_pack_qty, 0); ?></div></div>
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty Sold</div><div class="kpi-v"><?php echo inr_format($grand_total_pack_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_pieces, 0); ?> pieces sold</div></div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo inr_format($grand_total_pieces, 0); ?></div></div>
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Return Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_return_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_return_pieces, 0); ?> pieces returned</div></div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <div class="kpi-card"><div class="kpi-t">Consolidated Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_net_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_net_pieces, 0); ?> pieces net</div></div>
+                        </div>
+                        <div class="col-md-3">
                             <div class="kpi-card"><div class="kpi-t">Period</div><div class="kpi-v" style="font-size:15px;"><?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></div></div>
                         </div>
                     </div>
 
                     <div class="row mb-3">
                         <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_value, 2); ?></div></div>
+                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_value, 2); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;">Return: &#8377;<?php echo inr_format($grand_total_return_value, 2); ?></div></div>
                         </div>
                         <div class="col-md-3">
                             <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
@@ -891,7 +1010,7 @@ if ($is_neksomo_view) {
                             <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
                         </div>
                     </div>
-                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Sold Price − Purchase Value = Gross Profit. Gross Profit − Expense (Femi9 LLP, this period) = Net Profit.</p>
+                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">(Sold Price − Return Value) − (Purchase Value − Return Purchase Value) = Gross Profit. Gross Profit − Expense (Femi9 LLP, this period) = Net Profit.</p>
 
                     <?php
                     // Fixed partner split of Net Profit — Anand 50%, Saravana Shankar 40%, Tamil Selvan 10%.
@@ -1542,19 +1661,22 @@ if ($is_neksomo_view) {
                                 </div>
                                 <div class="card-body" style="overflow-x:auto">
                                     <div class="row mb-3">
-                                        <div class="col-md-4">
-                                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_pack_qty, 0); ?></div></div>
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_pack_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_pieces, 0); ?> pieces sold</div></div>
                                         </div>
-                                        <div class="col-md-4">
-                                            <div class="kpi-card"><div class="kpi-t">Total Pieces Sold</div><div class="kpi-v"><?php echo inr_format($grand_total_pieces, 0); ?></div></div>
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Return Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_return_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_return_pieces, 0); ?> pieces returned</div></div>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
+                                            <div class="kpi-card"><div class="kpi-t">Consolidated Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_net_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_net_pieces, 0); ?> pieces net</div></div>
+                                        </div>
+                                        <div class="col-md-3">
                                             <div class="kpi-card"><div class="kpi-t">Period</div><div class="kpi-v" style="font-size:15px;"><?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></div></div>
                                         </div>
                                     </div>
                                     <div class="row mb-3">
                                         <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_value, 2); ?></div></div>
+                                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_value, 2); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;">Return: &#8377;<?php echo inr_format($grand_total_return_value, 2); ?></div></div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
@@ -1566,7 +1688,7 @@ if ($is_neksomo_view) {
                                             <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
                                         </div>
                                     </div>
-                                    <p class="snote">Sold Price − Purchase Value = Gross Profit. Gross Profit − Expense (this entity, this period) = Net Profit.</p>
+                                    <p class="snote">(Sold Price − Return Value) − (Purchase Value − Return Purchase Value) = Gross Profit. Gross Profit − Expense (this entity, this period) = Net Profit.</p>
                                     <?php if ($grand_total_unrated_pieces > 0): ?>
                                     <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_total_unrated_pieces, 0); ?> pieces sold before any Femi9 LLP rate was set for their product — excluded from Sold Price.</div>
                                     <?php endif; ?>

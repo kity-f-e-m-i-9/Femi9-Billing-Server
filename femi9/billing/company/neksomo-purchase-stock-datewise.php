@@ -9,30 +9,59 @@ if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
     exit;
 }
 
+// Reached only from neksomo-purchase-stock.php's date-filter form — both
+// dates are required there (mirrors overall-stock.php -> overstock_datewise.php).
+$get_from_date = mysqli_real_escape_string($db_conn, trim($_REQUEST['fromdate'] ?? ''));
+$get_to_date   = mysqli_real_escape_string($db_conn, trim($_REQUEST['todate'] ?? ''));
+if ($get_from_date === '' || $get_to_date === '') {
+    header("Location: neksomo-purchase-stock");
+    exit;
+}
+
 // Neksomo's own godown id, looked up by name rather than hardcoded — same
 // pattern as neksomo-manufacturer-purchase-action.php.
 $select_Godowndetails = "SELECT * FROM company_godown WHERE gname = 'NEKSOMO HYGIENE INDUSTRIES' LIMIT 1";
 $fetch_Godowndetails  = mysqli_query($db_conn, $select_Godowndetails);
 $result_Godown        = mysqli_fetch_array($fetch_Godowndetails);
 
-// This landing page always shows all-time totals — same role as
-// overall-stock.php. The From/To date form below submits to
-// neksomo-purchase-stock-datewise.php (mirrors overall-stock.php ->
-// overstock_datewise.php) for the date-scoped report on a separate page.
+// Purchased Qty and LLP+Healthcare Sales Qty *within the selected range* —
+// shown as their own columns, purely informational about period activity.
 $select_purchased = "SELECT npi.product_id, SUM(npi.quantity_pieces) AS purchased_qty
                       FROM neksomo_purchase_items npi
                       JOIN neksomo_manufacturer_purchases mp ON mp.id = npi.purchase_id
+                      WHERE mp.purchase_date BETWEEN '$get_from_date' AND '$get_to_date'
                       GROUP BY npi.product_id";
 $Fetch_purchased = mysqli_query($db_conn, $select_purchased);
 $purchasedByProduct = [];
 while ($row = mysqli_fetch_assoc($Fetch_purchased)) {
     $purchasedByProduct[(int)$row['product_id']] = (int)$row['purchased_qty'];
 }
+$soldPiecesByProduct = get_neksomo_pieces_sold_via_llp_healthcare($db_conn, $get_from_date, $get_to_date);
 
-// LLP + Healthcare sales, converted to pieces via neksomo_product_mapping, all-time.
-$soldPiecesByProduct = get_neksomo_pieces_sold_via_llp_healthcare($db_conn, '', '');
+// Closing Stock is the *real* running balance as it stood at the end of
+// $get_to_date — all purchases ever made up to that date, minus all
+// LLP/Healthcare pieces ever sold up to that date — not the net movement
+// within the selected range (which would wrongly assume zero opening stock
+// at $get_from_date). No lower bound is passed, so both calls below run
+// "as of $get_to_date" over full history.
+$select_purchased_todate = "SELECT npi.product_id, SUM(npi.quantity_pieces) AS purchased_qty
+                             FROM neksomo_purchase_items npi
+                             JOIN neksomo_manufacturer_purchases mp ON mp.id = npi.purchase_id
+                             WHERE mp.purchase_date <= '$get_to_date'
+                             GROUP BY npi.product_id";
+$Fetch_purchased_todate = mysqli_query($db_conn, $select_purchased_todate);
+$purchasedByProductToDate = [];
+while ($row = mysqli_fetch_assoc($Fetch_purchased_todate)) {
+    $purchasedByProductToDate[(int)$row['product_id']] = (int)$row['purchased_qty'];
+}
+$soldPiecesByProductToDate = get_neksomo_pieces_sold_via_llp_healthcare($db_conn, '', $get_to_date);
 
-$Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesByProduct)];
+$closingByProduct = [];
+foreach (array_unique(array_merge(array_keys($purchasedByProductToDate), array_keys($soldPiecesByProductToDate))) as $pid) {
+    $closingByProduct[$pid] = ($purchasedByProductToDate[$pid] ?? 0) - ($soldPiecesByProductToDate[$pid] ?? 0);
+}
+
+$Result_sumclosing12 = [array_sum($closingByProduct)];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -44,7 +73,7 @@ $Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesBy
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
     <!-- Title -->
-    <title>Purchase Stock : <?php echo $business_name; ?></title>
+    <title>Datewise Purchase Stock : <?php echo $business_name; ?></title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -93,38 +122,23 @@ $Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesBy
                                     <h1>
 									<table class="headertble">
 									<tr>
-									<td>Purchase Stock : <?=inr_format($Result_sumclosing12[0] ?? 0, 0);?> (Qty)</td>
+									<td>Datewise Purchase Stock : <?=inr_format($Result_sumclosing12[0] ?? 0, 0);?> (Qty)</td>
+									<td><a href="neksomo-purchase-stock">&#8592; Go Back</a></td>
 									</tr>
 									</table>
 									</h1>
+									<h5><?=date("d-m-Y",strtotime($get_from_date));?> (to) <?=date("d-m-Y",strtotime($get_to_date));?></h5>
                                 </div>
                             </div>
                         </div>
-
-						<form method="get" action="neksomo-purchase-stock-datewise" id="datewiseFilterForm">
-							<div class="overviewcontainar">
-							<div id="searchleftcont">
-								<label class="form-label">From Date</label>
-								<input type="date" name="fromdate" class="form-control" required>
-							</div>
-							<div id="searchleftcont">
-								<label class="form-label">To Date</label>
-								<input type="date" name="todate" class="form-control" required>
-							</div>
-							<div id="searchbuttoncont">
-								<button type="submit" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
-							</div>
-							</div>
-							<div style="clear:both;"></div>
-							<br/>
-						</form>
 
                         <div class="row">
                             <div class="col">
                                 <div class="card">
                                     <div class="card-body">
 									<p class="text-muted" style="font-size:13px;">
-										Closing Stock = Purchased Qty &minus; (LLP + Healthcare Sales Qty, converted to pieces via the product mapping), all-time. Select a date range above to view a specific period.
+										Purchased Qty and LLP + Healthcare Sales Qty below are scoped to <?= date("d/M/Y", strtotime($get_from_date)); ?> &ndash; <?= date("d/M/Y", strtotime($get_to_date)); ?> (period activity only).
+										Closing Stock is the real running balance as it stood at the end of <?= date("d/M/Y", strtotime($get_to_date)); ?> — total pieces ever purchased minus total LLP/Healthcare pieces ever sold, up to that date — not derived from the two period columns.
 										A product with no mapped company pack-product(s) shows 0 sold, regardless of what actually moved through LLP/Healthcare.
 									</p>
 									<div style="background:#fff;overflow:scroll;width:100%;">
@@ -136,9 +150,9 @@ $Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesBy
                                                <tr>
 												<th>Product Name</th>
 												<th>HSN</th>
-												<th style="text-align:right;">Purchased Qty</th>
-												<th style="text-align:right;">LLP + Healthcare Sales Qty (pcs)</th>
-												<th style="text-align:right;">Closing Stock (pcs)</th>
+												<th style="text-align:right;">Purchased Qty (period)</th>
+												<th style="text-align:right;">LLP + Healthcare Sales Qty (pcs, period)</th>
+												<th style="text-align:right;">Closing Stock (pcs, as of <?= date("d/M/Y", strtotime($get_to_date)); ?>)</th>
 												</tr>
                                             </thead>
 
@@ -158,7 +172,7 @@ $select_products = "SELECT id, productName, hsn
 											$pid = (int)$Result_product['id'];
 											$PurchasedQty = $purchasedByProduct[$pid] ?? 0;
 											$SoldPieces   = $soldPiecesByProduct[$pid] ?? 0;
-											$ClosingStock = $PurchasedQty - $SoldPieces;
+											$ClosingStock = $closingByProduct[$pid] ?? 0;
 											$total_purchased += $PurchasedQty;
 											$total_sold      += $SoldPieces;
 											$total_closing    += $ClosingStock;
