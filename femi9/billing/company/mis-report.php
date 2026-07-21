@@ -547,11 +547,26 @@ if ($scope === 'company') {
     $pcs_ii_cond  = $filter_entity > 0 ? " AND ii.user_id={$filter_entity}"       : " AND ii.user_id IN ({$entity_ids_subq})";
     $pcs_uii_cond = $filter_entity > 0 ? " AND uii.from_user_id={$filter_entity}" : " AND uii.from_user_id IN ({$entity_ids_subq})";
     $pcs_ot_cond  = $filter_entity > 0 ? " AND os.godownid={$filter_entity}"      : " AND os.godownid IN ({$entity_ids_subq})";
-    // tp_invoices: territory partner invoices, godown-sourced only (source_cp_id=0
-    // excludes channel-partner-sourced TP invoices — not the company's own sale).
+    // tp_invoices: territory partner invoices, sourced either directly from a
+    // company godown (source_godown_id) or indirectly through a channel
+    // partner the godown has stocked via pl_godown_transfers (source_cp_id) —
+    // stock a CP sells still traces back to whichever godown supplied it, so
+    // it counts as that godown's sale too. A CP is attributed to a godown by
+    // transfer history (pl_godown_transfers.godown_id), not a static column —
+    // there's no "this CP belongs to godown X" field on channel_partners. If a
+    // CP has ever received stock from more than one godown, its cp-sourced
+    // sales would count under each of those godowns' single-entity views —
+    // not an issue with today's data (every transfer row is godown_id=1,
+    // FEMI NAYAN LLP), but worth knowing if a second godown starts supplying
+    // the same CP later.
     // See memory "neksomo-sold-by-company-calc" — a company sale can land in any
     // of invoice / user_invoice / tp_invoices, all three must be summed.
-    $pcs_tpi_cond = $filter_entity > 0 ? " AND tpi.source_godown_id={$filter_entity}" : " AND tpi.source_godown_id IN ({$entity_ids_subq})";
+    $pcs_tp_cp_subq = $filter_entity > 0
+        ? "SELECT DISTINCT cp_id FROM pl_godown_transfers WHERE transfer_type='godown_to_location' AND godown_id={$filter_entity}"
+        : "SELECT DISTINCT cp_id FROM pl_godown_transfers WHERE transfer_type='godown_to_location' AND godown_id IN ({$entity_ids_subq})";
+    $pcs_tpi_cond = $filter_entity > 0
+        ? " AND ( (tpi.source_cp_id=0 AND tpi.source_godown_id={$filter_entity}) OR (tpi.source_cp_id>0 AND tpi.source_cp_id IN ({$pcs_tp_cp_subq})) )"
+        : " AND ( (tpi.source_cp_id=0 AND tpi.source_godown_id IN ({$entity_ids_subq})) OR (tpi.source_cp_id>0 AND tpi.source_cp_id IN ({$pcs_tp_cp_subq})) )";
 
     // Per-day granularity is kept through the first aggregation (d.pr_id,
     // d.date) so each day's pieces can be valued against whichever
@@ -609,7 +624,7 @@ if ($scope === 'company') {
                  UNION ALL
                  SELECT tpii.product_id, tpii.quantity, tpi.invoice_date
                  FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
-                 WHERE tpi.source_cp_id=0 AND tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
+                 WHERE tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
              ) d
              WHERE d.pr_id IN (SELECT company_product_id FROM neksomo_product_mapping)
              GROUP BY d.pr_id, d.date
