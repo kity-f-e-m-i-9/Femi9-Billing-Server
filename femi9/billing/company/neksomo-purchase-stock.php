@@ -124,8 +124,8 @@ $Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesBy
                                 <div class="card">
                                     <div class="card-body">
 									<p class="text-muted" style="font-size:13px;">
-										Closing Stock = Purchased Qty &minus; (LLP + Healthcare Sales Qty, converted to pieces via the product mapping), all-time. Select a date range above to view a specific period.
-										A product with no mapped company pack-product(s) shows 0 sold, regardless of what actually moved through LLP/Healthcare.
+										Closing Stock = Purchased Qty &minus; (LLP + Healthcare Sales Qty, net of returns, converted to pieces via the product mapping), all-time. Select a date range above to view a specific period.
+										A returned piece goes back into available stock — it isn't gone twice. A product with no mapped company pack-product(s) shows 0 sold, regardless of what actually moved through LLP/Healthcare.
 									</p>
 									<div style="background:#fff;overflow:scroll;width:100%;">
 
@@ -137,7 +137,7 @@ $Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesBy
 												<th>Product Name</th>
 												<th>HSN</th>
 												<th style="text-align:right;">Purchased Qty</th>
-												<th style="text-align:right;">LLP + Healthcare Sales Qty (pcs)</th>
+												<th style="text-align:right;">LLP + Healthcare Sales Qty (pcs, net of returns)</th>
 												<th style="text-align:right;">Closing Stock (pcs)</th>
 												</tr>
                                             </thead>

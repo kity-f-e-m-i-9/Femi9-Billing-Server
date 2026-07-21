@@ -137,8 +137,8 @@ $Result_sumclosing12 = [array_sum($closingByProduct)];
                                 <div class="card">
                                     <div class="card-body">
 									<p class="text-muted" style="font-size:13px;">
-										Purchased Qty and LLP + Healthcare Sales Qty below are scoped to <?= date("d/M/Y", strtotime($get_from_date)); ?> &ndash; <?= date("d/M/Y", strtotime($get_to_date)); ?> (period activity only).
-										Closing Stock is the real running balance as it stood at the end of <?= date("d/M/Y", strtotime($get_to_date)); ?> — total pieces ever purchased minus total LLP/Healthcare pieces ever sold, up to that date — not derived from the two period columns.
+										Purchased Qty and LLP + Healthcare Sales Qty below are scoped to <?= date("d/M/Y", strtotime($get_from_date)); ?> &ndash; <?= date("d/M/Y", strtotime($get_to_date)); ?> (period activity only). Sales Qty is net of returns in that same period — a returned piece goes back into available stock, it isn't gone twice.
+										Closing Stock is the real running balance as it stood at the end of <?= date("d/M/Y", strtotime($get_to_date)); ?> — total pieces ever purchased minus total LLP/Healthcare pieces ever sold net of returns, up to that date — not derived from the two period columns.
 										A product with no mapped company pack-product(s) shows 0 sold, regardless of what actually moved through LLP/Healthcare.
 									</p>
 									<div style="background:#fff;overflow:scroll;width:100%;">
@@ -151,7 +151,7 @@ $Result_sumclosing12 = [array_sum($closingByProduct)];
 												<th>Product Name</th>
 												<th>HSN</th>
 												<th style="text-align:right;">Purchased Qty (period)</th>
-												<th style="text-align:right;">LLP + Healthcare Sales Qty (pcs, period)</th>
+												<th style="text-align:right;">LLP + Healthcare Sales Qty (pcs, net of returns, period)</th>
 												<th style="text-align:right;">Closing Stock (pcs, as of <?= date("d/M/Y", strtotime($get_to_date)); ?>)</th>
 												</tr>
                                             </thead>
