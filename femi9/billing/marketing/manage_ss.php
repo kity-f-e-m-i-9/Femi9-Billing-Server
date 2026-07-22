@@ -147,8 +147,10 @@ $shopcat_name=$result_shopcatt['catlable'];
 					<td><?php if($result_product_list["email"]!=NULL){ echo $result_product_list["email"]; }else{ echo "---";}?></td>
 					<td><?php echo $result_product_list["address"];?></td>
 					<td>
-					<?php if($result_product_list["google_location"]!=NULL){?>
-					<a href="<?php echo $result_product_list["google_location"];?>" target="_blank">View</a>
+					<?php if($result_product_list["latitude"]!=NULL && $result_product_list["longitude"]!=NULL){?>
+					<a href="https://www.google.com/maps?q=<?php echo $result_product_list["latitude"];?>,<?php echo $result_product_list["longitude"];?>" target="_blank" title="<?php echo htmlspecialchars($result_product_list["google_location"]);?>">View</a>
+					<?php }elseif($result_product_list["google_location"]!=NULL){?>
+					<a href="https://www.google.com/maps/search/?api=1&query=<?php echo urlencode($result_product_list["google_location"]);?>" target="_blank" title="<?php echo htmlspecialchars($result_product_list["google_location"]);?>">View</a>
 					<?php }else { echo "---";}?>
 					</td>
 					<td><?php if($result_product_list["gstin"]!=NULL){ echo $result_product_list["gstin"]; }else{ echo "---";}?></td>

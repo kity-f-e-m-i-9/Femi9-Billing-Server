@@ -14,32 +14,48 @@ $fetch_product_list = mysqli_query($db_conn, $select_product_list);
 while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
 
 	//state details
+	$state_name = 'Na';
 	$state_id = $result_product_list['state_id'];
-	$select_stateList = "select * from state where id='$state_id'";
-	$fetch_staeList = mysqli_query($db_conn, $select_stateList);
-	$result_stateList = mysqli_fetch_array($fetch_staeList);
-	$state_name = $result_stateList['st_name'];
+	if ($state_id !== null && $state_id !== '') {
+		$select_stateList = "select * from state where id='" . intval($state_id) . "'";
+		$fetch_staeList = mysqli_query($db_conn, $select_stateList);
+		if ($fetch_staeList && ($result_stateList = mysqli_fetch_array($fetch_staeList))) {
+			$state_name = $result_stateList['st_name'];
+		}
+	}
 
 	//district
+	$district_name = 'Na';
 	$district_id = $result_product_list['district_id'];
-	$select_district = "select * from district where id=$district_id";
-	$fetch_district = mysqli_query($db_conn, $select_district);
-	$result_district = mysqli_fetch_array($fetch_district);
-	$district_name = $result_district['dist_name'];
+	if ($district_id !== null && $district_id !== '') {
+		$select_district = "select * from district where id=" . intval($district_id);
+		$fetch_district = mysqli_query($db_conn, $select_district);
+		if ($fetch_district && ($result_district = mysqli_fetch_array($fetch_district))) {
+			$district_name = $result_district['dist_name'];
+		}
+	}
 
 	//Taluk
+	$taluk_name = 'Na';
 	$taluk_id = $result_product_list['taluk_id'];
-	$select_Taluk = "select * from taluk where id=$taluk_id";
-	$fetch_Taluk = mysqli_query($db_conn, $select_Taluk);
-	$result_Taluk = mysqli_fetch_array($fetch_Taluk);
-	$taluk_name = $result_Taluk['taluk'];
+	if ($taluk_id !== null && $taluk_id !== '') {
+		$select_Taluk = "select * from taluk where id=" . intval($taluk_id);
+		$fetch_Taluk = mysqli_query($db_conn, $select_Taluk);
+		if ($fetch_Taluk && ($result_Taluk = mysqli_fetch_array($fetch_Taluk))) {
+			$taluk_name = $result_Taluk['taluk'];
+		}
+	}
 
 	//pincode
+	$pincodeshow = 'Na';
 	$pincode_id = $result_product_list['pincode_id'];
-	$select_pincodelist = "select * from pincode where id='$pincode_id'";
-	$fetch_pincodelist = mysqli_query($db_conn, $select_pincodelist);
-	$result_pincodelist = mysqli_fetch_array($fetch_pincodelist);
-	$pincodeshow = $result_pincodelist['pincode'];
+	if ($pincode_id !== null && $pincode_id !== '') {
+		$select_pincodelist = "select * from pincode where id='" . intval($pincode_id) . "'";
+		$fetch_pincodelist = mysqli_query($db_conn, $select_pincodelist);
+		if ($fetch_pincodelist && ($result_pincodelist = mysqli_fetch_array($fetch_pincodelist))) {
+			$pincodeshow = $result_pincodelist['pincode'];
+		}
+	}
 
 	fputcsv($output, [
 		$result_product_list['name'],

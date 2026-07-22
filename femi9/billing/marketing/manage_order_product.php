@@ -158,7 +158,8 @@ $i= $start_from;
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
 				<th><?=$result_prdetails_header['productName'];?></th>
 				<?php }?>
-				
+
+													<th>Location</th>
 													<th>Edit</th>
                                                 </tr>
                                             </thead>
@@ -213,8 +214,13 @@ $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 				<td><b><?=$showQty;?></b></td>
 				<?php }?>
 				<!-------------------------------------------------------------------->
-					
-					
+
+					<td>
+					<?php if($result_product_list["latitude"]!=NULL && $result_product_list["longitude"]!=NULL){?>
+					<a href="https://www.google.com/maps?q=<?=$result_product_list["latitude"];?>,<?=$result_product_list["longitude"];?>" target="_blank" class="btn btn-sm btn-secondary">View Location</a>
+					<?php }else{ echo "---"; }?>
+					</td>
+
 			<td>
 			<a href="edit_order_product.php?orderid=<?php echo $orderid;?>&&actionupdate" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Details">
 			<img src="../../assets/images/edit-32.png"/></a>

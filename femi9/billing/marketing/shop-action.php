@@ -42,7 +42,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	$address=RemoveSpecialChar($address);
 	
 	$google_location=str_replace("'","&#39;",$_POST["google_location"]);
-	
+
+	$latitude=isset($_POST["latitude"]) && $_POST["latitude"]!=='' ? floatval($_POST["latitude"]) : null;
+	$longitude=isset($_POST["longitude"]) && $_POST["longitude"]!=='' ? floatval($_POST["longitude"]) : null;
+	$latitude_sql=$latitude===null ? "NULL" : "'".$latitude."'";
+	$longitude_sql=$longitude===null ? "NULL" : "'".$longitude."'";
+
 	$select_count_dist="select count(*) as numShop from ms_shop where mobile_number='$mobile_number' and ms_id='$ms_id'";
 $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
@@ -65,10 +70,10 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	
         $sql="insert into ms_shop (ms_id,user_icon,name,state_name,
 		district_name,taluk_name,pincode,email,mobile_number,
-		gstin,address,shop_cat,country_code,landline,google_location) values 
+		gstin,address,shop_cat,country_code,landline,google_location,latitude,longitude) values
 		('$ms_id','$uploadfile','$name','$state_name','$district_name','$taluk_name',
 		'$pincode','$email','$mobile_number','$gstin','$address','$shop_cat',
-		'$country_code','$landline','$google_location')";
+		'$country_code','$landline','$google_location',$latitude_sql,$longitude_sql)";
 		mysqli_query($db_conn,$sql);
 		
 		echo "<script>window.location='".$viewurl."';</script>";

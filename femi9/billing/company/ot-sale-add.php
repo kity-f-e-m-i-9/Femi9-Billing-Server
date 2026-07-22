@@ -221,8 +221,8 @@ $stmt_states->close();
                                     <?php include("validate-scripts.php"); ?>
 
                                     <form action="ot-sale-action" method="post"
-                                          enctype="multipart/form-data"
-                                          onsubmit="return confirm('Please confirm submission!');">
+                                          enctype="multipart/form-data" id="otSaleForm"
+                                          onsubmit="return confirmOtSaleSubmit();">
 
                                         <!-- Hidden fields -->
                                         <input type="hidden" name="tempid"      value="<?= htmlspecialchars($tempid, ENT_QUOTES) ?>">
@@ -292,9 +292,11 @@ $stmt_states->close();
 
                                                 <!-- Invoice Number -->
                                                 <label class="form-label">Invoice Number *</label>
-                                                <input type="text" name="inv_number" required
+                                                <input type="text" name="inv_number" id="inv_number" required
                                                        onkeypress="restrictSpecialChars(event)"
+                                                       onblur="checkInvoiceDuplicate()"
                                                        class="form-control" maxlength="50">
+                                                <div id="invoiceNumberWarning" style="color:#c0392b; font-size:13px; margin-top:4px;"></div>
                                                 <br>
 
                                                 <!-- Customer Name -->
@@ -487,6 +489,66 @@ $stmt_states->close();
             walletInp.value = 0; // reset wallet when not applicable
         }
         recalculateGrandTotal();
+        suggestInvoiceNumber(selectedCat);
+    }
+
+    // ----------------------------------------------------------------
+    // Invoice number auto-suggest + duplicate warning
+    // Only tracked for WEBSITE / ID CONCEPT / WHATSAPP SALES (WEB/ID/WA sequences).
+    // ----------------------------------------------------------------
+    const TRACKED_INVOICE_CATS = ['WEBSITE', 'ID CONCEPT', 'WHATSAPP SALES'];
+    let invoiceNumberIsDuplicate = false;
+
+    function suggestInvoiceNumber(selectedCat) {
+        const invField = document.getElementById('inv_number');
+        const warnEl   = document.getElementById('invoiceNumberWarning');
+        warnEl.textContent = '';
+        invoiceNumberIsDuplicate = false;
+
+        if (!TRACKED_INVOICE_CATS.includes(selectedCat)) {
+            invField.value = ''; // free/manual entry for all other categories
+            return;
+        }
+
+        fetch('ot-invoice-helper.php?action=next&cat=' + encodeURIComponent(selectedCat))
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.number) {
+                    invField.value = data.number;
+                }
+            })
+            .catch(() => {});
+    }
+
+    function checkInvoiceDuplicate() {
+        const catSelect = document.getElementById('catname');
+        const invField   = document.getElementById('inv_number');
+        const warnEl     = document.getElementById('invoiceNumberWarning');
+        const selectedCat = catSelect.value;
+
+        warnEl.textContent = '';
+        invoiceNumberIsDuplicate = false;
+
+        if (!TRACKED_INVOICE_CATS.includes(selectedCat) || !invField.value.trim()) { return; }
+
+        fetch('ot-invoice-helper.php?action=check&cat=' + encodeURIComponent(selectedCat) + '&inv_number=' + encodeURIComponent(invField.value.trim()))
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.exists) {
+                    invoiceNumberIsDuplicate = true;
+                    warnEl.textContent = '⚠️ This invoice number already exists for ' + selectedCat + '.';
+                }
+            })
+            .catch(() => {});
+    }
+
+    function confirmOtSaleSubmit() {
+        if (invoiceNumberIsDuplicate) {
+            if (!confirm('This invoice number already exists for this category. Continue anyway?')) {
+                return false;
+            }
+        }
+        return confirm('Please confirm submission!');
     }
 
     // ----------------------------------------------------------------

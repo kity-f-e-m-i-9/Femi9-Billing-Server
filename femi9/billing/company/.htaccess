@@ -1,5 +1,12 @@
 Options +MultiViews
 
+# Give this module its own session cookie so it doesn't share a session
+# file (and its file lock) with other billing modules open in other tabs
+# on the same domain — that lock contention was causing slow/hung logins.
+<IfModule php_module>
+  php_value session.name "femi9_company_sess"
+</IfModule>
+
 # Override cPanel's ea-php82 handler for local MAMP compatibility
 <IfModule mime_module>
   AddType application/x-httpd-php .php .php8 .phtml
