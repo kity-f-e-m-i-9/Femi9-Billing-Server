@@ -15,7 +15,7 @@ $file = "Datewise-Product-Orders-".$from_date."-to-".$to_date.".csv";
 $csv_content = '';
 
 // Header row for CSV
-$csv_content .= "#,Shop Name,Shop Contact Number,Address,Taluk,Date,Marketing Tool";
+$csv_content .= "#,Shop Name,Shop Contact Number,Address,Taluk,Location,Date,Marketing Tool";
 
 $select_prdetails_header="select * from products order by id asc";
 $fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
@@ -45,6 +45,12 @@ while($result_product_list12=mysqli_fetch_array($fetch_product_list))
 	$csv_content .= '"'.str_replace('"','""',$result_shopcatt['mobile_number']).'",';
 	$csv_content .= '"'.str_replace('"','""',ucwords($result_shopcatt["address"])).'",';
 	$csv_content .= '"'.str_replace('"','""',ucwords($result_shopcatt["taluk_name"])).'",';
+
+	$order_lat = $result_product_list["latitude"];
+	$order_lng = $result_product_list["longitude"];
+	$location_text = ($order_lat!=NULL && $order_lng!=NULL) ? 'https://www.google.com/maps?q='.$order_lat.','.$order_lng : '';
+	$csv_content .= '"'.$location_text.'",';
+
 	$csv_content .= '"'.date("d/m/Y",strtotime($result_product_list["order_date"])).'",';
 	$csv_content .= '"'.str_replace('"','""',$result_product_list["marketing_tool"]).'"';
 
