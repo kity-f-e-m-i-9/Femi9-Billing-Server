@@ -25,6 +25,8 @@ $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+// Bundled CA cert — avoids relying on the host server's (often outdated) system CA store.
+curl_setopt($ch, CURLOPT_CAINFO, __DIR__ . '/../shared/cacert.pem');
 $response = curl_exec($ch);
 $curlError = curl_error($ch);
 curl_close($ch);
