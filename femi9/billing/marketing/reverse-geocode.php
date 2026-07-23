@@ -25,8 +25,13 @@ $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-// Bundled CA cert — avoids relying on the host server's (often outdated) system CA store.
-curl_setopt($ch, CURLOPT_CAINFO, __DIR__ . '/../shared/cacert.pem');
+// Use the bundled CA cert only if present — falls back to the host's own system
+// CA store otherwise (most servers already have a current one; only needed as a
+// workaround on hosts with an outdated bundle, e.g. local XAMPP installs).
+$bundledCaCert = __DIR__ . '/../shared/cacert.pem';
+if (file_exists($bundledCaCert)) {
+    curl_setopt($ch, CURLOPT_CAINFO, $bundledCaCert);
+}
 $response = curl_exec($ch);
 $curlError = curl_error($ch);
 curl_close($ch);
