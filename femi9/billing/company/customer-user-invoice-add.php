@@ -598,6 +598,13 @@ xmlhttp.send();}
 			        .then(function(data) {
 			            if (data && data.number && invField.value.trim() === '') {
 			                invField.value = data.number;
+			                // Auto-fill doesn't fire onKeyup, so the duplicate-check
+			                // (and its hidden invoice_number_accept=1 field) never runs
+			                // unless we trigger it manually — without this, submit
+			                // wrongly treats it as "not checked" and rejects it.
+			                if (typeof showInvoiceDuplicate === 'function') {
+			                    showInvoiceDuplicate(data.number);
+			                }
 			            }
 			        })
 			        .catch(function() {});
