@@ -584,9 +584,25 @@ xmlhttp.open("GET","load_InvoiceNumber_customer.php?q="+str,true);
 xmlhttp.send();}
 </script>
 			<label class="form-label">Invoice Number *</label>
-            <input type="text" onKeyup="showInvoiceDuplicate(this.value)"; name="inv_number" autofocus required="" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" id="inv_number" onKeyup="showInvoiceDuplicate(this.value)"; name="inv_number" autofocus required="" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>
 			<span id="txtHintInvoice"></span>
+			<script>
+			// Auto-suggest next invoice number (Femi Nayan LLP: C/FY/LLP{n} sequence) —
+			// only fills if the field is still empty, never overwrites a typed value.
+			(function() {
+			    var invField = document.getElementById('inv_number');
+			    if (!invField || invField.value.trim() !== '') { return; }
+			    fetch('load_next_invoice_customer.php')
+			        .then(function(r) { return r.json(); })
+			        .then(function(data) {
+			            if (data && data.number && invField.value.trim() === '') {
+			                invField.value = data.number;
+			            }
+			        })
+			        .catch(function() {});
+			})();
+			</script>
 			
 										 
 <!------------------------------------------------------------------------------>
