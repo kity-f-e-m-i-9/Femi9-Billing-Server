@@ -82,7 +82,7 @@ if(isset($_REQUEST['update-customer']))
 	
 	$ms_address=str_replace("'","&#39;",$_REQUEST['ms_address']);
 	$ms_address = RemoveSpecialChar($ms_address);
-	$user_position=$_REQUEST['user_position'];
+	$user_position = isset($_REQUEST['user_position']) ? 1 : 0;
 	
 	$update_products="update marketing_staff set ms_name='$ms_name',ms_email='$ms_email',
 	ms_address='$ms_address',country_code='$country_code',user_position='$user_position' where id='$update_id'";
