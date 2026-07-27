@@ -4,6 +4,15 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
 
+$_chkTL = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'team_level_id'");
+if ($_chkTL && $_chkTL->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN team_level_id INT NULL DEFAULT NULL AFTER user_position");
+}
+$_chkMgr = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'manager_id'");
+if ($_chkMgr && $_chkMgr->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN manager_id INT NULL DEFAULT NULL AFTER team_level_id");
+}
+
 //fetch product details
 $select_product_list="select * from marketing_staff where id='$prid'";
 $fetch_product_list=mysqli_query($db_conn,$select_product_list);
@@ -197,10 +206,33 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 <textarea name="ms_address" onkeypress="restrictSpecialChars(event)" class="form-control" placeholder="optional"><?=$result_product_list['ms_address'];?></textarea>
 </br>
 
-<label class="form-label">Marketing Head
-<?php if($result_product_list['user_position']==1){?>
-       <input type="checkbox" name="user_position" value="1" checked>&nbsp;Enable</label>
-<?php }else{?><input type="checkbox" name="user_position" value="1">&nbsp;Enable</label><?php }?>
+<label class="form-label">Team Level</label>
+<select name="team_level_id" id="teamLevelSelect" class="form-control">
+    <option value="">-- None --</option>
+<?php
+$db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    level_rank INT NOT NULL,
+    level_name VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_level_rank (level_rank)
+)");
+$currentTeamLevelId = (int)($result_product_list['team_level_id'] ?? 0);
+$selectTeamLevels = $db_conn->query("SELECT id, level_name FROM marketing_team_levels ORDER BY level_rank ASC");
+while ($resultTeamLevel = $selectTeamLevels->fetch_assoc()) { ?>
+<option value="<?php echo (int)$resultTeamLevel['id'];?>" <?php echo ($currentTeamLevelId === (int)$resultTeamLevel['id']) ? 'selected' : '';?>><?php echo htmlspecialchars($resultTeamLevel['level_name']);?></option>
+<?php } ?>
+</select>
+<small class="text-muted">Manage levels from <a href="manage-marketing-team-levels">Manage Team Levels</a>.</small>
+<br/>
+
+<div id="managerFieldWrap" style="display:none;margin-top:10px;">
+    <label class="form-label" id="managerFieldLabel">Reports To</label>
+    <select name="manager_id" id="managerSelect" class="form-control">
+        <option value="">-- Select --</option>
+    </select>
+    <div id="managerChainPreview" style="font-size:12px;color:#666;margin-top:5px;"></div>
+</div>
 			<br/>
 			<style type="text/css"> .hidden {display: none;}</style>
 
@@ -378,6 +410,82 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
         });
 
         $('#lpSearchInput').on('input', function () { renderList($.trim($(this).val())); });
+
+        // ---- Team hierarchy: manager selection based on Team Level ----
+        var teamLevels = [];
+        var CURRENT_TEAM_LEVEL_ID = <?php echo (int)$currentTeamLevelId; ?>;
+        var CURRENT_MANAGER_ID = <?php echo (int)($result_product_list['manager_id'] ?? 0); ?>;
+
+        function levelAbove(levelId) {
+            var idx = -1;
+            for (var i = 0; i < teamLevels.length; i++) { if (teamLevels[i].id == levelId) { idx = i; break; } }
+            if (idx <= 0) return null;
+            return teamLevels[idx - 1];
+        }
+
+        function renderChain(chain) {
+            var $prev = $('#managerChainPreview').empty();
+            if (!chain.length) return;
+            var parts = [];
+            $.each(chain, function (_, c) {
+                parts.push((c.level_name ? c.level_name + ': ' : '') + c.name);
+            });
+            $prev.text('Reporting chain: ' + parts.join(' → '));
+        }
+
+        function loadManagerOptions(levelId, preselectId) {
+            var above = levelAbove(levelId);
+            if (!above) {
+                $('#managerFieldWrap').hide();
+                $('#managerSelect').html('<option value="">-- Select --</option>');
+                renderChain([]);
+                return;
+            }
+            $('#managerFieldLabel').text('Reports To (' + above.name + ')');
+            $('#managerFieldWrap').show();
+            $('#managerSelect').html('<option value="">Loading&hellip;</option>');
+            $.getJSON('get-ms-by-level.php?level_id=' + above.id + '&exclude_ms_id=' + EXCLUDE_MS, function (staff) {
+                var $sel = $('#managerSelect').empty();
+                $sel.append('<option value="">-- Select --</option>');
+                $.each(staff, function (_, s) {
+                    var $opt = $('<option>').val(s.id).text(s.name);
+                    if (preselectId && s.id == preselectId) { $opt.prop('selected', true); }
+                    $sel.append($opt);
+                });
+                if (preselectId) {
+                    $.getJSON('get-ms-chain.php?ms_id=' + preselectId, function (chain) { renderChain(chain); });
+                } else {
+                    renderChain([]);
+                }
+            }).fail(function () {
+                $('#managerSelect').html('<option value="">Failed to load</option>');
+            });
+        }
+
+        $('#teamLevelSelect').on('change', function () {
+            var levelId = $(this).val();
+            if (!levelId) {
+                $('#managerFieldWrap').hide();
+                renderChain([]);
+                return;
+            }
+            loadManagerOptions(levelId, null);
+        });
+
+        $('#managerSelect').on('change', function () {
+            var managerId = $(this).val();
+            if (!managerId) { renderChain([]); return; }
+            $.getJSON('get-ms-chain.php?ms_id=' + managerId, function (chain) {
+                renderChain(chain);
+            });
+        });
+
+        $.getJSON('get-ms-team-levels.php', function (levels) {
+            teamLevels = levels;
+            if (CURRENT_TEAM_LEVEL_ID) {
+                loadManagerOptions(CURRENT_TEAM_LEVEL_ID, CURRENT_MANAGER_ID);
+            }
+        });
     })(jQuery);
     </script>
 </body>
