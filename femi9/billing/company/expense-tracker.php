@@ -49,6 +49,23 @@ if ($period_cols && $period_cols->num_rows === 0) {
     $db_conn->query("ALTER TABLE expense_imports ADD COLUMN period_to DATE DEFAULT NULL AFTER period_from");
 }
 
+// Self-migrating: per-row date, populated by the Neksomo date-detecting
+// upload (expense-tracker-upload-datewise-action.php) — each transaction
+// keeps its own date instead of only the batch-level period_from/period_to.
+// NULL for items uploaded via the Tally Group Summary path, which has no
+// per-row date to begin with.
+$item_date_cols = $db_conn->query("SHOW COLUMNS FROM expense_import_items LIKE 'date'");
+if ($item_date_cols && $item_date_cols->num_rows === 0) {
+    $db_conn->query("ALTER TABLE expense_import_items ADD COLUMN date DATE DEFAULT NULL AFTER particulars");
+}
+
+// Neksomo gets a different upload flow: instead of picking one date range
+// for the whole file (today's Tally Group Summary upload), it uploads a
+// plain per-transaction list (Date, Particulars, Amount) and every row's own
+// date drives which month it lands in — see expense-tracker-upload-datewise-action.php.
+$__viewerType = get_login_usertype($db_conn);
+$is_neksomo_upload = ($__viewerType === 'neksomo');
+
 // Company profiles (finance-only restricted, same pattern as TP Advance Payments).
 // Not filtered by name — godown_finance_filter_sql() already encodes the full
 // access rule per login type (finance sees all, neksomo sees only its own
@@ -113,6 +130,12 @@ $batch_ids = array_column($batches, 'id');
 
 // Aggregated breakdown across all batches for the month
 $breakdown = [];
+// Individual dated transactions (populated by the date-detecting Neksomo
+// upload — expense-tracker-upload-datewise-action.php; Tally-uploaded items
+// have date=NULL and never appear here) shown in their own date-ordered
+// list, since the whole point of that upload path is per-row dates, which
+// the particulars-grouped breakdown above deliberately discards.
+$dated_items = [];
 if (!empty($batch_ids)) {
     $placeholders = implode(',', array_fill(0, count($batch_ids), '?'));
     $types = str_repeat('i', count($batch_ids));
@@ -126,6 +149,17 @@ if (!empty($batch_ids)) {
     $stmt->bind_param($types, ...$batch_ids);
     $stmt->execute();
     $breakdown = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $db_conn->prepare("
+        SELECT date, particulars, debit, credit, net_amount
+        FROM expense_import_items
+        WHERE import_id IN ($placeholders) AND date IS NOT NULL
+        ORDER BY date DESC, id DESC
+    ");
+    $stmt->bind_param($types, ...$batch_ids);
+    $stmt->execute();
+    $dated_items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 }
 
@@ -270,6 +304,34 @@ $i = 0;
                     <div class="row">
                         <div class="col-12">
                             <div class="upload-card">
+                                <?php if ($is_neksomo_upload): ?>
+                                <h6><i class="material-icons" style="vertical-align:middle;">upload_file</i> Upload Expense List (Date, Particulars, Amount)</h6>
+                                <form method="POST" action="expense-tracker-upload-datewise-action.php" enctype="multipart/form-data">
+                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Company Profile</label>
+                                            <select name="company_id" class="form-control" required>
+                                                <?php foreach ($company_profiles as $cp): ?>
+                                                <option value="<?php echo $cp['id']; ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($cp['gname']); ?>
+                                                </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label">Expense File (.xlsx/.xls/.csv)</label>
+                                            <input type="file" name="expense_file" class="form-control" accept=".xlsx,.xls,.csv" required>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="material-icons" style="vertical-align:middle;">cloud_upload</i> Upload
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">No date range needed — each row's own Date column decides which month it's booked under. Expected columns: Date, Particulars (or Description/Narration), Amount. Rows spanning several months are automatically split into one entry per month.</small>
+                                </form>
+                                <?php else: ?>
                                 <h6><i class="material-icons" style="vertical-align:middle;">upload_file</i> Upload Tally Group Summary (Expenses)</h6>
                                 <form method="POST" action="expense-tracker-upload-action.php" enctype="multipart/form-data">
                                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
@@ -304,6 +366,7 @@ $i = 0;
                                     </div>
                                     <small class="text-muted d-block mt-2">Export a "Group Summary" report from Tally (e.g. Indirect Expenses) as Excel and upload it here, matching whatever period the export covers (needn't be a full calendar month). Re-uploading for a period that falls in the same month adds to existing totals — it does not replace them.</small>
                                 </form>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -361,6 +424,43 @@ $i = 0;
                             </div>
                         </div>
                     </div>
+
+                    <!-- Dated Expense Entries (per-transaction, from the date-detecting upload) -->
+                    <?php if (!empty($dated_items)): ?>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header"><h5 class="card-title">Expense Entries by Date</h5></div>
+                                <div class="card-body">
+                                    <div style="overflow-x:auto;">
+                                        <table id="datedExpenseTable" style="width:100%;">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Particulars</th>
+                                                    <th class="text-right">Debit (₹)</th>
+                                                    <th class="text-right">Credit (₹)</th>
+                                                    <th class="text-right">Net Amount (₹)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            <?php foreach ($dated_items as $row): ?>
+                                                <tr>
+                                                    <td><?php echo date('d M Y', strtotime($row['date'])); ?></td>
+                                                    <td><?php echo htmlspecialchars($row['particulars']); ?></td>
+                                                    <td class="text-right"><?php echo inr_format($row['debit'], 2); ?></td>
+                                                    <td class="text-right"><?php echo inr_format($row['credit'], 2); ?></td>
+                                                    <td class="text-right font-weight-bold"><?php echo inr_format($row['net_amount'], 2); ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
                     <!-- Expense Breakdown -->
                     <div class="row">
@@ -425,6 +525,17 @@ $i = 0;
 <script src="../../assets/js/pages/datatables.js"></script>
 <script>
 $(document).ready(function () {
+    // Own DataTable init (not the shared datatable1-4 ids in
+    // assets/js/pages/datatables.js) — #datatable3's scrollX:true config
+    // was cloning the header into a separate scroll table whose column
+    // widths didn't line up with the body, misaligning the ₹ headers
+    // against their right-aligned values below them.
+    if ($('#datedExpenseTable').length) {
+        $('#datedExpenseTable').DataTable({
+            order: [[0, 'desc']]
+        });
+    }
+
     $('#datatable1').on('click', '.delete-batch-btn', function () {
         const id = $(this).data('id');
         if (!confirm('Delete this uploaded file and all its expense line items? This cannot be undone.')) {

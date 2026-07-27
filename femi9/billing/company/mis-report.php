@@ -40,16 +40,31 @@ if ($filter_entity > 0 && !is_godown_allowed($db_conn, $filter_entity)) $filter_
 if ($filter_entity === 0 && count($all_entities) === 1) $filter_entity = (int)$all_entities[0]['id'];
 $entity_ids_subq = ($scope === 'company') ? godown_ids_subquery($db_conn) : '';
 
-// The neksomo dashboard report specifically shows FEMI NAYAN LLP's sales
-// (per explicit request), not the neksomo login's own GodownAccess.php data
-// scope (NEKSOMO HYGIENE INDUSTRIES) — general godown access for this login
-// elsewhere in the app is intentionally left untouched, this override is
-// local to this report only.
+// The neksomo dashboard report specifically shows FEMI NAYAN LLP + FEMI
+// HEALTH CARE's combined sales by default (per explicit request), not the
+// neksomo login's own GodownAccess.php data scope (NEKSOMO HYGIENE
+// INDUSTRIES) — general godown access for this login elsewhere in the app is
+// intentionally left untouched, this override is local to this report only.
+// $entity_ids_subq is repointed from the usual GodownAccess-scoped subquery
+// to a literal id list of just these two godowns, so every existing
+// "$filter_entity > 0 ? =X : IN ({$entity_ids_subq})" condition below picks
+// up both entities for free without needing its own neksomo special-case.
+// $all_entities now has 2 rows, so the entity-picker dropdown further down
+// (guarded by count($all_entities) > 1) starts showing for this login too —
+// re-read entity_id from $_GET directly (bypassing the is_godown_allowed
+// reset at line 39, same bypass this report already relies on) so picking
+// just LLP or just Healthcare from it actually narrows the report instead of
+// always snapping back to the combined view.
 if ($is_neksomo_view) {
     $__llpRow = crow($db_conn, "SELECT id, gname FROM company_godown WHERE gname = 'FEMI NAYAN LLP' LIMIT 1");
-    if (!empty($__llpRow['id'])) {
-        $filter_entity = (int)$__llpRow['id'];
-        $all_entities  = [$__llpRow];
+    $__hcRow  = crow($db_conn, "SELECT id, gname FROM company_godown WHERE gname = 'FEMI HEALTH CARE' LIMIT 1");
+    $__neksomoPcsEntities = array_values(array_filter([$__llpRow, $__hcRow], function ($r) { return !empty($r['id']); }));
+    if (!empty($__neksomoPcsEntities)) {
+        $__neksomoPcsIds = array_map('intval', array_column($__neksomoPcsEntities, 'id'));
+        $__requestedEntity = (int)($_GET['entity_id'] ?? 0);
+        $filter_entity   = in_array($__requestedEntity, $__neksomoPcsIds, true) ? $__requestedEntity : 0;
+        $all_entities    = $__neksomoPcsEntities;
+        $entity_ids_subq = implode(',', $__neksomoPcsIds);
     }
 }
 
@@ -649,18 +664,38 @@ if ($scope === 'company') {
     if ($is_neksomo_view) {
         $__neksomoGodown = crow($db_conn, "SELECT id FROM company_godown WHERE gname = 'NEKSOMO HYGIENE INDUSTRIES' LIMIT 1");
         $pcs_expense_cond = "company_id = " . (int)($__neksomoGodown['id'] ?? 0);
+
+        // Neksomo's date-detecting expense upload (expense-tracker-upload-
+        // datewise-action.php) stamps each expense_import_items row with its
+        // own date, so its expenses can be matched to the exact From/To range
+        // selected here — not just whichever calendar month(s) it overlaps.
+        // Older/undated rows (uploaded via the Tally Group Summary path,
+        // date IS NULL) still fall back to the coarser expense_month bucket
+        // so nothing already uploaded silently drops out of the total.
+        $grand_total_expense = (float) cval($db_conn,
+            "SELECT COALESCE(SUM(eii.net_amount),0)
+             FROM expense_import_items eii
+             JOIN expense_imports ei ON ei.id = eii.import_id
+             WHERE ei.{$pcs_expense_cond}
+               AND (
+                     (eii.date IS NOT NULL AND eii.date BETWEEN ? AND ?)
+                  OR (eii.date IS NULL AND ei.expense_month BETWEEN DATE_FORMAT(?, '%Y-%m-01') AND DATE_FORMAT(?, '%Y-%m-01'))
+               )",
+            'ssss', [$from, $to, $from, $to]);
     } else {
         $pcs_expense_cond = $filter_entity > 0 ? "company_id = {$filter_entity}" : "company_id IN ({$entity_ids_subq})";
+        $grand_total_expense = (float) cval($db_conn,
+            "SELECT COALESCE(SUM(net_amount),0) FROM expense_imports
+             WHERE {$pcs_expense_cond}
+             AND expense_month BETWEEN DATE_FORMAT(?, '%Y-%m-01') AND DATE_FORMAT(?, '%Y-%m-01')",
+            'ss', [$from, $to]);
     }
-    $grand_total_expense = (float) cval($db_conn,
-        "SELECT COALESCE(SUM(net_amount),0) FROM expense_imports
-         WHERE {$pcs_expense_cond}
-         AND expense_month BETWEEN DATE_FORMAT(?, '%Y-%m-01') AND DATE_FORMAT(?, '%Y-%m-01')",
-        'ss', [$from, $to]);
 
     if ($filter_entity > 0) {
         $entity_names = array_column($all_entities, 'gname', 'id');
         $selected_entity_name = $entity_names[$filter_entity] ?? 'Selected Entity';
+    } elseif ($is_neksomo_view) {
+        $selected_entity_name = implode(' + ', array_column($all_entities, 'gname'));
     }
 
     // Return Qty/Pieces for the Pieces Sold card — same entity scope as the

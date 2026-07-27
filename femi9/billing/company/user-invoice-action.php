@@ -167,6 +167,9 @@ if (!$resultproducts) {
 }
 
 $gst_percentage = floatval($resultproducts['gst'] ?? 0);
+// The product's own price-tax setting ('inclusive'/'exclusive' — distinct from
+// $gst_type set further below, which is the invoice's inner/outer state field).
+$product_gst_type = ($resultproducts['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive';
 $hsn = $resultproducts['hsn'] ?? '';
 $rwpoints = floatval($resultproducts['rwpoints'] ?? 0) * $qty;
 
@@ -186,9 +189,18 @@ if (isset($_REQUEST['discount_percentage']) && $_REQUEST['discount_percentage'] 
 
 $subtotal = $totalamount - $discount_amount;
 $subtotal = number_format($subtotal, 2, '.', '');
- 
-$gstamount_total = ($subtotal * $gst_percentage) / 100; 
-$total = $subtotal + $gstamount_total;
+
+if ($product_gst_type === 'inclusive' && $gst_percentage > 0) {
+    // Entered rate already includes GST — carve the tax portion out of
+    // subtotal for reporting instead of adding it again; amount charged
+    // doesn't change.
+    $gstamount_total = $subtotal - ($subtotal * 100 / (100 + $gst_percentage));
+    $gstamount_total = number_format($gstamount_total, 2, '.', '');
+    $total = $subtotal;
+} else {
+    $gstamount_total = ($subtotal * $gst_percentage) / 100;
+    $total = $subtotal + $gstamount_total;
+}
 
 error_log("Item totals - Subtotal: Rs.$subtotal, GST: Rs.$gstamount_total, Total: Rs.$total");
 
