@@ -92,12 +92,21 @@ function dw_parse_amount($val) {
     return (float)$val;
 }
 
-// Excel/CSV dates arrive as whatever the cell displays — a formatted string
-// for xlsx/xls (toArray()'s formatData=true below turns date cells into
-// their displayed text), plain unformatted text for csv, or occasionally a
-// raw Excel serial number if the source cell had no date format applied.
-// d/m/Y is tried before the locale-ambiguous fallback so Indian-convention
-// dates (17/07/2026) aren't misread as month/day.
+// A genuine Excel date cell's *displayed* text depends entirely on that
+// cell's own number format — which is often "m/d/yyyy" (month-first) even
+// when the workbook otherwise reads day-first, since Excel/Numbers apply
+// whatever the user's OS locale was at data-entry time regardless of the
+// business's own date convention. Guessing day-first vs month-first from
+// that display text is unreliable no matter which order is tried (a cell
+// showing 10/6/2025 is genuinely 6 Oct read one way and genuinely 10 June
+// the other, and both are "valid" dates). toArray() below is called with
+// formatData=false specifically so a real date cell comes through as its
+// raw, unambiguous Excel serial number (handled by the branch just below)
+// instead of a locale-dependent display string. Only genuine *text* cells
+// (typed dates in a CSV, or a cell explicitly entered/formatted as text)
+// ever reach the string-format parsing further down — and for those, the
+// input is unambiguous plain text, so day-first is the correct assumption
+// per this business's convention.
 function dw_parse_date($val) {
     $val = trim((string)$val);
     if ($val === '') return null;
@@ -137,7 +146,7 @@ function dw_parse_date($val) {
 try {
     $spreadsheet = IOFactory::load($stored_path);
     $sheet = $spreadsheet->getActiveSheet();
-    $rows = $sheet->toArray(null, true, true, true);
+    $rows = $sheet->toArray(null, true, false, true);
 } catch (Exception $e) {
     error_log("Expense tracker (datewise) parse error: " . $e->getMessage());
     @unlink($stored_path);
