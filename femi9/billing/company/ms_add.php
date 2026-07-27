@@ -1,5 +1,5 @@
-<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata");?>
-require_once("include/PermissionCheck.php"); requirePermission('ms');
+<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata");
+require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -36,6 +36,44 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');
         <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
         <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
         <![endif]-->
+    <style>
+    .lp-wrapper { position: relative; }
+    .lp-control {
+        display: flex; align-items: center; min-height: 38px;
+        border: 1px solid #ced4da; border-radius: 4px; background: #fff;
+        padding: 2px 8px; cursor: pointer; user-select: none;
+    }
+    .lp-control:hover { border-color: #adb5bd; }
+    .lp-control.open { border-color: #80bdff; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+    .lp-value { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; min-height: 28px; align-items: center; padding: 2px 0; }
+    .lp-placeholder { color: #aaa; font-size: 13px; }
+    .lp-arrow { margin-left: 6px; display: flex; align-items: center; }
+    .lp-chip { display: inline-flex; align-items: center; gap: 4px; background: #e9ecef; border-radius: 3px; padding: 2px 6px; font-size: 12px; max-width: 180px; }
+    .lp-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lp-chip-remove { cursor: pointer; font-size: 15px; line-height: 1; color: #888; flex-shrink: 0; }
+    .lp-chip-remove:hover { color: #dc3545; }
+    .lp-panel {
+        position: absolute; top: calc(100% + 3px); left: 0; right: 0;
+        background: #fff; border: 1px solid #ced4da; border-radius: 4px;
+        z-index: 1050; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+        display: flex; flex-direction: column; max-height: 280px;
+    }
+    .lp-body { overflow-y: auto; flex: 1; }
+    .lp-row { display: flex; align-items: center; gap: 8px; padding: 9px 14px; font-size: 13px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
+    .lp-row:last-child { border-bottom: none; }
+    .lp-row-selectable { color: #333; }
+    .lp-row-selectable:hover { background: #f8f9fa; }
+    .lp-row-selected { background: #e8f0fe; color: #1a73e8; font-weight: 500; }
+    .lp-row-selected:hover { background: #d2e3fc; }
+    .lp-row-taken { color: #bbb; cursor: not-allowed; }
+    .lp-row-taken:hover { background: #fff; }
+    .lp-row .lp-check { color: #1a73e8; flex-shrink: 0; font-size: 16px; }
+    .lp-row .lp-lock { color: #ccc; flex-shrink: 0; font-size: 16px; }
+    .lp-empty, .lp-loading { padding: 16px; text-align: center; font-size: 13px; color: #aaa; }
+    .lp-search-box { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+    .lp-search-box input { flex: 1; border: 1px solid #ced4da; border-radius: 4px; padding: 5px 10px; font-size: 13px; outline: none; font-family: inherit; }
+    .lp-search-box input:focus { border-color: #80bdff; box-shadow: 0 0 0 .15rem rgba(0,123,255,.2); }
+    </style>
 </head>
 
 <body>
@@ -133,7 +171,27 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
             <input type="checkbox" name="user_position" value="1">&nbsp;Enable</label>
 			<br/>
 			<style type="text/css"> .hidden {display: none;}</style>
-												
+
+<label class="form-label">Assign Location</label>
+<div class="lp-wrapper" id="locationPickerWrapper">
+    <div class="lp-control" id="locationPickerControl">
+        <div class="lp-value" id="lpValue">
+            <span class="lp-placeholder">Select locations&hellip;</span>
+        </div>
+        <div class="lp-arrow"><i class="material-icons" style="font-size:18px;color:#999;">arrow_drop_down</i></div>
+    </div>
+    <div class="lp-panel" id="locationPanel" style="display:none;">
+        <div class="lp-search-box">
+            <i class="material-icons" style="font-size:18px;color:#aaa;">search</i>
+            <input type="text" id="lpSearchInput" placeholder="Search locations&hellip;" autocomplete="off">
+        </div>
+        <div class="lp-body" id="lpBody"><div class="lp-loading">Loading&hellip;</div></div>
+    </div>
+</div>
+<div id="lpHiddenInputs"></div>
+<small class="text-muted">Already-assigned locations are shown locked and cannot be selected.</small>
+<br/><br/>
+
 <button type="submit" name="add-customer" class="btn btn-primary"><i class="material-icons">add</i>Add</button>
 												
                                             </div>
@@ -161,6 +219,129 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
     <script src="../../assets/plugins/highlight/highlight.pack.js"></script>
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
+
+    <script>
+    (function ($) {
+        var allNodes = [];
+        var selected = [];
+        var open     = false;
+        var loaded   = false;
+
+        function escHtml(str) { return $('<div>').text(str).html(); }
+
+        function isSelected(id) {
+            for (var i = 0; i < selected.length; i++) { if (selected[i].id === id) return true; }
+            return false;
+        }
+
+        function toggleSelect(node) {
+            var idx = -1;
+            for (var i = 0; i < selected.length; i++) { if (selected[i].id === node.id) { idx = i; break; } }
+            if (idx >= 0) { selected.splice(idx, 1); } else { selected.push({ id: node.id, name: node.name }); }
+            renderChips();
+            renderList($.trim($('#lpSearchInput').val()));
+            updateHiddenInputs();
+        }
+
+        function renderList(q) {
+            var $body = $('#lpBody').empty();
+            var nodes = allNodes;
+            if (q) {
+                var ql = q.toLowerCase();
+                nodes = nodes.filter(function (n) { return n.name.toLowerCase().indexOf(ql) >= 0; });
+            }
+            if (nodes.length === 0) {
+                $body.html('<div class="lp-empty">' + (q ? 'No results for "' + escHtml(q) + '".' : 'No locations available. Ask admin to enable "Marketing Staff Filter" on a Location Layer.') + '</div>');
+                return;
+            }
+            var curLayer = null;
+            $.each(nodes, function (_, node) {
+                if (node.layer_name && node.layer_name !== curLayer) {
+                    curLayer = node.layer_name;
+                    $body.append('<div style="padding:5px 14px 4px;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid #f0f0f0;">' + escHtml(curLayer) + '</div>');
+                }
+                var $row = $('<div class="lp-row"></div>');
+                if (node.is_taken) {
+                    $row.addClass('lp-row-taken');
+                    $row.append('<i class="material-icons lp-lock" style="font-size:16px;">lock</i>');
+                    $row.append($('<span>').text(node.name));
+                } else if (isSelected(node.id)) {
+                    $row.addClass('lp-row-selectable lp-row-selected');
+                    $row.append('<i class="material-icons lp-check" style="font-size:16px;">check</i>');
+                    $row.append($('<span>').text(node.name));
+                    $row.on('click', function () { toggleSelect(node); });
+                } else {
+                    $row.addClass('lp-row-selectable');
+                    $row.append($('<span>').text(node.name));
+                    $row.on('click', function () { toggleSelect(node); });
+                }
+                $body.append($row);
+            });
+        }
+
+        function renderChips() {
+            var $val = $('#lpValue').empty();
+            if (selected.length === 0) { $val.html('<span class="lp-placeholder">Select locations&hellip;</span>'); return; }
+            $.each(selected, function (_, s) {
+                var $chip = $('<span class="lp-chip"></span>');
+                $chip.append($('<span>').text(s.name));
+                var $x = $('<span class="lp-chip-remove">&times;</span>');
+                $x.on('click', function (e) {
+                    e.stopPropagation();
+                    selected = selected.filter(function (r) { return r.id !== s.id; });
+                    renderChips();
+                    renderList($.trim($('#lpSearchInput').val()));
+                    updateHiddenInputs();
+                });
+                $chip.append($x);
+                $val.append($chip);
+            });
+        }
+
+        function updateHiddenInputs() {
+            var $c = $('#lpHiddenInputs').empty();
+            $.each(selected, function (_, s) { $c.append('<input type="hidden" name="location_ids[]" value="' + s.id + '">'); });
+        }
+
+        function loadNodes() {
+            $('#lpBody').html('<div class="lp-loading">Loading&hellip;</div>');
+            $.getJSON('get-ms-flat-nodes.php?exclude_ms_id=0', function (nodes) {
+                allNodes = nodes;
+                loaded = true;
+                renderList($.trim($('#lpSearchInput').val()));
+            }).fail(function () {
+                $('#lpBody').html('<div class="lp-empty">Failed to load. Please try again.</div>');
+            });
+        }
+
+        $('#locationPanel').on('click', function (e) { e.stopPropagation(); });
+
+        $('#locationPickerControl').on('click', function (e) {
+            e.stopPropagation();
+            if (!open) {
+                open = true;
+                $('#locationPickerControl').addClass('open');
+                $('#locationPanel').show();
+                if (!loaded) loadNodes();
+                setTimeout(function () { $('#lpSearchInput').focus(); }, 50);
+            } else {
+                open = false;
+                $('#locationPickerControl').removeClass('open');
+                $('#locationPanel').hide();
+            }
+        });
+
+        $(document).on('click', function () {
+            if (open) {
+                open = false;
+                $('#locationPickerControl').removeClass('open');
+                $('#locationPanel').hide();
+            }
+        });
+
+        $('#lpSearchInput').on('input', function () { renderList($.trim($(this).val())); });
+    })(jQuery);
+    </script>
 </body>
 
 </html>
