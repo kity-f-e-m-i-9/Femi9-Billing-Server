@@ -110,7 +110,18 @@ function dw_parse_date($val) {
         }
     }
 
-    foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd-M-y', 'd-M-Y', 'd.m.Y', 'M-d-Y'] as $fmt) {
+    // Day-first only, strictly — d/m/Y and d-m-Y (leading zeros optional on
+    // either side: DateTime::createFromFormat's 'd'/'m' accept both "6" and
+    // "06"), plus ISO Y-m-d and month-name forms, none of which are
+    // ambiguous either way. Deliberately no 'M-d-Y' and no strtotime()
+    // fallback: PHP's strtotime() treats a slash-separated date as
+    // American month/day/year specifically (it's documented behavior, not
+    // a bug), which silently turned "6/10/2025" (6 Oct 2025) into 10 June
+    // 2025 whenever the stricter formats above didn't match first. A date
+    // that doesn't match one of these day-first patterns is now treated as
+    // unparseable and the row is skipped (and counted in the upload's
+    // "skipped" warning) rather than guessed.
+    foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'Y/m/d', 'd-M-y', 'd-M-Y', 'd.m.Y'] as $fmt) {
         $dt = DateTime::createFromFormat($fmt, $val);
         if ($dt !== false) {
             $errors = DateTime::getLastErrors();
@@ -120,8 +131,7 @@ function dw_parse_date($val) {
         }
     }
 
-    $ts = strtotime($val);
-    return $ts !== false ? date('Y-m-d', $ts) : null;
+    return null;
 }
 
 try {
