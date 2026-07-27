@@ -36,7 +36,20 @@ $update_id=$_REQUEST['update_id'];
 	$address=RemoveSpecialChar($address);
 	
 	$google_location=str_replace("'","&#39;",$_POST["google_location"]);
-	
+
+	$latitude=isset($_POST["latitude"]) && $_POST["latitude"]!=='' ? floatval($_POST["latitude"]) : null;
+	$longitude=isset($_POST["longitude"]) && $_POST["longitude"]!=='' ? floatval($_POST["longitude"]) : null;
+	if($latitude===null || $longitude===null)
+	{
+		$select_existing_latlng="select latitude, longitude from ms_shop where id='$update_id'";
+		$fetch_existing_latlng=mysqli_query($db_conn,$select_existing_latlng);
+		$existing_latlng=mysqli_fetch_assoc($fetch_existing_latlng);
+		if($latitude===null) { $latitude=$existing_latlng['latitude']; }
+		if($longitude===null) { $longitude=$existing_latlng['longitude']; }
+	}
+	$latitude_sql=$latitude===null ? "NULL" : "'".$latitude."'";
+	$longitude_sql=$longitude===null ? "NULL" : "'".$longitude."'";
+
 	//upload user icon
 	$small_jpg= $_FILES['user_icon']['name'];
 	if($small_jpg!=NULL)
@@ -74,7 +87,8 @@ $insfilename=$old_icon;
 	$update_ss="update ms_shop set user_icon='$insfilename',name='$name',
 	state_name='$state_name',district_name='$district_name',taluk_name='$taluk_name',
 	pincode='$pincode',email='$email',gstin='$gstin',address='$address',shop_cat='$shop_cat',
-country_code='$country_code',landline='$landline',google_location='$google_location' where id='$update_id'";
+country_code='$country_code',landline='$landline',google_location='$google_location',
+latitude=$latitude_sql,longitude=$longitude_sql where id='$update_id'";
 	mysqli_query($db_conn,$update_ss);
 	
 	echo "<script>window.location='manage_ss.php?updatedSuccess';</script>";

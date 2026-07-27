@@ -14,8 +14,12 @@ if (isset($_REQUEST['add_order_get'])) {
 	
 	$marketing_tool=$_POST["marketing_tool"];
 	$marketing_tool=RemoveSpecialChar($marketing_tool);
-	
-	
+
+	$latitude=isset($_POST["latitude"]) && $_POST["latitude"]!=='' ? floatval($_POST["latitude"]) : null;
+	$longitude=isset($_POST["longitude"]) && $_POST["longitude"]!=='' ? floatval($_POST["longitude"]) : null;
+	$latitude_sql=$latitude===null ? "NULL" : "'".$latitude."'";
+	$longitude_sql=$longitude===null ? "NULL" : "'".$longitude."'";
+
 	$product_id = implode("#",$_REQUEST['pr_id']);
 $qty = implode("#",$_REQUEST['qty']);
 	
@@ -38,8 +42,8 @@ $result_count_dist=mysqli_fetch_array($fetc_count_dist);
 if($result_count_dist['numShop']==0)
 	{
 	
-        $sql="insert into ms_orders (order_id,shop_id,ms_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty) values ('$order_id','$shop_id','$ms_id','$order_date','yes','nil','$marketing_tool',
-		'$product_id_value','$qty_value')";
+        $sql="insert into ms_orders (order_id,shop_id,ms_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,latitude,longitude) values ('$order_id','$shop_id','$ms_id','$order_date','yes','nil','$marketing_tool',
+		'$product_id_value','$qty_value',$latitude_sql,$longitude_sql)";
 		mysqli_query($db_conn,$sql);
 
 	}

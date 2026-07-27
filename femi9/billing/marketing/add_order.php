@@ -34,7 +34,7 @@ $districtSet = [];
 if (!empty($markeingSTFID)) {
     $msid_esc = mysqli_real_escape_string($db_conn, $markeingSTFID);
     $r = mysqli_query($db_conn,
-        "SELECT id, name, district_name, taluk_name
+        "SELECT id, name, district_name, taluk_name, latitude, longitude
          FROM ms_shop
          WHERE ms_id = '$msid_esc'
          ORDER BY district_name ASC, taluk_name ASC, name ASC"
@@ -192,6 +192,8 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                             <input type="hidden" name="ms_id"      value="<?=htmlspecialchars($markeingSTFID)?>">
                                             <input type="hidden" name="order_date" value="<?=htmlspecialchars($order_date)?>">
                                             <input type="hidden" name="order_id"   value="<?=htmlspecialchars($tempID)?>">
+                                            <input type="hidden" name="latitude"   id="order_latitude"  value="">
+                                            <input type="hidden" name="longitude" id="order_longitude" value="">
 
                                             <div class="example-container">
                                                 <div class="example-content">
@@ -217,11 +219,14 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                         <?php foreach($shopList as $s): ?>
                                                         <option value="<?=htmlspecialchars($s['id'])?>"
                                                                 data-district="<?=htmlspecialchars($s['district_name'])?>"
-                                                                data-taluk="<?=htmlspecialchars($s['taluk_name'])?>">
+                                                                data-taluk="<?=htmlspecialchars($s['taluk_name'])?>"
+                                                                data-lat="<?=htmlspecialchars($s['latitude'])?>"
+                                                                data-lng="<?=htmlspecialchars($s['longitude'])?>">
                                                             <?=htmlspecialchars($s['name'])?> (<?=htmlspecialchars($s['taluk_name'])?>)
                                                         </option>
                                                         <?php endforeach; ?>
                                                     </select>
+                                                    <div id="shopDistanceInfo" style="margin-top:4px; font-size:13px; color:#555;"></div>
                                                     <br/>
 
                                                     <label class="form-label">Order Date*</label>
@@ -332,7 +337,9 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
             id:       opt.value,
             text:     opt.textContent.trim(),
             district: opt.getAttribute('data-district'),
-            taluk:    opt.getAttribute('data-taluk')
+            taluk:    opt.getAttribute('data-taluk'),
+            lat:      opt.getAttribute('data-lat'),
+            lng:      opt.getAttribute('data-lng')
         });
     });
 
@@ -374,6 +381,8 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                         value:           s.id,
                         'data-district': s.district,
                         'data-taluk':    s.taluk,
+                        'data-lat':      s.lat,
+                        'data-lng':      s.lng,
                         text:            s.text
                     })
                 );
@@ -383,7 +392,131 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         select.trigger('change.select2');
         select.val('').trigger('change');
     }
+
+    // ── Auto-capture device location on the Get Order form ──────────────────
+    (function() {
+        var latField = document.getElementById('order_latitude');
+        var lngField = document.getElementById('order_longitude');
+        if (!latField || !lngField) { return; } // Not the Get Order form
+
+        var capturedLat = null;
+        var capturedLng = null;
+        var capturedPlaceName = null;
+
+        function showToast(lines) {
+            var toast = document.createElement('div');
+            toast.className = 'location-toast';
+            lines.forEach(function(line, idx) {
+                var lineEl = document.createElement('div');
+                if (idx === 0) { lineEl.style.fontWeight = '600'; lineEl.style.marginBottom = '4px'; }
+                lineEl.textContent = line;
+                toast.appendChild(lineEl);
+            });
+            document.body.appendChild(toast);
+            requestAnimationFrame(function() { toast.classList.add('location-toast-visible'); });
+            setTimeout(function() {
+                toast.classList.remove('location-toast-visible');
+                setTimeout(function() { toast.remove(); }, 300);
+            }, 4000);
+        }
+
+        // Reuses the same server-side Google Geocoding proxy used on the Add Shop page.
+        function reverseGeocodeToName(lat, lng) {
+            var url = 'reverse-geocode.php?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng);
+            return fetch(url, { headers: { 'Accept': 'application/json' } })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data && data.error) { throw new Error(data.error); }
+                    return (data && data.name) ? data.name : (lat + ', ' + lng);
+                });
+        }
+
+        // Haversine distance in meters
+        function distanceMeters(lat1, lng1, lat2, lng2) {
+            var R = 6371000;
+            var dLat = (lat2 - lat1) * Math.PI / 180;
+            var dLng = (lng2 - lng1) * Math.PI / 180;
+            var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function updateShopDistance(andShowToast) {
+            var infoEl = document.getElementById('shopDistanceInfo');
+            if (!infoEl || capturedLat === null || capturedLng === null) { return; }
+
+            var selected = document.getElementById('shop_select');
+            var opt = selected ? selected.options[selected.selectedIndex] : null;
+            var shopLat = opt ? parseFloat(opt.getAttribute('data-lat')) : NaN;
+            var shopLng = opt ? parseFloat(opt.getAttribute('data-lng')) : NaN;
+
+            if (!opt || !opt.value || isNaN(shopLat) || isNaN(shopLng)) {
+                infoEl.textContent = '';
+                return;
+            }
+
+            var meters = distanceMeters(capturedLat, capturedLng, shopLat, shopLng);
+            var distText = meters >= 1000 ? (meters / 1000).toFixed(2) + ' km' : Math.round(meters) + ' m';
+            var distLine = '🏬 ' + distText + ' away from this shop\'s saved location';
+            infoEl.textContent = '📍 ' + distText + ' away from this shop\'s saved location';
+
+            if (andShowToast) {
+                var lines = capturedPlaceName ? ['📍 ' + capturedPlaceName, distLine] : [distLine];
+                showToast(lines);
+            }
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    capturedLat = position.coords.latitude;
+                    capturedLng = position.coords.longitude;
+                    latField.value = capturedLat;
+                    lngField.value = capturedLng;
+
+                    reverseGeocodeToName(capturedLat, capturedLng)
+                        .then(function(name) {
+                            capturedPlaceName = name;
+                            showToast(['📍 ' + name]);
+                        })
+                        .catch(function() {
+                            showToast(['📍 Location captured (' + capturedLat.toFixed(5) + ', ' + capturedLng.toFixed(5) + ')']);
+                        });
+
+                    updateShopDistance(false);
+                },
+                function() {
+                    // Permission denied / unavailable — order still proceeds without location
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        $('#shop_select').on('change', function() { updateShopDistance(true); });
+    })();
     </script>
+
+    <style>
+        .location-toast {
+            position: fixed;
+            top: 20px;
+            right: -320px;
+            max-width: 280px;
+            background: #323232;
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            z-index: 99999;
+            transition: right 0.3s ease;
+        }
+        .location-toast-visible {
+            right: 20px;
+        }
+    </style>
 
 </body>
 </html>

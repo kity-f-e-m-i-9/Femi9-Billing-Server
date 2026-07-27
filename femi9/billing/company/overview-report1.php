@@ -39,7 +39,7 @@ function sanitizeString(mixed $value, string $default = ''): string
 
 const ALLOWED_CATEGORIES = [
     '', 'super_stockiest', 'stockiest', 'distributor',
-    'super_distributor', 'customer', 'shop', 'outlet',
+    'super_distributor', 'customer', 'shop', 'outlet', 'territory_partner',
 ];
 
 const USER_TYPE_LABELS = [
@@ -49,6 +49,7 @@ const USER_TYPE_LABELS = [
     'distributor'       => 'Distributor',
     'outlet'            => 'Outlet',
     'shop'              => 'Shop',
+    'territory_partner' => 'Territory Partner',
 ];
 
 const ROWS_PER_PAGE = 30;
@@ -188,7 +189,22 @@ if (empty($selectedCategory) || $selectedCategory === 'customer') {
     $stmt->close();
 }
 
-$totalRows  = $totalUserInvoices + $totalCustomerInvoices;
+// Territory Partner invoices raised by the Company login itself (not by an SS
+// acting on the TP's behalf) — mirrors created_by_user_type used elsewhere.
+$totalTpInvoices = 0;
+if (empty($selectedCategory) || $selectedCategory === 'territory_partner') {
+    $stmt = $db_conn->prepare(
+        "SELECT COUNT(*) AS cnt FROM tp_invoices
+         WHERE invoice_date BETWEEN ? AND ? AND created_by_user_type = 'company' AND total_amount > 0
+           AND source_godown_id IN (" . godown_ids_subquery($db_conn) . ")"
+    );
+    $stmt->bind_param('ss', $fromDate, $toDate);
+    $stmt->execute();
+    $totalTpInvoices = (int)$stmt->get_result()->fetch_assoc()['cnt'];
+    $stmt->close();
+}
+
+$totalRows  = $totalUserInvoices + $totalCustomerInvoices + $totalTpInvoices;
 $totalPages = max(1, (int)ceil($totalRows / $recordsPerPage));
 $currentPage = min($currentPage, $totalPages);
 
@@ -207,6 +223,13 @@ $custOffset = 0; $custLimit = 0;
 if ($remaining > 0) {
     $custOffset = max(0, $globalOffset - $totalUserInvoices);
     $custLimit  = min($remaining, $totalCustomerInvoices - $custOffset);
+    $remaining -= $custLimit;
+}
+
+$tpOffset = 0; $tpLimit = 0;
+if ($remaining > 0) {
+    $tpOffset = max(0, $globalOffset - $totalUserInvoices - $totalCustomerInvoices);
+    $tpLimit  = min($remaining, $totalTpInvoices - $tpOffset);
 }
 
 // ─── Fetch page rows ──────────────────────────────────────────────────────────
@@ -242,6 +265,21 @@ if ($custLimit > 0) {
     $stmt->bind_param('sssii', $fromDate, $toDate, $Login_user_TYPEvl, $custLimit, $custOffset);
     $stmt->execute();
     $customerInvoices = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+}
+
+$tpInvoices = [];
+if ($tpLimit > 0) {
+    $sql = "SELECT id AS inv_id, invoice_number AS inv_number, invoice_date AS date, total_amount AS total,
+                   territory_partner_id, source_godown_id
+            FROM tp_invoices
+            WHERE invoice_date BETWEEN ? AND ? AND created_by_user_type = 'company' AND total_amount > 0
+              AND source_godown_id IN (" . godown_ids_subquery($db_conn) . ")
+            ORDER BY id ASC LIMIT ? OFFSET ?";
+    $stmt = $db_conn->prepare($sql);
+    $stmt->bind_param('ssii', $fromDate, $toDate, $tpLimit, $tpOffset);
+    $stmt->execute();
+    $tpInvoices = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 }
 
@@ -289,11 +327,28 @@ if (!empty($customerInvoices)) {
     $stmt->close();
 }
 
+$tpInvItems = [];
+if (!empty($tpInvoices)) {
+    $ids          = array_column($tpInvoices, 'inv_id');
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt         = $db_conn->prepare(
+        "SELECT tp_invoice_id, product_id, quantity FROM tp_invoice_items WHERE tp_invoice_id IN ($placeholders)"
+    );
+    $stmt->bind_param(str_repeat('i', count($ids)), ...$ids);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $tpInvItems[$row['tp_invoice_id']][$row['product_id']] = $row['quantity'];
+    }
+    $stmt->close();
+}
+
 // ─── Companies for this page ──────────────────────────────────────────────────
 $companies  = [];
 $companyIds = array_unique(array_merge(
     array_column($userInvoices, 'from_user_id'),
-    array_column($customerInvoices, 'user_id')
+    array_column($customerInvoices, 'user_id'),
+    array_filter(array_column($tpInvoices, 'source_godown_id'))
 ));
 if (!empty($companyIds)) {
     $placeholders = implode(',', array_fill(0, count($companyIds), '?'));
@@ -360,6 +415,23 @@ if (!empty($custIds)) {
     $stmt->close();
 }
 
+// ─── Territory Partner names ─────────────────────────────────────────────────
+$tpNames = [];
+$tpIds   = array_unique(array_column($tpInvoices, 'territory_partner_id'));
+if (!empty($tpIds)) {
+    $placeholders = implode(',', array_fill(0, count($tpIds), '?'));
+    $stmt         = $db_conn->prepare(
+        "SELECT id, name, mobile FROM territory_partners WHERE id IN ($placeholders)"
+    );
+    $stmt->bind_param(str_repeat('i', count($tpIds)), ...$tpIds);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $tpNames[$row['id']] = ['name' => $row['name'], 'mobile' => $row['mobile']];
+    }
+    $stmt->close();
+}
+
 // ─── Grand total (full range, not just page) ──────────────────────────────────
 $grandTotal = 0.0;
 if ($selectedCategory !== 'customer') {
@@ -380,6 +452,17 @@ if (empty($selectedCategory) || $selectedCategory === 'customer') {
          WHERE date BETWEEN ? AND ? AND user_type = ? AND sub_total > 0"
     );
     $stmt->bind_param('sss', $fromDate, $toDate, $Login_user_TYPEvl);
+    $stmt->execute();
+    $grandTotal += (float)$stmt->get_result()->fetch_assoc()['s'];
+    $stmt->close();
+}
+if (empty($selectedCategory) || $selectedCategory === 'territory_partner') {
+    $stmt = $db_conn->prepare(
+        "SELECT COALESCE(SUM(total_amount),0) AS s FROM tp_invoices
+         WHERE invoice_date BETWEEN ? AND ? AND created_by_user_type = 'company' AND total_amount > 0
+           AND source_godown_id IN (" . godown_ids_subquery($db_conn) . ")"
+    );
+    $stmt->bind_param('ss', $fromDate, $toDate);
     $stmt->execute();
     $grandTotal += (float)$stmt->get_result()->fetch_assoc()['s'];
     $stmt->close();
@@ -660,6 +743,7 @@ if ($search !== '') {
                                                         'super_distributor' => 'Super Distributor',
                                                         'customer'          => 'Customer',
                                                         'shop'              => 'Shop',
+                                                        'territory_partner' => 'Territory Partner',
                                                     ] as $val => $lbl): ?>
                                                         <option value="<?= e($val) ?>"
                                                             <?= $selectedCategory === $val ? 'selected' : '' ?>>
@@ -864,6 +948,42 @@ if ($search !== '') {
                                                     <td><?= e($cmpName) ?></td>
                                                     <td><?= e($inv['inv_number']) ?></td>
                                                     <td>Customer</td>
+                                                    <td>
+                                                        <strong><?= e($custName) ?></strong><br>
+                                                        <small class="text-muted"><b>M:</b> <?= e($custMob) ?></small>
+                                                    </td>
+                                                    <td><?= e(date('d/M/Y', strtotime($inv['date']))) ?></td>
+                                                    <td align="right"><strong>₹<?= inr_format((float)$inv['total'], 2) ?></strong></td>
+                                                    <?php foreach ($productIds as $pid):
+                                                        $qty = (int)($invItems[$pid] ?? 0);
+                                                        $productPageTotals[$pid] += $qty;
+                                                    ?>
+                                                        <td align="center" class="product-col">
+                                                            <?php if ($qty > 0): ?>
+                                                                <strong><?= $qty ?></strong>
+                                                            <?php else: ?>
+                                                                <span style="color:#ccc">–</span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                    <?php endforeach; ?>
+                                                </tr>
+                                                <?php endforeach; ?>
+
+                                                <?php
+                                                // ── Territory Partner Rows ─────────────────────────
+                                                foreach ($tpInvoices as $inv):
+                                                    $tpRow    = $tpNames[$inv['territory_partner_id']] ?? [];
+                                                    $custName = $tpRow['name']   ?? 'Unknown';
+                                                    $custMob  = $tpRow['mobile'] ?? '';
+                                                    $cmpName  = $companies[(int)$inv['source_godown_id']] ?? '';
+                                                    $invItems  = $tpInvItems[$inv['inv_id']] ?? [];
+                                                    $pageTotal += (float)$inv['total'];
+                                                ?>
+                                                <tr>
+                                                    <td><?= $rowNum++ ?></td>
+                                                    <td><?= e($cmpName) ?></td>
+                                                    <td><?= e($inv['inv_number']) ?></td>
+                                                    <td>Territory Partner</td>
                                                     <td>
                                                         <strong><?= e($custName) ?></strong><br>
                                                         <small class="text-muted"><b>M:</b> <?= e($custMob) ?></small>

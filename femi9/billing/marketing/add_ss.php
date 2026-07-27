@@ -126,8 +126,8 @@ $message_title="Shop (Retailers)";
 	<br/>
 	
 	<label for="exampleInputEmail1" class="form-label">Pincode*</label>
-	<input type="text" name="pincode" class="form-control" required="" onkeypress="restrictpincode(event)" maxlength="15">
-<br/>								
+	<input type="text" id="pincode" name="pincode" class="form-control" required="" onkeypress="restrictpincode(event)" maxlength="15">
+<br/>
 			
 <style>
         .form-group {
@@ -173,15 +173,25 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
             <textarea name="address" onkeypress="restrictSpecialChars(event)" class="form-control" required=""></textarea>
 			<br/>
 			
-			<label class="form-label">Google Location (URL)</label>
-            <textarea name="google_location" onkeypress="restrictSpecialChars(event)" class="form-control"></textarea>
+			<label class="form-label">Google Location</label>
+            <textarea name="google_location" id="google_location" class="form-control" readonly placeholder="Click 'Capture My Location' below"></textarea>
+			<input type="hidden" name="captured_postcode" id="captured_postcode" value="">
+			<input type="hidden" name="latitude" id="latitude" value="">
+			<input type="hidden" name="longitude" id="longitude" value="">
+			<div style="margin-top:8px;">
+				<button type="button" id="captureLocationBtn" class="btn btn-secondary btn-sm">
+					<i class="material-icons" style="font-size:16px; vertical-align:middle;">my_location</i> Capture My Location
+				</button>
+				<span id="captureLocationStatus" style="margin-left:8px; font-size:13px;"></span>
+			</div>
+			<div id="latLngDisplay" style="margin-top:6px; font-size:13px; color:#333;"></div>
 			<br/>
 			
 			<label class="form-label">GST Number</label>
             <input type="text" onkeypress="restrictGSTIN(event)" name="gstin" class="form-control">
 			<br/>
 			
-	<button type="submit" name="add-shop" onclick="return confirm('Please make a confirm');" class="btn btn-primary">
+	<button type="submit" name="add-shop" class="btn btn-primary">
 	<i class="material-icons">add</i>Add</button>
 												
                                             </div>
@@ -210,6 +220,88 @@ function validateFile(file) {
         return;
     }
 }
+
+// Reverse-geocodes lat/lng into a human-readable place name + postcode via our server-side
+// endpoint, which calls the Google Geocoding API (key stays server-side, never exposed to the browser).
+function reverseGeocodeToName(lat, lng) {
+    const url = 'reverse-geocode.php?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng);
+    return fetch(url, { headers: { 'Accept': 'application/json' } })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data && data.error) { throw new Error(data.error); }
+            return {
+                name: (data && data.name) ? data.name : (lat + ', ' + lng),
+                postcode: (data && data.postcode) ? data.postcode : ''
+            };
+        });
+}
+
+document.getElementById('captureLocationBtn').addEventListener('click', function() {
+    const statusEl = document.getElementById('captureLocationStatus');
+    const locationField = document.getElementById('google_location');
+    const postcodeField = document.getElementById('captured_postcode');
+    const latField = document.getElementById('latitude');
+    const lngField = document.getElementById('longitude');
+    const latLngDisplay = document.getElementById('latLngDisplay');
+    const btn = this;
+
+    if (!navigator.geolocation) {
+        statusEl.textContent = 'Geolocation is not supported on this device/browser.';
+        statusEl.style.color = 'red';
+        return;
+    }
+
+    btn.disabled = true;
+    statusEl.textContent = 'Fetching location... please allow location access.';
+    statusEl.style.color = '#555';
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            latField.value = lat;
+            lngField.value = lng;
+            latLngDisplay.textContent = 'Lat: ' + lat.toFixed(6) + ', Lng: ' + lng.toFixed(6) + ' (accuracy: ±' + Math.round(accuracy) + 'm)';
+            statusEl.textContent = 'Location found, resolving address...';
+            reverseGeocodeToName(lat, lng)
+                .then(function(result) {
+                    locationField.value = result.name;
+                    postcodeField.value = result.postcode;
+                    statusEl.textContent = 'Location captured successfully.';
+                    statusEl.style.color = 'green';
+                    btn.disabled = false;
+                })
+                .catch(function() {
+                    locationField.value = lat + ', ' + lng;
+                    postcodeField.value = '';
+                    statusEl.textContent = 'Location captured (address lookup failed, saved coordinates).';
+                    statusEl.style.color = 'orange';
+                    btn.disabled = false;
+                });
+        },
+        function(error) {
+            let msg = 'Unable to fetch location.';
+            if (error.code === error.PERMISSION_DENIED) {
+                msg = 'Location permission denied. Please allow location access and try again.';
+            } else if (error.code === error.POSITION_UNAVAILABLE) {
+                msg = 'Location unavailable. Please try again.';
+            } else if (error.code === error.TIMEOUT) {
+                msg = 'Location request timed out. Please try again.';
+            }
+            statusEl.textContent = msg;
+            statusEl.style.color = 'red';
+            btn.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+});
+
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    if (!confirm('Please make a confirm')) {
+        e.preventDefault();
+    }
+});
 </script>
 
                                     </div>
