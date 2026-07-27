@@ -36,7 +36,27 @@ if(isset($_REQUEST['add-customer']))
 		values ('$ms_name','$ms_mobile','$password','$ms_email','$ms_address',
 		'$country_code','active','$user_position')";
 		mysqli_query($db_conn,$insert_products);
-		
+		$new_ms_id = mysqli_insert_id($db_conn);
+
+		if ($new_ms_id && !empty($_POST['location_ids']) && is_array($_POST['location_ids'])) {
+			$db_conn->query("CREATE TABLE IF NOT EXISTS marketing_staff_locations (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				ms_id INT NOT NULL,
+				location_id INT NOT NULL,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE KEY uk_ms_location (ms_id, location_id)
+			)");
+			$stmt_loc = $db_conn->prepare("INSERT IGNORE INTO marketing_staff_locations (ms_id, location_id) VALUES (?, ?)");
+			foreach ($_POST['location_ids'] as $loc_id) {
+				$loc_id = (int)$loc_id;
+				if ($loc_id > 0) {
+					$stmt_loc->bind_param('ii', $new_ms_id, $loc_id);
+					$stmt_loc->execute();
+				}
+			}
+			$stmt_loc->close();
+		}
+
 		echo "<script>window.location='ms_manage?addesuccess';</script>";
 		exit;
 	}else{
@@ -62,12 +82,36 @@ if(isset($_REQUEST['update-customer']))
 	
 	$ms_address=str_replace("'","&#39;",$_REQUEST['ms_address']);
 	$ms_address = RemoveSpecialChar($ms_address);
-	$user_position=$_REQUEST['user_position'];
+	$user_position = isset($_REQUEST['user_position']) ? 1 : 0;
 	
 	$update_products="update marketing_staff set ms_name='$ms_name',ms_email='$ms_email',
 	ms_address='$ms_address',country_code='$country_code',user_position='$user_position' where id='$update_id'";
 	mysqli_query($db_conn,$update_products);
-		
+
+		$db_conn->query("CREATE TABLE IF NOT EXISTS marketing_staff_locations (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			ms_id INT NOT NULL,
+			location_id INT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE KEY uk_ms_location (ms_id, location_id)
+		)");
+		$update_id_int = (int)$update_id;
+		$stmt_del_loc = $db_conn->prepare("DELETE FROM marketing_staff_locations WHERE ms_id=?");
+		$stmt_del_loc->bind_param('i', $update_id_int);
+		$stmt_del_loc->execute();
+		$stmt_del_loc->close();
+		if (!empty($_POST['location_ids']) && is_array($_POST['location_ids'])) {
+			$stmt_loc = $db_conn->prepare("INSERT IGNORE INTO marketing_staff_locations (ms_id, location_id) VALUES (?, ?)");
+			foreach ($_POST['location_ids'] as $loc_id) {
+				$loc_id = (int)$loc_id;
+				if ($loc_id > 0) {
+					$stmt_loc->bind_param('ii', $update_id_int, $loc_id);
+					$stmt_loc->execute();
+				}
+			}
+			$stmt_loc->close();
+		}
+
 		echo "<script>window.location='ms_manage?updatedSuccess';</script>";
 		exit;
 	

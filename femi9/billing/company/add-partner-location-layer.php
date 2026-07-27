@@ -126,6 +126,14 @@ $next_depth = $stmt_mx ? (int)$stmt_mx->fetch_assoc()['next_depth'] : 1;
                                                     <small class="text-muted">Mark if this layer should appear as a filter option in TP pages.</small>
                                                 </div>
 
+                                                <div class="mb-3">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="is_ms_filter_enabled" id="is_ms_filter_enabled" value="1">
+                                                        <label class="form-check-label" for="is_ms_filter_enabled">Marketing Staff Filter Enabled</label>
+                                                    </div>
+                                                    <small class="text-muted">Mark if this layer should appear as a filter option in Marketing Staff location assignment.</small>
+                                                </div>
+
                                                 <br>
                                                 <button type="submit" name="insert-partner-location-layer" class="btn btn-primary">
                                                     <i class="material-icons">add</i> Add Layer

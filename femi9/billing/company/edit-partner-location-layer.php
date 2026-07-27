@@ -18,7 +18,12 @@ if ($_chk && $_chk->num_rows === 0) {
     $db_conn->query("ALTER TABLE partner_location_layers ADD COLUMN is_stock_location TINYINT(1) NOT NULL DEFAULT 1 AFTER layer_name");
 }
 
-$stmt_l = $db_conn->prepare("SELECT id, depth, layer_name, is_stock_location, is_cp_filter_enabled, is_tp_filter_enabled FROM partner_location_layers WHERE id = ?");
+$_chkMs = $db_conn->query("SHOW COLUMNS FROM partner_location_layers LIKE 'is_ms_filter_enabled'");
+if ($_chkMs && $_chkMs->num_rows === 0) {
+    $db_conn->query("ALTER TABLE partner_location_layers ADD COLUMN is_ms_filter_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER is_tp_filter_enabled");
+}
+
+$stmt_l = $db_conn->prepare("SELECT id, depth, layer_name, is_stock_location, is_cp_filter_enabled, is_tp_filter_enabled, is_ms_filter_enabled FROM partner_location_layers WHERE id = ?");
 $stmt_l->bind_param("i", $layer_id);
 $stmt_l->execute();
 $layer = $stmt_l->get_result()->fetch_assoc();
@@ -136,6 +141,15 @@ if (!$layer) {
                                                         <label class="form-check-label" for="is_tp_filter_enabled">TP Filter Enabled</label>
                                                     </div>
                                                     <small class="text-muted">Mark if this layer should appear as a filter option in TP pages.</small>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="is_ms_filter_enabled" id="is_ms_filter_enabled" value="1"
+                                                               <?php echo $layer['is_ms_filter_enabled'] ? 'checked' : ''; ?>>
+                                                        <label class="form-check-label" for="is_ms_filter_enabled">Marketing Staff Filter Enabled</label>
+                                                    </div>
+                                                    <small class="text-muted">Mark if this layer should appear as a filter option in Marketing Staff location assignment.</small>
                                                 </div>
 
                                                 <br>
