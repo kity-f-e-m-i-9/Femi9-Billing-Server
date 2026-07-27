@@ -559,6 +559,105 @@ $grand_total_net_qty = 0;
 $grand_total_net_pieces = 0;
 $selected_entity_name = 'All Visible Entities';
 if ($scope === 'company') {
+    // Self-migrating: this block is the only thing standing between a
+    // neksomo login and dashboard.php's `include("mis-report.php")` — with
+    // error_reporting(0) above, any of these tables/columns missing turns
+    // into a silent white screen (query returns false, ->fetch_all() on
+    // false is a fatal error) instead of a visible error. Every table below
+    // is otherwise only created by a specific management page being visited
+    // at least once (neksomo-product-map-list.php, expense-tracker.php) or
+    // by manually running a db_migrations/*.sql file — neither is guaranteed
+    // to have happened in every environment, so this report has to be able
+    // to provision its own dependencies rather than assume they exist.
+    require_once("include/NeksomoProductMapping.php");
+    ensure_neksomo_product_mapping_table($db_conn);
+
+    $db_conn->query("
+        CREATE TABLE IF NOT EXISTS pl_godown_transfers (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            transfer_type ENUM('godown_to_location','location_to_godown') NOT NULL,
+            godown_id INT NOT NULL,
+            location_id INT UNSIGNED DEFAULT NULL,
+            cp_id INT UNSIGNED DEFAULT NULL,
+            transfer_date DATE NOT NULL,
+            ref_number VARCHAR(50) NOT NULL DEFAULT '',
+            note VARCHAR(255) NOT NULL DEFAULT '',
+            created_by VARCHAR(100) NOT NULL DEFAULT '',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_plgt_godown (godown_id),
+            KEY idx_plgt_location (location_id),
+            KEY idx_plgt_type (transfer_type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    $db_conn->query("
+        CREATE TABLE IF NOT EXISTS neksomo_llp_piece_rates (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            product_id INT NOT NULL,
+            effective_date DATE NOT NULL,
+            rate_per_piece DECIMAL(10,2) NOT NULL,
+            created_by VARCHAR(100) DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_product_date (product_id, effective_date),
+            KEY idx_product (product_id),
+            KEY idx_sale_date (effective_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    $db_conn->query("
+        CREATE TABLE IF NOT EXISTS neksomo_llp_piece_purchase_rates (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            product_id INT NOT NULL,
+            effective_date DATE NOT NULL,
+            rate_per_piece DECIMAL(10,2) NOT NULL,
+            created_by VARCHAR(100) DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_product_date (product_id, effective_date),
+            KEY idx_product (product_id),
+            KEY idx_effective_date (effective_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    // expense_imports / expense_import_items may not exist at all yet on a
+    // fresh environment (normally created by expense-tracker.php), and even
+    // where they exist, period_from/period_to/date are later additions.
+    $db_conn->query("
+        CREATE TABLE IF NOT EXISTS expense_imports (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            company_id INT UNSIGNED NOT NULL,
+            expense_month DATE NOT NULL,
+            source_filename VARCHAR(255) NOT NULL,
+            group_name VARCHAR(255) DEFAULT NULL,
+            period_label VARCHAR(255) DEFAULT NULL,
+            total_debit DECIMAL(15,2) NOT NULL DEFAULT 0,
+            total_credit DECIMAL(15,2) NOT NULL DEFAULT 0,
+            net_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+            uploaded_by VARCHAR(100) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_company_month (company_id, expense_month)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+    $db_conn->query("
+        CREATE TABLE IF NOT EXISTS expense_import_items (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            import_id INT UNSIGNED NOT NULL,
+            particulars VARCHAR(255) NOT NULL,
+            debit DECIMAL(15,2) NOT NULL DEFAULT 0,
+            credit DECIMAL(15,2) NOT NULL DEFAULT 0,
+            net_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+            KEY idx_import (import_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+    if (($__c = $db_conn->query("SHOW COLUMNS FROM expense_imports LIKE 'period_from'")) && $__c->num_rows === 0) {
+        $db_conn->query("ALTER TABLE expense_imports ADD COLUMN period_from DATE DEFAULT NULL AFTER expense_month");
+        $db_conn->query("ALTER TABLE expense_imports ADD COLUMN period_to DATE DEFAULT NULL AFTER period_from");
+    }
+    if (($__c = $db_conn->query("SHOW COLUMNS FROM expense_import_items LIKE 'date'")) && $__c->num_rows === 0) {
+        $db_conn->query("ALTER TABLE expense_import_items ADD COLUMN date DATE DEFAULT NULL AFTER particulars");
+    }
+
     $pcs_ii_cond  = $filter_entity > 0 ? " AND ii.user_id={$filter_entity}"       : " AND ii.user_id IN ({$entity_ids_subq})";
     $pcs_uii_cond = $filter_entity > 0 ? " AND uii.from_user_id={$filter_entity}" : " AND uii.from_user_id IN ({$entity_ids_subq})";
     $pcs_ot_cond  = $filter_entity > 0 ? " AND os.godownid={$filter_entity}"      : " AND os.godownid IN ({$entity_ids_subq})";
