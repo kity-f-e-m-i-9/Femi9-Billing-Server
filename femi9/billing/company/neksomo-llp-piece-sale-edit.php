@@ -96,7 +96,7 @@ $products = $db_conn->query("SELECT id, productName, unit_type FROM products ORD
                                                 <input type="date" required name="effective_date" value="<?php echo htmlspecialchars($entry['effective_date']); ?>" class="form-control">
 
                                                 <label class="form-label"><span id="rateLabelText">Rate per Piece (&#8377;)</span></label>
-                                                <input type="number" min="0" step="0.01" required name="rate_per_piece" value="<?php echo htmlspecialchars((string)$entry['rate_per_piece']); ?>" class="form-control">
+                                                <input type="number" min="0" step="any" required name="rate_per_piece" value="<?php echo htmlspecialchars((string)$entry['rate_per_piece']); ?>" class="form-control">
 
                                                 <br/>
                                                 <button type="submit" name="update-record" class="btn btn-primary">Update</button>

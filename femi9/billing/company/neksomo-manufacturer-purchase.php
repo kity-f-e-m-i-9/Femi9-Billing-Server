@@ -178,7 +178,7 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
                                     </div>
                                     <div class="input-group-modern">
                                         <label><span id="costLabelText">Cost/Piece (₹)</span> <span style="color:#ef4444;">*</span></label>
-                                        <input type="number" id="costInput" class="form-control" min="0" step="0.01" placeholder="0.00">
+                                        <input type="number" id="costInput" class="form-control" min="0" step="any" placeholder="0.00">
                                         <div class="field-hint" id="gstHint" style="margin-top:4px;"></div>
                                     </div>
                                     <div class="input-group-modern" style="align-items:flex-end;">

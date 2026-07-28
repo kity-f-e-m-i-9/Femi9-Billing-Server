@@ -169,15 +169,18 @@ foreach ($rawItems as $it) {
     $gst_rate = $gstRateByProduct[$it['pid']] ?? 0.0;
     $gst_type = $gstTypeByProduct[$it['pid']] ?? 'exclusive';
 
-    $entered_amount = round($it['qty_pieces'] * $it['cost'], 2);
+    // Rounded to 6 decimal places (matching the DB columns' precision), not 2
+    // — cost/piece is user-entered and shouldn't be silently truncated to
+    // whole paise.
+    $entered_amount = round($it['qty_pieces'] * $it['cost'], 6);
     if ($gst_type === 'inclusive') {
         $total_cost    = $entered_amount;
-        $taxable_value = round($total_cost / (1 + $gst_rate / 100), 2);
-        $gst_amount    = round($total_cost - $taxable_value, 2);
+        $taxable_value = round($total_cost / (1 + $gst_rate / 100), 6);
+        $gst_amount    = round($total_cost - $taxable_value, 6);
     } else {
         $taxable_value = $entered_amount;
-        $gst_amount    = round($taxable_value * $gst_rate / 100, 2);
-        $total_cost    = round($taxable_value + $gst_amount, 2);
+        $gst_amount    = round($taxable_value * $gst_rate / 100, 6);
+        $total_cost    = round($taxable_value + $gst_amount, 6);
     }
 
     $items[] = [
@@ -193,9 +196,9 @@ foreach ($rawItems as $it) {
     ];
 }
 
-$grand_total    = round(array_sum(array_column($items, 'total_cost')), 2);
-$grand_taxable  = round(array_sum(array_column($items, 'taxable_value')), 2);
-$grand_gst      = round(array_sum(array_column($items, 'gst_amount')), 2);
+$grand_total    = round(array_sum(array_column($items, 'total_cost')), 6);
+$grand_taxable  = round(array_sum(array_column($items, 'taxable_value')), 6);
+$grand_gst      = round(array_sum(array_column($items, 'gst_amount')), 6);
 
 // Neksomo's own godown id, looked up by name rather than hardcoded — this
 // page is only ever reachable by neksomo/admin, and the stock it credits is
