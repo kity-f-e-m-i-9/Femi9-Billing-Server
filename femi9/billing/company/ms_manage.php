@@ -121,14 +121,33 @@ $i= $start_from;
 													<th>Password</th>
 													<th>Email</th>
 													<th>Address</th>
-													<th>Head</th>
+													<th>Team Level</th>
 													
 													<th>Actions</th>
                                                 </tr>
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from marketing_staff order by id desc";
+										<?php
+										$_chkTL = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'team_level_id'");
+										if ($_chkTL && $_chkTL->num_rows === 0) {
+											$db_conn->query("ALTER TABLE marketing_staff ADD COLUMN team_level_id INT NULL DEFAULT NULL AFTER user_position");
+										}
+										$db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
+											id INT AUTO_INCREMENT PRIMARY KEY,
+											level_rank INT NOT NULL,
+											level_name VARCHAR(50) NOT NULL,
+											created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+											UNIQUE KEY uk_level_rank (level_rank)
+										)");
+										$teamLevelMap = [];
+										$resTeamLevels = $db_conn->query("SELECT id, level_name FROM marketing_team_levels");
+										if ($resTeamLevels) {
+											while ($rowTeamLevel = $resTeamLevels->fetch_assoc()) {
+												$teamLevelMap[(int)$rowTeamLevel['id']] = $rowTeamLevel['level_name'];
+											}
+										}
+										$select_product_list="select * from marketing_staff order by id desc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
@@ -175,11 +194,14 @@ $i= $start_from;
 													<td><?php echo $result_product_list["ms_address"];?></td>
 													
 													<td>
-													<?php if($result_product_list['user_position']==1){?>
-													<button type="button" class="btn btn-success btn-style-light m-b-xs m-r-xs">Enable</button>
-													<?php }else{?>
-													<button type="button" class="btn btn-danger btn-style-light m-b-xs m-r-xs">Disable</button>
-													<?php }?>
+													<?php
+													$msTeamLevelId = (int)($result_product_list['team_level_id'] ?? 0);
+													if ($msTeamLevelId && isset($teamLevelMap[$msTeamLevelId])) {
+														echo htmlspecialchars($teamLevelMap[$msTeamLevelId]);
+													} else {
+														echo '<span class="text-muted">-</span>';
+													}
+													?>
 													</td>
 													
 																										<td>

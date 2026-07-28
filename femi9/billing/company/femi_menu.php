@@ -630,6 +630,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
                             <li><a href="ms_add">Add Marketing Staff</a></li>
                             <li><a href="ms_manage">Manage Marketing Staff</a></li>
+                            <li><a href="manage-marketing-team-levels">Manage Team Levels</a></li>
 							<li><a href="ms_prorders">Product Orders Report</a></li>
 							<li><a href="ms_noorders">No Orders Report</a></li>
 							<li><a href="ms_expenses">Expenses Report</a></li>
@@ -1064,6 +1065,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
                             <li><a href="ms_add">Add Marketing Staff</a></li>
                             <li><a href="ms_manage">Manage Marketing Staff</a></li>
+                            <li><a href="manage-marketing-team-levels">Manage Team Levels</a></li>
 							<li><a href="ms_prorders">Product Orders Report</a></li>
 							<li><a href="ms_noorders">No Orders Report</a></li>
                         </ul>
