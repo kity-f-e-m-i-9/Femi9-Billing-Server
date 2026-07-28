@@ -80,7 +80,7 @@ if (!$product) {
                                 <div class="card">
                                     <div class="card-body">
 
-                                    <?php if (isset($_REQUEST['error'])) { ?><div class="alert alert-danger">Please enter a product name.</div><?php } ?>
+                                    <?php if (isset($_REQUEST['error'])) { ?><div class="alert alert-danger">Please check that the product name, category, GST, and unit fields are filled in correctly.</div><?php } ?>
 
 <form action="neksomo-product-action.php" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
@@ -94,6 +94,35 @@ if (!$product) {
                                                 <label class="form-label">Product Name <span class="text-danger">*</span></label>
                                                 <input type="text" required name="productName" maxlength="255" class="form-control" autofocus onkeypress="restrictSpecialChars(event)"
                                                        value="<?php echo htmlspecialchars($product['productName']); ?>">
+
+                                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                                <select name="category" class="form-control" required>
+                                                    <option value="" disabled <?php echo empty($product['category']) ? 'selected' : ''; ?>>Select category</option>
+                                                    <option value="napkin" <?php echo $product['category'] === 'napkin' ? 'selected' : ''; ?>>Napkin</option>
+                                                    <option value="diaper" <?php echo $product['category'] === 'diaper' ? 'selected' : ''; ?>>Diaper</option>
+                                                </select>
+
+                                                <label class="form-label">Sold As <span class="text-danger">*</span></label>
+                                                <select name="unit_type" id="unit_type" class="form-control" required onchange="document.getElementById('pieces_per_pack_wrap').style.display = (this.value === 'pack') ? 'block' : 'none';">
+                                                    <option value="pieces" <?php echo $product['unit_type'] !== 'pack' ? 'selected' : ''; ?>>Pieces</option>
+                                                    <option value="pack" <?php echo $product['unit_type'] === 'pack' ? 'selected' : ''; ?>>Pack</option>
+                                                </select>
+
+                                                <div id="pieces_per_pack_wrap" style="display:<?php echo $product['unit_type'] === 'pack' ? 'block' : 'none'; ?>;">
+                                                    <label class="form-label">Pieces per Pack</label>
+                                                    <input type="number" min="1" name="pieces_per_pack" class="form-control" onkeypress="restrictnumber(event)" placeholder="e.g. 12"
+                                                           value="<?php echo htmlspecialchars((string)($product['pieces_per_pack'] ?? '')); ?>">
+                                                </div>
+
+                                                <label class="form-label">GST (%) <span class="text-danger">*</span></label>
+                                                <input type="number" min="0" max="99" required name="gst" class="form-control" onkeypress="restrictnumber(event)"
+                                                       value="<?php echo htmlspecialchars((string)$product['gst']); ?>">
+
+                                                <label class="form-label">GST Type <span class="text-danger">*</span></label>
+                                                <select name="gst_type" class="form-control" required>
+                                                    <option value="exclusive" <?php echo $product['gst_type'] !== 'inclusive' ? 'selected' : ''; ?>>Exclusive (GST added on top of price)</option>
+                                                    <option value="inclusive" <?php echo $product['gst_type'] === 'inclusive' ? 'selected' : ''; ?>>Inclusive (GST included in price)</option>
+                                                </select>
 
                                                 <label class="form-label">HSN <span class="text-muted" style="font-size:12px;">(optional)</span></label>
                                                 <input type="text" name="hsn" maxlength="255" class="form-control" onkeypress="restrictHSN(event)"

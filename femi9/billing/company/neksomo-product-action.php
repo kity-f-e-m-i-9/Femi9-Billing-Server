@@ -103,12 +103,31 @@ if ($action === 'insert-product') {
     }
     $own->close();
 
-    if ($productName === '') {
+    $category  = in_array($_POST['category'] ?? '', ['napkin', 'diaper'], true) ? $_POST['category'] : '';
+    $unit_type = in_array($_POST['unit_type'] ?? '', ['pieces', 'pack'], true) ? $_POST['unit_type'] : '';
+    $gst_type  = in_array($_POST['gst_type'] ?? '', ['inclusive', 'exclusive'], true) ? $_POST['gst_type'] : '';
+    $gst       = is_numeric($_POST['gst'] ?? null) ? (float) $_POST['gst'] : -1;
+
+    $pieces_per_pack = trim($_POST['pieces_per_pack'] ?? '');
+    $pieces_per_pack = ($pieces_per_pack !== '' && ctype_digit($pieces_per_pack)) ? (int) $pieces_per_pack : 0;
+
+    $valid = $productName !== ''
+        && $category !== ''
+        && $unit_type !== ''
+        && $gst_type !== ''
+        && $gst >= 0 && $gst <= 99
+        && ($unit_type !== 'pack' || $pieces_per_pack >= 1);
+
+    if (!$valid) {
         redirectWithMessage('neksomo-product-edit.php?id=' . $product_id, 'error');
     }
 
-    $stmt = $db_conn->prepare("UPDATE products SET productName = ?, hsn = ?, updated_at = NOW() WHERE id = ?");
-    $stmt->bind_param('ssi', $productName, $hsn, $product_id);
+    $pieces_per_pack_to_store = ($unit_type === 'pack') ? $pieces_per_pack : null;
+
+    $stmt = $db_conn->prepare(
+        "UPDATE products SET productName = ?, hsn = ?, category = ?, unit_type = ?, pieces_per_pack = ?, gst = ?, gst_type = ?, updated_at = NOW() WHERE id = ?"
+    );
+    $stmt->bind_param('ssssidsi', $productName, $hsn, $category, $unit_type, $pieces_per_pack_to_store, $gst, $gst_type, $product_id);
     $ok = $stmt->execute();
     $stmt->close();
 

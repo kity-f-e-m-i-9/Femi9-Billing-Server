@@ -1439,14 +1439,12 @@ if ($is_neksomo_view) {
                         </div>
                     </div>
 
-                    <div class="equation-row">
-                        <div class="kpi-card"><div class="kpi-t">Napkin Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
-                        <div class="equation-op">&minus;</div>
-                        <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_expense, 2); ?></div></div>
-                        <div class="equation-op eq">=</div>
-                        <div class="kpi-card"><div class="kpi-t">Napkin Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="kpi-card"><div class="kpi-t">Napkin Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
+                        </div>
                     </div>
-                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Gross Profit already nets out Purchase Value against Return Purchase Value on top of the Consolidated Amount above. Gross Profit − Expense (Femi9 LLP, this period) = Net Profit. Combined with Diaper and split by partner at the bottom of this page.</p>
+                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Gross Profit already nets out Purchase Value against Return Purchase Value on top of the Consolidated Amount above. Combined with Diaper and Expense at the bottom of this page.</p>
 
                     <?php if ($grand_total_unrated_pieces > 0): ?>
                     <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_total_unrated_pieces, 0); ?> pieces sold before any rate was set for their product — excluded from Sold Price. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
@@ -1527,14 +1525,12 @@ if ($is_neksomo_view) {
                     </div>
                     <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">GST shown separately — never included in Diaper Gross Profit above. Net of returns.</p>
 
-                    <div class="equation-row">
-                        <div class="kpi-card"><div class="kpi-t">Diaper Gross Profit</div><div class="kpi-v" style="<?php echo $grand_diaper_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_diaper_gross_profit, 2); ?></div></div>
-                        <div class="equation-op">&minus;</div>
-                        <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_diaper_expense, 2); ?></div></div>
-                        <div class="equation-op eq">=</div>
-                        <div class="kpi-card"><div class="kpi-t">Diaper Net Profit</div><div class="kpi-v" style="<?php echo $grand_diaper_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_diaper_net_profit, 2); ?></div></div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="kpi-card"><div class="kpi-t">Diaper Gross Profit</div><div class="kpi-v" style="<?php echo $grand_diaper_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_diaper_gross_profit, 2); ?></div></div>
+                        </div>
                     </div>
-                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Diaper is a pack-based product mapped 1:1 to its company SKU, so quantity/value here are packs/rate-per-pack — no piece conversion. Expense is 0 here since Neksomo's single expense pool is already counted in full against Napkin below — not double-counted. Combined with Napkin and split by partner at the bottom of this page.</p>
+                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Diaper is a pack-based product mapped 1:1 to its company SKU, so quantity/value here are packs/rate-per-pack — no piece conversion. Combined with Napkin and Expense at the bottom of this page.</p>
 
                     <?php if ($grand_diaper_unrated_qty > 0): ?>
                     <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_diaper_unrated_qty, 0); ?> packs sold before any rate was set for their product — excluded from Sold Value. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
@@ -1576,12 +1572,21 @@ if ($is_neksomo_view) {
 
                     <h3 style="font-size:19px;font-weight:700;margin:28px 0 4px;">Combined</h3>
                     <div class="equation-row">
-                        <div class="kpi-card"><div class="kpi-t">Napkin Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
+                        <div class="kpi-card"><div class="kpi-t">Napkin Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
                         <div class="equation-op">+</div>
-                        <div class="kpi-card"><div class="kpi-t">Diaper Net Profit</div><div class="kpi-v" style="<?php echo $grand_diaper_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_diaper_net_profit, 2); ?></div></div>
+                        <div class="kpi-card"><div class="kpi-t">Diaper Gross Profit</div><div class="kpi-v" style="<?php echo $grand_diaper_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_diaper_gross_profit, 2); ?></div></div>
                         <div class="equation-op eq">=</div>
-                        <div class="kpi-card"><div class="kpi-t">Combined Net Profit</div><div class="kpi-v" style="<?php echo $grand_combined_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_combined_net_profit, 2); ?></div></div>
+                        <div class="kpi-card"><div class="kpi-t">Combined Gross Profit</div><div class="kpi-v" style="<?php echo $grand_combined_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_combined_gross_profit, 2); ?></div></div>
                     </div>
+
+                    <div class="equation-row">
+                        <div class="kpi-card"><div class="kpi-t">Combined Gross Profit</div><div class="kpi-v" style="<?php echo $grand_combined_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_combined_gross_profit, 2); ?></div></div>
+                        <div class="equation-op">&minus;</div>
+                        <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_combined_expense, 2); ?></div></div>
+                        <div class="equation-op eq">=</div>
+                        <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_combined_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_combined_net_profit, 2); ?></div></div>
+                    </div>
+                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Expense is Neksomo's single shared expense pool (not split between categories).</p>
 
                     <div class="row mb-3">
                         <div class="col-md-4">
