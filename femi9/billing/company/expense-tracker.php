@@ -152,7 +152,7 @@ if (!empty($batch_ids)) {
     $stmt->close();
 
     $stmt = $db_conn->prepare("
-        SELECT date, particulars, debit, credit, net_amount
+        SELECT id, date, particulars, debit, credit, net_amount
         FROM expense_import_items
         WHERE import_id IN ($placeholders) AND date IS NOT NULL
         ORDER BY date DESC, id DESC
@@ -371,6 +371,50 @@ $i = 0;
                         </div>
                     </div>
 
+                    <?php if ($is_neksomo_upload): ?>
+                    <!-- Manual Entry -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="upload-card">
+                                <h6><i class="material-icons" style="vertical-align:middle;">edit_note</i> Add a Single Expense</h6>
+                                <form method="POST" action="expense-tracker-manual-entry-action.php">
+                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-2">
+                                            <label class="form-label">Company Profile</label>
+                                            <select name="company_id" class="form-control" required>
+                                                <?php foreach ($company_profiles as $cp): ?>
+                                                <option value="<?php echo $cp['id']; ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($cp['gname']); ?>
+                                                </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Date</label>
+                                            <input type="date" name="date" class="form-control" max="<?php echo date('Y-m-d'); ?>" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Particulars</label>
+                                            <input type="text" name="particulars" class="form-control" placeholder="What was this expense for?" maxlength="255" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Amount (₹)</label>
+                                            <input type="number" name="amount" class="form-control" step="0.01" placeholder="e.g. 1500" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="material-icons" style="vertical-align:middle;">add</i> Add
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">For a one-off expense that doesn't need a spreadsheet. Use a negative amount for a credit/refund. Entries for the same month accumulate into that month's total the same way re-uploading a file does.</small>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
                     <!-- Uploaded Files -->
                     <div class="row">
                         <div class="col-12">
@@ -441,6 +485,7 @@ $i = 0;
                                                     <th class="text-right">Debit (₹)</th>
                                                     <th class="text-right">Credit (₹)</th>
                                                     <th class="text-right">Net Amount (₹)</th>
+                                                    <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -451,6 +496,11 @@ $i = 0;
                                                     <td class="text-right"><?php echo inr_format($row['debit'], 2); ?></td>
                                                     <td class="text-right"><?php echo inr_format($row['credit'], 2); ?></td>
                                                     <td class="text-right font-weight-bold"><?php echo inr_format($row['net_amount'], 2); ?></td>
+                                                    <td>
+                                                        <button type="button" class="btn btn-sm btn-danger btn-action delete-item-btn" data-id="<?php echo $row['id']; ?>" title="Delete Entry">
+                                                            <i class="material-icons" style="font-size:16px;vertical-align:middle;">delete</i>
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                             <?php endforeach; ?>
                                             </tbody>
@@ -557,6 +607,31 @@ $(document).ready(function () {
         })
         .fail(function () {
             alert('Error deleting upload. Please try again.');
+            btn.prop('disabled', false);
+        });
+    });
+
+    $('#datedExpenseTable').on('click', '.delete-item-btn', function () {
+        const id = $(this).data('id');
+        if (!confirm('Delete this expense entry? This cannot be undone.')) {
+            return;
+        }
+        const btn = $(this);
+        btn.prop('disabled', true);
+        $.post('expense-tracker-delete-item-action.php', {
+            item_id: id,
+            csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+        })
+        .done(function (response) {
+            if (response.success) {
+                window.location.reload();
+            } else {
+                alert('Error: ' + (response.message || 'Failed to delete'));
+                btn.prop('disabled', false);
+            }
+        })
+        .fail(function () {
+            alert('Error deleting entry. Please try again.');
             btn.prop('disabled', false);
         });
     });

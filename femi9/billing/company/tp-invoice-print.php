@@ -6,6 +6,15 @@ $enc_id = $_GET['id'] ?? '';
 $inv_id = (int)base64_decode($enc_id);
 if (!$inv_id) { header("Location: manage-tp-invoices"); exit; }
 
+// Trims a rate like 1.50 down to "1.5" or 9.00 down to "9" — CGST/SGST is
+// always exactly half the item's GST%, which is often a non-whole number
+// (e.g. 3% GST -> 1.5% + 1.5%), so this avoids both misleading rounding
+// (inr_format's 0-decimal rounding would show 1.5% as "2%") and clutter
+// like "1.50%" for a value that's actually whole.
+function fmt_gst_pct($v) {
+    return rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
+}
+
 // Invoice header
 $stmt = $db_conn->prepare("
     SELECT tpi.*,
@@ -75,6 +84,7 @@ $totalgstamount   = 0;
 $hsn_totals       = []; // hsn => taxable sum
 $hsn_gst_totals   = []; // hsn => gst amount sum
 $hsn_gst_pct      = []; // hsn => gst rate (assumed uniform per HSN)
+$__inv_gst_pct    = 0;  // MAX gst rate across all lines — for the SGST/CGST label below, not a per-HSN figure
 foreach ($invoice_items as &$item) {
     $line_total = (float)$item['amount'];
     $gst_pct    = (int)$item['gst_percentage'];
@@ -98,6 +108,7 @@ foreach ($invoice_items as &$item) {
     $hsn_totals[$hsn]     = ($hsn_totals[$hsn] ?? 0) + $taxable_value;
     $hsn_gst_totals[$hsn] = ($hsn_gst_totals[$hsn] ?? 0) + $gst_amount;
     $hsn_gst_pct[$hsn]    = $gst_pct;
+    $__inv_gst_pct        = max($__inv_gst_pct, $gst_pct);
 }
 unset($item);
 $courier_charges  = (float)$result_Invoice_Details['courier_charges'];
@@ -469,14 +480,15 @@ Terms of Delivery<br/>&nbsp;
 <?php if ($totalgstamount > 0):
     $SGST = inr_format($totalgstamount / 2, 2);
     $CGST = inr_format($totalgstamount / 2, 2);
+    $__half_pct = fmt_gst_pct($__inv_gst_pct / 2);
 ?>
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>SGST</i></b></td>
+<td></td><td id="rightlaign"><b><i>SGST (<?= $__half_pct; ?>%)</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>CGST</i></b></td>
+<td></td><td id="rightlaign"><b><i>CGST (<?= $__half_pct; ?>%)</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
 </tr>
@@ -540,9 +552,9 @@ Terms of Delivery<br/>&nbsp;
 <tr>
 <td><?= htmlspecialchars($hsncode); ?></td>
 <td align="right"><?= inr_format($hsnamt, 2); ?></td>
-<td align="right"><?= inr_format($hsn_rate, 0); ?>%</td>
+<td align="right"><?= fmt_gst_pct($hsn_rate); ?>%</td>
 <td align="right"><?= inr_format($hsn_half, 2); ?></td>
-<td align="right"><?= inr_format($hsn_rate, 0); ?>%</td>
+<td align="right"><?= fmt_gst_pct($hsn_rate); ?>%</td>
 <td align="right"><?= inr_format($hsn_half, 2); ?></td>
 <td align="right"><?= inr_format($hsn_gst, 2); ?></td>
 </tr>
@@ -597,6 +609,7 @@ Terms of Delivery<br/>&nbsp;
 </table>
 <div style="clear:both;"></div>
 </div>
+<div align="center">SUBJECT TO ERODE JURISDICTION</div>
 <div align="center">
     This is a Computer Generated Invoice
     <?php if (!empty($result_Invoice_Details['cp_district'])): ?>

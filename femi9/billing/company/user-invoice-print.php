@@ -7,6 +7,19 @@ $Invoice_ID=base64_decode($Invoice_ID);
 $select_Invoice_Details="select * from user_invoice where inv_id='$Invoice_ID'";
 $fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
+// Needed early (before the item table) as well as in the GST summary
+// section further down, so it's pulled up here rather than declared once
+// down there.
+$gsttype=$result_Invoice_Details['gst_type'];
+
+// Trims a rate like 1.50 down to "1.5" or 9.00 down to "9" — CGST/SGST is
+// always exactly half the item's GST%, which is often a non-whole number
+// (e.g. 3% GST -> 1.5% + 1.5%), so this avoids both misleading rounding
+// (inr_format's 0-decimal rounding would show 1.5% as "2%") and clutter
+// like "1.50%" for a value that's actually whole.
+function fmt_gst_pct($v) {
+    return rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
+}
 
 //customer details
 $getinvuser=$result_Invoice_Details['to_user_type'];
@@ -447,9 +460,7 @@ Terms of Delivery<br/>
 
 <!------------------------------------------------------------------>
 <!------------------------------GST--------------------------------->
-<?php 
-$gsttype=$result_Invoice_Details['gst_type'];
-
+<?php
 $select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
 $fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
 $result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
@@ -457,17 +468,25 @@ $totalgstamount=$result_sum_gstamount[0];
 
 if($totalgstamount>0)
 {
+// Rate shown alongside the SGST/CGST/IGST label below — MAX() rather than
+// an average, since a mixed-rate invoice has no single correct "the" rate;
+// MAX at least reflects a real line on the invoice rather than a blended
+// number that matches nothing on it.
+$__gst_pct_row = mysqli_fetch_assoc(mysqli_query($db_conn, "SELECT MAX(gst_percentage) AS pct FROM user_invoice_items WHERE inv_id='$Invoice_ID'"));
+$__inv_gst_pct = (float)($__gst_pct_row['pct'] ?? 0);
+
 if($gsttype=="inner"){
-	
+
 $SGST=$totalgstamount/2;
 $SGST=inr_format($SGST, 2);
 
 $CGST=$totalgstamount/2;
 $CGST=inr_format($CGST, 2);
+$__half_pct = fmt_gst_pct($__inv_gst_pct / 2);
 ?>
 <tr id="bottombordervl">
 <td></td>
-<td id="rightlaign"><b><i>SGST</i></b></td>
+<td id="rightlaign"><b><i>SGST (<?=$__half_pct;?>%)</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
 <td></td>
@@ -479,7 +498,7 @@ $CGST=inr_format($CGST, 2);
 </tr>
 <tr id="bottombordervl">
 <td></td>
-<td id="rightlaign"><b><i>CGST</i></b></td>
+<td id="rightlaign"><b><i>CGST (<?=$__half_pct;?>%)</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
 <td></td>
@@ -492,7 +511,7 @@ $CGST=inr_format($CGST, 2);
 <?php }else{?>
 <tr id="bottombordervl">
 <td></td>
-<td id="rightlaign"><b><i>IGST</i></b></td>
+<td id="rightlaign"><b><i>IGST (<?=fmt_gst_pct($__inv_gst_pct);?>%)</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
 <td></td>
@@ -671,9 +690,9 @@ while($resulthsn=mysqli_fetch_array($fetchhsn)){
 <tr>
 <td><?=$hsncode;?></td>
 <td align="right"><?=inr_format($hsn_taxable, 2)?></td>
-<td align="right"><?=inr_format($hsn_half_rate, 0)?>%</td>
+<td align="right"><?=fmt_gst_pct($hsn_half_rate)?>%</td>
 <td align="right"><?=inr_format($hsn_half_amt, 2)?></td>
-<td align="right"><?=inr_format($hsn_half_rate, 0)?>%</td>
+<td align="right"><?=fmt_gst_pct($hsn_half_rate)?>%</td>
 <td align="right"><?=inr_format($hsn_half_amt, 2)?></td>
 <td align="right"><?=inr_format($hsn_gst, 2)?></td>
 </tr>
@@ -681,7 +700,7 @@ while($resulthsn=mysqli_fetch_array($fetchhsn)){
 <tr>
 <td><?=$hsncode;?></td>
 <td align="right"><?=inr_format($hsn_taxable, 2)?></td>
-<td align="right"><?=inr_format($hsn_pct, 0)?>%</td>
+<td align="right"><?=fmt_gst_pct($hsn_pct)?>%</td>
 <td align="right"><?=inr_format($hsn_gst, 2)?></td>
 <td align="right"><?=inr_format($hsn_gst, 2)?></td>
 </tr>
@@ -835,6 +854,7 @@ $TAXnumber = $totalgstamount;
 </table>
 <div style="clear:both;"></div>
 </div>
+<div align="center">SUBJECT TO ERODE JURISDICTION</div>
 <div align="center">This is a Computer Generated Invoice</div>
 			
 			
