@@ -13,7 +13,7 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-$products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM products WHERE deleted_at IS NULL AND temp_id LIKE 'NKS-%' ORDER BY productName ASC")->fetch_all(MYSQLI_ASSOC);
+$products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type, gst, gst_type FROM products WHERE deleted_at IS NULL AND temp_id LIKE 'NKS-%' ORDER BY productName ASC")->fetch_all(MYSQLI_ASSOC);
 $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE is_active = 1 ORDER BY vendor_name ASC")->fetch_all(MYSQLI_ASSOC);
 ?>
 
@@ -167,18 +167,19 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
                                         <select id="productSelect" class="form-control">
                                             <option value="">— Select Product —</option>
                                             <?php foreach ($products as $p): ?>
-                                            <option value="<?php echo (int)$p['id']; ?>" data-pieces-per-pack="<?php echo (int)$p['pieces_per_pack']; ?>"><?php echo htmlspecialchars($p['productName']); ?></option>
+                                            <option value="<?php echo (int)$p['id']; ?>" data-pieces-per-pack="<?php echo (int)$p['pieces_per_pack']; ?>" data-unit-type="<?php echo htmlspecialchars($p['unit_type']); ?>" data-gst="<?php echo (float)$p['gst']; ?>" data-gst-type="<?php echo htmlspecialchars($p['gst_type']); ?>"><?php echo htmlspecialchars($p['productName']); ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     <div class="input-group-modern">
-                                        <label>Qty (Pieces) <span style="color:#ef4444;">*</span></label>
+                                        <label><span id="qtyLabelText">Qty (Pieces)</span> <span style="color:#ef4444;">*</span></label>
                                         <input type="number" id="qtyInput" class="form-control" min="1" placeholder="0">
                                         <div class="field-hint" id="packSizeHint" style="margin-top:4px;"></div>
                                     </div>
                                     <div class="input-group-modern">
-                                        <label>Cost/Piece (₹) <span style="color:#ef4444;">*</span></label>
+                                        <label><span id="costLabelText">Cost/Piece (₹)</span> <span style="color:#ef4444;">*</span></label>
                                         <input type="number" id="costInput" class="form-control" min="0" step="0.01" placeholder="0.00">
+                                        <div class="field-hint" id="gstHint" style="margin-top:4px;"></div>
                                     </div>
                                     <div class="input-group-modern" style="align-items:flex-end;">
                                         <button type="button" class="btn-add-product" id="addProductBtn" onclick="addProduct()">
@@ -193,12 +194,12 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>#</th><th>Product</th><th>Qty (Pieces)</th><th>Cost/Piece (₹)</th><th>Line Total (₹)</th><th></th>
+                                            <th>#</th><th>Product</th><th>Qty</th><th>Cost/Unit (₹)</th><th>GST</th><th>Taxable (₹)</th><th>GST Amt (₹)</th><th>Total (₹)</th><th></th>
                                         </tr>
                                     </thead>
                                     <tbody id="productBody">
                                         <tr class="empty-row" id="emptyRow">
-                                            <td colspan="6">
+                                            <td colspan="9">
                                                 <i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>
                                                 No products added yet
                                             </td>
@@ -217,6 +218,14 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
                                         <div class="summary-row">
                                             <span class="summary-label">Total Quantity (Pieces)</span>
                                             <span class="summary-value" id="summaryQty">0</span>
+                                        </div>
+                                        <div class="summary-row">
+                                            <span class="summary-label">Total Taxable Value</span>
+                                            <span class="summary-value" id="summaryTaxable">₹0.00</span>
+                                        </div>
+                                        <div class="summary-row">
+                                            <span class="summary-label">Total GST</span>
+                                            <span class="summary-value" id="summaryGst">₹0.00</span>
                                         </div>
                                         <div class="summary-row" style="border-top:2px solid #e5e7eb;margin-top:4px;padding-top:12px;">
                                             <span class="summary-label" style="font-size:16px;font-weight:600;color:#1e293b;">Grand Total</span>
@@ -283,28 +292,88 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
         }
 
         $('#productSelect').on('change', function () {
-            var $opt = $(this).find('option:selected');
-            var pph  = parseInt($opt.data('pieces-per-pack')) || 0;
-            $('#packSizeHint').text(pph > 1 ? ('Pack size: ' + pph + ' pcs — any quantity is accepted; leftover pieces carry forward to the next purchase.') : '');
+            var $opt     = $(this).find('option:selected');
+            var pph      = parseInt($opt.data('pieces-per-pack')) || 0;
+            var isPack   = $opt.data('unit-type') === 'pack' && pph > 0;
+
+            if (isPack) {
+                $('#qtyLabelText').text('Qty (Packs)');
+                $('#costLabelText').text('Cost/Pack (₹)');
+                $('#packSizeHint').text('1 pack = ' + pph + ' pcs — enter the number of packs purchased.');
+            } else {
+                $('#qtyLabelText').text('Qty (Pieces)');
+                $('#costLabelText').text('Cost/Piece (₹)');
+                $('#packSizeHint').text(pph > 1 ? ('Pack size: ' + pph + ' pcs — any quantity is accepted; leftover pieces carry forward to the next purchase.') : '');
+            }
+
+            var gstRate = parseFloat($opt.data('gst')) || 0;
+            var gstType = $opt.data('gst-type') || 'exclusive';
+            if ($opt.val()) {
+                $('#gstHint').text(
+                    gstType === 'inclusive'
+                        ? ('GST ' + gstRate + '% inclusive — this rate already has GST built in.')
+                        : ('GST ' + gstRate + '% exclusive — GST will be added on top of this rate.')
+                );
+            } else {
+                $('#gstHint').text('');
+            }
         });
+
+        // Mirrors the server-side calc in neksomo-manufacturer-purchase-action.php:
+        // exclusive products add GST on top of the entered cost; inclusive products
+        // already have GST baked into it, so the taxable value is backed out of it.
+        // This is a preview only — the server always recomputes from the product's
+        // live GST setting before saving.
+        function computeGstBreakdown(qty, cost, gstRate, gstType) {
+            var enteredAmount = parseFloat((qty * cost).toFixed(2));
+            var taxable, gstAmount, total;
+            if (gstType === 'inclusive') {
+                total = enteredAmount;
+                taxable = parseFloat((total / (1 + gstRate / 100)).toFixed(2));
+                gstAmount = parseFloat((total - taxable).toFixed(2));
+            } else {
+                taxable = enteredAmount;
+                gstAmount = parseFloat((taxable * gstRate / 100).toFixed(2));
+                total = parseFloat((taxable + gstAmount).toFixed(2));
+            }
+            return { taxable: taxable, gstAmount: gstAmount, total: total };
+        }
 
         window.addProduct = function () {
             hideAddError();
             var $opt        = $('#productSelect').find('option:selected');
             var product_id  = parseInt($('#productSelect').val());
             var name        = $opt.text().trim();
-            var qty         = parseInt($('#qtyInput').val()) || 0;
-            var cost        = parseFloat($('#costInput').val());
+            var pph         = parseInt($opt.data('pieces-per-pack')) || 0;
+            var isPack      = $opt.data('unit-type') === 'pack' && pph > 0;
+            var enteredQty  = parseInt($('#qtyInput').val()) || 0;
+            var enteredCost = parseFloat($('#costInput').val());
+            var gstRate     = parseFloat($opt.data('gst')) || 0;
+            var gstType     = $opt.data('gst-type') || 'exclusive';
 
             if (!product_id)        { showAddError('Please select a product.'); return; }
-            if (qty < 1)             { showAddError('Quantity must be at least 1.'); return; }
-            if (isNaN(cost) || cost < 0) { showAddError('Please enter a valid cost per piece.'); return; }
+            if (enteredQty < 1)      { showAddError('Quantity must be at least 1' + (isPack ? ' pack.' : '.')); return; }
+            if (isNaN(enteredCost) || enteredCost < 0) {
+                showAddError('Please enter a valid cost per ' + (isPack ? 'pack.' : 'piece.')); return;
+            }
             if (purchaseItems.find(function (i) { return i.product_id === product_id; })) {
                 showAddError('This product is already added.'); return;
             }
 
-            var amount = parseFloat((qty * cost).toFixed(2));
-            purchaseItems.push({ product_id: product_id, name: name, qty: qty, cost: cost, amount: amount });
+            // Purchases are always tracked piece-wise internally (matches
+            // quantity_pieces/cost_per_piece on the server) — pack-mode entry
+            // is converted here so a pack purchase always lands on a whole
+            // number of packs with zero leftover.
+            var qty  = isPack ? (enteredQty * pph) : enteredQty;
+            var cost = isPack ? parseFloat((enteredCost / pph).toFixed(2)) : enteredCost;
+
+            var breakdown = computeGstBreakdown(qty, cost, gstRate, gstType);
+            purchaseItems.push({
+                product_id: product_id, name: name, qty: qty, cost: cost,
+                isPack: isPack, pph: pph, enteredQty: enteredQty, enteredCost: enteredCost,
+                gstRate: gstRate, gstType: gstType,
+                taxable: breakdown.taxable, gstAmount: breakdown.gstAmount, amount: breakdown.total
+            });
             renderTable();
             resetAddForm();
         };
@@ -317,16 +386,26 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
         function renderTable() {
             var $body = $('#productBody').empty();
             if (!purchaseItems.length) {
-                $body.html('<tr class="empty-row"><td colspan="6"><i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>No products added yet</td></tr>');
+                $body.html('<tr class="empty-row"><td colspan="9"><i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>No products added yet</td></tr>');
                 updateSummary(); return;
             }
             $.each(purchaseItems, function (i, item) {
+                var gstLabel = item.gstRate + '% ' + (item.gstType === 'inclusive' ? '(Incl.)' : '(Excl.)');
+                var qtyLabel = item.isPack
+                    ? (item.enteredQty + ' pack' + (item.enteredQty !== 1 ? 's' : '') + ' (' + item.qty + ' pcs)')
+                    : (item.qty + ' pcs');
+                var costLabel = item.isPack
+                    ? ('₹' + item.enteredCost.toFixed(2) + '/pack')
+                    : ('₹' + item.cost.toFixed(2) + '/pc');
                 $body.append(
                     '<tr>' +
                     '<td><span class="row-num">' + (i + 1) + '</span></td>' +
                     '<td><strong>' + escHtml(item.name) + '</strong></td>' +
-                    '<td>' + item.qty + '</td>' +
-                    '<td>₹' + item.cost.toFixed(2) + '</td>' +
+                    '<td>' + qtyLabel + '</td>' +
+                    '<td>' + costLabel + '</td>' +
+                    '<td>' + gstLabel + '</td>' +
+                    '<td>₹' + item.taxable.toFixed(2) + '</td>' +
+                    '<td>₹' + item.gstAmount.toFixed(2) + '</td>' +
                     '<td><strong>₹' + item.amount.toFixed(2) + '</strong></td>' +
                     '<td><button type="button" class="badge-remove" onclick="removeProduct(' + i + ')"><i class="material-icons" style="font-size:14px;vertical-align:middle;">delete</i> Remove</button></td>' +
                     '</tr>'
@@ -337,12 +416,19 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
         }
 
         function updateSummary() {
-            var total = 0, qty = 0;
-            $.each(purchaseItems, function (_, item) { total += item.amount; qty += item.qty; });
+            var total = 0, qty = 0, taxable = 0, gstAmount = 0;
+            $.each(purchaseItems, function (_, item) {
+                total += item.amount; qty += item.qty;
+                taxable += item.taxable; gstAmount += item.gstAmount;
+            });
             total = parseFloat(total.toFixed(2));
+            taxable = parseFloat(taxable.toFixed(2));
+            gstAmount = parseFloat(gstAmount.toFixed(2));
 
             $('#summaryItems').text(purchaseItems.length);
             $('#summaryQty').text(qty);
+            $('#summaryTaxable').text('₹' + fmtAmt(taxable));
+            $('#summaryGst').text('₹' + fmtAmt(gstAmount));
             $('#grandTotal').text('₹' + fmtAmt(total));
 
             var invNumberFilled = $('#invNumberInput').val().trim() !== '';
@@ -371,7 +457,10 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
             $('#productSelect').val('');
             $('#qtyInput').val('');
             $('#costInput').val('');
+            $('#qtyLabelText').text('Qty (Pieces)');
+            $('#costLabelText').text('Cost/Piece (₹)');
             $('#packSizeHint').text('');
+            $('#gstHint').text('');
             hideAddError();
         }
 

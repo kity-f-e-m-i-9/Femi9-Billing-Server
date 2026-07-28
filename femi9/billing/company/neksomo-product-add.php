@@ -70,7 +70,7 @@ if (empty($_SESSION['csrf_token'])) {
                                     <div class="card-body">
 
                                     <?php if (isset($_REQUEST['addesuccess'])) { ?><div class="alert alert-success">Product added.</div><?php } ?>
-                                    <?php if (isset($_REQUEST['error'])) { ?><div class="alert alert-danger">Please enter a product name.</div><?php } ?>
+                                    <?php if (isset($_REQUEST['error'])) { ?><div class="alert alert-danger">Please check that the product name, category, GST, and unit fields are filled in correctly.</div><?php } ?>
 
 <form action="neksomo-product-action.php" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
@@ -79,14 +79,41 @@ if (empty($_SESSION['csrf_token'])) {
                                         <div class="example-container">
                                             <div class="example-content">
                                                 <p class="text-muted" style="font-size:13px;">
-                                                    Neksomo products are tracked purely by piece — there's no pack size
-                                                    or reseller pricing here, just the product itself.
+                                                    Neksomo products have no reseller pricing tiers — just the product,
+                                                    its GST, and how it's sold.
                                                 </p>
 
                                                 <?php include("validate-scripts.php"); ?>
 
                                                 <label class="form-label">Product Name <span class="text-danger">*</span></label>
                                                 <input type="text" required name="productName" maxlength="255" class="form-control" autofocus onkeypress="restrictSpecialChars(event)">
+
+                                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                                <select name="category" class="form-control" required>
+                                                    <option value="" disabled selected>Select category</option>
+                                                    <option value="napkin">Napkin</option>
+                                                    <option value="diaper">Diaper</option>
+                                                </select>
+
+                                                <label class="form-label">Sold As <span class="text-danger">*</span></label>
+                                                <select name="unit_type" id="unit_type" class="form-control" required onchange="document.getElementById('pieces_per_pack_wrap').style.display = (this.value === 'pack') ? 'block' : 'none';">
+                                                    <option value="pieces" selected>Pieces</option>
+                                                    <option value="pack">Pack</option>
+                                                </select>
+
+                                                <div id="pieces_per_pack_wrap" style="display:none;">
+                                                    <label class="form-label">Pieces per Pack</label>
+                                                    <input type="number" min="1" name="pieces_per_pack" class="form-control" onkeypress="restrictnumber(event)" placeholder="e.g. 12">
+                                                </div>
+
+                                                <label class="form-label">GST (%) <span class="text-danger">*</span></label>
+                                                <input type="number" min="0" max="99" required name="gst" class="form-control" onkeypress="restrictnumber(event)">
+
+                                                <label class="form-label">GST Type <span class="text-danger">*</span></label>
+                                                <select name="gst_type" class="form-control" required>
+                                                    <option value="exclusive">Exclusive (GST added on top of price)</option>
+                                                    <option value="inclusive">Inclusive (GST included in price)</option>
+                                                </select>
 
                                                 <label class="form-label">HSN <span class="text-muted" style="font-size:12px;">(optional)</span></label>
                                                 <input type="text" name="hsn" maxlength="255" class="form-control" onkeypress="restrictHSN(event)">

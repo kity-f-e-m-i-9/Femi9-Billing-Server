@@ -139,32 +139,63 @@ if (empty($rawItems)) {
     redirectWithMessage('neksomo-manufacturer-purchase.php', 'error=noproducts');
 }
 
-// Look up pieces_per_pack for every product in one query
+// Look up pieces_per_pack and GST details for every product in one query.
+// GST is never trusted from the client — it's always taken from the
+// product's own gst/gst_type at the moment of purchase, so a line item's
+// tax breakdown can't be spoofed or drift from what's actually configured.
 $pids = array_column($rawItems, 'pid');
 $placeholders = implode(',', array_fill(0, count($pids), '?'));
-$ppStmt = $db_conn->prepare("SELECT id, pieces_per_pack FROM products WHERE id IN ($placeholders)");
+$ppStmt = $db_conn->prepare("SELECT id, pieces_per_pack, gst, gst_type FROM products WHERE id IN ($placeholders)");
 $ppStmt->bind_param(str_repeat('i', count($pids)), ...$pids);
 $ppStmt->execute();
 $piecesPerPackByProduct = [];
+$gstRateByProduct = [];
+$gstTypeByProduct = [];
 foreach ($ppStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
     $piecesPerPackByProduct[(int)$row['id']] = (int)$row['pieces_per_pack'];
+    $gstRateByProduct[(int)$row['id']] = (float)$row['gst'];
+    $gstTypeByProduct[(int)$row['id']] = $row['gst_type'] === 'inclusive' ? 'inclusive' : 'exclusive';
 }
 $ppStmt->close();
 
+// Cost/Piece is priced according to the product's own GST setting: for
+// exclusive products it's the pre-tax rate (GST is added on top); for
+// inclusive products it's the final rate (GST is backed out of it). Either
+// way, total_cost ends up as the tax-inclusive amount actually paid.
 $items = [];
 foreach ($rawItems as $it) {
     $pieces_per_pack = $piecesPerPackByProduct[$it['pid']] ?? 1;
     if ($pieces_per_pack < 1) $pieces_per_pack = 1;
+    $gst_rate = $gstRateByProduct[$it['pid']] ?? 0.0;
+    $gst_type = $gstTypeByProduct[$it['pid']] ?? 'exclusive';
+
+    $entered_amount = round($it['qty_pieces'] * $it['cost'], 2);
+    if ($gst_type === 'inclusive') {
+        $total_cost    = $entered_amount;
+        $taxable_value = round($total_cost / (1 + $gst_rate / 100), 2);
+        $gst_amount    = round($total_cost - $taxable_value, 2);
+    } else {
+        $taxable_value = $entered_amount;
+        $gst_amount    = round($taxable_value * $gst_rate / 100, 2);
+        $total_cost    = round($taxable_value + $gst_amount, 2);
+    }
+
     $items[] = [
         'pid'             => $it['pid'],
         'qty_pieces'      => $it['qty_pieces'],
         'pieces_per_pack' => $pieces_per_pack,
         'cost'            => $it['cost'],
-        'total_cost' => round($it['qty_pieces'] * $it['cost'], 2),
+        'gst_rate'        => $gst_rate,
+        'gst_type'        => $gst_type,
+        'taxable_value'   => $taxable_value,
+        'gst_amount'      => $gst_amount,
+        'total_cost'      => $total_cost,
     ];
 }
 
-$grand_total = round(array_sum(array_column($items, 'total_cost')), 2);
+$grand_total    = round(array_sum(array_column($items, 'total_cost')), 2);
+$grand_taxable  = round(array_sum(array_column($items, 'taxable_value')), 2);
+$grand_gst      = round(array_sum(array_column($items, 'gst_amount')), 2);
 
 // Neksomo's own godown id, looked up by name rather than hardcoded — this
 // page is only ever reachable by neksomo/admin, and the stock it credits is
@@ -222,25 +253,29 @@ try {
     $first = $items[0];
     $headerStmt = $db_conn->prepare(
         "INSERT INTO neksomo_manufacturer_purchases
-            (vendor_id, invoice_number, product_id, manufacturer_name, purchase_date, total_amount, quantity_packs, cost_per_piece, total_cost, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            (vendor_id, invoice_number, product_id, manufacturer_name, purchase_date, total_amount, total_taxable_value, total_gst_amount, quantity_packs, cost_per_piece, total_cost, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $headerStmt->bind_param(
-        'isissdidds',
+        'isissdddidds',
         $vendor_id, $inv_number, $first['pid'], $vendor_name, $purchase_date,
-        $grand_total, $first['qty_packs'], $first['cost'], $first['total_cost'], $created_by
+        $grand_total, $grand_taxable, $grand_gst, $first['qty_packs'], $first['cost'], $first['total_cost'], $created_by
     );
     $headerStmt->execute();
     $purchase_id = $db_conn->insert_id;
     $headerStmt->close();
 
     $itemStmt = $db_conn->prepare(
-        "INSERT INTO neksomo_purchase_items (purchase_id, product_id, quantity_packs, quantity_pieces, cost_per_piece, total_cost, stock_ledger_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO neksomo_purchase_items (purchase_id, product_id, quantity_packs, quantity_pieces, cost_per_piece, gst_rate, gst_type, total_cost, taxable_value, gst_amount, stock_ledger_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
 
     foreach ($items as $item) {
-        $itemStmt->bind_param('iiiiddi', $purchase_id, $item['pid'], $item['qty_packs'], $item['qty_pieces'], $item['cost'], $item['total_cost'], $item['ledger_id']);
+        $itemStmt->bind_param(
+            'iiiiddsdddi',
+            $purchase_id, $item['pid'], $item['qty_packs'], $item['qty_pieces'], $item['cost'],
+            $item['gst_rate'], $item['gst_type'], $item['total_cost'], $item['taxable_value'], $item['gst_amount'], $item['ledger_id']
+        );
         $itemStmt->execute();
     }
     $itemStmt->close();

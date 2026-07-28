@@ -19,20 +19,74 @@ $result_Godown        = mysqli_fetch_array($fetch_Godowndetails);
 // overall-stock.php. The From/To date form below submits to
 // neksomo-purchase-stock-datewise.php (mirrors overall-stock.php ->
 // overstock_datewise.php) for the date-scoped report on a separate page.
-$select_purchased = "SELECT npi.product_id, SUM(npi.quantity_pieces) AS purchased_qty
+//
+// Pack-based products (unit_type='pack') are maintained in packs throughout —
+// quantity_packs instead of quantity_pieces, and sold qty comes from
+// get_neksomo_packs_sold_via_llp_healthcare() (1:1 pack mapping, no
+// pieces_per_pack conversion) instead of the pieces helper.
+$select_purchased = "SELECT npi.product_id, SUM(npi.quantity_pieces) AS purchased_pieces, SUM(npi.quantity_packs) AS purchased_packs
                       FROM neksomo_purchase_items npi
                       JOIN neksomo_manufacturer_purchases mp ON mp.id = npi.purchase_id
                       GROUP BY npi.product_id";
 $Fetch_purchased = mysqli_query($db_conn, $select_purchased);
-$purchasedByProduct = [];
+$purchasedPiecesByProduct = [];
+$purchasedPacksByProduct = [];
 while ($row = mysqli_fetch_assoc($Fetch_purchased)) {
-    $purchasedByProduct[(int)$row['product_id']] = (int)$row['purchased_qty'];
+    $purchasedPiecesByProduct[(int)$row['product_id']] = (int)$row['purchased_pieces'];
+    $purchasedPacksByProduct[(int)$row['product_id']]  = (int)$row['purchased_packs'];
 }
 
-// LLP + Healthcare sales, converted to pieces via neksomo_product_mapping, all-time.
+// LLP + Healthcare sales, all-time: pieces-based products converted to pieces
+// via neksomo_product_mapping; pack-based products kept as packs (1:1 mapping).
 $soldPiecesByProduct = get_neksomo_pieces_sold_via_llp_healthcare($db_conn, '', '');
+$soldPacksByProduct  = get_neksomo_packs_sold_via_llp_healthcare($db_conn, '', '');
 
-$Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesByProduct)];
+// Build per-product rows up front (rather than inside the HTML loop below) so
+// the header total and the table/footer totals are derived from the exact
+// same numbers — each product's own unit_type decides whether its purchased/
+// sold/closing figures come from the pieces or the packs maps, so summing the
+// raw pieces/packs arrays directly (which both contain entries for every
+// product, not just ones of that unit) would double count across units.
+$select_products = "SELECT id, productName, hsn, unit_type
+                     FROM products
+                     WHERE temp_id LIKE 'NKS-%' AND deleted_at IS NULL
+                     ORDER BY productName ASC";
+$Fetch_products = mysqli_query($db_conn, $select_products);
+$product_rows = [];
+$total_closing_pieces = 0;
+$total_purchased_pieces = 0;
+$total_sold_pieces = 0;
+$total_closing_packs = 0;
+$total_purchased_packs = 0;
+$total_sold_packs = 0;
+while ($Result_product = mysqli_fetch_assoc($Fetch_products)) {
+    $pid = (int)$Result_product['id'];
+    $isPack = ($Result_product['unit_type'] === 'pack');
+    $PurchasedQty = $isPack ? ($purchasedPacksByProduct[$pid] ?? 0) : ($purchasedPiecesByProduct[$pid] ?? 0);
+    $SoldQty      = $isPack ? ($soldPacksByProduct[$pid] ?? 0)     : ($soldPiecesByProduct[$pid] ?? 0);
+    $ClosingStock = $PurchasedQty - $SoldQty;
+    if ($isPack) {
+        $total_purchased_packs += $PurchasedQty;
+        $total_sold_packs      += $SoldQty;
+        $total_closing_packs   += $ClosingStock;
+    } else {
+        $total_purchased_pieces += $PurchasedQty;
+        $total_sold_pieces      += $SoldQty;
+        $total_closing_pieces   += $ClosingStock;
+    }
+    $product_rows[] = [
+        'productName'  => $Result_product['productName'],
+        'hsn'          => $Result_product['hsn'],
+        'isPack'       => $isPack,
+        'unitLabel'    => $isPack ? 'packs' : 'pcs',
+        'PurchasedQty' => $PurchasedQty,
+        'SoldQty'      => $SoldQty,
+        'ClosingStock' => $ClosingStock,
+    ];
+}
+
+$Result_closing_pieces = $total_closing_pieces;
+$Result_closing_packs  = $total_closing_packs;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -93,7 +147,7 @@ $Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesBy
                                     <h1>
 									<table class="headertble">
 									<tr>
-									<td>Purchase Stock : <?=inr_format($Result_sumclosing12[0] ?? 0, 0);?> (Qty)</td>
+									<td>Purchase Stock : <?=inr_format($Result_closing_pieces, 0);?> pcs, <?=inr_format($Result_closing_packs, 0);?> packs (Qty)</td>
 									</tr>
 									</table>
 									</h1>
@@ -124,8 +178,9 @@ $Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesBy
                                 <div class="card">
                                     <div class="card-body">
 									<p class="text-muted" style="font-size:13px;">
-										Closing Stock = Purchased Qty &minus; (LLP + Healthcare Sales Qty, net of returns, converted to pieces via the product mapping), all-time. Select a date range above to view a specific period.
-										A returned piece goes back into available stock — it isn't gone twice. A product with no mapped company pack-product(s) shows 0 sold, regardless of what actually moved through LLP/Healthcare.
+										Closing Stock = Purchased Qty &minus; LLP + Healthcare Sales Qty (net of returns), all-time. Select a date range above to view a specific period.
+										Pieces-based products are converted to pieces via the product mapping; pack-based products are maintained in packs (mapped 1:1, no piece conversion) — each row shows its own unit.
+										A returned piece/pack goes back into available stock — it isn't gone twice. A product with no mapped company pack-product(s) shows 0 sold, regardless of what actually moved through LLP/Healthcare.
 									</p>
 									<div style="background:#fff;overflow:scroll;width:100%;">
 
@@ -137,47 +192,28 @@ $Result_sumclosing12 = [array_sum($purchasedByProduct) - array_sum($soldPiecesBy
 												<th>Product Name</th>
 												<th>HSN</th>
 												<th style="text-align:right;">Purchased Qty</th>
-												<th style="text-align:right;">LLP + Healthcare Sales Qty (pcs, net of returns)</th>
-												<th style="text-align:right;">Closing Stock (pcs)</th>
+												<th style="text-align:right;">LLP + Healthcare Sales Qty (net of returns)</th>
+												<th style="text-align:right;">Closing Stock</th>
 												</tr>
                                             </thead>
 
 											<tbody>
-			<?php
-$total_closing = 0;
-$total_purchased = 0;
-$total_sold = 0;
-
-$select_products = "SELECT id, productName, hsn
-                     FROM products
-                     WHERE temp_id LIKE 'NKS-%' AND deleted_at IS NULL
-                     ORDER BY productName ASC";
-										$Fetch_products = mysqli_query($db_conn, $select_products);
-										$row_count = mysqli_num_rows($Fetch_products);
-										while ($Result_product = mysqli_fetch_array($Fetch_products)) {
-											$pid = (int)$Result_product['id'];
-											$PurchasedQty = $purchasedByProduct[$pid] ?? 0;
-											$SoldPieces   = $soldPiecesByProduct[$pid] ?? 0;
-											$ClosingStock = $PurchasedQty - $SoldPieces;
-											$total_purchased += $PurchasedQty;
-											$total_sold      += $SoldPieces;
-											$total_closing    += $ClosingStock;
-										?>
+			<?php foreach ($product_rows as $r): ?>
                                                 <tr>
-                                                    <td><?php echo $Result_product["productName"];?></td>
-													<td><?php echo $Result_product["hsn"];?></td>
+                                                    <td><?php echo $r['productName'];?></td>
+													<td><?php echo $r['hsn'];?></td>
 
 						<!-------PURCHASE QTY------------->
-						<td align="right"><?php echo inr_format($PurchasedQty, 0);?></td>
+						<td align="right"><?php echo inr_format($r['PurchasedQty'], 0) . ' ' . $r['unitLabel'];?></td>
 
-						<!-------LLP + HEALTHCARE SALES (PIECES)------------->
-						<td align="right"><?php echo inr_format($SoldPieces, 0);?></td>
+						<!-------LLP + HEALTHCARE SALES QTY------------->
+						<td align="right"><?php echo inr_format($r['SoldQty'], 0) . ' ' . $r['unitLabel'];?></td>
 
-						<td align="right"><b><?php echo inr_format($ClosingStock, 0);?></b></td>
+						<td align="right"><b><?php echo inr_format($r['ClosingStock'], 0) . ' ' . $r['unitLabel'];?></b></td>
 
                                                 </tr>
-										<?php }
-										if ($row_count === 0) { ?>
+										<?php endforeach;
+										if (empty($product_rows)) { ?>
 										<tr><td colspan="5" style="text-align:center;color:#898781;">No products added yet.</td></tr>
 										<?php } ?>
 
@@ -185,10 +221,16 @@ $select_products = "SELECT id, productName, hsn
 
 										 <tfoot>
 										 <tr>
-										<td colspan="2" style="text-align:right;">Total</td>
-										<td align="right"><b><?=inr_format($total_purchased, 0);?></b></td>
-										<td align="right"><b><?=inr_format($total_sold, 0);?></b></td>
-										<td align="right"><b><?=inr_format($total_closing, 0);?></b></td>
+										<td colspan="2" style="text-align:right;">Total (Pieces)</td>
+										<td align="right"><b><?=inr_format($total_purchased_pieces, 0);?> pcs</b></td>
+										<td align="right"><b><?=inr_format($total_sold_pieces, 0);?> pcs</b></td>
+										<td align="right"><b><?=inr_format($total_closing_pieces, 0);?> pcs</b></td>
+										</tr>
+										 <tr>
+										<td colspan="2" style="text-align:right;">Total (Packs)</td>
+										<td align="right"><b><?=inr_format($total_purchased_packs, 0);?> packs</b></td>
+										<td align="right"><b><?=inr_format($total_sold_packs, 0);?> packs</b></td>
+										<td align="right"><b><?=inr_format($total_closing_packs, 0);?> packs</b></td>
 										</tr>
 										 </tfoot>
 

@@ -9,7 +9,7 @@ if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
 }
 
 $entries = $db_conn->query(
-    "SELECT r.id, r.effective_date, r.rate_per_piece, p.productName
+    "SELECT r.id, r.effective_date, r.rate_per_piece, r.gst_rate, r.gst_type, p.productName, p.unit_type
      FROM neksomo_llp_piece_purchase_rates r
      JOIN products p ON p.id = r.product_id
      ORDER BY p.productName ASC, r.effective_date DESC"
@@ -67,7 +67,7 @@ $entries = $db_conn->query(
                                     <h1>
                                         <table class="headertble">
                                         <tr>
-                                        <td>Purchase Rates (Femi9 LLP, Per Piece)</td>
+                                        <td>Purchase Rates (Femi9 LLP)</td>
                                         <td><a href="neksomo-llp-piece-purchase-rate.php" title="Add Rate">&#10011;</a></td>
                                         </tr>
                                         </table>
@@ -87,7 +87,8 @@ $entries = $db_conn->query(
                                                 <tr>
                                                     <th>Product</th>
                                                     <th>Effective Date</th>
-                                                    <th>Rate/Piece &#8377;</th>
+                                                    <th>Rate &#8377;</th>
+                                                    <th>GST</th>
                                                     <th>Actions</th>
                                                 </tr>
                                             </thead>
@@ -96,7 +97,8 @@ $entries = $db_conn->query(
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($e['productName']); ?></td>
                                                     <td><?php echo date('d M Y', strtotime($e['effective_date'])); ?></td>
-                                                    <td>&#8377;<?php echo number_format((float)$e['rate_per_piece'], 2); ?></td>
+                                                    <td>&#8377;<?php echo number_format((float)$e['rate_per_piece'], 2); ?><?php echo $e['unit_type'] === 'pack' ? '/pack' : '/pc'; ?></td>
+                                                    <td><?php echo number_format((float)$e['gst_rate'], 2); ?>% <?php echo $e['gst_type'] === 'inclusive' ? '(Incl.)' : '(Excl.)'; ?></td>
                                                     <td>
                                                         <div class="actions-group">
                                                             <a href="neksomo-llp-piece-purchase-rate-edit.php?id=<?php echo $eid; ?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
@@ -106,7 +108,7 @@ $entries = $db_conn->query(
                                                 </tr>
                                             <?php endforeach; ?>
                                             <?php if (empty($entries)): ?>
-                                                <tr><td colspan="4" style="text-align:center;color:#898781;">No rates entered yet.</td></tr>
+                                                <tr><td colspan="5" style="text-align:center;color:#898781;">No rates entered yet.</td></tr>
                                             <?php endif; ?>
                                             </tbody>
                                         </table>

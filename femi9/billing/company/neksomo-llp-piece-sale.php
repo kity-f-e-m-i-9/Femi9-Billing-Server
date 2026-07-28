@@ -13,7 +13,7 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-$products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM products WHERE deleted_at IS NULL AND temp_id LIKE 'NKS-%' ORDER BY productName ASC")->fetch_all(MYSQLI_ASSOC);
+$products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type, gst, gst_type FROM products WHERE deleted_at IS NULL AND temp_id LIKE 'NKS-%' ORDER BY productName ASC")->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -83,7 +83,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM produc
                                     <h1>
                                         <table class="headertble">
                                         <tr>
-                                        <td>Sale to Femi9 LLP (Per Piece)</td>
+                                        <td>Sale to Femi9 LLP</td>
                                         <td><a href="neksomo-llp-piece-sale-manage" title="Manage Entries">&#9776;</a></td>
                                         </tr>
                                         </table>
@@ -110,9 +110,10 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM produc
                         <div class="form-section">
                             <div class="section-header"><i class="material-icons">edit_document</i>Rate Details</div>
                             <p class="text-muted" style="font-size:13px;">
-                                This is a rate list, not a per-sale log. Enter the per-piece rate and the
+                                This is a rate list, not a per-sale log. Enter the rate and the
                                 date it takes effect — that rate applies to every sale from that date
                                 onward, until a later effective date for the same product supersedes it.
+                                Piece-based products are rated per piece; pack-based products are rated per pack.
                             </p>
                             <div class="row g-4 align-items-start">
                                 <div class="col-lg-4 col-md-6">
@@ -132,12 +133,13 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM produc
                                         <select id="productSelect" class="form-control">
                                             <option value="">— Select Product —</option>
                                             <?php foreach ($products as $p): ?>
-                                            <option value="<?php echo (int)$p['id']; ?>"><?php echo htmlspecialchars($p['productName']); ?></option>
+                                            <option value="<?php echo (int)$p['id']; ?>" data-unit-type="<?php echo htmlspecialchars($p['unit_type']); ?>" data-gst="<?php echo (float)$p['gst']; ?>" data-gst-type="<?php echo htmlspecialchars($p['gst_type']); ?>"><?php echo htmlspecialchars($p['productName']); ?></option>
                                             <?php endforeach; ?>
                                         </select>
+                                        <div class="field-hint" id="gstHint" style="margin-top:4px;"></div>
                                     </div>
                                     <div class="input-group-modern">
-                                        <label>Rate/Piece (₹) <span style="color:#ef4444;">*</span></label>
+                                        <label><span id="rateLabelText">Rate/Piece (₹)</span> <span style="color:#ef4444;">*</span></label>
                                         <input type="number" id="rateInput" class="form-control" min="0" step="0.01" placeholder="0.00">
                                     </div>
                                     <div class="input-group-modern" style="align-items:flex-end;">
@@ -153,7 +155,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM produc
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>#</th><th>Product</th><th>Rate/Piece (₹)</th><th></th>
+                                            <th>#</th><th>Product</th><th>Rate (₹)</th><th></th>
                                         </tr>
                                     </thead>
                                     <tbody id="productBody">
@@ -193,20 +195,40 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM produc
     (function ($) {
         var rateItems = [];
 
+        $('#productSelect').on('change', function () {
+            var $opt   = $(this).find('option:selected');
+            var isPack = $opt.data('unit-type') === 'pack';
+            $('#rateLabelText').text(isPack ? 'Rate/Pack (₹)' : 'Rate/Piece (₹)');
+
+            var gstRate = parseFloat($opt.data('gst')) || 0;
+            var gstType = $opt.data('gst-type') || 'exclusive';
+            if ($opt.val()) {
+                $('#gstHint').text(
+                    'GST ' + gstRate + '% ' + gstType + ' — ' +
+                    (gstType === 'inclusive'
+                        ? 'this rate already has GST built in; Gross Profit uses the pre-tax portion.'
+                        : 'this rate is already pre-tax and used as-is for Gross Profit.')
+                );
+            } else {
+                $('#gstHint').text('');
+            }
+        });
+
         window.addProduct = function () {
             hideAddError();
             var $opt       = $('#productSelect').find('option:selected');
             var product_id = parseInt($('#productSelect').val());
             var name       = $opt.text().trim();
+            var isPack     = $opt.data('unit-type') === 'pack';
             var rate       = parseFloat($('#rateInput').val());
 
             if (!product_id)             { showAddError('Please select a product.'); return; }
-            if (isNaN(rate) || rate < 0) { showAddError('Please enter a valid rate per piece.'); return; }
+            if (isNaN(rate) || rate < 0) { showAddError('Please enter a valid rate.'); return; }
             if (rateItems.find(function (i) { return i.product_id === product_id; })) {
                 showAddError('This product is already added.'); return;
             }
 
-            rateItems.push({ product_id: product_id, name: name, rate: rate });
+            rateItems.push({ product_id: product_id, name: name, rate: rate, unitLabel: isPack ? '/pack' : '/pc' });
             renderTable();
             resetAddForm();
         };
@@ -227,7 +249,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM produc
                     '<tr>' +
                     '<td><span class="row-num">' + (i + 1) + '</span></td>' +
                     '<td><strong>' + escHtml(item.name) + '</strong></td>' +
-                    '<td>₹' + item.rate.toFixed(2) + '</td>' +
+                    '<td>₹' + item.rate.toFixed(2) + item.unitLabel + '</td>' +
                     '<td><button type="button" class="badge-remove" onclick="removeProduct(' + i + ')"><i class="material-icons" style="font-size:14px;vertical-align:middle;">delete</i> Remove</button></td>' +
                     '</tr>'
                 );
@@ -258,6 +280,8 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack FROM produc
         function resetAddForm() {
             $('#productSelect').val('');
             $('#rateInput').val('');
+            $('#rateLabelText').text('Rate/Piece (₹)');
+            $('#gstHint').text('');
             hideAddError();
         }
 

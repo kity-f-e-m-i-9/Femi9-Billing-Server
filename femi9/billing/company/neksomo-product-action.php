@@ -26,29 +26,43 @@ $productName = trim(str_replace("'", "", $_POST['productName'] ?? ''));
 $hsn         = trim(str_replace("'", "", $_POST['hsn'] ?? ''));
 
 if ($action === 'insert-product') {
-    if ($productName === '') {
+    $category  = in_array($_POST['category'] ?? '', ['napkin', 'diaper'], true) ? $_POST['category'] : '';
+    $unit_type = in_array($_POST['unit_type'] ?? '', ['pieces', 'pack'], true) ? $_POST['unit_type'] : '';
+    $gst_type  = in_array($_POST['gst_type'] ?? '', ['inclusive', 'exclusive'], true) ? $_POST['gst_type'] : '';
+    $gst       = is_numeric($_POST['gst'] ?? null) ? (float) $_POST['gst'] : -1;
+
+    $pieces_per_pack = trim($_POST['pieces_per_pack'] ?? '');
+    $pieces_per_pack = ($pieces_per_pack !== '' && ctype_digit($pieces_per_pack)) ? (int) $pieces_per_pack : 0;
+
+    $valid = $productName !== ''
+        && $category !== ''
+        && $unit_type !== ''
+        && $gst_type !== ''
+        && $gst >= 0 && $gst <= 99
+        && ($unit_type !== 'pack' || $pieces_per_pack >= 1);
+
+    if (!$valid) {
         redirectWithMessage('neksomo-product-add.php', 'error');
     }
 
-    // Products added here are piece-native — no pack size (pieces_per_pack
-    // stays NULL, which every Neksomo report already treats as "1 piece per
-    // pack") and none of the reseller pack-tier prices apply, so they're all
-    // zeroed rather than shown as fields on the form.
-    $temp_id         = 'NKS-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
-    $pieces_per_pack = null;
-    $zero            = 0;
-    $gst_type        = 'exclusive';
+    // Pack-selling products keep their pack size; piece-native products leave
+    // pieces_per_pack NULL, which every Neksomo report already treats as
+    // "1 piece per pack". None of the reseller pack-tier prices apply here,
+    // so they're all zeroed rather than shown as fields on the form.
+    $temp_id                  = 'NKS-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
+    $pieces_per_pack_to_store = ($unit_type === 'pack') ? $pieces_per_pack : null;
+    $zero                     = 0;
 
     $stmt = $db_conn->prepare(
         "INSERT INTO products
-            (temp_id, productName, pieces_per_pack, mrp, supersstock_price, super_distributor_price,
+            (temp_id, productName, pieces_per_pack, unit_type, category, mrp, supersstock_price, super_distributor_price,
              stockist_price, distributor_price, outlet_price, gst, gst_type, hsn, rwpoints, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
     );
     $stmt->bind_param(
-        'ssidddddddssd',
-        $temp_id, $productName, $pieces_per_pack, $zero, $zero, $zero,
-        $zero, $zero, $zero, $zero, $gst_type, $hsn, $zero
+        'ssissdddddddssd',
+        $temp_id, $productName, $pieces_per_pack_to_store, $unit_type, $category, $zero, $zero, $zero,
+        $zero, $zero, $zero, $gst, $gst_type, $hsn, $zero
     );
     $ok = $stmt->execute();
     $product_id = $ok ? (int)$db_conn->insert_id : 0;

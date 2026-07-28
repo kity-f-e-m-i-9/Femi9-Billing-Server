@@ -557,7 +557,38 @@ $grand_total_return_value = 0.0;
 $grand_total_return_purchase_value = 0.0;
 $grand_total_net_qty = 0;
 $grand_total_net_pieces = 0;
+$grand_total_gst_value = 0.0;
+$grand_total_return_gst_value = 0.0;
+$grand_total_purchase_gst_value = 0.0;
+$grand_total_return_purchase_gst_value = 0.0;
+$grand_total_output_gst = 0.0;
+$grand_total_input_gst = 0.0;
+$grand_total_net_gst = 0.0;
 $selected_entity_name = 'All Visible Entities';
+$diaper_sold = [];
+$grand_diaper_pack_qty = 0;
+$grand_diaper_return_qty = 0;
+$grand_diaper_net_qty = 0;
+$grand_diaper_value = 0.0;
+$grand_diaper_return_value = 0.0;
+$grand_diaper_purchase_value = 0.0;
+$grand_diaper_return_purchase_value = 0.0;
+$grand_diaper_unrated_qty = 0;
+$grand_diaper_unpriced_qty = 0;
+$grand_diaper_gst_value = 0.0;
+$grand_diaper_return_gst_value = 0.0;
+$grand_diaper_purchase_gst_value = 0.0;
+$grand_diaper_return_purchase_gst_value = 0.0;
+$grand_diaper_gross_profit = 0.0;
+$grand_diaper_expense = 0.0;
+$grand_diaper_net_profit = 0.0;
+$grand_diaper_output_gst = 0.0;
+$grand_diaper_input_gst = 0.0;
+$grand_diaper_net_gst = 0.0;
+$grand_combined_gross_profit = 0.0;
+$grand_combined_expense = 0.0;
+$grand_combined_net_profit = 0.0;
+$grand_combined_net_gst = 0.0;
 if ($scope === 'company') {
     // Self-migrating: this block is the only thing standing between a
     // neksomo login and dashboard.php's `include("mis-report.php")` — with
@@ -700,29 +731,55 @@ if ($scope === 'company') {
     // different id spaces and silently matches nothing.
     //
     // Every card in this section is scoped to mapped products only: the
-    // WHERE d.pr_id IN (SELECT company_product_id FROM neksomo_product_mapping)
-    // filter below drops sold/returned pack SKUs that have no Neksomo mapping
-    // at all before they're ever summed, so an unmapped product can't inflate
-    // Total Pack Qty Sold / Return Qty / Consolidated Qty while still reading
-    // ₹0 for Sold Price and Gross Profit.
+    // WHERE clause below drops sold/returned pack SKUs that have no Neksomo
+    // mapping at all before they're ever summed, so an unmapped product can't
+    // inflate Total Pack Qty Sold / Return Qty / Consolidated Qty while still
+    // reading ₹0 for Sold Price and Gross Profit. It also excludes mappings
+    // to a diaper-category Neksomo product (np.category='diaper') — those
+    // belong in the Diaper section below, not here. Napkin's existing
+    // Neksomo products (18/19/20) have category NULL (added before the
+    // category field existed), so the filter is "not diaper", not "= napkin".
     $pieces_sold = call_rows($db_conn,
         "SELECT p.id pid, p.productName, p.pieces_per_pack,
                 COALESCE(SUM(dp.day_qty),0) total_qty,
                 COALESCE(SUM(dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1)),0) total_pieces,
                 COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.rate ELSE 0 END),0) total_value,
                 COALESCE(SUM(CASE WHEN dp.rate IS NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) ELSE 0 END),0) unrated_pieces,
+                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.rate_gst_amt ELSE 0 END),0) total_gst_value,
                 COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.purchase_rate ELSE 0 END),0) total_purchase_value,
-                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) ELSE 0 END),0) unpriced_pieces
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) ELSE 0 END),0) unpriced_pieces,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.purchase_rate_gst_amt ELSE 0 END),0) total_purchase_gst_value
          FROM (
              SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
-                    (SELECT r.rate_per_piece FROM neksomo_llp_piece_rates r
+                    -- GST is a pass-through tax, not revenue, so Gross Profit is always
+                    -- computed on the taxable (pre-tax) rate: an exclusive-type rate is
+                    -- already pre-tax as entered; an inclusive-type rate has GST backed
+                    -- out of it here. gst_rate/gst_type are snapshotted onto the rate row
+                    -- at entry time (see neksomo-llp-piece-sale-action.php), so this isn't
+                    -- affected by a product's GST% changing later. The GST portion itself
+                    -- (rate_gst_amt/purchase_rate_gst_amt) is computed alongside and summed
+                    -- separately (total_gst_value/total_purchase_gst_value) — shown in the
+                    -- report as its own figure, never folded into Gross Profit.
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+                     FROM neksomo_llp_piece_rates r
                      WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
                        AND r.effective_date <= d.date
                      ORDER BY r.effective_date DESC LIMIT 1) rate,
-                    (SELECT pr.rate_per_piece FROM neksomo_llp_piece_purchase_rates pr
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece - r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece * r.gst_rate/100 END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) rate_gst_amt,
+                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
+                     FROM neksomo_llp_piece_purchase_rates pr
                      WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
                        AND pr.effective_date <= d.date
-                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate,
+                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece - pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece * pr.gst_rate/100 END
+                     FROM neksomo_llp_piece_purchase_rates pr
+                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND pr.effective_date <= d.date
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate_gst_amt
              FROM (
                  SELECT ii.pr_id, ii.qty, i.date
                  FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
@@ -740,7 +797,9 @@ if ($scope === 'company') {
                  FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
                  WHERE tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
              ) d
-             WHERE d.pr_id IN (SELECT company_product_id FROM neksomo_product_mapping)
+             WHERE d.pr_id IN (SELECT m.company_product_id FROM neksomo_product_mapping m
+                               JOIN products np ON np.id = m.neksomo_product_id
+                               WHERE COALESCE(np.category, '') != 'diaper')
              GROUP BY d.pr_id, d.date
          ) dp JOIN products p ON p.id = dp.pr_id
          GROUP BY p.id, p.productName, p.pieces_per_pack
@@ -751,8 +810,10 @@ if ($scope === 'company') {
     $grand_total_pack_qty        = (int) array_sum(array_column($pieces_sold, 'total_qty'));
     $grand_total_value           = (float) array_sum(array_column($pieces_sold, 'total_value'));
     $grand_total_unrated_pieces  = (int) array_sum(array_column($pieces_sold, 'unrated_pieces'));
+    $grand_total_gst_value       = (float) array_sum(array_column($pieces_sold, 'total_gst_value'));
     $grand_total_purchase_value  = (float) array_sum(array_column($pieces_sold, 'total_purchase_value'));
     $grand_total_unpriced_pieces = (int) array_sum(array_column($pieces_sold, 'unpriced_pieces'));
+    $grand_total_purchase_gst_value = (float) array_sum(array_column($pieces_sold, 'total_purchase_gst_value'));
 
     // Expense — for a neksomo login specifically, always Neksomo's own
     // expense uploads, NOT LLP's — even though $filter_entity above is
@@ -812,17 +873,31 @@ if ($scope === 'company') {
                 COALESCE(SUM(dp.day_qty),0) total_qty,
                 COALESCE(SUM(dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1)),0) total_pieces,
                 COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.rate ELSE 0 END),0) total_value,
-                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.purchase_rate ELSE 0 END),0) total_purchase_value
+                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.rate_gst_amt ELSE 0 END),0) total_gst_value,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.purchase_rate ELSE 0 END),0) total_purchase_value,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * dp.purchase_rate_gst_amt ELSE 0 END),0) total_purchase_gst_value
          FROM (
              SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
-                    (SELECT r.rate_per_piece FROM neksomo_llp_piece_rates r
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+                     FROM neksomo_llp_piece_rates r
                      WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
                        AND r.effective_date <= d.date
                      ORDER BY r.effective_date DESC LIMIT 1) rate,
-                    (SELECT pr.rate_per_piece FROM neksomo_llp_piece_purchase_rates pr
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece - r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece * r.gst_rate/100 END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) rate_gst_amt,
+                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
+                     FROM neksomo_llp_piece_purchase_rates pr
                      WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
                        AND pr.effective_date <= d.date
-                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate,
+                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece - pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece * pr.gst_rate/100 END
+                     FROM neksomo_llp_piece_purchase_rates pr
+                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND pr.effective_date <= d.date
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate_gst_amt
              FROM (
                  SELECT ri.prid pr_id, ri.qty, ri.date
                  FROM user_return_stock_items ri
@@ -832,7 +907,9 @@ if ($scope === 'company') {
                  FROM ot_sales_return osr
                  WHERE osr.return_date BETWEEN ? AND ?{$pcs_otret_cond}
              ) d
-             WHERE d.pr_id IN (SELECT company_product_id FROM neksomo_product_mapping)
+             WHERE d.pr_id IN (SELECT m.company_product_id FROM neksomo_product_mapping m
+                               JOIN products np ON np.id = m.neksomo_product_id
+                               WHERE COALESCE(np.category, '') != 'diaper')
              GROUP BY d.pr_id, d.date
          ) dp JOIN products p ON p.id = dp.pr_id
          GROUP BY p.id",
@@ -840,11 +917,29 @@ if ($scope === 'company') {
     $grand_total_return_qty            = (int) array_sum(array_column($pieces_returned, 'total_qty'));
     $grand_total_return_pieces         = (int) array_sum(array_column($pieces_returned, 'total_pieces'));
     $grand_total_return_value          = (float) array_sum(array_column($pieces_returned, 'total_value'));
+    $grand_total_return_gst_value      = (float) array_sum(array_column($pieces_returned, 'total_gst_value'));
     $grand_total_return_purchase_value = (float) array_sum(array_column($pieces_returned, 'total_purchase_value'));
+    $grand_total_return_purchase_gst_value = (float) array_sum(array_column($pieces_returned, 'total_purchase_gst_value'));
 
     // Consolidated (net) qty — sold minus returned, same entity/period scope.
     $grand_total_net_qty    = $grand_total_pack_qty - $grand_total_return_qty;
     $grand_total_net_pieces = $grand_total_pieces - $grand_total_return_pieces;
+
+    // Fold per-product return qty/pieces/value into $pieces_sold rows (by
+    // product id) for the Product-wise Pieces Sold table below — same
+    // convention as $diaper_sold's fold-in.
+    $pcs_return_qty_by_pid    = array_column($pieces_returned, 'total_qty', 'pid');
+    $pcs_return_pieces_by_pid = array_column($pieces_returned, 'total_pieces', 'pid');
+    $pcs_return_value_by_pid  = array_column($pieces_returned, 'total_value', 'pid');
+    foreach ($pieces_sold as &$__ps_row) {
+        $__ps_row['return_qty']    = (int) ($pcs_return_qty_by_pid[$__ps_row['pid']] ?? 0);
+        $__ps_row['return_pieces'] = (int) ($pcs_return_pieces_by_pid[$__ps_row['pid']] ?? 0);
+        $__ps_row['net_qty']       = (int) $__ps_row['total_qty'] - $__ps_row['return_qty'];
+        $__ps_row['net_pieces']    = (int) $__ps_row['total_pieces'] - $__ps_row['return_pieces'];
+        $__ps_row['return_value']  = (float) ($pcs_return_value_by_pid[$__ps_row['pid']] ?? 0);
+        $__ps_row['net_value']     = (float) $__ps_row['total_value'] - $__ps_row['return_value'];
+    }
+    unset($__ps_row);
 
     // Gross Profit nets returns on both sides: a returned piece is revenue
     // that never really landed (subtract it from Sold Value) and cost that
@@ -856,6 +951,179 @@ if ($scope === 'company') {
     $grand_gross_profit = ($grand_total_value - $grand_total_return_value)
                         - ($grand_total_purchase_value - $grand_total_return_purchase_value);
     $grand_net_profit   = $grand_gross_profit - $grand_total_expense;
+
+    // GST shown separately from Gross Profit — never folded into it. Output
+    // GST is what was collected on sales (net of returns); Input GST is what
+    // was paid on purchases (net of returns) and is a credit against Output
+    // GST, not a cost — standard GST accounting.
+    $grand_total_output_gst = $grand_total_gst_value - $grand_total_return_gst_value;
+    $grand_total_input_gst  = $grand_total_purchase_gst_value - $grand_total_return_purchase_gst_value;
+    $grand_total_net_gst    = $grand_total_output_gst - $grand_total_input_gst;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DIAPER — a diaper Neksomo product (products.category='diaper') is
+    // itself pack-based (unit_type='pack') and maps 1:1 to a pack-based
+    // company SKU, unlike the napkin/piece-based figures above. So the sold
+    // metric here is the pack quantity actually sold — no pieces_per_pack
+    // conversion. Rates are looked up from the SAME neksomo_llp_piece_rates /
+    // neksomo_llp_piece_purchase_rates tables napkin uses (those pages now
+    // accept both piece- and pack-based products) — for a pack-based product
+    // the stored rate_per_piece column holds a per-PACK rate instead, so
+    // day_qty * rate is already the correct value with no conversion.
+    // ═══════════════════════════════════════════════════════════════════════
+    $diaper_mapped_ids_subq = "SELECT company_product_id FROM neksomo_product_mapping m
+                                JOIN products np ON np.id = m.neksomo_product_id
+                                WHERE np.category = 'diaper'";
+
+    $diaper_sold = call_rows($db_conn,
+        "SELECT p.id pid, p.productName,
+                COALESCE(SUM(dp.day_qty),0) total_qty,
+                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * dp.rate ELSE 0 END),0) total_value,
+                COALESCE(SUM(CASE WHEN dp.rate IS NULL THEN dp.day_qty ELSE 0 END),0) unrated_qty,
+                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * dp.rate_gst_amt ELSE 0 END),0) total_gst_value,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * dp.purchase_rate ELSE 0 END),0) total_purchase_value,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NULL THEN dp.day_qty ELSE 0 END),0) unpriced_qty,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * dp.purchase_rate_gst_amt ELSE 0 END),0) total_purchase_gst_value
+         FROM (
+             SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
+                    -- Taxable (pre-tax) rate — see the same-purpose comment on the
+                    -- napkin $pieces_sold query above; identical GST convention.
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) rate,
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece - r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece * r.gst_rate/100 END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) rate_gst_amt,
+                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
+                     FROM neksomo_llp_piece_purchase_rates pr
+                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND pr.effective_date <= d.date
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate,
+                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece - pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece * pr.gst_rate/100 END
+                     FROM neksomo_llp_piece_purchase_rates pr
+                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND pr.effective_date <= d.date
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate_gst_amt
+             FROM (
+                 SELECT ii.pr_id, ii.qty, i.date
+                 FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+                 WHERE i.user_type=? AND i.date BETWEEN ? AND ?{$pcs_ii_cond}
+                 UNION ALL
+                 SELECT uii.pr_id, uii.qty, ui.date
+                 FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+                 WHERE ui.from_user_type=? AND ui.date BETWEEN ? AND ?{$pcs_uii_cond}
+                 UNION ALL
+                 SELECT os.prid, os.qty, os.date
+                 FROM ot_sales os
+                 WHERE os.date BETWEEN ? AND ?{$pcs_ot_cond}
+                 UNION ALL
+                 SELECT tpii.product_id, tpii.quantity, tpi.invoice_date
+                 FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
+                 WHERE tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
+             ) d
+             WHERE d.pr_id IN ({$diaper_mapped_ids_subq})
+             GROUP BY d.pr_id, d.date
+         ) dp JOIN products p ON p.id = dp.pr_id
+         GROUP BY p.id, p.productName
+         ORDER BY total_qty DESC",
+        'ssssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to, $from, $to]);
+
+    $grand_diaper_pack_qty       = (int) array_sum(array_column($diaper_sold, 'total_qty'));
+    $grand_diaper_value          = (float) array_sum(array_column($diaper_sold, 'total_value'));
+    $grand_diaper_unrated_qty    = (int) array_sum(array_column($diaper_sold, 'unrated_qty'));
+    $grand_diaper_gst_value      = (float) array_sum(array_column($diaper_sold, 'total_gst_value'));
+    $grand_diaper_purchase_value = (float) array_sum(array_column($diaper_sold, 'total_purchase_value'));
+    $grand_diaper_unpriced_qty   = (int) array_sum(array_column($diaper_sold, 'unpriced_qty'));
+    $grand_diaper_purchase_gst_value = (float) array_sum(array_column($diaper_sold, 'total_purchase_gst_value'));
+
+    $diaper_returned = call_rows($db_conn,
+        "SELECT p.id pid,
+                COALESCE(SUM(dp.day_qty),0) total_qty,
+                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * dp.rate ELSE 0 END),0) total_value,
+                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * dp.rate_gst_amt ELSE 0 END),0) total_gst_value,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * dp.purchase_rate ELSE 0 END),0) total_purchase_value,
+                COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * dp.purchase_rate_gst_amt ELSE 0 END),0) total_purchase_gst_value
+         FROM (
+             SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) rate,
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece - r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece * r.gst_rate/100 END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) rate_gst_amt,
+                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
+                     FROM neksomo_llp_piece_purchase_rates pr
+                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND pr.effective_date <= d.date
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate,
+                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece - pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece * pr.gst_rate/100 END
+                     FROM neksomo_llp_piece_purchase_rates pr
+                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND pr.effective_date <= d.date
+                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate_gst_amt
+             FROM (
+                 SELECT ri.prid pr_id, ri.qty, ri.date
+                 FROM user_return_stock_items ri
+                 WHERE ri.to_usertype=? AND ri.date BETWEEN ? AND ?{$pcs_uret_cond}
+                 UNION ALL
+                 SELECT osr.prid pr_id, osr.qty, osr.return_date date
+                 FROM ot_sales_return osr
+                 WHERE osr.return_date BETWEEN ? AND ?{$pcs_otret_cond}
+             ) d
+             WHERE d.pr_id IN ({$diaper_mapped_ids_subq})
+             GROUP BY d.pr_id, d.date
+         ) dp JOIN products p ON p.id = dp.pr_id
+         GROUP BY p.id",
+        'sssss', [$utype, $from, $to, $from, $to]);
+
+    $grand_diaper_return_qty            = (int) array_sum(array_column($diaper_returned, 'total_qty'));
+    $grand_diaper_return_value          = (float) array_sum(array_column($diaper_returned, 'total_value'));
+    $grand_diaper_return_gst_value      = (float) array_sum(array_column($diaper_returned, 'total_gst_value'));
+    $grand_diaper_return_purchase_value = (float) array_sum(array_column($diaper_returned, 'total_purchase_value'));
+    $grand_diaper_return_purchase_gst_value = (float) array_sum(array_column($diaper_returned, 'total_purchase_gst_value'));
+    $grand_diaper_net_qty                = $grand_diaper_pack_qty - $grand_diaper_return_qty;
+
+    // Fold return qty/value into $diaper_sold rows (by product id) for the
+    // product-wise breakdown table.
+    $diaper_return_qty_by_pid   = array_column($diaper_returned, 'total_qty', 'pid');
+    $diaper_return_value_by_pid = array_column($diaper_returned, 'total_value', 'pid');
+    foreach ($diaper_sold as &$__ds_row) {
+        $__ds_row['return_qty']   = (int) ($diaper_return_qty_by_pid[$__ds_row['pid']] ?? 0);
+        $__ds_row['net_qty']      = (int) $__ds_row['total_qty'] - $__ds_row['return_qty'];
+        $__ds_row['return_value'] = (float) ($diaper_return_value_by_pid[$__ds_row['pid']] ?? 0);
+        $__ds_row['net_value']    = (float) $__ds_row['total_value'] - $__ds_row['return_value'];
+    }
+    unset($__ds_row);
+
+    // Diaper Gross Profit, same formula as napkin's. Expense is deliberately
+    // 0 here — there's only one shared Neksomo expense pool (already counted
+    // in full against napkin below), not a separate diaper allocation, so
+    // adding it again here would double-count it in the combined total.
+    $grand_diaper_gross_profit = ($grand_diaper_value - $grand_diaper_return_value)
+                                - ($grand_diaper_purchase_value - $grand_diaper_return_purchase_value);
+    $grand_diaper_expense    = 0.0;
+    $grand_diaper_net_profit = $grand_diaper_gross_profit - $grand_diaper_expense;
+
+    // GST shown separately from Diaper Gross Profit too — same convention as napkin.
+    $grand_diaper_output_gst = $grand_diaper_gst_value - $grand_diaper_return_gst_value;
+    $grand_diaper_input_gst  = $grand_diaper_purchase_gst_value - $grand_diaper_return_purchase_gst_value;
+    $grand_diaper_net_gst    = $grand_diaper_output_gst - $grand_diaper_input_gst;
+
+    // Combined — napkin + diaper, summed. Expense is not summed twice: it's
+    // the same single Neksomo expense pool already reflected in
+    // $grand_total_expense (napkin's), with $grand_diaper_expense fixed at 0.
+    $grand_combined_gross_profit = $grand_gross_profit + $grand_diaper_gross_profit;
+    $grand_combined_expense      = $grand_total_expense + $grand_diaper_expense;
+    $grand_combined_net_profit   = $grand_net_profit + $grand_diaper_net_profit;
+    $grand_combined_net_gst      = $grand_total_net_gst + $grand_diaper_net_gst;
 }
 
 // Per-product returns, scoped the same way as the Returns KPI above (same
@@ -1092,6 +1360,15 @@ if ($is_neksomo_view) {
         .kpi-card { background:#fff; border:1px solid rgba(11,11,11,0.10); border-radius:10px; padding:16px 18px; height:100%; }
         .kpi-t { font-size:11px; text-transform:uppercase; letter-spacing:.5px; font-weight:600; color:#52514e; }
         .kpi-v { font-size:24px; font-weight:700; margin-top:6px; color:#0b0b0b; }
+        .equation-row { display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+        .equation-row .kpi-card { flex:1 1 180px; }
+        .equation-op { display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:300; color:#b5b3ab; flex:0 0 auto; padding:0 2px; }
+        .equation-op.eq { color:#52514e; font-weight:600; }
+        .kpi-multi { margin-top:8px; }
+        .kpi-multi > div { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-bottom:1px dashed #e1e0d9; font-size:13px; color:#52514e; }
+        .kpi-multi > div:last-child { border-bottom:none; padding-top:8px; font-size:15px; }
+        .kpi-multi > div:last-child b { font-size:17px; color:#0b0b0b; }
+        .kpi-multi b { font-weight:700; }
     </style>
 </head>
 <body>
@@ -1130,58 +1407,46 @@ if ($is_neksomo_view) {
                         </form>
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty Sold</div><div class="kpi-v"><?php echo inr_format($grand_total_pack_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_pieces, 0); ?> pieces sold</div></div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Return Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_return_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_return_pieces, 0); ?> pieces returned</div></div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Consolidated Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_net_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_net_pieces, 0); ?> pieces net</div></div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Period</div><div class="kpi-v" style="font-size:15px;"><?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></div></div>
-                        </div>
-                    </div>
+                    <h3 style="font-size:19px;font-weight:700;margin:20px 0 4px;">Napkin</h3>
+                    <p class="text-muted" style="font-size:12px;margin-bottom:10px;">Period: <?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></p>
 
-                    <div class="row mb-3">
-                        <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_value, 2); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;">Return: &#8377;<?php echo inr_format($grand_total_return_value, 2); ?></div></div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_expense, 2); ?></div></div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
-                        </div>
-                    </div>
-                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">(Sold Price − Return Value) − (Purchase Value − Return Purchase Value) = Gross Profit. Gross Profit − Expense (Femi9 LLP, this period) = Net Profit.</p>
-
-                    <?php
-                    // Fixed partner split of Net Profit — Anand 50%, Saravana Shankar 40%, Tamil Selvan 10%.
-                    $profit_shares = [
-                        'Anand'            => 0.50,
-                        'Saravana Shankar' => 0.40,
-                        'Tamil Selvan'     => 0.10,
-                    ];
-                    ?>
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <p class="text-muted" style="font-size:11.5px;margin-bottom:6px;">Net Profit Share (this period)</p>
-                        </div>
-                        <?php foreach ($profit_shares as $partner_name => $partner_pct): ?>
-                        <div class="col-md-4">
-                            <div class="kpi-card">
-                                <div class="kpi-t"><?php echo htmlspecialchars($partner_name); ?> (<?php echo (int)round($partner_pct * 100); ?>%)</div>
-                                <div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit * $partner_pct, 2); ?></div>
+                    <div class="equation-row">
+                        <div class="kpi-card">
+                            <div class="kpi-t">Sold</div>
+                            <div class="kpi-multi">
+                                <div><span>Pack Qty</span><b><?php echo inr_format($grand_total_pack_qty, 0); ?></b></div>
+                                <div><span>Pieces</span><b><?php echo inr_format($grand_total_pieces, 0); ?></b></div>
+                                <div><span>Value</span><b>&#8377;<?php echo inr_format($grand_total_value, 2); ?></b></div>
                             </div>
                         </div>
-                        <?php endforeach; ?>
+                        <div class="equation-op">&minus;</div>
+                        <div class="kpi-card">
+                            <div class="kpi-t">Return</div>
+                            <div class="kpi-multi">
+                                <div><span>Pack Qty</span><b><?php echo inr_format($grand_total_return_qty, 0); ?></b></div>
+                                <div><span>Pieces</span><b><?php echo inr_format($grand_total_return_pieces, 0); ?></b></div>
+                                <div><span>Value</span><b>&#8377;<?php echo inr_format($grand_total_return_value, 2); ?></b></div>
+                            </div>
+                        </div>
+                        <div class="equation-op eq">=</div>
+                        <div class="kpi-card">
+                            <div class="kpi-t">Overall Turnover</div>
+                            <div class="kpi-multi">
+                                <div><span>Pack Qty</span><b><?php echo inr_format($grand_total_net_qty, 0); ?></b></div>
+                                <div><span>Pieces</span><b><?php echo inr_format($grand_total_net_pieces, 0); ?></b></div>
+                                <div><span>Amount</span><b>&#8377;<?php echo inr_format($grand_total_value - $grand_total_return_value, 2); ?></b></div>
+                            </div>
+                        </div>
                     </div>
+
+                    <div class="equation-row">
+                        <div class="kpi-card"><div class="kpi-t">Napkin Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
+                        <div class="equation-op">&minus;</div>
+                        <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_expense, 2); ?></div></div>
+                        <div class="equation-op eq">=</div>
+                        <div class="kpi-card"><div class="kpi-t">Napkin Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
+                    </div>
+                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Gross Profit already nets out Purchase Value against Return Purchase Value on top of the Consolidated Amount above. Gross Profit − Expense (Femi9 LLP, this period) = Net Profit. Combined with Diaper and split by partner at the bottom of this page.</p>
 
                     <?php if ($grand_total_unrated_pieces > 0): ?>
                     <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_total_unrated_pieces, 0); ?> pieces sold before any rate was set for their product — excluded from Sold Price. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
@@ -1195,22 +1460,28 @@ if ($is_neksomo_view) {
                         <div class="card-body">
                             <div style="overflow-x:auto;">
                             <table class="mt">
-                                <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Pieces/Pack</th><th>Total Pieces Sold</th><th>Value &#8377;</th></tr></thead>
+                                <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Return Qty</th><th>Net Qty</th><th>Pieces/Pack</th><th>Total Pieces Sold</th><th>Return Pieces</th><th>Net Pieces</th><th>Sold Value &#8377;</th><th>Return Value &#8377;</th><th>Net Value &#8377;</th></tr></thead>
                                 <tbody>
                                 <?php if (empty($pieces_sold)): ?>
-                                    <tr><td colspan="5" style="text-align:center;color:#898781;">No sales in this period.</td></tr>
+                                    <tr><td colspan="11" style="text-align:center;color:#898781;">No sales in this period.</td></tr>
                                 <?php else: foreach ($pieces_sold as $row): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($row['productName']); ?></td>
                                         <td><?php echo inr_format((int)$row['total_qty'], 0); ?></td>
+                                        <td><?php echo inr_format((int)$row['return_qty'], 0); ?></td>
+                                        <td><strong><?php echo inr_format((int)$row['net_qty'], 0); ?></strong></td>
                                         <td><?php echo $row['pieces_per_pack'] !== null ? (int)$row['pieces_per_pack'] : '1 *'; ?></td>
-                                        <td><strong><?php echo inr_format((int)$row['total_pieces'], 0); ?></strong></td>
+                                        <td><?php echo inr_format((int)$row['total_pieces'], 0); ?></td>
+                                        <td><?php echo inr_format((int)$row['return_pieces'], 0); ?></td>
+                                        <td><strong><?php echo inr_format((int)$row['net_pieces'], 0); ?></strong></td>
                                         <td>
                                             &#8377;<?php echo inr_format((float)$row['total_value'], 2); ?>
                                             <?php if ((float)$row['unrated_pieces'] > 0): ?>
                                             <div style="font-size:11px;color:#dc2626;"><?php echo inr_format((int)$row['unrated_pieces'], 0); ?> pcs unrated</div>
                                             <?php endif; ?>
                                         </td>
+                                        <td>&#8377;<?php echo inr_format((float)$row['return_value'], 2); ?></td>
+                                        <td><strong>&#8377;<?php echo inr_format((float)$row['net_value'], 2); ?></strong></td>
                                     </tr>
                                 <?php endforeach; endif; ?>
                                 </tbody>
@@ -1218,6 +1489,127 @@ if ($is_neksomo_view) {
                             </div>
                             <p style="font-size:11.5px;color:#898781;margin-top:10px;">* Pack size not set for this product — pieces shown equal pack quantity. Value uses whichever Femi9 LLP rate was effective on each sale's actual date.</p>
                         </div>
+                    </div>
+
+                    <h3 style="font-size:19px;font-weight:700;margin:28px 0 12px;">Diaper</h3>
+                    <div class="equation-row">
+                        <div class="kpi-card">
+                            <div class="kpi-t">Sold</div>
+                            <div class="kpi-multi">
+                                <div><span>Pack Qty</span><b><?php echo inr_format($grand_diaper_pack_qty, 0); ?></b></div>
+                                <div><span>Value</span><b>&#8377;<?php echo inr_format($grand_diaper_value, 2); ?></b></div>
+                            </div>
+                        </div>
+                        <div class="equation-op">&minus;</div>
+                        <div class="kpi-card">
+                            <div class="kpi-t">Return</div>
+                            <div class="kpi-multi">
+                                <div><span>Pack Qty</span><b><?php echo inr_format($grand_diaper_return_qty, 0); ?></b></div>
+                                <div><span>Value</span><b>&#8377;<?php echo inr_format($grand_diaper_return_value, 2); ?></b></div>
+                            </div>
+                        </div>
+                        <div class="equation-op eq">=</div>
+                        <div class="kpi-card">
+                            <div class="kpi-t">Overall Turnover</div>
+                            <div class="kpi-multi">
+                                <div><span>Pack Qty</span><b><?php echo inr_format($grand_diaper_net_qty, 0); ?></b></div>
+                                <div><span>Amount</span><b>&#8377;<?php echo inr_format($grand_diaper_value - $grand_diaper_return_value, 2); ?></b></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="equation-row">
+                        <div class="kpi-card"><div class="kpi-t">Output GST (Sales)</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_diaper_output_gst, 2); ?></div></div>
+                        <div class="equation-op">&minus;</div>
+                        <div class="kpi-card"><div class="kpi-t">Input GST (Purchases)</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_diaper_input_gst, 2); ?></div></div>
+                        <div class="equation-op eq">=</div>
+                        <div class="kpi-card"><div class="kpi-t">Net GST Payable</div><div class="kpi-v" style="<?php echo $grand_diaper_net_gst < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_diaper_net_gst, 2); ?></div></div>
+                    </div>
+                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">GST shown separately — never included in Diaper Gross Profit above. Net of returns.</p>
+
+                    <div class="equation-row">
+                        <div class="kpi-card"><div class="kpi-t">Diaper Gross Profit</div><div class="kpi-v" style="<?php echo $grand_diaper_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_diaper_gross_profit, 2); ?></div></div>
+                        <div class="equation-op">&minus;</div>
+                        <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_diaper_expense, 2); ?></div></div>
+                        <div class="equation-op eq">=</div>
+                        <div class="kpi-card"><div class="kpi-t">Diaper Net Profit</div><div class="kpi-v" style="<?php echo $grand_diaper_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_diaper_net_profit, 2); ?></div></div>
+                    </div>
+                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">Diaper is a pack-based product mapped 1:1 to its company SKU, so quantity/value here are packs/rate-per-pack — no piece conversion. Expense is 0 here since Neksomo's single expense pool is already counted in full against Napkin below — not double-counted. Combined with Napkin and split by partner at the bottom of this page.</p>
+
+                    <?php if ($grand_diaper_unrated_qty > 0): ?>
+                    <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_diaper_unrated_qty, 0); ?> packs sold before any rate was set for their product — excluded from Sold Value. <a href="neksomo-llp-piece-sale.php">Add a rate</a> covering that period to include them.</div>
+                    <?php endif; ?>
+                    <?php if ($grand_diaper_unpriced_qty > 0): ?>
+                    <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_diaper_unpriced_qty, 0); ?> packs sold before any purchase rate was set for their product — treated as ₹0 cost, so Gross Profit may be overstated. <a href="neksomo-llp-piece-purchase-rate.php">Add a purchase rate</a> covering that period.</div>
+                    <?php endif; ?>
+
+                    <div class="card">
+                        <div class="card-header"><h5 class="card-title">Product-wise Packs Sold</h5></div>
+                        <div class="card-body">
+                            <div style="overflow-x:auto;">
+                            <table class="mt">
+                                <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Return Qty</th><th>Net Qty</th><th>Sold Value &#8377;</th><th>Return Value &#8377;</th><th>Net Value &#8377;</th></tr></thead>
+                                <tbody>
+                                <?php if (empty($diaper_sold)): ?>
+                                    <tr><td colspan="7" style="text-align:center;color:#898781;">No sales in this period.</td></tr>
+                                <?php else: foreach ($diaper_sold as $row): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($row['productName']); ?></td>
+                                        <td><?php echo inr_format((int)$row['total_qty'], 0); ?></td>
+                                        <td><?php echo inr_format((int)$row['return_qty'], 0); ?></td>
+                                        <td><strong><?php echo inr_format((int)$row['net_qty'], 0); ?></strong></td>
+                                        <td>
+                                            &#8377;<?php echo inr_format((float)$row['total_value'], 2); ?>
+                                            <?php if ((float)$row['unrated_qty'] > 0): ?>
+                                            <div style="font-size:11px;color:#dc2626;"><?php echo inr_format((int)$row['unrated_qty'], 0); ?> packs unrated</div>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>&#8377;<?php echo inr_format((float)$row['return_value'], 2); ?></td>
+                                        <td><strong>&#8377;<?php echo inr_format((float)$row['net_value'], 2); ?></strong></td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                                </tbody>
+                            </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 style="font-size:19px;font-weight:700;margin:28px 0 4px;">Combined</h3>
+                    <div class="equation-row">
+                        <div class="kpi-card"><div class="kpi-t">Napkin Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
+                        <div class="equation-op">+</div>
+                        <div class="kpi-card"><div class="kpi-t">Diaper Net Profit</div><div class="kpi-v" style="<?php echo $grand_diaper_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_diaper_net_profit, 2); ?></div></div>
+                        <div class="equation-op eq">=</div>
+                        <div class="kpi-card"><div class="kpi-t">Combined Net Profit</div><div class="kpi-v" style="<?php echo $grand_combined_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_combined_net_profit, 2); ?></div></div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="kpi-card"><div class="kpi-t">Overall GST Payable</div><div class="kpi-v" style="<?php echo $grand_combined_net_gst < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_combined_net_gst, 2); ?></div></div>
+                        </div>
+                    </div>
+                    <p class="text-muted" style="font-size:11.5px;margin-top:-8px;margin-bottom:14px;">GST payable is separate from profit — it's collected on behalf of the government, not earnings. Napkin is always 0% GST, so this is effectively Diaper's Net GST.</p>
+
+                    <?php
+                    // Fixed partner split of combined Net Profit — Anand 50%, Saravana Shankar 40%, Tamil Selvan 10%.
+                    $profit_shares = [
+                        'Anand'            => 0.50,
+                        'Saravana Shankar' => 0.40,
+                        'Tamil Selvan'     => 0.10,
+                    ];
+                    ?>
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <p class="text-muted" style="font-size:11.5px;margin-bottom:6px;">Combined Net Profit Share (this period)</p>
+                        </div>
+                        <?php foreach ($profit_shares as $partner_name => $partner_pct): ?>
+                        <div class="col-md-4">
+                            <div class="kpi-card">
+                                <div class="kpi-t"><?php echo htmlspecialchars($partner_name); ?> (<?php echo (int)round($partner_pct * 100); ?>%)</div>
+                                <div class="kpi-v" style="<?php echo $grand_combined_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_combined_net_profit * $partner_pct, 2); ?></div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
 
                 </div>

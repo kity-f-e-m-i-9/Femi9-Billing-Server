@@ -156,6 +156,11 @@ function get_llp_healthcare_returned_packs($db_conn, $from_date, $to_date) {
 // summed across every company product mapped to that neksomo product). Net of
 // returns — a returned pack is no longer counted as sold, matching
 // overstock_datewise.php's net_change treatment of total_sales_return.
+//
+// Excludes mappings whose Neksomo product is pack-based (unit_type='pack') —
+// those are mapped 1:1 pack-for-pack to their company SKU instead, and are
+// counted by get_neksomo_packs_sold_via_llp_healthcare() below, not converted
+// to pieces here.
 function get_neksomo_pieces_sold_via_llp_healthcare($db_conn, $from_date, $to_date) {
     $soldByProduct     = get_llp_healthcare_sold_packs($db_conn, $from_date, $to_date);
     $returnedByProduct = get_llp_healthcare_returned_packs($db_conn, $from_date, $to_date);
@@ -168,7 +173,9 @@ function get_neksomo_pieces_sold_via_llp_healthcare($db_conn, $from_date, $to_da
     $res = $db_conn->query(
         "SELECT m.neksomo_product_id, m.company_product_id, p.pieces_per_pack
          FROM neksomo_product_mapping m
-         JOIN products p ON p.id = m.company_product_id"
+         JOIN products p ON p.id = m.company_product_id
+         JOIN products np ON np.id = m.neksomo_product_id
+         WHERE np.unit_type != 'pack'"
     );
     $piecesByNeksomoProduct = [];
     while ($row = $res->fetch_assoc()) {
@@ -180,4 +187,34 @@ function get_neksomo_pieces_sold_via_llp_healthcare($db_conn, $from_date, $to_da
         $piecesByNeksomoProduct[$nid] = ($piecesByNeksomoProduct[$nid] ?? 0) + ($netPacks * $ppp);
     }
     return $piecesByNeksomoProduct;
+}
+
+// Packs sold per neksomo_product_id, for pack-based Neksomo products
+// (unit_type='pack') mapped 1:1 to a pack-based company SKU — no
+// pieces_per_pack conversion, unlike get_neksomo_pieces_sold_via_llp_healthcare()
+// above. Net of returns, same convention.
+function get_neksomo_packs_sold_via_llp_healthcare($db_conn, $from_date, $to_date) {
+    $soldByProduct     = get_llp_healthcare_sold_packs($db_conn, $from_date, $to_date);
+    $returnedByProduct = get_llp_healthcare_returned_packs($db_conn, $from_date, $to_date);
+    $netByProduct = [];
+    foreach (array_unique(array_merge(array_keys($soldByProduct), array_keys($returnedByProduct))) as $pid) {
+        $netByProduct[$pid] = ($soldByProduct[$pid] ?? 0) - ($returnedByProduct[$pid] ?? 0);
+    }
+    if (empty($netByProduct)) return [];
+
+    $res = $db_conn->query(
+        "SELECT m.neksomo_product_id, m.company_product_id
+         FROM neksomo_product_mapping m
+         JOIN products np ON np.id = m.neksomo_product_id
+         WHERE np.unit_type = 'pack'"
+    );
+    $packsByNeksomoProduct = [];
+    while ($row = $res->fetch_assoc()) {
+        $companyPid = (int)$row['company_product_id'];
+        $netPacks   = $netByProduct[$companyPid] ?? 0;
+        if ($netPacks === 0) continue;
+        $nid = (int)$row['neksomo_product_id'];
+        $packsByNeksomoProduct[$nid] = ($packsByNeksomoProduct[$nid] ?? 0) + $netPacks;
+    }
+    return $packsByNeksomoProduct;
 }
