@@ -10,12 +10,10 @@ $to_date   = $_REQUEST['todate'] ?? $today;
 
 $stmt = mysqli_prepare($db_conn,
     "SELECT o.id, o.order_id, o.order_date, o.new_order, o.noorder_reason, o.marketing_tool,
-            o.pr_id, o.qty, o.invoiced_inv_id, o.assigned_by_ms_id, o.voided_at,
-            s.name shop_name, s.latitude shop_lat, s.longitude shop_lng, p.productName, dm.ms_name
+            o.pr_id, o.qty, o.invoiced_inv_id, s.name shop_name, p.productName
      FROM tp_orders o
      LEFT JOIN shop s ON s.id=o.shop_id
      LEFT JOIN products p ON p.id=o.pr_id
-     LEFT JOIN marketing_staff dm ON dm.id=o.assigned_by_ms_id
      WHERE o.tp_id=? AND o.order_date BETWEEN ? AND ?
      ORDER BY o.order_date DESC, o.order_id DESC, o.id ASC"
 );
@@ -32,14 +30,9 @@ foreach ($rows as $r) {
         $visits[$oid] = [
             'order_date' => $r['order_date'],
             'shop_name'  => $r['shop_name'],
-            'shop_lat'   => $r['shop_lat'],
-            'shop_lng'   => $r['shop_lng'],
             'new_order'  => $r['new_order'],
             'noorder_reason' => $r['noorder_reason'],
             'invoiced_inv_id' => $r['invoiced_inv_id'],
-            'assigned_by_ms_id' => $r['assigned_by_ms_id'],
-            'voided_at'  => $r['voided_at'],
-            'dm_name'    => $r['ms_name'],
             'lines'      => [],
         ];
     }
@@ -82,36 +75,6 @@ if (!empty($invIds)) {
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
-    <style>
-        .mt { width:100%; border-collapse:collapse; font-size:13px; }
-        .mt th {
-            background:#f7f7f6; font-weight:600; color:#52514e; padding:10px 12px; text-align:left;
-            border-bottom:1px solid #e1e0d9; white-space:nowrap; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px;
-        }
-        .mt td { padding:10px 12px; border-bottom:1px solid #e1e0d9; vertical-align:top; }
-
-        .tp-tag { font-size:11px; padding:3px 9px; border-radius:6px; font-weight:600; white-space:nowrap; display:inline-block; }
-        .tp-tag-good     { background:#e5f7e5; color:#0ca30c; }
-        .tp-tag-bad      { background:#fbe6e6; color:#d03b3b; }
-        .tp-tag-info     { background:#eaf2fc; color:#2a78d6; }
-        .tp-tag-neutral  { background:#f0f1f2; color:#52525b; }
-
-        .tp-action-link {
-            font-size:12px; font-weight:600; text-decoration:none; padding:5px 11px;
-            border-radius:6px; display:inline-block;
-        }
-        .tp-action-primary { background:#eaf2fc; color:#2a78d6; }
-        .tp-action-primary:hover { background:#d7e8fb; color:#2a78d6; }
-        .tp-action-success { background:#e5f7e5; color:#0ca30c; }
-        .tp-action-success:hover { background:#d3f0d3; color:#0ca30c; }
-        .tp-action-danger { background:#fbe6e6; color:#d03b3b; }
-        .tp-action-danger:hover { background:#f7d5d5; color:#d03b3b; }
-
-        .tp-location-link { font-size:11.5px; color:#6b7280; text-decoration:none; }
-        .tp-location-link:hover { text-decoration:underline; }
-        .tp-line-item { font-size:12.5px; color:#3a3a38; }
-        .tp-line-item + .tp-line-item { margin-top:2px; }
-    </style>
 </head>
 <body>
     <div class="app align-content-stretch d-flex flex-wrap">
@@ -165,8 +128,7 @@ if (!empty($invIds)) {
                             <div class="col-md-12">
                                 <div class="card">
                                     <div class="card-body">
-                                        <div style="overflow-x:auto;">
-                                        <table class="mt">
+                                        <table class="table table-bordered">
                                             <thead>
                                                 <tr>
                                                     <th>Date</th>
@@ -178,58 +140,44 @@ if (!empty($invIds)) {
                                             </thead>
                                             <tbody>
                                                 <?php if (empty($visits)): ?>
-                                                <tr><td colspan="5" class="text-center text-muted">No field order entries in this date range.</td></tr>
+                                                <tr><td colspan="5" class="text-center">No field order entries in this date range.</td></tr>
                                                 <?php else: foreach ($visits as $oid => $v): ?>
                                                 <tr>
                                                     <td><?=htmlspecialchars(date("d-m-Y", strtotime($v['order_date'])))?></td>
-                                                    <td>
-                                                        <?=htmlspecialchars($v['shop_name'] ?? '-')?>
-                                                        <?php if (!empty($v['shop_lat']) && !empty($v['shop_lng'])): ?>
-                                                        <br/><a href="https://www.google.com/maps?q=<?=htmlspecialchars($v['shop_lat'])?>,<?=htmlspecialchars($v['shop_lng'])?>" target="_blank" class="tp-location-link">View Location</a>
-                                                        <?php endif; ?>
-                                                    </td>
+                                                    <td><?=htmlspecialchars($v['shop_name'] ?? '-')?></td>
                                                     <td>
                                                         <?php if ($v['new_order'] === 'yes'): ?>
-                                                        <span class="tp-tag tp-tag-good">Get Order</span>
+                                                        <span class="badge bg-success">Get Order</span>
                                                         <?php else: ?>
-                                                        <span class="tp-tag tp-tag-bad">No Order</span>
-                                                        <?php endif; ?>
-                                                        <?php if (!empty($v['assigned_by_ms_id'])): ?>
-                                                        <div style="margin-top:5px;"><span class="tp-tag tp-tag-info">From DM: <?=htmlspecialchars($v['dm_name'] ?? '-')?></span></div>
+                                                        <span class="badge bg-danger">No Order</span>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
                                                         <?php if ($v['new_order'] === 'yes'): ?>
                                                             <?php foreach ($v['lines'] as $ln): ?>
-                                                            <div class="tp-line-item"><?=htmlspecialchars($ln['product'] ?? '-')?>: <b><?=htmlspecialchars($ln['qty'])?></b></div>
+                                                            <?=htmlspecialchars($ln['product'] ?? '-')?>: <b><?=htmlspecialchars($ln['qty'])?></b><br/>
                                                             <?php endforeach; ?>
                                                         <?php else: ?>
-                                                            <span class="text-muted">Reason: <?=htmlspecialchars($v['noorder_reason'])?></span>
+                                                            Reason: <?=htmlspecialchars($v['noorder_reason'])?>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
                                                         <?php if ($v['new_order'] === 'yes'): ?>
-                                                            <?php if (!empty($v['voided_at'])): ?>
-                                                            <span class="tp-tag tp-tag-bad">Voided</span>
-                                                            <?php elseif (!empty($v['invoiced_inv_id']) && isset($completedInvIds[$v['invoiced_inv_id']])): ?>
-                                                            <a href="shop-invoice-print.php?invoiceid=<?=base64_encode($v['invoiced_inv_id'])?>" class="tp-action-link tp-action-success" target="_blank">Completed Invoice</a>
+                                                            <?php if (!empty($v['invoiced_inv_id']) && isset($completedInvIds[$v['invoiced_inv_id']])): ?>
+                                                            <a href="shop-invoice-print.php?invoiceid=<?=base64_encode($v['invoiced_inv_id'])?>" class="btn btn-success btn-sm" target="_blank">Completed Invoice</a>
                                                             <?php elseif (!empty($v['invoiced_inv_id'])): ?>
-                                                            <a href="shop-invoice-add.php?InvoiceID=<?=base64_encode($v['invoiced_inv_id'])?>&invuser=shop&action=edit" class="tp-action-link tp-action-primary">Continue Invoice</a>
+                                                            <a href="shop-invoice-add.php?InvoiceID=<?=base64_encode($v['invoiced_inv_id'])?>&invuser=shop&action=edit" class="btn btn-outline-primary btn-sm">Continue Invoice</a>
                                                             <?php else: ?>
-                                                            <a href="order-to-invoice.php?order_id=<?=urlencode($oid)?>" onclick="return confirm('Create an invoice for this order, using the shop and product/qty exactly as captured here?');" class="tp-action-link tp-action-primary">Invoice</a>
-                                                            <div style="margin-top:5px;">
-                                                            <a href="void-order.php?order_id=<?=urlencode($oid)?>" onclick="return confirm('Void this order? Use this when the shop no longer wants the product — the visit stays on record as Voided.');" class="tp-action-link tp-action-danger">Void</a>
-                                                            </div>
+                                                            <a href="order-to-invoice.php?order_id=<?=urlencode($oid)?>" onclick="return confirm('Create an invoice for this order, using the shop and product/qty exactly as captured here?');" class="btn btn-primary btn-sm">Invoice</a>
                                                             <?php endif; ?>
                                                         <?php else: ?>
-                                                            <span class="text-muted">&mdash;</span>
+                                                            -
                                                         <?php endif; ?>
                                                     </td>
                                                 </tr>
                                                 <?php endforeach; endif; ?>
                                             </tbody>
                                         </table>
-                                        </div>
                                     </div>
                                 </div>
                             </div>

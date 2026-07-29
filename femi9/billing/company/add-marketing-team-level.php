@@ -12,20 +12,10 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_level_rank (level_rank)
 )");
-$_chkLL = $db_conn->query("SHOW COLUMNS FROM marketing_team_levels LIKE 'location_layer_id'");
-if ($_chkLL && $_chkLL->num_rows === 0) {
-    $db_conn->query("ALTER TABLE marketing_team_levels ADD COLUMN location_layer_id INT NULL DEFAULT NULL AFTER level_name");
-}
 
 // Pre-fill next available rank
 $stmt_mx = $db_conn->query("SELECT COALESCE(MAX(level_rank), 0) + 1 AS next_rank FROM marketing_team_levels");
 $next_rank = $stmt_mx ? (int)$stmt_mx->fetch_assoc()['next_rank'] : 1;
-
-$_chkMs = $db_conn->query("SHOW COLUMNS FROM partner_location_layers LIKE 'is_ms_filter_enabled'");
-if ($_chkMs && $_chkMs->num_rows === 0) {
-    $db_conn->query("ALTER TABLE partner_location_layers ADD COLUMN is_ms_filter_enabled TINYINT(1) NOT NULL DEFAULT 0");
-}
-$locationLayers = $db_conn->query("SELECT id, depth, layer_name FROM partner_location_layers WHERE is_ms_filter_enabled = 1 ORDER BY depth ASC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -118,19 +108,6 @@ $locationLayers = $db_conn->query("SELECT id, depth, layer_name FROM partner_loc
                                                            placeholder="e.g. SM / ASM / DM"
                                                            maxlength="50"
                                                            onkeypress="restrictSpecialChars(event)">
-                                                </div>
-
-                                                <div class="mb-3">
-                                                    <label class="form-label">Location Layer</label>
-                                                    <select name="location_layer_id" class="form-control">
-                                                        <option value="">-- None --</option>
-                                                        <?php while ($resultLL = $locationLayers->fetch_assoc()): ?>
-                                                            <option value="<?php echo (int)$resultLL['id']; ?>">
-                                                                Depth <?php echo (int)$resultLL['depth']; ?> - <?php echo htmlspecialchars($resultLL['layer_name']); ?>
-                                                            </option>
-                                                        <?php endwhile; ?>
-                                                    </select>
-                                                    <small class="text-muted">Staff at this level will only be assignable locations from this layer (e.g. SM &rarr; State, ASM &rarr; District, DM &rarr; District). Multiple levels can share the same layer &mdash; a subordinate level is then restricted to the specific locations their manager already holds within it. Only layers with "Marketing Staff Filter Enabled" show here.</small>
                                                 </div>
 
                                                 <br>

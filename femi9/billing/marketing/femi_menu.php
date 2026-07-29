@@ -87,11 +87,8 @@ if($LoginPasswordCheck=="12345678")
                             </li>
                         </ul>
                     </li>
-
-					<li>
-                        <a href="my-team"><i class="material-icons-two-tone">groups</i>My Team</a>
-                    </li>
-
+					
+					
 					<li>
                         <a href=""><i class="material-icons-two-tone">done</i>Expenses
 						<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
