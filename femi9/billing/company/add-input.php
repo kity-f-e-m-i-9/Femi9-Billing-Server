@@ -71,7 +71,7 @@ while ($row = $resGd->fetch_assoc()) {
 
 // ── Product list ─────────────────────────────────────────────────────────────
 $products = [];
-$resProd = $db_conn->query("SELECT id, productName FROM products ORDER BY productName ASC");
+$resProd = $db_conn->query("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 while ($row = $resProd->fetch_assoc()) {
     $products[] = $row;
 }

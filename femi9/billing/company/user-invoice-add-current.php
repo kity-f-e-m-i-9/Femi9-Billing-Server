@@ -339,7 +339,7 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                                                 <select name="pr_id" id="productSelect" class="form-select" onchange="showPrice(this.value)">
                                                                     <option value="">Select Product</option>
                                                                     <?php
-                                                                    $select_Products = "SELECT * FROM products ORDER BY productName ASC";
+                                                                    $select_Products = "SELECT * FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC";
                                                                     $fetch_Products = mysqli_query($db_conn, $select_Products);
                                                                     while ($row_Product = mysqli_fetch_array($fetch_Products)) {
                                                                         echo '<option value="' . $row_Product['id'] . '">' . htmlspecialchars($row_Product['productName']) . '</option>';

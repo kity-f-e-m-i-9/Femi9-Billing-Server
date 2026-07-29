@@ -128,7 +128,7 @@ $get_to_date   = $_REQUEST['todate'] ?? date('Y-m-d');
                                             </thead>
                                             <tbody>
                                                 <?php
-                                                $select_productDetils = "select * from products order by id asc";
+                                                $select_productDetils = "select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc";
                                                 $Fetch_productDetils = mysqli_query($db_conn, $select_productDetils);
                                                 while ($Result_productDetils = mysqli_fetch_array($Fetch_productDetils)):
                                                     $report_prid = $Result_productDetils['id'];

@@ -131,7 +131,7 @@ $tempID="".$randum_number."RTST/".$temp_date."/".$temp_time."";?>
 <label class="form-label">Product Name*</label>
 <select required="" name="prid" class="form-control">
 <option value="" hidden="">Select</option>
-<?php $select_product_list="select * from products";
+<?php $select_product_list="select * from products where (temp_id not like 'NKS-%' or temp_id is null)";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{

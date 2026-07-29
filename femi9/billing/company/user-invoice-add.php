@@ -883,7 +883,7 @@ else{ $amount_received_fully="0";}
                 <select required name="pr_id" class="form-control" onChange="showPrice(this.value)">
                     <option value="" hidden="">Select Product</option>
                     <?php 
-                    $select_Products_list="select * from products order by id asc";
+                    $select_Products_list="select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc";
                     $fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
                     while($result_Products_list=mysqli_fetch_array($fetch_Products_list)) {
                     ?>
@@ -1515,7 +1515,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
                 <select required name="pr_id" class="form-control" onchange="showPrice(this.value)">
                     <option value="" hidden>Select Product</option>
                     <?php 
-                    $select_Products_list="select * from products order by id asc";
+                    $select_Products_list="select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc";
                     $fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
                     while($result_Products_list=mysqli_fetch_array($fetch_Products_list)) {
                     ?>

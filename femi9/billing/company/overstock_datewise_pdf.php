@@ -111,7 +111,7 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 											
 											<tbody>
 <?php 
-$select_productDetils="select * from products order by id asc";
+$select_productDetils="select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc";
 						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
 						while($Result_productDetils=mysqli_fetch_array($Fetch_productDetils))
 										{

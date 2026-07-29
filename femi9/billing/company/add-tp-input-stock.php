@@ -28,7 +28,7 @@ if ($selected_tp_db_id > 0) {
 
     if ($selected_tp) {
         // All products
-        $prod_res = $db_conn->query("SELECT id, productName FROM products ORDER BY productName ASC");
+        $prod_res = $db_conn->query("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
         if ($prod_res) while ($r = $prod_res->fetch_assoc()) $products[] = $r;
 
         // Current stock for this TP

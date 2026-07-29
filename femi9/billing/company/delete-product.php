@@ -3,7 +3,7 @@
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
 
-$del_product="delete from products where id='$prid'";
+$del_product="delete from products where id='$prid' and (temp_id not like 'NKS-%' or temp_id is null)";
 mysqli_query($db_conn,$del_product);
 
 echo "<script>window.location='manage-products?deletedDone';</script>";

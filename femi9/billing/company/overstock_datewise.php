@@ -231,7 +231,7 @@ $filterByGodown = ($_REQUEST['godownid'] != NULL);
 
 // All products, loaded once (was re-queried inside the day loop before).
 $allProducts = [];
-$fetch_productDetils = mysqli_query($db_conn, "select * from products order by id asc");
+$fetch_productDetils = mysqli_query($db_conn, "select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc");
 while ($p = mysqli_fetch_assoc($fetch_productDetils)) { $allProducts[] = $p; }
 
 // Today's real closing_qty per product (summed across whichever godowns are

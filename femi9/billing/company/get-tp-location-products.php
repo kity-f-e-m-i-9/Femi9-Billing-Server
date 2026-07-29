@@ -12,6 +12,7 @@ $stmt = $db_conn->prepare("
     FROM channel_partner_stock cps
     JOIN products p ON p.id = cps.product_id
     WHERE cps.channel_partner_id = ? AND cps.closing_qty > 0 AND p.deleted_at IS NULL
+      AND (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
     ORDER BY p.productName
 ");
 $stmt->bind_param("i", $cp_id);

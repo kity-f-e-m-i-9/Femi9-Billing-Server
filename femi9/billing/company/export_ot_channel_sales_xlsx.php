@@ -119,7 +119,7 @@ if (!$from_date_obj || !$to_date_obj || $from_date > $to_date) {
 
 // --------- Load products (for dynamic columns) ----------
 $products = [];
-$stmt_products = $db_conn->prepare("SELECT id, productName FROM products ORDER BY id ASC");
+$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 if (!$stmt_products) {
     ob_end_clean();
     header('Content-Type: text/plain; charset=utf-8');

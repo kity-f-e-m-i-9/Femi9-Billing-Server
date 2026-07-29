@@ -13,7 +13,7 @@ $res = mysqli_query($db_conn,
     "SELECT p.id, p.productName, s.closing_qty
      FROM products p
      JOIN stock s ON s.product_id = p.id AND s.user_type = 'company' AND s.user_id = '$godown_id_esc'
-     WHERE s.closing_qty > 0
+     WHERE s.closing_qty > 0 AND (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
      ORDER BY p.productName"
 );
 

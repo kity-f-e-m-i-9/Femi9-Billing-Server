@@ -285,7 +285,7 @@ if ($tpLimit > 0) {
 
 // ─── Products ─────────────────────────────────────────────────────────────────
 $products = []; $productIds = [];
-$stmt = $db_conn->prepare("SELECT id, productName FROM products ORDER BY id ASC");
+$stmt = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 $stmt->execute();
 $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) {

@@ -8,7 +8,7 @@ $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
 
 //fetch product details
-$select_product_list="select * from products where id='$prid'";
+$select_product_list="select * from products where id='$prid' and (temp_id not like 'NKS-%' or temp_id is null)";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 									$result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>

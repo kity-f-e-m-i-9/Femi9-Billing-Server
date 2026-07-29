@@ -54,7 +54,7 @@ $where_sql = implode(' AND ', $where_parts);
 
 // Products
 $products = [];
-$prod_res = mysqli_query($db_conn, "SELECT id, productName FROM products ORDER BY id ASC");
+$prod_res = mysqli_query($db_conn, "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 if ($prod_res) while ($pr = mysqli_fetch_assoc($prod_res)) $products[$pr['id']] = $pr['productName'];
 
 // Count distinct CPs that have stock

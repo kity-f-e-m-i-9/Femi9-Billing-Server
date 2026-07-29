@@ -79,7 +79,7 @@ $wallet_cats_json  = json_encode(array_map('strtolower', $wallet_categories));
 // ---------------------------------------------------------------
 // Fetch product list (once, reuse in table row)
 // ---------------------------------------------------------------
-$stmt_products = $db_conn->prepare("SELECT id, productName FROM products ORDER BY productName ASC");
+$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 $stmt_products->execute();
 $all_products = $stmt_products->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_products->close();

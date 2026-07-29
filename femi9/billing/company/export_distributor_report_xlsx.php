@@ -47,7 +47,7 @@ if ($selected_amount_range !== '' && !in_array($selected_amount_range, $allowed_
 
 // Get all products
 $products = [];
-$stmt_products = $db_conn->prepare("SELECT id, productName FROM products ORDER BY id ASC");
+$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 $stmt_products->execute();
 $product_result = $stmt_products->get_result();
 

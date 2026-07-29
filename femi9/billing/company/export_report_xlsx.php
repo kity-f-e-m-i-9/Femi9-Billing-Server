@@ -108,7 +108,7 @@ if ($selected_state_id <= 0) {
 
 // --------- Load products (for dynamic columns) ----------
 $products = [];
-$stmt_products = $db_conn->prepare("SELECT id, productName FROM products ORDER BY id ASC");
+$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 if ($stmt_products) {
     $stmt_products->execute();
     $result_products = $stmt_products->get_result();
