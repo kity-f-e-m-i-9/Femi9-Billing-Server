@@ -65,7 +65,7 @@ if (empty($result_Godown)) {
 
 // Line items with product details
 $stmt2 = $db_conn->prepare("
-    SELECT tpii.quantity, tpii.rate, tpii.amount,
+    SELECT tpii.quantity, tpii.rate, tpii.amount, tpii.discount_percentage, tpii.discount_amount,
            p.productName, p.hsn, p.gst AS gst_percentage, p.gst_type, p.mrp
     FROM tp_invoice_items tpii
     JOIN products p ON p.id = tpii.product_id
@@ -86,20 +86,26 @@ $hsn_gst_totals   = []; // hsn => gst amount sum
 $hsn_gst_pct      = []; // hsn => gst rate (assumed uniform per HSN)
 $__inv_gst_pct    = 0;  // MAX gst rate across all lines — for the SGST/CGST label below, not a per-HSN figure
 foreach ($invoice_items as &$item) {
-    $line_total = (float)$item['amount'];
-    $gst_pct    = (int)$item['gst_percentage'];
-    $gst_type   = $item['gst_type'] ?? 'exclusive';
+    $gross_amount  = (float)$item['amount'];
+    $item_disc_amt = (float)($item['discount_amount'] ?? 0);
+    $net_amount    = $gross_amount - $item_disc_amt; // what's actually billed for this line
+    $gst_pct       = (int)$item['gst_percentage'];
+    $gst_type      = $item['gst_type'] ?? 'exclusive';
 
     if ($gst_type === 'inclusive' && $gst_pct > 0) {
-        $taxable_value = $line_total * 100 / (100 + $gst_pct);
-        $gst_amount    = $line_total - $taxable_value;
+        // Rate column keeps showing the pre-discount per-unit rate, so its taxable
+        // portion is carved out of the gross amount, not the discounted one.
+        $gross_taxable_value = $gross_amount * 100 / (100 + $gst_pct);
+        $taxable_value       = $net_amount * 100 / (100 + $gst_pct);
+        $gst_amount          = $net_amount - $taxable_value;
     } else {
-        $taxable_value = $line_total;
-        $gst_amount    = $line_total * $gst_pct / 100;
+        $gross_taxable_value = $gross_amount;
+        $taxable_value       = $net_amount;
+        $gst_amount          = $net_amount * $gst_pct / 100;
     }
     $item['taxable_value'] = $taxable_value;
     $item['gst_amount']    = $gst_amount;
-    $item['taxable_rate']  = ((int)$item['quantity'] > 0) ? $taxable_value / (int)$item['quantity'] : 0;
+    $item['taxable_rate']  = ((int)$item['quantity'] > 0) ? $gross_taxable_value / (int)$item['quantity'] : 0;
 
     $TotalAMount123   += $taxable_value;
     $Totalquantity123 += (int)$item['quantity'];
@@ -448,6 +454,8 @@ Terms of Delivery<br/>&nbsp;
     // stored rate already has GST baked in, so it's carved out here rather
     // than printed as-is (which would silently overstate the taxable rate).
     $rate          = (float)$item['taxable_rate'];
+    $item_disc_amt = (float)($item['discount_amount'] ?? 0);
+    $item_disc_pct = (float)($item['discount_percentage'] ?? 0);
 ?>
 <tr>
 <td><?= $invno; ?></td>
@@ -458,7 +466,7 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign"><?= inr_format($rate, 2); ?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?= $gst_pct; ?>%</td>
-<td id="rightlaign">0.00<br/>(0%)</td>
+<td id="rightlaign"><?= inr_format($item_disc_amt, 2); ?><br/>(<?= fmt_gst_pct($item_disc_pct); ?>%)</td>
 <td id="rightlaign"><?= inr_format($taxable_value, 2); ?></td>
 </tr>
 <?php endforeach; ?>
