@@ -11,9 +11,20 @@ if ($col && $col->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_invoices ADD INDEX idx_tpi_creator (created_by_user_type, created_by_user_id, invoice_number)");
     $db_conn->query("UPDATE tp_invoices SET created_by_user_type='super_stockiest', created_by_user_id=SUBSTRING_INDEX(SUBSTRING(invoice_number,6),'/',1) WHERE invoice_number LIKE 'TP/SS%'");
     $db_conn->query("UPDATE tp_invoices SET created_by_user_type='company' WHERE created_by_user_type=''");
-    $idx = $db_conn->query("SHOW INDEX FROM tp_invoices WHERE Key_name='uk_tp_inv_number'");
-    if ($idx && $idx->num_rows > 0) {
-        $db_conn->query("ALTER TABLE tp_invoices DROP INDEX uk_tp_inv_number");
+}
+
+// See tp-invoice-action.php for why this runs unconditionally and matches
+// by structure instead of a fixed index name.
+$idxRes = $db_conn->query("SHOW INDEX FROM tp_invoices WHERE Non_unique=0 AND Column_name='invoice_number'");
+if ($idxRes) {
+    while ($idxRow = $idxRes->fetch_assoc()) {
+        $keyName = $idxRow['Key_name'];
+        if ($keyName === 'PRIMARY') continue;
+        $colCount = $db_conn->query("SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tp_invoices' AND INDEX_NAME='" . $db_conn->real_escape_string($keyName) . "'");
+        $colCountRow = $colCount ? $colCount->fetch_assoc() : null;
+        if ($colCountRow && (int)$colCountRow['c'] === 1) {
+            $db_conn->query("ALTER TABLE tp_invoices DROP INDEX `" . $db_conn->real_escape_string($keyName) . "`");
+        }
     }
 }
 
