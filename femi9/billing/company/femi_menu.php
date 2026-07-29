@@ -629,7 +629,14 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
                             <li><a href="ms_add">Add Marketing Staff</a></li>
                             <li><a href="ms_manage">Manage Marketing Staff</a></li>
-                            <li><a href="manage-marketing-team-levels">Manage Team Levels</a></li>
+                            <li>
+                                <a href="#">Manage Team<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                                <ul class="sub-menu">
+                                    <li><a href="manage-marketing-team-levels">Manage Team Levels</a></li>
+                                    <li><a href="ms-team-view">Tree View</a></li>
+                                    <li><a href="ms-team-shop-view">Shop View</a></li>
+                                </ul>
+                            </li>
 							<li><a href="ms_prorders">Product Orders Report</a></li>
 							<li><a href="ms_noorders">No Orders Report</a></li>
 							<li><a href="ms_expenses">Expenses Report</a></li>
@@ -1064,7 +1071,14 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
                             <li><a href="ms_add">Add Marketing Staff</a></li>
                             <li><a href="ms_manage">Manage Marketing Staff</a></li>
-                            <li><a href="manage-marketing-team-levels">Manage Team Levels</a></li>
+                            <li>
+                                <a href="#">Manage Team<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                                <ul class="sub-menu">
+                                    <li><a href="manage-marketing-team-levels">Manage Team Levels</a></li>
+                                    <li><a href="ms-team-view">Tree View</a></li>
+                                    <li><a href="ms-team-shop-view">Shop View</a></li>
+                                </ul>
+                            </li>
 							<li><a href="ms_prorders">Product Orders Report</a></li>
 							<li><a href="ms_noorders">No Orders Report</a></li>
                         </ul>

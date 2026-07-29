@@ -127,6 +127,16 @@ select:focus, input[type=number]:focus { background:#fffa8f; }
     $isFromFieldOrder = (bool)$stmtOrig->get_result()->fetch_assoc();
     $stmtOrig->close();
 
+    // A DM-assigned order (not the TP's own field visit) gets a direct
+    // qty/price/discount Edit on each line, instead of only Remove+re-Add —
+    // the DM's suggested order is a starting point the TP should be able to
+    // adjust in place.
+    $stmtDm = $db_conn->prepare("SELECT 1 FROM tp_orders WHERE invoiced_inv_id=? AND assigned_by_ms_id IS NOT NULL LIMIT 1");
+    $stmtDm->bind_param('s', $Invoice_ID);
+    $stmtDm->execute();
+    $isFromDmOrder = (bool)$stmtDm->get_result()->fetch_assoc();
+    $stmtDm->close();
+
     $stmtRct = $db_conn->prepare("SELECT 1 FROM receipt WHERE inv_id=? LIMIT 1");
     $stmtRct->bind_param('s', $Invoice_ID);
     $stmtRct->execute();
@@ -210,14 +220,43 @@ while ($ri = mysqli_fetch_array($res_items)) {
     $TotalAMount123 += $TotalAMount;
     $ItemRowid = base64_encode($ri['id']);
 ?>
-    <tr>
+    <tr id="itemrow_<?php echo $ri['id']; ?>">
         <th><?php echo ++$rd; ?></th>
         <td><?php echo $pr['productName']; ?></td>
-        <td><?php echo $ri['qty']; ?></td>
+        <?php $canEditLine = $isFromDmOrder && $amount_received_fully == 0; ?>
+        <td>
+            <?php if ($canEditLine) { ?>
+            <input type="number" min="0" step="any" id="qty_<?php echo $ri['id']; ?>"
+                   value="<?php echo $ri['qty']; ?>"
+                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
+                   class="form-control form-control-sm" style="width:70px;">
+            <?php } else { ?>
+            <?php echo $ri['qty']; ?>
+            <?php } ?>
+        </td>
         <td>&#8377;<?php echo inr_format($ri['amount'], 2); ?></td>
-        <td><?php echo $ri['discount_amount']; ?>(<?php echo $ri['discount_percentage']; ?>%)</td>
+        <td>
+            <?php if ($canEditLine) { ?>
+            <input type="number" min="0" step="any" id="discamt_<?php echo $ri['id']; ?>"
+                   value="<?php echo $ri['discount_amount']; ?>" placeholder="Rs."
+                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
+                   class="form-control form-control-sm" style="width:80px;">
+            <div style="font-size:11px;color:#6b7280;">(<?php echo $ri['discount_percentage']; ?>%)</div>
+            <?php } else { ?>
+            <?php echo $ri['discount_amount']; ?>(<?php echo $ri['discount_percentage']; ?>%)
+            <?php } ?>
+        </td>
         <td>&#8377;<?php echo inr_format($ri['subtotal'], 2); ?></td>
-        <td><?php echo $ri['gstamount_total']; ?>(<?php echo $ri['gst_percentage']; ?>%)</td>
+        <td>
+            <?php if ($canEditLine) { ?>
+            <input type="number" min="0" step="any" id="gstpct_<?php echo $ri['id']; ?>"
+                   value="<?php echo $ri['gst_percentage']; ?>" placeholder="GST %"
+                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
+                   class="form-control form-control-sm" style="width:70px;">
+            <?php } else { ?>
+            <?php echo $ri['gstamount_total']; ?>(<?php echo $ri['gst_percentage']; ?>%)
+            <?php } ?>
+        </td>
         <td align="right"><?php echo inr_format($TotalAMount, 2); ?></td>
         <?php if ($amount_received_fully == 0) { ?>
         <td>
@@ -233,6 +272,36 @@ while ($ri = mysqli_fetch_array($res_items)) {
     </tbody>
 </table>
 </div></div>
+
+<?php if ($isFromDmOrder) { ?>
+<form id="rowEditForm" method="post" action="shop-invoice-item-edit.php" style="display:none;">
+    <input type="hidden" name="invid" id="rf_invid">
+    <input type="hidden" name="rowid" id="rf_rowid">
+    <input type="hidden" name="invuser" id="rf_invuser">
+    <input type="hidden" name="qty" id="rf_qty">
+    <input type="hidden" name="discount_amount" id="rf_discamt">
+    <input type="hidden" name="gst_percentage" id="rf_gstpct">
+</form>
+<script>
+// Click straight into Qty / Discount(Rs.) / GST% on a DM-assigned order's
+// invoice and change it — saves itself the moment you leave the field, no
+// separate Edit/Save step. Price (MRP) is not editable here. Discount is
+// rupees-only; the percentage shown underneath is derived and read-only.
+function saveLineEdit(id, invid, rowid, invuser) {
+    var qty     = document.getElementById('qty_' + id).value;
+    var discamt = document.getElementById('discamt_' + id).value;
+    var gstpct  = document.getElementById('gstpct_' + id).value;
+    if (qty === '' || isNaN(qty)) { return; }
+    document.getElementById('rf_invid').value = invid;
+    document.getElementById('rf_rowid').value = rowid;
+    document.getElementById('rf_invuser').value = invuser;
+    document.getElementById('rf_qty').value = qty;
+    document.getElementById('rf_discamt').value = discamt === '' ? 0 : discamt;
+    document.getElementById('rf_gstpct').value = gstpct === '' ? 0 : gstpct;
+    document.getElementById('rowEditForm').submit();
+}
+</script>
+<?php } ?>
 
 <?php if ($needs_inv_number): ?>
 <script>

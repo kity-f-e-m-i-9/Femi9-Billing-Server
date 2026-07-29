@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once("include/ShopInvoiceHistory.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -8,6 +9,18 @@ if (!isset($_REQUEST['addInvoice'])) { header("Location: shop-invoice-add.php");
 
 $inv_id      = $_REQUEST['inv_id']      ?? '';
 $invuser     = $_REQUEST['invuser']     ?? 'shop';
+
+// A voided invoice is read-only.
+$stmtVoidChk = $db_conn->prepare("SELECT status FROM user_invoice WHERE inv_id=? LIMIT 1");
+$stmtVoidChk->bind_param('s', $inv_id);
+$stmtVoidChk->execute();
+$voidChkRow = $stmtVoidChk->get_result()->fetch_assoc();
+$stmtVoidChk->close();
+if (($voidChkRow['status'] ?? '') === 'cancelled') {
+    $_SESSION['errorMessage'] = "This invoice has been voided and can no longer be edited.";
+    echo "<script>window.location='shop-manage-invoice.php';</script>";
+    exit;
+}
 $customer_id = $_REQUEST['customer_id'] ?? '';
 $date        = date("Y-m-d", strtotime($_REQUEST['date'] ?? date("Y-m-d")));
 $inv_year    = date("Y", strtotime($date));
@@ -145,5 +158,7 @@ $stmtItem->bind_param(
     $rwpoints_i, $buyer_gsttype, $rwpoints_sls_i
 );
 $stmtItem->execute(); $stmtItem->close();
+
+logShopInvoiceChange($db_conn, $inv_id, $pr_id, 'added', null, $qty, $Login_user_TYPEvl, (string)$Login_user_IDvl);
 
 echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&AddedSuccess&&invuser=$invuser&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&FemiAdded';</script>";

@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once("include/ShopInvoiceHistory.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -198,6 +199,8 @@ try {
         );
         $stmtItem->execute();
         $stmtItem->close();
+
+        logShopInvoiceChange($db_conn, $inv_id, $pr_id, 'initial', null, $qty, $Login_user_TYPEvl, (string)$tp_id, 'From field order visit');
     }
 
     $stmtMark = $db_conn->prepare("UPDATE tp_orders SET invoiced_inv_id=? WHERE order_id=? AND tp_id=?");
