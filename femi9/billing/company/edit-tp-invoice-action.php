@@ -305,11 +305,12 @@ try {
     tpAdvanceDeduct($db_conn, $inv_id, $inv_num, $tp_id, $new_net);
 
     // 6. Update invoice header (discount_amount preserved/updated so total stays consistent)
+    // Note: existence is already guaranteed by the FOR UPDATE lock above (within this same
+    // transaction, a concurrent DELETE would block on that row lock). affected_rows can
+    // legitimately be 0 here if the new values are identical to the stored ones — that is
+    // not evidence of a deletion, so it must not be treated as an error.
     $upd = $db_conn->prepare("UPDATE tp_invoices SET invoice_date=?, courier_charges=?, discount_amount=?, total_amount=? WHERE id=?");
     $upd->bind_param("sdddi", $invoice_date, $courier_charges, $discount_amount, $new_total, $inv_id); $upd->execute();
-    if ($upd->affected_rows === 0) {
-        throw new \Exception("Invoice was deleted by another request during edit.");
-    }
     $upd->close();
 
     // 7. Replace line items

@@ -692,26 +692,26 @@ if ($scope === 'company') {
     $pcs_ii_cond  = $filter_entity > 0 ? " AND ii.user_id={$filter_entity}"       : " AND ii.user_id IN ({$entity_ids_subq})";
     $pcs_uii_cond = $filter_entity > 0 ? " AND uii.from_user_id={$filter_entity}" : " AND uii.from_user_id IN ({$entity_ids_subq})";
     $pcs_ot_cond  = $filter_entity > 0 ? " AND os.godownid={$filter_entity}"      : " AND os.godownid IN ({$entity_ids_subq})";
+    // demofreedamage: stock given out as a demo, given away free, or written
+    // off as damaged. It never generates an invoice, but the pieces still
+    // left the godown for good — same as a sale, from Neksomo's piece-count
+    // perspective (Femi9 LLP still owes Neksomo for pieces that left stock,
+    // whatever the reason). 'Conversion' rows are a different concept
+    // (internal stock reclassification, not stock leaving the business) and
+    // are deliberately excluded here.
+    $pcs_dfd_cond = $filter_entity > 0 ? " AND dfd.userid={$filter_entity}" : " AND dfd.userid IN ({$entity_ids_subq})";
     // tp_invoices: territory partner invoices, sourced either directly from a
-    // company godown (source_godown_id) or indirectly through a channel
-    // partner the godown has stocked via pl_godown_transfers (source_cp_id) —
-    // stock a CP sells still traces back to whichever godown supplied it, so
-    // it counts as that godown's sale too. A CP is attributed to a godown by
-    // transfer history (pl_godown_transfers.godown_id), not a static column —
-    // there's no "this CP belongs to godown X" field on channel_partners. If a
-    // CP has ever received stock from more than one godown, its cp-sourced
-    // sales would count under each of those godowns' single-entity views —
-    // not an issue with today's data (every transfer row is godown_id=1,
-    // FEMI NAYAN LLP), but worth knowing if a second godown starts supplying
-    // the same CP later.
+    // company godown (source_godown_id) or through a channel partner
+    // (source_cp_id). Any CP-sourced invoice counts as LLP+Healthcare
+    // turnover unconditionally — no trace-back through pl_godown_transfers to
+    // confirm which godown actually supplied that CP. This can pull in CP
+    // sales that were never actually supplied by LLP/Healthcare stock, but
+    // that's the intended behavior per explicit confirmation.
     // See memory "neksomo-sold-by-company-calc" — a company sale can land in any
     // of invoice / user_invoice / tp_invoices, all three must be summed.
-    $pcs_tp_cp_subq = $filter_entity > 0
-        ? "SELECT DISTINCT cp_id FROM pl_godown_transfers WHERE transfer_type='godown_to_location' AND godown_id={$filter_entity}"
-        : "SELECT DISTINCT cp_id FROM pl_godown_transfers WHERE transfer_type='godown_to_location' AND godown_id IN ({$entity_ids_subq})";
     $pcs_tpi_cond = $filter_entity > 0
-        ? " AND ( (tpi.source_cp_id=0 AND tpi.source_godown_id={$filter_entity}) OR (tpi.source_cp_id>0 AND tpi.source_cp_id IN ({$pcs_tp_cp_subq})) )"
-        : " AND ( (tpi.source_cp_id=0 AND tpi.source_godown_id IN ({$entity_ids_subq})) OR (tpi.source_cp_id>0 AND tpi.source_cp_id IN ({$pcs_tp_cp_subq})) )";
+        ? " AND ( (tpi.source_cp_id=0 AND tpi.source_godown_id={$filter_entity}) OR tpi.source_cp_id>0 )"
+        : " AND ( (tpi.source_cp_id=0 AND tpi.source_godown_id IN ({$entity_ids_subq})) OR tpi.source_cp_id>0 )";
 
     // Per-day granularity is kept through the first aggregation (d.pr_id,
     // d.date) so each day's pieces can be valued against whichever
@@ -796,6 +796,10 @@ if ($scope === 'company') {
                  SELECT tpii.product_id, tpii.quantity, tpi.invoice_date
                  FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
                  WHERE tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
+                 UNION ALL
+                 SELECT dfd.product_id, dfd.qty, dfd.date
+                 FROM demofreedamage dfd
+                 WHERE dfd.usertype=? AND dfd.category IN ('Demo','Free','Damage') AND dfd.date BETWEEN ? AND ?{$pcs_dfd_cond}
              ) d
              WHERE d.pr_id IN (SELECT m.company_product_id FROM neksomo_product_mapping m
                                JOIN products np ON np.id = m.neksomo_product_id
@@ -804,7 +808,7 @@ if ($scope === 'company') {
          ) dp JOIN products p ON p.id = dp.pr_id
          GROUP BY p.id, p.productName, p.pieces_per_pack
          ORDER BY total_pieces DESC",
-        'ssssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to, $from, $to]);
+        'sssssssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to, $from, $to, $utype, $from, $to]);
 
     $grand_total_pieces          = (int) array_sum(array_column($pieces_sold, 'total_pieces'));
     $grand_total_pack_qty        = (int) array_sum(array_column($pieces_sold, 'total_qty'));
@@ -941,6 +945,29 @@ if ($scope === 'company') {
     }
     unset($__ps_row);
 
+    // Per-product Demo/Free/Damage breakdown (packs), folded into $pieces_sold
+    // by product id — shown as its own split in the Product-wise Pieces Sold
+    // table below, on top of (not separate from) the Total Pack Qty Sold it's
+    // already counted inside.
+    $pcs_dfd_breakdown = call_rows($db_conn,
+        "SELECT product_id pid,
+                COALESCE(SUM(CASE WHEN category='Demo' THEN qty ELSE 0 END),0) demo_qty,
+                COALESCE(SUM(CASE WHEN category='Free' THEN qty ELSE 0 END),0) free_qty,
+                COALESCE(SUM(CASE WHEN category='Damage' THEN qty ELSE 0 END),0) damage_qty
+         FROM demofreedamage dfd
+         WHERE usertype=? AND category IN ('Demo','Free','Damage') AND date BETWEEN ? AND ?{$pcs_dfd_cond}
+         GROUP BY product_id",
+        'sss', [$utype, $from, $to]);
+    $pcs_demo_qty_by_pid   = array_column($pcs_dfd_breakdown, 'demo_qty', 'pid');
+    $pcs_free_qty_by_pid   = array_column($pcs_dfd_breakdown, 'free_qty', 'pid');
+    $pcs_damage_qty_by_pid = array_column($pcs_dfd_breakdown, 'damage_qty', 'pid');
+    foreach ($pieces_sold as &$__ps_row) {
+        $__ps_row['demo_qty']   = (int) ($pcs_demo_qty_by_pid[$__ps_row['pid']] ?? 0);
+        $__ps_row['free_qty']   = (int) ($pcs_free_qty_by_pid[$__ps_row['pid']] ?? 0);
+        $__ps_row['damage_qty'] = (int) ($pcs_damage_qty_by_pid[$__ps_row['pid']] ?? 0);
+    }
+    unset($__ps_row);
+
     // Gross Profit nets returns on both sides: a returned piece is revenue
     // that never really landed (subtract it from Sold Value) and cost that
     // was never really incurred by this sale (subtract it from Purchase
@@ -1024,13 +1051,17 @@ if ($scope === 'company') {
                  SELECT tpii.product_id, tpii.quantity, tpi.invoice_date
                  FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
                  WHERE tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
+                 UNION ALL
+                 SELECT dfd.product_id, dfd.qty, dfd.date
+                 FROM demofreedamage dfd
+                 WHERE dfd.usertype=? AND dfd.category IN ('Demo','Free','Damage') AND dfd.date BETWEEN ? AND ?{$pcs_dfd_cond}
              ) d
              WHERE d.pr_id IN ({$diaper_mapped_ids_subq})
              GROUP BY d.pr_id, d.date
          ) dp JOIN products p ON p.id = dp.pr_id
          GROUP BY p.id, p.productName
          ORDER BY total_qty DESC",
-        'ssssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to, $from, $to]);
+        'sssssssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to, $from, $to, $utype, $from, $to]);
 
     $grand_diaper_pack_qty       = (int) array_sum(array_column($diaper_sold, 'total_qty'));
     $grand_diaper_value          = (float) array_sum(array_column($diaper_sold, 'total_value'));
@@ -1100,6 +1131,28 @@ if ($scope === 'company') {
         $__ds_row['net_qty']      = (int) $__ds_row['total_qty'] - $__ds_row['return_qty'];
         $__ds_row['return_value'] = (float) ($diaper_return_value_by_pid[$__ds_row['pid']] ?? 0);
         $__ds_row['net_value']    = (float) $__ds_row['total_value'] - $__ds_row['return_value'];
+    }
+    unset($__ds_row);
+
+    // Per-product Demo/Free/Damage breakdown (packs), folded into
+    // $diaper_sold by product id — same convention as napkin's above.
+    $diaper_dfd_breakdown = call_rows($db_conn,
+        "SELECT product_id pid,
+                COALESCE(SUM(CASE WHEN category='Demo' THEN qty ELSE 0 END),0) demo_qty,
+                COALESCE(SUM(CASE WHEN category='Free' THEN qty ELSE 0 END),0) free_qty,
+                COALESCE(SUM(CASE WHEN category='Damage' THEN qty ELSE 0 END),0) damage_qty
+         FROM demofreedamage dfd
+         WHERE usertype=? AND category IN ('Demo','Free','Damage') AND date BETWEEN ? AND ?{$pcs_dfd_cond}
+           AND product_id IN ({$diaper_mapped_ids_subq})
+         GROUP BY product_id",
+        'sss', [$utype, $from, $to]);
+    $diaper_demo_qty_by_pid   = array_column($diaper_dfd_breakdown, 'demo_qty', 'pid');
+    $diaper_free_qty_by_pid   = array_column($diaper_dfd_breakdown, 'free_qty', 'pid');
+    $diaper_damage_qty_by_pid = array_column($diaper_dfd_breakdown, 'damage_qty', 'pid');
+    foreach ($diaper_sold as &$__ds_row) {
+        $__ds_row['demo_qty']   = (int) ($diaper_demo_qty_by_pid[$__ds_row['pid']] ?? 0);
+        $__ds_row['free_qty']   = (int) ($diaper_free_qty_by_pid[$__ds_row['pid']] ?? 0);
+        $__ds_row['damage_qty'] = (int) ($diaper_damage_qty_by_pid[$__ds_row['pid']] ?? 0);
     }
     unset($__ds_row);
 
@@ -1458,14 +1511,17 @@ if ($is_neksomo_view) {
                         <div class="card-body">
                             <div style="overflow-x:auto;">
                             <table class="mt">
-                                <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Return Qty</th><th>Net Qty</th><th>Pieces/Pack</th><th>Total Pieces Sold</th><th>Return Pieces</th><th>Net Pieces</th><th>Sold Value &#8377;</th><th>Return Value &#8377;</th><th>Net Value &#8377;</th></tr></thead>
+                                <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Demo</th><th>Free</th><th>Damage</th><th>Return Qty</th><th>Net Qty</th><th>Pieces/Pack</th><th>Total Pieces Sold</th><th>Return Pieces</th><th>Net Pieces</th><th>Sold Value &#8377;</th><th>Return Value &#8377;</th><th>Net Value &#8377;</th></tr></thead>
                                 <tbody>
                                 <?php if (empty($pieces_sold)): ?>
-                                    <tr><td colspan="11" style="text-align:center;color:#898781;">No sales in this period.</td></tr>
+                                    <tr><td colspan="14" style="text-align:center;color:#898781;">No sales in this period.</td></tr>
                                 <?php else: foreach ($pieces_sold as $row): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($row['productName']); ?></td>
                                         <td><?php echo inr_format((int)$row['total_qty'], 0); ?></td>
+                                        <td><?php echo inr_format((int)$row['demo_qty'], 0); ?></td>
+                                        <td><?php echo inr_format((int)$row['free_qty'], 0); ?></td>
+                                        <td><?php echo inr_format((int)$row['damage_qty'], 0); ?></td>
                                         <td><?php echo inr_format((int)$row['return_qty'], 0); ?></td>
                                         <td><strong><?php echo inr_format((int)$row['net_qty'], 0); ?></strong></td>
                                         <td><?php echo $row['pieces_per_pack'] !== null ? (int)$row['pieces_per_pack'] : '1 *'; ?></td>
@@ -1485,7 +1541,7 @@ if ($is_neksomo_view) {
                                 </tbody>
                             </table>
                             </div>
-                            <p style="font-size:11.5px;color:#898781;margin-top:10px;">* Pack size not set for this product — pieces shown equal pack quantity. Value uses whichever Femi9 LLP rate was effective on each sale's actual date.</p>
+                            <p style="font-size:11.5px;color:#898781;margin-top:10px;">* Pack size not set for this product — pieces shown equal pack quantity. Value uses whichever Femi9 LLP rate was effective on each sale's actual date. Demo/Free/Damage are a breakdown of Pack Qty Sold, not additional to it — Conversion entries aren't included anywhere in this report.</p>
                         </div>
                     </div>
 
@@ -1544,14 +1600,17 @@ if ($is_neksomo_view) {
                         <div class="card-body">
                             <div style="overflow-x:auto;">
                             <table class="mt">
-                                <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Return Qty</th><th>Net Qty</th><th>Sold Value &#8377;</th><th>Return Value &#8377;</th><th>Net Value &#8377;</th></tr></thead>
+                                <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Demo</th><th>Free</th><th>Damage</th><th>Return Qty</th><th>Net Qty</th><th>Sold Value &#8377;</th><th>Return Value &#8377;</th><th>Net Value &#8377;</th></tr></thead>
                                 <tbody>
                                 <?php if (empty($diaper_sold)): ?>
-                                    <tr><td colspan="7" style="text-align:center;color:#898781;">No sales in this period.</td></tr>
+                                    <tr><td colspan="10" style="text-align:center;color:#898781;">No sales in this period.</td></tr>
                                 <?php else: foreach ($diaper_sold as $row): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($row['productName']); ?></td>
                                         <td><?php echo inr_format((int)$row['total_qty'], 0); ?></td>
+                                        <td><?php echo inr_format((int)$row['demo_qty'], 0); ?></td>
+                                        <td><?php echo inr_format((int)$row['free_qty'], 0); ?></td>
+                                        <td><?php echo inr_format((int)$row['damage_qty'], 0); ?></td>
                                         <td><?php echo inr_format((int)$row['return_qty'], 0); ?></td>
                                         <td><strong><?php echo inr_format((int)$row['net_qty'], 0); ?></strong></td>
                                         <td>
@@ -1567,6 +1626,7 @@ if ($is_neksomo_view) {
                                 </tbody>
                             </table>
                             </div>
+                            <p style="font-size:11.5px;color:#898781;margin-top:10px;">Demo/Free/Damage are a breakdown of Pack Qty Sold, not additional to it — Conversion entries aren't included anywhere in this report.</p>
                         </div>
                     </div>
 

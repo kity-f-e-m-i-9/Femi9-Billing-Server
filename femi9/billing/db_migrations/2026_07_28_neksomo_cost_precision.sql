@@ -23,3 +23,4 @@ ALTER TABLE neksomo_manufacturer_purchases
     MODIFY COLUMN total_amount DECIMAL(16,6) NOT NULL,
     MODIFY COLUMN total_taxable_value DECIMAL(16,6) NOT NULL,
     MODIFY COLUMN total_gst_amount DECIMAL(16,6) NOT NULL;
+

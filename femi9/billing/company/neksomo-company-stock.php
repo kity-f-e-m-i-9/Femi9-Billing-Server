@@ -192,6 +192,75 @@ $select_OPStock = "SELECT s.*, p.productName, p.pieces_per_pack
 									<br/>
 									<?php endforeach; ?>
 
+									<?php
+									// Channel Partner: not a company_godown row like the sections above —
+									// channel_partner_stock is keyed by (channel_partner_id, product_id), so
+									// this is a closing qty aggregated across every active CP, per product,
+									// not a single location's own stock. No opening/sales/sent breakdown
+									// exists at this level (channel_partner_stock only tracks input_qty and
+									// closing_qty), so this table has fewer columns than the sections above.
+									// NKS- products excluded to match cp-stock.php's own convention.
+									$select_CPStock = "SELECT p.id, p.productName, p.pieces_per_pack,
+										COALESCE(SUM(cps.input_qty), 0) AS input_qty,
+										COALESCE(SUM(cps.closing_qty), 0) AS closing_qty
+										FROM products p
+										LEFT JOIN (
+											SELECT cps.product_id, cps.input_qty, cps.closing_qty
+											FROM channel_partner_stock cps
+											JOIN channel_partners cp ON cp.id = cps.channel_partner_id AND cp.is_active = 1
+										) cps ON cps.product_id = p.id
+										WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
+										GROUP BY p.id, p.productName, p.pieces_per_pack
+										ORDER BY p.productName ASC";
+									$Fetch_CPStock = mysqli_query($db_conn, $select_CPStock);
+									$cp_total_input = 0;
+									$cp_total_closing = 0;
+									$cp_total_closing_pieces = 0;
+									?>
+
+									<h1>Channel Partner (All CPs)</h1>
+
+									<table class="table">
+										<thead>
+											<tr>
+												<th>Product Name</th>
+												<th style="text-align:right;">Input Stock Qty</th>
+												<th style="text-align:right;">Closing Qty</th>
+												<th style="text-align:right;">Closing Qty (Pieces)</th>
+											</tr>
+										</thead>
+
+										<tbody>
+										<?php while ($Result_CPStock = mysqli_fetch_array($Fetch_CPStock)):
+											$CPInputQty      = $Result_CPStock['input_qty'];
+											$CPClosing       = $Result_CPStock['closing_qty'];
+											$CPPiecesPerPack = max((int)($Result_CPStock['pieces_per_pack'] ?? 1), 1);
+											$CPClosingPieces = $CPClosing * $CPPiecesPerPack;
+
+											$cp_total_input          += $CPInputQty;
+											$cp_total_closing        += $CPClosing;
+											$cp_total_closing_pieces += $CPClosingPieces;
+										?>
+											<tr>
+												<td><?php echo $Result_CPStock['productName']; ?></td>
+												<td align="right"><?php echo inr_format($CPInputQty, 0); ?></td>
+												<td align="right"><b><?php echo inr_format($CPClosing, 0); ?></b></td>
+												<td align="right"><b><?php echo inr_format($CPClosingPieces, 0); ?></b></td>
+											</tr>
+										<?php endwhile; ?>
+										</tbody>
+
+										<tfoot>
+											<tr>
+												<td style="text-align:right;">Total Stock Qty</td>
+												<td align="right"><b><?=inr_format($cp_total_input, 0);?></b></td>
+												<td align="right"><b><?=inr_format($cp_total_closing, 0);?></b></td>
+												<td align="right"><b><?=inr_format($cp_total_closing_pieces, 0);?></b></td>
+											</tr>
+										</tfoot>
+									</table>
+									<br/>
+
 									</div>
                                     </div>
                                 </div>

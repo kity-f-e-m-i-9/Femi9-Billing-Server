@@ -15,10 +15,16 @@
  *   invoice_items                      -> customer invoices.              user_type='company',      user_id      = 1 (LLP) / 2 (Healthcare)
  *   user_invoice_items                 -> SS/SD/S/D/Shop invoices.        from_user_type='company', from_user_id = 1 (LLP) / 2 (Healthcare)
  *   user_return_stock_items            -> returns against those invoices. to_usertype='company',    to_userid    = 1 (LLP) / 2 (Healthcare)
- *   tp_invoices                        -> territory partner invoices, godown-sourced only. source_godown_id = 1 (LLP) / 2 (Healthcare)
- *                     (channel-partner-sourced TP invoices are already excluded here — their
- *                     source_godown_id is 0, mutually exclusive with source_cp_id at creation
- *                     time in tp-invoice-action.php — same as overstock_datewise.php relies on.)
+ *   tp_invoices                        -> territory partner invoices, either godown-sourced (source_godown_id = 1
+ *                     LLP / 2 Healthcare) or channel-partner-sourced (source_cp_id > 0). Any
+ *                     CP-sourced invoice counts unconditionally, with no trace-back through
+ *                     pl_godown_transfers to confirm which godown actually supplied that CP —
+ *                     same broadened rule mis-report.php's Neksomo turnover calculation uses.
+ *   demofreedamage                     -> demo/free/damage stock given out (no invoice, but stock
+ *                     still left for good). usertype='company', userid = 1 (LLP) / 2 (Healthcare).
+ *                     Only category IN ('Demo','Free','Damage') counts — 'Conversion' rows are a
+ *                     different concept (internal reclassification, not stock leaving the
+ *                     business) and are excluded, same as mis-report.php's Pieces Sold Report.
  *
  * Filters are applied on each *_items table's own date column (not the invoice
  * header's date) to match overstock_datewise.php exactly — header and item
@@ -45,8 +51,9 @@ function get_llp_healthcare_godown_ids($db_conn) {
 
 // Sold qty (packs) per company product_id, from LLP + Healthcare godowns,
 // optionally restricted to a date range. Sums ot_sales, invoice_items,
-// user_invoice_items and tp_invoice_items — every table a company-issued sale
-// can land in, same set overstock_datewise.php's Sales Qty column counts.
+// user_invoice_items, tp_invoice_items, and demofreedamage (Demo/Free/Damage
+// only, not Conversion) — every table a company-issued sale or demo/free/
+// damage stock-out can land in.
 // Gross — not netted against returns; see get_llp_healthcare_returned_packs().
 function get_llp_healthcare_sold_packs($db_conn, $from_date, $to_date) {
     $godownIds = get_llp_healthcare_godown_ids($db_conn);
@@ -92,16 +99,34 @@ function get_llp_healthcare_sold_packs($db_conn, $from_date, $to_date) {
         $soldByProduct[$pid] = ($soldByProduct[$pid] ?? 0) + (int)$row['q'];
     }
 
-    // tp_invoices: territory partner invoices, godown-sourced only. Channel-
-    // partner-sourced rows are already excluded via source_godown_id (see
-    // class doc comment above), so no separate source_cp_id check is needed.
+    // tp_invoices: territory partner invoices, godown-sourced or channel-
+    // partner-sourced (any source_cp_id>0 counts, unconditionally — see class
+    // doc comment above).
     $sql3 = "SELECT tpii.product_id AS pr_id, SUM(tpii.quantity) AS q
              FROM tp_invoices tpi
              JOIN tp_invoice_items tpii ON tpii.tp_invoice_id = tpi.id
-             WHERE tpi.source_godown_id IN ($godownList) " . $dateClause('tpi.invoice_date') . "
+             WHERE (tpi.source_godown_id IN ($godownList) OR tpi.source_cp_id > 0) " . $dateClause('tpi.invoice_date') . "
              GROUP BY tpii.product_id";
     $res3 = $db_conn->query($sql3);
     while ($row = $res3->fetch_assoc()) {
+        $pid = (int)$row['pr_id'];
+        $soldByProduct[$pid] = ($soldByProduct[$pid] ?? 0) + (int)$row['q'];
+    }
+
+    // demofreedamage: stock given out as a demo, given away free, or written
+    // off as damaged. It never generates an invoice, but the pieces still
+    // left the godown for good — same as a sale, from Neksomo's piece-count
+    // perspective (Femi9 LLP still owes Neksomo for pieces that left stock,
+    // whatever the reason). 'Conversion' rows are a different concept
+    // (internal stock reclassification, not stock leaving the business) and
+    // are deliberately excluded here — same convention as mis-report.php's
+    // Pieces Sold Report.
+    $sql4 = "SELECT product_id AS pr_id, SUM(qty) AS q
+             FROM demofreedamage
+             WHERE usertype = 'company' AND userid IN ($godownList) AND category IN ('Demo','Free','Damage') " . $dateClause('date') . "
+             GROUP BY product_id";
+    $res4 = $db_conn->query($sql4);
+    while ($row = $res4->fetch_assoc()) {
         $pid = (int)$row['pr_id'];
         $soldByProduct[$pid] = ($soldByProduct[$pid] ?? 0) + (int)$row['q'];
     }
