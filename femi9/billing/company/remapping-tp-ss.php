@@ -188,7 +188,7 @@ if ($_r2) { while ($row = mysqli_fetch_assoc($_r2)) { $ssList[] = $row; } }
         <div class="modal-content" style="border-radius:10px;border:none;">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">swap_horiz</i>Remap Territory Partner</h5>
-                <button type="button" class="close" data-dismiss="modal" style="color:#fff;opacity:.8;font-size:22px;">&times;</button>
+                <button type="button" class="close" data-bs-dismiss="modal" style="color:#fff;opacity:.8;font-size:22px;">&times;</button>
             </div>
             <form method="post">
                 <div class="modal-body" style="padding:24px;">
@@ -215,7 +215,7 @@ if ($_r2) { while ($row = mysqli_fetch_assoc($_r2)) { $ssList[] = $row; } }
                     </select>
                 </div>
                 <div class="modal-footer" style="border-top:1px solid #f1f5f9;padding:14px 24px;">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary btn-sm" style="background:#0d9488;border-color:#0d9488;">Confirm Remap</button>
                 </div>
             </form>
