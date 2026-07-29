@@ -75,9 +75,25 @@ if ($col2 && $col2->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_invoices ADD INDEX idx_tpi_creator (created_by_user_type, created_by_user_id, invoice_number)");
     $db_conn->query("UPDATE tp_invoices SET created_by_user_type='super_stockiest', created_by_user_id=SUBSTRING_INDEX(SUBSTRING(invoice_number,6),'/',1) WHERE invoice_number LIKE 'TP/SS%'");
     $db_conn->query("UPDATE tp_invoices SET created_by_user_type='company' WHERE created_by_user_type=''");
-    $idx = $db_conn->query("SHOW INDEX FROM tp_invoices WHERE Key_name='uk_tp_inv_number'");
-    if ($idx && $idx->num_rows > 0) {
-        $db_conn->query("ALTER TABLE tp_invoices DROP INDEX uk_tp_inv_number");
+}
+
+// Drop any leftover database-wide UNIQUE index on invoice_number alone —
+// on some environments this pre-existing constraint was named differently
+// (e.g. 'uk_tpi_number' instead of 'uk_tp_inv_number'), so it must be found
+// by structure (single-column unique index on invoice_number) rather than by
+// a fixed name, and this check must run on every request, not just when
+// created_by_user_type is first added, otherwise a mis-named leftover index
+// silently keeps blocking manual invoice numbers across different SS accounts.
+$idxRes = $db_conn->query("SHOW INDEX FROM tp_invoices WHERE Non_unique=0 AND Column_name='invoice_number'");
+if ($idxRes) {
+    while ($idxRow = $idxRes->fetch_assoc()) {
+        $keyName = $idxRow['Key_name'];
+        if ($keyName === 'PRIMARY') continue;
+        $colCount = $db_conn->query("SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tp_invoices' AND INDEX_NAME='" . $db_conn->real_escape_string($keyName) . "'");
+        $colCountRow = $colCount ? $colCount->fetch_assoc() : null;
+        if ($colCountRow && (int)$colCountRow['c'] === 1) {
+            $db_conn->query("ALTER TABLE tp_invoices DROP INDEX `" . $db_conn->real_escape_string($keyName) . "`");
+        }
     }
 }
 
