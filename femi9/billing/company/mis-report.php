@@ -126,6 +126,25 @@ function call_rows($db, $sql, $types = '', $params = []) {
     return $r ? $r->fetch_all(MYSQLI_ASSOC) : [];
 }
 
+// Merge multiple state/district breakdown result sets (each a list of rows
+// with a $name_key/'cnt'/'revenue' shape) by name, summing cnt/revenue for
+// rows that name the same state or district, sorted by revenue descending.
+function merge_geo_rows($name_key, ...$sources) {
+    $map = [];
+    foreach ($sources as $rows) {
+        foreach ($rows as $r) {
+            $name = $r[$name_key];
+            if (!isset($map[$name])) $map[$name] = ['cnt' => 0, 'revenue' => 0.0];
+            $map[$name]['cnt']     += (int)$r['cnt'];
+            $map[$name]['revenue'] += (float)$r['revenue'];
+        }
+    }
+    $out = [];
+    foreach ($map as $name => $v) $out[] = [$name_key => $name, 'cnt' => $v['cnt'], 'revenue' => $v['revenue']];
+    usort($out, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
+    return $out;
+}
+
 // Build TP WHERE clause additions
 function tp_cond_inv($tp_id) {
     return $tp_id > 0 ? " AND i.user_id={$tp_id}" : "";
@@ -146,15 +165,22 @@ $tc_ii  = $filter_tp > 0 ? " AND ii.user_id={$filter_tp}"        : "";
 $tc_uii = $filter_tp > 0 ? " AND uii.from_user_id={$filter_tp}"  : "";
 
 // tp_invoices = company or a super-stockist billing a TP (there is no
-// from/to-type column — the issuer is inferred from source_cp_id/
-// source_godown_id, which only company invoices ever populate; a
-// super-stockist's TP invoices always leave both at 0, see
-// super-stockist/tp-invoice-action.php). TP itself never issues one of
-// these — a tp_invoice is always billed TO a TP — so only 'company' and
+// from/to-type column — the issuer is inferred from created_by_user_type,
+// added later than the table itself, see super-stockist/tp-invoice-action.php
+// and company/tp-invoice-action.php). TP itself never issues one of these —
+// a tp_invoice is always billed TO a TP — so only 'company' and
 // 'super_stockiest' scopes ever pick any of them up.
+// Both scopes match on created_by_user_type rather than source_cp_id/
+// source_godown_id — those columns are only populated on invoices created
+// after source tracking was added, so a handful of early company-created TP
+// invoices (source_cp_id=0 AND source_godown_id=0, e.g. TP/26-27/001-003)
+// were silently excluded from company-scope totals, AND double-counted into
+// super-stockiest-scope totals (which matched on the same "neither source
+// set" condition with no creator check) when filtered on source instead of
+// on who actually created the invoice.
 $tpinv_source_sql = null;
-if ($scope === 'company') $tpinv_source_sql = "(source_cp_id>0 OR source_godown_id>0)";
-elseif ($scope === 'super_stockiest') $tpinv_source_sql = "(source_cp_id=0 AND source_godown_id=0)";
+if ($scope === 'company') $tpinv_source_sql = "(created_by_user_type != 'super_stockiest')";
+elseif ($scope === 'super_stockiest') $tpinv_source_sql = "(created_by_user_type = 'super_stockiest')";
 $tc_tpi = $filter_tp > 0 ? " AND territory_partner_id={$filter_tp}" : "";
 
 // ── Load all TPs for filter dropdown ──────────────────────────────────────
@@ -265,8 +291,19 @@ $returns_row = crow($db_conn,
         GROUP BY returnid
      ) x",
     'sss', [$utype, $from, $to]);
-$total_returns    = (int)$returns_row['cnt'];
-$total_return_amt = (float)$returns_row['amount'];
+// OT channel returns (ot_sales_return) — company scope only, same gating as
+// OT sales above. Unlike user_return_stock, ot_sales_return's `total` is
+// already a per-line amount (not repeated per return), so no dedup needed —
+// same convention the per-product returns query below already uses.
+$ot_returns_row = ['cnt' => 0, 'amount' => 0];
+if ($scope === 'company') {
+    $ot_returns_row = crow($db_conn,
+        "SELECT COUNT(DISTINCT tempid) cnt, COALESCE(SUM(total),0) amount FROM ot_sales_return
+         WHERE return_date BETWEEN ? AND ?",
+        'ss', [$from, $to]);
+}
+$total_returns    = (int)$returns_row['cnt'] + (int)($ot_returns_row['cnt'] ?? 0);
+$total_return_amt = (float)$returns_row['amount'] + (float)($ot_returns_row['amount'] ?? 0);
 // Total Turnover is net of returns received back in the selected period.
 $total_revenue -= $total_return_amt;
 
@@ -278,6 +315,11 @@ $prev_return_amt = (float)cval($db_conn,
         GROUP BY returnid
      ) x",
     'sss', [$utype, $prev_from, $prev_to]);
+if ($scope === 'company') {
+    $prev_return_amt += (float)cval($db_conn,
+        "SELECT COALESCE(SUM(total),0) FROM ot_sales_return WHERE return_date BETWEEN ? AND ?",
+        'ss', [$prev_from, $prev_to]);
+}
 $tpi_prev_rev = 0.0;
 if ($tpinv_source_sql) {
     $tpi_prev_rev = (float)cval($db_conn,
@@ -406,11 +448,18 @@ if ($scope === 'company') {
     }
     // Territory Partner channel — the dedicated tp_invoices table (company's
     // own invoices to a TP; distinct from user_invoice, which TP billing no
-    // longer uses at all).
+    // longer uses at all). $tpi_row already reflects every company-created
+    // TP invoice (see $tpinv_source_sql above), so this channel picks up the
+    // same figures as the Overview KPI with no extra query needed here.
     if (!isset($channel_breakdown['territory_partner'])) $channel_breakdown['territory_partner'] = ['cnt' => 0, 'rev' => 0.0];
     $channel_breakdown['territory_partner']['cnt'] += (int)($tpi_row['cnt'] ?? 0);
     $channel_breakdown['territory_partner']['rev'] += (float)($tpi_row['rev'] ?? 0);
-    $channel_breakdown['ot'] = ['cnt' => (int)($ot_row['cnt'] ?? 0), 'rev' => (float)($ot_row['rev'] ?? 0)];
+    // OT channel revenue net of its own returns (ot_sales_return) — same
+    // $ot_returns_row already computed for the Overview Returns KPI above.
+    $channel_breakdown['ot'] = [
+        'cnt' => (int)($ot_row['cnt'] ?? 0),
+        'rev' => (float)($ot_row['rev'] ?? 0) - (float)($ot_returns_row['amount'] ?? 0),
+    ];
     $channel_labels['ot'] = 'OT Channel';
 }
 $channel_total_rev = array_sum(array_column($channel_breakdown, 'rev')) ?: 1;
@@ -436,11 +485,26 @@ if ($tpinv_source_sql) {
          GROUP BY invoice_date ORDER BY invoice_date",
         'ss', [$from, $to]);
 }
+// OT channel — company scope only, net of its own returns per day, same
+// convention as the Channel Breakdown's OT row above.
+$do = $dor = [];
+if ($scope === 'company') {
+    $do = call_rows($db_conn,
+        "SELECT `date` d, COALESCE(SUM(total),0) rev FROM ot_sales
+         WHERE `date` BETWEEN ? AND ? GROUP BY `date` ORDER BY `date`",
+        'ss', [$from, $to]);
+    $dor = call_rows($db_conn,
+        "SELECT return_date d, COALESCE(SUM(total),0) rev FROM ot_sales_return
+         WHERE return_date BETWEEN ? AND ? GROUP BY return_date ORDER BY return_date",
+        'ss', [$from, $to]);
+}
 $dm = [];
 foreach ($dc as $r) $dm[$r['d']]['c'] = (float)$r['rev'];
 foreach ($ds as $r) $dm[$r['d']]['s'] = (float)$r['rev'];
 foreach ($dt as $r) $dm[$r['d']]['t'] = (float)$r['rev'];
-$chart_labels = $chart_cust = $chart_shop = $chart_tp = [];
+foreach ($do as $r) $dm[$r['d']]['o'] = ($dm[$r['d']]['o'] ?? 0) + (float)$r['rev'];
+foreach ($dor as $r) $dm[$r['d']]['o'] = ($dm[$r['d']]['o'] ?? 0) - (float)$r['rev'];
+$chart_labels = $chart_cust = $chart_shop = $chart_tp = $chart_ot = [];
 $ptr = strtotime($from); $end = strtotime($to);
 while ($ptr <= $end) {
     $d = date('Y-m-d', $ptr);
@@ -448,13 +512,14 @@ while ($ptr <= $end) {
     $chart_cust[]   = $dm[$d]['c'] ?? 0;
     $chart_shop[]   = $dm[$d]['s'] ?? 0;
     $chart_tp[]     = $dm[$d]['t'] ?? 0;
+    $chart_ot[]     = $dm[$d]['o'] ?? 0;
     $ptr = strtotime('+1 day', $ptr);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. PERIOD BREAKDOWN
 // ═══════════════════════════════════════════════════════════════════════════
-function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt, $tpinv_source_sql, $tc_tpi) {
+function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt, $tpinv_source_sql, $tc_tpi, $scope) {
     $cust = call_rows($db,
         "SELECT DATE_FORMAT(`date`,'$gfmt') g, DATE_FORMAT(MIN(`date`),'$lfmt') lbl,
                 COUNT(*) cnt, COALESCE(SUM(total),0) rev
@@ -476,16 +541,34 @@ function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt, 
              GROUP BY g ORDER BY g",
             'ss', [$from, $to]);
     }
+    // OT channel — company scope only, net of its own returns per bucket,
+    // same convention as the Channel Breakdown / Daily Trend chart's OT figures.
+    $ot = $otret = [];
+    if ($scope === 'company') {
+        $ot = call_rows($db,
+            "SELECT DATE_FORMAT(`date`,'$gfmt') g, DATE_FORMAT(MIN(`date`),'$lfmt') lbl,
+                    COUNT(DISTINCT tempid) cnt, COALESCE(SUM(total),0) rev
+             FROM ot_sales WHERE `date` BETWEEN ? AND ?
+             GROUP BY g ORDER BY g",
+            'ss', [$from, $to]);
+        $otret = call_rows($db,
+            "SELECT DATE_FORMAT(return_date,'$gfmt') g, COALESCE(SUM(total),0) rev
+             FROM ot_sales_return WHERE return_date BETWEEN ? AND ?
+             GROUP BY g",
+            'ss', [$from, $to]);
+    }
     $map = [];
     foreach ($cust as $r) { $map[$r['g']]['lbl']=$r['lbl']; $map[$r['g']]['c']=(float)$r['rev']; $map[$r['g']]['cc']=(int)$r['cnt']; }
     foreach ($shop as $r) { $map[$r['g']]['lbl']=$map[$r['g']]['lbl']??$r['lbl']; $map[$r['g']]['s']=(float)$r['rev']; $map[$r['g']]['sc']=(int)$r['cnt']; }
     foreach ($tp as $r) { $map[$r['g']]['lbl']=$map[$r['g']]['lbl']??$r['lbl']; $map[$r['g']]['t']=(float)$r['rev']; $map[$r['g']]['tc']=(int)$r['cnt']; }
+    foreach ($ot as $r) { $map[$r['g']]['lbl']=$map[$r['g']]['lbl']??$r['lbl']; $map[$r['g']]['o']=(float)$r['rev']; $map[$r['g']]['oc']=(int)$r['cnt']; }
+    foreach ($otret as $r) { $map[$r['g']]['o']=($map[$r['g']]['o']??0)-(float)$r['rev']; }
     ksort($map); return $map;
 }
-$daily_p   = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m-%d','%d %b',$tpinv_source_sql,$tc_tpi);
-$weekly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%u','W%u %Y',$tpinv_source_sql,$tc_tpi);
-$monthly_p = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m','%b %Y',$tpinv_source_sql,$tc_tpi);
-$yearly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y','%Y',$tpinv_source_sql,$tc_tpi);
+$daily_p   = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m-%d','%d %b',$tpinv_source_sql,$tc_tpi,$scope);
+$weekly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%u','W%u %Y',$tpinv_source_sql,$tc_tpi,$scope);
+$monthly_p = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m','%b %Y',$tpinv_source_sql,$tc_tpi,$scope);
+$yearly_p  = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y','%Y',$tpinv_source_sql,$tc_tpi,$scope);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. PRODUCT-WISE SALES
@@ -1208,7 +1291,9 @@ foreach ($product_returns as $r) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 5. STATE / DISTRICT-WISE (shop invoices → shop → partner_location_nodes)
+// 5. STATE / DISTRICT-WISE (shop invoices → shop → partner_location_nodes,
+// plus TP invoices → the TP's own territory, plus OT sales → their own
+// state_id field)
 //
 // `shop.state_id` is unreliable legacy data — for most shops it holds a
 // district's node id (or free text like "Tamilnadu " / "தமிழ்நாடு" / blank),
@@ -1217,6 +1302,21 @@ foreach ($product_returns as $r) {
 // State and District are derived by walking the location tree up from
 // district_id to its depth-2 (state) / depth-3 (district) ancestor, with
 // state_id used only as a fallback when district_id itself doesn't resolve.
+//
+// TP invoices have no shop/location link of their own, so each is attributed
+// to its Territory Partner's own assigned territory instead — specifically
+// the TP's earliest-assigned location (territory_partner_locations), walked
+// up the same way. A TP can be assigned several locations, but in practice
+// they fall within one state, so one representative location is treated as
+// good enough for both State and District (unlike shop invoices, which carry
+// a real per-invoice location).
+//
+// OT sales (`ot_sales.state_id`) have the exact same "actually a district id"
+// issue as shop.state_id, so they're folded in as a fallback-only join too —
+// no separate district_id column exists for OT the way shop has one. OT
+// returns (`ot_sales_return`) carry no location data at all (only godownid),
+// so unlike other sections' OT figures, this breakdown cannot net OT sales
+// against their returns — it shows OT sales gross.
 // ═══════════════════════════════════════════════════════════════════════════
 $tc_ui_plain = $filter_tp > 0 ? " AND ui.from_user_id={$filter_tp}" : "";
 $state_anc_cte = "WITH RECURSIVE anc AS (
@@ -1224,7 +1324,7 @@ $state_anc_cte = "WITH RECURSIVE anc AS (
     UNION ALL
     SELECT c.id, a.anc_id, a.anc_name FROM partner_location_nodes c JOIN anc a ON c.parent_id=a.node_id
 )";
-$state_sales = call_rows($db_conn,
+$state_sales_shop = call_rows($db_conn,
     "{$state_anc_cte}
      SELECT COALESCE(a1.anc_name, a2.anc_name) state_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
      FROM user_invoice ui
@@ -1235,21 +1335,80 @@ $state_sales = call_rows($db_conn,
        AND COALESCE(a1.anc_name, a2.anc_name) IS NOT NULL
      GROUP BY COALESCE(a1.anc_id, a2.anc_id), state_name ORDER BY revenue DESC",
     'sss', [$utype, $from, $to]);
+$state_sales_tp = [];
+if ($tpinv_source_sql) {
+    $state_sales_tp = call_rows($db_conn,
+        "{$state_anc_cte}
+         SELECT a.anc_name state_name, COUNT(*) cnt, COALESCE(SUM(x.total_amount),0) revenue
+         FROM (
+             SELECT ti.total_amount,
+                    (SELECT tpl.location_id FROM territory_partner_locations tpl
+                     WHERE tpl.territory_partner_id=ti.territory_partner_id
+                     ORDER BY tpl.assigned_at ASC, tpl.id ASC LIMIT 1) AS location_id
+             FROM tp_invoices ti
+             WHERE {$tpinv_source_sql} AND ti.invoice_date BETWEEN ? AND ?{$tc_tpi}
+         ) x
+         JOIN anc a ON a.node_id = x.location_id
+         GROUP BY a.anc_id, a.anc_name",
+        'ss', [$from, $to]);
+}
+$state_sales_ot = [];
+if ($scope === 'company') {
+    $state_sales_ot = call_rows($db_conn,
+        "{$state_anc_cte}
+         SELECT a.anc_name state_name, COUNT(DISTINCT os.tempid) cnt, COALESCE(SUM(os.total),0) revenue
+         FROM ot_sales os JOIN anc a ON a.node_id = os.state_id
+         WHERE os.date BETWEEN ? AND ?
+         GROUP BY a.anc_id, a.anc_name",
+        'ss', [$from, $to]);
+}
+$state_sales = merge_geo_rows('state_name', $state_sales_shop, $state_sales_tp, $state_sales_ot);
 
 $dist_anc_cte = "WITH RECURSIVE danc AS (
     SELECT id AS node_id, id AS anc_id, name AS anc_name FROM partner_location_nodes WHERE depth=3
     UNION ALL
     SELECT c.id, a.anc_id, a.anc_name FROM partner_location_nodes c JOIN danc a ON c.parent_id=a.node_id
 )";
-$district_sales = call_rows($db_conn,
+$district_sales_shop = call_rows($db_conn,
     "{$dist_anc_cte}
      SELECT danc.anc_name district_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
      FROM user_invoice ui
      JOIN shop s ON s.temp_id=ui.to_user_id
      JOIN danc ON danc.node_id=s.district_id
      WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
-     GROUP BY danc.anc_id, danc.anc_name ORDER BY revenue DESC LIMIT 20",
+     GROUP BY danc.anc_id, danc.anc_name",
     'sss', [$utype, $from, $to]);
+$district_sales_tp = [];
+if ($tpinv_source_sql) {
+    $district_sales_tp = call_rows($db_conn,
+        "{$dist_anc_cte}
+         SELECT danc.anc_name district_name, COUNT(*) cnt, COALESCE(SUM(x.total_amount),0) revenue
+         FROM (
+             SELECT ti.total_amount,
+                    (SELECT tpl.location_id FROM territory_partner_locations tpl
+                     WHERE tpl.territory_partner_id=ti.territory_partner_id
+                     ORDER BY tpl.assigned_at ASC, tpl.id ASC LIMIT 1) AS location_id
+             FROM tp_invoices ti
+             WHERE {$tpinv_source_sql} AND ti.invoice_date BETWEEN ? AND ?{$tc_tpi}
+         ) x
+         JOIN danc ON danc.node_id = x.location_id
+         GROUP BY danc.anc_id, danc.anc_name",
+        'ss', [$from, $to]);
+}
+$district_sales_ot = [];
+if ($scope === 'company') {
+    $district_sales_ot = call_rows($db_conn,
+        "{$dist_anc_cte}
+         SELECT danc.anc_name district_name, COUNT(DISTINCT os.tempid) cnt, COALESCE(SUM(os.total),0) revenue
+         FROM ot_sales os JOIN danc ON danc.node_id = os.state_id
+         WHERE os.date BETWEEN ? AND ?
+         GROUP BY danc.anc_id, danc.anc_name",
+        'ss', [$from, $to]);
+}
+$district_sales = array_slice(
+    merge_geo_rows('district_name', $district_sales_shop, $district_sales_tp, $district_sales_ot),
+    0, 20
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 6. TERRITORY PARTNER PERFORMANCE (= Salesperson Performance)
@@ -1295,7 +1454,7 @@ $overall_pct_all = $total_target_all > 0
     ? min(round($total_achieved_all / $total_target_all * 100, 1), 999) : 0;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 7. TOP SHOPS & TOP CUSTOMERS
+// 7. TOP SHOPS & TOP DISTRIBUTORS
 // ═══════════════════════════════════════════════════════════════════════════
 $top_shops = call_rows($db_conn,
     "SELECT s.name shop_name, COUNT(*) inv_cnt, COALESCE(SUM(ui.total),0) revenue
@@ -1304,13 +1463,41 @@ $top_shops = call_rows($db_conn,
      GROUP BY s.temp_id, s.name ORDER BY revenue DESC LIMIT 10",
     'sss', [$utype, $from, $to]);
 
-$tc_inv_i = $filter_tp > 0 ? " AND i.user_id={$filter_tp}" : "";
-$top_custs = call_rows($db_conn,
-    "SELECT COALESCE(c.name,'Walking Customer') cust_name, COUNT(*) inv_cnt, COALESCE(SUM(i.total),0) revenue
-     FROM invoice i LEFT JOIN customers c ON c.id=i.customer_id
-     WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_inv_i}
-     GROUP BY i.customer_id ORDER BY revenue DESC LIMIT 10",
+// Top Distributors — merges three wholesale/bulk-buyer entity types that are
+// each billed by company but live in separate tables: Distributor, Super
+// Distributor (both via user_invoice, joined by temp_id like Top Shops does
+// for shop), and Territory Partner (via the dedicated tp_invoices table,
+// same $tpinv_source_sql as every other section). Unlike Top Shops (a single
+// entity type), these three are concatenated rather than merged by name —
+// a Distributor and a TP sharing a name are still different entities.
+$top_dist_d = call_rows($db_conn,
+    "SELECT d.name dist_name, COUNT(*) inv_cnt, COALESCE(SUM(ui.total),0) revenue
+     FROM user_invoice ui JOIN distributor d ON d.temp_id=ui.to_user_id
+     WHERE ui.from_user_type=? AND ui.to_user_type='distributor' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
+     GROUP BY d.temp_id, d.name",
     'sss', [$utype, $from, $to]);
+$top_dist_sd = call_rows($db_conn,
+    "SELECT sd.name dist_name, COUNT(*) inv_cnt, COALESCE(SUM(ui.total),0) revenue
+     FROM user_invoice ui JOIN super_distributor sd ON sd.temp_id=ui.to_user_id
+     WHERE ui.from_user_type=? AND ui.to_user_type='super_distributor' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
+     GROUP BY sd.temp_id, sd.name",
+    'sss', [$utype, $from, $to]);
+$top_dist_tp = [];
+if ($tpinv_source_sql) {
+    $top_dist_tp = call_rows($db_conn,
+        "SELECT tp.name dist_name, COUNT(*) inv_cnt, COALESCE(SUM(ti.total_amount),0) revenue
+         FROM tp_invoices ti JOIN territory_partners tp ON tp.id=ti.territory_partner_id
+         WHERE {$tpinv_source_sql} AND ti.invoice_date BETWEEN ? AND ?{$tc_tpi}
+         GROUP BY tp.id, tp.name",
+        'ss', [$from, $to]);
+}
+$top_distributors = array_merge(
+    array_map(fn($r) => $r + ['dist_type' => 'Distributor'], $top_dist_d),
+    array_map(fn($r) => $r + ['dist_type' => 'Super Distributor'], $top_dist_sd),
+    array_map(fn($r) => $r + ['dist_type' => 'Territory Partner'], $top_dist_tp)
+);
+usort($top_distributors, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
+$top_distributors = array_slice($top_distributors, 0, 10);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 8. ORDER STATUS
@@ -1336,6 +1523,29 @@ foreach (array_merge($ord_c,$ord_s) as $o) {
 // ═══════════════════════════════════════════════════════════════════════════
 // 9. 6-MONTH GROWTH TREND
 // ═══════════════════════════════════════════════════════════════════════════
+// TP sales (tp_invoices, via $tpinv_source_sql) and OT channel sales, net of
+// OT's own returns (ot_sales / ot_sales_return, company scope only), same
+// sources folded into every other section's totals. The return contribution
+// is summed as a negative amount so it nets out of SUM(rev) below, rather
+// than needing a separate subtraction step.
+$sm_tp_union = '';
+if ($tpinv_source_sql) {
+    $sm_tp_union = "UNION ALL
+         SELECT invoice_date d, SUM(total_amount) rev, COUNT(*) cnt FROM tp_invoices
+         WHERE {$tpinv_source_sql} AND invoice_date>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_tpi}
+         GROUP BY invoice_date";
+}
+$sm_ot_union = '';
+if ($scope === 'company') {
+    $sm_ot_union = "UNION ALL
+         SELECT `date` d, SUM(total) rev, COUNT(DISTINCT tempid) cnt FROM ot_sales
+         WHERE `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH)
+         GROUP BY `date`
+         UNION ALL
+         SELECT return_date d, -SUM(total) rev, 0 cnt FROM ot_sales_return
+         WHERE return_date>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH)
+         GROUP BY return_date";
+}
 $six_months = call_rows($db_conn,
     "SELECT DATE_FORMAT(d,'%Y-%m') mon, DATE_FORMAT(MIN(d),'%b %Y') lbl,
             SUM(rev) total_rev, SUM(cnt) total_cnt
@@ -1347,6 +1557,8 @@ $six_months = call_rows($db_conn,
          SELECT `date` d, SUM(total) rev, COUNT(*) cnt FROM user_invoice
          WHERE from_user_type=? AND sub_total>0 AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_ui}
          GROUP BY `date`
+         {$sm_tp_union}
+         {$sm_ot_union}
      ) z GROUP BY DATE_FORMAT(d,'%Y-%m') ORDER BY mon",
     'ss', [$utype, $utype]);
 $prev_m = null;
@@ -1359,7 +1571,13 @@ unset($m);
 // ═══════════════════════════════════════════════════════════════════════════
 // 10. RETURNS LIST
 // ═══════════════════════════════════════════════════════════════════════════
-$returns_list = call_rows($db_conn,
+// No "sales to TP" dimension applies to a returns list — this section only
+// picks up the OT channel returns gap (ot_sales_return is a completely
+// different table/shape than user_return_stock: per-product-line, no
+// returnid/status/invoice-number workflow, tempid groups a whole order), so
+// both sources are queried separately then normalized into one shared shape
+// and merged/re-sorted, rather than trying to force one UNION query.
+$returns_list_db = call_rows($db_conn,
     "SELECT urs.*, inv_num.inv_number, tp.name tp_name
      FROM user_return_stock urs
      LEFT JOIN (SELECT inv_id, inv_number FROM invoice UNION ALL SELECT inv_id, inv_number FROM user_invoice) inv_num ON inv_num.inv_id=urs.invnumber
@@ -1367,6 +1585,41 @@ $returns_list = call_rows($db_conn,
      WHERE urs.to_usertype=?".($filter_tp>0?" AND urs.to_userid={$filter_tp}":"")." AND urs.date BETWEEN ? AND ?
      ORDER BY urs.date DESC LIMIT 25",
     'sss', [$utype, $from, $to]);
+$returns_list = array_map(fn($r) => [
+    'returnid'   => $r['returnid'],
+    'inv_number' => $r['inv_number'] ?? $r['invnumber'],
+    'tp_name'    => $r['tp_name'],
+    'from_label' => ucfirst(str_replace('_', ' ', $r['from_usertype'])),
+    'date'       => $r['date'],
+    'amount'     => (float)$r['total'],
+    'status'     => $r['status'],
+    'detail_url' => '../territory-partner/cnote_details.php?returnid=' . base64_encode($r['returnid']),
+], $returns_list_db);
+
+if ($scope === 'company') {
+    // One row per whole return (tempid), matching user_return_stock's
+    // per-return granularity — ot_sales_return is per-product-line.
+    $ot_returns_db = call_rows($db_conn,
+        "SELECT osr.tempid returnid, MIN(osr.return_date) rdate, SUM(osr.total) amount,
+                (SELECT os.order_number FROM ot_sales os WHERE os.tempid=osr.tempid LIMIT 1) order_number
+         FROM ot_sales_return osr
+         WHERE osr.return_date BETWEEN ? AND ?
+         GROUP BY osr.tempid ORDER BY rdate DESC LIMIT 25",
+        'ss', [$from, $to]);
+    $ot_returns_list = array_map(fn($r) => [
+        'returnid'   => $r['returnid'],
+        'inv_number' => $r['order_number'] ?: $r['returnid'],
+        'tp_name'    => null,
+        'from_label' => 'OT Channel',
+        'date'       => $r['rdate'],
+        'amount'     => (float)$r['amount'],
+        'status'     => null, // OT returns have no accept/pending workflow
+        'detail_url' => null, // no OT-return detail page exists
+    ], $ot_returns_db);
+    $returns_list = array_merge($returns_list, $ot_returns_list);
+    usort($returns_list, fn($a, $b) => strtotime($b['date']) <=> strtotime($a['date']));
+    $returns_list = array_slice($returns_list, 0, 25);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // JSON for charts
@@ -1375,6 +1628,7 @@ $j_labels  = json_encode($chart_labels);
 $j_cust    = json_encode($chart_cust);
 $j_shop    = json_encode($chart_shop);
 $j_tp      = json_encode($chart_tp);
+$j_ot      = json_encode($chart_ot);
 $j_glabels = json_encode(array_column($six_months,'lbl'));
 $j_gvals   = json_encode(array_map('floatval', array_column($six_months,'total_rev')));
 $j_plabels = json_encode(array_column($product_sales,'productName'));
@@ -1748,14 +2002,18 @@ if ($is_neksomo_view) {
         .section-nav a.active { background: var(--blue-tint); color: var(--blue); }
 
         /* ── KPI stat tiles ───────────────────────────────────────────── */
-        .kpi-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px 16px 20px; position: relative; overflow: hidden; height: 100%; box-shadow: 0 1px 2px rgba(11,11,11,0.03); }
+        .kpi-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px 18px 22px; position: relative; overflow: hidden; height: 100%; box-shadow: 0 1px 2px rgba(11,11,11,0.03); transition: box-shadow .15s ease, transform .15s ease; }
+        .kpi-card:hover { box-shadow: 0 6px 16px rgba(11,11,11,0.08); transform: translateY(-1px); }
         .kpi-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background: var(--kpi-accent, var(--blue)); }
-        .kpi-card .kpi-ico { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; background: var(--kpi-tint, var(--blue-tint)); color: var(--kpi-accent, var(--blue)); font-size:16px; position:absolute; right:14px; top:14px; }
-        .kpi-card .kpi-t  { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight:600; color: var(--text-secondary); padding-right:38px; }
-        .kpi-card .kpi-v  { font-size: 21px; font-weight: 700; margin-top: 6px; line-height: 1.25; color: var(--text-primary); word-break: break-word; }
-        .kpi-card .kpi-s  { font-size: 12px; margin-top: 6px; color: var(--text-secondary); }
+        .kpi-card .kpi-ico { width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; background: var(--kpi-tint, var(--blue-tint)); color: var(--kpi-accent, var(--blue)); font-size:17px; position:absolute; right:16px; top:16px; }
+        .kpi-card .kpi-t  { font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; font-weight:700; color: var(--text-secondary); padding-right:40px; }
+        .kpi-card .kpi-v  { font-size: 28px; font-weight: 800; margin-top: 10px; line-height: 1.15; color: var(--text-primary); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; word-break: break-word; }
+        .kpi-card .kpi-s  { font-size: 12.5px; font-weight: 600; margin-top: 9px; color: var(--text-secondary); }
         .kpi-card .kpi-s.good { color: var(--good); }
         .kpi-card .kpi-s.bad  { color: var(--critical); }
+        @media (max-width: 576px) {
+            .kpi-card .kpi-v { font-size: 23px; }
+        }
 
         /* ── Tabs (period breakdown) ──────────────────────────────────── */
         .tab-nav { display:flex; gap:0; border-bottom:1px solid var(--gridline); margin-bottom:14px; }
@@ -1930,7 +2188,7 @@ if ($is_neksomo_view) {
                         <?php if ($scope === 'tp'): ?><a href="#sec-tpperf">TP Performance</a><?php endif; ?>
                         <a href="#sec-products">Products</a>
                         <a href="#sec-geo">Geography</a>
-                        <a href="#sec-topcustomers">Shops &amp; Customers</a>
+                        <a href="#sec-topcustomers">Shops &amp; Distributors</a>
                         <a href="#sec-growth">Growth</a>
                         <a href="#sec-returns">Returns</a>
                     </nav>
@@ -2090,18 +2348,19 @@ if ($is_neksomo_view) {
                                         $active = $id === 'daily' ? 'active' : '';
                                         echo "<div class='tab-content {$active}' id='tab-{$id}'>";
                                         if (empty($data)) { echo "<p class='text-muted text-center py-3'>No data.</p></div>"; return; }
-                                        $gr = array_sum(array_map(fn($r)=>($r['c']??0)+($r['s']??0)+($r['t']??0), $data)) ?: 1;
+                                        $gr = array_sum(array_map(fn($r)=>($r['c']??0)+($r['s']??0)+($r['t']??0)+($r['o']??0), $data)) ?: 1;
                                         echo "<div style='overflow-x:auto'><table class='mt'>";
-                                        echo "<thead><tr><th>Period</th><th>Customer</th><th>Shop</th><th>TP</th><th>Total</th><th>Invoices</th><th>Share</th></tr></thead><tbody>";
+                                        echo "<thead><tr><th>Period</th><th>Customer</th><th>Shop</th><th>TP</th><th>OT</th><th>Total</th><th>Invoices</th><th>Share</th></tr></thead><tbody>";
                                         foreach ($data as $g => $r) {
-                                            $rev = ($r['c']??0)+($r['s']??0)+($r['t']??0);
-                                            $cnt = ($r['cc']??0)+($r['sc']??0)+($r['tc']??0);
+                                            $rev = ($r['c']??0)+($r['s']??0)+($r['t']??0)+($r['o']??0);
+                                            $cnt = ($r['cc']??0)+($r['sc']??0)+($r['tc']??0)+($r['oc']??0);
                                             $pct = round($rev/$gr*100,1);
                                             echo "<tr>
                                                 <td><b>".htmlspecialchars($r['lbl']??$g)."</b></td>
                                                 <td>₹".inr_format($r['c']??0, 2)." <small>({$r['cc']})</small></td>
                                                 <td>₹".inr_format($r['s']??0, 2)." <small>({$r['sc']})</small></td>
                                                 <td>₹".inr_format($r['t']??0, 2)." <small>({$r['tc']})</small></td>
+                                                <td>₹".inr_format($r['o']??0, 2)." <small>({$r['oc']})</small></td>
                                                 <td><b>₹".inr_format($rev, 2)."</b></td>
                                                 <td>{$cnt}</td>
                                                 <td><div style='display:flex;align-items:center;gap:6px'>
@@ -2337,7 +2596,7 @@ if ($is_neksomo_view) {
                             <div class="card">
                                 <div class="card-header"><h5 class="card-title">State-wise Sales</h5></div>
                                 <div class="card-body" style="overflow-x:auto">
-                                    <p class="snote">Shop invoices only (customer invoices have no geographic data).</p>
+                                    <p class="snote">Shop invoices (by location), TP invoices (by territory), and OT sales (by state_id) — direct customer invoices have no geographic data.</p>
                                     <?php if (empty($state_sales)): ?>
                                         <p class="text-muted text-center py-3">No geographic data.</p>
                                     <?php else:
@@ -2396,7 +2655,7 @@ if ($is_neksomo_view) {
                         </div>
                     </div>
 
-                    <!-- ══ TOP SHOPS & CUSTOMERS ════════════════════════════ -->
+                    <!-- ══ TOP SHOPS & DISTRIBUTORS ═════════════════════════ -->
                     <div class="row mis-section" id="sec-topcustomers">
                         <div class="col-xl-6">
                             <div class="card">
@@ -2429,20 +2688,21 @@ if ($is_neksomo_view) {
                         </div>
                         <div class="col-xl-6">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">Top 10 Customers by Revenue</h5></div>
+                                <div class="card-header"><h5 class="card-title">Top 10 Distributors by Revenue</h5></div>
                                 <div class="card-body" style="overflow-x:auto">
-                                    <?php if (empty($top_custs)): ?>
-                                        <p class="text-muted text-center py-3">No customer data.</p>
+                                    <?php if (empty($top_distributors)): ?>
+                                        <p class="text-muted text-center py-3">No distributor data.</p>
                                     <?php else:
-                                        $mcr = (float)$top_custs[0]['revenue'] ?: 1;
+                                        $mcr = (float)$top_distributors[0]['revenue'] ?: 1;
                                     ?>
                                     <table class="mt">
-                                        <thead><tr><th>#</th><th>Customer</th><th>Invoices</th><th>Revenue</th></tr></thead>
+                                        <thead><tr><th>#</th><th>Distributor</th><th>Type</th><th>Invoices</th><th>Revenue</th></tr></thead>
                                         <tbody>
-                                        <?php foreach ($top_custs as $i => $c): ?>
+                                        <?php foreach ($top_distributors as $i => $c): ?>
                                             <tr>
                                                 <td><?php echo $i+1; ?></td>
-                                                <td><b><?php echo htmlspecialchars($c['cust_name']); ?></b></td>
+                                                <td><b><?php echo htmlspecialchars($c['dist_name']); ?></b></td>
+                                                <td><?php echo htmlspecialchars($c['dist_type']); ?></td>
                                                 <td><?php echo $c['inv_cnt']; ?></td>
                                                 <td>
                                                     <span class="br">₹<?php echo inr_format($c['revenue'], 2); ?></span>
@@ -2521,19 +2781,21 @@ if ($is_neksomo_view) {
                                         <?php foreach ($returns_list as $r): ?>
                                             <tr>
                                                 <td><small><?php echo htmlspecialchars($r['returnid']); ?></small></td>
-                                                <td><?php echo htmlspecialchars($r['inv_number'] ?? $r['invnumber']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['inv_number']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['tp_name'] ?? '—'); ?></td>
-                                                <td><?php echo ucfirst(str_replace('_',' ',$r['from_usertype'])); ?></td>
+                                                <td><?php echo htmlspecialchars($r['from_label']); ?></td>
                                                 <td><?php echo date('d M Y', strtotime($r['date'])); ?></td>
-                                                <td><span class="br">₹<?php echo inr_format($r['total'], 2); ?></span></td>
+                                                <td><span class="br">₹<?php echo inr_format($r['amount'], 2); ?></span></td>
                                                 <td>
-                                                    <?php if ($r['status']==='pending'): ?>
+                                                    <?php if ($r['status'] === null): ?>
+                                                    <span class="sbadge bp">Completed</span>
+                                                    <?php elseif ($r['status']==='pending'): ?>
                                                     <span class="sbadge bpa">Pending</span>
                                                     <?php else: ?>
                                                     <span class="sbadge bp"><?php echo ucfirst($r['status']); ?></span>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td><a href="../territory-partner/cnote_details.php?returnid=<?php echo base64_encode($r['returnid']); ?>">View</a></td>
+                                                <td><?php if ($r['detail_url']): ?><a href="<?php echo htmlspecialchars($r['detail_url']); ?>">View</a><?php else: ?>—<?php endif; ?></td>
                                             </tr>
                                         <?php endforeach; ?>
                                         </tbody>
@@ -2609,7 +2871,8 @@ document.querySelectorAll('.tab-item').forEach(function(t) {
             datasets: [
                 { label: 'Customer', data: <?php echo $j_cust; ?>,  borderColor:'#2a78d6', backgroundColor:'rgba(42,120,214,.10)', borderWidth:2, tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#2a78d6' },
                 { label: 'Shop',     data: <?php echo $j_shop; ?>,  borderColor:'#1baf7a', backgroundColor:'rgba(27,175,122,.10)', borderWidth:2, tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#1baf7a' },
-                { label: 'Territory Partner', data: <?php echo $j_tp; ?>,  borderColor:'#4a3aa7', backgroundColor:'rgba(74,58,167,.10)', borderWidth:2, tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#4a3aa7' }
+                { label: 'Territory Partner', data: <?php echo $j_tp; ?>,  borderColor:'#4a3aa7', backgroundColor:'rgba(74,58,167,.10)', borderWidth:2, tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#4a3aa7' }<?php if ($scope === 'company'): ?>,
+                { label: 'OT Channel', data: <?php echo $j_ot; ?>,  borderColor:'#d68f2a', backgroundColor:'rgba(214,143,42,.10)', borderWidth:2, tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#d68f2a' }<?php endif; ?>
             ]
         },
         options: { responsive:true, maintainAspectRatio:false,
