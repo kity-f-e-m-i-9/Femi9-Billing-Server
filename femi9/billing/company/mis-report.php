@@ -304,7 +304,9 @@ if ($scope === 'company') {
 }
 $total_returns    = (int)$returns_row['cnt'] + (int)($ot_returns_row['cnt'] ?? 0);
 $total_return_amt = (float)$returns_row['amount'] + (float)($ot_returns_row['amount'] ?? 0);
-// Total Turnover is net of returns received back in the selected period.
+// $gross_revenue (Sales card) is pre-return; $total_revenue (Total Turnover
+// card) is net of returns received back in the selected period.
+$gross_revenue = $total_revenue;
 $total_revenue -= $total_return_amt;
 
 // Previous period (also net of that period's own returns, for a fair growth %)
@@ -1289,6 +1291,12 @@ $returns_by_pid = [];
 foreach ($product_returns as $r) {
     $returns_by_pid[(int)$r['pid']] = ['qty' => (float)$r['ret_qty'], 'amt' => (float)$r['ret_amt']];
 }
+// Return Quantity / net units for the Overview's consolidated Sales/Returns/
+// Total Turnover cards — reuses this same per-product return data rather
+// than a separate query, since it's already scoped identically to
+// $total_returns/$total_return_amt above.
+$total_return_qty = (float)array_sum(array_column($returns_by_pid, 'qty'));
+$net_units         = $total_units - $total_return_qty;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. STATE / DISTRICT-WISE (shop invoices → shop → partner_location_nodes,
@@ -2014,6 +2022,20 @@ if ($is_neksomo_view) {
             .kpi-card .kpi-v { font-size: 23px; }
         }
 
+        /* ── Equation-style consolidated cards (Sales − Returns = Turnover) ── */
+        .equation-row { display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+        .equation-row .kpi-card { flex:1 1 220px; }
+        .equation-op { display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:300; color: var(--text-muted); flex:0 0 auto; padding:0 2px; }
+        .equation-op.eq { color: var(--text-secondary); font-weight:600; }
+        .kpi-multi { margin-top:10px; }
+        .kpi-multi > div { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-bottom:1px dashed var(--gridline); font-size:13px; color: var(--text-secondary); }
+        .kpi-multi > div:last-child { border-bottom:none; padding-top:8px; font-size:15px; }
+        .kpi-multi > div:last-child b { font-size:17px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+        .kpi-multi b { font-weight:700; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+        @media (max-width: 576px) {
+            .equation-op { flex-basis:100%; }
+        }
+
         /* ── Tabs (period breakdown) ──────────────────────────────────── */
         .tab-nav { display:flex; gap:0; border-bottom:1px solid var(--gridline); margin-bottom:14px; }
         .tab-item { padding:7px 18px; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-secondary); border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .12s,border-color .12s; }
@@ -2216,17 +2238,15 @@ if ($is_neksomo_view) {
                         ? inr_format($active_customers, 0).' customers · '.inr_format($active_businesses, 0).' businesses'
                         : $active_sublabel.' with invoices in period';
                     // kpi row: [accent key, icon, label, value, sub-text, sub-text tone ('', 'good', 'bad')]
+                    // Sales / Returns / Total Turnover are shown as a consolidated
+                    // 3-card equation (Sales − Returns = Total Turnover) below,
+                    // each card carrying its own amount + count/quantity stats —
+                    // same .equation-row/.kpi-multi pattern already used for the
+                    // Neksomo Sold/Return/Overall Turnover cards further down this
+                    // page — so they're built separately, not part of $kpis.
                     $kpis = [
-                        ['blue','payments','Total Turnover','₹'.inr_format($total_revenue, 0),
-                         ($revenue_growth>=0?'▲':'▼').' '.abs($revenue_growth).'% vs prev', $revenue_growth>=0?'good':'bad'],
-                        ['aqua','receipt_long','Total Invoices',inr_format($total_invoices, 0),
-                         'in selected period', ''],
-                        ['green','inventory_2','Units Sold',inr_format($total_units, 0),
-                         'in selected period', ''],
                         ['violet','people',$active_label,inr_format($active_tps, 0),
                          $active_sub_text, ''],
-                        ['critical','keyboard_return','Returns',inr_format($total_returns, 0),
-                         '₹'.inr_format($total_return_amt, 0).' returned', ''],
                     ];
                     if ($scope === 'tp') {
                         $tgt_accent = $overall_pct_all>=100 ? 'good' : ($overall_pct_all>=50 ? 'warning' : 'critical');
@@ -2243,6 +2263,39 @@ if ($is_neksomo_view) {
                     }
                     ?>
                     <div class="row mis-section" id="sec-overview">
+                        <div class="col-12">
+                        <div class="equation-row">
+                            <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
+                                <i class="material-icons-outlined kpi-ico">payments</i>
+                                <div class="kpi-t">Sales</div>
+                                <div class="kpi-multi">
+                                    <div><span>Amount</span><b>₹<?php echo inr_format($gross_revenue, 0); ?></b></div>
+                                    <div><span>Invoices</span><b><?php echo inr_format($total_invoices, 0); ?></b></div>
+                                    <div><span>Units</span><b><?php echo inr_format($total_units, 0); ?></b></div>
+                                </div>
+                            </div>
+                            <div class="equation-op">&minus;</div>
+                            <div class="kpi-card" style="--kpi-accent:var(--critical);--kpi-tint:var(--critical-tint);">
+                                <i class="material-icons-outlined kpi-ico">keyboard_return</i>
+                                <div class="kpi-t">Returns</div>
+                                <div class="kpi-multi">
+                                    <div><span>Amount</span><b>₹<?php echo inr_format($total_return_amt, 0); ?></b></div>
+                                    <div><span>Returns</span><b><?php echo inr_format($total_returns, 0); ?></b></div>
+                                    <div><span>Quantity</span><b><?php echo inr_format($total_return_qty, 0); ?></b></div>
+                                </div>
+                            </div>
+                            <div class="equation-op eq">=</div>
+                            <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
+                                <i class="material-icons-outlined kpi-ico">account_balance_wallet</i>
+                                <div class="kpi-t">Total Turnover</div>
+                                <div class="kpi-multi">
+                                    <div><span>Amount</span><b>₹<?php echo inr_format($total_revenue, 0); ?></b></div>
+                                    <div><span>Quantity</span><b><?php echo inr_format($net_units, 0); ?></b></div>
+                                    <div><span>vs Prev Period</span><b style="color:<?php echo $revenue_growth>=0?'var(--good)':'var(--critical)'; ?>"><?php echo ($revenue_growth>=0?'▲':'▼').' '.abs($revenue_growth).'%'; ?></b></div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
                         <?php foreach ($kpis as $k): [$accent, $tint] = $accents[$k[0]]; ?>
                         <div class="col-xl-3 col-lg-4 col-md-6 col-6 mb-3">
                             <div class="kpi-card" style="--kpi-accent:<?php echo $accent; ?>;--kpi-tint:<?php echo $tint; ?>;">
