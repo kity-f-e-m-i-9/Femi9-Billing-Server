@@ -191,18 +191,18 @@ $all_tps = call_rows($db_conn,
 // 1. KPI — current & previous period
 // ═══════════════════════════════════════════════════════════════════════════
 $cust_row = crow($db_conn,
-    "SELECT COUNT(*) cnt, COALESCE(SUM(total),0) rev FROM invoice
+    "SELECT COUNT(*) cnt, COALESCE(SUM(total-courier_charges),0) rev FROM invoice
      WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}",
     'sss', [$utype, $from, $to]);
 $shop_row = crow($db_conn,
-    "SELECT COUNT(*) cnt, COALESCE(SUM(total),0) rev FROM user_invoice
+    "SELECT COUNT(*) cnt, COALESCE(SUM(total-courier_charges),0) rev FROM user_invoice
      WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}",
     'sss', [$utype, $from, $to]);
 
 $tpi_row = ['cnt' => 0, 'rev' => 0];
 if ($tpinv_source_sql) {
     $tpi_row = crow($db_conn,
-        "SELECT COUNT(*) cnt, COALESCE(SUM(total_amount),0) rev FROM tp_invoices
+        "SELECT COUNT(*) cnt, COALESCE(SUM(total_amount-courier_charges),0) rev FROM tp_invoices
          WHERE {$tpinv_source_sql} AND invoice_date BETWEEN ? AND ?{$tc_tpi}",
         'ss', [$from, $to]);
 }
@@ -325,16 +325,16 @@ if ($scope === 'company') {
 $tpi_prev_rev = 0.0;
 if ($tpinv_source_sql) {
     $tpi_prev_rev = (float)cval($db_conn,
-        "SELECT COALESCE(SUM(total_amount),0) FROM tp_invoices
+        "SELECT COALESCE(SUM(total_amount-courier_charges),0) FROM tp_invoices
          WHERE {$tpinv_source_sql} AND invoice_date BETWEEN ? AND ?{$tc_tpi}",
         'ss', [$prev_from, $prev_to]);
 }
 $prev_rev = (float)cval($db_conn,
-    "SELECT COALESCE(SUM(total),0) FROM invoice
+    "SELECT COALESCE(SUM(total-courier_charges),0) FROM invoice
      WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}",
     'sss', [$utype, $prev_from, $prev_to])
   + (float)cval($db_conn,
-    "SELECT COALESCE(SUM(total),0) FROM user_invoice
+    "SELECT COALESCE(SUM(total-courier_charges),0) FROM user_invoice
      WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}",
     'sss', [$utype, $prev_from, $prev_to])
   + $ot_prev_rev
@@ -434,11 +434,11 @@ if ($scope === 'company') {
     // user_invoice rows where the company is specifically the issuer
     // (from_user_type='company', i.e. company billing SS/S/SD/D/Shop).
     $ch_a = call_rows($db_conn,
-        "SELECT user_type ch, COUNT(*) cnt, COALESCE(SUM(total),0) rev FROM invoice
+        "SELECT user_type ch, COUNT(*) cnt, COALESCE(SUM(total-courier_charges),0) rev FROM invoice
          WHERE user_type='company' AND sub_total>0 AND `date` BETWEEN ? AND ?
          GROUP BY user_type", 'ss', [$from, $to]);
     $ch_b = call_rows($db_conn,
-        "SELECT to_user_type ch, COUNT(*) cnt, COALESCE(SUM(total),0) rev FROM user_invoice
+        "SELECT to_user_type ch, COUNT(*) cnt, COALESCE(SUM(total-courier_charges),0) rev FROM user_invoice
          WHERE from_user_type='company' AND sub_total>0 AND `date` BETWEEN ? AND ?
          GROUP BY to_user_type", 'ss', [$from, $to]);
     foreach (array_merge($ch_a, $ch_b) as $r) {
@@ -470,19 +470,19 @@ $channel_total_rev = array_sum(array_column($channel_breakdown, 'rev')) ?: 1;
 // 2. DAILY TREND CHART DATA
 // ═══════════════════════════════════════════════════════════════════════════
 $dc = call_rows($db_conn,
-    "SELECT `date` d, COALESCE(SUM(total),0) rev FROM invoice
+    "SELECT `date` d, COALESCE(SUM(total-courier_charges),0) rev FROM invoice
      WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}
      GROUP BY `date` ORDER BY `date`",
     'sss', [$utype, $from, $to]);
 $ds = call_rows($db_conn,
-    "SELECT `date` d, COALESCE(SUM(total),0) rev FROM user_invoice
+    "SELECT `date` d, COALESCE(SUM(total-courier_charges),0) rev FROM user_invoice
      WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}
      GROUP BY `date` ORDER BY `date`",
     'sss', [$utype, $from, $to]);
 $dt = [];
 if ($tpinv_source_sql) {
     $dt = call_rows($db_conn,
-        "SELECT invoice_date d, COALESCE(SUM(total_amount),0) rev FROM tp_invoices
+        "SELECT invoice_date d, COALESCE(SUM(total_amount-courier_charges),0) rev FROM tp_invoices
          WHERE {$tpinv_source_sql} AND invoice_date BETWEEN ? AND ?{$tc_tpi}
          GROUP BY invoice_date ORDER BY invoice_date",
         'ss', [$from, $to]);
@@ -524,13 +524,13 @@ while ($ptr <= $end) {
 function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt, $tpinv_source_sql, $tc_tpi, $scope) {
     $cust = call_rows($db,
         "SELECT DATE_FORMAT(`date`,'$gfmt') g, DATE_FORMAT(MIN(`date`),'$lfmt') lbl,
-                COUNT(*) cnt, COALESCE(SUM(total),0) rev
+                COUNT(*) cnt, COALESCE(SUM(total-courier_charges),0) rev
          FROM invoice WHERE user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_inv}
          GROUP BY g ORDER BY g",
         'sss', [$utype, $from, $to]);
     $shop = call_rows($db,
         "SELECT DATE_FORMAT(`date`,'$gfmt') g, DATE_FORMAT(MIN(`date`),'$lfmt') lbl,
-                COUNT(*) cnt, COALESCE(SUM(total),0) rev
+                COUNT(*) cnt, COALESCE(SUM(total-courier_charges),0) rev
          FROM user_invoice WHERE from_user_type=? AND sub_total>0 AND `date` BETWEEN ? AND ?{$tc_ui}
          GROUP BY g ORDER BY g",
         'sss', [$utype, $from, $to]);
@@ -538,7 +538,7 @@ function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt, 
     if ($tpinv_source_sql) {
         $tp = call_rows($db,
             "SELECT DATE_FORMAT(invoice_date,'$gfmt') g, DATE_FORMAT(MIN(invoice_date),'$lfmt') lbl,
-                    COUNT(*) cnt, COALESCE(SUM(total_amount),0) rev
+                    COUNT(*) cnt, COALESCE(SUM(total_amount-courier_charges),0) rev
              FROM tp_invoices WHERE {$tpinv_source_sql} AND invoice_date BETWEEN ? AND ?{$tc_tpi}
              GROUP BY g ORDER BY g",
             'ss', [$from, $to]);
@@ -1334,7 +1334,7 @@ $state_anc_cte = "WITH RECURSIVE anc AS (
 )";
 $state_sales_shop = call_rows($db_conn,
     "{$state_anc_cte}
-     SELECT COALESCE(a1.anc_name, a2.anc_name) state_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
+     SELECT COALESCE(a1.anc_name, a2.anc_name) state_name, COUNT(*) cnt, COALESCE(SUM(ui.total-ui.courier_charges),0) revenue
      FROM user_invoice ui
      JOIN shop s ON s.temp_id=ui.to_user_id
      LEFT JOIN anc a1 ON a1.node_id=s.district_id
@@ -1379,7 +1379,7 @@ $dist_anc_cte = "WITH RECURSIVE danc AS (
 )";
 $district_sales_shop = call_rows($db_conn,
     "{$dist_anc_cte}
-     SELECT danc.anc_name district_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
+     SELECT danc.anc_name district_name, COUNT(*) cnt, COALESCE(SUM(ui.total-ui.courier_charges),0) revenue
      FROM user_invoice ui
      JOIN shop s ON s.temp_id=ui.to_user_id
      JOIN danc ON danc.node_id=s.district_id
@@ -1435,13 +1435,13 @@ $tp_perf = ($scope === 'tp') ? call_rows($db_conn,
             COALESCE(tgt.target,0) target
      FROM territory_partners tp
      LEFT JOIN (
-         SELECT from_user_id, COUNT(*) cnt, SUM(total) rev,
+         SELECT from_user_id, COUNT(*) cnt, SUM(total-courier_charges) rev,
                 (SELECT COALESCE(SUM(qty),0) FROM user_invoice_items uii WHERE uii.from_user_id=ui.from_user_id AND uii.from_user_type='territory_partner' AND uii.date BETWEEN '{$from}' AND '{$to}') units
          FROM user_invoice ui WHERE from_user_type='territory_partner' AND sub_total>0 AND `date` BETWEEN '{$from}' AND '{$to}'
          GROUP BY from_user_id
      ) si ON si.from_user_id = tp.id
      LEFT JOIN (
-         SELECT user_id, COUNT(*) cnt, SUM(total) rev,
+         SELECT user_id, COUNT(*) cnt, SUM(total-courier_charges) rev,
                 (SELECT COALESCE(SUM(qty),0) FROM invoice_items ii WHERE ii.user_id=i.user_id AND ii.user_type='territory_partner' AND ii.date BETWEEN '{$from}' AND '{$to}') units
          FROM invoice i WHERE user_type='territory_partner' AND sub_total>0 AND `date` BETWEEN '{$from}' AND '{$to}'
          GROUP BY user_id
@@ -1465,7 +1465,7 @@ $overall_pct_all = $total_target_all > 0
 // 7. TOP SHOPS & TOP DISTRIBUTORS
 // ═══════════════════════════════════════════════════════════════════════════
 $top_shops = call_rows($db_conn,
-    "SELECT s.name shop_name, COUNT(*) inv_cnt, COALESCE(SUM(ui.total),0) revenue
+    "SELECT s.name shop_name, COUNT(*) inv_cnt, COALESCE(SUM(ui.total-ui.courier_charges),0) revenue
      FROM user_invoice ui JOIN shop s ON s.temp_id=ui.to_user_id
      WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
      GROUP BY s.temp_id, s.name ORDER BY revenue DESC LIMIT 10",
@@ -1479,13 +1479,13 @@ $top_shops = call_rows($db_conn,
 // entity type), these three are concatenated rather than merged by name —
 // a Distributor and a TP sharing a name are still different entities.
 $top_dist_d = call_rows($db_conn,
-    "SELECT d.name dist_name, COUNT(*) inv_cnt, COALESCE(SUM(ui.total),0) revenue
+    "SELECT d.name dist_name, COUNT(*) inv_cnt, COALESCE(SUM(ui.total-ui.courier_charges),0) revenue
      FROM user_invoice ui JOIN distributor d ON d.temp_id=ui.to_user_id
      WHERE ui.from_user_type=? AND ui.to_user_type='distributor' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
      GROUP BY d.temp_id, d.name",
     'sss', [$utype, $from, $to]);
 $top_dist_sd = call_rows($db_conn,
-    "SELECT sd.name dist_name, COUNT(*) inv_cnt, COALESCE(SUM(ui.total),0) revenue
+    "SELECT sd.name dist_name, COUNT(*) inv_cnt, COALESCE(SUM(ui.total-ui.courier_charges),0) revenue
      FROM user_invoice ui JOIN super_distributor sd ON sd.temp_id=ui.to_user_id
      WHERE ui.from_user_type=? AND ui.to_user_type='super_distributor' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
      GROUP BY sd.temp_id, sd.name",
@@ -1493,7 +1493,7 @@ $top_dist_sd = call_rows($db_conn,
 $top_dist_tp = [];
 if ($tpinv_source_sql) {
     $top_dist_tp = call_rows($db_conn,
-        "SELECT tp.name dist_name, COUNT(*) inv_cnt, COALESCE(SUM(ti.total_amount),0) revenue
+        "SELECT tp.name dist_name, COUNT(*) inv_cnt, COALESCE(SUM(ti.total_amount-ti.courier_charges),0) revenue
          FROM tp_invoices ti JOIN territory_partners tp ON tp.id=ti.territory_partner_id
          WHERE {$tpinv_source_sql} AND ti.invoice_date BETWEEN ? AND ?{$tc_tpi}
          GROUP BY tp.id, tp.name",
@@ -1539,7 +1539,7 @@ foreach (array_merge($ord_c,$ord_s) as $o) {
 $sm_tp_union = '';
 if ($tpinv_source_sql) {
     $sm_tp_union = "UNION ALL
-         SELECT invoice_date d, SUM(total_amount) rev, COUNT(*) cnt FROM tp_invoices
+         SELECT invoice_date d, SUM(total_amount-courier_charges) rev, COUNT(*) cnt FROM tp_invoices
          WHERE {$tpinv_source_sql} AND invoice_date>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_tpi}
          GROUP BY invoice_date";
 }
@@ -1558,11 +1558,11 @@ $six_months = call_rows($db_conn,
     "SELECT DATE_FORMAT(d,'%Y-%m') mon, DATE_FORMAT(MIN(d),'%b %Y') lbl,
             SUM(rev) total_rev, SUM(cnt) total_cnt
      FROM (
-         SELECT `date` d, SUM(total) rev, COUNT(*) cnt FROM invoice
+         SELECT `date` d, SUM(total-courier_charges) rev, COUNT(*) cnt FROM invoice
          WHERE user_type=? AND sub_total>0 AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_inv}
          GROUP BY `date`
          UNION ALL
-         SELECT `date` d, SUM(total) rev, COUNT(*) cnt FROM user_invoice
+         SELECT `date` d, SUM(total-courier_charges) rev, COUNT(*) cnt FROM user_invoice
          WHERE from_user_type=? AND sub_total>0 AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_ui}
          GROUP BY `date`
          {$sm_tp_union}

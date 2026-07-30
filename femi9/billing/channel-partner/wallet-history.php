@@ -165,10 +165,19 @@ while ($credit = mysqli_fetch_array($creditRes)):
     $whomName = '';
     $whomMobile = '';
     if ($commType === 'Refferral' && $whomType && $whomId) {
-        $tmap = ['candf'=>'c_and_f','super_stockiest'=>'super_stockiest','stockiest'=>'stockiest','distributor'=>'distributor','territory_partner'=>'territory_partners'];
-        $wtable = $tmap[$whomType] ?? '';
-        if ($wtable) {
-            $wr = mysqli_fetch_assoc(mysqli_query($db_conn, "SELECT name, mobile_number FROM $wtable WHERE temp_id='$whomId' LIMIT 1"));
+        // territory_partners uses id/mobile, not temp_id/mobile_number like the others
+        $tmap = [
+            'candf'             => ['table' => 'c_and_f',           'id_col' => 'temp_id', 'mobile_col' => 'mobile_number'],
+            'super_stockiest'   => ['table' => 'super_stockiest',   'id_col' => 'temp_id', 'mobile_col' => 'mobile_number'],
+            'stockiest'         => ['table' => 'stockiest',         'id_col' => 'temp_id', 'mobile_col' => 'mobile_number'],
+            'distributor'       => ['table' => 'distributor',       'id_col' => 'temp_id', 'mobile_col' => 'mobile_number'],
+            'territory_partner' => ['table' => 'territory_partners','id_col' => 'id',      'mobile_col' => 'mobile'],
+        ];
+        $wmap = $tmap[$whomType] ?? null;
+        if ($wmap) {
+            $whomIdEsc = mysqli_real_escape_string($db_conn, $whomId);
+            $wr = mysqli_fetch_assoc(mysqli_query($db_conn,
+                "SELECT name, {$wmap['mobile_col']} AS mobile_number FROM {$wmap['table']} WHERE {$wmap['id_col']}='$whomIdEsc' LIMIT 1"));
             $whomName   = $wr['name'] ?? '';
             $whomMobile = $wr['mobile_number'] ?? '';
         }

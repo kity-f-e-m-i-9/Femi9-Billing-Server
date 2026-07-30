@@ -161,3 +161,21 @@
 [27-Jul-2026 08:48:52 UTC] === STOCK CHECK PASSED ===
 [27-Jul-2026 08:48:52 UTC] Invoice item added successfully
 [27-Jul-2026 08:48:52 UTC] === INVOICE ACTION SUCCESS ===
+[29-Jul-2026 11:09:59 UTC] === INVOICE ACTION START ===
+[29-Jul-2026 11:09:59 UTC] Invoice ID: 4782648772CMPSS29072643936
+[29-Jul-2026 11:09:59 UTC] Invoice User Type: super_stockiest
+[29-Jul-2026 11:09:59 UTC] NEW MODE: Using session - user_type: company, user_id: 1
+[29-Jul-2026 11:09:59 UTC] Adding product 1 (Qty: 1) to invoice 4782648772CMPSS29072643936
+[29-Jul-2026 11:09:59 UTC] Item totals - Subtotal: Rs.140.00, GST: Rs.0, Total: Rs.140
+[29-Jul-2026 11:09:59 UTC] GST Type: inner, Buyer GST Type: register
+[29-Jul-2026 11:09:59 UTC] Creating new invoice header: 4782648772CMPSS29072643936
+[29-Jul-2026 11:09:59 UTC] Invoice header created successfully
+[29-Jul-2026 11:09:59 UTC] === STOCK CHECK START ===
+[29-Jul-2026 11:09:59 UTC] Product ID: 1
+[29-Jul-2026 11:09:59 UTC] Requested Qty: 1
+[29-Jul-2026 11:09:59 UTC] Query params - user_type: 'company', user_id: '1'
+[29-Jul-2026 11:09:59 UTC] Stock found: closing_qty = 120
+[29-Jul-2026 11:09:59 UTC] Comparison: 120 < 1 = FALSE (OK)
+[29-Jul-2026 11:09:59 UTC] === STOCK CHECK PASSED ===
+[29-Jul-2026 11:09:59 UTC] Invoice item added successfully
+[29-Jul-2026 11:09:59 UTC] === INVOICE ACTION SUCCESS ===
