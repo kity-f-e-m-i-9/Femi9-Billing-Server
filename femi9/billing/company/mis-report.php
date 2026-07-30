@@ -1583,7 +1583,7 @@ $returns_list_db = call_rows($db_conn,
      LEFT JOIN (SELECT inv_id, inv_number FROM invoice UNION ALL SELECT inv_id, inv_number FROM user_invoice) inv_num ON inv_num.inv_id=urs.invnumber
      LEFT JOIN territory_partners tp ON tp.id=urs.to_userid AND urs.to_usertype='territory_partner'
      WHERE urs.to_usertype=?".($filter_tp>0?" AND urs.to_userid={$filter_tp}":"")." AND urs.date BETWEEN ? AND ?
-     ORDER BY urs.date DESC LIMIT 25",
+     ORDER BY urs.date DESC",
     'sss', [$utype, $from, $to]);
 $returns_list = array_map(fn($r) => [
     'returnid'   => $r['returnid'],
@@ -1604,7 +1604,7 @@ if ($scope === 'company') {
                 (SELECT os.order_number FROM ot_sales os WHERE os.tempid=osr.tempid LIMIT 1) order_number
          FROM ot_sales_return osr
          WHERE osr.return_date BETWEEN ? AND ?
-         GROUP BY osr.tempid ORDER BY rdate DESC LIMIT 25",
+         GROUP BY osr.tempid ORDER BY rdate DESC",
         'ss', [$from, $to]);
     $ot_returns_list = array_map(fn($r) => [
         'returnid'   => $r['returnid'],
@@ -1618,7 +1618,6 @@ if ($scope === 'company') {
     ], $ot_returns_db);
     $returns_list = array_merge($returns_list, $ot_returns_list);
     usort($returns_list, fn($a, $b) => strtotime($b['date']) <=> strtotime($a['date']));
-    $returns_list = array_slice($returns_list, 0, 25);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2774,12 +2773,14 @@ if ($is_neksomo_view) {
                                 <div class="card-body" style="overflow-x:auto">
                                     <?php if (empty($returns_list)): ?>
                                         <p class="text-muted text-center py-3">No returns in this period.</p>
-                                    <?php else: ?>
-                                    <table class="mt">
+                                    <?php else:
+                                        $returns_page_size = 25;
+                                    ?>
+                                    <table class="mt" id="returnsTable">
                                         <thead><tr><th>Return ID</th><th>Invoice No.</th><th>TP</th><th>From</th><th>Date</th><th>Amount</th><th>Status</th><th>Detail</th></tr></thead>
                                         <tbody>
-                                        <?php foreach ($returns_list as $r): ?>
-                                            <tr>
+                                        <?php foreach ($returns_list as $i => $r): ?>
+                                            <tr class="returns-row"<?php echo $i >= $returns_page_size ? ' style="display:none;"' : ''; ?>>
                                                 <td><small><?php echo htmlspecialchars($r['returnid']); ?></small></td>
                                                 <td><?php echo htmlspecialchars($r['inv_number']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['tp_name'] ?? '—'); ?></td>
@@ -2800,6 +2801,13 @@ if ($is_neksomo_view) {
                                         <?php endforeach; ?>
                                         </tbody>
                                     </table>
+                                    <?php if (count($returns_list) > $returns_page_size): ?>
+                                    <div style="text-align:center;margin-top:14px;">
+                                        <button type="button" id="returnsLoadMoreBtn" class="preset-btn" data-page-size="<?php echo $returns_page_size; ?>" style="padding:7px 20px;">
+                                            Load More (<?php echo count($returns_list) - $returns_page_size; ?> more)
+                                        </button>
+                                    </div>
+                                    <?php endif; ?>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -2833,6 +2841,28 @@ document.querySelectorAll('.tab-item').forEach(function(t) {
         if (el) el.classList.add('active');
     });
 });
+
+// Returns & Credit Notes: "Load More" reveals additional pre-rendered rows
+// client-side, page size at a time — no AJAX round-trip since the full list
+// is already server-rendered, just display:none beyond the first page.
+(function() {
+    var btn = document.getElementById('returnsLoadMoreBtn');
+    if (!btn) return;
+    var pageSize = parseInt(btn.dataset.pageSize, 10) || 25;
+    var shown = pageSize;
+    var rows = document.querySelectorAll('#returnsTable .returns-row');
+    btn.addEventListener('click', function() {
+        var next = Math.min(shown + pageSize, rows.length);
+        for (var i = shown; i < next; i++) rows[i].style.display = '';
+        shown = next;
+        var remaining = rows.length - shown;
+        if (remaining > 0) {
+            btn.textContent = 'Load More (' + remaining + ' more)';
+        } else {
+            btn.style.display = 'none';
+        }
+    });
+})();
 
 // Section nav: smooth scroll + scrollspy active-state
 (function() {
