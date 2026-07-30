@@ -231,8 +231,15 @@ try {
     $inv_num = tpInvoiceNextNumber($db_conn, 'CO', $invoice_date);
 
     // Invoice header
-    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("siiiisddds", $inv_num, $tp_id, $source_loc_id, $source_cp_id, $source_godown_id, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by);
+    // created_by_user_type is set explicitly here — leaving it out left every
+    // company-created invoice with a blank value (its column default),
+    // silently excluded by any report/query that filters on
+    // created_by_user_type='company' (e.g. overview-report1.php's Sales
+    // Report), even though it was already relied on elsewhere in this file
+    // ($tpinv_source_sql-style callers) and by super-stockist's own insert.
+    $created_by_user_type = 'company';
+    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by,created_by_user_type) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+    $s->bind_param("siiiisdddss", $inv_num, $tp_id, $source_loc_id, $source_cp_id, $source_godown_id, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type);
     $s->execute();
     $invoice_id = $db_conn->insert_id;
     $s->close();
