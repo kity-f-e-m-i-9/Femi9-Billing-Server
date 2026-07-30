@@ -30,24 +30,30 @@ $fyStartYear = $month >= 4 ? $year : $year - 1;
 $fy = substr($fyStartYear, -2) . '-' . substr($fyStartYear + 1, -2);
 
 /**
- * Does this specific company already have ANY invoices under this channel
- * (any financial year)? ot_sales_invoice has no godownid of its own, so
+ * Does this specific company already have invoices under this channel that
+ * follow the CURRENT numbering convention (e.g. "ID/26-27/135")? Bare
+ * pre-convention legacy numbers (e.g. a lone "306" with no prefix/FY at all,
+ * left over from years before this format existed) don't count as an
+ * existing series — they're orphaned old entries, not something to
+ * continue counting from. ot_sales_invoice has no godownid of its own, so
  * company is resolved via ot_sales (godownid is set per invoice, one value
- * per tempid). A company with zero history gets the new tagged/padded
- * format starting at 001; a company with existing history continues its
- * plain series instead — this flag decides which branch applies.
+ * per tempid). A company with zero qualifying history gets the new
+ * tagged/padded format starting at 001; a company with real history
+ * continues its plain series instead — this flag decides which branch
+ * applies.
  */
-function otCompanyHasHistory(mysqli $db_conn, string $cat, int $godownid): bool
+function otCompanyHasHistory(mysqli $db_conn, string $cat, string $prefix, int $godownid): bool
 {
     if ($godownid <= 0) return false;
 
+    $likePattern = $prefix . '/%';
     $stmt = $db_conn->prepare("
         SELECT COUNT(*) AS c
         FROM ot_sales_invoice osi
         INNER JOIN ot_sales os ON os.tempid = osi.tempid
-        WHERE osi.cat = ? AND os.godownid = ?
+        WHERE osi.cat = ? AND os.godownid = ? AND osi.inv_number LIKE ?
     ");
-    $stmt->bind_param('si', $cat, $godownid);
+    $stmt->bind_param('sis', $cat, $godownid, $likePattern);
     $stmt->execute();
     $count = (int)$stmt->get_result()->fetch_assoc()['c'];
     $stmt->close();
@@ -57,20 +63,23 @@ function otCompanyHasHistory(mysqli $db_conn, string $cat, int $godownid): bool
 
 /**
  * Highest invoice number this specific company has already used for this
- * channel, regardless of financial year — so continuing its plain series
- * picks up from where it already stands instead of restarting.
+ * channel under the current numbering convention (any financial year) — so
+ * continuing its plain series picks up from where it already stands
+ * instead of restarting. Only rows matching "{prefix}/..." are considered;
+ * bare pre-convention legacy numbers are excluded (see otCompanyHasHistory).
  */
-function otMaxExistingNumberForCompany(mysqli $db_conn, string $cat, int $godownid): int
+function otMaxExistingNumberForCompany(mysqli $db_conn, string $cat, string $prefix, int $godownid): int
 {
     if ($godownid <= 0) return 0;
 
+    $likePattern = $prefix . '/%';
     $stmt = $db_conn->prepare("
         SELECT DISTINCT osi.inv_number
         FROM ot_sales_invoice osi
         INNER JOIN ot_sales os ON os.tempid = osi.tempid
-        WHERE osi.cat = ? AND os.godownid = ?
+        WHERE osi.cat = ? AND os.godownid = ? AND osi.inv_number LIKE ?
     ");
-    $stmt->bind_param('si', $cat, $godownid);
+    $stmt->bind_param('sis', $cat, $godownid, $likePattern);
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -125,11 +134,11 @@ if ($action === 'next') {
     // (LLP/HC/initials-fallback), same convention as
     // load_next_invoice_customer.php's LLP series (C/FY/LLP{n}).
     if ($cat === 'ID CONCEPT') {
-        if (otCompanyHasHistory($db_conn, $cat, $godownid)) {
+        if (otCompanyHasHistory($db_conn, $cat, $prefix, $godownid)) {
             // This company already invoices here — continue its plain
             // series exactly (no entity tag), just the next number.
             // e.g. existing ...ID/26-27/135 -> next ID/26-27/136.
-            $max = otMaxExistingNumberForCompany($db_conn, $cat, $godownid);
+            $max = otMaxExistingNumberForCompany($db_conn, $cat, $prefix, $godownid);
             $nextNumber = $prefix . '/' . $fy . '/' . ($max + 1);
         } else {
             // Brand new company, zero invoices under this channel — start
