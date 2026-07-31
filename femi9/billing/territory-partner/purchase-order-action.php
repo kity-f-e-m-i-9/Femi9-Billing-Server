@@ -47,6 +47,25 @@ mysqli_stmt_execute($balStmt);
 $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
 mysqli_stmt_close($balStmt);
 
+// Orders still "waiting" already have their advance-covered portion (total
+// minus any excess covered by uploaded payment proof) implicitly earmarked,
+// even though balance_amount is only decremented once an order is fulfilled.
+// Without this, a TP could submit several pending orders that each pass this
+// check individually while cumulatively over-committing the real balance.
+$reservedStmt = mysqli_prepare($db_conn,
+    "SELECT COALESCE(SUM(poi.total - po.excess_amount), 0) AS reserved
+     FROM tp_purchase_orders po
+     JOIN (SELECT po_id, SUM(amount) AS total FROM tp_purchase_order_items GROUP BY po_id) poi
+       ON poi.po_id = po.id
+     WHERE po.territory_partner_id = ? AND po.status = 'waiting'"
+);
+mysqli_stmt_bind_param($reservedStmt, "i", $tp_id);
+mysqli_stmt_execute($reservedStmt);
+$reservedAmount = (float)(mysqli_stmt_get_result($reservedStmt)->fetch_assoc()['reserved'] ?? 0);
+mysqli_stmt_close($reservedStmt);
+
+$advBalance = max(0, round($advBalance - $reservedAmount, 2));
+
 $excessAmount = round(max(0, $grandTotal - $advBalance), 2);
 
 if ($excessAmount > 0) {

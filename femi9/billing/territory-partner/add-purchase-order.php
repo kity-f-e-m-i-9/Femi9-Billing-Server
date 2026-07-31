@@ -23,6 +23,27 @@ mysqli_stmt_execute($balStmt);
 $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
 mysqli_stmt_close($balStmt);
 
+// Orders still "waiting" (not yet invoiced/fulfilled, not cancelled) already
+// have their advance-covered portion (order total minus any excess covered
+// by uploaded payment proof) implicitly earmarked, even though
+// tp_advance_payments.balance_amount is only actually decremented once the
+// order is fulfilled. Without subtracting this, a TP could place several
+// pending orders that each look "within budget" individually while
+// cumulatively over-committing the real balance.
+$reservedStmt = mysqli_prepare($db_conn,
+    "SELECT COALESCE(SUM(poi.total - po.excess_amount), 0) AS reserved
+     FROM tp_purchase_orders po
+     JOIN (SELECT po_id, SUM(amount) AS total FROM tp_purchase_order_items GROUP BY po_id) poi
+       ON poi.po_id = po.id
+     WHERE po.territory_partner_id = ? AND po.status = 'waiting'"
+);
+mysqli_stmt_bind_param($reservedStmt, "i", $Login_user_IDvl);
+mysqli_stmt_execute($reservedStmt);
+$reservedAmount = (float)(mysqli_stmt_get_result($reservedStmt)->fetch_assoc()['reserved'] ?? 0);
+mysqli_stmt_close($reservedStmt);
+
+$advBalance = max(0, round($advBalance - $reservedAmount, 2));
+
 // Screenshots uploaded for this TP's in-progress order (not yet linked to a
 // submitted PO) — resumable if the TP reloads the page mid-upload.
 $existingScreenshots = [];
