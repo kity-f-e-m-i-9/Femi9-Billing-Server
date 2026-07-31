@@ -98,11 +98,12 @@ if(isset($_REQUEST['addInvoice2']))
 	}
 	
 	$gst_percentage = $resultproducts['gst'];
+	$gst_type_item = $resultproducts['gst_type'] ?: 'exclusive';
 	$hsn = $resultproducts['hsn'];
 	$rwpoints = $resultproducts['rwpoints'] * $qty;
-	
+
 	$gstamount_singlepr = "0";
-	
+
 	if(isset($_REQUEST['discount_percentage']) && $_REQUEST['discount_percentage'] > 0) {
 		$discount_percentage = floatval($_REQUEST['discount_percentage']);
 		$discount_amount = $totalamount * $discount_percentage / 100;
@@ -112,13 +113,23 @@ if(isset($_REQUEST['addInvoice2']))
 		$discount_percentage = $totalamount > 0 ? ($discount_amount * 100 / $totalamount) : 0;
 		$discount_percentage = number_format($discount_percentage, 2, '.', '');
 	}
-	
+
 	$subtotal = $totalamount - $discount_amount;
 	$subtotal = number_format($subtotal, 2, '.', '');
-	 
-	$gstamount_total = ($subtotal * $gst_percentage / 100); 
-	$total = $subtotal + $gstamount_total;
-	
+
+	// Inclusive-tax products already have GST baked into the entered price, so
+	// the tax is carved out of subtotal (and NOT added again into total);
+	// exclusive-tax products get GST added on top — same convention as
+	// tp-invoice-print.php.
+	if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
+		$taxable_value = $subtotal * 100 / (100 + $gst_percentage);
+		$gstamount_total = $subtotal - $taxable_value;
+		$total = $subtotal;
+	} else {
+		$gstamount_total = ($subtotal * $gst_percentage / 100);
+		$total = $subtotal + $gstamount_total;
+	}
+
 	error_log("[SS-ACTION2] Product: $pr_id, Qty: $qty, Amount: $amount, Total: $total");
 	
 	//--------------------------------------------------------------------------------
