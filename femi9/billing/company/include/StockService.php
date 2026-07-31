@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/NeksomoStockBridge.php';
+
 /**
  * StockService — centralized, transactional stock management.
  *
@@ -50,6 +52,8 @@ class StockService
         }
 
         try {
+            $this->ensureNeksomoTopUp($productId, $userType, $userId, $qty, $createdBy);
+
             $row = $this->lockStockRow($productId, $userType, $userId);
 
             if ($row === null) {
@@ -436,6 +440,13 @@ class StockService
 
     /**
      * Return the current closing_qty for a stock entity (no lock).
+     *
+     * For a company product mapped to a Neksomo product, when this is being
+     * asked at the NEKSOMO HYGIENE INDUSTRIES godown, the real `stock` row
+     * alone understates what's truly available — Neksomo's own purchases
+     * never credit that row directly (see NeksomoStockBridge.php). This adds
+     * in whatever's still available from that shared pool, read-only (no
+     * mutation) — actual conversion only happens at the point of deduction.
      */
     public function getClosingQty(int $productId, string $userType, string $userId): ?int
     {
@@ -447,7 +458,11 @@ class StockService
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
-        return $row ? (int)$row['closing_qty'] : null;
+        $real = $row ? (int)$row['closing_qty'] : null;
+
+        $pool = $this->neksomoPoolAvailable($productId, $userType, $userId);
+        if ($pool <= 0) return $real;
+        return ($real ?? 0) + $pool;
     }
 
     /**
@@ -544,6 +559,8 @@ class StockService
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
+            $this->ensureNeksomoTopUp($productId, $userType, $userId, $qty, $createdBy);
+
             $row = $this->lockStockRow($productId, $userType, $userId);
             if ($row === null) {
                 if (!$externalTransaction) $this->db->rollback();
@@ -633,6 +650,8 @@ class StockService
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
+            $this->ensureNeksomoTopUp($productId, $userType, $userId, $qty, $createdBy);
+
             $row = $this->lockStockRow($productId, $userType, $userId);
             if ($row === null) {
                 throw new StockException(
@@ -801,6 +820,53 @@ class StockService
     // -------------------------------------------------------------------------
     // PRIVATE HELPERS
     // -------------------------------------------------------------------------
+
+    /**
+     * Read-only: how much of a Neksomo product's shared pool is still
+     * available for $productId, if it's mapped and this is the Neksomo
+     * godown. 0 for every other product/godown (near-zero overhead).
+     */
+    private function neksomoPoolAvailable(int $productId, string $userType, string $userId): int
+    {
+        if ($userType !== 'company') return 0;
+        if ((int)$userId !== get_neksomo_godown_id($this->db)) return 0;
+        return get_neksomo_pool_available_packs($this->db, $productId);
+    }
+
+    /**
+     * Draws exactly the shortfall (never more) out of a Neksomo product's
+     * shared pool to top up $productId's real stock row, right before a
+     * deduction needs it — never as a side effect of a mere read. No-op for
+     * anything not mapped / not at the Neksomo godown / already sufficient.
+     * Must be called from inside an already-open transaction.
+     */
+    private function ensureNeksomoTopUp(
+        int    $productId,
+        string $userType,
+        string $userId,
+        int    $qtyNeeded,
+        string $createdBy
+    ): void {
+        if ($userType !== 'company') return;
+        if ((int)$userId !== get_neksomo_godown_id($this->db)) return;
+
+        $row  = $this->lockStockRow($productId, $userType, $userId);
+        $real = $row ? (int)$row['closing_qty'] : 0;
+        if ($real >= $qtyNeeded) return;
+
+        $shortfall = $qtyNeeded - $real;
+        $poolAvailable = get_neksomo_pool_available_packs($this->db, $productId);
+        $toConvert = min($shortfall, $poolAvailable);
+        if ($toConvert <= 0) return;
+
+        // stock_ledger.ref_type is a closed ENUM without a Neksomo-specific
+        // member — 'adjustment' is the established convention for this kind
+        // of system-generated credit (same as neksomo-manufacturer-purchase-
+        // action.php's own purchase credits); the distinguishing detail goes
+        // in ref_id instead.
+        $this->credit($productId, $userType, $userId, $toConvert, 'adjustment', 'neksomo_conversion_' . uniqid(), $createdBy, true);
+        record_neksomo_stock_conversion($this->db, $productId, $toConvert, $createdBy);
+    }
 
     /**
      * Lock the stock row for this entity using SELECT … FOR UPDATE.
