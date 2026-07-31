@@ -68,6 +68,9 @@ function showPrice(str) {
     xmlhttp.onreadystatechange = function() {
         if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
             document.getElementById("txtHintPrice").innerHTML = xmlhttp.responseText;
+            var mrpVal = document.getElementById("amount").getAttribute("data-mrp");
+            var mrpField = document.getElementById("mrpDisplayField");
+            if (mrpField) { mrpField.value = mrpVal ? ('MRP: ₹' + mrpVal) : ''; }
         }
     };
     xmlhttp.open("GET", "loadPrice.php?q=" + str + "&invuser=customer", true);
@@ -147,7 +150,7 @@ $cnt_items = (int)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS
 
 <?php if ($amount_received_fully == 0): ?>
 <div class="item">
-<select required name="pr_id" style="width:100%;" class="prinput" autofocus onchange="showPrice(this.value)">
+<select required name="pr_id" style="width:100% !important;" class="prinput" autofocus onchange="showPrice(this.value)">
 <option value="" hidden>Select Product</option>
 <?php
 $res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 ORDER BY p.id ASC");
@@ -158,7 +161,8 @@ while ($rp = mysqli_fetch_array($res_prods)) {
 </select>
 <br/><br/>
 <input type="number" min="0" name="qty" id="qty" onkeyup="totalkm()" required placeholder="Qty" class="numberinput">
-<span id="txtHintPrice"><input type="number" min="0" step="any" name="amount" id="amount" onkeyup="totalkm()" required placeholder="Price"></span>
+<span id="txtHintPrice"><input type="number" min="0" step="any" name="amount" id="amount" onkeyup="totalkm()" required placeholder="Customer Price"></span>
+<input type="text" id="mrpDisplayField" placeholder="MRP" class="numberinput" onkeydown="return false;" onpaste="return false;">
 <input type="number" min="0" step="any" name="total" id="output" class="numberinput" required placeholder="Total" readonly>
 <input type="number" min="0" step="any" id="discountpercentae" name="discount_percentage" onkeyup="discamount()" required placeholder="Disc(%)" class="numberinput">
 <input type="number" min="0" id="discountamount" name="discount_amount" step="any" required placeholder="Disc(Rs.)" class="numberinput">
@@ -449,7 +453,7 @@ while ($rc = mysqli_fetch_array($res_custs)) {
 <script>flatpickr("#bookingDate", { dateFormat: "Y-m-d", maxDate: "today" });</script>
 
 <div class="item">
-<select required name="pr_id" style="width:100%;" onchange="showPrice(this.value)" class="prinput">
+<select required name="pr_id" style="width:100% !important;" onchange="showPrice(this.value)" class="prinput">
 <option value="" hidden>Select Product</option>
 <?php
 $res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 ORDER BY p.id ASC");
@@ -460,7 +464,8 @@ while ($rp = mysqli_fetch_array($res_prods)) {
 </select>
 <br/><br/>
 <input type="number" min="0" name="qty" id="qty" onkeyup="totalkm()" required placeholder="Qty" class="numberinput">
-<span id="txtHintPrice"><input type="number" min="0" name="amount" id="amount" onkeyup="totalkm()" required placeholder="Price"></span>
+<span id="txtHintPrice"><input type="number" min="0" name="amount" id="amount" onkeyup="totalkm()" required placeholder="Customer Price"></span>
+<input type="text" id="mrpDisplayField" placeholder="MRP" class="numberinput" onkeydown="return false;" onpaste="return false;">
 <input type="number" min="0" name="total" id="output" readonly required placeholder="Total" class="numberinput">
 <input type="number" min="0" step="any" id="discountpercentae" name="discount_percentage" onkeyup="discamount()" required placeholder="Disc(%)" class="numberinput">
 <input type="number" min="0" id="discountamount" name="discount_amount" step="any" required placeholder="Disc(Rs.)" class="numberinput">

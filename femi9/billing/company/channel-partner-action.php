@@ -104,6 +104,18 @@ if ($action === 'insert-channel-partner') {
         }
     }
 
+    // Self-healing: if the sequence row was never seeded on this database
+    // (e.g. a fresh/local copy), the lock+increment below silently keeps
+    // computing next_num=0 forever, producing duplicate CP-0000 ids and a
+    // duplicate-key error on the second insert. Seed it from the highest
+    // cp_id already in use so it never collides with real records.
+    $seedChk = $db_conn->query("SELECT 1 FROM cp_id_sequence WHERE id = 1");
+    if (!$seedChk || $seedChk->num_rows === 0) {
+        $maxRes = $db_conn->query("SELECT MAX(CAST(SUBSTRING(cp_id, 4) AS UNSIGNED)) AS max_num FROM channel_partners WHERE cp_id LIKE 'CP-%'");
+        $maxNum = $maxRes ? (int)($maxRes->fetch_assoc()['max_num'] ?? 0) : 0;
+        $db_conn->query("INSERT INTO cp_id_sequence (id, last_val) VALUES (1, $maxNum) ON DUPLICATE KEY UPDATE last_val = GREATEST(last_val, $maxNum)");
+    }
+
     $db_conn->begin_transaction();
     try {
         // Lock the sequence row, increment, read — atomic under the transaction lock

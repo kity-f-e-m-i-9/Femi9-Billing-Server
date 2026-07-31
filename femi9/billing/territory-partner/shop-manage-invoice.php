@@ -87,8 +87,11 @@ $i          = $start_from;
                                                 <th>Invoice Date</th>
                                                 <th>Invoice Amount</th>
                                                 <th>Print</th>
+                                                <th>Status</th>
                                                 <th>Edit</th>
                                                 <th>Return (Credit&nbsp;Note)</th>
+                                                <th>History</th>
+                                                <th>Void</th>
                                                 <th>Delete</th>
                                             </tr>
                                         </thead>
@@ -126,6 +129,14 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
     // invoice number — it would look auto-generated to the TP.
     $isPendingInvNumber = ($result_product_list["inv_number"] === $result_product_list["inv_id"]);
     $invNumberDisplay   = $isPendingInvNumber ? "Pending" : htmlspecialchars($result_product_list["inv_number"]);
+    $isVoided           = ($result_product_list["status"] ?? '') === 'cancelled';
+
+    // Void only makes sense once the invoice is actually finished — i.e. a
+    // receipt has been recorded (same "Continue Invoice" vs "Completed
+    // Invoice" distinction manage-orders.php already uses). Never offer Void
+    // on a still-in-progress draft; it isn't a real invoice yet.
+    $isCompleted = mysqli_num_rows(mysqli_query($db_conn,
+        "SELECT 1 FROM receipt WHERE inv_id='" . $result_product_list["inv_id"] . "' LIMIT 1")) > 0;
 ?>
                                             <tr>
                                                 <td><?php echo ++$i; ?></td>
@@ -198,12 +209,32 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                 </td>
 
                                                 <td>
-                                                <a href="shop-invoice-add.php?invuser=<?php echo $getinvuser; ?>&&action=edit&&InvoiceID=<?php echo $INVID_encode; ?>" title="Edit"><img src="../../assets/images/edit-32.png"/></a>
+                                                <?php if ($isVoided) { ?>
+                                                <span class="badge badge-style-bordered badge-danger">Voided</span>
+                                                <?php } else { ?>
+                                                <span class="badge badge-style-bordered badge-success">Active</span>
+                                                <?php } ?>
                                                 </td>
 
                                                 <td>
-                                                <?php if ($result_product_list["sub_total"] > 0) { ?>
+                                                <?php if ($isVoided) { echo "---"; } else { ?>
+                                                <a href="shop-invoice-add.php?invuser=<?php echo $getinvuser; ?>&&action=edit&&InvoiceID=<?php echo $INVID_encode; ?>" title="Edit"><img src="../../assets/images/edit-32.png"/></a>
+                                                <?php } ?>
+                                                </td>
+
+                                                <td>
+                                                <?php if ($result_product_list["sub_total"] > 0 && !$isVoided) { ?>
                                                 <a href="cnote_new.php?invuser=<?php echo $getinvuser; ?>&&InvoiceID=<?php echo $INVID_encode; ?>"><span class="badge badge-warning">Return</span></a>
+                                                <?php } else { echo "---"; } ?>
+                                                </td>
+
+                                                <td>
+                                                <a href="shop-invoice-history.php?invid=<?php echo $INVID_encode; ?>" target="_blank" title="History"><span class="badge badge-style-bordered badge-primary">History</span></a>
+                                                </td>
+
+                                                <td>
+                                                <?php if ($isCompleted && !$isVoided) { ?>
+                                                <a href="void-shop-invoice.php?invuser=<?php echo $getinvuser; ?>&&invid=<?php echo $INVID_encode; ?>" onclick="return confirm('Void this invoice? Any deducted stock will be restored.');" title="Void"><span class="badge badge-style-bordered badge-dark">Void</span></a>
                                                 <?php } else { echo "---"; } ?>
                                                 </td>
 

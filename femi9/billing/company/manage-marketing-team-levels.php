@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms');
+require_once("include/TeamLevelColors.php");
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) {
@@ -19,17 +20,23 @@ $_chkTL = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'team_level_id
 if ($_chkTL && $_chkTL->num_rows === 0) {
     $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN team_level_id INT NULL DEFAULT NULL AFTER user_position");
 }
+$_chkLL = $db_conn->query("SHOW COLUMNS FROM marketing_team_levels LIKE 'location_layer_id'");
+if ($_chkLL && $_chkLL->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_team_levels ADD COLUMN location_layer_id INT NULL DEFAULT NULL AFTER level_name");
+}
 
 $stmt_l = $db_conn->query("
-    SELECT l.id, l.level_rank, l.level_name,
+    SELECT l.id, l.level_rank, l.level_name, ll.layer_name,
            COALESCE(s.cnt, 0) AS staff_count
     FROM marketing_team_levels l
+    LEFT JOIN partner_location_layers ll ON ll.id = l.location_layer_id
     LEFT JOIN (
         SELECT team_level_id, COUNT(*) AS cnt FROM marketing_staff GROUP BY team_level_id
     ) s ON s.team_level_id = l.id
     ORDER BY l.level_rank
 ");
 $levels = $stmt_l ? $stmt_l->fetch_all(MYSQLI_ASSOC) : [];
+$levelColorMap = getTeamLevelColorMap($db_conn);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,6 +62,15 @@ $levels = $stmt_l ? $stmt_l->fetch_all(MYSQLI_ASSOC) : [];
         .action-link:hover { background:#f3f4f6;border-color:#d1d5db; }
         .action-link.delete:hover { background:#fef2f2;border-color:#fecaca; }
         .actions-group { display:inline-flex;align-items:center;gap:5px;white-space:nowrap; }
+
+        .level-color-card {
+            border:1px solid #e5e7eb; border-left:6px solid var(--lvl-color,#667eea);
+            border-radius:10px; padding:14px 16px; background:#fff; height:100%;
+        }
+        .level-color-card .rank { font-size:11px; font-weight:700; color:#999; text-transform:uppercase; letter-spacing:.5px; }
+        .level-color-card .name { font-size:16px; font-weight:700; color:var(--lvl-color,#333); margin-top:2px; }
+        .level-color-card .count { font-size:12px; color:#666; margin-top:6px; }
+        .level-color-swatch { display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--lvl-color,#999); vertical-align:middle; margin-right:6px; }
     </style>
 </head>
 <body>
@@ -122,6 +138,21 @@ $levels = $stmt_l ? $stmt_l->fetch_all(MYSQLI_ASSOC) : [];
                         </div>
                     </div>
 
+                    <!-- Color cards -->
+                    <?php if (!empty($levels)): ?>
+                    <div class="row mb-3">
+                        <?php foreach ($levels as $level): ?>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="level-color-card" style="--lvl-color:<?php echo $levelColorMap[(int)$level['id']] ?? '#667eea'; ?>;">
+                                    <div class="rank">Rank <?php echo (int)$level['level_rank']; ?></div>
+                                    <div class="name"><?php echo htmlspecialchars($level['level_name']); ?></div>
+                                    <div class="count"><?php echo (int)$level['staff_count']; ?> staff</div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+
                     <!-- Table -->
                     <div class="row">
                         <div class="col-md-8">
@@ -133,6 +164,7 @@ $levels = $stmt_l ? $stmt_l->fetch_all(MYSQLI_ASSOC) : [];
                                                 <tr>
                                                     <th>Rank</th>
                                                     <th>Level Name</th>
+                                                    <th>Location Layer</th>
                                                     <th>Staff at this level</th>
                                                     <th>Actions</th>
                                                 </tr>
@@ -146,7 +178,17 @@ $levels = $stmt_l ? $stmt_l->fetch_all(MYSQLI_ASSOC) : [];
                                                     <td>
                                                         <span class="badge badge-secondary" style="font-size:13px;"><?php echo (int)$level['level_rank']; ?></span>
                                                     </td>
-                                                    <td><strong><?php echo htmlspecialchars($level['level_name']); ?></strong></td>
+                                                    <td>
+                                                        <span class="level-color-swatch" style="--lvl-color:<?php echo $levelColorMap[(int)$level['id']] ?? '#667eea'; ?>;"></span>
+                                                        <strong><?php echo htmlspecialchars($level['level_name']); ?></strong>
+                                                    </td>
+                                                    <td>
+                                                        <?php if (!empty($level['layer_name'])): ?>
+                                                            <?php echo htmlspecialchars($level['layer_name']); ?>
+                                                        <?php else: ?>
+                                                            <span class="text-danger">Not linked</span>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td>
                                                         <?php if ($staff_cnt > 0): ?>
                                                             <a href="ms_manage">
@@ -170,7 +212,7 @@ $levels = $stmt_l ? $stmt_l->fetch_all(MYSQLI_ASSOC) : [];
                                             <?php endforeach; ?>
                                             <?php if (empty($levels)): ?>
                                                 <tr>
-                                                    <td colspan="4" class="text-center text-muted" style="padding:20px;">
+                                                    <td colspan="5" class="text-center text-muted" style="padding:20px;">
                                                         No team levels configured yet.
                                                         <a href="add-marketing-team-level">Add your first level</a>.
                                                     </td>

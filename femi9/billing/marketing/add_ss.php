@@ -1,11 +1,17 @@
 <?php include("checksession.php");
 include("config.php");
+require_once("include/AssignedLocations.php");
 error_reporting(0);
 
 $title="Add Shop (Retailers)";
 $manage_url="manage_ss";
 $manage_title="Manage Shop (Retailers)";
 $message_title="Shop (Retailers)";
+
+// District/Taluk are scoped to this DM's assigned locations (State auto-derives
+// from the chosen district) instead of free-text — free-text is what caused the
+// "Erode / Erode- / Erodr" duplicate-spelling mess in the shop data.
+$assignedDistricts = getMsAssignedDistricts($db_conn, (int)$markeingSTFID);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -63,6 +69,7 @@ $message_title="Shop (Retailers)";
                                 <div class="page-description">
 								
 								<?php if(isset($_REQUEST['distalready'])){?><div class="alert alert-danger">Shop Details Already Exists.</div><?php }?>
+								<?php if(isset($_REQUEST['invaliddistrict'])){?><div class="alert alert-danger">Please select a valid District/Taluk from the list.</div><?php }?>
 								
                                     <h1>
 									<table class="headertble">
@@ -113,16 +120,28 @@ $message_title="Shop (Retailers)";
             <input type="file" name="user_icon" id="fileUpload" accept=".jpg, .jpeg, .png" class="form-control">
 			<br/>
 
-	<label for="exampleInputEmail1" class="form-label">State Name*</label>
-    <input type="text" required="" name="state_name" class="form-control" onkeypress="restrictSpecialChars(event)">
-	<br/>
-	
+	<?php if (empty($assignedDistricts)): ?>
+	<div class="alert alert-warning">No district has been assigned to you yet. Contact your admin before adding a shop.</div>
+	<?php endif; ?>
+
 	<label for="exampleInputEmail1" class="form-label">District Name*</label>
-    <input type="text" required="" name="district_name" class="form-control" onkeypress="restrictSpecialChars(event)">
+    <select required name="district_node_id" id="district_select" class="form-control" onchange="onDistrictSelect(this.value)" <?php echo empty($assignedDistricts) ? 'disabled' : ''; ?>>
+        <option value="" hidden>Select District</option>
+        <?php foreach ($assignedDistricts as $d): ?>
+        <option value="<?php echo $d['id']; ?>"><?php echo htmlspecialchars($d['name']); ?></option>
+        <?php endforeach; ?>
+    </select>
 	<br/>
-	
+
+	<label for="exampleInputEmail1" class="form-label">State Name*</label>
+    <input type="text" readonly id="state_display" class="form-control" style="background:#f3f4f6;" placeholder="Select a district first">
+    <input type="hidden" name="state_node_id" id="state_node_id">
+	<br/>
+
 	<label for="exampleInputEmail1" class="form-label">Taluk Name*</label>
-    <input type="text" required="" name="taluk_name" class="form-control" onkeypress="restrictSpecialChars(event)">
+    <select required name="taluk_node_id" id="taluk_select" class="form-control" <?php echo empty($assignedDistricts) ? 'disabled' : ''; ?>>
+        <option value="" hidden>Select District First</option>
+    </select>
 	<br/>
 	
 	<label for="exampleInputEmail1" class="form-label">Pincode*</label>
@@ -197,7 +216,40 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
                                             </div>
                                         </div>
 										</form>
-										
+
+										<script>
+var msDistrictData = <?php echo json_encode(array_column($assignedDistricts, null, 'id')); ?>;
+
+function onDistrictSelect(districtId) {
+    var stateDisplay = document.getElementById('state_display');
+    var stateNodeId  = document.getElementById('state_node_id');
+    var talukSelect  = document.getElementById('taluk_select');
+    talukSelect.innerHTML = '<option value="" hidden>Select Taluk</option>';
+
+    var d = msDistrictData[districtId];
+    if (!d) {
+        stateDisplay.value = '';
+        stateNodeId.value = '';
+        return;
+    }
+    stateDisplay.value = d.state_name;
+    stateNodeId.value = d.state_id;
+    d.taluks.forEach(function(t) {
+        var o = document.createElement('option');
+        o.value = t.id; o.textContent = t.name;
+        talukSelect.appendChild(o);
+    });
+    if (d.taluks.length === 1) { talukSelect.value = d.taluks[0].id; }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var sel = document.getElementById('district_select');
+    if (!sel) return;
+    var opts = Array.from(sel.options).filter(function(o){ return o.value !== ''; });
+    if (opts.length === 1) { sel.value = opts[0].value; onDistrictSelect(opts[0].value); }
+});
+</script>
+
 										<script>
 document.getElementById('fileUpload').addEventListener('change', function(event) {
     validateFile(event.target.files[0]);

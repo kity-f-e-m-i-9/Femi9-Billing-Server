@@ -3,10 +3,24 @@
 ob_start();
 include("checksession.php");
 include("config.php");
+require_once("include/TeamSubtree.php");
 error_reporting(0);
 
 $from_date=$_REQUEST['frd'];
 $to_date=$_REQUEST['tod'];
+
+// Same view_ms_id scoping as manage_order_product.php — a manager exporting
+// a subordinate's report must be validated against their real downline.
+$viewMsId = (int)$markeingSTFID;
+if (isset($_REQUEST['view_ms_id']) && $_REQUEST['view_ms_id'] !== '') {
+    $requestedMsId = (int)$_REQUEST['view_ms_id'];
+    if ($requestedMsId !== (int)$markeingSTFID) {
+        $allowedSubtree = getMsSubtreeIds($db_conn, (int)$markeingSTFID);
+        if (in_array($requestedMsId, $allowedSubtree, true)) {
+            $viewMsId = $requestedMsId;
+        }
+    }
+}
 
 // Set the filename for download
 $file = "Datewise-Product-Orders-".$from_date."-to-".$to_date.".csv";
@@ -17,28 +31,54 @@ $csv_content = '';
 // Header row for CSV
 $csv_content .= "#,Shop Name,Shop Contact Number,Address,Taluk,Location,Date,Marketing Tool";
 
-$select_prdetails_header="select * from products order by id asc";
-$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
-while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){
-	$csv_content .= ',"'.str_replace('"','""',$result_prdetails_header['productName']).'"';
+// Batched once instead of per-row/per-product — same fix as manage_order_product.php
+// (this used to run a query per product per order, which was very slow with a
+// wide date range).
+$allProducts = [];
+$resAllProd = mysqli_query($db_conn, "SELECT id, productName FROM products ORDER BY id ASC");
+while ($apr = mysqli_fetch_assoc($resAllProd)) { $allProducts[] = $apr; }
+
+foreach ($allProducts as $apr) {
+	$csv_content .= ',"'.str_replace('"','""',$apr['productName']).'"';
 }
 $csv_content .= "\n";
 
+$viewMsIdEsc = mysqli_real_escape_string($db_conn, $viewMsId);
+$orderIdsInRange = [];
+$orderMeta = [];
+$qtyMap = [];
+$shopIds = [];
+$resOrders = mysqli_query($db_conn,
+	"SELECT order_id, shop_id, order_date, marketing_tool, latitude, longitude, pr_id, qty
+	 FROM ms_orders
+	 WHERE ms_id='$viewMsIdEsc' AND new_order='yes' AND order_date BETWEEN '$from_date' AND '$to_date'
+	 ORDER BY order_date DESC, order_id DESC"
+);
+while ($orow = mysqli_fetch_assoc($resOrders)) {
+	$oid = $orow['order_id'];
+	if (!isset($orderMeta[$oid])) {
+		$orderMeta[$oid] = $orow;
+		$orderIdsInRange[] = $oid;
+		if (!empty($orow['shop_id'])) { $shopIds[$orow['shop_id']] = true; }
+	}
+	$qtyMap[$oid][$orow['pr_id']] = (int)$orow['qty'];
+}
+
+$shopMeta = [];
+if (!empty($shopIds)) {
+	$shopIdList = implode(',', array_map('intval', array_keys($shopIds)));
+	$resShops = mysqli_query($db_conn, "SELECT * FROM ms_shop WHERE id IN ($shopIdList)");
+	while ($srow = mysqli_fetch_assoc($resShops)) { $shopMeta[$srow['id']] = $srow; }
+}
+
 $i=0;
-$select_product_list="select distinct order_id from ms_orders where ms_id='$markeingSTFID' and new_order='yes' and order_date between '$from_date' and '$to_date'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
-while($result_product_list12=mysqli_fetch_array($fetch_product_list))
+foreach ($orderIdsInRange as $orderid)
 {
-	$orderid=$result_product_list12['order_id'];
-	$select_shopcatt12="select * from ms_orders where order_id='$orderid'";
-	$fetch_shopcatt12=mysqli_query($db_conn,$select_shopcatt12);
-	$result_product_list=mysqli_fetch_array($fetch_shopcatt12);
+	$result_product_list = $orderMeta[$orderid];
 
 	//shop category
 	$shop_id=$result_product_list['shop_id'];
-	$select_shopcatt="select * from ms_shop where id='$shop_id'";
-	$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
-	$result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
+	$result_shopcatt = $shopMeta[$shop_id] ?? [];
 
 	$csv_content .= ++$i.',';
 	$csv_content .= '"'.str_replace('"','""',$result_shopcatt['name']).'",';
@@ -55,18 +95,9 @@ while($result_product_list12=mysqli_fetch_array($fetch_product_list))
 	$csv_content .= '"'.str_replace('"','""',$result_product_list["marketing_tool"]).'"';
 
 	//------------------------PRODUCT WISE SALES QTY-------------------------------
-	$select_prdetails_header="select * from `products` order by `id` asc";
-	$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
-	while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){
-
-		$prid_header=$result_prdetails_header['id'];
-
-		//SALES QTY
-		$select_SUM_QTY="select qty from ms_orders where order_id='".$result_product_list['order_id']."' and pr_id='$prid_header'";
-		$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
-		$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
-		if($result_SUM_QTY['qty']!=NULL){ $showQty=$result_SUM_QTY['qty'];}else{$showQty="0";}
-
+	foreach ($allProducts as $apr) {
+		$prid_header = $apr['id'];
+		$showQty = $qtyMap[$orderid][$prid_header] ?? 0;
 		$csv_content .= ',"'.$showQty.'"';
 	}
 	//--------------------------------------------------------------------

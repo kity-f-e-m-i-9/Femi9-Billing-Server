@@ -28,7 +28,7 @@ function checkAndAwardDailyReward($db_conn, $userType, $userId, $invoiceId, $inv
 
     try {
         $today = date('Y-m-d');
-        $points = 1; // Daily reward points
+        $points = 2; // Daily reward points
 
         // Check if user already received reward today
         $check_stmt = mysqli_prepare($db_conn,

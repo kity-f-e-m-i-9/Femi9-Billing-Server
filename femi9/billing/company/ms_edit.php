@@ -206,9 +206,6 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 <textarea name="ms_address" onkeypress="restrictSpecialChars(event)" class="form-control" placeholder="optional"><?=$result_product_list['ms_address'];?></textarea>
 </br>
 
-<label class="form-label">Team Level</label>
-<select name="team_level_id" id="teamLevelSelect" class="form-control">
-    <option value="">-- None --</option>
 <?php
 $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -218,19 +215,58 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
     UNIQUE KEY uk_level_rank (level_rank)
 )");
 $currentTeamLevelId = (int)($result_product_list['team_level_id'] ?? 0);
-$selectTeamLevels = $db_conn->query("SELECT id, level_name FROM marketing_team_levels ORDER BY level_rank ASC");
-while ($resultTeamLevel = $selectTeamLevels->fetch_assoc()) { ?>
-<option value="<?php echo (int)$resultTeamLevel['id'];?>" <?php echo ($currentTeamLevelId === (int)$resultTeamLevel['id']) ? 'selected' : '';?>><?php echo htmlspecialchars($resultTeamLevel['level_name']);?></option>
-<?php } ?>
-</select>
+$currentTeamLevelName = '';
+if ($currentTeamLevelId) {
+    $stmt_ctl = $db_conn->prepare("SELECT level_name FROM marketing_team_levels WHERE id = ?");
+    $stmt_ctl->bind_param("i", $currentTeamLevelId);
+    $stmt_ctl->execute();
+    $ctlRow = $stmt_ctl->get_result()->fetch_assoc();
+    $stmt_ctl->close();
+    $currentTeamLevelName = $ctlRow['level_name'] ?? '';
+}
+?>
+<label class="form-label">Team Level</label>
+<div class="lp-wrapper" id="teamLevelPickerWrapper">
+    <div class="lp-control" id="teamLevelPickerControl">
+        <div class="lp-value" id="tlpValue">
+            <?php if ($currentTeamLevelName !== ''): ?>
+                <span><?php echo htmlspecialchars($currentTeamLevelName); ?></span>
+            <?php else: ?>
+                <span class="lp-placeholder">-- None --</span>
+            <?php endif; ?>
+        </div>
+        <div class="lp-arrow"><i class="material-icons" style="font-size:18px;color:#999;">arrow_drop_down</i></div>
+    </div>
+    <div class="lp-panel" id="teamLevelPanel" style="display:none;">
+        <div class="lp-search-box">
+            <i class="material-icons" style="font-size:18px;color:#aaa;">search</i>
+            <input type="text" id="tlpSearchInput" placeholder="Search team level&hellip;" autocomplete="off">
+        </div>
+        <div class="lp-body" id="tlpBody"><div class="lp-loading">Loading&hellip;</div></div>
+    </div>
+</div>
+<input type="hidden" name="team_level_id" id="teamLevelSelect" value="<?php echo $currentTeamLevelId ?: ''; ?>">
 <small class="text-muted">Manage levels from <a href="manage-marketing-team-levels">Manage Team Levels</a>.</small>
 <br/>
 
 <div id="managerFieldWrap" style="display:none;margin-top:10px;">
     <label class="form-label" id="managerFieldLabel">Reports To</label>
-    <select name="manager_id" id="managerSelect" class="form-control">
-        <option value="">-- Select --</option>
-    </select>
+    <div class="lp-wrapper" id="managerPickerWrapper">
+        <div class="lp-control" id="managerPickerControl">
+            <div class="lp-value" id="mgrValue">
+                <span class="lp-placeholder">-- Select --</span>
+            </div>
+            <div class="lp-arrow"><i class="material-icons" style="font-size:18px;color:#999;">arrow_drop_down</i></div>
+        </div>
+        <div class="lp-panel" id="managerPanel" style="display:none;">
+            <div class="lp-search-box">
+                <i class="material-icons" style="font-size:18px;color:#aaa;">search</i>
+                <input type="text" id="mgrSearchInput" placeholder="Search&hellip;" autocomplete="off">
+            </div>
+            <div class="lp-body" id="mgrBody"><div class="lp-loading">Loading&hellip;</div></div>
+        </div>
+    </div>
+    <input type="hidden" name="manager_id" id="managerSelect" value="">
     <div id="managerChainPreview" style="font-size:12px;color:#666;margin-top:5px;"></div>
 </div>
 			<br/>
@@ -373,11 +409,40 @@ while ($resultTeamLevel = $selectTeamLevels->fetch_assoc()) { ?>
             $.each(selected, function (_, s) { $c.append('<input type="hidden" name="location_ids[]" value="' + s.id + '">'); });
         }
 
+        function clearSelection() {
+            selected = [];
+            renderChips();
+            updateHiddenInputs();
+        }
+
         function loadNodes() {
+            var levelId = $('#teamLevelSelect').val();
+            if (!levelId) {
+                loaded = false;
+                allNodes = [];
+                $('#lpBody').html('<div class="lp-empty">Select a Team Level first.</div>');
+                return;
+            }
+            var managerId = $('#managerSelect').val() || 0;
             $('#lpBody').html('<div class="lp-loading">Loading&hellip;</div>');
-            $.getJSON('get-ms-flat-nodes.php?exclude_ms_id=' + EXCLUDE_MS, function (nodes) {
-                allNodes = nodes;
+            $.getJSON('get-ms-location-options.php?team_level_id=' + levelId + '&manager_id=' + managerId + '&exclude_ms_id=' + EXCLUDE_MS, function (resp) {
                 loaded = true;
+                if (resp.needs_manager) {
+                    allNodes = [];
+                    $('#lpBody').html('<div class="lp-empty">Select "Reports To" first.</div>');
+                    return;
+                }
+                if (resp.error === 'no_layer_linked') {
+                    allNodes = [];
+                    $('#lpBody').html('<div class="lp-empty">This team level has no Location Layer linked. Configure it in Manage Team Levels.</div>');
+                    return;
+                }
+                if (resp.error === 'layer_not_enabled') {
+                    allNodes = [];
+                    $('#lpBody').html('<div class="lp-empty">Location layer is not enabled for Marketing Staff. Enable "Marketing Staff Filter Enabled" on it in Location Layers.</div>');
+                    return;
+                }
+                allNodes = resp.nodes;
                 renderList($.trim($('#lpSearchInput').val()));
             }).fail(function () {
                 $('#lpBody').html('<div class="lp-empty">Failed to load. Please try again.</div>');
@@ -411,8 +476,58 @@ while ($resultTeamLevel = $selectTeamLevels->fetch_assoc()) { ?>
 
         $('#lpSearchInput').on('input', function () { renderList($.trim($(this).val())); });
 
-        // ---- Team hierarchy: manager selection based on Team Level ----
+        // ---- Team Level: searchable single-select (like Assign Location) ----
         var teamLevels = [];
+        var tlOpen = false;
+
+        function renderTeamLevelList(q) {
+            var $body = $('#tlpBody').empty();
+            var items = teamLevels;
+            if (q) {
+                var ql = q.toLowerCase();
+                items = items.filter(function (n) { return n.name.toLowerCase().indexOf(ql) >= 0; });
+            }
+            if (items.length === 0) {
+                $body.html('<div class="lp-empty">' + (q ? 'No results for "' + escHtml(q) + '".' : 'No team levels configured. Add one in Manage Team Levels.') + '</div>');
+                return;
+            }
+            $.each(items, function (_, item) {
+                var $row = $('<div class="lp-row lp-row-selectable"></div>');
+                $row.append($('<span>').text(item.name));
+                $row.on('click', function () { selectTeamLevel(item); });
+                $body.append($row);
+            });
+        }
+
+        function selectTeamLevel(item) {
+            $('#teamLevelSelect').val(item.id).trigger('change');
+            $('#tlpValue').empty().append($('<span>').text(item.name));
+            closeTeamLevelPanel();
+        }
+
+        function openTeamLevelPanel() {
+            tlOpen = true;
+            $('#teamLevelPickerControl').addClass('open');
+            $('#teamLevelPanel').show();
+            renderTeamLevelList('');
+            setTimeout(function () { $('#tlpSearchInput').val('').focus(); }, 50);
+        }
+
+        function closeTeamLevelPanel() {
+            tlOpen = false;
+            $('#teamLevelPickerControl').removeClass('open');
+            $('#teamLevelPanel').hide();
+        }
+
+        $('#teamLevelPanel').on('click', function (e) { e.stopPropagation(); });
+        $('#teamLevelPickerControl').on('click', function (e) {
+            e.stopPropagation();
+            if (!tlOpen) { openTeamLevelPanel(); } else { closeTeamLevelPanel(); }
+        });
+        $(document).on('click', function () { if (tlOpen) closeTeamLevelPanel(); });
+        $('#tlpSearchInput').on('input', function () { renderTeamLevelList($.trim($(this).val())); });
+
+        // ---- Team hierarchy: manager selection based on Team Level ----
         var CURRENT_TEAM_LEVEL_ID = <?php echo (int)$currentTeamLevelId; ?>;
         var CURRENT_MANAGER_ID = <?php echo (int)($result_product_list['manager_id'] ?? 0); ?>;
 
@@ -433,40 +548,105 @@ while ($resultTeamLevel = $selectTeamLevels->fetch_assoc()) { ?>
             $prev.text('Reporting chain: ' + parts.join(' → '));
         }
 
+        // ---- Reports To (manager): searchable single-select ----
+        var managerOptions = [];
+        var mgrOpen = false;
+
+        function renderManagerList(q) {
+            var $body = $('#mgrBody').empty();
+            var items = managerOptions;
+            if (q) {
+                var ql = q.toLowerCase();
+                items = items.filter(function (n) { return n.name.toLowerCase().indexOf(ql) >= 0; });
+            }
+            if (items.length === 0) {
+                $body.html('<div class="lp-empty">' + (q ? 'No results for "' + escHtml(q) + '".' : 'No staff available at this level yet.') + '</div>');
+                return;
+            }
+            $.each(items, function (_, item) {
+                var $row = $('<div class="lp-row lp-row-selectable"></div>');
+                $row.append($('<span>').text(item.name));
+                $row.on('click', function () { selectManager(item); });
+                $body.append($row);
+            });
+        }
+
+        function setManagerValue(id, name) {
+            $('#managerSelect').val(id || '');
+            if (name) {
+                $('#mgrValue').empty().append($('<span>').text(name));
+            } else {
+                $('#mgrValue').html('<span class="lp-placeholder">-- Select --</span>');
+            }
+        }
+
+        function selectManager(item) {
+            setManagerValue(item.id, item.name);
+            $('#managerSelect').trigger('change');
+            closeManagerPanel();
+        }
+
+        function openManagerPanel() {
+            mgrOpen = true;
+            $('#managerPickerControl').addClass('open');
+            $('#managerPanel').show();
+            renderManagerList('');
+            setTimeout(function () { $('#mgrSearchInput').val('').focus(); }, 50);
+        }
+
+        function closeManagerPanel() {
+            mgrOpen = false;
+            $('#managerPickerControl').removeClass('open');
+            $('#managerPanel').hide();
+        }
+
+        $('#managerPanel').on('click', function (e) { e.stopPropagation(); });
+        $('#managerPickerControl').on('click', function (e) {
+            e.stopPropagation();
+            if (!mgrOpen) { openManagerPanel(); } else { closeManagerPanel(); }
+        });
+        $(document).on('click', function () { if (mgrOpen) closeManagerPanel(); });
+        $('#mgrSearchInput').on('input', function () { renderManagerList($.trim($(this).val())); });
+
         function loadManagerOptions(levelId, preselectId) {
             var above = levelAbove(levelId);
             if (!above) {
                 $('#managerFieldWrap').hide();
-                $('#managerSelect').html('<option value="">-- Select --</option>');
+                managerOptions = [];
+                setManagerValue('', '');
                 renderChain([]);
+                loadNodes();
                 return;
             }
             $('#managerFieldLabel').text('Reports To (' + above.name + ')');
             $('#managerFieldWrap').show();
-            $('#managerSelect').html('<option value="">Loading&hellip;</option>');
+            $('#mgrValue').html('<span class="lp-placeholder">Loading&hellip;</span>');
             $.getJSON('get-ms-by-level.php?level_id=' + above.id + '&exclude_ms_id=' + EXCLUDE_MS, function (staff) {
-                var $sel = $('#managerSelect').empty();
-                $sel.append('<option value="">-- Select --</option>');
-                $.each(staff, function (_, s) {
-                    var $opt = $('<option>').val(s.id).text(s.name);
-                    if (preselectId && s.id == preselectId) { $opt.prop('selected', true); }
-                    $sel.append($opt);
-                });
+                managerOptions = staff;
+                var match = null;
                 if (preselectId) {
+                    $.each(staff, function (_, s) { if (s.id == preselectId) match = s; });
+                }
+                if (match) {
+                    setManagerValue(match.id, match.name);
                     $.getJSON('get-ms-chain.php?ms_id=' + preselectId, function (chain) { renderChain(chain); });
                 } else {
+                    setManagerValue('', '');
                     renderChain([]);
                 }
+                loadNodes();
             }).fail(function () {
-                $('#managerSelect').html('<option value="">Failed to load</option>');
+                $('#mgrValue').html('<span class="lp-placeholder">Failed to load</span>');
             });
         }
 
         $('#teamLevelSelect').on('change', function () {
             var levelId = $(this).val();
+            clearSelection();
             if (!levelId) {
                 $('#managerFieldWrap').hide();
                 renderChain([]);
+                loadNodes();
                 return;
             }
             loadManagerOptions(levelId, null);
@@ -474,16 +654,20 @@ while ($resultTeamLevel = $selectTeamLevels->fetch_assoc()) { ?>
 
         $('#managerSelect').on('change', function () {
             var managerId = $(this).val();
-            if (!managerId) { renderChain([]); return; }
+            clearSelection();
+            if (!managerId) { renderChain([]); loadNodes(); return; }
             $.getJSON('get-ms-chain.php?ms_id=' + managerId, function (chain) {
                 renderChain(chain);
             });
+            loadNodes();
         });
 
         $.getJSON('get-ms-team-levels.php', function (levels) {
             teamLevels = levels;
             if (CURRENT_TEAM_LEVEL_ID) {
                 loadManagerOptions(CURRENT_TEAM_LEVEL_ID, CURRENT_MANAGER_ID);
+            } else {
+                loadNodes();
             }
         });
     })(jQuery);
