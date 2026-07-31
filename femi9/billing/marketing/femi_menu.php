@@ -6,6 +6,18 @@ $fetch_LoGuserDtailsMN=mysqli_query($db_conn,$select_LoGuserDtailsMN);
 $result_LoGuserDtailsMN=mysqli_fetch_array($fetch_LoGuserDtailsMN);
 $LoginPasswordCheck=$result_LoGuserDtailsMN['password'];
 
+// "My Team" is only meaningful for a DM/manager who actually has people
+// reporting to them — hide the sidebar link entirely otherwise.
+$hasTeamMN = false;
+$loginMsIdMN = (int)($result_LoGuserDtailsMN['id'] ?? 0);
+if ($loginMsIdMN > 0) {
+    $teamChkMN = $db_conn->prepare("SELECT COUNT(*) AS n FROM marketing_staff WHERE manager_id=?");
+    $teamChkMN->bind_param('i', $loginMsIdMN);
+    $teamChkMN->execute();
+    $hasTeamMN = (int)($teamChkMN->get_result()->fetch_assoc()['n'] ?? 0) > 0;
+    $teamChkMN->close();
+}
+
 if($LoginPasswordCheck=="12345678")
 { 
 ?>
@@ -87,8 +99,13 @@ if($LoginPasswordCheck=="12345678")
                             </li>
                         </ul>
                     </li>
-					
-					
+
+					<?php if ($hasTeamMN): ?>
+					<li>
+                        <a href="my-team"><i class="material-icons-two-tone">groups</i>My Team</a>
+                    </li>
+					<?php endif; ?>
+
 					<li>
                         <a href=""><i class="material-icons-two-tone">done</i>Expenses
 						<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>

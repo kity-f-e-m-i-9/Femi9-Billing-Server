@@ -4,6 +4,49 @@ ini_set('display_errors', '1');
 
 include("checksession.php");
 include("config.php");
+require_once("include/AssignedLocations.php");
+
+// District Filter is scoped to this DM's assigned locations (not every
+// district their shop history happens to touch) — same source as add_ss.php.
+$assignedDistricts = getMsAssignedDistricts($db_conn, (int)$markeingSTFID);
+
+// Firka (depth 6) options per taluk, and which TP (if any) is assigned to
+// each firka — territory_partner_locations is the TP side's own location
+// assignment, same table used by territory-partner/geo_layers.php. Picking
+// a firka on the Get Order form auto-detects and locks the TP field instead
+// of the DM having to guess who covers that area.
+$allTalukIds = [];
+foreach ($assignedDistricts as $d) {
+    foreach ($d['taluks'] as $t) { $allTalukIds[] = $t['id']; }
+}
+
+$talukFirkaMap = [];
+if (!empty($allTalukIds)) {
+    $talukIdList = implode(',', array_map('intval', $allTalukIds));
+    $resFirka = $db_conn->query(
+        "SELECT id, name, parent_id FROM partner_location_nodes
+         WHERE depth=6 AND parent_id IN ($talukIdList) AND is_active=1 ORDER BY name ASC"
+    );
+    while ($f = mysqli_fetch_assoc($resFirka)) {
+        $talukFirkaMap[$f['parent_id']][] = ['id' => (int)$f['id'], 'name' => $f['name']];
+    }
+}
+
+$firkaTpMap = [];
+$allFirkaIds = [];
+foreach ($talukFirkaMap as $list) { foreach ($list as $f) { $allFirkaIds[] = $f['id']; } }
+if (!empty($allFirkaIds)) {
+    $firkaIdList = implode(',', array_map('intval', $allFirkaIds));
+    $resTpLoc = $db_conn->query(
+        "SELECT tpl.location_id, tp.id AS tp_id, tp.name AS tp_name
+         FROM territory_partner_locations tpl
+         JOIN territory_partners tp ON tp.id=tpl.territory_partner_id
+         WHERE tpl.location_id IN ($firkaIdList) AND tp.is_active=1"
+    );
+    while ($tr = mysqli_fetch_assoc($resTpLoc)) {
+        $firkaTpMap[(int)$tr['location_id']] = ['id' => (int)$tr['tp_id'], 'name' => $tr['tp_name']];
+    }
+}
 
 $title         = "New Order";
 $manage_url    = "manage_order";
@@ -28,22 +71,41 @@ function GeraHash($qtd) {
 $tempID = GeraHash(32) . date("dmy") . date("gis");
 
 // ── Fetch all shops for this staff member — one query for all dropdowns ───────
+// district_name/taluk_name are free text (source of the "Erode" / "Erode/" /
+// "Erode-" duplicate-dropdown problem) — district_node_id/taluk_node_id were
+// backfilled against the clean partner_location_nodes hierarchy, so the
+// District/Taluk filters below group by that id (one clean spelling per real
+// place) instead of the raw text. Shops that couldn't be matched (free-text
+// typo/out-of-state) fall back into a single "Other / Unmapped" bucket rather
+// than being lost.
 $shopList    = [];
-$districtSet = [];
+$districtSet = []; // districtKey (node id, or 0 = unmapped) => display name
 
 if (!empty($markeingSTFID)) {
     $msid_esc = mysqli_real_escape_string($db_conn, $markeingSTFID);
     $r = mysqli_query($db_conn,
-        "SELECT id, name, district_name, taluk_name, latitude, longitude
-         FROM ms_shop
-         WHERE ms_id = '$msid_esc'
-         ORDER BY district_name ASC, taluk_name ASC, name ASC"
+        "SELECT s.id, s.name, s.district_name, s.taluk_name, s.latitude, s.longitude,
+                s.district_node_id, s.taluk_node_id,
+                dn.name AS clean_district_name, tn.name AS clean_taluk_name
+         FROM ms_shop s
+         LEFT JOIN partner_location_nodes dn ON dn.id = s.district_node_id
+         LEFT JOIN partner_location_nodes tn ON tn.id = s.taluk_node_id
+         WHERE s.ms_id = '$msid_esc'
+         ORDER BY COALESCE(dn.name, s.district_name) ASC, COALESCE(tn.name, s.taluk_name) ASC, s.name ASC"
     );
     while ($s = mysqli_fetch_assoc($r)) {
+        $districtKey   = (int)($s['district_node_id'] ?? 0);
+        $talukKey      = (int)($s['taluk_node_id'] ?? 0);
+        $districtLabel = $districtKey > 0 ? $s['clean_district_name'] : 'Other / Unmapped';
+        $talukLabel    = $talukKey > 0 ? $s['clean_taluk_name'] : ($s['taluk_name'] ?: 'Other');
+
+        $s['district_key']   = $districtKey;
+        $s['taluk_key']      = $talukKey;
+        $s['district_label'] = $districtLabel;
+        $s['taluk_label']    = $talukLabel;
+
         $shopList[] = $s;
-        if ($s['district_name'] !== '' && !in_array($s['district_name'], $districtSet)) {
-            $districtSet[] = $s['district_name'];
-        }
+        if (!isset($districtSet[$districtKey])) { $districtSet[$districtKey] = $districtLabel; }
     }
 }
 
@@ -51,6 +113,13 @@ if (!empty($markeingSTFID)) {
 $productList = [];
 $r = mysqli_query($db_conn, "SELECT id, productName FROM products ORDER BY productName ASC");
 while ($p = mysqli_fetch_assoc($r)) $productList[] = $p;
+
+// ── Active TPs — used to populate the "Assign To TP" dropdown, filtered
+// client-side to the selected shop's district (branch_district is free text,
+// matched case-insensitively against ms_shop.district_name) ───────────────────
+$tpList = [];
+$r = mysqli_query($db_conn, "SELECT id, name, branch_district FROM territory_partners WHERE is_active=1 ORDER BY name ASC");
+while ($t = mysqli_fetch_assoc($r)) $tpList[] = $t;
 
 // ── Which form to show ────────────────────────────────────────────────────────
 $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noorder12aedrftgop2we4mncl");
@@ -141,8 +210,8 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <label class="form-label">District Filter</label>
                                                     <select id="district_filter_select" class="form-control" onchange="onDistrictChange(this.value)">
                                                         <option value="">All Districts</option>
-                                                        <?php foreach($districtSet as $dn): ?>
-                                                        <option value="<?=htmlspecialchars($dn)?>"><?=htmlspecialchars($dn)?></option>
+                                                        <?php foreach($assignedDistricts as $d): ?>
+                                                        <option value="<?=$d['id']?>"><?=htmlspecialchars($d['name'])?></option>
                                                         <?php endforeach; ?>
                                                     </select>
                                                     <br/>
@@ -158,9 +227,10 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                         <option value="" hidden>Select</option>
                                                         <?php foreach($shopList as $s): ?>
                                                         <option value="<?=htmlspecialchars($s['id'])?>"
-                                                                data-district="<?=htmlspecialchars($s['district_name'])?>"
-                                                                data-taluk="<?=htmlspecialchars($s['taluk_name'])?>">
-                                                            <?=htmlspecialchars($s['name'])?> (<?=htmlspecialchars($s['taluk_name'])?>)
+                                                                data-district-id="<?=$s['district_key']?>"
+                                                                data-taluk-id="<?=$s['taluk_key']?>"
+                                                                data-taluk-label="<?=htmlspecialchars($s['taluk_label'])?>">
+                                                            <?=htmlspecialchars($s['name'])?> (<?=htmlspecialchars($s['taluk_label'])?>)
                                                         </option>
                                                         <?php endforeach; ?>
                                                     </select>
@@ -201,8 +271,8 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <label class="form-label">District Filter</label>
                                                     <select id="district_filter_select" class="form-control" onchange="onDistrictChange(this.value)">
                                                         <option value="">All Districts</option>
-                                                        <?php foreach($districtSet as $dn): ?>
-                                                        <option value="<?=htmlspecialchars($dn)?>"><?=htmlspecialchars($dn)?></option>
+                                                        <?php foreach($assignedDistricts as $d): ?>
+                                                        <option value="<?=$d['id']?>"><?=htmlspecialchars($d['name'])?></option>
                                                         <?php endforeach; ?>
                                                     </select>
                                                     <br/>
@@ -213,20 +283,40 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     </select>
                                                     <br/>
 
+                                                    <label class="form-label">Firka Filter</label>
+                                                    <select id="firka_filter_select" class="form-control" onchange="onFirkaChange(this.value)" disabled>
+                                                        <option value="">Select Taluk First</option>
+                                                    </select>
+                                                    <br/>
+
                                                     <label class="form-label">Shop*</label>
                                                     <select class="my-select form-control" name="shop_id" id="shop_select" required>
                                                         <option value="" hidden>Select</option>
                                                         <?php foreach($shopList as $s): ?>
                                                         <option value="<?=htmlspecialchars($s['id'])?>"
+                                                                data-district-id="<?=$s['district_key']?>"
+                                                                data-taluk-id="<?=$s['taluk_key']?>"
+                                                                data-taluk-label="<?=htmlspecialchars($s['taluk_label'])?>"
                                                                 data-district="<?=htmlspecialchars($s['district_name'])?>"
-                                                                data-taluk="<?=htmlspecialchars($s['taluk_name'])?>"
                                                                 data-lat="<?=htmlspecialchars($s['latitude'])?>"
                                                                 data-lng="<?=htmlspecialchars($s['longitude'])?>">
-                                                            <?=htmlspecialchars($s['name'])?> (<?=htmlspecialchars($s['taluk_name'])?>)
+                                                            <?=htmlspecialchars($s['name'])?> (<?=htmlspecialchars($s['taluk_label'])?>)
                                                         </option>
                                                         <?php endforeach; ?>
                                                     </select>
                                                     <div id="shopDistanceInfo" style="margin-top:4px; font-size:13px; color:#555;"></div>
+                                                    <br/>
+
+                                                    <label class="form-label">Assign To TP*</label>
+                                                    <select class="my-select form-control" name="tp_id" id="tp_select" required>
+                                                        <option value="" hidden>Select TP</option>
+                                                        <?php foreach($tpList as $t): ?>
+                                                        <option value="<?=htmlspecialchars($t['id'])?>"
+                                                                data-district="<?=htmlspecialchars($t['branch_district'])?>">
+                                                            <?=htmlspecialchars($t['name'])?>
+                                                        </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
                                                     <br/>
 
                                                     <label class="form-label">Order Date*</label>
@@ -296,6 +386,15 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     <script src="../../assets/js/pages/select3.js"></script>
 
     <script>
+    // Clean district → taluk (and taluk → firka → TP) data, sourced from the
+    // partner_location_nodes hierarchy / territory_partner_locations — not
+    // from shop records — so the Taluk Filter never shows spelling variants
+    // like "Anthiur"/"Anthiyur" again, and a Firka pick can auto-detect the
+    // TP who actually covers that area.
+    var msDistrictData  = <?php echo json_encode(array_column($assignedDistricts, null, 'id')); ?>;
+    var talukFirkaData  = <?php echo json_encode($talukFirkaMap); ?>;
+    var firkaTpData     = <?php echo json_encode($firkaTpMap); ?>;
+
     // ── Add / Remove product rows ────────────────────────────────────────────
     function addRow(tableID) {
         var table    = document.getElementById(tableID);
@@ -331,59 +430,161 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     }
 
     // ── District → Taluk → Shop chained filter ───────────────────────────────
+    // District/taluk are matched by the clean partner_location_nodes id
+    // (data-district-id/data-taluk-id), not raw text — that's what collapses
+    // "Erode"/"Erode/"/"Erode-" etc into one dropdown entry. Shops that never
+    // matched a node (id 0) sit together under "Other / Unmapped".
     var allShops = [];
-    document.querySelectorAll('#shop_select option[data-district]').forEach(function(opt) {
+    document.querySelectorAll('#shop_select option[data-district-id]').forEach(function(opt) {
         allShops.push({
-            id:       opt.value,
-            text:     opt.textContent.trim(),
-            district: opt.getAttribute('data-district'),
-            taluk:    opt.getAttribute('data-taluk'),
-            lat:      opt.getAttribute('data-lat'),
-            lng:      opt.getAttribute('data-lng')
+            id:         opt.value,
+            text:       opt.textContent.trim(),
+            districtId: opt.getAttribute('data-district-id'),
+            talukId:    opt.getAttribute('data-taluk-id'),
+            talukLabel: opt.getAttribute('data-taluk-label'),
+            district:   opt.getAttribute('data-district'),
+            lat:        opt.getAttribute('data-lat'),
+            lng:        opt.getAttribute('data-lng')
         });
     });
 
-    function onDistrictChange(district) {
-        var talukSel       = document.getElementById('taluk_filter_select');
-        talukSel.innerHTML = '<option value="">All Taluks</option>';
-        talukSel.disabled  = !district;
-
-        var seen = {};
-        allShops.forEach(function(s) {
-            if ((!district || s.district === district) && s.taluk && !seen[s.taluk]) {
-                seen[s.taluk] = true;
-                var o         = document.createElement('option');
-                o.value       = s.taluk;
-                o.textContent = s.taluk;
-                talukSel.appendChild(o);
-            }
+    // ── Assign To TP: filter to TPs whose branch district matches the
+    // selected shop's district (case-insensitive, trimmed text match — TP
+    // branch_district and ms_shop.district_name are independently free-typed
+    // fields, not a shared master list, so mismatched spellings won't match). ──
+    var allTPs = [];
+    var tpSelectEl = document.getElementById('tp_select');
+    if (tpSelectEl) {
+        document.querySelectorAll('#tp_select option[data-district]').forEach(function(opt) {
+            allTPs.push({
+                id:       opt.value,
+                text:     opt.textContent.trim(),
+                district: (opt.getAttribute('data-district') || '').trim().toLowerCase()
+            });
         });
 
-        rebuildShops(district, '');
+        function rebuildTPs(district) {
+            var select = $('#tp_select');
+            var currentVal = select.val();
+            select.empty();
+            select.append('<option value="" hidden>Select TP</option>');
+
+            var normDistrict = (district || '').trim().toLowerCase();
+            allTPs.forEach(function(t) {
+                if (!normDistrict || t.district === normDistrict) {
+                    select.append($('<option>', { value: t.id, text: t.text }));
+                }
+            });
+
+            if (select.find('option[value="' + currentVal + '"]').length) {
+                select.val(currentVal);
+            }
+            select.trigger('change.select2');
+        }
+
+        $('#shop_select').on('change', function() {
+            // Skip while a Firka pick has auto-detected and locked the TP —
+            // otherwise this district-text-match rebuild wipes it back to
+            // empty the moment a shop is chosen afterwards.
+            if ($('#tp_select').next('.select2-container').css('pointer-events') === 'none') { return; }
+            var opt = this.options[this.selectedIndex];
+            rebuildTPs(opt ? opt.getAttribute('data-district') : '');
+        });
     }
 
-    function onTalukChange(taluk) {
-        var district = document.getElementById('district_filter_select').value;
-        rebuildShops(district, taluk);
+    function resetFirkaAndTp() {
+        var firkaSel = document.getElementById('firka_filter_select');
+        if (!firkaSel) { return; }
+        firkaSel.innerHTML = '<option value="">Select Taluk First</option>';
+        firkaSel.disabled  = true;
+        unlockTpSelect();
     }
 
-    function rebuildShops(district, taluk) {
+    // #tp_select is select2-initialized (.my-select) — the visible widget is
+    // a sibling .select2-container, not the (hidden) native <select> itself,
+    // so both the value update and the interaction lock have to go through
+    // jQuery/select2, not plain DOM properties.
+    function unlockTpSelect() {
+        var $tp = $('#tp_select');
+        if (!$tp.length) { return; }
+        $tp.next('.select2-container').css('pointer-events', '');
+        if (typeof rebuildTPs === 'function') { rebuildTPs(''); }
+    }
+
+    function onDistrictChange(districtId) {
+        var talukSel       = document.getElementById('taluk_filter_select');
+        talukSel.innerHTML = '<option value="">All Taluks</option>';
+        talukSel.disabled  = !districtId;
+
+        // Clean taluk list straight from the location hierarchy for this
+        // district — not derived from (possibly dirty) shop records.
+        var d = msDistrictData[districtId];
+        if (d) {
+            d.taluks.forEach(function(t) {
+                var o = document.createElement('option');
+                o.value = t.id; o.textContent = t.name;
+                talukSel.appendChild(o);
+            });
+        }
+
+        resetFirkaAndTp();
+        rebuildShops(districtId, '');
+    }
+
+    function onTalukChange(talukId) {
+        var districtId = document.getElementById('district_filter_select').value;
+        rebuildShops(districtId, talukId);
+
+        var firkaSel = document.getElementById('firka_filter_select');
+        if (firkaSel) {
+            firkaSel.innerHTML = '<option value="">All Firkas</option>';
+            firkaSel.disabled  = !talukId;
+            var firkas = talukFirkaData[talukId] || [];
+            firkas.forEach(function(f) {
+                var o = document.createElement('option');
+                o.value = f.id; o.textContent = f.name;
+                firkaSel.appendChild(o);
+            });
+        }
+        unlockTpSelect();
+    }
+
+    function onFirkaChange(firkaId) {
+        var $tp = $('#tp_select');
+        if (!$tp.length) { return; }
+        var tp = firkaTpData[firkaId];
+        if (!tp) { unlockTpSelect(); return; }
+
+        // Auto-detect the TP covering this firka and lock the field — the DM
+        // no longer picks a TP manually once a firka is chosen. The select
+        // itself stays enabled (so its value still submits); only the
+        // visible select2 widget is blocked from further interaction.
+        if (!$tp.find('option[value="' + tp.id + '"]').length) {
+            $tp.append($('<option>', { value: tp.id, text: tp.name }));
+        }
+        $tp.val(tp.id).trigger('change.select2');
+        $tp.next('.select2-container').css('pointer-events', 'none');
+    }
+
+    function rebuildShops(districtId, talukId) {
         var select = $('#shop_select');
         select.empty();
         select.append('<option value="" hidden>Select</option>');
 
         allShops.forEach(function(s) {
-            var okDistrict = !district || s.district === district;
-            var okTaluk    = !taluk    || s.taluk    === taluk;
+            var okDistrict = !districtId || s.districtId === districtId;
+            var okTaluk    = !talukId    || s.talukId    === talukId;
             if (okDistrict && okTaluk) {
                 select.append(
                     $('<option>', {
-                        value:           s.id,
-                        'data-district': s.district,
-                        'data-taluk':    s.taluk,
-                        'data-lat':      s.lat,
-                        'data-lng':      s.lng,
-                        text:            s.text
+                        value:              s.id,
+                        'data-district-id': s.districtId,
+                        'data-taluk-id':    s.talukId,
+                        'data-taluk-label': s.talukLabel,
+                        'data-district':    s.district,
+                        'data-lat':         s.lat,
+                        'data-lng':         s.lng,
+                        text:               s.text
                     })
                 );
             }
@@ -392,6 +593,19 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         select.trigger('change.select2');
         select.val('').trigger('change');
     }
+
+    // If this DM has exactly one assigned district, select it automatically
+    // instead of leaving "All Districts" as the default — narrows the Shop
+    // list down to just that district's shops right away.
+    (function() {
+        var districtSel = document.getElementById('district_filter_select');
+        if (!districtSel) { return; }
+        var opts = Array.from(districtSel.options).filter(function(o) { return o.value !== ''; });
+        if (opts.length === 1) {
+            districtSel.value = opts[0].value;
+            onDistrictChange(opts[0].value);
+        }
+    })();
 
     // ── Auto-capture device location on the Get Order form ──────────────────
     (function() {

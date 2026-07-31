@@ -27,7 +27,7 @@ $result = $db_conn->query("
     LEFT JOIN partner_location_nodes pn ON pn.id = n.parent_id
     LEFT JOIN partner_location_layers pll ON pll.depth = n.depth
     GROUP BY cp.id
-    ORDER BY cp.name
+    ORDER BY cp.id
 ");
 $partners = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 $i = 0;

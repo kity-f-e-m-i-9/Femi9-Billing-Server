@@ -1,30 +1,51 @@
 <?php include("checksession.php");
 include("config.php");
+require_once("include/AssignedLocations.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-	
-	
+
+
 		$addurl="add_ss.php?distalready";
 		$viewurl="manage_ss.php?addedsuccess";
-	
+
 	$ms_id=$_POST["ms_id"];
 	$shop_cat=$_POST["shop_cat"];
-	
+
 	$name=str_replace("'","&#39;",$_POST["name"]);
 	$name=RemoveSpecialChar($name);
-	
-	$state_name=$_POST["state_name"];
-	$state_name=RemoveSpecialChar($state_name);
-	
-	$district_name=$_POST["district_name"];
-	$district_name=RemoveSpecialChar($district_name);
-	
-	$taluk_name=$_POST["taluk_name"];
-	$taluk_name=RemoveSpecialChar($taluk_name);
-	
+
+	// District/taluk are picked from this DM's assigned locations (see
+	// add_ss.php) — validated again here server-side rather than trusting
+	// the posted id, and the clean name text + state come from the location
+	// hierarchy itself, never typed free-hand.
+	$district_node_id = (int)($_POST['district_node_id'] ?? 0);
+	$taluk_node_id     = (int)($_POST['taluk_node_id'] ?? 0);
+
+	$assignedDistricts  = getMsAssignedDistricts($db_conn, (int)$ms_id);
+	$assignedDistrictsById = array_column($assignedDistricts, null, 'id');
+	$matchedDistrict = $assignedDistrictsById[$district_node_id] ?? null;
+
+	if (!$matchedDistrict) {
+		echo "<script>window.location='add_ss.php?invaliddistrict';</script>";
+		exit;
+	}
+	$matchedTaluk = null;
+	foreach ($matchedDistrict['taluks'] as $t) {
+		if ((int)$t['id'] === $taluk_node_id) { $matchedTaluk = $t; break; }
+	}
+	if (!$matchedTaluk) {
+		echo "<script>window.location='add_ss.php?invaliddistrict';</script>";
+		exit;
+	}
+
+	$state_node_id  = (int)$matchedDistrict['state_id'];
+	$state_name     = RemoveSpecialChar($matchedDistrict['state_name']);
+	$district_name  = RemoveSpecialChar($matchedDistrict['name']);
+	$taluk_name     = RemoveSpecialChar($matchedTaluk['name']);
+
 	$pincode=$_POST["pincode"];
 	$pincode=RemoveSpecialChar($pincode);
 	
@@ -69,9 +90,10 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	
 	
         $sql="insert into ms_shop (ms_id,user_icon,name,state_name,
-		district_name,taluk_name,pincode,email,mobile_number,
+		district_name,taluk_name,state_node_id,district_node_id,taluk_node_id,pincode,email,mobile_number,
 		gstin,address,shop_cat,country_code,landline,google_location,latitude,longitude) values
 		('$ms_id','$uploadfile','$name','$state_name','$district_name','$taluk_name',
+		'$state_node_id','$district_node_id','$taluk_node_id',
 		'$pincode','$email','$mobile_number','$gstin','$address','$shop_cat',
 		'$country_code','$landline','$google_location',$latitude_sql,$longitude_sql)";
 		mysqli_query($db_conn,$sql);

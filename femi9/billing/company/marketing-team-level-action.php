@@ -32,6 +32,10 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_level_rank (level_rank)
 )");
+$_chkLL = $db_conn->query("SHOW COLUMNS FROM marketing_team_levels LIKE 'location_layer_id'");
+if ($_chkLL && $_chkLL->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_team_levels ADD COLUMN location_layer_id INT NULL DEFAULT NULL AFTER level_name");
+}
 
 // ── INSERT ────────────────────────────────────────────────────────────────────
 if (isset($_POST['insert-marketing-team-level'])) {
@@ -42,6 +46,7 @@ if (isset($_POST['insert-marketing-team-level'])) {
 
     $level_rank = filter_var($_POST['level_rank'] ?? 0, FILTER_VALIDATE_INT);
     $level_name = sanitizeMTL($_POST['level_name'] ?? '');
+    $location_layer_id = !empty($_POST['location_layer_id']) ? (int)$_POST['location_layer_id'] : 0;
 
     if (!$level_rank || $level_rank < 1 || $level_rank > 100 || empty($level_name)) {
         redirectMTL('add-marketing-team-level', 'invalidparameters');
@@ -57,8 +62,9 @@ if (isset($_POST['insert-marketing-team-level'])) {
         redirectMTL('add-marketing-team-level', 'alreadyexists&rank=' . $level_rank);
     }
 
-    $stmt_ins = $db_conn->prepare("INSERT INTO marketing_team_levels (level_rank, level_name) VALUES (?, ?)");
-    $stmt_ins->bind_param("is", $level_rank, $level_name);
+    $stmt_ins = $db_conn->prepare("INSERT INTO marketing_team_levels (level_rank, level_name, location_layer_id) VALUES (?, ?, ?)");
+    $location_layer_id_param = $location_layer_id > 0 ? $location_layer_id : null;
+    $stmt_ins->bind_param("isi", $level_rank, $level_name, $location_layer_id_param);
 
     if ($stmt_ins->execute()) {
         $stmt_ins->close();
@@ -80,6 +86,7 @@ if (isset($_POST['update-marketing-team-level'])) {
     $prid       = $_POST['prid'] ?? '';
     $level_rank = filter_var($_POST['level_rank'] ?? 0, FILTER_VALIDATE_INT);
     $level_name = sanitizeMTL($_POST['level_name'] ?? '');
+    $location_layer_id = !empty($_POST['location_layer_id']) ? (int)$_POST['location_layer_id'] : 0;
 
     if (!$update_id || !$level_rank || $level_rank < 1 || $level_rank > 100 || empty($level_name)) {
         redirectMTL('manage-marketing-team-levels', 'invalidparameters');
@@ -96,8 +103,9 @@ if (isset($_POST['update-marketing-team-level'])) {
         redirectMTL("edit-marketing-team-level?prid=$encoded_prid", 'alreadyexists&rank=' . $level_rank);
     }
 
-    $stmt_upd = $db_conn->prepare("UPDATE marketing_team_levels SET level_rank = ?, level_name = ? WHERE id = ?");
-    $stmt_upd->bind_param("isi", $level_rank, $level_name, $update_id);
+    $stmt_upd = $db_conn->prepare("UPDATE marketing_team_levels SET level_rank = ?, level_name = ?, location_layer_id = ? WHERE id = ?");
+    $location_layer_id_param = $location_layer_id > 0 ? $location_layer_id : null;
+    $stmt_upd->bind_param("isii", $level_rank, $level_name, $location_layer_id_param, $update_id);
 
     if ($stmt_upd->execute()) {
         $stmt_upd->close();
