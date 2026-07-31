@@ -121,6 +121,21 @@ $sucMessage = $_SESSION['sucMessage'];
 					</script>
 <?php  unset($_SESSION['sucMessage']); } ?>
 
+<?php
+if (isset($_SESSION['errorMessage'])) {
+$errMessage = $_SESSION['errorMessage'];
+?>
+                      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                      <script>
+                        Swal.fire({
+                          icon: 'error',
+                          title: 'Error',
+                          text: '<?php echo htmlspecialchars($errMessage, ENT_QUOTES); ?>',
+                          confirmButtonText: 'OK'
+                        });
+					</script>
+<?php  unset($_SESSION['errorMessage']); } ?>
+
 						
 <?php
 //----Continuos Serial Number In Next Page.......................
@@ -193,7 +208,7 @@ $i= $start_from;
 						
 											?>
                                             
-                                                <tr>
+                                                <tr id="viewRow_<?=$RowID;?>">
                                                     <td><?php echo ++$i; ?></td>
                     <td><?php echo $Result_productDetils["productName"];?></td>
 					<td><?php echo inr_format($PR_qty, 1);?></td>
@@ -201,12 +216,27 @@ $i= $start_from;
 					<td><?php echo inr_format($SubTotal, 2);?></td>
 					<td><?php echo inr_format($PR_discount, 2);?></td>
 					<td><?php echo inr_format($PR_total, 2);?></td>
-													
+
 																										<td>
 													    <div class="actions-group">
+													        <a href="#" class="action-link" title="Edit" onclick="toggleEditRow('<?=$RowID;?>'); return false;"><i class="material-icons-outlined" style="font-size:17px;color:#3b82f6;">edit</i></a>
 													        <a href="ot-sale-delete.php?id=<?=$RowID;?>&&tempid=<?=$tempid;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 													</td>
+                                                </tr>
+                                                <tr id="editRow_<?=$RowID;?>" style="display:none;background:#f8fafc;">
+                                                    <td></td>
+                                                    <td><?php echo $Result_productDetils["productName"];?></td>
+                                                    <td><input type="number" min="1" step="1" class="form-control form-control-sm" id="editQty_<?=$RowID;?>" value="<?=$PR_qty;?>" style="width:90px;"></td>
+                                                    <td><input type="number" min="0" step="any" class="form-control form-control-sm" id="editRate_<?=$RowID;?>" value="<?=$PR_rate;?>" style="width:100px;"></td>
+                                                    <td colspan="2"><input type="number" min="0" step="any" class="form-control form-control-sm" id="editDisc_<?=$RowID;?>" value="<?=$PR_discount;?>" placeholder="Discount(Rs.)" style="width:110px;"></td>
+                                                    <td></td>
+                                                    <td>
+                                                        <div class="actions-group">
+                                                            <a href="#" class="action-link" title="Save" onclick="saveEditRow('<?=$RowID;?>'); return false;"><i class="material-icons-outlined" style="font-size:17px;color:#16a34a;">check</i></a>
+                                                            <a href="#" class="action-link" title="Cancel" onclick="toggleEditRow('<?=$RowID;?>'); return false;"><i class="material-icons-outlined" style="font-size:17px;color:#6b7280;">close</i></a>
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                            
 										<?php }?>
@@ -216,7 +246,7 @@ $i= $start_from;
                                     </div>
 									</div>
                                 </div>
-                                
+
                             </div>
                         </div>
                     </div>
@@ -224,6 +254,34 @@ $i= $start_from;
             </div>
         </div>
     </div>
+
+    <form id="itemEditForm" method="post" action="ot-sale-item-edit.php" style="display:none;">
+        <input type="hidden" name="rowid"    id="ief_rowid">
+        <input type="hidden" name="tempid"   value="<?=htmlspecialchars($tempid, ENT_QUOTES);?>">
+        <input type="hidden" name="qty"      id="ief_qty">
+        <input type="hidden" name="price"    id="ief_price">
+        <input type="hidden" name="discount" id="ief_discount">
+    </form>
+    <script>
+    function toggleEditRow(rowId) {
+        var viewRow = document.getElementById('viewRow_' + rowId);
+        var editRow = document.getElementById('editRow_' + rowId);
+        var editing = editRow.style.display !== 'none';
+        editRow.style.display = editing ? 'none' : '';
+    }
+    function saveEditRow(rowId) {
+        var qty  = document.getElementById('editQty_' + rowId).value;
+        var rate = document.getElementById('editRate_' + rowId).value;
+        var disc = document.getElementById('editDisc_' + rowId).value;
+        if (!qty || parseFloat(qty) <= 0) { alert('Enter a valid qty.'); return; }
+        if (!confirm('Save changes to this product line? Stock will be adjusted for the qty difference.')) return;
+        document.getElementById('ief_rowid').value    = rowId;
+        document.getElementById('ief_qty').value      = qty;
+        document.getElementById('ief_price').value    = rate;
+        document.getElementById('ief_discount').value = disc || 0;
+        document.getElementById('itemEditForm').submit();
+    }
+    </script>
 
     <!-- Javascripts -->
     <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>

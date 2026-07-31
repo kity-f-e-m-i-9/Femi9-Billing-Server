@@ -340,13 +340,88 @@ if (isset($_REQUEST['updateRecord'])) {
     $gst_type       = ($state_id == $admin_state_id) ? "inner" : "outer";
 
     // ← CHANGED: wallet_amount included in invoice update
-    $Update_Invoice = "update ot_sales_invoice 
+    $Update_Invoice = "update ot_sales_invoice
         set inv_number='$inv_number',
             courier_charges='$courier_charges',
             wallet_amount='$wallet_amount',
-            cat='$catname' 
+            cat='$catname'
         where tempid='$tempid'";
     mysqli_query($db_conn, $Update_Invoice);
+
+    // Per-product qty/rate/discount edit (ot-sale-edit.php's Product Details
+    // table) -- adjust `stock` by only the delta between old and new qty for
+    // each line, same approach as ot-sale-item-edit.php's single-row editor.
+    $item_ids   = $_POST['item_id']       ?? [];
+    $item_qtys  = $_POST['item_qty']      ?? [];
+    $item_rates = $_POST['item_price']    ?? [];
+    $item_discs = $_POST['item_discount'] ?? [];
+
+    if (!empty($item_ids)) {
+        $stockServiceUpd = new StockService($db_conn);
+        $createdByUpd    = $_SESSION['LOGIN_USER'] ?? 'system';
+
+        $db_conn->begin_transaction();
+        try {
+            for ($i = 0; $i < count($item_ids); $i++) {
+                $lineId = (int) $item_ids[$i];
+                $newQty = (int) ($item_qtys[$i] ?? 0);
+                $newRate = (float) ($item_rates[$i] ?? 0);
+                $newDisc = (float) ($item_discs[$i] ?? 0);
+                if ($lineId <= 0 || $newQty <= 0) continue;
+
+                $stmtOld = $db_conn->prepare("SELECT prid, qty, godownid FROM ot_sales WHERE id = ? AND tempid = ?");
+                $stmtOld->bind_param('is', $lineId, $tempid);
+                $stmtOld->execute();
+                $oldItem = $stmtOld->get_result()->fetch_assoc();
+                $stmtOld->close();
+                if (!$oldItem) continue;
+
+                $lineProductId = (int) $oldItem['prid'];
+                $oldQty        = (int) $oldItem['qty'];
+                $lineGodownid  = (string) $oldItem['godownid'];
+                $delta         = $newQty - $oldQty;
+
+                if ($delta > 0) {
+                    $available = $stockServiceUpd->getClosingQty($lineProductId, $Login_user_TYPEvl, $lineGodownid);
+                    if ($available === null || $available < $delta) {
+                        throw new StockException("Insufficient stock for product #$lineProductId. Available: " . ($available ?? 0) . ", Extra needed: $delta");
+                    }
+                    $stockServiceUpd->otDeduct($lineProductId, $Login_user_TYPEvl, $lineGodownid, $delta, $tempid, $createdByUpd, true);
+                } elseif ($delta < 0) {
+                    $stockServiceUpd->otReverse($lineProductId, $Login_user_TYPEvl, $lineGodownid, -$delta, $tempid, $createdByUpd, true);
+                }
+
+                $stmtGst = $db_conn->prepare("SELECT gst FROM products WHERE id = ?");
+                $stmtGst->bind_param('i', $lineProductId);
+                $stmtGst->execute();
+                $lineGst = (float) ($stmtGst->get_result()->fetch_assoc()['gst'] ?? 0);
+                $stmtGst->close();
+
+                $lineSubTotal  = ($newRate * $newQty) - $newDisc;
+                $lineGstAmount = round($lineSubTotal * $lineGst / 100, 2);
+                $lineTotal     = $lineSubTotal + $lineGstAmount;
+
+                $stmtLineUpd = $db_conn->prepare(
+                    "UPDATE ot_sales SET qty=?, price=?, discount=?, sub_total=?, gst_amount=?, total=? WHERE id=?"
+                );
+                $stmtLineUpd->bind_param('idddddi', $newQty, $newRate, $newDisc, $lineSubTotal, $lineGstAmount, $lineTotal, $lineId);
+                $stmtLineUpd->execute();
+                $stmtLineUpd->close();
+            }
+            $db_conn->commit();
+        } catch (StockException $e) {
+            $db_conn->rollback();
+            $_SESSION['errorMessage'] = "Stock error: " . $e->getMessage();
+            echo "<script>window.location='ot-sale-edit?tempid=" . urlencode(base64_encode($tempid)) . "';</script>";
+            exit;
+        } catch (\Throwable $e) {
+            $db_conn->rollback();
+            error_log("ot-sale-action updateRecord item edit error: " . $e->getMessage());
+            $_SESSION['errorMessage'] = "An error occurred while updating product lines.";
+            echo "<script>window.location='ot-sale-edit?tempid=" . urlencode(base64_encode($tempid)) . "';</script>";
+            exit;
+        }
+    }
 
     // ← CHANGED: Recalculate total on update to reflect any wallet_amount change
     $select_subtotal = "select sum(total) from ot_sales where tempid='$tempid'";
