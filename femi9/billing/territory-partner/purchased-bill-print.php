@@ -4,7 +4,7 @@ include("config.php");
 
 $enc_id = $_GET['id'] ?? '';
 $inv_id = (int)base64_decode($enc_id);
-if (!$inv_id) { header("Location: purchased-bill.php"); exit; }
+if (!$inv_id) { header("Location: manage-purchase-orders.php"); exit; }
 
 // Invoice header — verify it belongs to the logged-in TP
 $stmt = $db_conn->prepare("
@@ -40,7 +40,7 @@ $stmt->bind_param("ii", $inv_id, $tp_id);
 $stmt->execute();
 $result_Invoice_Details = $stmt->get_result()->fetch_assoc();
 $stmt->close();
-if (!$result_Invoice_Details) { header("Location: purchased-bill.php"); exit; }
+if (!$result_Invoice_Details) { header("Location: manage-purchase-orders.php"); exit; }
 
 // Godown
 $_gd_id = (int)($result_Invoice_Details['source_godown_id'] ?? 0);
@@ -204,7 +204,7 @@ $Currency_Name   = "INR";
                 <table align="right">
                 <tr>
                     <td><button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button></td>
-                    <td><button type="button" onClick="javascript:window.location='purchased-bill.php';" class="btn btn-primary m-b-xs m-r-xs">Purchased Bills</button></td>
+                    <td><button type="button" onClick="javascript:window.location='manage-purchase-orders.php';" class="btn btn-primary m-b-xs m-r-xs">My Purchase Orders</button></td>
                 </tr>
                 </table>
                 <br/>

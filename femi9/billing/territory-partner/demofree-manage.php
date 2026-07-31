@@ -71,7 +71,7 @@ $i = $start_from;
                                                     <th>Date</th>
                                                     <th>Remarks</th>
                                                     <?php
-                                                    $select_prdetails_header = "select * from `products` order by `id` asc";
+                                                    $select_prdetails_header = "select * from `products` where (`temp_id` not like 'NKS-%' or `temp_id` is null) order by `id` asc";
                                                     $fetch_prdetails_header = mysqli_query($db_conn, $select_prdetails_header);
                                                     while ($result_prdetails_header = mysqli_fetch_array($fetch_prdetails_header)) {
                                                     ?>
@@ -98,7 +98,7 @@ while ($rowTempid = mysqli_fetch_array($fetch_tempids)) {
                                                     <td><?php echo date("d/M/Y", strtotime($ResultRecords["date"])); ?></td>
                                                     <td><?php echo $ResultRecords["remarks"]; ?></td>
 <?php
-    $select_prdetails_header = "select * from `products` order by `id` asc";
+    $select_prdetails_header = "select * from `products` where (`temp_id` not like 'NKS-%' or `temp_id` is null) order by `id` asc";
     $fetch_prdetails_header = mysqli_query($db_conn, $select_prdetails_header);
     while ($result_prdetails_header = mysqli_fetch_array($fetch_prdetails_header)) {
         $prid_header = $result_prdetails_header['id'];

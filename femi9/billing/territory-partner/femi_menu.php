@@ -95,10 +95,6 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
         </li>
 
         <li>
-            <a href="purchased-bill.php"><i class="material-icons-two-tone">inbox</i>Purchased Bill Copy</a>
-        </li>
-
-        <li>
             <a href="account-manager.php"><i class="material-icons-two-tone">info</i>Account Manager</a>
         </li>
 

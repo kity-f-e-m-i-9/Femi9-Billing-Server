@@ -139,7 +139,7 @@ $tp_id = (int) $Login_user_IDvl;
                                                     </thead>
                                                     <tbody>
 <?php
-$stmtProds = $db_conn->prepare("SELECT id, productName FROM products ORDER BY id ASC");
+$stmtProds = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 $stmtProds->execute();
 $products = $stmtProds->get_result();
 $stmtProds->close();

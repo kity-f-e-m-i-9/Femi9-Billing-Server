@@ -291,6 +291,14 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
             return parseFloat(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        // Shows the cost exactly as entered (up to 6 decimals, matching the
+        // DB column precision) instead of forcing it down to 2 decimals.
+        function fmtCost(n) {
+            var s = parseFloat(n).toFixed(6).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+            var decimals = s.indexOf('.') === -1 ? 0 : s.split('.')[1].length;
+            return decimals < 2 ? parseFloat(n).toFixed(2) : s;
+        }
+
         $('#productSelect').on('change', function () {
             var $opt     = $(this).find('option:selected');
             var pph      = parseInt($opt.data('pieces-per-pack')) || 0;
@@ -365,7 +373,7 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
             // is converted here so a pack purchase always lands on a whole
             // number of packs with zero leftover.
             var qty  = isPack ? (enteredQty * pph) : enteredQty;
-            var cost = isPack ? parseFloat((enteredCost / pph).toFixed(2)) : enteredCost;
+            var cost = isPack ? parseFloat((enteredCost / pph).toFixed(6)) : enteredCost;
 
             var breakdown = computeGstBreakdown(qty, cost, gstRate, gstType);
             purchaseItems.push({
@@ -395,8 +403,8 @@ $vendors  = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE i
                     ? (item.enteredQty + ' pack' + (item.enteredQty !== 1 ? 's' : '') + ' (' + item.qty + ' pcs)')
                     : (item.qty + ' pcs');
                 var costLabel = item.isPack
-                    ? ('₹' + item.enteredCost.toFixed(2) + '/pack')
-                    : ('₹' + item.cost.toFixed(2) + '/pc');
+                    ? ('₹' + fmtCost(item.enteredCost) + '/pack')
+                    : ('₹' + fmtCost(item.cost) + '/pc');
                 $body.append(
                     '<tr>' +
                     '<td><span class="row-num">' + (i + 1) + '</span></td>' +
