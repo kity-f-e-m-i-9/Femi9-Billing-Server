@@ -323,6 +323,10 @@ mysqli_stmt_close($scrStmt);
     <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
 
     <script>
+    $(document).ready(function() {
+        $('#pr_select').select2({ width: '100%', placeholder: 'Select Product' });
+    });
+
     var poLines = [];
 
     function showPoPrice(str) {

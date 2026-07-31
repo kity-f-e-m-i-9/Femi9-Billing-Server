@@ -195,7 +195,39 @@ $STName=$result_stateList12['st_name'];
             <input type="number" min="0" name="courier_charges" value="<?=$result_Invoice['courier_charges'];?>" required="" class="form-control">
 			<br/>
 
-			<span id="opstock">									
+			<h5>Product Details</h5>
+			<div class="table-responsive">
+			<table class="table table-bordered" id="editProductsTable">
+			    <thead>
+			        <tr><th>Product</th><th>Qty</th><th>Rate(Rs.)</th><th>Discount(Rs.)</th></tr>
+			    </thead>
+			    <tbody>
+			    <?php
+			    // Editing qty here adjusts `stock` (closing_qty/sales_qty) by only the
+			    // delta on Update -- see ot-sale-action.php's updateRecord handler.
+			    $select_edit_items = "SELECT os.id, os.prid, os.qty, os.price, os.discount, p.productName
+			                           FROM ot_sales os
+			                           JOIN products p ON p.id = os.prid
+			                           WHERE os.tempid='$tempid' ORDER BY os.id ASC";
+			    $fetch_edit_items = mysqli_query($db_conn, $select_edit_items);
+			    while ($itemRow = mysqli_fetch_assoc($fetch_edit_items)) {
+			    ?>
+			        <tr>
+			            <td>
+			                <?=htmlspecialchars($itemRow['productName']);?>
+			                <input type="hidden" name="item_id[]" value="<?=$itemRow['id'];?>">
+			            </td>
+			            <td><input type="number" min="1" step="1" name="item_qty[]" value="<?=$itemRow['qty'];?>" class="form-control" required></td>
+			            <td><input type="number" min="0" step="any" name="item_price[]" value="<?=$itemRow['price'];?>" class="form-control" required></td>
+			            <td><input type="number" min="0" step="any" name="item_discount[]" value="<?=$itemRow['discount'];?>" class="form-control"></td>
+			        </tr>
+			    <?php } ?>
+			    </tbody>
+			</table>
+			</div>
+			<br/>
+
+			<span id="opstock">
 <button type="submit" name="updateRecord" class="btn btn-primary"><i class="material-icons">update</i>Update</button>
 </span>
 												

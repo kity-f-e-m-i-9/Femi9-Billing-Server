@@ -48,6 +48,12 @@ if (!empty($allFirkaIds)) {
     }
 }
 
+// Whether this DM's assigned area has any active TP coverage at all — not a
+// DM choice, purely automatic. If their district has no TP (or the TP that
+// used to cover it was deactivated), the TP-assignment fields never show at
+// all and the order is understood to be handled by the company directly.
+$dmHasActiveTp = !empty($firkaTpMap);
+
 $title         = "New Order";
 $manage_url    = "manage_order";
 $manage_title  = "Manage Orders";
@@ -268,6 +274,11 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                             <div class="example-container">
                                                 <div class="example-content">
 
+                                                    <?php if (!$dmHasActiveTp): ?>
+                                                    <div style="margin-bottom:14px; font-size:12px; color:#374151; background:#f3f4f6; padding:8px 12px; border-radius:6px;">No active TP covers your assigned area — this order will be handled directly by the company.</div>
+                                                    <?php endif; ?>
+
+                                                    <div id="tpAssignBlock" style="<?=$dmHasActiveTp ? '' : 'display:none;'?>">
                                                     <label class="form-label">District Filter</label>
                                                     <select id="district_filter_select" class="form-control" onchange="onDistrictChange(this.value)">
                                                         <option value="">All Districts</option>
@@ -288,6 +299,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                         <option value="">Select Taluk First</option>
                                                     </select>
                                                     <br/>
+                                                    </div>
 
                                                     <label class="form-label">Shop*</label>
                                                     <select class="my-select form-control" name="shop_id" id="shop_select" required>
@@ -307,8 +319,9 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <div id="shopDistanceInfo" style="margin-top:4px; font-size:13px; color:#555;"></div>
                                                     <br/>
 
-                                                    <label class="form-label">Assign To TP*</label>
-                                                    <select class="my-select form-control" name="tp_id" id="tp_select" required>
+                                                    <div id="tpSelectBlock" style="<?=$dmHasActiveTp ? '' : 'display:none;'?>">
+                                                    <label class="form-label">Assign To TP</label>
+                                                    <select class="my-select form-control" name="tp_id" id="tp_select">
                                                         <option value="" hidden>Select TP</option>
                                                         <?php foreach($tpList as $t): ?>
                                                         <option value="<?=htmlspecialchars($t['id'])?>"
@@ -317,6 +330,8 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                         </option>
                                                         <?php endforeach; ?>
                                                     </select>
+                                                    <div id="noTpHint" style="display:none; margin-top:4px; font-size:12px; color:#9a6b00;">No TP covers this area yet — this order will go to the company for review instead.</div>
+                                                    </div>
                                                     <br/>
 
                                                     <label class="form-label">Order Date*</label>
@@ -480,6 +495,9 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                 select.val(currentVal);
             }
             select.trigger('change.select2');
+
+            var hint = document.getElementById('noTpHint');
+            if (hint) { hint.style.display = (select.find('option').length <= 1) ? 'block' : 'none'; }
         }
 
         $('#shop_select').on('change', function() {

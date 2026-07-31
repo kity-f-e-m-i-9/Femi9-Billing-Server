@@ -55,13 +55,14 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 											
 											<tbody>
 <?php 
+// Same "no TP assigned" scope as ms_prorders.php — this PDF exports that report.
 if($from_date!=NULL && $se_msid==NULL)
 {
-$select_product_list="select distinct order_id from ms_orders where new_order='yes' and order_date between '$from_date' and '$to_date'";
+$select_product_list="select distinct order_id from ms_orders where new_order='yes' and order_date between '$from_date' and '$to_date' and tp_id IS NULL";
 }
 if($from_date!=NULL && $se_msid!=NULL)
 {
-$select_product_list="select distinct order_id from ms_orders where new_order='yes' and order_date between '$from_date' and '$to_date' and ms_id='$se_msid'";
+$select_product_list="select distinct order_id from ms_orders where new_order='yes' and order_date between '$from_date' and '$to_date' and ms_id='$se_msid' and tp_id IS NULL";
 }
 $fetch_product_list=mysqli_query($db_conn,$select_product_list);
 while($result_product_list12=mysqli_fetch_array($fetch_product_list))

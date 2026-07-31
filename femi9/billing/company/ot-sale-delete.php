@@ -8,7 +8,7 @@ $tempid = $_REQUEST['tempid'] ?? '';
 
 // Fetch the OT sale item before deleting it
 $stmt = $db_conn->prepare(
-    "SELECT prid, qty, godownid, usertype FROM ot_sales WHERE id = ?"
+    "SELECT prid, qty, godownid FROM ot_sales WHERE id = ?"
 );
 $stmt->bind_param('i', $rowid);
 $stmt->execute();
@@ -19,7 +19,12 @@ if ($item) {
     $productId = (int)    $item['prid'];
     $qty       = (int)    $item['qty'];
     $godownid  = (string) $item['godownid'];
-    $usertype  = (string) ($item['usertype'] ?: $Login_user_TYPEvl);
+    // Stock is kept under the deducting session's own type (see
+    // ot-sale-action.php's otDeduct call and ot-sale-return.php's otReverse
+    // call, both of which use $Login_user_TYPEvl) -- ot_sales.usertype is a
+    // different, unrelated column (the submitting account's role), so using
+    // it here silently missed the stock row and never restored quantity.
+    $usertype = $Login_user_TYPEvl;
 
     $stockService = new StockService($db_conn);
     $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';

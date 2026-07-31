@@ -499,7 +499,7 @@ function receiptamount() {
 
 <?php $show_remarks = $result_ReceiptDetails['receipt_remarks'] ?? ''; ?>
 <div class="bold">Remarks<span>
-<textarea name="receipt_remarks" required class="form-control"><?php echo $show_remarks; ?></textarea>
+<textarea name="receipt_remarks" class="form-control"><?php echo $show_remarks; ?></textarea>
 </span></div>
 
 <div style="clear:both;"></div>

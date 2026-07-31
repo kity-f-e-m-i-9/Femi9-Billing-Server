@@ -322,7 +322,7 @@ function receiptamount() {
 </select>
 </div>
 <div class="bold">Remarks
-<textarea name="receipt_remarks" required class="form-control"><?php echo htmlspecialchars($res_receipt['receipt_remarks'] ?? ''); ?></textarea>
+<textarea name="receipt_remarks" class="form-control"><?php echo htmlspecialchars($res_receipt['receipt_remarks'] ?? ''); ?></textarea>
 </div>
 
 <div style="clear:both;"></div>
@@ -496,5 +496,11 @@ while ($rp = mysqli_fetch_array($res_prods)) {
 <script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script>
+$(document).ready(function() {
+    $('select[name="customer_id"]').select2({ width: '100%', placeholder: 'Select', allowClear: true });
+    $('select[name="pr_id"]').select2({ width: '100%', placeholder: 'Select Product' });
+});
+</script>
 </body>
 </html>

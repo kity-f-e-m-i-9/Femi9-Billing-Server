@@ -335,7 +335,7 @@ function render_geo_filter($layers, $geoNodes, $depthToField) {
         orderLines.push({ pr_id: prId, name: prName, qty: qty, price: price, discPct: discPct, discAmt: discAmt });
         renderOrderLines();
 
-        sel.value = '';
+        $(sel).val('').trigger('change');
         document.getElementById('ord_qty').value = '';
         document.getElementById('ord_amount').value = '';
         document.getElementById('ord_total').value = '';
@@ -388,6 +388,11 @@ function render_geo_filter($layers, $geoNodes, $depthToField) {
         }
         return true;
     }
+
+    $(document).ready(function() {
+        $('#shop_select').select2({ width: '100%', placeholder: 'Select', allowClear: true });
+        $('#pr_select').select2({ width: '100%', placeholder: 'Select Product' });
+    });
 
     // ── Shop location metadata (raw partner_location_nodes ids) ──────────────
     var allShops = [];
