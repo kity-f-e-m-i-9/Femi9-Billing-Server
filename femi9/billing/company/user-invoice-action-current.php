@@ -62,6 +62,9 @@ $selectproducts = "select * from products where id='$pr_id'";
 $fetchproducts = mysqli_query($db_conn, $selectproducts);
 $resultproducts = mysqli_fetch_array($fetchproducts);
 $gst_percentage = $resultproducts['gst'];
+// The product's own price-tax setting ('inclusive'/'exclusive' — distinct from
+// $gst_type set further below, which is the invoice's inner/outer state field).
+$product_gst_type = ($resultproducts['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive';
 $hsn = $resultproducts['hsn'];
 $rwpoints = $resultproducts['rwpoints'] * $qty;
 $gstamount_singlepr = "0";
@@ -80,8 +83,17 @@ if ($_REQUEST['discount_percentage'] > 0) {
 $subtotal = $totalamount - $discount_amount;
 $subtotal = number_format($subtotal, 2, '.', '');
 
-$gstamount_total = ($subtotal * $gst_percentage / 100);
-$total = $subtotal + $gstamount_total;
+if ($product_gst_type === 'inclusive' && $gst_percentage > 0) {
+    // Entered rate already includes GST — carve the tax portion out of
+    // subtotal for reporting instead of adding it again; amount charged
+    // doesn't change.
+    $gstamount_total = $subtotal - ($subtotal * 100 / (100 + $gst_percentage));
+    $gstamount_total = number_format($gstamount_total, 2, '.', '');
+    $total = $subtotal;
+} else {
+    $gstamount_total = ($subtotal * $gst_percentage / 100);
+    $total = $subtotal + $gstamount_total;
+}
 
 // Get company state code
 $sqladminlog = "select * from admin_log where usertype='admin'";

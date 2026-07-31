@@ -9,7 +9,7 @@ include("checksession.php");
 $file = "Products.csv";
 
 // Fetch product data from database
-$select_records = "SELECT * FROM products ORDER BY id ASC";
+$select_records = "SELECT * FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC";
 $fetch_records = mysqli_query($db_conn, $select_records);
 
 // Initialize CSV content

@@ -195,8 +195,8 @@ $totalTpInvoices = 0;
 if (empty($selectedCategory) || $selectedCategory === 'territory_partner') {
     $stmt = $db_conn->prepare(
         "SELECT COUNT(*) AS cnt FROM tp_invoices
-         WHERE invoice_date BETWEEN ? AND ? AND created_by_user_type = 'company' AND total_amount > 0
-           AND source_godown_id IN (" . godown_ids_subquery($db_conn) . ")"
+         WHERE invoice_date BETWEEN ? AND ? AND created_by_user_type != 'super_stockiest' AND total_amount > 0
+           AND (source_cp_id > 0 OR source_godown_id IN (" . godown_ids_subquery($db_conn) . "))"
     );
     $stmt->bind_param('ss', $fromDate, $toDate);
     $stmt->execute();
@@ -271,10 +271,10 @@ if ($custLimit > 0) {
 $tpInvoices = [];
 if ($tpLimit > 0) {
     $sql = "SELECT id AS inv_id, invoice_number AS inv_number, invoice_date AS date, total_amount AS total,
-                   territory_partner_id, source_godown_id
+                   territory_partner_id, source_godown_id, source_cp_id
             FROM tp_invoices
-            WHERE invoice_date BETWEEN ? AND ? AND created_by_user_type = 'company' AND total_amount > 0
-              AND source_godown_id IN (" . godown_ids_subquery($db_conn) . ")
+            WHERE invoice_date BETWEEN ? AND ? AND created_by_user_type != 'super_stockiest' AND total_amount > 0
+              AND (source_cp_id > 0 OR source_godown_id IN (" . godown_ids_subquery($db_conn) . "))
             ORDER BY id ASC LIMIT ? OFFSET ?";
     $stmt = $db_conn->prepare($sql);
     $stmt->bind_param('ssii', $fromDate, $toDate, $tpLimit, $tpOffset);
@@ -285,7 +285,7 @@ if ($tpLimit > 0) {
 
 // ─── Products ─────────────────────────────────────────────────────────────────
 $products = []; $productIds = [];
-$stmt = $db_conn->prepare("SELECT id, productName FROM products ORDER BY id ASC");
+$stmt = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 $stmt->execute();
 $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) {
@@ -360,6 +360,24 @@ if (!empty($companyIds)) {
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $companies[$row['id']] = $row['gname'];
+    }
+    $stmt->close();
+}
+
+// ─── Channel Partners for CP-sourced TP invoices ──────────────────────────────
+// A CP-sourced TP invoice has no single godown behind it (stock traces back
+// through pl_godown_transfers, not tracked per-invoice), so it's labelled by
+// the channel partner it actually came from instead of a company entity.
+$channelPartners = [];
+$cpIds = array_unique(array_filter(array_column($tpInvoices, 'source_cp_id')));
+if (!empty($cpIds)) {
+    $placeholders = implode(',', array_fill(0, count($cpIds), '?'));
+    $stmt         = $db_conn->prepare("SELECT id, name FROM channel_partners WHERE id IN ($placeholders)");
+    $stmt->bind_param(str_repeat('i', count($cpIds)), ...$cpIds);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $channelPartners[$row['id']] = $row['name'];
     }
     $stmt->close();
 }
@@ -459,8 +477,8 @@ if (empty($selectedCategory) || $selectedCategory === 'customer') {
 if (empty($selectedCategory) || $selectedCategory === 'territory_partner') {
     $stmt = $db_conn->prepare(
         "SELECT COALESCE(SUM(total_amount),0) AS s FROM tp_invoices
-         WHERE invoice_date BETWEEN ? AND ? AND created_by_user_type = 'company' AND total_amount > 0
-           AND source_godown_id IN (" . godown_ids_subquery($db_conn) . ")"
+         WHERE invoice_date BETWEEN ? AND ? AND created_by_user_type != 'super_stockiest' AND total_amount > 0
+           AND (source_cp_id > 0 OR source_godown_id IN (" . godown_ids_subquery($db_conn) . "))"
     );
     $stmt->bind_param('ss', $fromDate, $toDate);
     $stmt->execute();
@@ -975,7 +993,10 @@ if ($search !== '') {
                                                     $tpRow    = $tpNames[$inv['territory_partner_id']] ?? [];
                                                     $custName = $tpRow['name']   ?? 'Unknown';
                                                     $custMob  = $tpRow['mobile'] ?? '';
-                                                    $cmpName  = $companies[(int)$inv['source_godown_id']] ?? '';
+                                                    $cmpName  = $companies[(int)$inv['source_godown_id']]
+                                                        ?? (((int)$inv['source_cp_id'] > 0)
+                                                            ? ($channelPartners[(int)$inv['source_cp_id']] ?? 'Channel Partner') . ' (CP)'
+                                                            : '');
                                                     $invItems  = $tpInvItems[$inv['inv_id']] ?? [];
                                                     $pageTotal += (float)$inv['total'];
                                                 ?>

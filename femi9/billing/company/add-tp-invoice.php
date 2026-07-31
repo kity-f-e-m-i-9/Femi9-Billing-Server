@@ -152,7 +152,7 @@ if ($prefill_po_id > 0) {
         }
         .product-add-grid {
             display: grid;
-            grid-template-columns: 2.5fr 1fr 1fr 1fr auto;
+            grid-template-columns: 2fr .8fr .7fr .9fr .8fr .9fr auto;
             gap: 14px;
             align-items: end;
         }
@@ -233,7 +233,7 @@ if ($prefill_po_id > 0) {
 
         /* ── Responsive ── */
         @media (max-width: 992px) {
-            .product-add-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
+            .product-add-grid { grid-template-columns: 1fr 1fr 1fr; }
             .product-add-grid .input-group-modern:first-child { grid-column: 1 / -1; }
             .product-add-grid .input-group-modern:last-child { grid-column: 1 / -1; }
         }
@@ -377,6 +377,14 @@ if ($prefill_po_id > 0) {
                                         <label>Rate (₹) <span style="color:#ef4444;">*</span> <span style="font-size:10px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;">stockist price</span></label>
                                         <input type="number" id="rateInput" class="form-control" min="0" step="0.01" placeholder="0.00">
                                     </div>
+                                    <div class="input-group-modern">
+                                        <label>Disc(%)</label>
+                                        <input type="number" id="discPctInput" class="form-control" min="0" max="100" step="0.01" placeholder="0">
+                                    </div>
+                                    <div class="input-group-modern">
+                                        <label>Disc(₹)</label>
+                                        <input type="number" id="discAmtInput" class="form-control" min="0" step="0.01" placeholder="0.00">
+                                    </div>
                                     <div class="input-group-modern" style="align-items:flex-end;">
                                         <button type="button" class="btn-add" id="addProductBtn" onclick="addProduct()">
                                             <i class="material-icons">add</i> Add
@@ -396,13 +404,15 @@ if ($prefill_po_id > 0) {
                                             <th>Available</th>
                                             <th>Qty</th>
                                             <th>Rate (₹)</th>
+                                            <th>Disc(%)</th>
+                                            <th>Disc(₹)</th>
                                             <th>Amount (₹)</th>
                                             <th></th>
                                         </tr>
                                     </thead>
                                     <tbody id="productBody">
                                         <tr class="empty-row" id="emptyRow">
-                                            <td colspan="7">
+                                            <td colspan="9">
                                                 <i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>
                                                 No products added yet
                                             </td>
@@ -428,6 +438,10 @@ if ($prefill_po_id > 0) {
                                             <span class="summary-value" id="summarySubtotal">₹0.00</span>
                                         </div>
                                         <div class="summary-row">
+                                            <span class="summary-label">Item Discount</span>
+                                            <span class="summary-value" id="summaryItemDiscount">₹0.00</span>
+                                        </div>
+                                        <div class="summary-row">
                                             <span class="summary-label" style="display:flex;flex-direction:column;gap:3px;">
                                                 <span style="display:flex;align-items:center;gap:6px;">
                                                     <i class="material-icons" style="font-size:17px;color:#64748b;">local_shipping</i>
@@ -437,19 +451,6 @@ if ($prefill_po_id > 0) {
                                             </span>
                                             <span class="summary-value">
                                                 <input type="number" id="courierInput" name="courier_charges"
-                                                       min="0" step="0.01" value="0"
-                                                       style="width:130px;border:2px solid #e5e7eb;border-radius:7px;padding:7px 12px;text-align:right;font-size:14px;font-family:'Poppins',sans-serif;font-weight:500;transition:border-color .2s;"
-                                                       onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)'"
-                                                       onblur="this.style.borderColor='#e5e7eb';this.style.boxShadow='none'">
-                                            </span>
-                                        </div>
-                                        <div class="summary-row">
-                                            <span class="summary-label" style="display:flex;align-items:center;gap:6px;">
-                                                <i class="material-icons" style="font-size:17px;color:#64748b;">discount</i>
-                                                Discount (₹)
-                                            </span>
-                                            <span class="summary-value">
-                                                <input type="number" id="discountInput" name="discount_amount"
                                                        min="0" step="0.01" value="0"
                                                        style="width:130px;border:2px solid #e5e7eb;border-radius:7px;padding:7px 12px;text-align:right;font-size:14px;font-family:'Poppins',sans-serif;font-weight:500;transition:border-color .2s;"
                                                        onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)'"
@@ -817,7 +818,26 @@ $(document).ready(function() {
         $('#availQty').val(avail > 0 ? avail : '');
         $('#rateInput').val(rate > 0 ? rate.toFixed(2) : '0.00');
         $('#qtyInput').val('').attr('max', avail);
+        $('#discPctInput, #discAmtInput').val('');
         hideAddError();
+    });
+
+    // Disc(%) -> Disc(₹): typing a percentage computes the rupee discount
+    // off this line's gross (qty × rate).
+    $('#discPctInput').on('input', function () {
+        var qty  = parseFloat($('#qtyInput').val()) || 0;
+        var rate = parseFloat($('#rateInput').val()) || 0;
+        var pct  = parseFloat($(this).val()) || 0;
+        $('#discAmtInput').val(((qty * rate) * pct / 100).toFixed(2));
+    });
+
+    // Disc(₹) -> Disc(%): typing a rupee discount back-computes the percentage.
+    $('#discAmtInput').on('input', function () {
+        var qty   = parseFloat($('#qtyInput').val()) || 0;
+        var rate  = parseFloat($('#rateInput').val()) || 0;
+        var gross = qty * rate;
+        var amt   = parseFloat($(this).val()) || 0;
+        $('#discPctInput').val(gross > 0 ? (amt / gross * 100).toFixed(2) : '');
     });
 
     /* ── Add product ── */
@@ -829,19 +849,24 @@ $(document).ready(function() {
         var avail     = parseInt($('#availQty').val()) || 0;
         var qty       = parseInt($('#qtyInput').val()) || 0;
         var rate      = parseFloat($('#rateInput').val()) || 0;
+        var discPct   = parseFloat($('#discPctInput').val()) || 0;
+        var discAmt   = parseFloat($('#discAmtInput').val()) || 0;
 
         if (!product_id) { showAddError('Please select a product.'); return; }
         if (qty < 1)     { showAddError('Quantity must be at least 1.'); return; }
         if (rate <= 0)   { showAddError('Please enter a valid rate.'); return; }
         if (qty > avail) { showAddError('Quantity exceeds available stock (' + avail + ').'); return; }
+        if (discAmt > qty * rate) { showAddError('Discount cannot exceed the line amount.'); return; }
 
         // Check duplicate
         if (invoiceItems.find(function(i){ return i.product_id === product_id; })) {
             showAddError('This product is already added. Remove it first to change quantity.'); return;
         }
 
-        var amount = parseFloat((qty * rate).toFixed(2));
-        invoiceItems.push({ product_id: product_id, name: name, avail: avail, qty: qty, rate: rate, amount: amount });
+        var gross  = parseFloat((qty * rate).toFixed(2));
+        discAmt    = parseFloat(discAmt.toFixed(2));
+        var amount = parseFloat(Math.max(0, gross - discAmt).toFixed(2));
+        invoiceItems.push({ product_id: product_id, name: name, avail: avail, qty: qty, rate: rate, discPct: discPct, discAmt: discAmt, amount: amount });
 
         renderTable();
         resetAddForm();
@@ -859,7 +884,7 @@ $(document).ready(function() {
         $body.empty();
 
         if (!invoiceItems.length) {
-            $body.html('<tr class="empty-row"><td colspan="7"><i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>No products added yet</td></tr>');
+            $body.html('<tr class="empty-row"><td colspan="9"><i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>No products added yet</td></tr>');
             updateSummary();
             return;
         }
@@ -872,6 +897,8 @@ $(document).ready(function() {
                 '<td><span class="avail-chip' + (item.avail > 0 ? '' : ' none') + '">' + item.avail + '</span></td>' +
                 '<td>' + item.qty + '</td>' +
                 '<td>₹' + item.rate.toFixed(2) + '</td>' +
+                '<td>' + item.discPct.toFixed(2) + '%</td>' +
+                '<td>₹' + item.discAmt.toFixed(2) + '</td>' +
                 '<td><strong>₹' + item.amount.toFixed(2) + '</strong></td>' +
                 '<td><button type="button" class="badge-remove" onclick="removeProduct(' + i + ')"><i class="material-icons" style="font-size:14px;vertical-align:middle;">delete</i> Remove</button></td>'
             );
@@ -882,25 +909,30 @@ $(document).ready(function() {
         buildHiddenInputs();
     }
 
-    /* ── Courier / Discount inputs trigger recalc ── */
-    $('#courierInput, #discountInput').on('input change', function () { updateSummary(); });
+    /* ── Courier input triggers recalc ── */
+    $('#courierInput').on('input change', function () { updateSummary(); });
 
     /* ── Summary & hidden inputs ── */
     function updateSummary() {
-        var subtotal = 0, qty = 0;
-        $.each(invoiceItems, function (_, item) { subtotal += item.amount; qty += item.qty; });
+        var subtotal = 0, qty = 0, itemDiscTotal = 0;
+        $.each(invoiceItems, function (_, item) {
+            subtotal += item.qty * item.rate;
+            itemDiscTotal += item.discAmt;
+            qty += item.qty;
+        });
         subtotal = parseFloat(subtotal.toFixed(2));
+        itemDiscTotal = parseFloat(itemDiscTotal.toFixed(2));
+        var afterItemDisc = Math.max(0, parseFloat((subtotal - itemDiscTotal).toFixed(2)));
 
-        var discount = Math.max(0, parseFloat($('#discountInput').val()) || 0);
-        discount     = parseFloat(Math.min(discount, subtotal).toFixed(2));
         var courier  = Math.max(0, parseFloat($('#courierInput').val()) || 0);
         courier      = parseFloat(courier.toFixed(2));
-        var netAmount = parseFloat((subtotal - discount).toFixed(2));
+        var netAmount = afterItemDisc;
         var total     = parseFloat((netAmount + courier).toFixed(2));
 
         $('#summaryItems').text(invoiceItems.length);
         $('#summaryQty').text(qty);
         $('#summarySubtotal').text('₹' + fmtAmt(subtotal));
+        $('#summaryItemDiscount').text('₹' + fmtAmt(itemDiscTotal));
         $('#grandTotal').text('₹' + fmtAmt(total));
 
         // Balance rows — courier is NOT deducted from advance (collected separately)
@@ -919,7 +951,7 @@ $(document).ready(function() {
             // Update balance panel note live
             if (netAmount > 0 && advanceBalance >= netAmount) {
                 var note = '₹' + fmtAmt(netAmount) + ' will be deducted from advance.';
-                if (discount > 0) note += ' Discount ₹' + fmtAmt(discount) + ' applied.';
+                if (itemDiscTotal > 0) note += ' Discount ₹' + fmtAmt(itemDiscTotal) + ' applied.';
                 if (courier > 0) note += ' Courier ₹' + fmtAmt(courier) + ' collected separately.';
                 setBalancePanel('ok', '₹' + fmtAmt(advanceBalance), note, false);
             } else if (netAmount > 0 && advanceBalance < netAmount) {
@@ -948,6 +980,8 @@ $(document).ready(function() {
             html += '<input type="hidden" name="product_id[]" value="' + item.product_id + '">';
             html += '<input type="hidden" name="qty[]"        value="' + item.qty + '">';
             html += '<input type="hidden" name="rate[]"       value="' + item.rate + '">';
+            html += '<input type="hidden" name="item_discount_percentage[]" value="' + item.discPct + '">';
+            html += '<input type="hidden" name="item_discount_amount[]"     value="' + item.discAmt + '">';
         });
         $('#hiddenProductInputs').html(html);
     }
@@ -995,6 +1029,7 @@ $(document).ready(function() {
         $('#availQty').val('');
         $('#qtyInput').val('');
         $('#rateInput').val('');
+        $('#discPctInput, #discAmtInput').val('');
         hideAddError();
     }
 

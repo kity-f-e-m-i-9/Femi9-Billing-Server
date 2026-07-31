@@ -14,6 +14,7 @@ $stmt = $db_conn->prepare("
     FROM stock s
     JOIN products p ON p.id = s.product_id
     WHERE s.user_type = 'company' AND s.user_id = ? AND s.closing_qty > 0 AND p.deleted_at IS NULL
+      AND (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
     ORDER BY p.productName
 ");
 $stmt->bind_param("s", $uid);

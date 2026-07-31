@@ -164,7 +164,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
     <div class="item">
 	<select required="" name="pr_id" required="" autofocus onChange="showPrice(this.value)">
 <option value="" hidden="">Select Product</option>
-<?php $select_Products_list="select * from products order by id asc";
+<?php $select_Products_list="select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc";
 		$fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
 										while($result_Products_list=mysqli_fetch_array($fetch_Products_list))
 										{
@@ -346,7 +346,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
     <div class="item">
 	<select required="" name="pr_id" required="" onChange="showPrice(this.value)">
 <option value="" hidden="">Select Product</option>
-<?php $select_Products_list="select * from products order by id asc";
+<?php $select_Products_list="select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc";
 		$fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
 										while($result_Products_list=mysqli_fetch_array($fetch_Products_list))
 										{

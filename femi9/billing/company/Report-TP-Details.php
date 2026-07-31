@@ -96,7 +96,7 @@ while ($tp = $tpRes->fetch_assoc()) {
 $tpStmt->close();
 
 $products = [];
-$prodRes = mysqli_query($db_conn, "SELECT id, productName FROM products ORDER BY id ASC");
+$prodRes = mysqli_query($db_conn, "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 while ($p = mysqli_fetch_assoc($prodRes)) { $products[$p['id']] = $p['productName']; }
 
 $rows = [];

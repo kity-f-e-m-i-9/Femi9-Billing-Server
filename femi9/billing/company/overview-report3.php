@@ -214,7 +214,7 @@ if ($catname !== '' && !in_array($catname, $categories, true)) {
 // ─── Load products ────────────────────────────────────────────────────────────
 $products   = [];
 $productIds = [];
-$prRows     = dbQuery($db_conn, "SELECT id, productName FROM products ORDER BY id ASC");
+$prRows     = dbQuery($db_conn, "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 foreach ($prRows as $row) {
     $products[(int)$row['id']] = $row['productName'];
     $productIds[]              = (int)$row['id'];

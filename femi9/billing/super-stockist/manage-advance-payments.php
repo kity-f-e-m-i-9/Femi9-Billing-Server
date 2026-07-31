@@ -647,9 +647,16 @@ if ($users_result) {
             });
         });
 
-        // Format number with commas
+        // Format number with commas — the API sends amounts already formatted
+        // as Indian-locale comma strings (e.g. "6,45,15,987.00"), so strip
+        // commas before parsing or parseFloat stops at the first one and
+        // silently truncates the value (e.g. down to just "6").
         function formatNumber(num) {
-            return parseFloat(num).toLocaleString('en-IN', {
+            if (num === null || num === undefined || num === '') return '0.00';
+            if (typeof num === 'string') num = num.replace(/,/g, '');
+            num = parseFloat(num);
+            if (isNaN(num)) return '0.00';
+            return num.toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });

@@ -24,7 +24,7 @@ if (!$entry) {
     exit;
 }
 
-$products = $db_conn->query("SELECT id, productName FROM products ORDER BY productName ASC")->fetch_all(MYSQLI_ASSOC);
+$products = $db_conn->query("SELECT id, productName, unit_type FROM products ORDER BY productName ASC")->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -86,17 +86,17 @@ $products = $db_conn->query("SELECT id, productName FROM products ORDER BY produ
                                         <div class="example-container">
                                             <div class="example-content">
                                                 <label class="form-label">Product</label>
-                                                <select required name="product_id" class="form-control">
+                                                <select required name="product_id" id="productSelect" class="form-control">
                                                     <?php foreach ($products as $p): ?>
-                                                    <option value="<?php echo (int)$p['id']; ?>" <?php echo ((int)$p['id'] === (int)$entry['product_id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($p['productName']); ?></option>
+                                                    <option value="<?php echo (int)$p['id']; ?>" data-unit-type="<?php echo htmlspecialchars($p['unit_type'] ?? 'pieces'); ?>" <?php echo ((int)$p['id'] === (int)$entry['product_id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($p['productName']); ?></option>
                                                     <?php endforeach; ?>
                                                 </select>
 
                                                 <label class="form-label">Effective Date</label>
                                                 <input type="date" required name="effective_date" value="<?php echo htmlspecialchars($entry['effective_date']); ?>" class="form-control">
 
-                                                <label class="form-label">Rate per Piece (&#8377;)</label>
-                                                <input type="number" min="0" step="0.01" required name="rate_per_piece" value="<?php echo htmlspecialchars((string)$entry['rate_per_piece']); ?>" class="form-control">
+                                                <label class="form-label"><span id="rateLabelText">Rate per Piece (&#8377;)</span></label>
+                                                <input type="number" min="0" step="any" required name="rate_per_piece" value="<?php echo htmlspecialchars((string)$entry['rate_per_piece']); ?>" class="form-control">
 
                                                 <br/>
                                                 <button type="submit" name="update-record" class="btn btn-primary">Update</button>
@@ -121,6 +121,16 @@ $products = $db_conn->query("SELECT id, productName FROM products ORDER BY produ
     <script src="../../assets/plugins/pace/pace.min.js"></script>
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
+    <script>
+    (function ($) {
+        function updateRateLabel() {
+            var isPack = $('#productSelect').find('option:selected').data('unit-type') === 'pack';
+            $('#rateLabelText').text(isPack ? 'Rate per Pack (₹)' : 'Rate per Piece (₹)');
+        }
+        $('#productSelect').on('change', updateRateLabel);
+        updateRateLabel();
+    }(jQuery));
+    </script>
 </body>
 
 </html>

@@ -63,6 +63,8 @@ $products = $db_conn->query(
                                 <div class="page-description">
                                     <?php if (isset($_REQUEST['updatedSuccess'])) { ?><div class="alert alert-success">Product updated.</div><?php } ?>
                                     <?php if (isset($_REQUEST['statuschanged'])) { ?><div class="alert alert-success">Product status updated.</div><?php } ?>
+                                    <?php if (isset($_REQUEST['deletedDone'])) { ?><div class="alert alert-success">Product deleted.</div><?php } ?>
+                                    <?php if (isset($_REQUEST['deleteblocked'])) { ?><div class="alert alert-danger">This product has purchases, rates, a mapping, or stock movement against it, so it can't be deleted. Use Deactivate instead.</div><?php } ?>
                                     <?php if (isset($_REQUEST['error'])) { ?><div class="alert alert-danger">Something went wrong. Please try again.</div><?php } ?>
 
                                     <h1>
@@ -107,11 +109,13 @@ $products = $db_conn->query(
                                                     <td>
                                                         <div class="actions-group">
                                                             <a href="neksomo-product-edit.php?id=<?php echo (int)$p['id']; ?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#2563eb;">edit</i></a>
+                                                            <a href="neksomo-product-map.php?id=<?php echo (int)$p['id']; ?>" class="action-link" title="Map to company product(s)"><i class="material-icons-outlined" style="font-size:17px;color:#7c3aed;">link</i></a>
                                                             <?php if (empty($p['deleted_at'])): ?>
-                                                                <a href="toggle-neksomo-product-status.php?id=<?php echo $pid; ?>" class="action-link delete" title="Deactivate" onclick="return confirm('Deactivate this product? It will no longer appear in purchase entry.');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">block</i></a>
+                                                                <a href="toggle-neksomo-product-status.php?id=<?php echo $pid; ?>" class="action-link" title="Deactivate" onclick="return confirm('Deactivate this product? It will no longer appear in purchase entry.');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">block</i></a>
                                                             <?php else: ?>
                                                                 <a href="toggle-neksomo-product-status.php?id=<?php echo $pid; ?>" class="action-link" title="Reactivate" onclick="return confirm('Reactivate this product?');"><i class="material-icons-outlined" style="font-size:17px;color:#10b981;">check_circle</i></a>
                                                             <?php endif; ?>
+                                                            <a href="delete-neksomo-product.php?id=<?php echo $pid; ?>" class="action-link delete" title="Delete" onclick="return confirm('Permanently delete this product? This only works if it has no purchases, rates, mapping, or stock activity — otherwise use Deactivate instead.');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
                                                         </div>
                                                     </td>
                                                 </tr>

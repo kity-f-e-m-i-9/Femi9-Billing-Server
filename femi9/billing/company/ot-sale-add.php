@@ -79,7 +79,7 @@ $wallet_cats_json  = json_encode(array_map('strtolower', $wallet_categories));
 // ---------------------------------------------------------------
 // Fetch product list (once, reuse in table row)
 // ---------------------------------------------------------------
-$stmt_products = $db_conn->prepare("SELECT id, productName FROM products ORDER BY productName ASC");
+$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 $stmt_products->execute();
 $all_products = $stmt_products->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_products->close();
@@ -236,8 +236,8 @@ $stmt_states->close();
 
                                                 <!-- Company / Godown -->
                                                 <label class="form-label">Company Profile *</label>
-                                                <select required name="godownid" autofocus class="form-control"
-                                                        onchange="checkOpeningStock(this.value);">
+                                                <select required name="godownid" id="godownid" autofocus class="form-control"
+                                                        onchange="checkOpeningStock(this.value); handleCompanyChange();">
                                                     <option value="" hidden>Select</option>
                                                     <?php foreach ($all_godowns as $gd): ?>
                                                         <option value="<?= (int)$gd['id'] ?>">
@@ -492,6 +492,17 @@ $stmt_states->close();
         suggestInvoiceNumber(selectedCat);
     }
 
+    // Company/godown changed — the invoice series depends on which company
+    // was picked (e.g. ID CONCEPT's series carries that company's entity
+    // marker), so re-suggest the number using whatever category is already
+    // selected, if any.
+    function handleCompanyChange() {
+        const catSelect = document.getElementById('catname');
+        if (catSelect.value) {
+            suggestInvoiceNumber(catSelect.value);
+        }
+    }
+
     // ----------------------------------------------------------------
     // Invoice number auto-suggest + duplicate warning
     // Only tracked for WEBSITE / ID CONCEPT / WHATSAPP SALES (WEB/ID/WA sequences).
@@ -500,8 +511,9 @@ $stmt_states->close();
     let invoiceNumberIsDuplicate = false;
 
     function suggestInvoiceNumber(selectedCat) {
-        const invField = document.getElementById('inv_number');
-        const warnEl   = document.getElementById('invoiceNumberWarning');
+        const invField  = document.getElementById('inv_number');
+        const warnEl    = document.getElementById('invoiceNumberWarning');
+        const godownid  = document.getElementById('godownid').value;
         warnEl.textContent = '';
         invoiceNumberIsDuplicate = false;
 
@@ -510,7 +522,7 @@ $stmt_states->close();
             return;
         }
 
-        fetch('ot-invoice-helper.php?action=next&cat=' + encodeURIComponent(selectedCat))
+        fetch('ot-invoice-helper.php?action=next&cat=' + encodeURIComponent(selectedCat) + '&godownid=' + encodeURIComponent(godownid))
             .then(r => r.json())
             .then(data => {
                 if (data && data.number) {

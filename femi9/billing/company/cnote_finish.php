@@ -20,16 +20,28 @@ date_default_timezone_set("Asia/Kolkata");
 $returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid']) : '';
 $returnid = mysqli_real_escape_string($db_conn, $returnid);
 
-$SubTotal = (float)($_REQUEST['SubTotal'] ?? 0);
-$discount = (float)($_REQUEST['discount'] ?? 0);
-$total_amount = (float)($SubTotal - $discount);
-
 if (empty($returnid)) {
     error_log("FINISH RETURN ERROR: Invalid return ID");
     $_SESSION['errorMessage'] = "Invalid return ID";
     header("Location: cnote_manage.php?error=invalid_returnid");
     exit;
 }
+
+// SubTotal is computed server-side from the actual line items, never trusted
+// from the client — the form's Subtotal field is a disabled display mirror of
+// this same figure, not something the user can edit (Discount is the only
+// genuine user-editable amount here). Trusting the posted value let the header
+// total drift out of sync with the real items whenever anything changed
+// between page render and submit (e.g. an item removed via cnote_delete.php
+// in another tab).
+$stmt = $db_conn->prepare("SELECT COALESCE(SUM(total),0) AS computed_subtotal FROM user_return_stock_items WHERE returnid = ?");
+$stmt->bind_param("s", $returnid);
+$stmt->execute();
+$SubTotal = (float)($stmt->get_result()->fetch_assoc()['computed_subtotal'] ?? 0);
+$stmt->close();
+
+$discount = (float)($_REQUEST['discount'] ?? 0);
+$total_amount = (float)($SubTotal - $discount);
 
 if ($SubTotal < 0 || $discount < 0 || $total_amount < 0) {
     error_log("FINISH RETURN ERROR: Invalid amounts - SubTotal: $SubTotal, Discount: $discount");

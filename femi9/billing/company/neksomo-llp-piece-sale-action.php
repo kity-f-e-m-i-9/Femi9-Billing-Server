@@ -46,15 +46,31 @@ if (isset($_POST['add-record'])) {
         redirectWithMessage('neksomo-llp-piece-sale.php', 'error');
     }
 
+    // GST is never trusted from the client — snapshot each product's own
+    // gst/gst_type at the moment the rate is entered, same convention as
+    // neksomo_purchase_items (Purchase from Manufacturer).
+    $pids = array_column($rows, 'product_id');
+    $placeholders = implode(',', array_fill(0, count($pids), '?'));
+    $gstStmt = $db_conn->prepare("SELECT id, gst, gst_type FROM products WHERE id IN ($placeholders)");
+    $gstStmt->bind_param(str_repeat('i', count($pids)), ...$pids);
+    $gstStmt->execute();
+    $gstByProduct = [];
+    foreach ($gstStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+        $gstByProduct[(int)$r['id']] = ['rate' => (float)$r['gst'], 'type' => $r['gst_type'] === 'inclusive' ? 'inclusive' : 'exclusive'];
+    }
+    $gstStmt->close();
+
     $created_by = $_SESSION['LOGIN_USER'] ?? 'system';
     $stmt = $db_conn->prepare(
-        "INSERT INTO neksomo_llp_piece_rates (product_id, effective_date, rate_per_piece, created_by)
-         VALUES (?, ?, ?, ?)"
+        "INSERT INTO neksomo_llp_piece_rates (product_id, effective_date, rate_per_piece, gst_rate, gst_type, created_by)
+         VALUES (?, ?, ?, ?, ?, ?)"
     );
 
     $added = 0; $skipped = 0;
     foreach ($rows as $row) {
-        $stmt->bind_param('isds', $row['product_id'], $effective_date, $row['rate'], $created_by);
+        $gst_rate = $gstByProduct[$row['product_id']]['rate'] ?? 0.0;
+        $gst_type = $gstByProduct[$row['product_id']]['type'] ?? 'exclusive';
+        $stmt->bind_param('isddss', $row['product_id'], $effective_date, $row['rate'], $gst_rate, $gst_type, $created_by);
         try {
             $stmt->execute();
             $added++;
@@ -86,10 +102,20 @@ if (isset($_POST['update-record'])) {
         redirectWithMessage('neksomo-llp-piece-sale-manage.php', 'error');
     }
 
+    // Re-snapshot GST from the product's current setting whenever the rate
+    // row is written, same as the insert path above.
+    $gstLookup = $db_conn->prepare("SELECT gst, gst_type FROM products WHERE id = ?");
+    $gstLookup->bind_param('i', $product_id);
+    $gstLookup->execute();
+    $gstRow = $gstLookup->get_result()->fetch_assoc();
+    $gstLookup->close();
+    $gst_rate = (float) ($gstRow['gst'] ?? 0);
+    $gst_type = ($gstRow['gst_type'] ?? '') === 'inclusive' ? 'inclusive' : 'exclusive';
+
     $stmt = $db_conn->prepare(
-        "UPDATE neksomo_llp_piece_rates SET product_id=?, effective_date=?, rate_per_piece=? WHERE id=?"
+        "UPDATE neksomo_llp_piece_rates SET product_id=?, effective_date=?, rate_per_piece=?, gst_rate=?, gst_type=? WHERE id=?"
     );
-    $stmt->bind_param('isdi', $product_id, $effective_date, $rate_per_piece, $update_id);
+    $stmt->bind_param('isddsi', $product_id, $effective_date, $rate_per_piece, $gst_rate, $gst_type, $update_id);
     try {
         $stmt->execute();
         $stmt->close();

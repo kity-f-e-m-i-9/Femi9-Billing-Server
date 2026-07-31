@@ -916,7 +916,7 @@ $qparam = urlencode($search ?? '');
                                             
                                             // Get all products
                                             $products = [];
-                                            $product_query = "SELECT id, productName FROM products ORDER BY id ASC";
+                                            $product_query = "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC";
                                             $product_result = mysqli_query($db_conn, $product_query);
                                             
                                             if($product_result) {

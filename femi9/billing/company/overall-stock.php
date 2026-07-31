@@ -1,6 +1,8 @@
 <?php include("checksession.php"); require_once("include/GodownAccess.php");
 require_once("include/PermissionCheck.php"); requirePermission('products');
 error_reporting(0);
+// Pulled from the Neksomo menu — a purpose-built stock view is coming for that login.
+if (is_neksomo_login($db_conn)) { header("Location: dashboard.php"); exit; }
 $user_type_Loginvl="company";
 ?>
 <!DOCTYPE html>

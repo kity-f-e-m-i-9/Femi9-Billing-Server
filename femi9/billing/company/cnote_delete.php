@@ -227,6 +227,33 @@ try {
     $stmt->execute();
     $stmt->close();
 
+    /*
+    |----------------------------------------------------------------------
+    | RECALCULATE HEADER TOTALS FROM REMAINING ITEMS
+    | Without this, user_return_stock.total/subtotal keeps whatever value
+    | was last written at Finish time, drifting out of sync with the items
+    | that actually remain — the bug this fix closes.
+    |----------------------------------------------------------------------
+    */
+    $stmt = $db_conn->prepare("SELECT COALESCE(SUM(total),0) AS remaining_total FROM user_return_stock_items WHERE returnid = ?");
+    $stmt->bind_param("s", $returnid_decode);
+    $stmt->execute();
+    $remaining_total = (float)$stmt->get_result()->fetch_assoc()['remaining_total'];
+    $stmt->close();
+
+    $stmt = $db_conn->prepare("SELECT discount FROM user_return_stock WHERE returnid = ? LIMIT 1");
+    $stmt->bind_param("s", $returnid_decode);
+    $stmt->execute();
+    $existing_discount = (float)($stmt->get_result()->fetch_assoc()['discount'] ?? 0);
+    $stmt->close();
+
+    $new_total = max(0, $remaining_total - $existing_discount);
+
+    $stmt = $db_conn->prepare("UPDATE user_return_stock SET subtotal = ?, total = ? WHERE returnid = ?");
+    $stmt->bind_param("dds", $remaining_total, $new_total, $returnid_decode);
+    $stmt->execute();
+    $stmt->close();
+
     // Commit transaction
     mysqli_commit($db_conn);
 

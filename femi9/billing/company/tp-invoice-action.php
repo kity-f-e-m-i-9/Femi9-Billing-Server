@@ -120,6 +120,14 @@ if ($col && $col->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN courier_charges DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER invoice_date");
 }
 
+// Per-product Disc(%)/Disc(₹) on the invoice line items — see
+// db_migrations/2026_07_20_tp_invoice_items_discount.sql
+$colD = $db_conn->query("SHOW COLUMNS FROM tp_invoice_items LIKE 'discount_amount'");
+if ($colD && $colD->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_invoice_items ADD COLUMN discount_percentage DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER amount");
+    $db_conn->query("ALTER TABLE tp_invoice_items ADD COLUMN discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER discount_percentage");
+}
+
 // ── Input & validation ─────────────────────────────────────────────────────────
 
 $po_id            = (int)($_POST['po_id'] ?? 0);
@@ -130,13 +138,15 @@ $source_godown_id = (int)($_POST['source_godown_id'] ?? 0);
 $invoice_date     = trim($_POST['invoice_date'] ?? date('Y-m-d'));
 $courier_charges  = round((float)($_POST['courier_charges'] ?? 0), 2);
 if ($courier_charges < 0) $courier_charges = 0;
-$discount_amount  = round((float)($_POST['discount_amount'] ?? 0), 2);
-if ($discount_amount < 0) $discount_amount = 0;
+// No invoice-level discount — discounting happens per product line only (disc_pct/disc_amt below).
+$discount_amount  = 0.00;
 $created_by       = $_SESSION['LOGIN_USER'] ?? '';
 
-$raw_pids  = $_POST['product_id'] ?? [];
-$raw_qtys  = $_POST['qty']        ?? [];
-$raw_rates = $_POST['rate']       ?? [];
+$raw_pids      = $_POST['product_id']              ?? [];
+$raw_qtys      = $_POST['qty']                     ?? [];
+$raw_rates     = $_POST['rate']                    ?? [];
+$raw_disc_pcts = $_POST['item_discount_percentage'] ?? [];
+$raw_disc_amts = $_POST['item_discount_amount']     ?? [];
 
 $use_godown = ($source_godown_id > 0 && !$source_cp_id);
 
@@ -167,7 +177,12 @@ foreach ($raw_pids as $i => $rpid) {
     if ($rate < 0) { $item_errors[] = "product_$pid:rate"; continue; }
     if (isset($seen[$pid])) { $item_errors[] = "product_$pid:duplicate"; continue; }
     $seen[$pid] = true;
-    $items[] = ['pid' => $pid, 'qty' => $qty, 'rate' => $rate, 'amount' => round($qty * $rate, 2)];
+    $amount   = round($qty * $rate, 2);
+    $disc_pct = round((float)($raw_disc_pcts[$i] ?? 0), 2);
+    $disc_amt = round((float)($raw_disc_amts[$i] ?? 0), 2);
+    if ($disc_amt < 0) $disc_amt = 0;
+    if ($disc_amt > $amount) $disc_amt = $amount;
+    $items[] = ['pid' => $pid, 'qty' => $qty, 'rate' => $rate, 'amount' => $amount, 'disc_pct' => $disc_pct, 'disc_amt' => $disc_amt];
 }
 
 if (!empty($item_errors)) {
@@ -177,8 +192,10 @@ if (empty($items)) {
     header("Location: add-tp-invoice?error=noproducts"); exit;
 }
 
-$subtotal      = round(array_sum(array_column($items, 'amount')), 2);
-$net_amount    = round($subtotal - $discount_amount, 2);
+// Gross subtotal minus each line's own discount — no invoice-level discount.
+$gross_subtotal       = round(array_sum(array_column($items, 'amount')), 2);
+$item_discount_total  = round(array_sum(array_column($items, 'disc_amt')), 2);
+$net_amount    = round($gross_subtotal - $item_discount_total, 2);
 if ($net_amount < 0) $net_amount = 0;
 $invoice_total = round($net_amount + $courier_charges, 2);
 
@@ -214,14 +231,21 @@ try {
     $inv_num = tpInvoiceNextNumber($db_conn, 'CO', $invoice_date);
 
     // Invoice header
-    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("siiiisddds", $inv_num, $tp_id, $source_loc_id, $source_cp_id, $source_godown_id, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by);
+    // created_by_user_type is set explicitly here — leaving it out left every
+    // company-created invoice with a blank value (its column default),
+    // silently excluded by any report/query that filters on
+    // created_by_user_type='company' (e.g. overview-report1.php's Sales
+    // Report), even though it was already relied on elsewhere in this file
+    // ($tpinv_source_sql-style callers) and by super-stockist's own insert.
+    $created_by_user_type = 'company';
+    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by,created_by_user_type) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+    $s->bind_param("siiiisdddss", $inv_num, $tp_id, $source_loc_id, $source_cp_id, $source_godown_id, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type);
     $s->execute();
     $invoice_id = $db_conn->insert_id;
     $s->close();
 
     // Line items + stock movements
-    $s_item = $db_conn->prepare("INSERT INTO tp_invoice_items (tp_invoice_id,product_id,quantity,rate,amount) VALUES (?,?,?,?,?)");
+    $s_item = $db_conn->prepare("INSERT INTO tp_invoice_items (tp_invoice_id,product_id,quantity,rate,amount,discount_percentage,discount_amount) VALUES (?,?,?,?,?,?,?)");
     foreach ($items as $item) {
         // Re-check inside transaction with row lock to prevent race condition
         if ($use_godown) {
@@ -245,7 +269,7 @@ try {
         insertTpLedger($db_conn, $tp_id, $item['pid'], $item['qty'], $tp_before, $tp_after, $inv_num, $created_by);
 
         // Invoice line
-        $s_item->bind_param("iiidd", $invoice_id, $item['pid'], $item['qty'], $item['rate'], $item['amount']);
+        $s_item->bind_param("iiidddd", $invoice_id, $item['pid'], $item['qty'], $item['rate'], $item['amount'], $item['disc_pct'], $item['disc_amt']);
         $s_item->execute();
     }
     $s_item->close();

@@ -91,7 +91,7 @@ error_reporting(0);
                         
                         // Get products for table headers
                         $products = array();
-                        $select_products = "SELECT * FROM products ORDER BY id ASC";
+                        $select_products = "SELECT * FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC";
                         $fetch_products = mysqli_query($db_conn, $select_products);
                         while($result_products = mysqli_fetch_array($fetch_products)) {
                             $products[] = $result_products;

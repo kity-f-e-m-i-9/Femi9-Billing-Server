@@ -24,7 +24,8 @@ ini_set('log_errors', 1);
 
 function redirect_back($params) {
     $query = http_build_query(array_merge([
-        'expense_month' => $_POST['expense_month'] ?? '',
+        'from_date' => $_POST['from_date'] ?? '',
+        'to_date' => $_POST['to_date'] ?? '',
         'company_id' => $_POST['company_id'] ?? '',
     ], $params));
     header("Location: expense-tracker.php?$query");
@@ -44,16 +45,25 @@ if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_to
 }
 
 $company_id = (int)($_POST['company_id'] ?? 0);
-$expense_month = $_POST['expense_month'] ?? '';
+$period_from = $_POST['from_date'] ?? '';
+$period_to   = $_POST['to_date'] ?? '';
 
 if ($company_id <= 0 || !is_godown_allowed($db_conn, $company_id)) {
     redirect_back(['err' => 'Invalid or unauthorized company profile']);
 }
 
-if (!preg_match('/^\d{4}-\d{2}$/', $expense_month)) {
-    redirect_back(['err' => 'Invalid month']);
+$from_ts = preg_match('/^\d{4}-\d{2}-\d{2}$/', $period_from) ? strtotime($period_from) : false;
+$to_ts   = preg_match('/^\d{4}-\d{2}-\d{2}$/', $period_to)   ? strtotime($period_to)   : false;
+if ($from_ts === false || $to_ts === false) {
+    redirect_back(['err' => 'Please provide a valid From Date and To Date']);
 }
-$expense_month_date = $expense_month . '-01';
+if ($to_ts < $from_ts) {
+    redirect_back(['err' => 'To Date cannot be before From Date']);
+}
+// expense_month stays in sync with period_from's month, so the existing
+// month-bucketed queries on this page and in mis-report.php's net profit
+// calc keep working unchanged for uploads that cover a single month.
+$expense_month_date = date('Y-m-01', $from_ts);
 
 if (empty($_FILES['tally_file']) || $_FILES['tally_file']['error'] !== UPLOAD_ERR_OK) {
     redirect_back(['err' => 'File upload failed. Please try again.']);
@@ -193,14 +203,17 @@ mysqli_begin_transaction($db_conn);
 try {
     $uploaded_by = $_SESSION['LOGIN_USER'] ?? '';
 
+    $period_from_date = date('Y-m-d', $from_ts);
+    $period_to_date   = date('Y-m-d', $to_ts);
+
     $stmt = $db_conn->prepare("
         INSERT INTO expense_imports
-            (company_id, expense_month, source_filename, group_name, period_label, total_debit, total_credit, net_amount, uploaded_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (company_id, expense_month, period_from, period_to, source_filename, group_name, period_label, total_debit, total_credit, net_amount, uploaded_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->bind_param(
-        "issssddds",
-        $company_id, $expense_month_date, $original_name, $group_name, $period_label,
+        "issssssddds",
+        $company_id, $expense_month_date, $period_from_date, $period_to_date, $original_name, $group_name, $period_label,
         $parsed_debit, $parsed_credit, $net_amount, $uploaded_by
     );
     $stmt->execute();

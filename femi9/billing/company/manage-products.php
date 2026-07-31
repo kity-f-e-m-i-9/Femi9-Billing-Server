@@ -121,7 +121,7 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from products order by id asc";
+										<?php $select_product_list="select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{

@@ -429,7 +429,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<th>Total Taxable Value</th>
 							</tr>
 							
-							<?php $select_hsnwise_total="SELECT DISTINCT hsn FROM products ORDER BY hsn ASC";
+							<?php $select_hsnwise_total="SELECT DISTINCT hsn FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY hsn ASC";
 							$fetch_hsnwise_total=mysqli_query($db_conn,$select_hsnwise_total);
 							while($result_hsnwise_total=mysqli_fetch_array($fetch_hsnwise_total)){
 								

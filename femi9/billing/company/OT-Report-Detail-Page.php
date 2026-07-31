@@ -781,7 +781,7 @@ $page_title = htmlspecialchars($Report_LABEL . ' : ' . ($business_name ?? 'Busin
 <?php
 // Fetch all products
 $products = [];
-$stmt_products = $db_conn->prepare("SELECT id, productName FROM products ORDER BY id ASC");
+$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
 if (!$stmt_products) {
     die("Product query preparation failed: " . htmlspecialchars($db_conn->error, ENT_QUOTES, 'UTF-8'));
 }

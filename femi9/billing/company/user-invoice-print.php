@@ -7,6 +7,19 @@ $Invoice_ID=base64_decode($Invoice_ID);
 $select_Invoice_Details="select * from user_invoice where inv_id='$Invoice_ID'";
 $fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
+// Needed early (before the item table) as well as in the GST summary
+// section further down, so it's pulled up here rather than declared once
+// down there.
+$gsttype=$result_Invoice_Details['gst_type'];
+
+// Trims a rate like 1.50 down to "1.5" or 9.00 down to "9" — CGST/SGST is
+// always exactly half the item's GST%, which is often a non-whole number
+// (e.g. 3% GST -> 1.5% + 1.5%), so this avoids both misleading rounding
+// (inr_format's 0-decimal rounding would show 1.5% as "2%") and clutter
+// like "1.50%" for a value that's actually whole.
+function fmt_gst_pct($v) {
+    return rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
+}
 
 //customer details
 $getinvuser=$result_Invoice_Details['to_user_type'];
@@ -394,13 +407,21 @@ Terms of Delivery<br/>
 		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
-		$TotalAMount=$result_INVProductDetails['qty']*$result_INVProductDetails['amount'];
-		$TotalAMount23=$TotalAMount-$result_INVProductDetails['discount_amount'];
+		// Taxable (excl.-of-tax) line value, derived from the stored total/
+		// gstamount_total columns rather than recomputed from qty*rate — this
+		// is correct regardless of the product's GST setting: for 'exclusive'
+		// products gstamount_total was added on top of subtotal to get total,
+		// for 'inclusive' products it was carved out of subtotal instead (see
+		// the GST fix in user-invoice-action2.php etc.), so total minus
+		// gstamount_total always equals the taxable value either way.
+		$TotalAMount23=(float)$result_INVProductDetails['total']-(float)$result_INVProductDetails['gstamount_total'];
 		$TotalAMount123+=$TotalAMount23;
-		
+
 		$Totalquantity=$result_INVProductDetails['qty'];
 		$Totalquantity123+=$Totalquantity;
-		
+
+		$taxable_rate = $Totalquantity > 0 ? $TotalAMount23 / $Totalquantity : 0;
+
 		$discountamount_show=inr_format($result_INVProductDetails['discount_amount'], 2);
 		$discountpercentage_show=inr_format($result_INVProductDetails['discount_percentage'], 0);
 	?>
@@ -410,7 +431,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"><?=$result_ProductDetails123['hsn'];?></td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2);?></td>
-<td id="rightlaign"><?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
+<td id="rightlaign"><?php echo inr_format($taxable_rate, 2);?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?=$result_INVProductDetails['gst_percentage'];?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=$discountpercentage_show;?>%)</td>
@@ -439,9 +460,7 @@ Terms of Delivery<br/>
 
 <!------------------------------------------------------------------>
 <!------------------------------GST--------------------------------->
-<?php 
-$gsttype=$result_Invoice_Details['gst_type'];
-
+<?php
 $select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
 $fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
 $result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
@@ -449,17 +468,25 @@ $totalgstamount=$result_sum_gstamount[0];
 
 if($totalgstamount>0)
 {
+// Rate shown alongside the SGST/CGST/IGST label below — MAX() rather than
+// an average, since a mixed-rate invoice has no single correct "the" rate;
+// MAX at least reflects a real line on the invoice rather than a blended
+// number that matches nothing on it.
+$__gst_pct_row = mysqli_fetch_assoc(mysqli_query($db_conn, "SELECT MAX(gst_percentage) AS pct FROM user_invoice_items WHERE inv_id='$Invoice_ID'"));
+$__inv_gst_pct = (float)($__gst_pct_row['pct'] ?? 0);
+
 if($gsttype=="inner"){
-	
+
 $SGST=$totalgstamount/2;
 $SGST=inr_format($SGST, 2);
 
 $CGST=$totalgstamount/2;
 $CGST=inr_format($CGST, 2);
+$__half_pct = fmt_gst_pct($__inv_gst_pct / 2);
 ?>
 <tr id="bottombordervl">
 <td></td>
-<td id="rightlaign"><b><i>SGST</i></b></td>
+<td id="rightlaign"><b><i>SGST (<?=$__half_pct;?>%)</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
 <td></td>
@@ -471,7 +498,7 @@ $CGST=inr_format($CGST, 2);
 </tr>
 <tr id="bottombordervl">
 <td></td>
-<td id="rightlaign"><b><i>CGST</i></b></td>
+<td id="rightlaign"><b><i>CGST (<?=$__half_pct;?>%)</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
 <td></td>
@@ -484,7 +511,7 @@ $CGST=inr_format($CGST, 2);
 <?php }else{?>
 <tr id="bottombordervl">
 <td></td>
-<td id="rightlaign"><b><i>IGST</i></b></td>
+<td id="rightlaign"><b><i>IGST (<?=fmt_gst_pct($__inv_gst_pct);?>%)</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
 <td></td>
@@ -619,38 +646,85 @@ $number = $result_Invoice_Details['total'];
 
 <!---------------------HSN WISE TOTAL------------------------------>
 <table width="100%" id="hsnsac">
+<?php if($gsttype=="inner"){ ?>
 <tr>
-<td width="70%" align="center">HSN/SAC</td>
-<td align="right">Taxable Value</td>
+<td align="center">HSN/SAC</td>
+<td align="right">Taxable<br/>Value</td>
+<td align="right" colspan="2">CGST</td>
+<td align="right" colspan="2">SGST/UTGST</td>
+<td align="right">Total<br/>Tax Amount</td>
 </tr>
-<?php 
-//$selecthsn="select distinct hsn from user_invoice_items where inv_id='$Invoice_ID' and gst_percentage>0";
+<tr>
+<td></td><td></td>
+<td align="right">Rate</td><td align="right">Amount</td>
+<td align="right">Rate</td><td align="right">Amount</td>
+<td></td>
+</tr>
+<?php }else{ ?>
+<tr>
+<td align="center">HSN/SAC</td>
+<td align="right">Taxable<br/>Value</td>
+<td align="right">IGST<br/>Rate</td>
+<td align="right">IGST<br/>Amount</td>
+<td align="right">Total<br/>Tax Amount</td>
+</tr>
+<?php } ?>
+<?php
 $selecthsn="select distinct hsn from user_invoice_items where inv_id='$Invoice_ID'";
 $fetchhsn=mysqli_query($db_conn,$selecthsn);
+$hsn_grand_taxable=0; $hsn_grand_gst=0;
 while($resulthsn=mysqli_fetch_array($fetchhsn)){
-	
+
 	$hsncode=$resulthsn['hsn'];
-//sum hsn taxable Amount
-$selecthsnTaxamount="select sum(total) from user_invoice_items where inv_id='$Invoice_ID' and hsn='$hsncode'";
-$fetchhsnTaxamount=mysqli_query($db_conn,$selecthsnTaxamount);
-$resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
+	// total-gstamount_total = taxable value regardless of whether GST was added on top or carved out (see the GST fix in user-invoice-action2.php etc.)
+	$selecthsnTaxamount="select sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst, max(gst_percentage) as pct from user_invoice_items where inv_id='$Invoice_ID' and hsn='$hsncode'";
+	$fetchhsnTaxamount=mysqli_query($db_conn,$selecthsnTaxamount);
+	$resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
+	$hsn_taxable = (float)$resulthsnTaxamount['taxable'];
+	$hsn_gst     = (float)$resulthsnTaxamount['gst'];
+	$hsn_pct     = (float)$resulthsnTaxamount['pct'];
+	$hsn_grand_taxable += $hsn_taxable;
+	$hsn_grand_gst      += $hsn_gst;
 ?>
+<?php if($gsttype=="inner"): $hsn_half_rate=$hsn_pct/2; $hsn_half_amt=$hsn_gst/2; ?>
 <tr>
 <td><?=$hsncode;?></td>
-<td  align="right"><?=inr_format($resulthsnTaxamount[0], 2)?></td>
+<td align="right"><?=inr_format($hsn_taxable, 2)?></td>
+<td align="right"><?=fmt_gst_pct($hsn_half_rate)?>%</td>
+<td align="right"><?=inr_format($hsn_half_amt, 2)?></td>
+<td align="right"><?=fmt_gst_pct($hsn_half_rate)?>%</td>
+<td align="right"><?=inr_format($hsn_half_amt, 2)?></td>
+<td align="right"><?=inr_format($hsn_gst, 2)?></td>
 </tr>
-<?php }
-
-//sum hsn taxable Amount
-//$selecthsnTaxamount12="select sum(total) from user_invoice_items where inv_id='$Invoice_ID' and gst_percentage>0";
-$selecthsnTaxamount12="select sum(total) from user_invoice_items where inv_id='$Invoice_ID'";
-$fetchhsnTaxamount12=mysqli_query($db_conn,$selecthsnTaxamount12);
-$resulthsnTaxamount12=mysqli_fetch_array($fetchhsnTaxamount12);
-?>
+<?php else: ?>
+<tr>
+<td><?=$hsncode;?></td>
+<td align="right"><?=inr_format($hsn_taxable, 2)?></td>
+<td align="right"><?=fmt_gst_pct($hsn_pct)?>%</td>
+<td align="right"><?=inr_format($hsn_gst, 2)?></td>
+<td align="right"><?=inr_format($hsn_gst, 2)?></td>
+</tr>
+<?php endif; ?>
+<?php } ?>
+<?php if($gsttype=="inner"): ?>
 <tr>
 <td align="right"><b>Total&nbsp;</b></td>
-<td align="right"><b><?=inr_format($resulthsnTaxamount12[0], 2)?></b></td>
+<td align="right"><b><?=inr_format($hsn_grand_taxable, 2)?></b></td>
+<td></td>
+<td align="right"><b><?=inr_format($hsn_grand_gst/2, 2)?></b></td>
+<td></td>
+<td align="right"><b><?=inr_format($hsn_grand_gst/2, 2)?></b></td>
+<td align="right"><b><?=inr_format($hsn_grand_gst, 2)?></b></td>
 </tr>
+<?php else: ?>
+<tr>
+<td align="right"><b>Total&nbsp;</b></td>
+<td align="right"><b><?=inr_format($hsn_grand_taxable, 2)?></b></td>
+<td></td>
+<td align="right"><b><?=inr_format($hsn_grand_gst, 2)?></b></td>
+<td align="right"><b><?=inr_format($hsn_grand_gst, 2)?></b></td>
+</tr>
+<?php endif; ?>
 </table>
 <!---------------------HSN WISE TOTAL----END***------------------------->
 
@@ -692,6 +766,25 @@ $TAXnumber = $totalgstamount;
   
   $TAXstr = array_reverse($TAXstr);
   $TAXresult = implode('', $TAXstr);
+
+  // Paise portion — without this, a tax amount under ₹1 (e.g. ₹0.73,
+  // common on small-value lines) has $TAXno=0 above, so $TAXresult comes out
+  // empty and "Tax Amount (in words)" prints as just "INR  Only" with
+  // nothing in it.
+  $TAXpaise = (int) round(($totalgstamount - floor($totalgstamount)) * 100);
+  $TAXpaise_words = '';
+  if ($TAXpaise > 0) {
+      $TAXpaise_words = ($TAXpaise < 21)
+          ? $TAXwords[$TAXpaise]
+          : trim($TAXwords[floor($TAXpaise / 10) * 10] . " " . $TAXwords[$TAXpaise % 10]);
+  }
+  if (trim($TAXresult) !== '' && $TAXpaise_words !== '') {
+      $TAXresult = trim($TAXresult) . ' Rupees and ' . $TAXpaise_words . ' Paise';
+  } elseif ($TAXpaise_words !== '') {
+      $TAXresult = $TAXpaise_words . ' Paise';
+  } elseif (trim($TAXresult) === '') {
+      $TAXresult = 'Zero';
+  }
   /*$TAXpoints = ($TAXpoint) ?
     "." . $TAXwords[$TAXpoint / 10] . " " . 
           $TAXwords[$TAXpoint = $TAXpoint % 10] : '';*/
@@ -761,6 +854,7 @@ $TAXnumber = $totalgstamount;
 </table>
 <div style="clear:both;"></div>
 </div>
+<div align="center">SUBJECT TO ERODE JURISDICTION</div>
 <div align="center">This is a Computer Generated Invoice</div>
 			
 			

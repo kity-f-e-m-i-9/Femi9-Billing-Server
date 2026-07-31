@@ -404,3 +404,96 @@
 [06-Jun-2026 04:49:22 UTC] Outer transaction COMMITTED
 [06-Jun-2026 04:49:22 UTC] === INVOICE SUBMISSION COMPLETED: 6855282663CMPDST060626101033 ===
 [06-Jun-2026 04:49:22 UTC] ================================================================================
+[27-Jul-2026 08:11:39 UTC] ================================================================================
+[27-Jul-2026 08:11:39 UTC] === INVOICE SUBMISSION STARTED ===
+[27-Jul-2026 08:11:39 UTC] Invoice ID: 9146665139CMPSS27072614118 | Time: 2026-07-27 08:11:39
+[27-Jul-2026 08:11:39 UTC] ================================================================================
+[27-Jul-2026 08:11:39 UTC] Company: 1 (company)
+[27-Jul-2026 08:11:39 UTC] Customer: 14866FSPST26072413719 (super_stockiest)
+[27-Jul-2026 08:11:39 UTC] Requires advance: YES
+[27-Jul-2026 08:11:39 UTC] Mode: NEW
+[27-Jul-2026 08:11:39 UTC] Totals — Sub: 25.75  Disc: 0  Credit: 0  Courier: 0  Total: 25.75
+[27-Jul-2026 08:11:39 UTC] === ADVANCE PAYMENT START ===
+[27-Jul-2026 08:11:39 UTC] Advance deducted: Rs.25.75
+[27-Jul-2026 08:11:39 UTC] === ADVANCE PAYMENT END ===
+[27-Jul-2026 08:11:39 UTC] Outer transaction started
+[27-Jul-2026 08:11:39 UTC] Receipt created: advance_product Rs.25.75
+[27-Jul-2026 08:11:39 UTC] Invoice totals updated
+[27-Jul-2026 08:11:39 UTC] === STOCK UPDATE (StockService) START === Invoice: 9146665139CMPSS27072614118
+[27-Jul-2026 08:11:39 UTC] Processing product=21 qty=1 seller=company/1 buyer=super_stockiest/14866FSPST26072413719
+[27-Jul-2026 08:11:39 UTC] === STOCK UPDATE COMPLETED === 1 items processed
+[27-Jul-2026 08:11:39 UTC] Stock update completed
+[27-Jul-2026 08:11:39 UTC] Invoice status set to 'submitted' (1 row)
+[27-Jul-2026 08:11:39 UTC] Outer transaction COMMITTED
+[27-Jul-2026 08:11:39 UTC] === INVOICE SUBMISSION COMPLETED: 9146665139CMPSS27072614118 ===
+[27-Jul-2026 08:11:39 UTC] ================================================================================
+[27-Jul-2026 08:21:08 UTC] ================================================================================
+[27-Jul-2026 08:21:08 UTC] === INVOICE SUBMISSION STARTED ===
+[27-Jul-2026 08:21:08 UTC] Invoice ID: 9585859533CMPSS27072615005 | Time: 2026-07-27 08:21:08
+[27-Jul-2026 08:21:08 UTC] ================================================================================
+[27-Jul-2026 08:21:08 UTC] Company: 1 (company)
+[27-Jul-2026 08:21:08 UTC] Customer: 14866FSPST26072413719 (super_stockiest)
+[27-Jul-2026 08:21:08 UTC] Requires advance: YES
+[27-Jul-2026 08:21:08 UTC] Mode: NEW
+[27-Jul-2026 08:21:08 UTC] Totals — Sub: 25  Disc: 0  Credit: 0  Courier: 0  Total: 25
+[27-Jul-2026 08:21:08 UTC] === ADVANCE PAYMENT START ===
+[27-Jul-2026 08:21:08 UTC] Advance deducted: Rs.25.00
+[27-Jul-2026 08:21:08 UTC] === ADVANCE PAYMENT END ===
+[27-Jul-2026 08:21:08 UTC] Outer transaction started
+[27-Jul-2026 08:21:08 UTC] Receipt created: advance_product Rs.25
+[27-Jul-2026 08:21:08 UTC] Invoice totals updated
+[27-Jul-2026 08:21:08 UTC] === STOCK UPDATE (StockService) START === Invoice: 9585859533CMPSS27072615005
+[27-Jul-2026 08:21:08 UTC] Processing product=21 qty=1 seller=company/1 buyer=super_stockiest/14866FSPST26072413719
+[27-Jul-2026 08:21:08 UTC] === STOCK UPDATE COMPLETED === 1 items processed
+[27-Jul-2026 08:21:08 UTC] Stock update completed
+[27-Jul-2026 08:21:08 UTC] Invoice status set to 'submitted' (1 row)
+[27-Jul-2026 08:21:08 UTC] Outer transaction COMMITTED
+[27-Jul-2026 08:21:08 UTC] === INVOICE SUBMISSION COMPLETED: 9585859533CMPSS27072615005 ===
+[27-Jul-2026 08:21:08 UTC] ================================================================================
+[27-Jul-2026 08:49:02 UTC] ================================================================================
+[27-Jul-2026 08:49:02 UTC] === INVOICE SUBMISSION STARTED ===
+[27-Jul-2026 08:49:02 UTC] Invoice ID: 3853571535CMPSS27072621837 | Time: 2026-07-27 08:49:02
+[27-Jul-2026 08:49:02 UTC] ================================================================================
+[27-Jul-2026 08:49:02 UTC] Company: 1 (company)
+[27-Jul-2026 08:49:02 UTC] Customer: 14866FSPST26072413719 (super_stockiest)
+[27-Jul-2026 08:49:02 UTC] Requires advance: YES
+[27-Jul-2026 08:49:02 UTC] Mode: NEW
+[27-Jul-2026 08:49:02 UTC] Totals — Sub: 165  Disc: 0  Credit: 0  Courier: 0  Total: 165
+[27-Jul-2026 08:49:02 UTC] === ADVANCE PAYMENT START ===
+[27-Jul-2026 08:49:02 UTC] Advance deducted: Rs.165.00
+[27-Jul-2026 08:49:02 UTC] === ADVANCE PAYMENT END ===
+[27-Jul-2026 08:49:02 UTC] Outer transaction started
+[27-Jul-2026 08:49:02 UTC] Receipt created: advance_product Rs.165
+[27-Jul-2026 08:49:02 UTC] Invoice totals updated
+[27-Jul-2026 08:49:02 UTC] === STOCK UPDATE (StockService) START === Invoice: 3853571535CMPSS27072621837
+[27-Jul-2026 08:49:02 UTC] Processing product=1 qty=1 seller=company/1 buyer=super_stockiest/14866FSPST26072413719
+[27-Jul-2026 08:49:02 UTC] Processing product=21 qty=1 seller=company/1 buyer=super_stockiest/14866FSPST26072413719
+[27-Jul-2026 08:49:02 UTC] === STOCK UPDATE COMPLETED === 2 items processed
+[27-Jul-2026 08:49:02 UTC] Stock update completed
+[27-Jul-2026 08:49:02 UTC] Invoice status set to 'submitted' (1 row)
+[27-Jul-2026 08:49:02 UTC] Outer transaction COMMITTED
+[27-Jul-2026 08:49:02 UTC] === INVOICE SUBMISSION COMPLETED: 3853571535CMPSS27072621837 ===
+[27-Jul-2026 08:49:02 UTC] ================================================================================
+[29-Jul-2026 11:11:24 UTC] ================================================================================
+[29-Jul-2026 11:11:24 UTC] === INVOICE SUBMISSION STARTED ===
+[29-Jul-2026 11:11:24 UTC] Invoice ID: 4782648772CMPSS29072643936 | Time: 2026-07-29 11:11:24
+[29-Jul-2026 11:11:24 UTC] ================================================================================
+[29-Jul-2026 11:11:24 UTC] Company: 1 (company)
+[29-Jul-2026 11:11:24 UTC] Customer: 14866FSPST26072413719 (super_stockiest)
+[29-Jul-2026 11:11:24 UTC] Requires advance: YES
+[29-Jul-2026 11:11:24 UTC] Mode: NEW
+[29-Jul-2026 11:11:24 UTC] Totals — Sub: 1390  Disc: 0  Credit: 0  Courier: 0  Total: 1390
+[29-Jul-2026 11:11:24 UTC] === ADVANCE PAYMENT START ===
+[29-Jul-2026 11:11:24 UTC] Advance deducted: Rs.1,390.00
+[29-Jul-2026 11:11:24 UTC] === ADVANCE PAYMENT END ===
+[29-Jul-2026 11:11:24 UTC] Outer transaction started
+[29-Jul-2026 11:11:24 UTC] Receipt created: advance_product Rs.1390
+[29-Jul-2026 11:11:24 UTC] Invoice totals updated
+[29-Jul-2026 11:11:24 UTC] === STOCK UPDATE (StockService) START === Invoice: 4782648772CMPSS29072643936
+[29-Jul-2026 11:11:24 UTC] Processing product=1 qty=10 seller=company/1 buyer=super_stockiest/14866FSPST26072413719
+[29-Jul-2026 11:11:24 UTC] === STOCK UPDATE COMPLETED === 1 items processed
+[29-Jul-2026 11:11:24 UTC] Stock update completed
+[29-Jul-2026 11:11:24 UTC] Invoice status set to 'submitted' (1 row)
+[29-Jul-2026 11:11:24 UTC] Outer transaction COMMITTED
+[29-Jul-2026 11:11:24 UTC] === INVOICE SUBMISSION COMPLETED: 4782648772CMPSS29072643936 ===
+[29-Jul-2026 11:11:24 UTC] ================================================================================

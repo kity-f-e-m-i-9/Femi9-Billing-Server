@@ -175,10 +175,19 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     </li>
 
 					<li>
+                        <a href="#"><i class="material-icons-two-tone">inventory_2</i>Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="neksomo-purchase-stock.php">Purchase Stock</a></li>
+						<li><a href="neksomo-company-stock.php">Company Stock</a></li>
+                        </ul>
+                    </li>
+
+					<li>
                         <a href="#"><i class="material-icons-two-tone">add_box</i>Products<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="neksomo-product-add.php">Add Product</a></li>
 						<li><a href="neksomo-manage-products.php">Manage Products</a></li>
+						<li><a href="neksomo-product-map-list.php">Map Products</a></li>
                         </ul>
                     </li>
 
@@ -220,14 +229,6 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <li><a href="manage-input">Manage Input Stocks</a></li>
 						<li><a href="add-input-users">Add Input Stock Users</a></li>
                         <li><a href="manage-input-users">Manage Input Stocks Users</a></li>
-                        </ul>
-                    </li>
-
-					<li>
-                        <a href="#"><i class="material-icons-two-tone">done</i>Overall Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
-                        <ul class="sub-menu">
-                            <li><a href="overall-stock">Company Overall Stock</a></li>
-                            <li><a href="overall-stock-users">Overall Stock - Users</a></li>
                         </ul>
                     </li>
 
@@ -312,6 +313,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 								<li><a href="tp-cnote-manage">TP Credit Notes</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
 							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
+							<li><a href="tp-wallet-referral-calculator">TP Wallet Referral Calculator</a></li>
                         </ul>
                     </li>
 					<!----------------------Stock Transfers--------------------------->
@@ -775,6 +777,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 								<li><a href="tp-cnote-manage">TP Credit Notes</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
 							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
+							<li><a href="tp-wallet-referral-calculator">TP Wallet Referral Calculator</a></li>
                         </ul>
                     </li>
 					<?php }?>
