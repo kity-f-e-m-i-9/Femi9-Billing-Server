@@ -23,6 +23,7 @@ $advBalance = 0;
     <link rel="icon" type="image/png" href="../../assets/images/neptune.png">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link href="../../assets/plugins/select2/css/select2.min.css" rel="stylesheet">
 </head>
 <body>
 <div class="app align-content-stretch d-flex flex-wrap">
@@ -102,8 +103,21 @@ $tempid = "" . $randum_number . "DFD/" . $temp_date . "/" . $temp_time . "";
 <br/>
 
 <script>
+function reinitProductSelects() {
+    // select2 wraps each select in extra markup, so strip it back to the
+    // plain <select> before cloning a row and only re-wrap once the clone
+    // is in place -- otherwise the clone duplicates the widget, not the field.
+    $('select[name="product_id[]"]').each(function() {
+        if ($(this).hasClass('select2-hidden-accessible')) { $(this).select2('destroy'); }
+    });
+    $('select[name="product_id[]"]').select2({ width: '100%', placeholder: 'Select Product' });
+}
+
 function addRow(tableID) {
     var table = document.getElementById(tableID);
+    $('select[name="product_id[]"]').each(function() {
+        if ($(this).hasClass('select2-hidden-accessible')) { $(this).select2('destroy'); }
+    });
     var rowCount = table.rows.length;
     if (rowCount < 100) {
         var row = table.insertRow(rowCount);
@@ -115,6 +129,7 @@ function addRow(tableID) {
     } else {
         alert("Maximum 100 rows allowed.");
     }
+    $('select[name="product_id[]"]').select2({ width: '100%', placeholder: 'Select Product' });
 }
 function deleteRow(tableID) {
     var table = document.getElementById(tableID);
@@ -183,11 +198,13 @@ function deleteRow(tableID) {
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
 <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
 <script src="../../assets/plugins/pace/pace.min.js"></script>
+<script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 flatpickr("#bookingDate", { dateFormat: "Y-m-d", maxDate: "today" });
+$(document).ready(function() { reinitProductSelects(); });
 </script>
 </body>
 </html>

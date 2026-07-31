@@ -98,7 +98,13 @@ $Cust_Mbile = $resCust['mobile'] ?? '';
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
 <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
 <script src="../../assets/plugins/pace/pace.min.js"></script>
+<script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script>
+$(document).ready(function() {
+    $('select[name="new_customer_id"]').select2({ width: '100%', placeholder: 'Select Customer', allowClear: true });
+});
+</script>
 </body>
 </html>

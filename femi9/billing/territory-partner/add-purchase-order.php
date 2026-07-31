@@ -149,6 +149,10 @@ if ($resProd) while ($p = mysqli_fetch_assoc($resProd)) $productList[] = $p;
     <script src="../../assets/js/custom.js"></script>
 
     <script>
+    $(document).ready(function() {
+        $('#pr_select').select2({ width: '100%', placeholder: 'Select Product' });
+    });
+
     var poLines = [];
 
     function showPoPrice(str) {
@@ -189,7 +193,7 @@ if ($resProd) while ($p = mysqli_fetch_assoc($resProd)) $productList[] = $p;
         poLines.push({ pr_id: prId, name: prName, qty: qty, price: price, discPct: discPct, discAmt: discAmt });
         renderPoLines();
 
-        sel.value = '';
+        $(sel).val('').trigger('change');
         document.getElementById('po_qty').value = '';
         document.getElementById('po_price').value = '';
         document.getElementById('po_total').value = '';
