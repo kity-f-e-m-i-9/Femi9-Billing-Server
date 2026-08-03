@@ -116,8 +116,10 @@ if (!empty($markeingSTFID)) {
 }
 
 // ── Products — fetched once, used in GET ORDER form ───────────────────────────
+// Neksomo-sourced products (temp_id LIKE 'NKS-%') are excluded from selection
+// here, same convention as the shop/customer/TP invoice "add product" dropdowns.
 $productList = [];
-$r = mysqli_query($db_conn, "SELECT id, productName FROM products ORDER BY productName ASC");
+$r = mysqli_query($db_conn, "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 while ($p = mysqli_fetch_assoc($r)) $productList[] = $p;
 
 // ── Active TPs — used to populate the "Assign To TP" dropdown, filtered
@@ -355,7 +357,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                         <tr>
                                                             <td><input type="checkbox" name="chk[]"/></td>
                                                             <td>
-                                                                <select required name="pr_id[]" class="form-control">
+                                                                <select required name="pr_id[]" class="form-control product-select">
                                                                     <option value="" hidden>Select Product</option>
                                                                     <?php foreach($productList as $p): ?>
                                                                     <option value="<?=$p['id']?>"><?=htmlspecialchars($p['productName'])?></option>
@@ -411,6 +413,18 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     var firkaTpData     = <?php echo json_encode($firkaTpMap); ?>;
 
     // ── Add / Remove product rows ────────────────────────────────────────────
+    // The product cell's pristine markup is captured once, before select2 gets
+    // anywhere near it — select2 hides the original <select> and appends its
+    // own generated widget as a sibling, so cloning a select2-ized cell's live
+    // innerHTML (as this used to) would duplicate that generated widget into
+    // the new row instead of a plain, initializable <select>.
+    var productCellIndex    = 1; // checkbox, product select, qty
+    var productCellTemplate = null;
+
+    function initProductSearch($scope) {
+        $scope.find('select.product-select').select2({ placeholder: 'Search product…', width: '100%' });
+    }
+
     function addRow(tableID) {
         var table    = document.getElementById(tableID);
         var rowCount = table.rows.length;
@@ -418,13 +432,24 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
             var row      = table.insertRow(rowCount);
             var colCount = table.rows[0].cells.length;
             for (var i = 0; i < colCount; i++) {
-                var newcell       = row.insertCell(i);
-                newcell.innerHTML = table.rows[0].cells[i].innerHTML;
+                var newcell = row.insertCell(i);
+                newcell.innerHTML = (i === productCellIndex && productCellTemplate !== null)
+                    ? productCellTemplate
+                    : table.rows[0].cells[i].innerHTML;
             }
+            initProductSearch($(row));
         } else {
             alert("Maximum allowed record is 100.");
         }
     }
+
+    $(document).ready(function() {
+        var tbl = document.getElementById('dataTable');
+        if (tbl && tbl.rows.length) {
+            productCellTemplate = tbl.rows[0].cells[productCellIndex].innerHTML;
+        }
+        initProductSearch($('#dataTable'));
+    });
 
     function deleteRow(tableID) {
         var table    = document.getElementById(tableID);

@@ -251,7 +251,7 @@ function deleteRow(tableID) {
 						 <td>
 							<select name="pr_id[]" class="form-control">
 <option value="" hidden="">Select Product</option>
-<?php $select_product_list12="select * from products";
+<?php $select_product_list12="select * from products where (temp_id not like 'NKS-%' or temp_id is null)";
 										$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
 										while($result_product_list12=mysqli_fetch_array($fetch_product_list12))
 										{
