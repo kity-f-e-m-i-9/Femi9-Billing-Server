@@ -113,6 +113,103 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 						$select_msDetails12="select * from marketing_staff where id='$se_msid'";
 $fetch_msDetails12=mysqli_query($db_conn,$select_msDetails12);
 $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
+
+// ── Per-DM summary cards ────────────────────────────────────────────────
+// Same 6 KPI cards the DM sees on their own manage_order_product.php,
+// shown here too once the company narrows the view down to one DM —
+// scoped by $se_msid instead of the DM's own session id.
+if ($se_msid != NULL) {
+    $se_msidEsc = mysqli_real_escape_string($db_conn, $se_msid);
+
+    $getOrderCount = 0; $noOrderCount = 0;
+    $resGN = mysqli_query($db_conn,
+        "SELECT new_order, COUNT(DISTINCT order_id) c FROM ms_orders
+         WHERE ms_id='$se_msidEsc' AND order_date BETWEEN '$from_date' AND '$to_date'
+         GROUP BY new_order"
+    );
+    while ($gr = mysqli_fetch_assoc($resGN)) {
+        if ($gr['new_order'] === 'yes') { $getOrderCount = (int)$gr['c']; }
+        else { $noOrderCount = (int)$gr['c']; }
+    }
+
+    $productNeeded = [];
+    $totalQtyNeeded = 0;
+    $resPQ = mysqli_query($db_conn,
+        "SELECT mo.pr_id, p.productName, SUM(mo.qty) totalqty
+         FROM ms_orders mo LEFT JOIN products p ON p.id=mo.pr_id
+         WHERE mo.ms_id='$se_msidEsc' AND mo.new_order='yes'
+               AND mo.order_date BETWEEN '$from_date' AND '$to_date'
+         GROUP BY mo.pr_id ORDER BY totalqty DESC"
+    );
+    while ($pr = mysqli_fetch_assoc($resPQ)) {
+        $productNeeded[] = ['name' => $pr['productName'] ?: '-', 'qty' => (int)$pr['totalqty']];
+        $totalQtyNeeded += (int)$pr['totalqty'];
+    }
+
+    $invoiceIds = [];
+    $resInv = mysqli_query($db_conn,
+        "SELECT DISTINCT t.invoiced_inv_id
+         FROM ms_orders o JOIN tp_orders t ON t.order_id=o.order_id
+         WHERE o.ms_id='$se_msidEsc' AND o.new_order='yes'
+               AND o.order_date BETWEEN '$from_date' AND '$to_date'
+               AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''"
+    );
+    while ($ir = mysqli_fetch_assoc($resInv)) { $invoiceIds[] = $ir['invoiced_inv_id']; }
+
+    $invoiceCount = count($invoiceIds);
+    $totalInvoiceValue = 0;
+    $fullyPaidCount = 0; $fullyPaidValue = 0;
+    $partiallyPaidCount = 0; $partiallyPaidReceived = 0; $partiallyPaidInvIds = [];
+    $voidedCount = 0; $voidedValue = 0; $voidedInvIds = [];
+
+    if (!empty($invoiceIds)) {
+        $idList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $invoiceIds)) . "'";
+
+        $resVal = mysqli_query($db_conn, "SELECT inv_id, total, status FROM user_invoice WHERE inv_id IN ($idList)");
+        $invTotals = []; $invStatus = [];
+        while ($vr = mysqli_fetch_assoc($resVal)) {
+            $invTotals[$vr['inv_id']] = (float)$vr['total'];
+            $invStatus[$vr['inv_id']] = $vr['status'];
+            $totalInvoiceValue += (float)$vr['total'];
+        }
+
+        $resRec = mysqli_query($db_conn, "SELECT inv_id, SUM(received) received FROM receipt WHERE inv_id IN ($idList) GROUP BY inv_id");
+        $received = [];
+        while ($rr = mysqli_fetch_assoc($resRec)) { $received[$rr['inv_id']] = (float)$rr['received']; }
+
+        foreach ($invTotals as $iid => $tot) {
+            if (($invStatus[$iid] ?? '') === 'cancelled') {
+                $voidedCount++; $voidedValue += $tot; $voidedInvIds[] = $iid;
+                continue;
+            }
+            $rec = $received[$iid] ?? 0;
+            if ($rec >= $tot && $tot > 0) {
+                $fullyPaidCount++; $fullyPaidValue += $tot;
+            } elseif ($rec > 0) {
+                $partiallyPaidCount++; $partiallyPaidReceived += $rec; $partiallyPaidInvIds[] = $iid;
+            }
+        }
+    }
+
+    function msProrders_getProductBreakdown($db_conn, array $invIds): array {
+        if (empty($invIds)) { return []; }
+        $idList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $invIds)) . "'";
+        $res = mysqli_query($db_conn,
+            "SELECT uii.pr_id, p.productName, SUM(uii.qty) totalqty
+             FROM user_invoice_items uii LEFT JOIN products p ON p.id=uii.pr_id
+             WHERE uii.inv_id IN ($idList)
+             GROUP BY uii.pr_id ORDER BY totalqty DESC"
+        );
+        $out = [];
+        while ($row = mysqli_fetch_assoc($res)) {
+            $out[] = ['name' => $row['productName'] ?: '-', 'qty' => (int)$row['totalqty']];
+        }
+        return $out;
+    }
+
+    $partiallyPaidProducts = msProrders_getProductBreakdown($db_conn, $partiallyPaidInvIds);
+    $voidedProducts = msProrders_getProductBreakdown($db_conn, $voidedInvIds);
+}
 						?>
 						
                                     <h1>
@@ -176,10 +273,155 @@ while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 							</div>
 							<div style="clear:both;"></div>
 							<br/>
-							</form>	
-							
-							
-						
+							</form>
+
+							<?php if ($se_msid != NULL): ?>
+							<div class="row mb-3">
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card-wrap">
+							            <div class="mskpi-card mskpi-card-clickable">
+							                <i class="material-icons-outlined mskpi-ico">receipt_long</i>
+							                <div class="mskpi-t">Invoices Placed</div>
+							                <div class="mskpi-v"><?php echo (int)$invoiceCount; ?></div>
+							                <div class="mskpi-sub"><?php echo (int)$totalQtyNeeded; ?> products needed &middot; hover / tap for details</div>
+							            </div>
+							            <div class="mskpi-detail-panel">
+							                <div class="mskpi-detail-title">Products needed</div>
+							                <?php if (empty($productNeeded)): ?>
+							                    <div class="mskpi-detail-empty">No products in this range.</div>
+							                <?php else: foreach ($productNeeded as $pn): ?>
+							                    <div class="mskpi-detail-row"><span><?php echo htmlspecialchars($pn['name']); ?></span><span class="mskpi-detail-qty"><?php echo (int)$pn['qty']; ?></span></div>
+							                <?php endforeach; endif; ?>
+							            </div>
+							        </div>
+							    </div>
+
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card">
+							            <i class="material-icons-outlined mskpi-ico">payments</i>
+							            <div class="mskpi-t">Total Invoice Value</div>
+							            <div class="mskpi-v">&#8377;<?php echo inr_format($totalInvoiceValue, 2); ?></div>
+							        </div>
+							    </div>
+
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card">
+							            <i class="material-icons-outlined mskpi-ico">check_circle</i>
+							            <div class="mskpi-t">Fully Paid</div>
+							            <div class="mskpi-v"><?php echo (int)$fullyPaidCount; ?></div>
+							            <div class="mskpi-sub">&#8377;<?php echo inr_format($fullyPaidValue, 2); ?></div>
+							        </div>
+							    </div>
+
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card-wrap">
+							            <div class="mskpi-card mskpi-card-clickable">
+							                <i class="material-icons-outlined mskpi-ico">hourglass_bottom</i>
+							                <div class="mskpi-t">Partially Paid</div>
+							                <div class="mskpi-v"><?php echo (int)$partiallyPaidCount; ?></div>
+							                <div class="mskpi-sub">&#8377;<?php echo inr_format($partiallyPaidReceived, 2); ?> received &middot; hover / tap for details</div>
+							            </div>
+							            <div class="mskpi-detail-panel">
+							                <div class="mskpi-detail-title">Products in these invoices</div>
+							                <?php if (empty($partiallyPaidProducts)): ?>
+							                    <div class="mskpi-detail-empty">No partially paid invoices in this range.</div>
+							                <?php else: foreach ($partiallyPaidProducts as $pp): ?>
+							                    <div class="mskpi-detail-row"><span><?php echo htmlspecialchars($pp['name']); ?></span><span class="mskpi-detail-qty"><?php echo (int)$pp['qty']; ?></span></div>
+							                <?php endforeach; endif; ?>
+							            </div>
+							        </div>
+							    </div>
+
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card-wrap">
+							            <div class="mskpi-card mskpi-card-clickable">
+							                <i class="material-icons-outlined mskpi-ico">cancel</i>
+							                <div class="mskpi-t">Voided</div>
+							                <div class="mskpi-v"><?php echo (int)$voidedCount; ?></div>
+							                <div class="mskpi-sub">&#8377;<?php echo inr_format($voidedValue, 2); ?> voided &middot; hover / tap for details</div>
+							            </div>
+							            <div class="mskpi-detail-panel">
+							                <div class="mskpi-detail-title">Products in voided invoices</div>
+							                <?php if (empty($voidedProducts)): ?>
+							                    <div class="mskpi-detail-empty">No voided invoices in this range.</div>
+							                <?php else: foreach ($voidedProducts as $vp): ?>
+							                    <div class="mskpi-detail-row"><span><?php echo htmlspecialchars($vp['name']); ?></span><span class="mskpi-detail-qty"><?php echo (int)$vp['qty']; ?></span></div>
+							                <?php endforeach; endif; ?>
+							            </div>
+							        </div>
+							    </div>
+
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card">
+							            <i class="material-icons-outlined mskpi-ico">assignment_turned_in</i>
+							            <div class="mskpi-t">Get Order / No Order</div>
+							            <div class="mskpi-v"><span style="color:#0ca30c;"><?php echo (int)$getOrderCount; ?></span> / <span style="color:#d03b3b;"><?php echo (int)$noOrderCount; ?></span></div>
+							        </div>
+							    </div>
+							</div>
+							<style>
+							    .mskpi-card {
+							        background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+							        padding: 18px 20px; position: relative; overflow: hidden;
+							        height: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+							    }
+							    .mskpi-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background: #667eea; }
+							    .mskpi-card .mskpi-ico {
+							        width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+							        background: #eef1fd; color: #667eea; font-size:16px;
+							        position:absolute; right:14px; top:14px;
+							    }
+							    .mskpi-card .mskpi-t { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight:600; color: #6b7280; padding-right:38px; }
+							    .mskpi-card .mskpi-v { font-size: 22px; font-weight: 700; margin-top: 6px; color: #111827; }
+							    .mskpi-card .mskpi-sub { font-size: 11px; color: #6b7280; margin-top: 4px; }
+							    .mskpi-card-clickable { cursor: pointer; }
+							    .mskpi-card-clickable:hover { border-color: #667eea; }
+							    .mskpi-card-wrap { position: relative; }
+							    .mskpi-detail-panel {
+							        display: none;
+							        position: absolute; top: 100%; left: 0; right: auto; z-index: 30;
+							        width: max-content; min-width: 220px; max-width: 320px;
+							        background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+							        margin-top: 6px; padding: 8px 12px; max-height: 220px; overflow-y: auto;
+							        box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+							    }
+							    .mskpi-card-wrap:hover .mskpi-detail-panel,
+							    .mskpi-detail-panel.show { display: block; }
+							    .mskpi-detail-panel::before {
+							        content: ''; position: absolute; top: -6px; left: 20px;
+							        width: 11px; height: 11px; background: #fff; border-left: 1px solid #e5e7eb; border-top: 1px solid #e5e7eb;
+							        transform: rotate(45deg);
+							    }
+							    .mskpi-detail-title {
+							        font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+							        color: #9ca3af; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid #f0f1f2;
+							    }
+							    .mskpi-detail-row { display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12.5px; padding:6px 0; border-bottom:1px solid #f6f6f5; color:#374151; }
+							    .mskpi-detail-row:last-child { border-bottom:none; }
+							    .mskpi-detail-qty {
+							        font-weight: 700; font-size: 11.5px; color: #374151; background: #f0f1f2;
+							        padding: 2px 9px; border-radius: 6px; min-width: 20px; text-align: center;
+							    }
+							    .mskpi-detail-empty { font-size:12px; color:#9ca3af; padding:6px 0; }
+							</style>
+							<script>
+							document.addEventListener('click', function(e) {
+							    var card = e.target.closest('.mskpi-card-wrap .mskpi-card-clickable');
+							    if (card) {
+							        var panel = card.parentElement.querySelector('.mskpi-detail-panel');
+							        if (panel) {
+							            var isOpen = panel.classList.contains('show');
+							            document.querySelectorAll('.mskpi-detail-panel.show').forEach(function(p) { p.classList.remove('show'); });
+							            if (!isOpen) { panel.classList.add('show'); }
+							        }
+							        e.stopPropagation();
+							        return;
+							    }
+							    document.querySelectorAll('.mskpi-detail-panel.show').forEach(function(p) { p.classList.remove('show'); });
+							});
+							</script>
+							<?php endif; ?>
+
 <?php
 //----Continuos Serial Number In Next Page.......................
 $num_rec_per_page=30;

@@ -12,6 +12,39 @@ $idList = implode(',', $subtreeIds);
 
 $levelColorMap = getTeamLevelColorMap($db_conn);
 
+// ── Assigned district(s) per person, batched ────────────────────────────────
+// marketing_staff_locations can point at a STATE/DISTRICT/TALUK/FIRKA node;
+// whatever depth it's at, the district it belongs to is what's shown here —
+// same resolution rule as AssignedLocations.php's getMsAssignedDistricts(),
+// just computed once for the whole subtree instead of per row.
+$allLocNodes = [];
+$_lr = $db_conn->query("SELECT id, parent_id, depth, name FROM partner_location_nodes WHERE is_active=1");
+while ($row = $_lr->fetch_assoc()) {
+    $allLocNodes[(int)$row['id']] = [
+        'parent_id' => $row['parent_id'] !== null ? (int)$row['parent_id'] : null,
+        'depth'     => (int)$row['depth'],
+        'name'      => $row['name'],
+    ];
+}
+function districtForNode(int $locId, array $allLocNodes): ?string {
+    if (!isset($allLocNodes[$locId])) return null;
+    $cur = $allLocNodes[$locId];
+    if ($cur['depth'] === 2) return null; // STATE-level assignment — no single district to show
+    while ($cur !== null && $cur['depth'] !== 3) {
+        $cur = $cur['parent_id'] !== null ? ($allLocNodes[$cur['parent_id']] ?? null) : null;
+    }
+    return $cur['name'] ?? null;
+}
+$districtsByMs = [];
+$_ar = $db_conn->query("SELECT ms_id, location_id FROM marketing_staff_locations WHERE ms_id IN ($idList)");
+if ($_ar) {
+    while ($row = $_ar->fetch_assoc()) {
+        $distName = districtForNode((int)$row['location_id'], $allLocNodes);
+        if ($distName !== null) { $districtsByMs[(int)$row['ms_id']][$distName] = true; }
+    }
+}
+foreach ($districtsByMs as $msId => $names) { $districtsByMs[$msId] = implode(', ', array_keys($names)); }
+
 $fromDate = $_GET['from_date'] ?? '';
 $toDate = $_GET['to_date'] ?? '';
 $fromDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate) ? $fromDate : '';
@@ -75,16 +108,18 @@ $kpiShops = $kpiSum['shops'];
 $kpiGot   = $kpiSum['got'];
 $kpiNo    = $kpiSum['no'];
 
-function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, int $rank = 0, bool $indent = false, string $dateParam = ''): string {
+function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, int $rank = 0, bool $indent = false, string $dateParam = '', array $districtsByMs = []): string {
     $id = (int)$row['id'];
     $color = $levelColorMap[(int)$row['team_level_id']] ?? '#999999';
     [$sum, $ids] = subtreeSumAndIds($id, $byManager, $rawStats);
     $idsParam = implode(',', $ids);
+    $district = $districtsByMs[$id] ?? '';
 
     $html = '<tr' . ($indent ? '' : ' style="background:#f8fafc;"') . '>';
     $html .= '<td>' . ($rank > 0 ? $rank : '') . '</td>';
     $html .= '<td>' . ($indent ? '&#8618;&nbsp;' : '') . ($indent ? '' : '<b>') . htmlspecialchars($row['ms_name']) . ($indent ? '' : '</b>') . '</td>';
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
+    $html .= '<td>' . ($district !== '' ? htmlspecialchars($district) : '<span class="text-muted" style="font-size:11px;">&mdash;</span>') . '</td>';
     $html .= '<td><span class="stat-pill">' . $sum['shops'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['got'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['no'] . '</span></td>';
@@ -257,6 +292,7 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
                                                     <th>#</th>
                                                     <th>Name</th>
                                                     <th>Level</th>
+                                                    <th>District</th>
                                                     <th>Total Shops</th>
                                                     <th>Get Order</th>
                                                     <th>No Order</th>
@@ -267,9 +303,9 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
                                             <?php $rank = 0; foreach ($byManager[$rootId] as $asm):
                                                 $asmId = (int)$asm['id'];
                                                 $rank++;
-                                                echo renderStatRow($asm, $byManager, $rawStats, $levelColorMap, $rank, false, $dateParam);
+                                                echo renderStatRow($asm, $byManager, $rawStats, $levelColorMap, $rank, false, $dateParam, $districtsByMs);
                                                 $dmList = $byManager[$asmId] ?? [];
-                                                foreach ($dmList as $dm): echo renderStatRow($dm, $byManager, $rawStats, $levelColorMap, 0, true, $dateParam); endforeach;
+                                                foreach ($dmList as $dm): echo renderStatRow($dm, $byManager, $rawStats, $levelColorMap, 0, true, $dateParam, $districtsByMs); endforeach;
                                             endforeach; ?>
                                             </tbody>
                                         </table>
