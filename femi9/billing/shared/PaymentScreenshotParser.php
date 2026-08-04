@@ -56,16 +56,21 @@ class PaymentScreenshotParser {
             ];
         }
 
+        // Recipient is a hard gate, checked before amount/reference quality:
+        // a screenshot paid to some other party is never valid proof no
+        // matter how cleanly its amount/reference read, so it's rejected
+        // outright rather than routed to pending_review.
+        if (!self::hasCompanyRecipientMention($text)) {
+            return [
+                'status' => 'rejected',
+                'amount' => count($amounts) === 1 ? array_values($amounts)[0] : null,
+                'reference' => count($references) === 1 ? array_values($references)[0] : null,
+                'reason' => "This payment does not appear to have been made to Femi9 — the recipient name wasn't found in this screenshot. Please upload a screenshot showing the payment made to Femi9 / Femi Nayan LLP.",
+                'raw_text' => $text,
+            ];
+        }
+
         if (count($amounts) === 1 && count($references) === 1) {
-            if (!self::hasCompanyRecipientMention($text)) {
-                return [
-                    'status' => 'pending_review',
-                    'amount' => array_values($amounts)[0],
-                    'reference' => array_values($references)[0],
-                    'reason' => "Could not confirm this payment was made to Femi9 — the recipient name wasn't found in this screenshot. Please verify manually.",
-                    'raw_text' => $text,
-                ];
-            }
             return [
                 'status' => 'accepted',
                 'amount' => array_values($amounts)[0],
@@ -147,9 +152,19 @@ class PaymentScreenshotParser {
             // wrongly read as amount 311. A mangled currency symbol is never
             // an actual letter, so excluding letters here fixes that without
             // losing the "*5,446"-style cases this rule exists for.
-            if (preg_match('/^[^\dA-Za-z]{0,3}(\d[\d,]*\.?\d{0,2})[^\dA-Za-z]{0,3}$/', $trimmed, $m)
-                && strlen(preg_replace('/[^\d]/', '', $m[1])) >= 2) {
-                $addCandidate($m[1]);
+            if (preg_match('/^[^\dA-Za-z]{0,3}(\d[\d,]*\.?\d{0,2})[^\dA-Za-z]{0,3}$/', $trimmed, $m)) {
+                $digitCount = strlen(preg_replace('/[^\d]/', '', $m[1]));
+                // A bare digit-only line with no comma/decimal formatting and
+                // 8+ digits is never a real rupee amount in this system —
+                // it's what UTR/RRN/UPI-transaction-ID values look like when
+                // OCR puts the label and the number on separate lines (seen
+                // in production: a "UPI transaction ID" label line followed
+                // by "621635328456" on its own line, wrongly read as a
+                // second amount alongside the real "₹50").
+                $looksLikeBareId = $digitCount >= 8 && strpos($m[1], ',') === false && strpos($m[1], '.') === false;
+                if ($digitCount >= 2 && !$looksLikeBareId) {
+                    $addCandidate($m[1]);
+                }
                 continue;
             }
 
