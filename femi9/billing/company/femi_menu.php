@@ -314,6 +314,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
 							<li><a href="tp-po-screenshot-review">PO Screenshot Review</a></li>
 							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
+							<li><a href="tp-bonus-advance-payments">Manage TP Bonus Points</a></li>
 							<li><a href="tp-wallet-referral-calculator">TP Wallet Referral Calculator</a></li>
                         </ul>
                     </li>
@@ -779,6 +780,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
 							<li><a href="tp-po-screenshot-review">PO Screenshot Review</a></li>
 							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
+							<li><a href="tp-bonus-advance-payments">Manage TP Bonus Points</a></li>
 							<li><a href="tp-wallet-referral-calculator">TP Wallet Referral Calculator</a></li>
                         </ul>
                     </li>
