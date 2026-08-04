@@ -40,7 +40,7 @@ $grandTotal = array_sum(array_column($items, 'amount'));
 // Available advance balance — recomputed server-side, never trust the client total.
 $balStmt = mysqli_prepare($db_conn,
     "SELECT COALESCE(SUM(balance_amount), 0) AS bal
-     FROM tp_advance_payments WHERE territory_partner_id = ? AND status = 'active'"
+     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted'"
 );
 mysqli_stmt_bind_param($balStmt, "i", $tp_id);
 mysqli_stmt_execute($balStmt);

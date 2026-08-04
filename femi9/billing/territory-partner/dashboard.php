@@ -58,7 +58,7 @@ $invCount = $custInvCount + $shopInvCount;
 // Advance balance
 $balStmt = mysqli_prepare($db_conn,
     "SELECT COALESCE(SUM(balance_amount), 0) AS bal
-     FROM tp_advance_payments WHERE territory_partner_id = ? AND status = 'active'"
+     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted'"
 );
 mysqli_stmt_bind_param($balStmt, "i", $Login_user_IDvl);
 mysqli_stmt_execute($balStmt);
