@@ -146,19 +146,27 @@ while ($gr = mysqli_fetch_assoc($resGN)) {
 }
 
 // Product-wise qty needed across all "Get Order" visits in range (what the
-// DM asked for, regardless of whether the TP has invoiced it yet).
+// DM asked for, regardless of whether the TP has invoiced it yet). Value is
+// an estimate — qty * the product's outlet_price (the same default rate
+// order-to-invoice.php pre-fills when the TP actually invoices it) — not
+// what the TP ends up billing, which can differ (custom rate, discount).
 $productNeeded = [];
 $totalQtyNeeded = 0;
+$totalGetOrderValue = 0.0;
 $resPQ = $db_conn->query(
-    "SELECT mo.pr_id, p.productName, SUM(mo.qty) totalqty
+    "SELECT mo.pr_id, p.productName, p.outlet_price, SUM(mo.qty) totalqty,
+            SUM(mo.qty * p.outlet_price * (1 - mo.discount_percentage/100)) totalvalue
      FROM ms_orders mo LEFT JOIN products p ON p.id=mo.pr_id
      WHERE mo.ms_id='" . mysqli_real_escape_string($db_conn, $viewMsId) . "' AND mo.new_order='yes'
            AND mo.order_date BETWEEN '$from_date' AND '$to_date'
      GROUP BY mo.pr_id ORDER BY totalqty DESC"
 );
 while ($pr = mysqli_fetch_assoc($resPQ)) {
-    $productNeeded[] = ['name' => $pr['productName'] ?: '-', 'qty' => (int)$pr['totalqty']];
-    $totalQtyNeeded += (int)$pr['totalqty'];
+    $qty = (int)$pr['totalqty'];
+    $value = (float)($pr['totalvalue'] ?? 0);
+    $productNeeded[] = ['name' => $pr['productName'] ?: '-', 'qty' => $qty, 'value' => $value];
+    $totalQtyNeeded += $qty;
+    $totalGetOrderValue += $value;
 }
 
 // Which of those visits the TP has actually turned into an invoice.
@@ -237,8 +245,12 @@ $voidedProducts = getProductBreakdownForInvoices($db_conn, $voidedInvIds);
 // order_id/pr_id/inv_id, and the table below just looks values up in PHP.
 
 $allProducts = [];
-$resAllProd = $db_conn->query("SELECT id, productName FROM products ORDER BY id ASC");
-while ($apr = mysqli_fetch_assoc($resAllProd)) { $allProducts[] = $apr; }
+$productPriceMap = [];
+$resAllProd = $db_conn->query("SELECT id, productName, outlet_price FROM products ORDER BY id ASC");
+while ($apr = mysqli_fetch_assoc($resAllProd)) {
+    $allProducts[] = $apr;
+    $productPriceMap[(int)$apr['id']] = (float)$apr['outlet_price'];
+}
 
 $viewMsIdEsc = mysqli_real_escape_string($db_conn, $viewMsId);
 
@@ -248,8 +260,9 @@ $orderIdsInRange = [];
 $orderMeta = [];
 $qtyMap = [];
 $shopIds = [];
+$orderValueMap = [];
 $resOrders = $db_conn->query(
-    "SELECT order_id, shop_id, order_date, marketing_tool, latitude, longitude, pr_id, qty
+    "SELECT order_id, shop_id, order_date, marketing_tool, latitude, longitude, pr_id, qty, discount_percentage
      FROM ms_orders
      WHERE ms_id='$viewMsIdEsc' AND new_order='yes' AND order_date BETWEEN '$from_date' AND '$to_date'
      ORDER BY order_date DESC, order_id DESC"
@@ -262,6 +275,10 @@ while ($orow = mysqli_fetch_assoc($resOrders)) {
         if (!empty($orow['shop_id'])) { $shopIds[$orow['shop_id']] = true; }
     }
     $qtyMap[$oid][$orow['pr_id']] = (int)$orow['qty'];
+    $lineQty = (int)$orow['qty'];
+    $linePrice = $productPriceMap[(int)$orow['pr_id']] ?? 0;
+    $lineDiscount = (float)($orow['discount_percentage'] ?? 0);
+    $orderValueMap[$oid] = ($orderValueMap[$oid] ?? 0) + ($lineQty * $linePrice * (1 - $lineDiscount / 100));
 }
 
 $shopMeta = [];
@@ -355,6 +372,25 @@ if (!empty($invoiceIds)) {
                     <div class="kpi-detail-empty">No products in this range.</div>
                 <?php else: foreach ($productNeeded as $pn): ?>
                     <div class="kpi-detail-row"><span><?php echo htmlspecialchars($pn['name']); ?></span><span class="kpi-detail-qty"><?php echo (int)$pn['qty']; ?></span></div>
+                <?php endforeach; endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="kpi-card-wrap">
+            <div class="kpi-card kpi-card-clickable">
+                <i class="material-icons-outlined kpi-ico">shopping_cart</i>
+                <div class="kpi-t">Get Order Value</div>
+                <div class="kpi-v">&#8377;<?php echo inr_format($totalGetOrderValue, 2); ?></div>
+                <div class="kpi-sub">Estimated &middot; hover / tap for details</div>
+            </div>
+            <div class="kpi-detail-panel">
+                <div class="kpi-detail-title">Estimated value by product</div>
+                <?php if (empty($productNeeded)): ?>
+                    <div class="kpi-detail-empty">No products in this range.</div>
+                <?php else: foreach ($productNeeded as $pn): ?>
+                    <div class="kpi-detail-row"><span><?php echo htmlspecialchars($pn['name']); ?></span><span class="kpi-detail-qty">&#8377;<?php echo inr_format($pn['value'], 2); ?></span></div>
                 <?php endforeach; endif; ?>
             </div>
         </div>
@@ -518,6 +554,7 @@ $i= $start_from;
 													<th>Date</th>
 													<th>Marketing Tool</th>
 													<th>Products</th>
+													<th>Order Value</th>
 
 													<th>Location</th>
 													<th>TP Status</th>
@@ -644,6 +681,8 @@ $tpStatusHtml = "<div class='tp-status-box'>{$headerHtml}{$detailHtml}</div>";
 					</div>
 				</td>
 				<!-------------------------------------------------------------------->
+
+					<td><b>&#8377;<?=inr_format($orderValueMap[$orderid] ?? 0, 2);?></b></td>
 
 					<td>
 					<?php if($result_product_list["latitude"]!=NULL && $result_product_list["longitude"]!=NULL){?>

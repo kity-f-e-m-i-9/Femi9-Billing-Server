@@ -116,15 +116,21 @@ function bridgeOrderToTp($db_conn, int $tp_id, $ms_id, $shop_id, string $order_i
         }
 
         $ms_id_int = (int)$ms_id;
+        // Carries the DM's own per-product discount % across so
+        // order-to-invoice.php pre-fills the TP's invoice with whatever
+        // discount the DM already promised the shop — the TP can still
+        // freely change it (more discount, extra products, etc.) once
+        // they're in the invoice; this is only the starting point.
         $stmtTpOrder = $db_conn->prepare(
-            "INSERT INTO tp_orders (order_id, shop_id, tp_id, order_date, new_order, pr_id, qty, assigned_by_ms_id)
-             VALUES (?, ?, ?, ?, 'yes', ?, ?, ?)"
+            "INSERT INTO tp_orders (order_id, shop_id, tp_id, order_date, new_order, pr_id, qty, discount_percentage, assigned_by_ms_id)
+             VALUES (?, ?, ?, ?, 'yes', ?, ?, ?, ?)"
         );
         foreach ($lines as $line) {
             $pr_id = (int)$line['pr_id'];
             $qty   = (int)$line['qty'];
+            $discount_percentage = (float)($line['discount_percentage'] ?? 0);
             if ($pr_id <= 0 || $qty <= 0) { continue; }
-            $stmtTpOrder->bind_param('siisiii', $order_id, $bridgedShopId, $tp_id, $order_date, $pr_id, $qty, $ms_id_int);
+            $stmtTpOrder->bind_param('siisiidi', $order_id, $bridgedShopId, $tp_id, $order_date, $pr_id, $qty, $discount_percentage, $ms_id_int);
             $stmtTpOrder->execute();
         }
         $stmtTpOrder->close();

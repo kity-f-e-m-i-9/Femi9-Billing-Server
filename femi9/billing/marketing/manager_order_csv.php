@@ -29,14 +29,18 @@ $file = "Datewise-Product-Orders-".$from_date."-to-".$to_date.".csv";
 $csv_content = '';
 
 // Header row for CSV
-$csv_content .= "#,Shop Name,Shop Contact Number,Address,Taluk,Location,Date,Marketing Tool";
+$csv_content .= "#,Shop Name,Shop Contact Number,Address,Taluk,Location,Date,Marketing Tool,Order Value (Est.)";
 
 // Batched once instead of per-row/per-product — same fix as manage_order_product.php
 // (this used to run a query per product per order, which was very slow with a
 // wide date range).
 $allProducts = [];
-$resAllProd = mysqli_query($db_conn, "SELECT id, productName FROM products ORDER BY id ASC");
-while ($apr = mysqli_fetch_assoc($resAllProd)) { $allProducts[] = $apr; }
+$productPriceMap = [];
+$resAllProd = mysqli_query($db_conn, "SELECT id, productName, outlet_price FROM products ORDER BY id ASC");
+while ($apr = mysqli_fetch_assoc($resAllProd)) {
+	$allProducts[] = $apr;
+	$productPriceMap[(int)$apr['id']] = (float)$apr['outlet_price'];
+}
 
 foreach ($allProducts as $apr) {
 	$csv_content .= ',"'.str_replace('"','""',$apr['productName']).'"';
@@ -48,8 +52,9 @@ $orderIdsInRange = [];
 $orderMeta = [];
 $qtyMap = [];
 $shopIds = [];
+$orderValueMap = [];
 $resOrders = mysqli_query($db_conn,
-	"SELECT order_id, shop_id, order_date, marketing_tool, latitude, longitude, pr_id, qty
+	"SELECT order_id, shop_id, order_date, marketing_tool, latitude, longitude, pr_id, qty, discount_percentage
 	 FROM ms_orders
 	 WHERE ms_id='$viewMsIdEsc' AND new_order='yes' AND order_date BETWEEN '$from_date' AND '$to_date'
 	 ORDER BY order_date DESC, order_id DESC"
@@ -62,6 +67,10 @@ while ($orow = mysqli_fetch_assoc($resOrders)) {
 		if (!empty($orow['shop_id'])) { $shopIds[$orow['shop_id']] = true; }
 	}
 	$qtyMap[$oid][$orow['pr_id']] = (int)$orow['qty'];
+	$lineQty = (int)$orow['qty'];
+	$linePrice = $productPriceMap[(int)$orow['pr_id']] ?? 0;
+	$lineDiscount = (float)($orow['discount_percentage'] ?? 0);
+	$orderValueMap[$oid] = ($orderValueMap[$oid] ?? 0) + ($lineQty * $linePrice * (1 - $lineDiscount / 100));
 }
 
 $shopMeta = [];
@@ -92,7 +101,8 @@ foreach ($orderIdsInRange as $orderid)
 	$csv_content .= '"'.$location_text.'",';
 
 	$csv_content .= '"'.date("d/m/Y",strtotime($result_product_list["order_date"])).'",';
-	$csv_content .= '"'.str_replace('"','""',$result_product_list["marketing_tool"]).'"';
+	$csv_content .= '"'.str_replace('"','""',$result_product_list["marketing_tool"]).'",';
+	$csv_content .= '"'.number_format($orderValueMap[$orderid] ?? 0, 2, '.', '').'"';
 
 	//------------------------PRODUCT WISE SALES QTY-------------------------------
 	foreach ($allProducts as $apr) {

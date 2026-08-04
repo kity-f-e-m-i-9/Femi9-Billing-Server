@@ -572,7 +572,21 @@ while ($r = mysqli_fetch_array($res_shops)) { ?>
 <label class="form-label">Invoice Date*</label>
 <input id="bookingDate" style="margin-bottom:10px;" type="date" name="date" value="<?php echo date("Y-m-d"); ?>" required class="form-control">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script>flatpickr("#bookingDate", { dateFormat: "Y-m-d", maxDate: "today" });</script>
+<script>
+// Invoice date can only be today, yesterday, or the day before — no older
+// backdating allowed. altInput swaps in a flatpickr-controlled text field in
+// place of the native type="date" widget — without it, the browser's own
+// calendar icon still opens its native picker (which ignores minDate/
+// maxDate entirely) alongside flatpickr's, letting any date through.
+var invoiceMinDate = new Date();
+invoiceMinDate.setDate(invoiceMinDate.getDate() - 2);
+var invoiceDateOpts = {
+    dateFormat: "Y-m-d", altFormat: "d-m-Y", altInput: true,
+    maxDate: "today", minDate: invoiceMinDate
+};
+flatpickr("#bookingDate", invoiceDateOpts);
+</script>
+<style>.flatpickr-alt-input { margin-bottom: 10px; }</style>
 
 <div class="item">
 <select required name="pr_id" style="width:100%;" onchange="showPrice(this.value)" class="prinput">
