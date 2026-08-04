@@ -16,7 +16,42 @@ if (isset($_REQUEST['addInvoice'])) {
     $pr_id         = (int) $_REQUEST['pr_id'];
     $amount        = (int) $_REQUEST['amount'];
     $qty           = (int) $_REQUEST['qty'];
-    $total         = $amount * $qty;
+    $totalamount   = $amount * $qty;
+
+    // Product GST — inclusive-tax products already have GST baked into the
+    // entered price, so the tax is carved out of subtotal (and NOT added
+    // again into total); exclusive-tax products get GST added on top —
+    // same convention as tp-invoice-print.php.
+    $stmtProd = $db_conn->prepare("SELECT gst, gst_type, hsn FROM products WHERE id = ?");
+    $stmtProd->bind_param('i', $pr_id);
+    $stmtProd->execute();
+    $prodRow = $stmtProd->get_result()->fetch_assoc();
+    $stmtProd->close();
+    $gst_percentage   = (float) ($prodRow['gst'] ?? 0);
+    $product_gst_type = ($prodRow['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive';
+    $hsn              = $prodRow['hsn'] ?? '';
+
+    $subtotal            = $totalamount;
+    $discount_percentage = 0;
+    $discount_amount     = 0;
+    if ($product_gst_type === 'inclusive' && $gst_percentage > 0) {
+        $gstamount_total = $subtotal - ($subtotal * 100 / (100 + $gst_percentage));
+        $total           = $subtotal;
+    } else {
+        $gstamount_total = $subtotal * $gst_percentage / 100;
+        $total           = $subtotal + $gstamount_total;
+    }
+    $gstamount_singlepr = 0;
+
+    // Buyer GST registration + intra/inter-state — same convention as
+    // customer-user-invoice-action.php (customer sales always treated intra-state).
+    $stmtCust = $db_conn->prepare("SELECT gstin FROM customers WHERE id = ?");
+    $stmtCust->bind_param('i', $customer_id);
+    $stmtCust->execute();
+    $custRow = $stmtCust->get_result()->fetch_assoc();
+    $stmtCust->close();
+    $buyer_gsttype = (strlen($custRow['gstin'] ?? '') === 15) ? 'register' : 'unregister';
+    $gst_type      = 'inner';
 
     // Create invoice header if this is the first item
     $stmt = $db_conn->prepare(
@@ -43,11 +78,11 @@ if (isset($_REQUEST['addInvoice'])) {
         $stmt = $db_conn->prepare(
             "INSERT INTO invoice
                 (inv_id, id_only, inv_number, customer_id, date, inv_year,
-                 sub_total, discount, total, user_type, user_id)
-             VALUES (?, ?, ?, ?, ?, ?, '0', '0', '0', ?, ?)"
+                 sub_total, discount, total, user_type, user_id, gst_type, buyer_gsttype)
+             VALUES (?, ?, ?, ?, ?, ?, '0', '0', '0', ?, ?, ?, ?)"
         );
-        $stmt->bind_param('siisiss', $inv_id, $id_only, $inv_number, $customer_id,
-                          $date, $inv_year, $user_type_Loginvl, $user_id_Loginvl);
+        $stmt->bind_param('sisisissss', $inv_id, $id_only, $inv_number, $customer_id,
+                          $date, $inv_year, $user_type_Loginvl, $user_id_Loginvl, $gst_type, $buyer_gsttype);
         $stmt->execute();
         $stmt->close();
     }
@@ -76,13 +111,18 @@ if (isset($_REQUEST['addInvoice'])) {
         exit;
     }
 
-    // Insert line item only — stock deduction happens atomically in invoice-submit.php
+    // Insert line item — stock deduction happens atomically in invoice-submit.php
     $stmt = $db_conn->prepare(
-        "INSERT INTO invoice_items (inv_id, pr_id, amount, qty, total, user_type, user_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO invoice_items
+            (inv_id, pr_id, amount, qty, total, user_type, user_id,
+             gst_percentage, gstamount_singlepr, gstamount_total, subtotal,
+             discount_percentage, discount_amount, gst_type, hsn, date, buyer_gsttype)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
-    $stmt->bind_param('siiiiss', $inv_id, $pr_id, $amount, $qty, $total,
-                      $user_type_Loginvl, $user_id_Loginvl);
+    $stmt->bind_param('siiidssddddddssss', $inv_id, $pr_id, $amount, $qty, $total,
+                      $user_type_Loginvl, $user_id_Loginvl,
+                      $gst_percentage, $gstamount_singlepr, $gstamount_total, $subtotal,
+                      $discount_percentage, $discount_amount, $gst_type, $hsn, $date, $buyer_gsttype);
     $stmt->execute();
     $stmt->close();
 

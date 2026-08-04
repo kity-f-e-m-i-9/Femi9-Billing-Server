@@ -46,6 +46,7 @@ else{$gst_type="outer";}
 $fetchproducts=mysqli_query($db_conn,$selectproducts);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $gst_percentage=$resultproducts['gst'];
+$product_gst_type=($resultproducts['gst_type'] ?? 'exclusive')==='inclusive' ? 'inclusive' : 'exclusive';
 
 $gstamount_singlepr="0";
 	 
@@ -56,9 +57,21 @@ $gstamount_singlepr="0";
 	 
 	$amount=$result_pramount['amount'];
 	$qty=$result_pramount['qty'];
-	
-	$gstamount_total=$total*$gst_percentage/100;
-	$total=$result_pramount['total']+$gstamount_total;
+	$subtotal=$result_pramount['total'];
+
+	// Inclusive-tax products already have GST baked into the requested price, so
+	// the tax is carved out of subtotal (and NOT added again into total);
+	// exclusive-tax products get GST added on top — same convention as
+	// tp-invoice-print.php. (Previously $total was read here before it was
+	// ever assigned, so gstamount_total silently evaluated to 0 regardless
+	// of GST% — no tax was ever actually applied.)
+	if($product_gst_type==='inclusive' && $gst_percentage>0){
+		$gstamount_total=$subtotal-($subtotal*100/(100+$gst_percentage));
+		$total=$subtotal;
+	}else{
+		$gstamount_total=$subtotal*$gst_percentage/100;
+		$total=$subtotal+$gstamount_total;
+	}
 	
 	$select_count_invoice="select count(*) as numInvoice from user_invoice where inv_id='$inv_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and to_user_type='$invuser' and to_user_id='$customer_id'";
 	$fetch_count_invoice=mysqli_query($db_conn,$select_count_invoice);

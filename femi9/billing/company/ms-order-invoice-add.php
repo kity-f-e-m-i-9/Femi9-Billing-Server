@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pr_id = (int)$ln['pr_id']; $qty = (int)$ln['qty'];
                 if ($pr_id <= 0 || $qty <= 0) { continue; }
 
-                $stmtProd = $db_conn->prepare("SELECT productName, gst, hsn, outlet_price FROM products WHERE id=?");
+                $stmtProd = $db_conn->prepare("SELECT productName, gst, gst_type, hsn, outlet_price FROM products WHERE id=?");
                 $stmtProd->bind_param('i', $pr_id);
                 $stmtProd->execute();
                 $prod = $stmtProd->get_result()->fetch_assoc();
@@ -170,12 +170,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $pr_id = $vl['pr_id']; $qty = $vl['qty']; $prod = $vl['prod'];
                         $amount          = (float)$prod['outlet_price'];
                         $gst_percentage  = $prod['gst'] ?? 0;
+                        $product_gst_type = ($prod['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive';
                         $hsn             = $prod['hsn'] ?? '';
                         $totalamount     = $amount * $qty;
                         $discount_amount = 0; $discount_percentage = 0;
                         $subtotal        = $totalamount;
-                        $gstamount_total = $subtotal * $gst_percentage / 100;
-                        $total           = $subtotal + $gstamount_total;
+                        // Inclusive-tax products already have GST baked into outlet_price, so
+                        // the tax is carved out of subtotal (and NOT added again into total);
+                        // exclusive-tax products get GST added on top — same convention as
+                        // tp-invoice-print.php.
+                        if ($product_gst_type === 'inclusive' && $gst_percentage > 0) {
+                            $gstamount_total = $subtotal - ($subtotal * 100 / (100 + $gst_percentage));
+                            $total           = $subtotal;
+                        } else {
+                            $gstamount_total = $subtotal * $gst_percentage / 100;
+                            $total           = $subtotal + $gstamount_total;
+                        }
                         $headerSubTotal += $subtotal;
                         $headerTotal    += $total;
 
@@ -264,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pr_id = (int)$ln['pr_id']; $qty = (int)$ln['qty'];
                     if ($pr_id <= 0 || $qty <= 0) { continue; }
 
-                    $stmtProd = $db_conn->prepare("SELECT productName, gst, hsn, outlet_price FROM products WHERE id=?");
+                    $stmtProd = $db_conn->prepare("SELECT productName, gst, gst_type, hsn, outlet_price FROM products WHERE id=?");
                     $stmtProd->bind_param('i', $pr_id);
                     $stmtProd->execute();
                     $prod = $stmtProd->get_result()->fetch_assoc();
@@ -315,12 +325,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $pr_id = $vl['pr_id']; $qty = $vl['qty']; $prod = $vl['prod'];
                             $amount          = (float)$prod['outlet_price'];
                             $gst_percentage  = $prod['gst'] ?? 0;
+                            $product_gst_type = ($prod['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive';
                             $hsn             = $prod['hsn'] ?? '';
                             $totalamount     = $amount * $qty;
                             $discount_amount = 0; $discount_percentage = 0;
                             $subtotal        = $totalamount;
-                            $gstamount_total = $subtotal * $gst_percentage / 100;
-                            $total           = $subtotal + $gstamount_total;
+                            // Inclusive-tax products already have GST baked into outlet_price, so
+                            // the tax is carved out of subtotal (and NOT added again into total);
+                            // exclusive-tax products get GST added on top — same convention as
+                            // tp-invoice-print.php.
+                            if ($product_gst_type === 'inclusive' && $gst_percentage > 0) {
+                                $gstamount_total = $subtotal - ($subtotal * 100 / (100 + $gst_percentage));
+                                $total           = $subtotal;
+                            } else {
+                                $gstamount_total = $subtotal * $gst_percentage / 100;
+                                $total           = $subtotal + $gstamount_total;
+                            }
 
                             $stmtItem = $db_conn->prepare(
                                 "INSERT INTO user_invoice_items
