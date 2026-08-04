@@ -289,6 +289,10 @@ mysqli_stmt_close($scrStmt);
 
                                 <div style="font-size:13px;color:#78716c;">Uploaded towards excess (accepted + pending review): <strong id="poAcceptedTotal" style="color:#065f46;">0.00</strong> / &#8377;<span id="poExcessAmount2">0.00</span></div>
                                 <div class="apo-progress-track"><div class="apo-progress-fill" id="poProgressFill" style="width:0%;"></div></div>
+                                <div id="poReadyNote" style="display:none;font-size:12.5px;color:#065f46;margin:-8px 0 12px;">
+                                    <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">check_circle</i>
+                                    A screenshot has been uploaded and is awaiting/passed verification — you can submit; company will review the amount before invoicing.
+                                </div>
 
                                 <div id="poScreenshotList"></div>
 
@@ -441,6 +445,17 @@ mysqli_stmt_close($scrStmt);
             .reduce(function(sum, s) { return sum + (parseFloat(s.detected_amount) || 0); }, 0);
     }
 
+    // Some pending_review screenshots have no detected_amount at all (OCR
+    // couldn't confidently read a single amount — e.g. "found more than one
+    // possible amount"), so poEligibleTotal() undercounts them as ₹0 even
+    // though a real upload attempt exists. Submission shouldn't hinge on
+    // OCR having successfully parsed a number — only on the TP actually
+    // having uploaded something that isn't rejected. Company still reviews
+    // and can act on anything pending before ever invoicing.
+    function poHasEligibleProof() {
+        return poScreenshots.some(function(s) { return s.status === 'accepted' || s.status === 'pending_review'; });
+    }
+
     function poGrandTotal() {
         var total = 0;
         poLines.forEach(function(l) {
@@ -470,6 +485,7 @@ mysqli_stmt_close($scrStmt);
         }
 
         document.getElementById('poAcceptedTotal').textContent = eligible.toFixed(2);
+        document.getElementById('poReadyNote').style.display = (excess > 0.001 && poHasEligibleProof()) ? '' : 'none';
 
         var uploadRow = document.getElementById('poScreenshotUploadRow');
         uploadRow.style.display = poScreenshots.length >= MAX_SCREENSHOTS ? 'none' : '';
@@ -646,12 +662,10 @@ mysqli_stmt_close($scrStmt);
         var advBalance = parseFloat(document.getElementById('advBalanceVal').value) || 0;
         var total = poGrandTotal();
         var excess = total - advBalance;
-        var eligible = poEligibleTotal();
 
-        if (excess > 0.001 && eligible + 0.001 < excess) {
+        if (excess > 0.001 && !poHasEligibleProof()) {
             alert('Your order total exceeds your available advance balance by ₹' + excess.toFixed(2) +
-                ', but only ₹' + eligible.toFixed(2) + ' of uploaded payment proof covers it so far (accepted + pending review). ' +
-                'Please upload more screenshots for the remaining ₹' + (excess - eligible).toFixed(2) + '.');
+                '. Please upload at least one payment screenshot for the excess amount before submitting.');
             return false;
         }
         return true;

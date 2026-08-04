@@ -70,26 +70,27 @@ $excessAmount = round(max(0, $grandTotal - $advBalance), 2);
 
 if ($excessAmount > 0) {
     // Authoritative server-side gate — the total shown to the TP in the
-    // browser is a courtesy preview, not the source of truth. Screenshots
-    // still "pending_review" count too: that status just means OCR couldn't
-    // confidently read the amount/reference, not that anything is wrong —
-    // company can still see and act on pending items via tp-today-orders.php
-    // before ever invoicing, so this isn't the only checkpoint. Rejected
-    // screenshots never count.
+    // browser is a courtesy preview, not the source of truth. This only
+    // requires SOME non-rejected upload to exist, not that its amount adds
+    // up to the excess — a pending_review screenshot often has no
+    // detected_amount at all (OCR found it ambiguous, not necessarily
+    // wrong), and gating on a sum here just blocks genuine attempts.
+    // Company can still see and act on every screenshot via
+    // tp-today-orders.php before ever invoicing, so this isn't the only
+    // checkpoint. Rejected screenshots never count.
     $scrStmt = mysqli_prepare($db_conn,
-        "SELECT COALESCE(SUM(detected_amount), 0) AS total
+        "SELECT COUNT(*) AS cnt
          FROM tp_purchase_order_screenshots
          WHERE territory_partner_id = ? AND po_id IS NULL AND status IN ('accepted', 'pending_review')"
     );
     mysqli_stmt_bind_param($scrStmt, "i", $tp_id);
     mysqli_stmt_execute($scrStmt);
-    $acceptedTotal = (float)(mysqli_stmt_get_result($scrStmt)->fetch_assoc()['total'] ?? 0);
+    $eligibleCount = (int)(mysqli_stmt_get_result($scrStmt)->fetch_assoc()['cnt'] ?? 0);
     mysqli_stmt_close($scrStmt);
 
-    if ($acceptedTotal + 0.001 < $excessAmount) {
+    if ($eligibleCount < 1) {
         $_SESSION['errorMessage'] = 'Your order total exceeds your available advance balance by ₹' . number_format($excessAmount, 2)
-            . ', but only ₹' . number_format($acceptedTotal, 2) . ' of uploaded payment proof covers it so far. '
-            . 'Please upload more screenshots for the remaining amount.';
+            . '. Please upload at least one payment screenshot for the excess amount before submitting.';
         header("Location: add-purchase-order.php");
         exit;
     }
