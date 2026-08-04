@@ -98,7 +98,7 @@ $total_return_amt  = (float)$returns_row['amount'];
 // Advance balance
 $adv_balance = (float)mis_val($db_conn,
     "SELECT COALESCE(SUM(balance_amount),0) FROM tp_advance_payments
-     WHERE territory_partner_id=? AND status='active'",
+     WHERE territory_partner_id=? AND status='active' AND deleted_at IS NULL",
     'i', [$uid]);
 
 // Previous period KPI (for growth %)
