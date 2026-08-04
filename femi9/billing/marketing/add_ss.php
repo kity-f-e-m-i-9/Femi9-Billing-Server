@@ -117,7 +117,7 @@ $assignedDistricts = getMsAssignedDistricts($db_conn, (int)$markeingSTFID);
 			<br/>
 			
 			<label class="form-label">Shop Photo (Live)</label>
-            <input type="file" name="user_icon" id="fileUpload" accept=".jpg, .jpeg, .png" class="form-control">
+            <input type="file" name="user_icon" id="fileUpload" accept=".jpg, .jpeg, .png" capture="environment" class="form-control">
 			<br/>
 
 	<?php if (empty($assignedDistricts)): ?>

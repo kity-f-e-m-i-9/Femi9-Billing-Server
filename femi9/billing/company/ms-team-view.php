@@ -148,7 +148,10 @@ function renderSmCluster(array $sm, array $byManager, array $levelColorMap, arra
             $branchId = (int)$branch['id'];
             $branchColor = $levelColorMap[(int)$branch['team_level_id']] ?? '#999999';
             $subList = $byManager[$branchId] ?? [];
-            $branchDistrict = $districtsByMs[$branchId] ?? '';
+            // Only District Managers get a district shown under their name here
+            // — an ASM/SM node happening to also carry a location assignment
+            // (e.g. test data) shouldn't clutter the ASM row itself.
+            $branchDistrict = (stripos($branch['level_name'] ?? '', 'District') !== false) ? ($districtsByMs[$branchId] ?? '') : '';
             $html .= '<div class="branch-circle org-node-clickable" style="--own-color:' . $branchColor . ';"'
                    . ' data-ms-id="' . $branchId . '" data-ms-name="' . htmlspecialchars($branch['ms_name'], ENT_QUOTES) . '" data-ms-level="' . htmlspecialchars($branch['level_name'] ?: '-', ENT_QUOTES) . '">'
                    . '<div class="branch-stem"></div>'
@@ -553,7 +556,7 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
                 $b.append($('<div class="org-node-circle"></div>').text(k.initials));
                 $b.append($('<div class="branch-level"></div>').text(k.level_name));
                 $b.append($('<div class="branch-name"></div>').text(k.name));
-                if (k.district) { $b.append($('<div class="branch-district"></div>').text(k.district)); }
+                if (k.district && /district/i.test(k.level_name)) { $b.append($('<div class="branch-district"></div>').text(k.district)); }
                 if (subKids.length) {
                     $b.append('<div class="sub-indicator-stem"></div>');
                     var $count = $('<div class="branch-count"></div>').text(subKids.length + ' below');
