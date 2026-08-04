@@ -35,6 +35,29 @@ if (empty($items)) {
     exit;
 }
 
+// Delivery address — either the TP's existing registered address, or a
+// one-off address typed for this order. Stored on the PO itself (not just a
+// pointer back to territory_partners) so it stays correct even if the TP's
+// master address changes later.
+$useDefaultDelivery = isset($_POST['use_default_delivery_address']) ? 1 : 0;
+$customDeliveryLine1    = trim($_POST['custom_delivery_line1']    ?? '');
+$customDeliveryLine2    = trim($_POST['custom_delivery_line2']    ?? '');
+$customDeliveryCity     = trim($_POST['custom_delivery_city']     ?? '');
+$customDeliveryDistrict = trim($_POST['custom_delivery_district'] ?? '');
+$customDeliveryState    = trim($_POST['custom_delivery_state']    ?? '');
+$customDeliveryCountry  = trim($_POST['custom_delivery_country']  ?? '');
+$customDeliveryPincode  = trim($_POST['custom_delivery_pincode']  ?? '');
+
+if (!$useDefaultDelivery && $customDeliveryLine1 === '') {
+    $_SESSION['errorMessage'] = 'Please enter a delivery address, or use the existing delivery address.';
+    header("Location: add-purchase-order.php");
+    exit;
+}
+if ($useDefaultDelivery) {
+    // Ignore any typed address when the default is selected.
+    $customDeliveryLine1 = $customDeliveryLine2 = $customDeliveryCity = $customDeliveryDistrict = $customDeliveryState = $customDeliveryCountry = $customDeliveryPincode = null;
+}
+
 $grandTotal = array_sum(array_column($items, 'amount'));
 
 // Available advance balance — recomputed server-side, never trust the client total.
@@ -98,8 +121,18 @@ if ($excessAmount > 0) {
 
 $db_conn->begin_transaction();
 try {
-    $s = $db_conn->prepare("INSERT INTO tp_purchase_orders (territory_partner_id, order_date, status, excess_amount) VALUES (?, ?, 'waiting', ?)");
-    $s->bind_param("isd", $tp_id, $order_date, $excessAmount);
+    $s = $db_conn->prepare(
+        "INSERT INTO tp_purchase_orders
+            (territory_partner_id, order_date, status, excess_amount, use_default_delivery_address,
+             custom_delivery_line1, custom_delivery_line2, custom_delivery_city, custom_delivery_district,
+             custom_delivery_state, custom_delivery_country, custom_delivery_pincode)
+         VALUES (?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    $s->bind_param(
+        "isdisssssss", $tp_id, $order_date, $excessAmount, $useDefaultDelivery,
+        $customDeliveryLine1, $customDeliveryLine2, $customDeliveryCity, $customDeliveryDistrict,
+        $customDeliveryState, $customDeliveryCountry, $customDeliveryPincode
+    );
     $s->execute();
     $po_id = $db_conn->insert_id;
     $s->close();

@@ -356,8 +356,16 @@ $cp_seller_parts = array_filter([
 
 <?php
 $d = $result_Invoice_Details;
-// Build delivery address lines
-$delivery_parts = array_filter([
+// Build delivery address lines — use the one-off address typed at PO time
+// if the TP chose not to ship to their default registered address.
+$useCustomDelivery = empty($d['use_default_delivery_address']) && !empty($d['custom_delivery_line1']);
+$delivery_parts = $useCustomDelivery ? array_filter([
+    $d['custom_delivery_line1'],
+    $d['custom_delivery_line2'],
+    implode(', ', array_filter([$d['custom_delivery_city'], $d['custom_delivery_district']])),
+    implode(', ', array_filter([$d['custom_delivery_state'], $d['custom_delivery_country']])),
+    !empty($d['custom_delivery_pincode']) ? 'Pincode: ' . $d['custom_delivery_pincode'] : '',
+]) : array_filter([
     $d['delivery_line1'],
     $d['delivery_line2'],
     implode(', ', array_filter([$d['delivery_city'], $d['delivery_district']])),

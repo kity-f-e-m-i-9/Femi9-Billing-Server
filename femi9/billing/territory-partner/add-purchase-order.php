@@ -60,6 +60,24 @@ while ($s = mysqli_fetch_assoc($scrRes)) {
     if ($s['status'] === 'accepted') $acceptedScreenshotTotal += (float)$s['detected_amount'];
 }
 mysqli_stmt_close($scrStmt);
+
+// TP's own registered delivery address — shown as the default when the
+// "use existing delivery address" checkbox is left checked.
+$tpDeliveryStmt = mysqli_prepare($db_conn,
+    "SELECT delivery_line1, delivery_line2, delivery_city, delivery_district, delivery_state, delivery_country, delivery_pincode
+     FROM territory_partners WHERE id = ?"
+);
+mysqli_stmt_bind_param($tpDeliveryStmt, "i", $Login_user_IDvl);
+mysqli_stmt_execute($tpDeliveryStmt);
+$tpDeliveryAddress = mysqli_stmt_get_result($tpDeliveryStmt)->fetch_assoc() ?: [];
+mysqli_stmt_close($tpDeliveryStmt);
+$tpDeliveryAddressParts = array_filter([
+    $tpDeliveryAddress['delivery_line1'] ?? '',
+    $tpDeliveryAddress['delivery_line2'] ?? '',
+    implode(', ', array_filter([$tpDeliveryAddress['delivery_city'] ?? '', $tpDeliveryAddress['delivery_district'] ?? ''])),
+    implode(', ', array_filter([$tpDeliveryAddress['delivery_state'] ?? '', $tpDeliveryAddress['delivery_country'] ?? ''])),
+    !empty($tpDeliveryAddress['delivery_pincode']) ? 'Pincode: ' . $tpDeliveryAddress['delivery_pincode'] : '',
+]);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -109,6 +127,12 @@ mysqli_stmt_close($scrStmt);
         .apo-balance-card .material-icons-outlined { font-size: 30px; color: #10b981; }
         .apo-balance-card .value { font-size: 20px; font-weight: 700; color: #065f46; }
         .apo-balance-card .label { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: #059669; }
+
+        .apo-delivery-default { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; font-size: 13.5px; color: #374151; line-height: 1.6; }
+        .apo-delivery-check { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 14px; font-weight: 600; color: #374151; }
+        .apo-delivery-check input { width: 16px; height: 16px; }
+        .apo-delivery-fields { display: none; }
+        .apo-delivery-fields.show { display: block; }
 
         .apo-add-panel { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; margin-bottom: 6px; }
         .apo-add-panel .form-label { font-size: 11.5px; font-weight: 600; color: #6b7280; margin-bottom: 4px; }
@@ -216,6 +240,60 @@ mysqli_stmt_close($scrStmt);
                                     <div class="apo-info-chip">
                                         <label>Invoice Date</label>
                                         <div class="value"><?=date("d-m-Y", strtotime($order_date))?></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="apo-card">
+                                <div class="apo-card-title"><i class="material-icons-outlined">local_shipping</i>Delivery Address</div>
+
+                                <label class="apo-delivery-check">
+                                    <input type="checkbox" id="useDefaultDeliveryAddress" name="use_default_delivery_address" value="1" checked onchange="toggleDeliveryFields()">
+                                    Use existing delivery address
+                                </label>
+
+                                <div id="defaultDeliveryPreview" class="apo-delivery-default">
+                                    <?php if (!empty($tpDeliveryAddressParts)): ?>
+                                        <?=implode('<br/>', array_map('htmlspecialchars', $tpDeliveryAddressParts))?>
+                                    <?php else: ?>
+                                        <span class="text-muted">No delivery address on file. Uncheck above to enter one.</span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div id="customDeliveryFields" class="apo-delivery-fields">
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Address Line 1</label>
+                                            <input type="text" name="custom_delivery_line1" id="custom_delivery_line1" class="form-control" placeholder="Address Line 1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Address Line 2</label>
+                                            <input type="text" name="custom_delivery_line2" class="form-control" placeholder="Address Line 2">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-3">
+                                            <label class="form-label">City</label>
+                                            <input type="text" name="custom_delivery_city" class="form-control" placeholder="City">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">District</label>
+                                            <input type="text" name="custom_delivery_district" class="form-control" placeholder="District">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">State</label>
+                                            <input type="text" name="custom_delivery_state" class="form-control" placeholder="State">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Pincode</label>
+                                            <input type="text" name="custom_delivery_pincode" class="form-control" placeholder="Pincode">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Country</label>
+                                            <input type="text" name="custom_delivery_country" class="form-control" placeholder="Country" value="India">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -330,6 +408,12 @@ mysqli_stmt_close($scrStmt);
     $(document).ready(function() {
         $('#pr_select').select2({ width: '100%', placeholder: 'Select Product' });
     });
+
+    function toggleDeliveryFields() {
+        var useDefault = document.getElementById('useDefaultDeliveryAddress').checked;
+        document.getElementById('defaultDeliveryPreview').style.display = useDefault ? '' : 'none';
+        document.getElementById('customDeliveryFields').classList.toggle('show', !useDefault);
+    }
 
     var poLines = [];
 
@@ -651,11 +735,18 @@ mysqli_stmt_close($scrStmt);
             $('#pr_select').select2({ placeholder: 'Search product…', allowClear: true, width: '100%' });
         }
         renderPoScreenshotList();
+        toggleDeliveryFields();
     });
 
     function validatePoLines() {
         if (poLines.length === 0) {
             alert('Add at least one product before submitting.');
+            return false;
+        }
+
+        if (!document.getElementById('useDefaultDeliveryAddress').checked &&
+            !document.getElementById('custom_delivery_line1').value.trim()) {
+            alert('Enter a delivery address, or check "Use existing delivery address".');
             return false;
         }
 
