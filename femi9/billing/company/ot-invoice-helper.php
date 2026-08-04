@@ -30,49 +30,22 @@ $fyStartYear = $month >= 4 ? $year : $year - 1;
 $fy = substr($fyStartYear, -2) . '-' . substr($fyStartYear + 1, -2);
 
 /**
- * Does this specific company already have invoices under this channel that
- * follow the CURRENT numbering convention (e.g. "ID/26-27/135")? Bare
- * pre-convention legacy numbers (e.g. a lone "306" with no prefix/FY at all,
- * left over from years before this format existed) don't count as an
- * existing series — they're orphaned old entries, not something to
- * continue counting from. ot_sales_invoice has no godownid of its own, so
- * company is resolved via ot_sales (godownid is set per invoice, one value
- * per tempid). A company with zero qualifying history gets the new
- * tagged/padded format starting at 001; a company with real history
- * continues its plain series instead — this flag decides which branch
- * applies.
- */
-function otCompanyHasHistory(mysqli $db_conn, string $cat, string $prefix, int $godownid): bool
-{
-    if ($godownid <= 0) return false;
-
-    $likePattern = $prefix . '/%';
-    $stmt = $db_conn->prepare("
-        SELECT COUNT(*) AS c
-        FROM ot_sales_invoice osi
-        INNER JOIN ot_sales os ON os.tempid = osi.tempid
-        WHERE osi.cat = ? AND os.godownid = ? AND osi.inv_number LIKE ?
-    ");
-    $stmt->bind_param('sis', $cat, $godownid, $likePattern);
-    $stmt->execute();
-    $count = (int)$stmt->get_result()->fetch_assoc()['c'];
-    $stmt->close();
-
-    return $count > 0;
-}
-
-/**
  * Highest invoice number this specific company has already used for this
- * channel under the current numbering convention (any financial year) — so
- * continuing its plain series picks up from where it already stands
- * instead of restarting. Only rows matching "{prefix}/..." are considered;
- * bare pre-convention legacy numbers are excluded (see otCompanyHasHistory).
+ * channel *under its own entity tag* (e.g. the "005" in "ID/26-27/LLP005"),
+ * across any financial year — so the tag is never dropped once a company
+ * starts using it, and continuing just bumps the padded number. Bare
+ * pre-convention legacy numbers (e.g. a lone "125"/"306" with no entity tag
+ * at all, left over from before this format existed) never match — they're
+ * orphaned old entries, not part of this company's tagged series. ot_sales_invoice
+ * has no godownid of its own, so company is resolved via ot_sales (godownid
+ * is set per invoice, one value per tempid). If $entityCode is '' (no known
+ * tag for this godown), falls back to matching bare trailing digits instead.
  */
-function otMaxExistingNumberForCompany(mysqli $db_conn, string $cat, string $prefix, int $godownid): int
+function otMaxExistingNumberForCompany(mysqli $db_conn, string $cat, string $prefix, int $godownid, string $entityCode): int
 {
     if ($godownid <= 0) return 0;
 
-    $likePattern = $prefix . '/%';
+    $likePattern = $entityCode !== '' ? $prefix . '/%/' . $entityCode . '%' : $prefix . '/%';
     $stmt = $db_conn->prepare("
         SELECT DISTINCT osi.inv_number
         FROM ot_sales_invoice osi
@@ -86,8 +59,15 @@ function otMaxExistingNumberForCompany(mysqli $db_conn, string $cat, string $pre
 
     $max = 0;
     foreach ($rows as $row) {
-        if (preg_match('/(\d+)$/', (string)$row['inv_number'], $m)) {
-            $max = max($max, (int)$m[1]);
+        $parts = explode('/', (string)$row['inv_number']);
+        $last  = end($parts);
+        if ($entityCode !== '') {
+            if (str_starts_with($last, $entityCode)) {
+                $numPart = substr($last, strlen($entityCode));
+                if (ctype_digit($numPart)) { $max = max($max, (int)$numPart); }
+            }
+        } elseif (ctype_digit($last)) {
+            $max = max($max, (int)$last);
         }
     }
     return $max;
@@ -134,21 +114,16 @@ if ($action === 'next') {
     // (LLP/HC/initials-fallback), same convention as
     // load_next_invoice_customer.php's LLP series (C/FY/LLP{n}).
     if ($cat === 'ID CONCEPT') {
-        if (otCompanyHasHistory($db_conn, $cat, $prefix, $godownid)) {
-            // This company already invoices here — continue its plain
-            // series exactly (no entity tag), just the next number.
-            // e.g. existing ...ID/26-27/135 -> next ID/26-27/136.
-            $max = otMaxExistingNumberForCompany($db_conn, $cat, $prefix, $godownid);
-            $nextNumber = $prefix . '/' . $fy . '/' . ($max + 1);
-        } else {
-            // Brand new company, zero invoices under this channel — start
-            // fresh with the tagged, zero-padded format: ID/26-27/LLP001.
-            $entityCode = otEntityCode($db_conn, $godownid);
-            $paddedNum  = str_pad('1', 3, '0', STR_PAD_LEFT);
-            $nextNumber = $entityCode !== ''
-                ? $prefix . '/' . $fy . '/' . $entityCode . $paddedNum
-                : $prefix . '/' . $fy . '/' . $paddedNum;
-        }
+        // Always tagged + zero-padded, whether this is the company's first
+        // invoice under this channel or its Nth — the entity tag (LLP/HC/
+        // initials) never gets dropped partway through a series.
+        // e.g. LLP001 -> LLP002 -> ... -> LLP005 -> LLP006.
+        $entityCode = otEntityCode($db_conn, $godownid);
+        $max        = otMaxExistingNumberForCompany($db_conn, $cat, $prefix, $godownid, $entityCode);
+        $paddedNum  = str_pad((string)($max + 1), 3, '0', STR_PAD_LEFT);
+        $nextNumber = $entityCode !== ''
+            ? $prefix . '/' . $fy . '/' . $entityCode . $paddedNum
+            : $prefix . '/' . $fy . '/' . $paddedNum;
 
         echo json_encode(['number' => $nextNumber]);
         exit;

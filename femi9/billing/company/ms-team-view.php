@@ -33,6 +33,39 @@ $levelCounts = $db_conn->query("
 // One distinct color per level, in rank order (shared across the whole app)
 $levelColorMap = getTeamLevelColorMap($db_conn);
 
+// ── Assigned district(s) per staff member, batched ──────────────────────────
+// marketing_staff_locations can point at a STATE/DISTRICT/TALUK/FIRKA node;
+// whatever depth it's at, the district it belongs to is what's shown here —
+// same resolution rule as marketing/include/AssignedLocations.php's
+// getMsAssignedDistricts(), just computed once for everyone instead of per row.
+$allLocNodes = [];
+$_lr = $db_conn->query("SELECT id, parent_id, depth, name FROM partner_location_nodes WHERE is_active=1");
+while ($row = $_lr->fetch_assoc()) {
+    $allLocNodes[(int)$row['id']] = [
+        'parent_id' => $row['parent_id'] !== null ? (int)$row['parent_id'] : null,
+        'depth'     => (int)$row['depth'],
+        'name'      => $row['name'],
+    ];
+}
+function msTeamViewDistrictForNode(int $locId, array $allLocNodes): ?string {
+    if (!isset($allLocNodes[$locId])) return null;
+    $cur = $allLocNodes[$locId];
+    if ($cur['depth'] === 2) return null; // STATE-level assignment — no single district to show
+    while ($cur !== null && $cur['depth'] !== 3) {
+        $cur = $cur['parent_id'] !== null ? ($allLocNodes[$cur['parent_id']] ?? null) : null;
+    }
+    return $cur['name'] ?? null;
+}
+$districtsByMs = [];
+$_ar = $db_conn->query("SELECT ms_id, location_id FROM marketing_staff_locations");
+if ($_ar) {
+    while ($row = $_ar->fetch_assoc()) {
+        $distName = msTeamViewDistrictForNode((int)$row['location_id'], $allLocNodes);
+        if ($distName !== null) { $districtsByMs[(int)$row['ms_id']][$distName] = true; }
+    }
+}
+foreach ($districtsByMs as $msId => $names) { $districtsByMs[$msId] = implode(', ', array_keys($names)); }
+
 // ── Staff, grouped by level (for card click) and by manager (for drill-down) ──
 $staffRows = $db_conn->query("
     SELECT ms.id, ms.ms_name, ms.manager_id, ms.team_level_id, tl.level_name, tl.level_rank
@@ -51,7 +84,7 @@ function msInitials(string $name): string {
     return mb_strtoupper($first . $last);
 }
 
-function toEntry(array $row, array $levelColorMap): array {
+function toEntry(array $row, array $levelColorMap, array $districtsByMs = []): array {
     $lvlId = (int)$row['team_level_id'];
     return [
         'id'         => (int)$row['id'],
@@ -59,6 +92,7 @@ function toEntry(array $row, array $levelColorMap): array {
         'level_name' => $row['level_name'] ?: '-',
         'color'      => $levelColorMap[$lvlId] ?? '#999999',
         'initials'   => msInitials($row['ms_name']),
+        'district'   => $districtsByMs[(int)$row['id']] ?? '',
     ];
 }
 
@@ -68,7 +102,7 @@ $noLevelCount = 0;
 foreach ($staffRows as $row) {
     if (!$row['level_rank']) { $noLevelCount++; continue; }
     $lvlId = (int)$row['team_level_id'];
-    $levelStaffMap[$lvlId][] = toEntry($row, $levelColorMap);
+    $levelStaffMap[$lvlId][] = toEntry($row, $levelColorMap, $districtsByMs);
     $mgrKey = $row['manager_id'] ? (int)$row['manager_id'] : 0;
     $byManager[$mgrKey][] = $row;
 }
@@ -77,7 +111,7 @@ foreach ($staffRows as $row) {
 $childrenMap = [];
 foreach ($byManager as $mgrId => $children) {
     if ($mgrId === 0) continue;
-    $childrenMap[$mgrId] = array_map(fn($c) => toEntry($c, $levelColorMap), $children);
+    $childrenMap[$mgrId] = array_map(fn($c) => toEntry($c, $levelColorMap, $districtsByMs), $children);
 }
 
 // Flat map of every staff member — powers the ancestor-chain breadcrumb (SM →
@@ -85,7 +119,7 @@ foreach ($byManager as $mgrId => $children) {
 $allStaffMap = [];
 foreach ($staffRows as $row) {
     if (!$row['level_rank']) continue;
-    $entry = toEntry($row, $levelColorMap);
+    $entry = toEntry($row, $levelColorMap, $districtsByMs);
     $entry['manager_id'] = $row['manager_id'] ? (int)$row['manager_id'] : 0;
     $allStaffMap[(int)$row['id']] = $entry;
 }
@@ -93,7 +127,7 @@ foreach ($staffRows as $row) {
 // ── Trunk + branch clusters: one root (SM) per cluster, its direct reports as
 // circles around it, connected by a simple trunk→bar→stem line. Deeper levels
 // are reached by clicking — never rendered inline, so the layout never sprawls.
-function renderSmCluster(array $sm, array $byManager, array $levelColorMap): string {
+function renderSmCluster(array $sm, array $byManager, array $levelColorMap, array $districtsByMs = []): string {
     $smId = (int)$sm['id'];
     $smColor = $levelColorMap[(int)$sm['team_level_id']] ?? '#6b4226';
     $branchList = $byManager[$smId] ?? [];
@@ -114,12 +148,14 @@ function renderSmCluster(array $sm, array $byManager, array $levelColorMap): str
             $branchId = (int)$branch['id'];
             $branchColor = $levelColorMap[(int)$branch['team_level_id']] ?? '#999999';
             $subList = $byManager[$branchId] ?? [];
+            $branchDistrict = $districtsByMs[$branchId] ?? '';
             $html .= '<div class="branch-circle org-node-clickable" style="--own-color:' . $branchColor . ';"'
                    . ' data-ms-id="' . $branchId . '" data-ms-name="' . htmlspecialchars($branch['ms_name'], ENT_QUOTES) . '" data-ms-level="' . htmlspecialchars($branch['level_name'] ?: '-', ENT_QUOTES) . '">'
                    . '<div class="branch-stem"></div>'
                    . '<div class="org-node-circle">' . htmlspecialchars(msInitials($branch['ms_name'])) . '</div>'
                    . '<div class="branch-level">' . htmlspecialchars($branch['level_name'] ?: '-') . '</div>'
-                   . '<div class="branch-name">' . htmlspecialchars($branch['ms_name']) . '</div>';
+                   . '<div class="branch-name">' . htmlspecialchars($branch['ms_name']) . '</div>'
+                   . ($branchDistrict !== '' ? '<div class="branch-district">' . htmlspecialchars($branchDistrict) . '</div>' : '');
             if (!empty($subList)) {
                 $subLevelName = $subList[0]['level_name'] ?: 'report';
                 $subColor = $levelColorMap[(int)$subList[0]['team_level_id']] ?? '#999999';
@@ -231,6 +267,10 @@ $smRoots = $byManager[0] ?? [];
             font-size:12px; line-height:15px; font-weight:600; color:#333; text-align:center;
             height:30px; overflow:hidden; display:flex; align-items:flex-start; justify-content:center;
         }
+        .branch-circle .branch-district {
+            font-size:10.5px; line-height:13px; color:#888; text-align:center; margin-top:2px;
+        }
+        .modal-report-item .node-district { font-size:11px; color:#888; margin-top:2px; }
         .sub-indicator-stem { width:2px; height:8px; background:var(--own-color,#ccc); margin-top:6px; }
         .branch-circle .branch-count {
             font-size:10px; font-weight:700; color:#fff;
@@ -363,7 +403,7 @@ $smRoots = $byManager[0] ?? [];
                                             <div class="text-center text-muted" style="padding:20px;">No marketing staff with a team level yet.</div>
                                         <?php else: ?>
                                             <?php foreach ($smRoots as $sm): ?>
-                                                <?php echo renderSmCluster($sm, $byManager, $levelColorMap); ?>
+                                                <?php echo renderSmCluster($sm, $byManager, $levelColorMap, $districtsByMs); ?>
                                             <?php endforeach; ?>
                                         <?php endif; ?>
                                     </div>
@@ -448,6 +488,7 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
             var $text = $('<div class="org-node-text"></div>');
             $text.append($('<div class="node-level"></div>').text(c.level_name));
             $text.append($('<div class="node-name"></div>').text(c.name));
+            if (c.district) { $text.append($('<div class="node-district"></div>').text(c.district)); }
             $item.append($text);
             $item.on('click', function (e) {
                 e.stopPropagation();
@@ -512,6 +553,7 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
                 $b.append($('<div class="org-node-circle"></div>').text(k.initials));
                 $b.append($('<div class="branch-level"></div>').text(k.level_name));
                 $b.append($('<div class="branch-name"></div>').text(k.name));
+                if (k.district) { $b.append($('<div class="branch-district"></div>').text(k.district)); }
                 if (subKids.length) {
                     $b.append('<div class="sub-indicator-stem"></div>');
                     var $count = $('<div class="branch-count"></div>').text(subKids.length + ' below');

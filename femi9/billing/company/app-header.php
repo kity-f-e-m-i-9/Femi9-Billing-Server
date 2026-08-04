@@ -37,7 +37,7 @@
 											<a href="change-password">
                                                 <div class="notifications-dropdown-item">
                                                     <div class="notifications-dropdown-item-text">
-                                                        <p class="bold-notifications-text">Chanage Password</p>
+                                                        <p class="bold-notifications-text">Change Password</p>
                                                     </div>
                                                 </div>
                                             </a>											
