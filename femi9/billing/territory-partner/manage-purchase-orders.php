@@ -248,6 +248,17 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
         }
         .po-delete-btn:hover { background: #fecaca; }
 
+        .po-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+        .po-view-btn, .po-print-btn {
+            border: none; cursor: pointer; font-size: 11.5px; font-weight: 600;
+            padding: 5px 12px; border-radius: 7px; display: inline-flex; align-items: center;
+            gap: 4px; transition: all .15s; text-decoration: none; white-space: nowrap;
+        }
+        .po-view-btn { background: #ede9fe; color: #5b21b6; }
+        .po-view-btn:hover { background: #ddd6fe; color: #5b21b6; }
+        .po-print-btn { background: #d1fae5; color: #065f46; }
+        .po-print-btn:hover { background: #a7f3d0; color: #065f46; }
+
         .po-empty { text-align: center; padding: 50px 20px; color: #9ca3af; }
         .po-empty .material-icons-outlined { font-size: 40px; display: block; margin: 0 auto 10px; opacity: .4; }
     </style>
@@ -349,7 +360,7 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                             <th>Products</th>
                                             <th>Total</th>
                                             <th>Status</th>
-                                            <th></th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -405,12 +416,22 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php if ($o['kind'] === 'po' && $o['status'] === 'waiting'): ?>
-                                                <form method="post" action="delete-purchase-order.php" onsubmit="return confirm('Delete this purchase order? This cannot be undone.');">
-                                                    <input type="hidden" name="po_id" value="<?=(int)$o['po_id']?>">
-                                                    <button type="submit" class="po-delete-btn"><i class="material-icons" style="font-size:14px;">delete</i> Delete</button>
-                                                </form>
-                                                <?php endif; ?>
+                                                <div class="po-actions">
+                                                    <button type="button" class="po-view-btn items-view-trigger" data-items="<?=$items_json?>" data-bill="<?=$bill_json?>" title="View order in detail">
+                                                        <i class="material-icons" style="font-size:14px;">visibility</i> View
+                                                    </button>
+                                                    <?php if ($o['status'] === 'completed' && $o['tp_invoice_id'] && isset($invNumbers[$o['tp_invoice_id']])): ?>
+                                                    <a href="purchased-bill-print.php?id=<?=urlencode(base64_encode($o['tp_invoice_id']))?>" target="_blank" class="po-print-btn" title="Print purchased bill copy">
+                                                        <i class="material-icons" style="font-size:14px;">print</i> Print
+                                                    </a>
+                                                    <?php endif; ?>
+                                                    <?php if ($o['kind'] === 'po' && $o['status'] === 'waiting'): ?>
+                                                    <form method="post" action="delete-purchase-order.php" onsubmit="return confirm('Delete this purchase order? This cannot be undone.');">
+                                                        <input type="hidden" name="po_id" value="<?=(int)$o['po_id']?>">
+                                                        <button type="submit" class="po-delete-btn"><i class="material-icons" style="font-size:14px;">delete</i> Delete</button>
+                                                    </form>
+                                                    <?php endif; ?>
+                                                </div>
                                             </td>
                                         </tr>
                                         <?php endforeach; endif; ?>
