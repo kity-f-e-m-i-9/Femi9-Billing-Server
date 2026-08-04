@@ -274,7 +274,7 @@ if (!empty($shopIds)) {
 $tpOrderMeta = [];
 if (!empty($orderIdsInRange)) {
     $oidList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $orderIdsInRange)) . "'";
-    $resTp = $db_conn->query("SELECT order_id, tp_id, invoiced_inv_id, voided_at FROM tp_orders WHERE order_id IN ($oidList)");
+    $resTp = $db_conn->query("SELECT order_id, tp_id, invoiced_inv_id, voided_at, void_reason FROM tp_orders WHERE order_id IN ($oidList)");
     while ($trow = mysqli_fetch_assoc($resTp)) {
         if (!isset($tpOrderMeta[$trow['order_id']])) { $tpOrderMeta[$trow['order_id']] = $trow; }
     }
@@ -555,8 +555,11 @@ if (!$tpRow) {
     // TP voided the order before ever converting it to an invoice — no
     // stock was ever touched for this (nothing to reverse), it's purely
     // "the shop didn't want this product" being recorded back to the DM.
-    $headerBadge = "<span class='badge badge-style-bordered badge-danger'>Voided (before invoicing)</span>";
+    $headerBadge = "<span class='badge badge-style-bordered badge-danger'>Cancelled (before invoicing)</span>";
     $detailLines[] = "<div class='tp-status-pending'>No stock affected</div>";
+    if (!empty($tpRow['void_reason'])) {
+        $detailLines[] = "<div class='tp-status-pending'>Reason: " . htmlspecialchars($tpRow['void_reason']) . "</div>";
+    }
 } elseif (empty($tpRow['invoiced_inv_id'])) {
     $headerBadge = "<span class='badge badge-style-bordered badge-warning'>Pending with TP</span>";
     $detailLines[] = "<div class='tp-status-pending'>Not yet invoiced</div>";

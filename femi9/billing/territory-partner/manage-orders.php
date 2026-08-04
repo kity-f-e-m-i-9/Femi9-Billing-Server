@@ -10,12 +10,14 @@ $to_date   = $_REQUEST['todate'] ?? $today;
 
 $stmt = mysqli_prepare($db_conn,
     "SELECT o.id, o.order_id, o.order_date, o.new_order, o.noorder_reason, o.marketing_tool,
-            o.pr_id, o.qty, o.invoiced_inv_id, o.assigned_by_ms_id, o.voided_at,
-            s.name shop_name, s.latitude shop_lat, s.longitude shop_lng, p.productName, dm.ms_name
+            o.pr_id, o.qty, o.invoiced_inv_id, o.assigned_by_ms_id, o.voided_at, o.void_reason,
+            s.name shop_name, s.latitude shop_lat, s.longitude shop_lng, p.productName, dm.ms_name,
+            mo.dm_lat, mo.dm_lng
      FROM tp_orders o
      LEFT JOIN shop s ON s.id=o.shop_id
      LEFT JOIN products p ON p.id=o.pr_id
      LEFT JOIN marketing_staff dm ON dm.id=o.assigned_by_ms_id
+     LEFT JOIN (SELECT order_id, MAX(latitude) dm_lat, MAX(longitude) dm_lng FROM ms_orders GROUP BY order_id) mo ON mo.order_id=o.order_id
      WHERE o.tp_id=? AND o.order_date BETWEEN ? AND ?
      ORDER BY o.order_date DESC, o.order_id DESC, o.id ASC"
 );
@@ -39,6 +41,9 @@ foreach ($rows as $r) {
             'invoiced_inv_id' => $r['invoiced_inv_id'],
             'assigned_by_ms_id' => $r['assigned_by_ms_id'],
             'voided_at'  => $r['voided_at'],
+            'void_reason' => $r['void_reason'],
+            'dm_lat'     => $r['dm_lat'],
+            'dm_lng'     => $r['dm_lng'],
             'dm_name'    => $r['ms_name'],
             'lines'      => [],
         ];
@@ -113,8 +118,12 @@ if (!empty($invIds)) {
         }
         .tp-action-danger:hover { color:#b32e2e; background:#fdf1f1; }
 
-        .tp-location-link { font-size:11.5px; color:#6b7280; text-decoration:none; }
-        .tp-location-link:hover { text-decoration:underline; }
+        .tp-location-link {
+            font-size:11px; font-weight:600; text-decoration:none; padding:4px 10px;
+            border-radius:14px; display:inline-block; margin-top:4px;
+            color:#2a78d6; background:#eaf2fc; border:1px solid #cfe1f7;
+        }
+        .tp-location-link:hover { color:#1a5eb0; background:#dcebfb; }
         .tp-line-item { font-size:12.5px; color:#3a3a38; }
         .tp-line-item + .tp-line-item { margin-top:2px; }
     </style>
@@ -191,7 +200,10 @@ if (!empty($invIds)) {
                                                     <td>
                                                         <?=htmlspecialchars($v['shop_name'] ?? '-')?>
                                                         <?php if (!empty($v['shop_lat']) && !empty($v['shop_lng'])): ?>
-                                                        <br/><a href="https://www.google.com/maps?q=<?=htmlspecialchars($v['shop_lat'])?>,<?=htmlspecialchars($v['shop_lng'])?>" target="_blank" class="tp-location-link">View Location</a>
+                                                        <br/><a href="https://www.google.com/maps?q=<?=htmlspecialchars($v['shop_lat'])?>,<?=htmlspecialchars($v['shop_lng'])?>" target="_blank" class="tp-location-link">Shop Location</a>
+                                                        <?php endif; ?>
+                                                        <?php if (!empty($v['dm_lat']) && !empty($v['dm_lng'])): ?>
+                                                        <br/><a href="https://www.google.com/maps?q=<?=htmlspecialchars($v['dm_lat'])?>,<?=htmlspecialchars($v['dm_lng'])?>" target="_blank" class="tp-location-link">Order Location (DM)</a>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
@@ -216,14 +228,17 @@ if (!empty($invIds)) {
                                                     <td>
                                                         <?php if ($v['new_order'] === 'yes'): ?>
                                                             <?php if (!empty($v['voided_at'])): ?>
-                                                            <span class="tp-tag tp-tag-bad">Voided</span>
+                                                            <span class="tp-tag tp-tag-bad" <?php if (!empty($v['void_reason'])): ?>title="<?=htmlspecialchars($v['void_reason'])?>"<?php endif; ?>>Cancelled</span>
+                                                            <?php if (!empty($v['void_reason'])): ?>
+                                                            <div class="text-muted" style="font-size:11px;margin-top:3px;">Reason: <?=htmlspecialchars($v['void_reason'])?></div>
+                                                            <?php endif; ?>
                                                             <?php elseif (!empty($v['invoiced_inv_id']) && isset($completedInvIds[$v['invoiced_inv_id']])): ?>
                                                             <a href="shop-invoice-print.php?invoiceid=<?=base64_encode($v['invoiced_inv_id'])?>" class="tp-action-link tp-action-success" target="_blank">Completed Invoice</a>
                                                             <?php elseif (!empty($v['invoiced_inv_id'])): ?>
                                                             <a href="shop-invoice-add.php?InvoiceID=<?=base64_encode($v['invoiced_inv_id'])?>&invuser=shop&action=edit" class="tp-action-link tp-action-primary">Continue Invoice</a>
                                                             <?php else: ?>
                                                             <a href="order-to-invoice.php?order_id=<?=urlencode($oid)?>" onclick="return confirm('Create an invoice for this order, using the shop and product/qty exactly as captured here?');" class="tp-action-link tp-action-primary">Invoice</a>
-                                                            <a href="void-order.php?order_id=<?=urlencode($oid)?>" onclick="return confirm('Void this order? Use this when the shop no longer wants the product — the visit stays on record as Voided.');" class="tp-action-link tp-action-danger" style="margin-left:6px;">Void</a>
+                                                            <a href="javascript:void(0);" onclick="openCancelOrderModal('<?=htmlspecialchars($oid, ENT_QUOTES)?>');" class="tp-action-link tp-action-danger" style="margin-left:6px;">Cancel</a>
                                                             <?php endif; ?>
                                                         <?php else: ?>
                                                             <span class="text-muted">&mdash;</span>
@@ -245,6 +260,29 @@ if (!empty($invIds)) {
         </div>
     </div>
 
+    <!-- Cancel Order modal — a reason is required before the order is voided -->
+    <div class="modal fade" id="cancelOrderModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" action="void-order.php" id="cancelOrderForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Cancel Order</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="order_id" id="cancelOrderIdField" value="">
+                        <label class="form-label">Reason for cancelling the order <span style="color:red;">*</span></label>
+                        <textarea name="void_reason" id="cancelOrderReasonField" class="form-control" rows="3" required maxlength="255" placeholder="e.g. Shop no longer wants this product"></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-danger">Confirm Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -252,5 +290,14 @@ if (!empty($invIds)) {
     <script src="../../assets/plugins/pace/pace.min.js"></script>
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
+    <script>
+    function openCancelOrderModal(orderId) {
+        document.getElementById('cancelOrderIdField').value = orderId;
+        document.getElementById('cancelOrderReasonField').value = '';
+        var modalEl = document.getElementById('cancelOrderModal');
+        var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+    </script>
 </body>
 </html>

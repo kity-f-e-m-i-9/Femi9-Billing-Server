@@ -10,11 +10,17 @@ date_default_timezone_set("Asia/Kolkata");
 // Voided marker instead of disappearing, and (unlike the invoice) there's no
 // stock to reverse since nothing was ever deducted at this stage.
 
-$order_id = $_REQUEST['order_id'] ?? '';
+$order_id    = $_REQUEST['order_id'] ?? '';
+$void_reason = trim($_REQUEST['void_reason'] ?? '');
 $tp_id    = (int)$Login_user_IDvl;
 $tp_id_str = (string)$tp_id;
 
 if ($order_id === '') {
+    header('Location: manage-orders.php');
+    exit;
+}
+if ($void_reason === '') {
+    $_SESSION['errorMessage'] = "Please enter a reason for cancelling the order.";
     header('Location: manage-orders.php');
     exit;
 }
@@ -49,12 +55,12 @@ if (!empty($lines[0]['voided_at'])) {
 }
 
 $stmtVoid = $db_conn->prepare(
-    "UPDATE tp_orders SET voided_at=NOW(), voided_by_user_type=?, voided_by_user_id=? WHERE order_id=? AND tp_id=?"
+    "UPDATE tp_orders SET voided_at=NOW(), voided_by_user_type=?, voided_by_user_id=?, void_reason=? WHERE order_id=? AND tp_id=?"
 );
-$stmtVoid->bind_param('sssi', $Login_user_TYPEvl, $tp_id_str, $order_id, $tp_id);
+$stmtVoid->bind_param('ssssi', $Login_user_TYPEvl, $tp_id_str, $void_reason, $order_id, $tp_id);
 $stmtVoid->execute();
 $stmtVoid->close();
 
-$_SESSION['successMessage'] = "Order voided.";
+$_SESSION['successMessage'] = "Order cancelled.";
 header('Location: manage-orders.php');
 exit;

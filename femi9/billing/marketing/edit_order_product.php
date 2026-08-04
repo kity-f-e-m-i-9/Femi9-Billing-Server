@@ -23,15 +23,22 @@ if(isset($_REQUEST['update_no_order']))
 {
 	
 	$update_orderid=$_POST["update_orderid"];
-	
+
 	//Delete old order details
     $delete_old_orders="delete from ms_orders where order_id='$update_orderid'";
 	mysqli_query($db_conn,$delete_old_orders);
-	
+
 	$ms_id=$_POST["ms_id"];
 	$order_date=$_POST["order_date"];
 	$shop_id=$_POST["shop_id"];
-	
+
+	// Whichever location the DM confirmed on submit (original visit location,
+	// or their current location if they chose to update it) — see the
+	// confirm() prompt in the page's JS. Falls back to NULL if geolocation
+	// was never available on either the original visit or this edit.
+	$edit_latitude  = (isset($_POST['latitude'])  && $_POST['latitude']  !== '') ? (float)$_POST['latitude']  : null;
+	$edit_longitude = (isset($_POST['longitude']) && $_POST['longitude'] !== '') ? (float)$_POST['longitude'] : null;
+
 	$marketing_tool=$_POST["marketing_tool"];
 	$marketing_tool=RemoveSpecialChar($marketing_tool);	
 	
@@ -56,9 +63,10 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 $result_count_dist=mysqli_fetch_array($fetc_count_dist);
 if($result_count_dist['numShop']==0)
 	{
-	
-        $sql="insert into ms_orders (order_id,shop_id,ms_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty) values ('$update_orderid','$shop_id','$ms_id','$order_date','yes','nil','$marketing_tool',
-		'$product_id_value','$qty_value')";
+	$lat_sql = $edit_latitude  !== null ? $edit_latitude  : "NULL";
+	$lng_sql = $edit_longitude !== null ? $edit_longitude : "NULL";
+        $sql="insert into ms_orders (order_id,shop_id,ms_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,latitude,longitude) values ('$update_orderid','$shop_id','$ms_id','$order_date','yes','nil','$marketing_tool',
+		'$product_id_value','$qty_value',$lat_sql,$lng_sql)";
 		mysqli_query($db_conn,$sql);
 
 	}
@@ -152,11 +160,15 @@ if($result_count_dist['numShop']==0)
                                     <div class="card-body">
 									
                                <?php include("validate-scripts.php");?>        
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data" id="editOrderForm" onsubmit="return confirmEditOrderLocation();">
 
+<input type="hidden" name="update_no_order" value="1">
 <input type="hidden" name="update_orderid" value="<?=$orderid;?>">
 <input type="hidden" name="ms_id" value="<?=$result_product_list['ms_id'];?>">
 <input type="hidden" name="order_date" value="<?=$result_product_list['order_date'];?>">
+<input type="hidden" name="latitude"  id="edit_order_latitude"  value="<?=htmlspecialchars($result_product_list['latitude'] ?? '');?>">
+<input type="hidden" name="longitude" id="edit_order_longitude" value="<?=htmlspecialchars($result_product_list['longitude'] ?? '');?>">
+<div id="editLocationNote" class="text-muted" style="font-size:12.5px;margin-bottom:10px;"></div>
 
                                         <div class="example-container">
                                             <div class="example-content">
@@ -292,6 +304,47 @@ function deleteRow(tableID) {
     <script src="../../assets/plugins/highlight/highlight.pack.js"></script>
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
+    <script>
+    // ── Detect current location on this Edit page, separately from the
+    // original visit's location already sitting in the hidden fields —
+    // on submit, ask the DM which one to save (see confirmEditOrderLocation).
+    var editCapturedLat = null;
+    var editCapturedLng = null;
+    var editOrigLat = document.getElementById('edit_order_latitude').value;
+    var editOrigLng = document.getElementById('edit_order_longitude').value;
+    var editLocationConfirmed = false;
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function (position) {
+                editCapturedLat = position.coords.latitude;
+                editCapturedLng = position.coords.longitude;
+                var noteEl = document.getElementById('editLocationNote');
+                if (noteEl) {
+                    noteEl.textContent = '📍 Current location detected — you\'ll be asked whether to save it when you click Update.';
+                }
+            },
+            function () { /* denied/unavailable — silently keep original location on submit */ },
+            { enableHighAccuracy: true, timeout: 8000 }
+        );
+    }
+
+    function confirmEditOrderLocation() {
+        if (editLocationConfirmed) { return true; } // already answered, let the real submit through
+        if (editCapturedLat === null || editCapturedLng === null) { return true; } // nothing new detected — submit with original location as-is
+
+        var useCurrent = confirm('Update order location to your current location?\n\nOK = use your current location\nCancel = keep the original Get Order location');
+        if (useCurrent) {
+            document.getElementById('edit_order_latitude').value = editCapturedLat;
+            document.getElementById('edit_order_longitude').value = editCapturedLng;
+        }
+        // Cancel leaves the hidden fields at their original PHP-rendered values.
+
+        editLocationConfirmed = true;
+        document.getElementById('editOrderForm').submit();
+        return false; // stop this submit attempt; the programmatic one above carries it through
+    }
+    </script>
 </body>
 
 </html>
