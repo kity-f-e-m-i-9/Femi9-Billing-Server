@@ -100,11 +100,17 @@ try {
     }
 
     // ── Collect all TP IDs that have any data ─────────────────────────────────
-    $all_ids = array_unique(array_merge(
+    // array_values() is required here: array_unique() preserves the original
+    // (gapped) keys after removing duplicates, but $stmt->execute() below binds
+    // this array positionally (?) — PDO needs a plain sequential 0-indexed
+    // array for that, or it throws "Invalid parameter number" the moment any
+    // TP appears in more than one of the three source arrays (i.e. almost
+    // always, since a TP that both purchased and logged in shows up in both).
+    $all_ids = array_values(array_unique(array_merge(
         array_keys($purchase_data),
         array_keys($daily_data),
         array_keys($return_data)
-    ));
+    )));
 
     if (!empty($all_ids)) {
         $placeholders = str_repeat('?,', count($all_ids) - 1) . '?';
