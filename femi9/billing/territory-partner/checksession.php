@@ -10,7 +10,7 @@ require_once __DIR__ . '/include/db-connect.php';
 
 if (!isset($_SESSION['LOGIN_USER']) || $_SESSION['LOGIN_USER'] === '') {
     $_SESSION['errorMessage'] = 'Session Expired. Please login again.';
-    header('Location: index.php?sessionexpiry');
+    header('Location: ../login/index.php');
     exit;
 }
 
@@ -22,7 +22,7 @@ if (isset($_SESSION['last_activity'])) {
         session_destroy();
         session_start();
         $_SESSION['errorMessage'] = 'Session expired due to inactivity. Please login again.';
-        header('Location: index.php?sessionexpiry');
+        header('Location: ../login/index.php');
         exit;
     }
 }
@@ -34,7 +34,7 @@ if (isset($_SESSION['LOGIN_USER_TYPE']) && $_SESSION['LOGIN_USER_TYPE'] !== 'ter
     session_destroy();
     session_start();
     $_SESSION['errorMessage'] = 'Invalid session. Please login again.';
-    header('Location: index.php');
+    header('Location: ../login/index.php');
     exit;
 }
 
@@ -55,14 +55,14 @@ mysqli_stmt_close($stmt_tp);
 if (!$result_LoGuserDtails) {
     session_unset(); session_destroy(); session_start();
     $_SESSION['errorMessage'] = 'User account not found. Please contact support.';
-    header('Location: index.php');
+    header('Location: ../login/index.php');
     exit;
 }
 
 if (!$result_LoGuserDtails['is_active']) {
     session_unset(); session_destroy(); session_start();
     $_SESSION['errorMessage'] = 'Your account has been deactivated. Please contact support.';
-    header('Location: index.php');
+    header('Location: ../login/index.php');
     exit;
 }
 

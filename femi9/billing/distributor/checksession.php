@@ -13,7 +13,16 @@ require_once __DIR__ . '/include/db-connect.php';
 // Check if user is logged in - Use isset() instead of empty()
 if (!isset($_SESSION['LOGIN_USER']) || $_SESSION['LOGIN_USER'] === '') {
     $_SESSION['errorMessage'] = 'Session Expired. Please login again.';
-    header('Location: index.php?sessionexpiry');
+    header('Location: ../login/index.php');
+    exit;
+}
+
+// The session may belong to a different account type (e.g. after switching
+// accounts, or a session shared across panels) — reject if it doesn't match.
+if (isset($_SESSION['LOGIN_USER_TYPE']) && $_SESSION['LOGIN_USER_TYPE'] !== 'distributor') {
+    session_unset();
+    session_destroy();
+    header('Location: ../login/index.php');
     exit;
 }
 
@@ -29,7 +38,7 @@ if (isset($_SESSION['last_activity'])) {
         session_destroy();
         session_start();
         $_SESSION['errorMessage'] = 'Session expired due to inactivity. Please login again.';
-        header('Location: index.php?sessionexpiry');
+        header('Location: ../login/index.php');
         exit;
     }
 }
@@ -57,7 +66,7 @@ if (!$result_LoGuserDtails) {
     session_destroy();
     session_start();
     $_SESSION['errorMessage'] = 'User account not found. Please contact support.';
-    header('Location: index.php');
+    header('Location: ../login/index.php');
     exit;
 }
 
@@ -67,7 +76,7 @@ if (isset($result_LoGuserDtails['account_status']) && $result_LoGuserDtails['acc
     session_destroy();
     session_start();
     $_SESSION['errorMessage'] = 'Your account has been deactivated. Please contact support.';
-    header('Location: index.php');
+    header('Location: ../login/index.php');
     exit;
 }
 

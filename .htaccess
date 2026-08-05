@@ -1,0 +1,5 @@
+RewriteEngine On
+
+# Serve the central login page at the bare domain root, without redirecting
+# the browser away from it (internal rewrite — URL bar stays on "/").
+RewriteRule ^$ femi9/billing/login/index.php [L]

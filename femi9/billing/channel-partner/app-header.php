@@ -127,6 +127,18 @@ $_hLocCount = count($_hLocs);
                         <div class="dropdown-menu dropdown-menu-end notifications-dropdown" aria-labelledby="cpDropDown">
                             <h6 class="dropdown-header">Channel Partner (<?php echo htmlspecialchars($Login_user_mobile); ?>)</h6>
                             <div class="notifications-dropdown-list">
+                                <?php if (count($_SESSION['LINKED_ACCOUNTS'] ?? []) > 1): ?>
+                                <h6 class="dropdown-header">Switch Account</h6>
+                                <?php foreach ($_SESSION['LINKED_ACCOUNTS'] as $_acct): if ($_acct['type'] === $_SESSION['LOGIN_USER_TYPE']) continue; ?>
+                                <a href="../login/switch-account.php?type=<?php echo urlencode($_acct['type']); ?>">
+                                    <div class="notifications-dropdown-item">
+                                        <div class="notifications-dropdown-item-text">
+                                            <p class="bold-notifications-text"><?php echo htmlspecialchars($_acct['display_name']); ?> — <?php echo htmlspecialchars($_acct['name']); ?></p>
+                                        </div>
+                                    </div>
+                                </a>
+                                <?php endforeach; ?>
+                                <?php endif; ?>
                                 <a href="change-password.php">
                                     <div class="notifications-dropdown-item">
                                         <div class="notifications-dropdown-item-text">
