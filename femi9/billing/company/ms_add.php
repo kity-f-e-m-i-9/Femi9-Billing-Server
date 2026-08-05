@@ -167,6 +167,10 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 <textarea name="ms_address" class="form-control" onkeypress="restrictSpecialChars(event)" placeholder="optional"></textarea>
 </br>
 
+<label class="form-label">Monthly Target Amount (&#8377;)</label>
+<input type="number" step="0.01" min="0" name="monthly_target_amount" class="form-control" placeholder="optional">
+</br>
+
 <?php
 $_chkTL = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'team_level_id'");
 if ($_chkTL && $_chkTL->num_rows === 0) {

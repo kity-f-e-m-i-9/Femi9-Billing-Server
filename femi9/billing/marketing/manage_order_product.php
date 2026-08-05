@@ -309,7 +309,32 @@ if (!empty($invoiceIds)) {
         $diffCountsByInv[$dr['inv_id']][$dr['change_type']] = (int)$dr['c'];
     }
 }
-						?>
+
+// ── Monthly Target ──────────────────────────────────────────────────────────
+// Fixed monthly target amount set per-DM (Company -> Update Marketing Staff).
+// Prorated to the selected date range by per-day target (monthly target /
+// days in that month) so the card stays meaningful whether the DM filters a
+// single day, a week, or the full month.
+$_chkTgtCol = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'monthly_target_amount'");
+if ($_chkTgtCol && $_chkTgtCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
+}
+$monthlyTarget = 0.0;
+$stmtTgt = $db_conn->prepare("SELECT monthly_target_amount FROM marketing_staff WHERE id=?");
+$stmtTgt->bind_param('i', $viewMsId);
+$stmtTgt->execute();
+$tgtRow = $stmtTgt->get_result()->fetch_assoc();
+$stmtTgt->close();
+$monthlyTarget = (float)($tgtRow['monthly_target_amount'] ?? 0);
+
+$daysInMonth  = (int)date('t', strtotime($from_date));
+$perDayTarget = $daysInMonth > 0 ? $monthlyTarget / $daysInMonth : 0.0;
+$daysInRange  = (int)floor((strtotime($to_date) - strtotime($from_date)) / 86400) + 1;
+if ($daysInRange < 1) { $daysInRange = 1; }
+$targetForPeriod = $perDayTarget * $daysInRange;
+$targetAchievedAmt = $totalInvoiceValue;
+$targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetForPeriod) * 100) : 0;
+					?>
 
                                     <h1>
 									<table class="headertble">
@@ -456,6 +481,24 @@ if (!empty($invoiceIds)) {
             <i class="material-icons-outlined kpi-ico">assignment_turned_in</i>
             <div class="kpi-t">Get Order / No Order</div>
             <div class="kpi-v"><span style="color:#0ca30c;"><?php echo (int)$getOrderCount; ?></span> / <span style="color:#d03b3b;"><?php echo (int)$noOrderCount; ?></span></div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="kpi-card" style="--kpi-accent:#f59e0b;">
+            <i class="material-icons-outlined kpi-ico">flag</i>
+            <div class="kpi-t">Monthly Target</div>
+            <?php if ($monthlyTarget <= 0): ?>
+                <div class="kpi-v" style="font-size:15px;color:#9ca3af;">Not set</div>
+                <div class="kpi-sub">Set from Company &rarr; Update Marketing Staff</div>
+            <?php else: ?>
+                <div class="kpi-v">&#8377;<?php echo inr_format($targetAchievedAmt, 2); ?> <span style="font-size:13px;color:#9ca3af;">/ &#8377;<?php echo inr_format($targetForPeriod, 2); ?></span></div>
+                <div class="kpi-sub">
+                    <?php echo number_format($targetPercent, 1); ?>% achieved for this range &middot;
+                    Per day: &#8377;<?php echo inr_format($perDayTarget, 2); ?>
+                    <br/>Monthly Target: &#8377;<?php echo inr_format($monthlyTarget, 2); ?>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
