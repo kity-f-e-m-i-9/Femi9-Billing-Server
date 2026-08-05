@@ -119,7 +119,7 @@ if (!empty($markeingSTFID)) {
 // Neksomo-sourced products (temp_id LIKE 'NKS-%') are excluded from selection
 // here, same convention as the shop/customer/TP invoice "add product" dropdowns.
 $productList = [];
-$r = mysqli_query($db_conn, "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
+$r = mysqli_query($db_conn, "SELECT id, productName, outlet_price FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 while ($p = mysqli_fetch_assoc($r)) $productList[] = $p;
 
 // ── Active TPs — used to populate the "Assign To TP" dropdown, filtered
@@ -355,21 +355,36 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
 
                                                     <table id="dataTable" border="0">
                                                         <tr>
+                                                            <td></td>
+                                                            <td><label class="form-label" style="margin-bottom:2px;">Product</label></td>
+                                                            <td><label class="form-label" style="margin-bottom:2px;">Qty</label></td>
+                                                            <td><label class="form-label" style="margin-bottom:2px;">Discount</label></td>
+                                                            <td><label class="form-label" style="margin-bottom:2px;">Amount</label></td>
+                                                        </tr>
+                                                        <tr>
                                                             <td><input type="checkbox" name="chk[]"/></td>
                                                             <td>
-                                                                <select required name="pr_id[]" class="form-control product-select">
+                                                                <select required name="pr_id[]" class="form-control product-select order-pr-select" onchange="recalcOrderLine(this)">
                                                                     <option value="" hidden>Select Product</option>
                                                                     <?php foreach($productList as $p): ?>
-                                                                    <option value="<?=$p['id']?>"><?=htmlspecialchars($p['productName'])?></option>
+                                                                    <option value="<?=$p['id']?>" data-price="<?=htmlspecialchars($p['outlet_price'])?>"><?=htmlspecialchars($p['productName'])?></option>
                                                                     <?php endforeach; ?>
                                                                 </select>
                                                             </td>
                                                             <td>
-                                                                <input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control" required/>
+                                                                <input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control order-qty" oninput="recalcOrderLine(this)" required/>
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" placeholder="Disc %" min="0" max="100" step="0.01" value="0" name="discount_percentage[]" class="form-control order-disc" oninput="recalcOrderLine(this)"/>
+                                                            </td>
+                                                            <td class="order-line-amounts">
+                                                                <div class="order-line-actual">Actual: &#8377;0.00</div>
+                                                                <div class="order-line-final">After Disc: &#8377;0.00</div>
                                                             </td>
                                                         </tr>
                                                     </table>
                                                     <br/>
+                                                    <div id="orderGrandTotal" style="font-weight:600;margin-bottom:10px;"></div>
 
                                                     <button type="submit" name="add_order_get" onclick="return confirm('Please confirm');" class="btn btn-primary">
                                                         <i class="material-icons">add</i> Add
@@ -425,19 +440,21 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         $scope.find('select.product-select').select2({ placeholder: 'Search product…', width: '100%' });
     }
 
+    // Row 0 is the header labels row — the actual template to clone is row 1.
     function addRow(tableID) {
         var table    = document.getElementById(tableID);
         var rowCount = table.rows.length;
         if (rowCount < 100) {
             var row      = table.insertRow(rowCount);
-            var colCount = table.rows[0].cells.length;
+            var colCount = table.rows[1].cells.length;
             for (var i = 0; i < colCount; i++) {
                 var newcell = row.insertCell(i);
                 newcell.innerHTML = (i === productCellIndex && productCellTemplate !== null)
                     ? productCellTemplate
-                    : table.rows[0].cells[i].innerHTML;
+                    : table.rows[1].cells[i].innerHTML;
             }
             initProductSearch($(row));
+            recalcOrderLine(row.querySelector('.order-qty'));
         } else {
             alert("Maximum allowed record is 100.");
         }
@@ -454,11 +471,11 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     function deleteRow(tableID) {
         var table    = document.getElementById(tableID);
         var rowCount = table.rows.length;
-        for (var i = 0; i < rowCount; i++) {
+        for (var i = 1; i < rowCount; i++) { // start at 1 — row 0 is the header labels row
             var row    = table.rows[i];
             var chkbox = row.cells[0].childNodes[0];
             if (null != chkbox && true == chkbox.checked) {
-                if (rowCount <= 1) {
+                if (rowCount <= 2) { // header + 1 data row — keep at least one product row
                     alert("Cannot remove all rows.");
                     break;
                 }
@@ -466,6 +483,60 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                 rowCount--;
                 i--;
             }
+        }
+        recalcOrderGrandTotal();
+    }
+
+    // ── Per-line Actual / After-Discount amount, plus an order grand total ──
+    function recalcOrderLine(el) {
+        if (!el) { return; }
+        var row = el.closest ? el.closest('tr') : null;
+        if (!row) { return; }
+
+        var prSelect = row.querySelector('.order-pr-select');
+        var qtyInput = row.querySelector('.order-qty');
+        var discInput = row.querySelector('.order-disc');
+        var actualEl = row.querySelector('.order-line-actual');
+        var finalEl  = row.querySelector('.order-line-final');
+        if (!prSelect || !qtyInput || !discInput || !actualEl || !finalEl) { return; }
+
+        var opt   = prSelect.options[prSelect.selectedIndex];
+        var price = opt ? (parseFloat(opt.getAttribute('data-price')) || 0) : 0;
+        var qty   = parseFloat(qtyInput.value) || 0;
+        var disc  = Math.min(100, Math.max(0, parseFloat(discInput.value) || 0));
+
+        var actual = price * qty;
+        var final  = actual * (1 - disc / 100);
+
+        actualEl.textContent = 'Actual: ₹' + actual.toFixed(2);
+        finalEl.textContent  = 'After Disc: ₹' + final.toFixed(2);
+
+        recalcOrderGrandTotal();
+    }
+
+    function recalcOrderGrandTotal() {
+        var table = document.getElementById('dataTable');
+        if (!table) { return; }
+        var actualTotal = 0, finalTotal = 0;
+        for (var i = 1; i < table.rows.length; i++) { // skip header row
+            var row = table.rows[i];
+            var prSelect = row.querySelector('.order-pr-select');
+            var qtyInput = row.querySelector('.order-qty');
+            var discInput = row.querySelector('.order-disc');
+            if (!prSelect || !qtyInput || !discInput) { continue; }
+            var opt   = prSelect.options[prSelect.selectedIndex];
+            var price = opt ? (parseFloat(opt.getAttribute('data-price')) || 0) : 0;
+            var qty   = parseFloat(qtyInput.value) || 0;
+            var disc  = Math.min(100, Math.max(0, parseFloat(discInput.value) || 0));
+            var actual = price * qty;
+            actualTotal += actual;
+            finalTotal  += actual * (1 - disc / 100);
+        }
+        var totalEl = document.getElementById('orderGrandTotal');
+        if (totalEl) {
+            totalEl.textContent = (actualTotal > 0 || finalTotal > 0)
+                ? 'Order Total — Actual: ₹' + actualTotal.toFixed(2) + '  |  After Discount: ₹' + finalTotal.toFixed(2)
+                : '';
         }
     }
 

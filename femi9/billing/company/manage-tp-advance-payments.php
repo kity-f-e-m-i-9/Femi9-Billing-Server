@@ -64,6 +64,24 @@ $stmt->execute();
 $payments = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
+// TP's monthly target = sum of target_amount across the Firka/location(s) assigned to them,
+// batched once for every TP appearing in this filtered result set (not per-row queries).
+$tpTargets = [];
+$tpIdsInResult = array_unique(array_column($payments, 'territory_partner_id'));
+if (!empty($tpIdsInResult)) {
+    $idList = implode(',', array_map('intval', $tpIdsInResult));
+    $resTgt = $db_conn->query("
+        SELECT tpl.territory_partner_id, SUM(pln.target_amount) AS total_target, COUNT(pln.target_amount) AS set_count
+        FROM territory_partner_locations tpl
+        JOIN partner_location_nodes pln ON pln.id = tpl.location_id
+        WHERE tpl.territory_partner_id IN ($idList)
+        GROUP BY tpl.territory_partner_id
+    ");
+    while ($tr = $resTgt->fetch_assoc()) {
+        $tpTargets[$tr['territory_partner_id']] = (int)$tr['set_count'] > 0 ? (float)$tr['total_target'] : null;
+    }
+}
+
 // Stats
 $total_count = count($payments);
 $total_amount = array_sum(array_column($payments, 'amount'));
@@ -233,6 +251,7 @@ $i = 0;
                                                     <th>S.No</th>
                                                     <th>TP Name</th>
                                                     <th>TP ID</th>
+                                                    <th>TP Target (₹)</th>
                                                     <th>Receiver Name</th>
                                                     <th>Date</th>
                                                     <th>Amount (₹)</th>
@@ -251,6 +270,14 @@ $i = 0;
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo htmlspecialchars($p['tp_name']); ?></td>
                                                     <td><code style="font-size:12px;"><?php echo htmlspecialchars($p['tp_code']); ?></code></td>
+                                                    <td>
+                                                        <?php $tgt = $tpTargets[$p['territory_partner_id']] ?? null; ?>
+                                                        <?php if ($tgt !== null && $tgt > 0): ?>
+                                                            <?php echo inr_format($tgt, 2); ?>
+                                                        <?php else: ?>
+                                                            <span class="text-muted">Not set</span>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td><?php echo htmlspecialchars($p['receiver_name'] ?: '—'); ?></td>
                                                     <td><?php echo htmlspecialchars($p['payment_date']); ?></td>
                                                     <td class="text-right font-weight-bold"><?php echo inr_format($p['amount'], 2); ?></td>

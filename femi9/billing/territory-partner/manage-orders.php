@@ -19,7 +19,7 @@ $stmt = mysqli_prepare($db_conn,
      LEFT JOIN marketing_staff dm ON dm.id=o.assigned_by_ms_id
      LEFT JOIN (SELECT order_id, MAX(latitude) dm_lat, MAX(longitude) dm_lng FROM ms_orders GROUP BY order_id) mo ON mo.order_id=o.order_id
      WHERE o.tp_id=? AND o.order_date BETWEEN ? AND ?
-     ORDER BY o.order_date DESC, o.order_id DESC, o.id ASC"
+     ORDER BY o.order_date DESC, o.id DESC"
 );
 mysqli_stmt_bind_param($stmt, "iss", $Login_user_IDvl, $from_date, $to_date);
 mysqli_stmt_execute($stmt);

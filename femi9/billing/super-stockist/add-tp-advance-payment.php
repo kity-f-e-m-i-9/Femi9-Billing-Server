@@ -127,6 +127,7 @@ $tps = $tp_stmt->get_result()->fetch_all(MYSQLI_ASSOC); $tp_stmt->close();
                                                     </option>
                                                     <?php endforeach; ?>
                                                 </select>
+                                                <div id="tpTargetInfo" style="display:none;margin-top:8px;font-size:13px;color:#374151;background:#eff6ff;border-left:4px solid #3b82f6;padding:8px 12px;border-radius:6px;"></div>
                                             </div>
 
                                             <!-- Payment Date -->
@@ -230,6 +231,22 @@ $(function () {
     }
     $('#territory_partner_id').select2({ placeholder: 'Select Territory Partner', allowClear: true, matcher: tpMatcher });
     $('#payment_mode').select2({ placeholder: 'Select Payment Mode', minimumResultsForSearch: Infinity });
+
+    $('#territory_partner_id').on('change', function () {
+        var tpId = $(this).val();
+        var $info = $('#tpTargetInfo');
+        if (!tpId) { $info.hide().empty(); return; }
+        $.getJSON('get-tp-advance-balance.php', { tp_id: tpId }, function (resp) {
+            var parts = [];
+            if (resp.target !== null && resp.target !== undefined) {
+                parts.push('<strong>Monthly Target:</strong> ₹' + Number(resp.target).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
+            } else {
+                parts.push('<strong>Monthly Target:</strong> Not set');
+            }
+            parts.push('<strong>Outstanding Advance Balance:</strong> ₹' + Number(resp.balance || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
+            $info.html(parts.join(' &middot; ')).show();
+        }).fail(function () { $info.hide().empty(); });
+    });
 
     // Pre-select TP if redirected from add-tp-invoice
     var preselect = <?php echo json_encode((int)($_GET['tp_id'] ?? 0)); ?>;

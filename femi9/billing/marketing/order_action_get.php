@@ -33,9 +33,11 @@ if (isset($_REQUEST['add_order_get'])) {
 
 	$product_id = implode("#",$_REQUEST['pr_id']);
 $qty = implode("#",$_REQUEST['qty']);
+$discount_pct = implode("#", $_REQUEST['discount_percentage'] ?? []);
 
 $product_id_ex = explode ("#",$product_id);
 $qty_ex = explode ("#",$qty);
+$discount_pct_ex = explode ("#", $discount_pct);
 
 $number = count($product_id_ex);
 $insertedLines = []; // pr_id/qty of the lines actually inserted, for the TP bridge below
@@ -44,6 +46,9 @@ for ($i=0; $i<=$number; $i++)
      $product_id_value = $product_id_ex[$i];
      $qty_value = $qty_ex[$i];
 	 $qty_value = RemoveSpecialChar($qty_value);
+	 $discount_value = isset($discount_pct_ex[$i]) ? (float)$discount_pct_ex[$i] : 0;
+	 if ($discount_value < 0) { $discount_value = 0; }
+	 if ($discount_value > 100) { $discount_value = 100; }
 
 	 if($product_id_value!=NULL)
 	 {
@@ -54,10 +59,10 @@ $result_count_dist=mysqli_fetch_array($fetc_count_dist);
 if($result_count_dist['numShop']==0)
 	{
 
-        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,latitude,longitude) values ('$order_id','$shop_id','$ms_id',$tp_id_sql,'$order_date','yes','nil','$marketing_tool',
-		'$product_id_value','$qty_value',$latitude_sql,$longitude_sql)";
+        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,discount_percentage,latitude,longitude) values ('$order_id','$shop_id','$ms_id',$tp_id_sql,'$order_date','yes','nil','$marketing_tool',
+		'$product_id_value','$qty_value','$discount_value',$latitude_sql,$longitude_sql)";
 		mysqli_query($db_conn,$sql);
-		$insertedLines[] = ['pr_id' => (int)$product_id_value, 'qty' => (int)$qty_value];
+		$insertedLines[] = ['pr_id' => (int)$product_id_value, 'qty' => (int)$qty_value, 'discount_percentage' => $discount_value];
 
 	}
 

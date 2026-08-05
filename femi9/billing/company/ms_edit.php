@@ -12,6 +12,10 @@ $_chkMgr = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'manager_id'"
 if ($_chkMgr && $_chkMgr->num_rows === 0) {
     $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN manager_id INT NULL DEFAULT NULL AFTER team_level_id");
 }
+$_chkTgt = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'monthly_target_amount'");
+if ($_chkTgt && $_chkTgt->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
+}
 
 //fetch product details
 $select_product_list="select * from marketing_staff where id='$prid'";
@@ -204,6 +208,10 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 
 <label class="form-label">Address</label>
 <textarea name="ms_address" onkeypress="restrictSpecialChars(event)" class="form-control" placeholder="optional"><?=$result_product_list['ms_address'];?></textarea>
+</br>
+
+<label class="form-label">Monthly Target Amount (&#8377;)</label>
+<input type="number" step="0.01" min="0" name="monthly_target_amount" value="<?=$result_product_list['monthly_target_amount'] !== null ? htmlspecialchars($result_product_list['monthly_target_amount']) : '';?>" class="form-control" placeholder="optional">
 </br>
 
 <?php

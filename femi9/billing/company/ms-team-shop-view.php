@@ -106,6 +106,7 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
     $html .= '<td style="padding-left:' . (12 + $indentPx) . 'px;">' . ($indentLevel > 0 ? '&#8618;&nbsp;' : '') . ($indentLevel === 0 ? '<b>' : '') . htmlspecialchars($row['ms_name']) . ($indentLevel === 0 ? '</b>' : '') . '</td>';
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['shops'] . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . ($sum['got'] + $sum['no']) . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['got'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['no'] . '</span></td>';
     $html .= '<td style="white-space:nowrap;">';
@@ -240,8 +241,17 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                         <div class="col-md-3 col-sm-6 mb-3">
                             <div class="kpi-card">
                                 <i class="material-icons-outlined kpi-ico">storefront</i>
-                                <div class="kpi-t">Total Shops</div>
+                                <div class="kpi-t">New Shop</div>
                                 <div class="kpi-v"><?php echo (int)$kpiShops; ?></div>
+                                <?php if ($hasDateFilter): ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Added in this date range</div><?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="kpi-card">
+                                <i class="material-icons-outlined kpi-ico">assignment_turned_in</i>
+                                <div class="kpi-t">Total Order Shop</div>
+                                <div class="kpi-v"><?php echo (int)($kpiGot + $kpiNo); ?></div>
+                                <div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;"><?php echo (int)$kpiGot; ?> Get Order + <?php echo (int)$kpiNo; ?> No Order</div>
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
@@ -278,7 +288,8 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                                                     <th>#</th>
                                                     <th>Name</th>
                                                     <th>Level</th>
-                                                    <th>Total Shops</th>
+                                                    <th>New Shop</th>
+                                                    <th>Total Order Shop</th>
                                                     <th>Get Order</th>
                                                     <th>No Order</th>
                                                     <th>Shop List</th>

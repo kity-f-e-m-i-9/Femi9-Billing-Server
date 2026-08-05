@@ -27,7 +27,20 @@ $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
+// TP's monthly target = sum of target_amount across the Firka/location(s) assigned to them
+$stmtTgt = $db_conn->prepare("
+    SELECT SUM(pln.target_amount) AS total_target, COUNT(pln.target_amount) AS set_count
+    FROM territory_partner_locations tpl
+    JOIN partner_location_nodes pln ON pln.id = tpl.location_id
+    WHERE tpl.territory_partner_id = ?
+");
+$stmtTgt->bind_param("i", $tp_id);
+$stmtTgt->execute();
+$tgtRow = $stmtTgt->get_result()->fetch_assoc();
+$stmtTgt->close();
+
 echo json_encode([
     'balance' => round((float)$row['balance'], 2),
     'count'   => (int)$row['cnt'],
+    'target'  => ($tgtRow && (int)$tgtRow['set_count'] > 0) ? round((float)$tgtRow['total_target'], 2) : null,
 ]);

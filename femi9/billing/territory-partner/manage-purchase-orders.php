@@ -424,6 +424,9 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                                     <a href="purchased-bill-print.php?id=<?=urlencode(base64_encode($o['tp_invoice_id']))?>" target="_blank" class="po-print-btn" title="Print purchased bill copy">
                                                         <i class="material-icons" style="font-size:14px;">print</i> Print
                                                     </a>
+                                                    <a href="purchased-bill-print.php?id=<?=urlencode(base64_encode($o['tp_invoice_id']))?>&whatsapp_share=1" target="_blank" class="po-print-btn" title="Share purchased bill to WhatsApp">
+                                                        <i class="material-icons" style="font-size:14px;">share</i> Share
+                                                    </a>
                                                     <?php endif; ?>
                                                     <?php if ($o['kind'] === 'po' && $o['status'] === 'waiting'): ?>
                                                     <form method="post" action="delete-purchase-order.php" onsubmit="return confirm('Delete this purchase order? This cannot be undone.');">

@@ -134,16 +134,21 @@ if ($se_msid != NULL) {
 
     $productNeeded = [];
     $totalQtyNeeded = 0;
+    $totalGetOrderValue = 0.0;
     $resPQ = mysqli_query($db_conn,
-        "SELECT mo.pr_id, p.productName, SUM(mo.qty) totalqty
+        "SELECT mo.pr_id, p.productName, p.outlet_price, SUM(mo.qty) totalqty,
+                SUM(mo.qty * p.outlet_price * (1 - mo.discount_percentage/100)) totalvalue
          FROM ms_orders mo LEFT JOIN products p ON p.id=mo.pr_id
          WHERE mo.ms_id='$se_msidEsc' AND mo.new_order='yes'
                AND mo.order_date BETWEEN '$from_date' AND '$to_date'
          GROUP BY mo.pr_id ORDER BY totalqty DESC"
     );
     while ($pr = mysqli_fetch_assoc($resPQ)) {
-        $productNeeded[] = ['name' => $pr['productName'] ?: '-', 'qty' => (int)$pr['totalqty']];
-        $totalQtyNeeded += (int)$pr['totalqty'];
+        $qty = (int)$pr['totalqty'];
+        $value = (float)($pr['totalvalue'] ?? 0);
+        $productNeeded[] = ['name' => $pr['productName'] ?: '-', 'qty' => $qty, 'value' => $value];
+        $totalQtyNeeded += $qty;
+        $totalGetOrderValue += $value;
     }
 
     $invoiceIds = [];
@@ -209,6 +214,21 @@ if ($se_msid != NULL) {
 
     $partiallyPaidProducts = msProrders_getProductBreakdown($db_conn, $partiallyPaidInvIds);
     $voidedProducts = msProrders_getProductBreakdown($db_conn, $voidedInvIds);
+
+    // ── Monthly Target ───────────────────────────────────────────────────
+    // Same prorated-target card the DM sees on their own manage_order_product.php.
+    $_chkTgtCol = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'monthly_target_amount'");
+    if ($_chkTgtCol && $_chkTgtCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
+    }
+    $monthlyTarget = (float)($result_msDetails12['monthly_target_amount'] ?? 0);
+    $daysInMonth  = (int)date('t', strtotime($from_date));
+    $perDayTarget = $daysInMonth > 0 ? $monthlyTarget / $daysInMonth : 0.0;
+    $daysInRange  = (int)floor((strtotime($to_date) - strtotime($from_date)) / 86400) + 1;
+    if ($daysInRange < 1) { $daysInRange = 1; }
+    $targetForPeriod = $perDayTarget * $daysInRange;
+    $targetAchievedAmt = $totalInvoiceValue;
+    $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetForPeriod) * 100) : 0;
 }
 						?>
 						
@@ -297,6 +317,25 @@ while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 							    </div>
 
 							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card-wrap">
+							        	<div class="mskpi-card mskpi-card-clickable">
+							        		<i class="material-icons-outlined mskpi-ico">shopping_cart</i>
+							        		<div class="mskpi-t">Get Order Value</div>
+							        		<div class="mskpi-v">&#8377;<?php echo inr_format($totalGetOrderValue, 2); ?></div>
+							        		<div class="mskpi-sub">Estimated &middot; hover / tap for details</div>
+							        	</div>
+							        	<div class="mskpi-detail-panel">
+							        		<div class="mskpi-detail-title">Estimated value by product</div>
+							        		<?php if (empty($productNeeded)): ?>
+							        			<div class="mskpi-detail-empty">No products in this range.</div>
+							        		<?php else: foreach ($productNeeded as $pn): ?>
+							        			<div class="mskpi-detail-row"><span><?php echo htmlspecialchars($pn['name']); ?></span><span class="mskpi-detail-qty">&#8377;<?php echo inr_format($pn['value'], 2); ?></span></div>
+							        		<?php endforeach; endif; ?>
+							        	</div>
+							        </div>
+							    </div>
+
+							    <div class="col-md-3 col-sm-6 mb-3">
 							        <div class="mskpi-card">
 							            <i class="material-icons-outlined mskpi-ico">payments</i>
 							            <div class="mskpi-t">Total Invoice Value</div>
@@ -356,6 +395,24 @@ while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 							            <i class="material-icons-outlined mskpi-ico">assignment_turned_in</i>
 							            <div class="mskpi-t">Get Order / No Order</div>
 							            <div class="mskpi-v"><span style="color:#0ca30c;"><?php echo (int)$getOrderCount; ?></span> / <span style="color:#d03b3b;"><?php echo (int)$noOrderCount; ?></span></div>
+							        </div>
+							    </div>
+
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card" style="--kpi-accent:#f59e0b;">
+							            <i class="material-icons-outlined mskpi-ico">flag</i>
+							            <div class="mskpi-t">Monthly Target</div>
+							            <?php if ($monthlyTarget <= 0): ?>
+							                <div class="mskpi-v" style="font-size:15px;color:#9ca3af;">Not set</div>
+							                <div class="mskpi-sub">Set from Update Marketing Staff</div>
+							            <?php else: ?>
+							                <div class="mskpi-v">&#8377;<?php echo inr_format($targetAchievedAmt, 2); ?> <span style="font-size:13px;color:#9ca3af;">/ &#8377;<?php echo inr_format($targetForPeriod, 2); ?></span></div>
+							                <div class="mskpi-sub">
+							                    <?php echo number_format($targetPercent, 1); ?>% achieved for this range &middot;
+							                    Per day: &#8377;<?php echo inr_format($perDayTarget, 2); ?>
+							                    <br/>Monthly Target: &#8377;<?php echo inr_format($monthlyTarget, 2); ?>
+							                </div>
+							            <?php endif; ?>
 							        </div>
 							    </div>
 							</div>

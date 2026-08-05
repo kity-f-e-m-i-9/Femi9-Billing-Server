@@ -134,13 +134,25 @@ function PrintDiv() {
 }
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="../../assets/js/whatsapp-invoice-share.js"></script>
+
 <table align="right">
 <tr>
 <td><button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button></td>
+<td><button type="button" id="waShareBtn" onclick="shareInvoiceToWhatsApp({elementId:'divToPrint', mobile:'<?php echo htmlspecialchars($shop['mobile_number'] ?? '', ENT_QUOTES); ?>', invoiceNumber:'<?php echo htmlspecialchars($inv['inv_number'] ?? '', ENT_QUOTES); ?>', fileName:'Invoice_<?php echo htmlspecialchars($inv['inv_number'] ?? '', ENT_QUOTES); ?>', businessName:'<?php echo htmlspecialchars($seller_display_name, ENT_QUOTES); ?>', button:this});" class="btn btn-success m-b-xs m-r-xs"><i class="material-icons" style="font-size:16px;vertical-align:middle;">share</i> Share to WhatsApp</button></td>
 <td><button type="button" onClick="javascript:window.location='shop-invoice-add.php?invuser=<?php echo $getinvuser; ?>';" class="btn btn-success m-b-xs m-r-xs">+ New Invoice</button></td>
 <td><button type="button" onClick="javascript:window.location='shop-manage-invoice.php?invuser=<?php echo $getinvuser; ?>';" class="btn btn-primary m-b-xs m-r-xs">Manage Invoice</button></td>
 </tr>
 </table>
+
+<?php if (($_REQUEST['whatsapp_share'] ?? '') === '1'): ?>
+<script>
+window.addEventListener('load', function () {
+    setTimeout(function () { document.getElementById('waShareBtn').click(); }, 300);
+});
+</script>
+<?php endif; ?>
 
 <div style="clear:both;"></div>
 <div align="right" style="width:100%;margin-bottom:10px;">
