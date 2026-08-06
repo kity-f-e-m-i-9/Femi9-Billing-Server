@@ -67,11 +67,13 @@ while ($Result_product = mysqli_fetch_assoc($Fetch_products)) {
     $isPack = ($Result_product['unit_type'] === 'pack');
     $PurchasedQty = $isPack ? ($purchasedPacksByProduct[$pid] ?? 0) : ($purchasedPiecesByProduct[$pid] ?? 0);
     $SoldQty      = $isPack ? ($soldPacksByProduct[$pid] ?? 0)     : ($soldPiecesByProduct[$pid] ?? 0);
-    // Already drawn into a mapped company product's real stock (e.g. via
-    // finance-side internal transfer) — same physical goods, so this must
-    // come out of what's still shown as available here, not count twice.
+    // Shown as its own reference column (how much of this pool has been
+    // drawn into a mapped company product's real stock via a finance-side
+    // internal transfer) but deliberately NOT subtracted from Closing
+    // Stock — that transfer doesn't remove the goods from Neksomo's own
+    // purchased pool for this report's purposes.
     $ConvertedQty = get_neksomo_converted_qty($db_conn, $pid);
-    $ClosingStock = $PurchasedQty - $SoldQty - $ConvertedQty;
+    $ClosingStock = $PurchasedQty - $SoldQty;
     if ($isPack) {
         $total_purchased_packs += $PurchasedQty;
         $total_sold_packs      += $SoldQty;
@@ -188,10 +190,10 @@ $Result_closing_packs  = $total_closing_packs;
                                 <div class="card">
                                     <div class="card-body">
 									<p class="text-muted" style="font-size:13px;">
-										Closing Stock = Purchased Qty &minus; LLP + Healthcare Sales Qty (net of returns) &minus; Converted to Finance Stock, all-time. Select a date range above to view a specific period.
+										Closing Stock = Purchased Qty &minus; LLP + Healthcare Sales Qty (net of returns), all-time. Select a date range above to view a specific period.
 										Pieces-based products are converted to pieces via the product mapping; pack-based products are maintained in packs (mapped 1:1, no piece conversion) — each row shows its own unit.
 										A returned piece/pack goes back into available stock — it isn't gone twice. A product with no mapped company pack-product(s) shows 0 sold, regardless of what actually moved through LLP/Healthcare.
-										"Converted to Finance Stock" is this same pool already drawn into a mapped company product's real stock (e.g. via an internal transfer at the Neksomo godown) — same physical goods, excluded here rather than counted twice.
+										"Converted to Finance Stock" is shown for reference only (how much of this pool has been drawn into a mapped company product's real stock, e.g. via an internal transfer at the Neksomo godown) — it is not subtracted from Closing Stock.
 									</p>
 									<div style="background:#fff;overflow:scroll;width:100%;">
 

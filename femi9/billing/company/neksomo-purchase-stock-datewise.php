@@ -67,11 +67,11 @@ $soldPacksByProductToDate  = get_neksomo_packs_sold_via_llp_healthcare($db_conn,
 
 $closingPiecesByProduct = [];
 foreach (array_unique(array_merge(array_keys($purchasedPiecesByProductToDate), array_keys($soldPiecesByProductToDate))) as $pid) {
-    $closingPiecesByProduct[$pid] = ($purchasedPiecesByProductToDate[$pid] ?? 0) - ($soldPiecesByProductToDate[$pid] ?? 0) - get_neksomo_converted_qty($db_conn, $pid, $get_to_date);
+    $closingPiecesByProduct[$pid] = ($purchasedPiecesByProductToDate[$pid] ?? 0) - ($soldPiecesByProductToDate[$pid] ?? 0);
 }
 $closingPacksByProduct = [];
 foreach (array_unique(array_merge(array_keys($purchasedPacksByProductToDate), array_keys($soldPacksByProductToDate))) as $pid) {
-    $closingPacksByProduct[$pid] = ($purchasedPacksByProductToDate[$pid] ?? 0) - ($soldPacksByProductToDate[$pid] ?? 0) - get_neksomo_converted_qty($db_conn, $pid, $get_to_date);
+    $closingPacksByProduct[$pid] = ($purchasedPacksByProductToDate[$pid] ?? 0) - ($soldPacksByProductToDate[$pid] ?? 0);
 }
 
 // Build per-product rows up front (rather than inside the HTML loop below) so
