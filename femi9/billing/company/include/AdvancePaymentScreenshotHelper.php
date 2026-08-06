@@ -264,6 +264,56 @@ function convertAdvancePaymentSubmissionToAdvancePayment(
     }
 }
 
+/**
+ * Cancel — a company-side undo, distinct from reject: reject only applies
+ * to a still-pending_review submission (the normal "this proof doesn't
+ * hold up" outcome); cancel additionally covers a submission that's already
+ * been approved but not yet converted to a real tp_advance_payments row
+ * (the reviewer approved by mistake, or the TP asked to withdraw after
+ * approval but before the money was actually credited). Once
+ * advance_payment_id is set, cancellation is refused outright — same guard
+ * as company/cancel-tp-purchase-order.php — since that money is already
+ * credited and needs a deliberate refund/adjustment decision, not a silent
+ * status flip that leaves the credit dangling with no submission behind it.
+ * @return array{success:bool,message:string}
+ */
+function cancelAdvancePaymentSubmission($db_conn, int $submissionId, string $cancelledBy, string $reason = ''): array {
+    $stmt = $db_conn->prepare(
+        "SELECT id, status, advance_payment_id FROM tp_advance_payment_submissions WHERE id = ?"
+    );
+    $stmt->bind_param('i', $submissionId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        return ['success' => false, 'message' => 'Submission not found.'];
+    }
+    if (!in_array($row['status'], ['pending_review', 'accepted'], true)) {
+        return ['success' => false, 'message' => 'This submission has already been reviewed.'];
+    }
+    if ($row['advance_payment_id'] !== null) {
+        return ['success' => false, 'message' => 'This submission cannot be cancelled — it has already been credited to the TP\'s advance balance. Adjust the advance payment separately first.'];
+    }
+
+    $reason = $reason !== '' ? $reason : 'Cancelled by reviewer.';
+    $upd = $db_conn->prepare(
+        "UPDATE tp_advance_payment_submissions
+         SET status='rejected', rejection_reason=?, reviewed_by=?, reviewed_at=NOW()
+         WHERE id=? AND status IN ('pending_review','accepted') AND advance_payment_id IS NULL"
+    );
+    $upd->bind_param('ssi', $reason, $cancelledBy, $submissionId);
+    $upd->execute();
+    $ok = $upd->affected_rows === 1;
+    $upd->close();
+
+    if (!$ok) {
+        return ['success' => false, 'message' => 'Could not cancel this submission — it may have already been actioned.'];
+    }
+
+    return ['success' => true, 'message' => 'Submission cancelled.'];
+}
+
 // Records what approval corrected a screenshot's auto-detection to. Read
 // side (recentAdvancePaymentScreenshotCorrections /
 // lookupKnownAdvancePaymentScreenshotCorrection) lives in

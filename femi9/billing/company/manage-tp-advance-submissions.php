@@ -428,7 +428,8 @@ $companyProfiles = $db_conn->query(
                 var todayStr = new Date().toISOString().slice(0, 10);
                 actionsHtml = '<div class="proof-action-panel" data-submission-id="' + sub.id + '">' +
                     '<button type="button" class="btn btn-outline-primary add-advance-toggle-btn">' +
-                    '<i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px;">add_card</i>Add to TP Payment Entry</button>' +
+                    '<i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px;">add_card</i>Add to TP Payment Entry</button> ' +
+                    '<button type="button" class="btn btn-outline-danger proof-cancel-btn">Cancel Submission</button>' +
                     '<div class="advance-form proof-field-row mt-3" style="display:none;">' +
                         '<div class="proof-field"><label>Company Profile</label>' +
                         '<select class="form-select advance-company-select" style="width:180px;">' + companyOptions + '</select></div>' +
@@ -527,6 +528,39 @@ $companyProfiles = $db_conn->query(
 
     $(document).on('click', '.add-advance-toggle-btn', function () {
         $(this).hide().siblings('.advance-form').show();
+    });
+
+    $(document).on('click', '.proof-cancel-btn', function () {
+        var $btn = $(this);
+        var $row = $btn.closest('[data-submission-id]');
+        var submissionId = parseInt($row.data('submission-id'), 10);
+
+        var reason = prompt('Reason for cancelling this submission (shown to the TP):', '');
+        if (reason === null) return;
+
+        $row.find('button').prop('disabled', true);
+
+        $.post('cancel-tp-advance-submission.php', {
+            csrf_token: CSRF_TOKEN,
+            submission_id: submissionId,
+            reason: reason
+        })
+            .done(function (data) {
+                if (!data.success) {
+                    alert(data.message || 'Could not cancel submission.');
+                    $row.find('button').prop('disabled', false);
+                    return;
+                }
+                currentSubmission.status = 'rejected';
+                currentSubmission.rejection_reason = reason || 'Cancelled by reviewer.';
+                renderProofModal();
+                updateProofButton();
+                tasShowAlert('Submission cancelled.', 'success');
+            })
+            .fail(function () {
+                alert('Could not reach the server. Please try again.');
+                $row.find('button').prop('disabled', false);
+            });
     });
 
     $(document).on('click', '.advance-save-btn', function () {

@@ -131,6 +131,10 @@ mysqli_stmt_close($balStmt);
             border: none; cursor: pointer; background: #667eea; color: #fff;
             font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 20px; white-space: nowrap;
         }
+        .apo-remove-chip {
+            border: none; background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 600;
+            padding: 5px 12px; border-radius: 20px; cursor: pointer; white-space: nowrap;
+        }
 
         .po-empty { text-align: center; padding: 50px 20px; color: #9ca3af; }
         .po-empty .material-icons-outlined { font-size: 40px; display: block; margin: 0 auto 10px; opacity: .4; }
@@ -237,11 +241,12 @@ mysqli_stmt_close($balStmt);
                                             <th>Screenshots</th>
                                             <th>Status</th>
                                             <th>Detail</th>
+                                            <th></th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php if (empty($submissions)): ?>
-                                        <tr><td colspan="7">
+                                        <tr><td colspan="8">
                                             <div class="po-empty">
                                                 <i class="material-icons-outlined">inbox</i>
                                                 No advance payment submissions in this date range.
@@ -250,7 +255,7 @@ mysqli_stmt_close($balStmt);
                                         <?php else: foreach ($submissions as $sub):
                                             $detail_json = htmlspecialchars(json_encode($sub, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
                                         ?>
-                                        <tr>
+                                        <tr id="sub-row-<?=(int)$sub['id']?>">
                                             <td><?=htmlspecialchars(date("d-m-Y g:i A", strtotime($sub['created_at'])))?></td>
                                             <td><strong>₹<?=number_format((float)$sub['amount'], 2)?></strong></td>
                                             <td><?=htmlspecialchars($sub['payment_mode'])?></td>
@@ -270,6 +275,11 @@ mysqli_stmt_close($balStmt);
                                                 <button type="button" class="po-items-trigger detail-view-trigger" data-detail="<?=$detail_json?>">
                                                     View
                                                 </button>
+                                            </td>
+                                            <td>
+                                                <?php if ($sub['status'] === 'pending_review'): ?>
+                                                <button type="button" class="apo-remove-chip" onclick="cancelSubmission(<?=(int)$sub['id']?>)">Cancel</button>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; endif; ?>
@@ -355,6 +365,22 @@ mysqli_stmt_close($balStmt);
         $('#detailViewModalBody').html(html);
         $('#detailViewModal').modal('show');
     });
+
+    function cancelSubmission(id) {
+        if (!confirm('Cancel this advance payment submission? This cannot be undone.')) return;
+        fetch('cancel-advance-payment.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'submission_id=' + encodeURIComponent(id)
+        })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) { alert(data.message || 'Could not cancel submission.'); return; }
+                var row = document.getElementById('sub-row-' + id);
+                if (row) row.remove();
+            })
+            .catch(function() { alert('Could not cancel submission — please check your connection.'); });
+    }
     </script>
 </body>
 </html>
