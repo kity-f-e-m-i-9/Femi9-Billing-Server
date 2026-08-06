@@ -159,6 +159,27 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     <style>
         table td { padding: 5px !important; }
         select:disabled { opacity: 0.45; }
+        #dataTableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        #dataTable { min-width: 640px; }
+        #dataTable .order-qty { min-width: 70px; }
+        #dataTable .order-disc { min-width: 80px; }
+        #dataTable .order-pr-select { min-width: 200px; }
+        #dataTable .order-line-amounts { min-width: 130px; white-space: nowrap; }
+        .mobile-field-label { display: none; }
+
+        /* Mobile: stack each product row's fields one per line (Product, then
+           Qty, then Discount, then Amount) instead of squeezing them side by
+           side into unreadable table columns. */
+        @media (max-width: 600px) {
+            #dataTableWrap { overflow-x: visible; }
+            #dataTable { min-width: 0; width: 100%; }
+            #dataTable, #dataTable tbody, #dataTable tr { display: block; width: 100%; }
+            #dataTable .dataTable-header-row { display: none; }
+            #dataTable td { display: block; width: 100% !important; box-sizing: border-box; padding: 4px 0 !important; }
+            .mobile-field-label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 2px; }
+            .mobile-chk-label { display: inline; font-weight: 500; color: #333; margin-bottom: 0; vertical-align: middle; }
+            #dataTable .order-qty, #dataTable .order-disc, #dataTable .order-pr-select { width: 100% !important; min-width: 0; }
+        }
     </style>
 </head>
 <body>
@@ -353,8 +374,9 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                         </button>
                                                     </p>
 
+                                                    <div id="dataTableWrap">
                                                     <table id="dataTable" border="0">
-                                                        <tr>
+                                                        <tr class="dataTable-header-row">
                                                             <td></td>
                                                             <td><label class="form-label" style="margin-bottom:2px;">Product</label></td>
                                                             <td><label class="form-label" style="margin-bottom:2px;">Qty</label></td>
@@ -362,8 +384,9 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                             <td><label class="form-label" style="margin-bottom:2px;">Amount</label></td>
                                                         </tr>
                                                         <tr>
-                                                            <td><input type="checkbox" name="chk[]"/></td>
+                                                            <td class="order-row-chk"><input type="checkbox" name="chk[]"/> <span class="mobile-field-label mobile-chk-label">Select to remove this product</span></td>
                                                             <td>
+                                                                <label class="mobile-field-label">Product</label>
                                                                 <select required name="pr_id[]" class="form-control product-select order-pr-select" onchange="recalcOrderLine(this)">
                                                                     <option value="" hidden>Select Product</option>
                                                                     <?php foreach($productList as $p): ?>
@@ -372,17 +395,21 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                                 </select>
                                                             </td>
                                                             <td>
-                                                                <input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control order-qty" oninput="recalcOrderLine(this)" required/>
+                                                                <label class="mobile-field-label">Qty</label>
+                                                                <input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control order-qty" oninput="recalcOrderLine(this)" autocomplete="off" required/>
                                                             </td>
                                                             <td>
-                                                                <input type="number" placeholder="Disc %" min="0" max="100" step="0.01" value="0" name="discount_percentage[]" class="form-control order-disc" oninput="recalcOrderLine(this)"/>
+                                                                <label class="mobile-field-label">Discount %</label>
+                                                                <input type="number" placeholder="Disc %" min="0" max="100" step="0.01" value="0" name="discount_percentage[]" class="form-control order-disc" oninput="recalcOrderLine(this)" autocomplete="off"/>
                                                             </td>
                                                             <td class="order-line-amounts">
+                                                                <label class="mobile-field-label">Amount</label>
                                                                 <div class="order-line-actual">Actual: &#8377;0.00</div>
                                                                 <div class="order-line-final">After Disc: &#8377;0.00</div>
                                                             </td>
                                                         </tr>
                                                     </table>
+                                                    </div>
                                                     <br/>
                                                     <div id="orderGrandTotal" style="font-weight:600;margin-bottom:10px;"></div>
 
@@ -462,8 +489,12 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
 
     $(document).ready(function() {
         var tbl = document.getElementById('dataTable');
-        if (tbl && tbl.rows.length) {
-            productCellTemplate = tbl.rows[0].cells[productCellIndex].innerHTML;
+        if (tbl && tbl.rows.length > 1) {
+            // Row 0 is just the header labels row (no real <select> in it since
+            // the mobile-stacked redesign) — row 1 is the actual data row and
+            // has the real product <select>, still pristine at this point
+            // because initProductSearch() below hasn't touched it yet.
+            productCellTemplate = tbl.rows[1].cells[productCellIndex].innerHTML;
         }
         initProductSearch($('#dataTable'));
     });

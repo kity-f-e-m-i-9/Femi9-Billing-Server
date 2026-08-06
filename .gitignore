@@ -2,3 +2,7 @@
 # checkout/reset/clean, or committed as part of a code change.
 femi9/billing/company/expense_uploads/*
 !femi9/billing/company/expense_uploads/.gitkeep
+
+# Local DB credentials — must never be reverted by git checkout/reset/pull.
+femi9/billing/shared/.env
+femi9/billing/super-stockist/.env

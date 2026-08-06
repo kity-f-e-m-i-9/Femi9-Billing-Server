@@ -424,9 +424,12 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                                     <a href="purchased-bill-print.php?id=<?=urlencode(base64_encode($o['tp_invoice_id']))?>" target="_blank" class="po-print-btn" title="Print purchased bill copy">
                                                         <i class="material-icons" style="font-size:14px;">print</i> Print
                                                     </a>
-                                                    <a href="purchased-bill-print.php?id=<?=urlencode(base64_encode($o['tp_invoice_id']))?>&whatsapp_share=1" target="_blank" class="po-print-btn" title="Share purchased bill to WhatsApp">
+                                                    <button type="button" class="po-print-btn" title="Share purchased bill to WhatsApp"
+                                                        data-id="<?=base64_encode($o['tp_invoice_id'])?>"
+                                                        data-invoice="<?=htmlspecialchars($invNumbers[$o['tp_invoice_id']])?>"
+                                                        onclick="sharePODirect(this)">
                                                         <i class="material-icons" style="font-size:14px;">share</i> Share
-                                                    </a>
+                                                    </button>
                                                     <?php endif; ?>
                                                     <?php if ($o['kind'] === 'po' && $o['status'] === 'waiting'): ?>
                                                     <form method="post" action="delete-purchase-order.php" onsubmit="return confirm('Delete this purchase order? This cannot be undone.');">
@@ -533,6 +536,62 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
         $('#itemsViewModalBody').html(html || '<div style="color:#9ca3af;">No items.</div>');
         $('#itemsViewModal').modal('show');
     });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+    <script src="../../assets/js/whatsapp-invoice-share.js"></script>
+    <script>
+    // Shares a purchased bill straight to WhatsApp from this list — no
+    // detour through the print page. This click is a real user gesture, so
+    // the whole async chain below (fetch -> PDF -> alert -> WhatsApp) keeps
+    // that gesture's permission to open a window, same as the print page's
+    // own button. Note: this page doesn't have the TP's own mobile number in
+    // scope, so mobile is left blank here — the shared helper still works
+    // fine (mobile is only used to prefill the desktop wa.me fallback link).
+    function sharePODirect(btn) {
+        var id             = btn.getAttribute('data-id');
+        var invoiceNumber  = btn.getAttribute('data-invoice');
+        var originalHtml   = btn.innerHTML;
+
+        btn.disabled  = true;
+        btn.innerHTML = '&hellip;';
+
+        fetch('purchased-bill-print.php?id=' + encodeURIComponent(id))
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                var parsed   = new DOMParser().parseFromString(html, 'text/html');
+                var printDiv = parsed.getElementById('divToPrint');
+                if (!printDiv) throw new Error('Invoice content not found.');
+
+                var iframe = document.createElement('iframe');
+                iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:600px;border:0;';
+                iframe.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + printDiv.outerHTML + '</body></html>';
+                iframe.onload = function () {
+                    var idoc = iframe.contentDocument;
+
+                    btn.disabled  = false;
+                    btn.innerHTML = originalHtml;
+
+                    shareInvoiceToWhatsApp({
+                        elementId:     'divToPrint',
+                        doc:           idoc,
+                        mobile:        '',
+                        invoiceNumber: invoiceNumber,
+                        fileName:      'PurchaseBill_' + invoiceNumber,
+                        businessName:  <?php echo json_encode($business_name ?? ''); ?>,
+                        button:        btn
+                    });
+
+                    setTimeout(function () { iframe.remove(); }, 15000);
+                };
+                document.body.appendChild(iframe);
+            })
+            .catch(function (err) {
+                console.error(err);
+                btn.disabled  = false;
+                btn.innerHTML = originalHtml;
+                alert('Could not prepare the bill. Please try again.');
+            });
+    }
     </script>
 </body>
 </html>

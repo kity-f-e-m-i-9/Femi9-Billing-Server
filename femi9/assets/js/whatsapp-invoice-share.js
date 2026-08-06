@@ -9,8 +9,13 @@
 // the customer's shop to attach the file that was just downloaded.
 
 function shareInvoiceToWhatsApp(opts) {
-    var el = document.getElementById(opts.elementId || 'divToPrint');
-    if (!el) { alert('Invoice content not found.'); return; }
+    var doc = opts.doc || document;
+    var el = doc.getElementById(opts.elementId || 'divToPrint');
+    if (!el) {
+        alert('Invoice content not found.');
+        if (opts.preOpenedWindow && !opts.preOpenedWindow.closed) opts.preOpenedWindow.close();
+        return;
+    }
 
     var btn = opts.button || null;
     var originalLabel = btn ? btn.innerHTML : null;
@@ -42,19 +47,21 @@ function shareInvoiceToWhatsApp(opts) {
         catch (e) { pdfFile = null; }
 
         if (pdfFile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+            if (opts.preOpenedWindow && !opts.preOpenedWindow.closed) opts.preOpenedWindow.close();
             navigator.share({ files: [pdfFile], title: fileName, text: shareText })
                 .catch(function (err) {
                     if (err && err.name !== 'AbortError') {
-                        whatsappShareFallback(pdfBlob, fileName, opts.mobile, shareText);
+                        whatsappShareFallback(pdfBlob, fileName, opts.mobile, shareText, opts.preOpenedWindow);
                     }
                 });
         } else {
-            whatsappShareFallback(pdfBlob, fileName, opts.mobile, shareText);
+            whatsappShareFallback(pdfBlob, fileName, opts.mobile, shareText, opts.preOpenedWindow);
         }
     }).catch(function (err) {
         console.error('Invoice PDF generation failed:', err);
         alert('Could not generate the PDF. Please try Print instead.');
         if (btn) { btn.disabled = false; btn.innerHTML = originalLabel; }
+        if (opts.preOpenedWindow && !opts.preOpenedWindow.closed) opts.preOpenedWindow.close();
     });
 }
 
@@ -63,7 +70,7 @@ function shareInvoiceToWhatsApp(opts) {
 // message — the customer's shop has to attach the just-downloaded file
 // manually. This is a real browser limitation, not something to work
 // around from the web page itself.
-function whatsappShareFallback(pdfBlob, fileName, mobile, shareText) {
+function whatsappShareFallback(pdfBlob, fileName, mobile, shareText, preOpenedWindow) {
     var url = URL.createObjectURL(pdfBlob);
     var a = document.createElement('a');
     a.href = url;
@@ -79,5 +86,13 @@ function whatsappShareFallback(pdfBlob, fileName, mobile, shareText) {
     var waUrl = (waNumber ? 'https://wa.me/' + waNumber : 'https://wa.me/') + '?text=' + msg;
 
     alert('PDF downloaded. WhatsApp will open next — please attach the downloaded file to the chat.');
-    setTimeout(function () { window.open(waUrl, '_blank'); }, 300);
+
+    // Navigating an already-open window/tab is never blocked as a popup,
+    // unlike window.open() called after the user's original click has gone
+    // stale (e.g. after a page navigation or a multi-second async gap).
+    if (preOpenedWindow && !preOpenedWindow.closed) {
+        preOpenedWindow.location = waUrl;
+    } else {
+        setTimeout(function () { window.open(waUrl, '_blank'); }, 300);
+    }
 }
