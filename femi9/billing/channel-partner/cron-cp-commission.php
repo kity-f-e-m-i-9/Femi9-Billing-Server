@@ -1,19 +1,46 @@
 #!/usr/bin/env php
 <?php
 /**
- * CP Monthly Commission Cron Job
+ * CP Monthly Commission Cron Job — DISABLED
  *
- * Run once a month (e.g. on the 1st) to credit every Channel Partner's
- * wallet for the previous calendar month:
+ * Automatic CP commission crediting has been intentionally turned off.
+ * CP wallet commissions are now credited exclusively through the admin
+ * dry-run/execute/rollback tool:
  *
- *   commission = MAX( 6% of last month's sales sourced from the CP's stock,
+ *   company/cp-wallet-commission-calculator.php
+ *
+ * That tool applies the exact same commission rule this script used to
+ * apply automatically:
+ *
+ *   commission = MAX( 6% of the month's sales sourced from the CP's stock,
  *                      2% of the CP's total security deposit across all locations )
  *
- * One record per CP per month (dedup on commission_type + user_id + from_date/to_date).
+ * Why disabled: the crontab entry that used to invoke this script
+ * unattended pointed at a log path whose parent directory didn't exist, so
+ * the shell redirect failed before the script ever ran — no CP was ever
+ * credited automatically, and nothing surfaced the failure. Rather than
+ * re-enable a silent unattended cron, crediting now requires an admin to
+ * explicitly run it via the calculator tool each month (dry run first,
+ * then execute), so every credit is a visible, reviewable, rollback-able
+ * action instead of a silent background job.
  *
- * Crontab example (run at 02:00 on the 1st of every month):
- *   0 2 1 * * /usr/bin/php /path/to/channel-partner/cron-cp-commission.php >> /path/to/channel-partner/status/cron-cp-commission.log 2>&1
+ * If this file is still wired into a crontab, remove that cron job — this
+ * script now exits immediately without touching the database.
  */
+
+logDisabledRun();
+exit(0);
+
+function logDisabledRun(): void
+{
+    $timestamp = date('Y-m-d H:i:s');
+    echo "[$timestamp] CP MONTHLY COMMISSION CRON IS DISABLED. Use company/cp-wallet-commission-calculator.php instead. Remove this cron job from crontab.\n";
+}
+
+// ---------------------------------------------------------------------
+// Everything below is retained only for reference / rollback and is
+// unreachable (the exit(0) above always fires first).
+// ---------------------------------------------------------------------
 
 // Prevent web access - only allow command line execution
 if (isset($_SERVER['HTTP_HOST'])) {

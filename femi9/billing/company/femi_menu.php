@@ -298,6 +298,8 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="add-channel-partner">Add Channel Partner</a></li>
 							<li><a href="manage-channel-partner">Manage Channel Partner</a></li>
 							<li><a href="cp-stock">CP Stock</a></li>
+							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
+							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
                         </ul>
                     </li>
 					<!----------------------Territory Partner--------------------------->
@@ -762,6 +764,8 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="add-channel-partner">Add Channel Partner</a></li>
 							<li><a href="manage-channel-partner">Manage Channel Partner</a></li>
 							<li><a href="cp-stock">CP Stock</a></li>
+							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
+							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
                         </ul>
                     </li>
 					<?php }?>
