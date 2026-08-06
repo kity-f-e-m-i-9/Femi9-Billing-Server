@@ -1,8 +1,8 @@
  <div class="app-header">
                 <nav class="navbar navbar-light navbar-expand-lg">
-                    <div><!---------------class="container-fluid"---------------->
-                        <div><!------class="navbar-nav" id="navbarNav"--------->
-						
+                    <div class="container-fluid">
+                        <div class="navbar-nav" id="navbarNav">
+
 				<table id="logoTablevl">
 				<tr valign="top">
 				<td><img src="../../assets/images/femi-logo.png" class="usericon"></td>

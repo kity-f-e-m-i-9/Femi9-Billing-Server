@@ -116,8 +116,10 @@ if (!empty($markeingSTFID)) {
 }
 
 // ── Products — fetched once, used in GET ORDER form ───────────────────────────
+// Neksomo-sourced products (temp_id LIKE 'NKS-%') are excluded from selection
+// here, same convention as the shop/customer/TP invoice "add product" dropdowns.
 $productList = [];
-$r = mysqli_query($db_conn, "SELECT id, productName, outlet_price FROM products ORDER BY productName ASC");
+$r = mysqli_query($db_conn, "SELECT id, productName, outlet_price FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 while ($p = mysqli_fetch_assoc($r)) $productList[] = $p;
 
 // ── Active TPs — used to populate the "Assign To TP" dropdown, filtered
@@ -157,6 +159,27 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     <style>
         table td { padding: 5px !important; }
         select:disabled { opacity: 0.45; }
+        #dataTableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        #dataTable { min-width: 640px; }
+        #dataTable .order-qty { min-width: 70px; }
+        #dataTable .order-disc { min-width: 80px; }
+        #dataTable .order-pr-select { min-width: 200px; }
+        #dataTable .order-line-amounts { min-width: 130px; white-space: nowrap; }
+        .mobile-field-label { display: none; }
+
+        /* Mobile: stack each product row's fields one per line (Product, then
+           Qty, then Discount, then Amount) instead of squeezing them side by
+           side into unreadable table columns. */
+        @media (max-width: 600px) {
+            #dataTableWrap { overflow-x: visible; }
+            #dataTable { min-width: 0; width: 100%; }
+            #dataTable, #dataTable tbody, #dataTable tr { display: block; width: 100%; }
+            #dataTable .dataTable-header-row { display: none; }
+            #dataTable td { display: block; width: 100% !important; box-sizing: border-box; padding: 4px 0 !important; }
+            .mobile-field-label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 2px; }
+            .mobile-chk-label { display: inline; font-weight: 500; color: #333; margin-bottom: 0; vertical-align: middle; }
+            #dataTable .order-qty, #dataTable .order-disc, #dataTable .order-pr-select { width: 100% !important; min-width: 0; }
+        }
     </style>
 </head>
 <body>
@@ -351,8 +374,9 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                         </button>
                                                     </p>
 
+                                                    <div id="dataTableWrap">
                                                     <table id="dataTable" border="0">
-                                                        <tr>
+                                                        <tr class="dataTable-header-row">
                                                             <td></td>
                                                             <td><label class="form-label" style="margin-bottom:2px;">Product</label></td>
                                                             <td><label class="form-label" style="margin-bottom:2px;">Qty</label></td>
@@ -360,9 +384,10 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                             <td><label class="form-label" style="margin-bottom:2px;">Amount</label></td>
                                                         </tr>
                                                         <tr>
-                                                            <td><input type="checkbox" name="chk[]"/></td>
+                                                            <td class="order-row-chk"><input type="checkbox" name="chk[]"/> <span class="mobile-field-label mobile-chk-label">Select to remove this product</span></td>
                                                             <td>
-                                                                <select required name="pr_id[]" class="form-control order-pr-select" onchange="recalcOrderLine(this)">
+                                                                <label class="mobile-field-label">Product</label>
+                                                                <select required name="pr_id[]" class="form-control product-select order-pr-select" onchange="recalcOrderLine(this)">
                                                                     <option value="" hidden>Select Product</option>
                                                                     <?php foreach($productList as $p): ?>
                                                                     <option value="<?=$p['id']?>" data-price="<?=htmlspecialchars($p['outlet_price'])?>"><?=htmlspecialchars($p['productName'])?></option>
@@ -370,17 +395,21 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                                 </select>
                                                             </td>
                                                             <td>
-                                                                <input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control order-qty" oninput="recalcOrderLine(this)" required/>
+                                                                <label class="mobile-field-label">Qty</label>
+                                                                <input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control order-qty" oninput="recalcOrderLine(this)" autocomplete="off" required/>
                                                             </td>
                                                             <td>
-                                                                <input type="number" placeholder="Disc %" min="0" max="100" step="0.01" value="0" name="discount_percentage[]" class="form-control order-disc" oninput="recalcOrderLine(this)"/>
+                                                                <label class="mobile-field-label">Discount %</label>
+                                                                <input type="number" placeholder="Disc %" min="0" max="100" step="0.01" value="0" name="discount_percentage[]" class="form-control order-disc" oninput="recalcOrderLine(this)" autocomplete="off"/>
                                                             </td>
                                                             <td class="order-line-amounts">
+                                                                <label class="mobile-field-label">Amount</label>
                                                                 <div class="order-line-actual">Actual: &#8377;0.00</div>
                                                                 <div class="order-line-final">After Disc: &#8377;0.00</div>
                                                             </td>
                                                         </tr>
                                                     </table>
+                                                    </div>
                                                     <br/>
                                                     <div id="orderGrandTotal" style="font-weight:600;margin-bottom:10px;"></div>
 
@@ -426,6 +455,18 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     var firkaTpData     = <?php echo json_encode($firkaTpMap); ?>;
 
     // ── Add / Remove product rows ────────────────────────────────────────────
+    // The product cell's pristine markup is captured once, before select2 gets
+    // anywhere near it — select2 hides the original <select> and appends its
+    // own generated widget as a sibling, so cloning a select2-ized cell's live
+    // innerHTML (as this used to) would duplicate that generated widget into
+    // the new row instead of a plain, initializable <select>.
+    var productCellIndex    = 1; // checkbox, product select, qty
+    var productCellTemplate = null;
+
+    function initProductSearch($scope) {
+        $scope.find('select.product-select').select2({ placeholder: 'Search product…', width: '100%' });
+    }
+
     // Row 0 is the header labels row — the actual template to clone is row 1.
     function addRow(tableID) {
         var table    = document.getElementById(tableID);
@@ -434,14 +475,29 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
             var row      = table.insertRow(rowCount);
             var colCount = table.rows[1].cells.length;
             for (var i = 0; i < colCount; i++) {
-                var newcell       = row.insertCell(i);
-                newcell.innerHTML = table.rows[1].cells[i].innerHTML;
+                var newcell = row.insertCell(i);
+                newcell.innerHTML = (i === productCellIndex && productCellTemplate !== null)
+                    ? productCellTemplate
+                    : table.rows[1].cells[i].innerHTML;
             }
+            initProductSearch($(row));
             recalcOrderLine(row.querySelector('.order-qty'));
         } else {
             alert("Maximum allowed record is 100.");
         }
     }
+
+    $(document).ready(function() {
+        var tbl = document.getElementById('dataTable');
+        if (tbl && tbl.rows.length > 1) {
+            // Row 0 is just the header labels row (no real <select> in it since
+            // the mobile-stacked redesign) — row 1 is the actual data row and
+            // has the real product <select>, still pristine at this point
+            // because initProductSearch() below hasn't touched it yet.
+            productCellTemplate = tbl.rows[1].cells[productCellIndex].innerHTML;
+        }
+        initProductSearch($('#dataTable'));
+    });
 
     function deleteRow(tableID) {
         var table    = document.getElementById(tableID);

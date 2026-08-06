@@ -781,11 +781,15 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
                                                             <i class="material-icons">print</i>
                                                             Print
                                                         </a>
-                                                        <a href="user-invoice-print.php?invoiceid=<?= base64_encode($invoice['inv_id']); ?>&invuser=<?= $getinvuser; ?>&whatsapp_share=1"
-                                                           class="btn-action btn-print" target="_blank" title="Share to WhatsApp">
+                                                        <button type="button" class="btn-action btn-print" title="Share to WhatsApp"
+                                                           data-id="<?= base64_encode($invoice['inv_id']); ?>"
+                                                           data-invuser="<?= htmlspecialchars($getinvuser); ?>"
+                                                           data-mobile="<?= htmlspecialchars($invoice['mobile_number'] ?? ''); ?>"
+                                                           data-invoice="<?= htmlspecialchars($invoice['inv_number']); ?>"
+                                                           onclick="shareCurrentUserInvoiceDirect(this)">
                                                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" style="vertical-align:middle;"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.29-1.39c1.44.79 3.06 1.2 4.71 1.2h.01c5.46 0 9.9-4.45 9.9-9.9C21.91 6.45 17.5 2 12.04 2zm5.8 14.03c-.24.68-1.4 1.32-1.93 1.4-.5.08-1.13.11-1.82-.11-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.79-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.66.5.24.58.83 2 .9 2.15.07.15.12.32.02.51-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.02 1.12 1 2.06 1.31 2.35 1.46.29.15.46.13.63-.08.17-.21.72-.84.92-1.13.19-.29.38-.24.64-.14.26.1 1.65.78 1.94.92.29.15.48.22.55.34.07.13.07.72-.17 1.4z"/></svg>
                                                             WhatsApp
-                                                        </a>
+                                                        </button>
                                                         <a href="add-receipt.php?invid=<?= $invoice['inv_id']; ?>&invuser=<?= $getinvuser; ?>" 
                                                            class="btn-action btn-receipt">
                                                             <i class="material-icons">receipt_long</i>
@@ -848,6 +852,8 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
     <script src="../../assets/plugins/datatables/datatables.min.js"></script>
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+    <script src="../../assets/js/whatsapp-invoice-share.js"></script>
     
     <script>
     $(document).ready(function() {
@@ -883,6 +889,60 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
             }
         });
     });
+    </script>
+    <script>
+    // Shares a user invoice straight to WhatsApp from this list — no detour
+    // through the print page. This click is a real user gesture, so the
+    // whole async chain below (fetch -> PDF -> alert -> WhatsApp) keeps that
+    // gesture's permission to open a window, same as the print page's own
+    // button.
+    function shareCurrentUserInvoiceDirect(btn) {
+        var id             = btn.getAttribute('data-id');
+        var invuser        = btn.getAttribute('data-invuser');
+        var mobile         = btn.getAttribute('data-mobile');
+        var invoiceNumber  = btn.getAttribute('data-invoice');
+        var originalHtml   = btn.innerHTML;
+
+        btn.disabled  = true;
+        btn.innerHTML = '&hellip;';
+
+        fetch('user-invoice-print.php?invoiceid=' + encodeURIComponent(id) + '&invuser=' + encodeURIComponent(invuser))
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                var parsed   = new DOMParser().parseFromString(html, 'text/html');
+                var printDiv = parsed.getElementById('divToPrint');
+                if (!printDiv) throw new Error('Invoice content not found.');
+
+                var iframe = document.createElement('iframe');
+                iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:600px;border:0;';
+                iframe.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + printDiv.outerHTML + '</body></html>';
+                iframe.onload = function () {
+                    var idoc = iframe.contentDocument;
+
+                    btn.disabled  = false;
+                    btn.innerHTML = originalHtml;
+
+                    shareInvoiceToWhatsApp({
+                        elementId:     'divToPrint',
+                        doc:           idoc,
+                        mobile:        mobile,
+                        invoiceNumber: invoiceNumber,
+                        fileName:      'Invoice_' + invoiceNumber,
+                        businessName:  <?php echo json_encode($business_name ?? ''); ?>,
+                        button:        btn
+                    });
+
+                    setTimeout(function () { iframe.remove(); }, 15000);
+                };
+                document.body.appendChild(iframe);
+            })
+            .catch(function (err) {
+                console.error(err);
+                btn.disabled  = false;
+                btn.innerHTML = originalHtml;
+                alert('Could not prepare the invoice. Please try again.');
+            });
+    }
     </script>
 </body>
 </html>
