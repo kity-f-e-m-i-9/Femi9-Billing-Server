@@ -96,6 +96,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
                             <li><a href="overall-stock">Company Overall Stock</a></li>
                             <li><a href="overall-stock-users">Overall Stock - Users</a></li>
+                            <li><a href="neksomo-purchase-stock">Neksomo Purchase Stock</a></li>
                         </ul>
                     </li>
 

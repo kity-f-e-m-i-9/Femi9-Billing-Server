@@ -5,7 +5,7 @@ require_once("include/NeksomoStockBridge.php");
 include("config.php");
 
 $__usertype = get_login_usertype($db_conn);
-if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
+if (!in_array($__usertype, ['neksomo', 'admin', 'finance'], true)) {
     header("Location: dashboard.php");
     exit;
 }

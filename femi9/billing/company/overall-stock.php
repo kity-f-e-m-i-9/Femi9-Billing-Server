@@ -196,9 +196,14 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 						$renderedProductIds[$StockProductID]=true;
 						$ClosingStock=(int)$Result_OPStock['closing_qty'];
 						// Real stock alone — a mapped product could still have more sitting in
-						// Neksomo's shared pool, not yet drawn down into this row.
+						// Neksomo's shared pool, not yet drawn down into this row. Uses the
+						// display-only purchased-minus-sold figure (not
+						// get_neksomo_pool_available_packs(), which also subtracts
+						// already-converted stock — goods already sitting in this same
+						// closing_qty would otherwise be excluded from the pool AND
+						// counted in closing_qty, undercounting the true total).
 						if ($isNeksomoGodown) {
-							$ClosingStock += get_neksomo_pool_available_packs($db_conn, $StockProductID);
+							$ClosingStock += get_neksomo_pool_purchased_minus_sold_packs($db_conn, $StockProductID);
 						}
 						$PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
 						$ExtraPieces=(int)($Result_OPStock['extra_pieces'] ?? 0);
@@ -232,16 +237,16 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 										<?php }
 
 										// A mapped company product may still have pool stock available (purchased
-										// - LLP/Healthcare sold - already converted, see NeksomoStockBridge.php)
-										// even though it has no real `stock` row at all yet (never transacted) —
-										// the query above would otherwise never show it. Render it as a
-										// not-yet-converted virtual row so it isn't invisible on this report.
+										// - LLP/Healthcare sold, see NeksomoStockBridge.php) even though it has no
+										// real `stock` row at all yet (never transacted) — the query above would
+										// otherwise never show it. Render it as a not-yet-converted virtual row so
+										// it isn't invisible on this report.
 										if ($isNeksomoGodown) {
 											$mappedIdsRes = $db_conn->query("SELECT DISTINCT company_product_id FROM neksomo_product_mapping");
 											while ($mappedIdsRes && ($mapRow = $mappedIdsRes->fetch_assoc())) {
 												$mappedPid = (int)$mapRow['company_product_id'];
 												if (isset($renderedProductIds[$mappedPid])) continue;
-												$poolAvailable = get_neksomo_pool_available_packs($db_conn, $mappedPid);
+												$poolAvailable = get_neksomo_pool_purchased_minus_sold_packs($db_conn, $mappedPid);
 												if ($poolAvailable <= 0) continue;
 
 												$prodRow = $db_conn->query("SELECT productName, pieces_per_pack FROM products WHERE id = $mappedPid")->fetch_assoc();

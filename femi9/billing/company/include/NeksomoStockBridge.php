@@ -123,6 +123,44 @@ function get_neksomo_pool_available_packs($db_conn, $companyProductId) {
     return intdiv($poolRemaining, $ratio);
 }
 
+// Display-only sibling of get_neksomo_pool_available_packs(): purchased -
+// LLP/Healthcare sold, all-time, in $companyProductId's own pack unit —
+// deliberately NOT subtracting already-converted quantity. Already-converted
+// stock hasn't left Neksomo's purchased pool, it's simply sitting in a
+// different bucket (a company product's real `stock` row); subtracting it
+// here would double-penalize the same goods once for being converted and
+// again for having been converted (same fix as neksomo-purchase-stock.php's
+// Closing Stock). Never call this from write-path conversion logic — that
+// must keep using get_neksomo_pool_available_packs(), which correctly
+// subtracts already-converted amounts to avoid drawing the same pool twice.
+function get_neksomo_pool_purchased_minus_sold_packs($db_conn, $companyProductId) {
+    $src = get_neksomo_source_for_company_product($db_conn, $companyProductId);
+    if (!$src) return 0;
+
+    $nid    = (int)$src['neksomo_product_id'];
+    $isPack = $src['unit_type'] === 'pack';
+
+    $purchasedRow = $db_conn->query(
+        "SELECT COALESCE(SUM(quantity_pieces), 0) AS pieces, COALESCE(SUM(quantity_packs), 0) AS packs
+         FROM neksomo_purchase_items WHERE product_id = $nid"
+    )->fetch_assoc();
+    $purchased = $isPack ? (int)$purchasedRow['packs'] : (int)$purchasedRow['pieces'];
+
+    $soldMap = $isPack
+        ? get_neksomo_packs_sold_via_llp_healthcare($db_conn, '', '')
+        : get_neksomo_pieces_sold_via_llp_healthcare($db_conn, '', '');
+    $sold = $soldMap[$nid] ?? 0;
+
+    $remaining = $purchased - $sold; // native unit
+    if ($remaining <= 0) return 0;
+
+    if ($isPack) return $remaining; // 1:1, no conversion ratio
+
+    $ratioRow = $db_conn->query("SELECT pieces_per_pack FROM products WHERE id = " . (int)$companyProductId)->fetch_assoc();
+    $ratio    = max(1, (int)($ratioRow['pieces_per_pack'] ?? 1));
+    return intdiv($remaining, $ratio);
+}
+
 // Records a draw of $qtyCompanyPacks (in the company product's own pack unit)
 // out of the shared Neksomo pool. Does NOT touch the `stock` table — callers
 // must separately credit that via StockService; this only books the pool draw.
