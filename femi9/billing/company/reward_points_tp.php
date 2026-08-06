@@ -52,11 +52,14 @@ try {
     ]);
 
     // ── Purchase Points ────────────────────────────────────────────────────────
+    // Only invoices with reward points enabled count — mirrors reward_points.php's
+    // "ui.rwpoints_enable = 1" gate for SS/Stockist/Distributor invoices.
     $stmt = $pdo->prepare("
         SELECT territory_partner_id AS user_id,
                COALESCE(SUM(total_amount) / 100, 0) AS purchase_points
         FROM tp_invoices
         WHERE invoice_date BETWEEN :from_date AND :to_date
+          AND rwpoints_enable = 1
         GROUP BY territory_partner_id
     ");
     $stmt->execute([':from_date' => $current_from_date, ':to_date' => $current_to_date]);
@@ -81,6 +84,8 @@ try {
     }
 
     // ── Return Deductions ─────────────────────────────────────────────────────
+    // Same rwpoints_enable gate — a return against an invoice that never
+    // earned points shouldn't be able to deduct points either.
     $stmt = $pdo->prepare("
         SELECT r.from_userid AS user_id,
                COALESCE(SUM(r.subtotal) / 100, 0) AS return_points
@@ -90,6 +95,7 @@ try {
               SELECT invoice_number
               FROM tp_invoices
               WHERE invoice_date BETWEEN :from_date AND :to_date
+                AND rwpoints_enable = 1
           )
         GROUP BY r.from_userid
     ");
@@ -99,17 +105,45 @@ try {
         $return_data[$row['user_id']] = (float)$row['return_points'];
     }
 
+    // ── Team Points ────────────────────────────────────────────────────────────
+    // "Team" = other TPs who registered this TP as their referrer with exactly
+    // a 10% referral_percentage (one level deep only — a team member's own
+    // referrals are not included). Only 0%-GST product lines count, and only
+    // from the team member's invoices that themselves have rwpoints_enable=1
+    // (the same per-invoice toggle used for the TP's own purchase points).
+    $stmt = $pdo->prepare("
+        SELECT referrer.id AS referrer_id,
+               COALESCE(SUM(tii.amount) / 100, 0) AS team_points
+        FROM territory_partners member
+        INNER JOIN territory_partners referrer ON referrer.tp_id = member.referral_id
+        INNER JOIN tp_invoices tpi        ON tpi.territory_partner_id = member.id
+        INNER JOIN tp_invoice_items tii   ON tii.tp_invoice_id = tpi.id
+        INNER JOIN products p             ON p.id = tii.product_id
+        WHERE member.referral_type = 'TP'
+          AND member.referral_percentage = 10
+          AND tpi.rwpoints_enable = 1
+          AND tpi.invoice_date BETWEEN :from_date AND :to_date
+          AND p.gst = 0
+        GROUP BY referrer.id
+    ");
+    $stmt->execute([':from_date' => $current_from_date, ':to_date' => $current_to_date]);
+    $team_data = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $team_data[$row['referrer_id']] = (float)$row['team_points'];
+    }
+
     // ── Collect all TP IDs that have any data ─────────────────────────────────
     // array_values() is required here: array_unique() preserves the original
     // (gapped) keys after removing duplicates, but $stmt->execute() below binds
     // this array positionally (?) — PDO needs a plain sequential 0-indexed
     // array for that, or it throws "Invalid parameter number" the moment any
-    // TP appears in more than one of the three source arrays (i.e. almost
+    // TP appears in more than one of the four source arrays (i.e. almost
     // always, since a TP that both purchased and logged in shows up in both).
     $all_ids = array_values(array_unique(array_merge(
         array_keys($purchase_data),
         array_keys($daily_data),
-        array_keys($return_data)
+        array_keys($return_data),
+        array_keys($team_data)
     )));
 
     if (!empty($all_ids)) {
@@ -130,12 +164,14 @@ try {
             $purchase_pts = $purchase_data[$uid] ?? 0;
             $daily_pts    = $daily_data[$uid]    ?? 0;
             $return_pts   = $return_data[$uid]   ?? 0;
-            $total        = max(0, $purchase_pts + $daily_pts - $return_pts);
+            $team_pts     = $team_data[$uid]     ?? 0;
+            $total        = max(0, $purchase_pts + $daily_pts + $team_pts - $return_pts);
 
             $combined_users[] = [
                 'user_id'         => $uid,
                 'purchase_points' => $purchase_pts,
                 'daily_points'    => $daily_pts,
+                'team_points'     => $team_pts,
                 'return_points'   => $return_pts,
                 'total_points'    => $total,
                 'details'         => $tp_details[$uid] ?? null,
@@ -172,6 +208,7 @@ try {
         .badge-total { background:#4f46e5; color:#fff; font-size:13px; padding:5px 12px; border-radius:20px; font-weight:600; }
         .badge-purchase { background:#10b981; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         .badge-daily { background:#3b82f6; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
+        .badge-team { background:#8b5cf6; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         .badge-return { background:#ef4444; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         table.dataTable thead th { background:#f8f9fa; font-weight:600; }
     </style>
@@ -248,6 +285,7 @@ try {
                                             <th>Mobile</th>
                                             <th>Purchase Pts</th>
                                             <th>Login Pts</th>
+                                            <th>Team Pts</th>
                                             <th>Returns (–)</th>
                                             <th>Total Points</th>
                                         </tr>
@@ -262,6 +300,7 @@ try {
                                             <td><?php echo htmlspecialchars($d['mobile'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><span class="badge-purchase"><?php echo inr_format($u['purchase_points'], 2); ?></span></td>
                                             <td><span class="badge-daily"><?php echo inr_format($u['daily_points'], 2); ?></span></td>
+                                            <td><?php if ($u['team_points'] > 0): ?><span class="badge-team"><?php echo inr_format($u['team_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><?php if ($u['return_points'] > 0): ?><span class="badge-return"><?php echo inr_format($u['return_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><span class="badge-total"><?php echo inr_format($u['total_points'], 2); ?></span></td>
                                         </tr>
@@ -291,7 +330,7 @@ try {
 <script>
 $(function(){
     $('#rpTable').DataTable({
-        order: [[7, 'desc']],
+        order: [[8, 'desc']],
         pageLength: 25,
         language: { emptyTable: 'No data found' }
     });
