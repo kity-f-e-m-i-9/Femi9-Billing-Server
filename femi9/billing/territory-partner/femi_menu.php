@@ -27,6 +27,8 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
             <ul class="sub-menu">
                 <li><a href="add-purchase-order.php">Purchase Order</a></li>
                 <li><a href="manage-purchase-orders.php">My Purchase Orders</a></li>
+                <li><a href="add-advance-payment.php">Advance Payment</a></li>
+                <li><a href="manage-advance-payments.php">My Advance Payments</a></li>
             </ul>
         </li>
 
