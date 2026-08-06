@@ -334,8 +334,15 @@ try {
 
     // Mark the originating purchase order (if this invoice was raised from
     // tp-today-orders.php's "Invoice" button) as completed and link it.
+    // Also allows re-invoicing a 'cancelled' PO (the company clicked
+    // "Invoice" on one cancelled by mistake and is now actually fulfilling
+    // it) — clears any stale cancellation fields left over from that.
     if ($po_id > 0) {
-        $s_po = $db_conn->prepare("UPDATE tp_purchase_orders SET status='completed', tp_invoice_id=? WHERE id=? AND territory_partner_id=? AND status='waiting'");
+        $s_po = $db_conn->prepare(
+            "UPDATE tp_purchase_orders
+             SET status='completed', tp_invoice_id=?, cancelled_at=NULL, cancelled_by=NULL, cancel_reason=NULL
+             WHERE id=? AND territory_partner_id=? AND status IN ('waiting','cancelled')"
+        );
         $s_po->bind_param("iii", $invoice_id, $po_id, $tp_id);
         $s_po->execute();
         $s_po->close();

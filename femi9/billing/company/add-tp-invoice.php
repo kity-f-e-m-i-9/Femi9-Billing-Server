@@ -12,11 +12,16 @@ $gd_result = $db_conn->query("SELECT id, gname FROM company_godown WHERE gname L
 $godowns_list = $gd_result ? $gd_result->fetch_all(MYSQLI_ASSOC) : [];
 
 // ── Prefill from a TP purchase order (tp-today-orders.php "Invoice" button) ──
+// Accepts 'waiting' (the normal case) and 'cancelled' (re-invoicing a PO
+// that was cancelled by mistake — tp-invoice-action.php completes/relinks
+// it on submit, same as a waiting PO). 'completed' is intentionally
+// excluded: that PO already has an invoice, so re-prefilling from it here
+// would silently orphan the first one when this new invoice gets linked.
 $prefill_po_id = (int)($_GET['po_id'] ?? 0);
 $prefill_tp_id = 0;
 $prefill_items = [];
 if ($prefill_po_id > 0) {
-    $poStmt = $db_conn->prepare("SELECT territory_partner_id FROM tp_purchase_orders WHERE id=? AND status='waiting'");
+    $poStmt = $db_conn->prepare("SELECT territory_partner_id FROM tp_purchase_orders WHERE id=? AND status IN ('waiting','cancelled')");
     $poStmt->bind_param("i", $prefill_po_id);
     $poStmt->execute();
     $poRow = $poStmt->get_result()->fetch_assoc();
