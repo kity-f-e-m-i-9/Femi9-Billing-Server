@@ -192,7 +192,24 @@ if ($classification === null) {
 function classifyFromVisionResult(array $v): array {
     $raw = 'Claude vision: amount=' . ($v['amount'] ?? 'null') . ' reference=' . ($v['reference'] ?? 'null')
         . ' recipient_matches=' . ($v['recipient_matches'] ? 'true' : 'false') . ' confidence=' . $v['confidence']
+        . ' looks_like_payment_screenshot=' . ($v['looks_like_payment_screenshot'] ? 'true' : 'false')
         . ($v['reasoning'] ? (' — ' . $v['reasoning']) : '');
+
+    // Distinguished from "readable but ambiguous" (which is a legitimate
+    // pending_review case) — an image that isn't a payment screenshot at
+    // all (an unrelated app screen, an error message, an invoice form) has
+    // nothing for a human reviewer to verify either, so it's rejected
+    // outright with a message that tells the TP what actually went wrong
+    // instead of the generic "could not be read clearly".
+    if (!$v['looks_like_payment_screenshot']) {
+        return [
+            'status' => 'rejected',
+            'amount' => null,
+            'reference' => null,
+            'reason' => "This doesn't look like a payment screenshot — please upload a screenshot of the actual payment confirmation (UPI success screen, bank transfer receipt, etc.).",
+            'raw_text' => $raw,
+        ];
+    }
 
     if (!$v['recipient_matches']) {
         return [

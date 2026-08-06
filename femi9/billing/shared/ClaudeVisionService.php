@@ -29,6 +29,7 @@ class ClaudeVisionService {
      *   reference: ?string,
      *   recipient_matches: bool,
      *   confidence: string,   // 'high' | 'low'
+     *   looks_like_payment_screenshot: bool,
      *   reasoning: string,
      *   message: string
      * }
@@ -87,6 +88,7 @@ class ClaudeVisionService {
                 'reference' => $parsed['reference'],
                 'recipient_matches' => (bool)($parsed['recipient_matches'] ?? false),
                 'confidence' => $parsed['confidence'] ?? 'low',
+                'looks_like_payment_screenshot' => $parsed['looks_like_payment_screenshot'],
                 'reasoning' => $parsed['reasoning'] ?? '',
                 'message' => 'OK',
             ];
@@ -103,14 +105,20 @@ proof of payment to the company "Femi9" (also written as "Femi Nayan LLP" or
 "Femi Health Care" — any of these count as a match).
 
 Read the screenshot carefully and identify:
-1. The amount actually paid (not a masked account number, not a transaction
+1. Whether this image is actually a payment confirmation / payment proof
+   screenshot at all (a UPI app success screen, a bank transfer receipt, an
+   SMS/notification showing a completed transaction, etc.) as opposed to
+   something else entirely — a screenshot of an unrelated app screen, an
+   error message, an invoice/order form, a chat conversation, a random
+   photo, or anything else that isn't proof of a payment having been made.
+2. The amount actually paid (not a masked account number, not a transaction
    ID, not a phone number, not a date/time, not any other number on screen).
-2. The payment reference number — this is usually labeled UTR, RRN, UPI
+3. The payment reference number — this is usually labeled UTR, RRN, UPI
    Reference No, UPI Transaction ID, or similar. It is normally 6-25
    alphanumeric characters. Do not confuse a "Google transaction ID" (an
    internal app ID) with the actual bank/UPI reference if both appear —
    prefer the UPI/bank-side one when both are present.
-3. Whether the payment recipient shown in the screenshot is Femi9 / Femi
+4. Whether the payment recipient shown in the screenshot is Femi9 / Femi
    Nayan LLP / Femi Health Care (recipient_matches: true) or someone else
    entirely (recipient_matches: false).
 
@@ -137,11 +145,12 @@ PROMPT;
         $prompt .= <<<PROMPT
 Respond with ONLY a JSON object, no other text, in exactly this shape:
 {
+  "looks_like_payment_screenshot": <true or false>,
   "amount": <number or null>,
   "reference": "<string or null>",
   "recipient_matches": <true or false>,
   "confidence": "high" or "low",
-  "reasoning": "<one short sentence explaining your read, or why confidence is low>"
+  "reasoning": "<one short sentence explaining your read, or why confidence is low, or why this isn't a payment screenshot>"
 }
 PROMPT;
 
@@ -163,6 +172,13 @@ PROMPT;
             'reference' => !empty($decoded['reference']) ? trim((string)$decoded['reference']) : null,
             'recipient_matches' => $decoded['recipient_matches'] ?? false,
             'confidence' => in_array($decoded['confidence'] ?? '', ['high', 'low'], true) ? $decoded['confidence'] : 'low',
+            // Defaults to true (rather than assuming the negative) when the
+            // model omits the field entirely, so older/odd responses fall
+            // back to today's generic "could not be read clearly" message
+            // instead of wrongly claiming it isn't a payment screenshot.
+            'looks_like_payment_screenshot' => array_key_exists('looks_like_payment_screenshot', $decoded)
+                ? (bool)$decoded['looks_like_payment_screenshot']
+                : true,
             'reasoning' => (string)($decoded['reasoning'] ?? ''),
         ];
     }
@@ -216,6 +232,7 @@ PROMPT;
             'reference' => null,
             'recipient_matches' => false,
             'confidence' => 'low',
+            'looks_like_payment_screenshot' => true,
             'reasoning' => '',
             'message' => $message,
         ];
