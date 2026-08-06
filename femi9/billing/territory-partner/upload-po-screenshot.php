@@ -6,6 +6,7 @@ error_reporting(0);
 require_once __DIR__ . '/include/PoScreenshotHelper.php';
 require_once __DIR__ . '/../shared/OcrService.php';
 require_once __DIR__ . '/../shared/PaymentScreenshotParser.php';
+require_once __DIR__ . '/../shared/ClaudeVisionService.php';
 
 header('Content-Type: application/json');
 
@@ -14,6 +15,26 @@ function respond(array $payload, int $httpCode = 200): void {
     echo json_encode($payload);
     exit;
 }
+
+// Without this, a fatal error partway through (Vision API call exceeding
+// max_execution_time, an uncaught exception, memory limit) leaves the
+// response empty or as raw HTML — the client's `.json()` parse then throws,
+// which the frontend reports as a generic "check your connection" failure
+// even though the request reached the server fine. Turn that into a real
+// JSON response routed to manual review instead of a misleading network error.
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        if (!headers_sent()) {
+            header('Content-Type: application/json');
+            http_response_code(200);
+        }
+        echo json_encode([
+            'success' => false,
+            'message' => 'Upload could not be processed automatically. Please try again, or contact support if this keeps happening.',
+        ]);
+    }
+});
 
 function acceptedTotalFor($db_conn, int $tp_id): float {
     $stmt = $db_conn->prepare(
@@ -101,29 +122,112 @@ if ($isUnconvertedHeic) {
     ]);
 }
 
-// Run OCR on the original upload — before compression, for the best text fidelity.
-$ocrText = '';
-$ocrAvailable = true;
+// Primary verification path: Claude reads the image directly and reasons
+// about amount/reference/recipient in context, few-shot primed with recent
+// reviewer corrections. This replaces blind OCR + regex, which mis-happened
+// on masked account numbers, transaction IDs, and glued currency symbols.
+$classification = null;
 try {
-    $ocr = new OcrService();
-    $ocrResult = $ocr->extractText($file['tmp_name']);
-    $ocrText = $ocrResult['success'] ? $ocrResult['text'] : '';
-    $ocrAvailable = $ocrResult['success'];
+    $vision = new ClaudeVisionService();
+    $priorCorrections = recentPoScreenshotCorrections($db_conn, 'claude_vision', 6);
+    $visionResult = $vision->analyzeScreenshot($file['tmp_name'], $priorCorrections);
+
+    if ($visionResult['success']) {
+        $classification = classifyFromVisionResult($visionResult);
+    }
 } catch (\Throwable $e) {
-    $ocrAvailable = false;
+    // Falls through to the OCR fallback below.
 }
 
-if ($ocrAvailable) {
-    $classification = PaymentScreenshotParser::classify($ocrText);
-} else {
-    // OCR itself is unavailable (misconfigured key, network issue, quota) —
-    // never penalize the TP for that; route to manual review instead.
-    $classification = [
+// Fallback path: if Claude's API is unavailable (misconfigured key, network
+// issue, quota) fall back to Google Vision OCR + regex rather than losing
+// automatic verification entirely.
+if ($classification === null) {
+    $ocrText = '';
+    $ocrAvailable = true;
+    try {
+        $ocr = new OcrService();
+        $ocrResult = $ocr->extractText($file['tmp_name']);
+        $ocrText = $ocrResult['success'] ? $ocrResult['text'] : '';
+        $ocrAvailable = $ocrResult['success'];
+    } catch (\Throwable $e) {
+        $ocrAvailable = false;
+    }
+
+    if ($ocrAvailable) {
+        $classification = PaymentScreenshotParser::classify($ocrText);
+
+        // If this exact OCR text was previously misread and a reviewer
+        // already corrected it (e.g. the TP re-uploads the same screenshot
+        // after an earlier pending_review), reuse the known-correct values
+        // instead of sending it back through manual review again for an
+        // identical image.
+        if ($classification['status'] !== 'accepted') {
+            $known = lookupKnownPoScreenshotCorrection($db_conn, $ocrText);
+            if ($known['amount'] !== null && $known['reference'] !== null) {
+                $classification['amount'] = $known['amount'];
+                $classification['reference'] = $known['reference'];
+                $classification['status'] = 'accepted';
+                $classification['reason'] = null;
+            }
+        }
+    } else {
+        // Neither verification path is available — never penalize the TP
+        // for that; route to manual review instead.
+        $classification = [
+            'status' => 'pending_review',
+            'amount' => null,
+            'reference' => null,
+            'reason' => 'Automatic verification is temporarily unavailable — this screenshot will be reviewed manually.',
+            'raw_text' => '',
+        ];
+    }
+}
+
+// Turns a Claude vision read into the same {status,amount,reference,reason,
+// raw_text} shape the rest of this endpoint (and PaymentScreenshotParser)
+// already works with, applying the same conservative policy: only accept
+// outright on a high-confidence read with both fields present and a
+// matching recipient — anything else goes to pending_review for a human.
+function classifyFromVisionResult(array $v): array {
+    $raw = 'Claude vision: amount=' . ($v['amount'] ?? 'null') . ' reference=' . ($v['reference'] ?? 'null')
+        . ' recipient_matches=' . ($v['recipient_matches'] ? 'true' : 'false') . ' confidence=' . $v['confidence']
+        . ($v['reasoning'] ? (' — ' . $v['reasoning']) : '');
+
+    if (!$v['recipient_matches']) {
+        return [
+            'status' => 'rejected',
+            'amount' => $v['amount'],
+            'reference' => $v['reference'],
+            'reason' => "This payment does not appear to have been made to Femi9 — please upload a screenshot showing the payment made to Femi9 / Femi Nayan LLP.",
+            'raw_text' => $raw,
+        ];
+    }
+
+    if ($v['confidence'] === 'high' && $v['amount'] !== null && $v['reference'] !== null) {
+        return [
+            'status' => 'accepted',
+            'amount' => $v['amount'],
+            'reference' => $v['reference'],
+            'reason' => null,
+            'raw_text' => $raw,
+        ];
+    }
+
+    $reason = $v['amount'] === null && $v['reference'] === null
+        ? 'Looks like a payment screenshot, but the amount and reference number could not be read clearly.'
+        : ($v['amount'] === null
+            ? 'Could not clearly read the paid amount from this screenshot.'
+            : ($v['reference'] === null
+                ? 'Could not clearly read a UTR/transaction reference number from this screenshot.'
+                : 'The automatic reading of this screenshot needs manual verification.'));
+
+    return [
         'status' => 'pending_review',
-        'amount' => null,
-        'reference' => null,
-        'reason' => 'Automatic verification is temporarily unavailable — this screenshot will be reviewed manually.',
-        'raw_text' => '',
+        'amount' => $v['amount'],
+        'reference' => $v['reference'],
+        'reason' => $reason,
+        'raw_text' => $raw,
     ];
 }
 

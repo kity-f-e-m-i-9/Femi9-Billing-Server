@@ -695,7 +695,16 @@ $tpDeliveryAddressParts = array_filter([
         formData.append('screenshot', fileOrBlob, filename);
 
         fetch('upload-po-screenshot.php', { method: 'POST', body: formData })
-            .then(function(r) { return r.json(); })
+            .then(function(r) {
+                return r.text().then(function(text) {
+                    try {
+                        return JSON.parse(text);
+                    } catch (parseErr) {
+                        console.error('Upload response was not valid JSON:', text);
+                        throw new Error('bad_response');
+                    }
+                });
+            })
             .then(function(data) {
                 btn.disabled = false;
                 if (!data.success) {
@@ -708,9 +717,11 @@ $tpDeliveryAddressParts = array_filter([
                 statusEl.textContent = '';
                 renderPoScreenshotList();
             })
-            .catch(function() {
+            .catch(function(err) {
                 btn.disabled = false;
-                statusEl.textContent = 'Upload failed — please check your connection and try again.';
+                statusEl.textContent = (err && err.message === 'bad_response')
+                    ? 'Upload could not be verified automatically — please try again.'
+                    : 'Upload failed — please check your connection and try again.';
             });
     }
 

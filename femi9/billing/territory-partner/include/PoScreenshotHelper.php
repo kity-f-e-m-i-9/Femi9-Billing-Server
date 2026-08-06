@@ -120,7 +120,7 @@ function rejectPoScreenshot($db_conn, int $screenshotId, string $reviewedBy): ar
  * @return array{success:bool,message:string}
  */
 function approvePoScreenshot($db_conn, int $screenshotId, float $confirmedAmount, string $confirmedReference, string $reviewedBy): array {
-    $stmt = $db_conn->prepare("SELECT id FROM tp_purchase_order_screenshots WHERE id = ? AND status = 'pending_review'");
+    $stmt = $db_conn->prepare("SELECT id, detected_amount, reference_number, ocr_raw_text FROM tp_purchase_order_screenshots WHERE id = ? AND status = 'pending_review'");
     $stmt->bind_param('i', $screenshotId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
@@ -139,6 +139,11 @@ function approvePoScreenshot($db_conn, int $screenshotId, float $confirmedAmount
         return ['success' => false, 'message' => 'This payment reference has already been used on another accepted screenshot.'];
     }
 
+    $rawText = $row['ocr_raw_text'] ?? '';
+    $engine = poScreenshotEngineFromRawText($rawText);
+    recordPoScreenshotCorrection($db_conn, $screenshotId, 'amount', $engine, $row['detected_amount'], (string)$confirmedAmount, $rawText);
+    recordPoScreenshotCorrection($db_conn, $screenshotId, 'reference', $engine, $row['reference_number'], $confirmedReference, $rawText);
+
     $upd = $db_conn->prepare(
         "UPDATE tp_purchase_order_screenshots
          SET status='accepted', detected_amount=?, reference_number=?, rejection_reason=NULL, reviewed_by=?, reviewed_at=NOW()
@@ -149,4 +154,92 @@ function approvePoScreenshot($db_conn, int $screenshotId, float $confirmedAmount
     $upd->close();
 
     return ['success' => true, 'message' => 'Screenshot approved.'];
+}
+
+// Pulls recent reviewer corrections to few-shot the vision model with real
+// past mistakes (e.g. "a masked account number was mistaken for the
+// amount"), so it can recognize similar traps on a screenshot it has never
+// seen before — not just an identical re-upload.
+//
+// Filtered to the same engine doing the reading: Claude (reasoning over the
+// image directly) and the Google Vision + regex fallback (blind OCR text
+// matching) fail in unrelated ways — a glyph-misread trap from OCR ("₹5
+// misread as 35") isn't a mistake a vision-reasoning model is prone to
+// repeating, so cross-engine examples would be noise rather than signal in
+// the prompt.
+function recentPoScreenshotCorrections($db_conn, string $engine, int $limit = 6): array {
+    $limit = max(1, min(20, $limit));
+    $stmt = $db_conn->prepare(
+        "SELECT field, wrong_value, correct_value FROM tp_po_screenshot_ocr_corrections
+         WHERE engine = ? ORDER BY created_at DESC LIMIT $limit"
+    );
+    $stmt->bind_param('s', $engine);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $corrections = [];
+    while ($row = $res->fetch_assoc()) {
+        $corrections[] = [
+            'field' => $row['field'],
+            'wrong' => $row['wrong_value'],
+            'correct' => $row['correct_value'],
+        ];
+    }
+    $stmt->close();
+    return $corrections;
+}
+
+// Looks up whether this exact OCR text has previously been corrected by a
+// reviewer (e.g. the same screenshot re-uploaded after an earlier
+// pending_review), and if so returns the confirmed amount/reference so the
+// upload can skip manual review entirely.
+function lookupKnownPoScreenshotCorrection($db_conn, string $rawText): array {
+    $result = ['amount' => null, 'reference' => null];
+    if ($rawText === '') return $result;
+
+    $hash = hash('sha256', $rawText);
+    $stmt = $db_conn->prepare(
+        "SELECT field, correct_value FROM tp_po_screenshot_ocr_corrections
+         WHERE raw_text_hash = ? ORDER BY created_at DESC"
+    );
+    $stmt->bind_param('s', $hash);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        if ($row['field'] === 'amount' && $result['amount'] === null) {
+            $result['amount'] = (float)$row['correct_value'];
+        } elseif ($row['field'] === 'reference' && $result['reference'] === null) {
+            $result['reference'] = $row['correct_value'];
+        }
+    }
+    $stmt->close();
+
+    return $result;
+}
+
+// Claude's raw_text is a structured one-line summary written by
+// classifyFromVisionResult() in upload-po-screenshot.php, always prefixed
+// "Claude vision: " — anything else stored in ocr_raw_text is the Google
+// Vision OCR fallback's verbatim extracted text.
+function poScreenshotEngineFromRawText(string $rawText): string {
+    return strpos($rawText, 'Claude vision:') === 0 ? 'claude_vision' : 'google_vision';
+}
+
+// Only worth recording when the auto-detected value actually differs from
+// what the reviewer confirmed (or was missing entirely) — an exact match
+// means auto-detection got it right and there's nothing to learn here.
+function recordPoScreenshotCorrection($db_conn, int $screenshotId, string $field, string $engine, $autoValue, string $correctValue, string $rawText): void {
+    $autoValueStr = $autoValue === null ? null : (string)$autoValue;
+    if ($autoValueStr !== null && trim($autoValueStr) !== '' && strcasecmp(trim($autoValueStr), trim($correctValue)) === 0) {
+        return;
+    }
+    if ($rawText === '') return;
+
+    $hash = hash('sha256', $rawText);
+    $stmt = $db_conn->prepare(
+        "INSERT INTO tp_po_screenshot_ocr_corrections (screenshot_id, field, engine, wrong_value, correct_value, raw_text_hash, ocr_raw_text)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    $stmt->bind_param('issssss', $screenshotId, $field, $engine, $autoValueStr, $correctValue, $hash, $rawText);
+    $stmt->execute();
+    $stmt->close();
 }

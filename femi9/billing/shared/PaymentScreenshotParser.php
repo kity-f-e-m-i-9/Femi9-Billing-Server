@@ -172,7 +172,17 @@ class PaymentScreenshotParser {
                 // Anchor strictly to the currency symbol so unrelated digits
                 // on the same line (dates, times, reward points OCR sometimes
                 // merges onto one line) aren't picked up as extra candidates.
-                if (preg_match_all('/(?:₹|Rs\.?|INR)\s*(?<![A-Za-z])(\d[\d,]*\.?\d{0,2})/i', $line, $matches)) {
+                //
+                // No lookbehind here: bank apps frequently glue the currency
+                // code straight onto the number with no space ("INR100300.0"
+                // — seen in production, where a lookbehind requiring a
+                // non-letter before the digit rejected the match outright
+                // because "R" from "INR" precedes it, silently dropping the
+                // real amount and leaving stray page-chrome digits elsewhere
+                // in the text to win as the only candidate). The currency
+                // symbol/code itself is the anchor, so no lookbehind is
+                // needed to avoid false positives.
+                if (preg_match_all('/(?:₹|Rs\.?|INR)\s*(\d[\d,]*\.?\d{0,2})/i', $line, $matches)) {
                     foreach ($matches[1] as $raw) $addCandidate($raw);
                 }
                 continue;
