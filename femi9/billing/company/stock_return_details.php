@@ -110,7 +110,7 @@ $i= $start_from;
                                 <div class="card">
                                    <div class="card-body" style="overflow:scroll !important;">
      
-<form action="stock_return_update" method="GET" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
+<form action="return-action" method="GET" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
 
 	 
 <table id="datatable1">
