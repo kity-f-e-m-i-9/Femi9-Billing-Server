@@ -46,11 +46,18 @@ $advBalance = max(0, round($advBalance - $reservedAmount, 2));
 
 // Screenshots uploaded for this TP's in-progress order (not yet linked to a
 // submitted PO) — resumable if the TP reloads the page mid-upload.
+//
+// Excludes 'rejected' rows: those are dead ends the TP already saw (nothing
+// further to resume — the only action was "remove and re-upload", which a
+// fresh visit effectively already is). Without this filter, a rejected
+// screenshot the TP never explicitly removed would resurface on every
+// future visit to this page indefinitely, even days/weeks later, looking
+// like a stuck upload rather than settled history.
 $existingScreenshots = [];
 $acceptedScreenshotTotal = 0.0;
 $scrStmt = mysqli_prepare($db_conn,
     "SELECT id, status, detected_amount, reference_number, rejection_reason, file_path
-     FROM tp_purchase_order_screenshots WHERE territory_partner_id = ? AND po_id IS NULL ORDER BY id ASC"
+     FROM tp_purchase_order_screenshots WHERE territory_partner_id = ? AND po_id IS NULL AND status != 'rejected' ORDER BY id ASC"
 );
 mysqli_stmt_bind_param($scrStmt, "i", $Login_user_IDvl);
 mysqli_stmt_execute($scrStmt);
@@ -578,7 +585,11 @@ $tpDeliveryAddressParts = array_filter([
     function statusBadge(status) {
         if (status === 'accepted') return '<span class="apo-status-pill accepted">Accepted</span>';
         if (status === 'rejected') return '<span class="apo-status-pill rejected">Rejected</span>';
-        return '<span class="apo-status-pill pending">Pending Review</span>';
+        // "Pending Review" reads like the upload is still in progress —
+        // this status only ever appears once verification has already
+        // finished and needs a human decision, so the label says that
+        // explicitly instead of looking like a stuck/incomplete upload.
+        return '<span class="apo-status-pill pending">Awaiting Company Review</span>';
     }
 
     function renderPoScreenshotList() {
