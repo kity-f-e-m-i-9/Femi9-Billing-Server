@@ -825,12 +825,20 @@ class StockService
      * Read-only: how much of a Neksomo product's shared pool is still
      * available for $productId, if it's mapped and this is the Neksomo
      * godown. 0 for every other product/godown (near-zero overhead).
+     *
+     * Uses purchased-minus-sold only (not get_neksomo_pool_available_packs(),
+     * which also subtracts already-converted stock) — conversion is a
+     * bookkeeping/visibility bridge that lets a mapped company product's own
+     * stock row draw from this pool, not a real stock movement that depletes
+     * what Neksomo itself can still send elsewhere. The same physical goods
+     * remain transferable from Neksomo's own godown regardless of how much
+     * has already been converted for other godowns' use.
      */
     private function neksomoPoolAvailable(int $productId, string $userType, string $userId): int
     {
         if ($userType !== 'company') return 0;
         if ((int)$userId !== get_neksomo_godown_id($this->db)) return 0;
-        return get_neksomo_pool_available_packs($this->db, $productId);
+        return get_neksomo_pool_purchased_minus_sold_packs($this->db, $productId);
     }
 
     /**
@@ -855,7 +863,7 @@ class StockService
         if ($real >= $qtyNeeded) return;
 
         $shortfall = $qtyNeeded - $real;
-        $poolAvailable = get_neksomo_pool_available_packs($this->db, $productId);
+        $poolAvailable = get_neksomo_pool_purchased_minus_sold_packs($this->db, $productId);
         $toConvert = min($shortfall, $poolAvailable);
         if ($toConvert <= 0) return;
 
