@@ -119,11 +119,11 @@ try {
     $stmtProdIns = $db_conn->prepare(
         "INSERT INTO internal_transfer
              (tempid, send_from, send_to, date, product_id, qty, price, discount,
-              sub_total, gst, gst_amount, total, hsn, username, usertype)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+              sub_total, gst, gst_type, taxable_value, gst_amount, total, hsn, username, usertype)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmtProd = $db_conn->prepare(
-        "SELECT gst, hsn FROM products WHERE id = ?"
+        "SELECT gst, gst_type, hsn FROM products WHERE id = ?"
     );
 
     foreach ($rows as $row) {
@@ -141,9 +141,25 @@ try {
         $sub_total_rate = $rate * $qty;
         $sub_total      = $sub_total_rate - $disc;
         $gst            = (float) $prod['gst'];
-        $gst_amount     = number_format($sub_total * $gst / 100, 2, '.', '');
-        $total          = $sub_total + (float) $gst_amount;
+        $gst_type       = ($prod['gst_type'] === 'inclusive') ? 'inclusive' : 'exclusive';
         $hsn            = $prod['hsn'];
+
+        // GST is never trusted from the client — always taken from the
+        // product's own gst/gst_type at the moment of transfer, same
+        // convention as neksomo-manufacturer-purchase-action.php. Inclusive
+        // products already have GST baked into the entered rate, so the
+        // taxable value is backed out of sub_total instead of adding GST on
+        // top of it (previously this page always added GST on top
+        // regardless of gst_type, overcharging tax on inclusive products).
+        if ($gst_type === 'inclusive') {
+            $total         = $sub_total;
+            $taxable_value = number_format($total / (1 + $gst / 100), 2, '.', '');
+            $gst_amount    = number_format($total - $taxable_value, 2, '.', '');
+        } else {
+            $taxable_value = number_format($sub_total, 2, '.', '');
+            $gst_amount    = number_format($sub_total * $gst / 100, 2, '.', '');
+            $total         = (float) $taxable_value + (float) $gst_amount;
+        }
 
         // Create invoice header once per tempid
         $stmtInvChk->bind_param('s', $tempid);
@@ -158,11 +174,16 @@ try {
         $stmtProdChk->execute();
         if ((int) $stmtProdChk->get_result()->fetch_assoc()['n'] > 0) continue;
 
-        // Insert transfer line
+        // Insert transfer line. gst_amount/total/taxable_value are bound as
+        // strings — number_format() returns a string in the inclusive
+        // branch and total is a float in the exclusive branch, but the
+        // destination columns (gst_amount/total varchar, taxable_value
+        // decimal) accept either via mysqli's string coercion; using 's'
+        // uniformly avoids a type mismatch between the two branches.
         $stmtProdIns->bind_param(
-            'ssssiiddddddsss',
+            'ssssiiddddsssssss',
             $tempid, $send_from, $send_to, $date, $pid, $qty,
-            $rate, $disc, $sub_total, $gst, $gst_amount, $total, $hsn,
+            $rate, $disc, $sub_total, $gst, $gst_type, $taxable_value, $gst_amount, $total, $hsn,
             $username, $usertype
         );
         $stmtProdIns->execute();
