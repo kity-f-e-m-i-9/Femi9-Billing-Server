@@ -216,7 +216,7 @@ function classifyFromVisionResult(array $v): array {
             'status' => 'rejected',
             'amount' => $v['amount'],
             'reference' => $v['reference'],
-            'reason' => "This payment does not appear to have been made to Femi9 — please upload a screenshot showing the payment made to Femi9 / Femi Nayan LLP.",
+            'reason' => "This payment does not appear to have been made to Femi9 — please upload a screenshot showing the payment made to Femi9 / Femi Nayan LLP / Anand Praveen.",
             'raw_text' => $raw,
         ];
     }

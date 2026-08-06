@@ -65,7 +65,7 @@ class PaymentScreenshotParser {
                 'status' => 'rejected',
                 'amount' => count($amounts) === 1 ? array_values($amounts)[0] : null,
                 'reference' => count($references) === 1 ? array_values($references)[0] : null,
-                'reason' => "This payment does not appear to have been made to Femi9 — the recipient name wasn't found in this screenshot. Please upload a screenshot showing the payment made to Femi9 / Femi Nayan LLP.",
+                'reason' => "This payment does not appear to have been made to Femi9 — the recipient name wasn't found in this screenshot. Please upload a screenshot showing the payment made to Femi9 / Femi Nayan LLP / Anand Praveen.",
                 'raw_text' => $text,
             ];
         }
@@ -115,12 +115,13 @@ class PaymentScreenshotParser {
     }
 
     // Confirms the screenshot shows a payment actually made to the company
-    // (Femi9 / FEMI NAYAN LLP / FEMI HEALTH CARE all share "femi") rather
-    // than to some unrelated third party — without this, any valid UPI
-    // screenshot with a readable amount and reference would auto-accept,
-    // regardless of who it was actually paid to.
+    // (Femi9 / FEMI NAYAN LLP / FEMI HEALTH CARE all share "femi") or to
+    // Anand Praveen, a company representative who also receives payments
+    // directly on Femi9's behalf — without this, any valid UPI screenshot
+    // with a readable amount and reference would auto-accept, regardless of
+    // who it was actually paid to.
     private static function hasCompanyRecipientMention($text) {
-        return stripos($text, 'femi') !== false;
+        return stripos($text, 'femi') !== false || stripos($text, 'anand praveen') !== false;
     }
 
     /** @return array<string,float> keyed by rounded value to dedupe */

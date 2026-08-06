@@ -101,8 +101,10 @@ class ClaudeVisionService {
     private function buildPrompt(array $priorCorrections) {
         $prompt = <<<PROMPT
 You are verifying a payment proof screenshot uploaded by a distributor as
-proof of payment to the company "Femi9" (also written as "Femi Nayan LLP" or
-"Femi Health Care" — any of these count as a match).
+proof of payment to the company "Femi9" (also written as "Femi Nayan LLP",
+"Femi Health Care", or "Anand Praveen" — a company representative who also
+receives payments directly on Femi9's behalf — any of these count as a
+match).
 
 Read the screenshot carefully and identify:
 1. Whether this image is actually a payment confirmation / payment proof
@@ -119,8 +121,8 @@ Read the screenshot carefully and identify:
    internal app ID) with the actual bank/UPI reference if both appear —
    prefer the UPI/bank-side one when both are present.
 4. Whether the payment recipient shown in the screenshot is Femi9 / Femi
-   Nayan LLP / Femi Health Care (recipient_matches: true) or someone else
-   entirely (recipient_matches: false).
+   Nayan LLP / Femi Health Care / Anand Praveen (recipient_matches: true)
+   or someone else entirely (recipient_matches: false).
 
 Be conservative: if the amount or reference is genuinely unclear, blurry,
 ambiguous, or you are guessing, say so honestly with confidence "low" rather
