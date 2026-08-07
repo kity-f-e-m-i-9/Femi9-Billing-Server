@@ -2,88 +2,78 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms');
 require_once("include/TeamLevelColors.php");
-require_once("include/TeamTargetRollup.php");
 error_reporting(0);
 
-// Target/achieved period — defaults to the current calendar month (matching
-// marketing/my-team.php's own default), optionally overridden via ?from=&to=
-// so company can look at a different month the same way.
-$_tgtFrom = $_GET['from'] ?? '';
-$_tgtTo   = $_GET['to'] ?? '';
-$targetFromDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_tgtFrom) ? $_tgtFrom : date('Y-m-01');
-$targetToDate   = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_tgtTo)   ? $_tgtTo   : date('Y-m-t');
-
-$db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
+$db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_team_levels (
     id INT AUTO_INCREMENT PRIMARY KEY,
     level_rank INT NOT NULL,
     level_name VARCHAR(50) NOT NULL,
+    location_layer_id INT NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_level_rank (level_rank)
 )");
-$_chkTL = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'team_level_id'");
+$_chkTL = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'team_level_id'");
 if ($_chkTL && $_chkTL->num_rows === 0) {
-    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN team_level_id INT NULL DEFAULT NULL AFTER user_position");
+    $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN team_level_id INT NULL DEFAULT NULL AFTER user_position");
 }
-$_chkMgr = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'manager_id'");
+$_chkMgr = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'manager_id'");
 if ($_chkMgr && $_chkMgr->num_rows === 0) {
-    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN manager_id INT NULL DEFAULT NULL AFTER team_level_id");
+    $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN manager_id INT NULL DEFAULT NULL AFTER team_level_id");
 }
+$db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_locations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    bdm_id INT NOT NULL,
+    location_id INT NOT NULL,
+    is_dual_role TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_bdm_location (bdm_id, location_id)
+)");
+$_chkDual = $db_conn->query("SHOW COLUMNS FROM salesbdm_locations LIKE 'is_dual_role'");
+if ($_chkDual && $_chkDual->num_rows === 0) {
+    $db_conn->query("ALTER TABLE salesbdm_locations ADD COLUMN is_dual_role TINYINT(1) NOT NULL DEFAULT 0 AFTER location_id");
+}
+
+// depth -> level_name / level_id -> depth lookups, used to detect + label a
+// dual-role person (e.g. Chief BDM who also personally holds specific
+// Districts) so the tree shows them under BOTH their own level and the
+// level one depth below.
+$depthLevelRows = $db_conn->query("
+    SELECT l.id, l.level_name, ll.depth
+    FROM salesbdm_team_levels l
+    LEFT JOIN partner_location_layers ll ON ll.id = l.location_layer_id
+")->fetch_all(MYSQLI_ASSOC);
+$depthToLevelName = [];
+$levelDepthById = [];
+foreach ($depthLevelRows as $dl) {
+    $levelDepthById[(int)$dl['id']] = $dl['depth'] !== null ? (int)$dl['depth'] : null;
+    if ($dl['depth'] !== null) { $depthToLevelName[(int)$dl['depth']] = $dl['level_name']; }
+}
+$dualBdmIds = [];
+$dualRes = $db_conn->query("SELECT DISTINCT bdm_id FROM salesbdm_locations WHERE is_dual_role = 1");
+if ($dualRes) { while ($r = $dualRes->fetch_assoc()) { $dualBdmIds[(int)$r['bdm_id']] = true; } }
 
 // ── Cards: staff count per level ────────────────────────────────────────────
 $levelCounts = $db_conn->query("
     SELECT l.id, l.level_rank, l.level_name, COALESCE(s.cnt, 0) AS staff_count
-    FROM marketing_team_levels l
+    FROM salesbdm_team_levels l
     LEFT JOIN (
-        SELECT team_level_id, COUNT(*) AS cnt FROM marketing_staff GROUP BY team_level_id
+        SELECT team_level_id, COUNT(*) AS cnt FROM sales_bdm_staff GROUP BY team_level_id
     ) s ON s.team_level_id = l.id
     ORDER BY l.level_rank ASC
 ")->fetch_all(MYSQLI_ASSOC);
 
 // One distinct color per level, in rank order (shared across the whole app)
-$levelColorMap = getTeamLevelColorMap($db_conn);
-
-// ── Assigned district(s) per staff member, batched ──────────────────────────
-// marketing_staff_locations can point at a STATE/DISTRICT/TALUK/FIRKA node;
-// whatever depth it's at, the district it belongs to is what's shown here —
-// same resolution rule as marketing/include/AssignedLocations.php's
-// getMsAssignedDistricts(), just computed once for everyone instead of per row.
-$allLocNodes = [];
-$_lr = $db_conn->query("SELECT id, parent_id, depth, name FROM partner_location_nodes WHERE is_active=1");
-while ($row = $_lr->fetch_assoc()) {
-    $allLocNodes[(int)$row['id']] = [
-        'parent_id' => $row['parent_id'] !== null ? (int)$row['parent_id'] : null,
-        'depth'     => (int)$row['depth'],
-        'name'      => $row['name'],
-    ];
-}
-function msTeamViewDistrictForNode(int $locId, array $allLocNodes): ?string {
-    if (!isset($allLocNodes[$locId])) return null;
-    $cur = $allLocNodes[$locId];
-    if ($cur['depth'] === 2) return null; // STATE-level assignment — no single district to show
-    while ($cur !== null && $cur['depth'] !== 3) {
-        $cur = $cur['parent_id'] !== null ? ($allLocNodes[$cur['parent_id']] ?? null) : null;
-    }
-    return $cur['name'] ?? null;
-}
-$districtsByMs = [];
-$_ar = $db_conn->query("SELECT ms_id, location_id FROM marketing_staff_locations");
-if ($_ar) {
-    while ($row = $_ar->fetch_assoc()) {
-        $distName = msTeamViewDistrictForNode((int)$row['location_id'], $allLocNodes);
-        if ($distName !== null) { $districtsByMs[(int)$row['ms_id']][$distName] = true; }
-    }
-}
-foreach ($districtsByMs as $msId => $names) { $districtsByMs[$msId] = implode(', ', array_keys($names)); }
+$levelColorMap = getSalesBdmTeamLevelColorMap($db_conn);
 
 // ── Staff, grouped by level (for card click) and by manager (for drill-down) ──
 $staffRows = $db_conn->query("
-    SELECT ms.id, ms.ms_name, ms.manager_id, ms.team_level_id, tl.level_name, tl.level_rank
-    FROM marketing_staff ms
-    LEFT JOIN marketing_team_levels tl ON tl.id = ms.team_level_id
-    ORDER BY tl.level_rank ASC, ms.ms_name ASC
+    SELECT bs.id, bs.bdm_name, bs.manager_id, bs.team_level_id, tl.level_name, tl.level_rank
+    FROM sales_bdm_staff bs
+    LEFT JOIN salesbdm_team_levels tl ON tl.id = bs.team_level_id
+    ORDER BY tl.level_rank ASC, bs.bdm_name ASC
 ")->fetch_all(MYSQLI_ASSOC);
 
-function msInitials(string $name): string {
+function bdmInitials(string $name): string {
     $words = preg_split('/\s+/', trim($name));
     $words = array_filter($words);
     if (empty($words)) return '?';
@@ -93,15 +83,27 @@ function msInitials(string $name): string {
     return mb_strtoupper($first . $last);
 }
 
-function toEntry(array $row, array $levelColorMap, array $districtsByMs = []): array {
+function computeDisplayLevel(int $bdmId, int $lvlId, ?string $levelName, array $depthToLevelName, array $levelDepthById, array $dualBdmIds): string {
+    $displayLevel = $levelName ?: '-';
+    if (isset($dualBdmIds[$bdmId]) && isset($levelDepthById[$lvlId]) && $levelDepthById[$lvlId] !== null) {
+        $nextDepth = $levelDepthById[$lvlId] + 1;
+        if (isset($depthToLevelName[$nextDepth])) {
+            $displayLevel .= ' + ' . $depthToLevelName[$nextDepth];
+        }
+    }
+    return $displayLevel;
+}
+
+function toBdmEntry(array $row, array $levelColorMap, array $depthToLevelName = [], array $levelDepthById = [], array $dualBdmIds = []): array {
     $lvlId = (int)$row['team_level_id'];
+    $bdmId = (int)$row['id'];
+    $displayLevel = computeDisplayLevel($bdmId, $lvlId, $row['level_name'], $depthToLevelName, $levelDepthById, $dualBdmIds);
     return [
-        'id'         => (int)$row['id'],
-        'name'       => $row['ms_name'],
-        'level_name' => $row['level_name'] ?: '-',
+        'id'         => $bdmId,
+        'name'       => $row['bdm_name'],
+        'level_name' => $displayLevel,
         'color'      => $levelColorMap[$lvlId] ?? '#999999',
-        'initials'   => msInitials($row['ms_name']),
-        'district'   => $districtsByMs[(int)$row['id']] ?? '',
+        'initials'   => bdmInitials($row['bdm_name']),
     ];
 }
 
@@ -111,72 +113,57 @@ $noLevelCount = 0;
 foreach ($staffRows as $row) {
     if (!$row['level_rank']) { $noLevelCount++; continue; }
     $lvlId = (int)$row['team_level_id'];
-    $levelStaffMap[$lvlId][] = toEntry($row, $levelColorMap, $districtsByMs);
+    $levelStaffMap[$lvlId][] = toBdmEntry($row, $levelColorMap, $depthToLevelName, $levelDepthById, $dualBdmIds);
     $mgrKey = $row['manager_id'] ? (int)$row['manager_id'] : 0;
     $byManager[$mgrKey][] = $row;
 }
 
-// Direct-reports map, keyed by ms_id — powers each drill-down step in the modal
+// Direct-reports map, keyed by bdm_id — powers each drill-down step in the modal
 $childrenMap = [];
 foreach ($byManager as $mgrId => $children) {
     if ($mgrId === 0) continue;
-    $childrenMap[$mgrId] = array_map(fn($c) => toEntry($c, $levelColorMap, $districtsByMs), $children);
+    $childrenMap[$mgrId] = array_map(fn($c) => toBdmEntry($c, $levelColorMap, $depthToLevelName, $levelDepthById, $dualBdmIds), $children);
 }
 
-// Flat map of every staff member — powers the ancestor-chain breadcrumb (SM →
-// ASM → …) shown above whoever you click on in the modal.
+// Location names held by each bdm (primary + dual-role), for the modal's
+// "Assigned Locations" list when drilling into a specific person.
+$locationsByBdm = [];
+$locRes = $db_conn->query("
+    SELECT sl.bdm_id, pn.name
+    FROM salesbdm_locations sl
+    JOIN partner_location_nodes pn ON pn.id = sl.location_id
+    ORDER BY pn.name ASC
+");
+if ($locRes) {
+    while ($r = $locRes->fetch_assoc()) {
+        $locationsByBdm[(int)$r['bdm_id']][] = $r['name'];
+    }
+}
+
+// Flat map of every staff member — powers the ancestor-chain breadcrumb
 $allStaffMap = [];
 foreach ($staffRows as $row) {
     if (!$row['level_rank']) continue;
-    $entry = toEntry($row, $levelColorMap, $districtsByMs);
+    $entry = toBdmEntry($row, $levelColorMap, $depthToLevelName, $levelDepthById, $dualBdmIds);
     $entry['manager_id'] = $row['manager_id'] ? (int)$row['manager_id'] : 0;
+    $entry['locations']  = $locationsByBdm[(int)$row['id']] ?? [];
     $allStaffMap[(int)$row['id']] = $entry;
 }
 
-// ── Team target/achieved roll-up, for the modal's "Team Target" section ────
-$_allMsIds = array_keys($allStaffMap);
-$_rawTargetStats = getRawTargetAchievedStats($db_conn, $_allMsIds, $targetFromDate, $targetToDate);
-
-function msTeamViewSubtreeTargetSum(int $id, array $byManager, array $rawTargetStats): array {
-    $sum = $rawTargetStats[$id] ?? ['target' => 0.0, 'achieved' => 0.0];
-    foreach (($byManager[$id] ?? []) as $child) {
-        $childSum = msTeamViewSubtreeTargetSum((int)$child['id'], $byManager, $rawTargetStats);
-        $sum['target']   += $childSum['target'];
-        $sum['achieved'] += $childSum['achieved'];
-    }
-    return $sum;
-}
-
-foreach ($allStaffMap as $id => &$entry) {
-    $sum = msTeamViewSubtreeTargetSum($id, $byManager, $_rawTargetStats);
-    $entry['target']   = round($sum['target'], 2);
-    $entry['achieved'] = round($sum['achieved'], 2);
-    $entry['percent']  = $sum['target'] > 0 ? round(min(100, ($sum['achieved'] / $sum['target']) * 100), 1) : 0;
-
-    $directReports = $byManager[$id] ?? [];
-    $completed = 0;
-    foreach ($directReports as $dr) {
-        $drSum = msTeamViewSubtreeTargetSum((int)$dr['id'], $byManager, $_rawTargetStats);
-        if ($drSum['target'] > 0 && ($drSum['achieved'] / $drSum['target']) * 100 >= 100) { $completed++; }
-    }
-    $entry['direct_report_count'] = count($directReports);
-    $entry['completed_count']     = $completed;
-}
-unset($entry);
-
-// ── Trunk + branch clusters: one root (SM) per cluster, its direct reports as
+// ── Trunk + branch clusters: one root per cluster, its direct reports as
 // circles around it, connected by a simple trunk→bar→stem line. Deeper levels
 // are reached by clicking — never rendered inline, so the layout never sprawls.
-function renderSmCluster(array $sm, array $byManager, array $levelColorMap, array $districtsByMs = []): string {
-    $smId = (int)$sm['id'];
-    $smColor = $levelColorMap[(int)$sm['team_level_id']] ?? '#6b4226';
-    $branchList = $byManager[$smId] ?? [];
+function renderBdmCluster(array $root, array $byManager, array $levelColorMap, array $depthToLevelName, array $levelDepthById, array $dualBdmIds): string {
+    $rootId = (int)$root['id'];
+    $rootColor = $levelColorMap[(int)$root['team_level_id']] ?? '#6b4226';
+    $branchList = $byManager[$rootId] ?? [];
+    $rootDisplayLevel = computeDisplayLevel($rootId, (int)$root['team_level_id'], $root['level_name'], $depthToLevelName, $levelDepthById, $dualBdmIds);
 
-    $html = '<div class="sm-cluster" style="--trunk-color:' . $smColor . ';">';
-    $html .= '<div class="sm-trunk org-node-clickable" style="--own-color:' . $smColor . ';"'
-           . ' data-ms-id="' . $smId . '" data-ms-name="' . htmlspecialchars($sm['ms_name'], ENT_QUOTES) . '" data-ms-level="' . htmlspecialchars($sm['level_name'] ?: '-', ENT_QUOTES) . '">'
-           . '<div class="trunk-level">' . htmlspecialchars($sm['level_name'] ?: '-') . '</div>'
-           . '<div class="trunk-name">' . htmlspecialchars($sm['ms_name']) . '</div>'
+    $html = '<div class="sm-cluster" style="--trunk-color:' . $rootColor . ';">';
+    $html .= '<div class="sm-trunk org-node-clickable" style="--own-color:' . $rootColor . ';"'
+           . ' data-bdm-id="' . $rootId . '" data-bdm-name="' . htmlspecialchars($root['bdm_name'], ENT_QUOTES) . '" data-bdm-level="' . htmlspecialchars($rootDisplayLevel, ENT_QUOTES) . '">'
+           . '<div class="trunk-level">' . htmlspecialchars($rootDisplayLevel) . '</div>'
+           . '<div class="trunk-name">' . htmlspecialchars($root['bdm_name']) . '</div>'
            . '</div>';
 
     if (!empty($branchList)) {
@@ -187,27 +174,21 @@ function renderSmCluster(array $sm, array $byManager, array $levelColorMap, arra
         foreach ($branchList as $branch) {
             $branchId = (int)$branch['id'];
             $branchColor = $levelColorMap[(int)$branch['team_level_id']] ?? '#999999';
+            $branchDisplayLevel = computeDisplayLevel($branchId, (int)$branch['team_level_id'], $branch['level_name'], $depthToLevelName, $levelDepthById, $dualBdmIds);
             $subList = $byManager[$branchId] ?? [];
-            // Only District Managers get a district shown under their name here
-            // — an ASM/SM node happening to also carry a location assignment
-            // (e.g. test data) shouldn't clutter the ASM row itself.
-            $branchDistrict = (stripos($branch['level_name'] ?? '', 'District') !== false) ? ($districtsByMs[$branchId] ?? '') : '';
             $html .= '<div class="branch-circle org-node-clickable" style="--own-color:' . $branchColor . ';"'
-                   . ' data-ms-id="' . $branchId . '" data-ms-name="' . htmlspecialchars($branch['ms_name'], ENT_QUOTES) . '" data-ms-level="' . htmlspecialchars($branch['level_name'] ?: '-', ENT_QUOTES) . '">'
+                   . ' data-bdm-id="' . $branchId . '" data-bdm-name="' . htmlspecialchars($branch['bdm_name'], ENT_QUOTES) . '" data-bdm-level="' . htmlspecialchars($branchDisplayLevel, ENT_QUOTES) . '">'
                    . '<div class="branch-stem"></div>'
-                   . '<div class="org-node-circle">' . htmlspecialchars(msInitials($branch['ms_name'])) . '</div>'
-                   . '<div class="branch-level">' . htmlspecialchars($branch['level_name'] ?: '-') . '</div>'
-                   . '<div class="branch-name">' . htmlspecialchars($branch['ms_name']) . '</div>'
-                   . ($branchDistrict !== '' ? '<div class="branch-district">' . htmlspecialchars($branchDistrict) . '</div>' : '');
+                   . '<div class="org-node-circle">' . htmlspecialchars(bdmInitials($branch['bdm_name'])) . '</div>'
+                   . '<div class="branch-level">' . htmlspecialchars($branchDisplayLevel) . '</div>'
+                   . '<div class="branch-name">' . htmlspecialchars($branch['bdm_name']) . '</div>';
             if (!empty($subList)) {
                 $subLevelName = $subList[0]['level_name'] ?: 'report';
                 $subColor = $levelColorMap[(int)$subList[0]['team_level_id']] ?? '#999999';
-                $subAbbrev = msInitials($subLevelName);
-                // One summary circle per ASM — not one per DM. Clicking it opens
-                // the same modal as clicking the ASM itself (chain + full DM list).
+                $subAbbrev = bdmInitials($subLevelName);
                 $html .= '<div class="sub-stem"></div>';
                 $html .= '<div class="branch-circle sub-level solo org-node-clickable" style="--own-color:' . $subColor . ';"'
-                       . ' data-ms-id="' . $branchId . '" data-ms-name="' . htmlspecialchars($branch['ms_name'], ENT_QUOTES) . '" data-ms-level="' . htmlspecialchars($branch['level_name'] ?: '-', ENT_QUOTES) . '"'
+                       . ' data-bdm-id="' . $branchId . '" data-bdm-name="' . htmlspecialchars($branch['bdm_name'], ENT_QUOTES) . '" data-bdm-level="' . htmlspecialchars($branch['level_name'] ?: '-', ENT_QUOTES) . '"'
                        . ' title="' . htmlspecialchars($subLevelName, ENT_QUOTES) . '">'
                        . '<div class="org-node-circle two-line">'
                        . '<span class="circle-label">' . htmlspecialchars($subAbbrev) . '</span>'
@@ -223,7 +204,7 @@ function renderSmCluster(array $sm, array $byManager, array $levelColorMap, arra
     return $html;
 }
 
-$smRoots = $byManager[0] ?? [];
+$rootStaff = $byManager[0] ?? [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -231,7 +212,7 @@ $smRoots = $byManager[0] ?? [];
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Marketing Team - Tree View : <?php echo $business_name; ?></title>
+    <title>Sales BDM Team - Tree View : <?php echo $business_name; ?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
@@ -258,8 +239,6 @@ $smRoots = $byManager[0] ?? [];
         }
         .level-card .hint { font-size:11px; color:#999; margin-top:6px; }
 
-        /* Trunk (SM) + branch circles (direct reports). Deeper levels open via modal
-           only — nothing recurses inline, so this never sprawls. */
         .org-tree-wrap { padding:10px 6px; }
         .sm-cluster { text-align:center; padding:20px 10px; border-bottom:1px solid #f0f0f0; }
         .sm-cluster:last-child { border-bottom:none; }
@@ -288,9 +267,6 @@ $smRoots = $byManager[0] ?? [];
         }
         .org-node-clickable { cursor: pointer; transition: box-shadow .15s, transform .15s; }
 
-        /* Each circle draws its own left/right half of the connecting line, so
-           the line starts exactly at the first circle and ends at the last —
-           no overhang past the edges. */
         .branch-circle { display:flex; flex-direction:column; align-items:center; width:100px; position:relative; padding-top:20px; }
         .branch-stem { position:absolute; top:0; left:50%; width:2px; height:20px; background:#ccc; transform:translateX(-1px); }
         .branch-circle::before, .branch-circle::after {
@@ -310,10 +286,6 @@ $smRoots = $byManager[0] ?? [];
             font-size:12px; line-height:15px; font-weight:600; color:#333; text-align:center;
             height:30px; overflow:hidden; display:flex; align-items:flex-start; justify-content:center;
         }
-        .branch-circle .branch-district {
-            font-size:10.5px; line-height:13px; color:#888; text-align:center; margin-top:2px;
-        }
-        .modal-report-item .node-district { font-size:11px; color:#888; margin-top:2px; }
         .sub-indicator-stem { width:2px; height:8px; background:var(--own-color,#ccc); margin-top:6px; }
         .branch-circle .branch-count {
             font-size:10px; font-weight:700; color:#fff;
@@ -322,10 +294,6 @@ $smRoots = $byManager[0] ?? [];
             box-shadow: 0 1px 4px rgba(0,0,0,.2);
         }
 
-        /* One summary circle per ASM (level abbreviation + count, e.g. "DM 3")
-           instead of one circle per DM — click opens the same modal as the
-           ASM, showing the full real DM list. Sits at a fixed row so a long
-           ASM name wrapping to 2 lines above doesn't push it out of line. */
         .sub-stem { width:2px; height:14px; background:#ccc; margin:10px auto 0; }
         .branch-circle.sub-level { width:auto; padding-top:0; }
         .branch-circle.solo::before, .branch-circle.solo::after { display:none; }
@@ -362,8 +330,7 @@ $smRoots = $byManager[0] ?? [];
         .modal-report-item.is-clickable:hover { box-shadow: 0 2px 8px rgba(0,0,0,.15); }
         .modal-report-item .node-level { font-size:10px; font-weight:700; color:var(--own-color,#999); text-transform:uppercase; letter-spacing:.5px; }
         .modal-report-item .node-name { font-size:13px; color:#333; font-weight:600; margin-top:2px; }
-        .modal-report-item .node-hint { font-size:11px; color:#999; margin-top:4px; }
-        #msModalBack { margin-right:8px; }
+        #bdmModalBack { margin-right:8px; }
     </style>
 </head>
 <body>
@@ -387,8 +354,8 @@ $smRoots = $byManager[0] ?? [];
                                 <h1>
                                     <table class="headertble">
                                         <tr>
-                                            <td>Marketing Team - Tree View</td>
-                                            <td><a href="ms_manage" title="Manage Marketing Staff">&#9776;</a></td>
+                                            <td>Sales BDM Team - Tree View</td>
+                                            <td><a href="salesbdm_manage" title="Manage Sales BDM">&#9776;</a></td>
                                         </tr>
                                     </table>
                                 </h1>
@@ -398,18 +365,7 @@ $smRoots = $byManager[0] ?? [];
 
                     <div class="row mb-2">
                         <div class="col">
-                            <p class="text-muted" style="font-size:13px;">Click a card to see everyone at that level, then click a person to drill into their team. Team Target/Achieved shown per person is for <b><?php echo date('d M Y', strtotime($targetFromDate)); ?> to <?php echo date('d M Y', strtotime($targetToDate)); ?></b>.</p>
-                            <form method="get" style="display:flex;gap:8px;align-items:end;">
-                                <div>
-                                    <label class="form-label" style="font-size:11px;font-weight:600;display:block;margin-bottom:2px;">From</label>
-                                    <input type="date" name="from" value="<?php echo htmlspecialchars($targetFromDate); ?>" class="form-control form-control-sm">
-                                </div>
-                                <div>
-                                    <label class="form-label" style="font-size:11px;font-weight:600;display:block;margin-bottom:2px;">To</label>
-                                    <input type="date" name="to" value="<?php echo htmlspecialchars($targetToDate); ?>" class="form-control form-control-sm">
-                                </div>
-                                <div><button type="submit" class="btn btn-primary btn-sm">Apply</button></div>
-                            </form>
+                            <p class="text-muted" style="font-size:13px;">Click a card to see everyone at that level, then click a person to drill into their team.</p>
                         </div>
                     </div>
 
@@ -417,7 +373,7 @@ $smRoots = $byManager[0] ?? [];
                     <div class="row mb-3">
                         <?php if (empty($levelCounts)): ?>
                             <div class="col">
-                                <div class="alert alert-info">No team levels configured yet. <a href="add-marketing-team-level">Add one</a>.</div>
+                                <div class="alert alert-info">No team levels configured yet. <a href="add-salesbdm-team-level">Add one</a>.</div>
                             </div>
                         <?php else: ?>
                             <?php foreach ($levelCounts as $lc): ?>
@@ -438,14 +394,14 @@ $smRoots = $byManager[0] ?? [];
                     <?php if ($noLevelCount > 0): ?>
                         <div class="row mb-3">
                             <div class="col">
-                                <div class="alert alert-warning" style="font-size:13px;"><?php echo (int)$noLevelCount; ?> marketing staff have no Team Level assigned and won't appear here.</div>
+                                <div class="alert alert-warning" style="font-size:13px;"><?php echo (int)$noLevelCount; ?> Sales BDM have no Team Level assigned and won't appear here.</div>
                             </div>
                         </div>
                     <?php endif; ?>
 
                     <div class="row mb-2">
                         <div class="col">
-                            <p class="text-muted" style="font-size:13px;margin-bottom:0;">Each trunk is a Sales Manager. Click the trunk or any circle to see who reports to them.</p>
+                            <p class="text-muted" style="font-size:13px;margin-bottom:0;">Each trunk is a top-level Sales BDM. Click the trunk or any circle to see who reports to them.</p>
                         </div>
                     </div>
                     <div class="row">
@@ -453,11 +409,11 @@ $smRoots = $byManager[0] ?? [];
                             <div class="card">
                                 <div class="card-body">
                                     <div class="org-tree-wrap">
-                                        <?php if (empty($smRoots)): ?>
-                                            <div class="text-center text-muted" style="padding:20px;">No marketing staff with a team level yet.</div>
+                                        <?php if (empty($rootStaff)): ?>
+                                            <div class="text-center text-muted" style="padding:20px;">No Sales BDM with a team level yet.</div>
                                         <?php else: ?>
-                                            <?php foreach ($smRoots as $sm): ?>
-                                                <?php echo renderSmCluster($sm, $byManager, $levelColorMap, $districtsByMs); ?>
+                                            <?php foreach ($rootStaff as $root): ?>
+                                                <?php echo renderBdmCluster($root, $byManager, $levelColorMap, $depthToLevelName, $levelDepthById, $dualBdmIds); ?>
                                             <?php endforeach; ?>
                                         <?php endif; ?>
                                     </div>
@@ -472,17 +428,17 @@ $smRoots = $byManager[0] ?? [];
     </div>
 </div>
 
-<div class="modal fade" id="msNodeModal" tabindex="-1" role="dialog" aria-hidden="true">
+<div class="modal fade" id="bdmNodeModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <button type="button" id="msModalBack" class="btn btn-sm btn-outline-secondary" style="display:none;">&larr; Back</button>
-                    <span id="msNodeModalTitle">Reports</span>
+                    <button type="button" id="bdmModalBack" class="btn btn-sm btn-outline-secondary" style="display:none;">&larr; Back</button>
+                    <span id="bdmNodeModalTitle">Reports</span>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" id="msNodeModalBody"></div>
+            <div class="modal-body" id="bdmNodeModalBody"></div>
         </div>
     </div>
 </div>
@@ -496,20 +452,19 @@ $smRoots = $byManager[0] ?? [];
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script>
-var msChildrenMap = <?php echo json_encode($childrenMap); ?>;
-var msLevelStaffMap = <?php echo json_encode($levelStaffMap); ?>;
-var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
+var bdmChildrenMap = <?php echo json_encode($childrenMap); ?>;
+var bdmLevelStaffMap = <?php echo json_encode($levelStaffMap); ?>;
+var bdmAllStaff = <?php echo json_encode($allStaffMap); ?>;
 
 (function ($) {
     var modalStack = [];
 
-    // Ancestors from top-most down to immediate manager (excludes the node itself)
     function getChain(nodeId) {
         var chain = [];
-        var current = msAllStaff[nodeId];
+        var current = bdmAllStaff[nodeId];
         var guard = 0;
         while (current && current.manager_id && guard < 20) {
-            var mgr = msAllStaff[current.manager_id];
+            var mgr = bdmAllStaff[current.manager_id];
             if (!mgr) break;
             chain.unshift(mgr);
             current = mgr;
@@ -520,7 +475,7 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
 
     function renderModalFrame() {
         var frame = modalStack[modalStack.length - 1];
-        $('#msModalBack').toggle(modalStack.length > 1);
+        $('#bdmModalBack').toggle(modalStack.length > 1);
         if (frame.type === 'list') {
             renderListFrame(frame);
         } else {
@@ -529,8 +484,8 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
     }
 
     function renderListFrame(frame) {
-        $('#msNodeModalTitle').text(frame.title + ' (' + frame.items.length + ')');
-        var $body = $('#msNodeModalBody').empty();
+        $('#bdmNodeModalTitle').text(frame.title + ' (' + frame.items.length + ')');
+        var $body = $('#bdmNodeModalBody').empty();
         if (!frame.items.length) {
             $body.html('<div class="text-muted">No one here yet.</div>');
             return;
@@ -542,7 +497,6 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
             var $text = $('<div class="org-node-text"></div>');
             $text.append($('<div class="node-level"></div>').text(c.level_name));
             $text.append($('<div class="node-name"></div>').text(c.name));
-            if (c.district) { $text.append($('<div class="node-district"></div>').text(c.district)); }
             $item.append($text);
             $item.on('click', function (e) {
                 e.stopPropagation();
@@ -555,30 +509,26 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
     }
 
     function renderPersonFrame(frame) {
-        var node = msAllStaff[frame.id];
-        var $body = $('#msNodeModalBody').empty();
+        var clickedNode = bdmAllStaff[frame.id];
+        var node = clickedNode;
+        var $body = $('#bdmNodeModalBody').empty();
         if (!node) {
-            $('#msNodeModalTitle').text('Not found');
+            $('#bdmNodeModalTitle').text('Not found');
             $body.html('<div class="text-muted">This person could not be found.</div>');
             return;
         }
 
-        // A leaf (e.g. a DM) has no one below them — showing their manager's
-        // full team instead is more useful: who's the SM, who's their ASM,
-        // and every DM under that same ASM. Keep the original id so we can
-        // highlight the exact person that was clicked among their siblings.
+        // Always show the clicked person's own trunk/reports — no flipping to
+        // the manager's cluster, so clicking a BDM shows only that BDM, not
+        // their siblings too. "Who is their Chief BDM" is covered by the
+        // chain breadcrumb below instead.
         var displayId = frame.id;
         var highlightId = frame.id;
-        var kids = msChildrenMap[displayId] || [];
-        if (!kids.length && node.manager_id && msAllStaff[node.manager_id]) {
-            displayId = node.manager_id;
-            node = msAllStaff[displayId];
-            kids = msChildrenMap[displayId] || [];
-        }
+        var kids = bdmChildrenMap[displayId] || [];
 
-        $('#msNodeModalTitle').text(node.level_name + ': ' + node.name);
+        $('#bdmNodeModalTitle').text(node.level_name + ': ' + node.name);
 
-        var chain = getChain(displayId);
+        var chain = getChain(frame.id);
         if (chain.length) {
             var $chainRow = $('<div class="chain-row"></div>');
             $.each(chain, function (i, a) {
@@ -589,23 +539,15 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
             $body.append($chainRow);
         }
 
-        // Target/achieved is always for the person actually clicked (frame.id),
-        // not the possibly-flipped display node, so it reflects whoever's name
-        // is on the org node the user clicked, not their manager.
-        var clickedNode = msAllStaff[frame.id];
-        if (clickedNode) {
-            var $tgtWrap = $('<div style="margin:0 0 16px;text-align:center;"></div>');
-            $tgtWrap.append($('<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;"></div>').text(clickedNode.name + '’s Team Target'));
-            var $tgtRow = $('<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;"></div>');
-            var pctColor = clickedNode.percent >= 100 ? '#0ca30c' : '#333';
-            $tgtRow.append($('<span class="chain-pill" style="background:#eee;color:#333;"></span>').text('Target: ₹' + Number(clickedNode.target).toLocaleString('en-IN')));
-            $tgtRow.append($('<span class="chain-pill" style="background:#eee;color:#333;"></span>').text('Achieved: ₹' + Number(clickedNode.achieved).toLocaleString('en-IN')));
-            $tgtRow.append($('<span class="chain-pill" style="background:#eee;"></span>').css('color', pctColor).text(clickedNode.percent + '% Achieved'));
-            if (clickedNode.direct_report_count > 0) {
-                $tgtRow.append($('<span class="chain-pill" style="background:#eee;color:#333;"></span>').text(clickedNode.completed_count + ' / ' + clickedNode.direct_report_count + ' Teams Hit Target'));
-            }
-            $tgtWrap.append($tgtRow);
-            $body.append($tgtWrap);
+        var $locWrap = null;
+        if (clickedNode.locations && clickedNode.locations.length) {
+            $locWrap = $('<div style="margin:0 0 16px;text-align:center;"></div>');
+            $locWrap.append($('<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;"></div>').text(clickedNode.name + '’s Assigned Locations'));
+            var $locChips = $('<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>');
+            $.each(clickedNode.locations, function (_, locName) {
+                $locChips.append($('<span class="chain-pill" style="background:#eee;color:#333;"></span>').text(locName));
+            });
+            $locWrap.append($locChips);
         }
 
         var $cluster = $('<div class="sm-cluster"></div>').css('--trunk-color', node.color);
@@ -619,14 +561,13 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
             $cluster.append($('<div class="sm-branch-label"></div>').text(kids.length + ' ' + kids[0].level_name));
             var $branches = $('<div class="sm-branches"></div>');
             $.each(kids, function (_, k) {
-                var subKids = msChildrenMap[k.id] || [];
+                var subKids = bdmChildrenMap[k.id] || [];
                 var $b = $('<div class="branch-circle org-node-clickable"></div>').css('--own-color', k.color);
                 if (k.id === highlightId) { $b.addClass('branch-highlighted'); }
                 $b.append('<div class="branch-stem"></div>');
                 $b.append($('<div class="org-node-circle"></div>').text(k.initials));
                 $b.append($('<div class="branch-level"></div>').text(k.level_name));
                 $b.append($('<div class="branch-name"></div>').text(k.name));
-                if (k.district && /district/i.test(k.level_name)) { $b.append($('<div class="branch-district"></div>').text(k.district)); }
                 if (subKids.length) {
                     $b.append('<div class="sub-indicator-stem"></div>');
                     var $count = $('<div class="branch-count"></div>').text(subKids.length + ' below');
@@ -645,26 +586,27 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
             $cluster.append($('<div class="sm-branch-label" style="margin-top:10px;"></div>').text('No one reports to them yet.'));
         }
         $body.append($cluster);
+        if ($locWrap) { $body.append($locWrap); }
     }
 
-    $('#msModalBack').on('click', function () {
+    $('#bdmModalBack').on('click', function () {
         if (modalStack.length > 1) { modalStack.pop(); renderModalFrame(); }
     });
 
     $(document).on('click', '.level-card', function () {
         var levelId = $(this).data('level-id');
         var levelName = $(this).data('level-name');
-        var items = msLevelStaffMap[levelId] || [];
+        var items = bdmLevelStaffMap[levelId] || [];
         modalStack = [{ type: 'list', title: levelName, items: items }];
         renderModalFrame();
-        $('#msNodeModal').modal('show');
+        $('#bdmNodeModal').modal('show');
     });
 
     $(document).on('click', '.org-node-clickable', function () {
-        var id = $(this).data('ms-id');
+        var id = $(this).data('bdm-id');
         modalStack = [{ type: 'person', id: id }];
         renderModalFrame();
-        $('#msNodeModal').modal('show');
+        $('#bdmNodeModal').modal('show');
     });
 })(jQuery);
 </script>

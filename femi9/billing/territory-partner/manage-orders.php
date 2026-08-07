@@ -18,7 +18,7 @@ $stmt = mysqli_prepare($db_conn,
      LEFT JOIN products p ON p.id=o.pr_id
      LEFT JOIN marketing_staff dm ON dm.id=o.assigned_by_ms_id
      LEFT JOIN (SELECT order_id, MAX(latitude) dm_lat, MAX(longitude) dm_lng FROM ms_orders GROUP BY order_id) mo ON mo.order_id=o.order_id
-     LEFT JOIN user_invoice ui ON ui.inv_id=o.invoiced_inv_id
+     LEFT JOIN user_invoice ui ON ui.inv_id=o.invoiced_inv_id COLLATE utf8mb4_general_ci
      WHERE o.tp_id=? AND o.order_date BETWEEN ? AND ?
      ORDER BY o.order_date DESC, o.id DESC"
 );
@@ -310,9 +310,13 @@ if (!empty($invIds)) {
     }
 
     // Shares a completed shop invoice straight to WhatsApp — no detour through
-    // the print page. This click is a real user gesture, so the whole async
-    // chain below (fetch -> PDF -> alert -> WhatsApp) keeps that gesture's
-    // permission to open a window, same as the print page's own button.
+    // the print page. Loads the print page in a hidden iframe via a real
+    // navigation (iframe.src, not fetch()) so it's indistinguishable from a
+    // normal click to any host-level bot/security filtering, and always
+    // carries the session cookie the same way a normal page load does. This
+    // click is a real user gesture, so the whole async chain below (load ->
+    // PDF -> alert -> WhatsApp) keeps that gesture's permission to open a
+    // window, same as the print page's own button.
     function shareShopInvoiceDirect(btn) {
         var id             = btn.getAttribute('data-id');
         var mobile         = btn.getAttribute('data-mobile');
@@ -322,42 +326,37 @@ if (!empty($invIds)) {
         btn.disabled  = true;
         btn.innerHTML = '&hellip;';
 
-        fetch('shop-invoice-print.php?invoiceid=' + encodeURIComponent(id))
-            .then(function (r) { return r.text(); })
-            .then(function (html) {
-                var parsed   = new DOMParser().parseFromString(html, 'text/html');
-                var printDiv = parsed.getElementById('divToPrint');
-                if (!printDiv) throw new Error('Invoice content not found.');
+        var iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:600px;border:0;';
+        iframe.onload = function () {
+            var idoc     = iframe.contentDocument;
+            var printDiv = idoc && idoc.getElementById('divToPrint');
 
-                var iframe = document.createElement('iframe');
-                iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:600px;border:0;';
-                iframe.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + printDiv.outerHTML + '</body></html>';
-                iframe.onload = function () {
-                    var idoc = iframe.contentDocument;
-
-                    btn.disabled  = false;
-                    btn.innerHTML = originalHtml;
-
-                    shareInvoiceToWhatsApp({
-                        elementId:     'divToPrint',
-                        doc:           idoc,
-                        mobile:        mobile,
-                        invoiceNumber: invoiceNumber,
-                        fileName:      'Invoice_' + invoiceNumber,
-                        businessName:  <?php echo json_encode($business_name ?? ''); ?>,
-                        button:        btn
-                    });
-
-                    setTimeout(function () { iframe.remove(); }, 15000);
-                };
-                document.body.appendChild(iframe);
-            })
-            .catch(function (err) {
-                console.error(err);
+            if (!printDiv) {
                 btn.disabled  = false;
                 btn.innerHTML = originalHtml;
+                iframe.remove();
                 alert('Could not prepare the invoice. Please try again.');
+                return;
+            }
+
+            btn.disabled  = false;
+            btn.innerHTML = originalHtml;
+
+            shareInvoiceToWhatsApp({
+                elementId:     'divToPrint',
+                doc:           idoc,
+                mobile:        mobile,
+                invoiceNumber: invoiceNumber,
+                fileName:      'Invoice_' + invoiceNumber,
+                businessName:  <?php echo json_encode($business_name ?? ''); ?>,
+                button:        btn
             });
+
+            setTimeout(function () { iframe.remove(); }, 15000);
+        };
+        iframe.src = 'shop-invoice-print.php?invoiceid=' + encodeURIComponent(id);
+        document.body.appendChild(iframe);
     }
     </script>
 </body>

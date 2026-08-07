@@ -113,6 +113,20 @@ function getUserConfig($userType) {
             'password_field' => 'password',
         ],
 
+        'salesbdm' => [
+            'table'               => 'sales_bdm_staff',
+            'display_name'        => 'Sales BDM',
+            'folder'              => 'salesbdm',
+            'id_field'            => 'id',
+            'username_field'      => 'bdm_mobile',
+            'mobile_field'        => 'bdm_mobile',
+            'password_field'      => 'password',
+            'status_field'        => 'account_status',
+            'status_active_value' => 'active',
+            'name_field'          => 'bdm_name',
+            'email_field'         => 'bdm_email',
+        ],
+
         'territory_partner' => [
             'table'               => 'territory_partners',
             'display_name'        => 'Territory Partner',

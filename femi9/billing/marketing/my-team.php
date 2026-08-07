@@ -3,6 +3,7 @@ include("checksession.php");
 include("config.php");
 require_once("include/TeamLevelColors.php");
 require_once("include/TeamSubtree.php");
+require_once("include/TeamTargetRollup.php");
 error_reporting(0);
 
 $rootId = (int)$markeingSTFID;
@@ -77,7 +78,7 @@ foreach ($staffRows as $row) {
 
 // ── Raw per-person shop/order counts across the whole team, in one pass ────
 $rawStats = [];
-foreach ($subtreeIds as $id) { $rawStats[$id] = ['shops' => 0, 'got' => 0, 'no' => 0]; }
+foreach ($subtreeIds as $id) { $rawStats[$id] = ['shops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0]; }
 $shopDateWhere = $hasDateFilter ? " AND DATE(created_at) BETWEEN '$fromDate' AND '$toDate'" : '';
 $orderDateWhere = $hasDateFilter ? " AND order_date BETWEEN '$fromDate' AND '$toDate'" : '';
 $_rs = $db_conn->query("SELECT ms_id, COUNT(*) AS cnt FROM ms_shop WHERE ms_id IN ($idList)$shopDateWhere GROUP BY ms_id");
@@ -87,16 +88,30 @@ if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['got'
 $_rs = $db_conn->query("SELECT ms_id, COUNT(*) AS cnt FROM ms_orders WHERE ms_id IN ($idList) AND new_order='no'$orderDateWhere GROUP BY ms_id");
 if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['no'] = (int)$r['cnt']; } }
 
+// Target/achieved specifically default to the CURRENT CALENDAR MONTH when no
+// filter is picked (monthly_target_amount is inherently a monthly figure) —
+// the shop/order counts above keep their existing lifetime-if-unfiltered
+// behavior untouched. When a filter IS picked, both use the same range.
+$targetFromDate = $hasDateFilter ? $fromDate : date('Y-m-01');
+$targetToDate   = $hasDateFilter ? $toDate   : date('Y-m-t');
+$targetStats = getRawTargetAchievedStats($db_conn, $subtreeIds, $targetFromDate, $targetToDate);
+foreach ($subtreeIds as $id) {
+    $rawStats[$id]['target']   = $targetStats[$id]['target']   ?? 0.0;
+    $rawStats[$id]['achieved'] = $targetStats[$id]['achieved'] ?? 0.0;
+}
+
 // Sum a person's own stats + everyone below them, and collect the id list
 // that "View Shop List" should link to.
 function subtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
-    $sum = $rawStats[$id] ?? ['shops' => 0, 'got' => 0, 'no' => 0];
+    $sum = $rawStats[$id] ?? ['shops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0];
     $ids = [$id];
     foreach (($byManager[$id] ?? []) as $child) {
         [$childSum, $childIds] = subtreeSumAndIds((int)$child['id'], $byManager, $rawStats);
-        $sum['shops'] += $childSum['shops'];
-        $sum['got']   += $childSum['got'];
-        $sum['no']    += $childSum['no'];
+        $sum['shops']    += $childSum['shops'];
+        $sum['got']      += $childSum['got'];
+        $sum['no']       += $childSum['no'];
+        $sum['target']   += $childSum['target'];
+        $sum['achieved'] += $childSum['achieved'];
         $ids = array_merge($ids, $childIds);
     }
     return [$sum, $ids];
@@ -104,6 +119,22 @@ function subtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
 
 [$kpiSum, $kpiIds] = subtreeSumAndIds($rootId, $byManager, $rawStats);
 $teamCount = count($kpiIds) - 1; // exclude yourself
+$kpiTarget   = $kpiSum['target'];
+$kpiAchieved = $kpiSum['achieved'];
+$kpiPercent  = $kpiTarget > 0 ? min(100, ($kpiAchieved / $kpiTarget) * 100) : 0;
+
+// Team completion — how many of root's DIRECT reports have themselves hit
+// 100% of THEIR OWN team's target (works the same whether root is an SM
+// counting ASM-team completions, or an ASM counting DM completions).
+$directReports = $byManager[$rootId] ?? [];
+$completedCount = 0;
+foreach ($directReports as $dr) {
+    [$drSum] = subtreeSumAndIds((int)$dr['id'], $byManager, $rawStats);
+    if ($drSum['target'] > 0 && ($drSum['achieved'] / $drSum['target']) * 100 >= 100) {
+        $completedCount++;
+    }
+}
+$directReportCount = count($directReports);
 $kpiShops = $kpiSum['shops'];
 $kpiGot   = $kpiSum['got'];
 $kpiNo    = $kpiSum['no'];
@@ -265,6 +296,46 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
                                     <div class="kpi-v"><?php echo (int)$kpiNo; ?></div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="row mb-2">
+                            <div class="col">
+                                <p class="text-muted" style="font-size:12px;margin-bottom:6px;">
+                                    Team Target &amp; Achievement &mdash; <?php echo $hasDateFilter ? (date('d M Y', strtotime($fromDate)) . ' to ' . date('d M Y', strtotime($toDate))) : ('This Month (' . date('d M Y', strtotime($targetFromDate)) . ' to ' . date('d M Y', strtotime($targetToDate)) . ')'); ?>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="kpi-card">
+                                    <i class="material-icons-outlined kpi-ico">flag</i>
+                                    <div class="kpi-t">Team Target</div>
+                                    <div class="kpi-v">&#8377;<?php echo inr_format($kpiTarget, 0); ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="kpi-card">
+                                    <i class="material-icons-outlined kpi-ico">trending_up</i>
+                                    <div class="kpi-t">Achieved</div>
+                                    <div class="kpi-v">&#8377;<?php echo inr_format($kpiAchieved, 0); ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="kpi-card">
+                                    <i class="material-icons-outlined kpi-ico">percent</i>
+                                    <div class="kpi-t">% Achieved</div>
+                                    <div class="kpi-v" style="<?php echo $kpiPercent >= 100 ? 'color:#0ca30c;' : ''; ?>"><?php echo round($kpiPercent, 1); ?>%</div>
+                                </div>
+                            </div>
+                            <?php if ($directReportCount > 0): ?>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="kpi-card">
+                                    <i class="material-icons-outlined kpi-ico">military_tech</i>
+                                    <div class="kpi-t">Teams Hit Target</div>
+                                    <div class="kpi-v"><?php echo (int)$completedCount; ?> / <?php echo (int)$directReportCount; ?></div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
 

@@ -21,3 +21,19 @@ function getTeamLevelColorMap($db_conn): array {
     }
     return $map;
 }
+
+// Same idea, same palette, for Sales BDM Team Levels — kept as a separate
+// function (not shared state) since it's a completely independent hierarchy.
+function getSalesBdmTeamLevelColorMap($db_conn): array {
+    $palette = getTeamLevelColorPalette();
+    $map = [];
+    $res = $db_conn->query("SELECT id FROM salesbdm_team_levels ORDER BY level_rank ASC");
+    if ($res) {
+        $i = 0;
+        while ($row = $res->fetch_assoc()) {
+            $map[(int)$row['id']] = $palette[$i % count($palette)];
+            $i++;
+        }
+    }
+    return $map;
+}

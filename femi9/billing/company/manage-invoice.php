@@ -210,42 +210,37 @@ $i= $start_from;
         btn.disabled  = true;
         btn.innerHTML = '&hellip;';
 
-        fetch('invoice-print?invoiceid=' + encodeURIComponent(invId))
-            .then(function (r) { return r.text(); })
-            .then(function (html) {
-                var parsed   = new DOMParser().parseFromString(html, 'text/html');
-                var printDiv = parsed.getElementById('divToPrint');
-                if (!printDiv) throw new Error('Invoice content not found.');
+        var iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:600px;border:0;';
+        iframe.onload = function () {
+            var idoc     = iframe.contentDocument;
+            var printDiv = idoc && idoc.getElementById('divToPrint');
 
-                var iframe = document.createElement('iframe');
-                iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:600px;border:0;';
-                iframe.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + printDiv.outerHTML + '</body></html>';
-                iframe.onload = function () {
-                    var idoc = iframe.contentDocument;
-
-                    btn.disabled  = false;
-                    btn.innerHTML = originalHtml;
-
-                    shareInvoiceToWhatsApp({
-                        elementId:     'divToPrint',
-                        doc:           idoc,
-                        mobile:        mobile,
-                        invoiceNumber: invoiceNumber,
-                        fileName:      'Invoice_' + invoiceNumber,
-                        businessName:  <?php echo json_encode($business_name ?? ''); ?>,
-                        button:        btn
-                    });
-
-                    setTimeout(function () { iframe.remove(); }, 15000);
-                };
-                document.body.appendChild(iframe);
-            })
-            .catch(function (err) {
-                console.error(err);
+            if (!printDiv) {
                 btn.disabled  = false;
                 btn.innerHTML = originalHtml;
+                iframe.remove();
                 alert('Could not prepare the invoice. Please try again.');
+                return;
+            }
+
+            btn.disabled  = false;
+            btn.innerHTML = originalHtml;
+
+            shareInvoiceToWhatsApp({
+                elementId:     'divToPrint',
+                doc:           idoc,
+                mobile:        mobile,
+                invoiceNumber: invoiceNumber,
+                fileName:      'Invoice_' + invoiceNumber,
+                businessName:  <?php echo json_encode($business_name ?? ''); ?>,
+                button:        btn
             });
+
+            setTimeout(function () { iframe.remove(); }, 15000);
+        };
+        iframe.src = 'invoice-print?invoiceid=' + encodeURIComponent(invId);
+        document.body.appendChild(iframe);
     }
     </script>
 </body>
