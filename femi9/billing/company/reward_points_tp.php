@@ -132,6 +132,34 @@ try {
         $team_data[$row['referrer_id']] = (float)$row['team_points'];
     }
 
+    // ── Advance Bonus Points (Monthly Target Achievement Bonus) ───────────────
+    // Awarded separately by tp-bonus-points-calculator.php into the shared
+    // reward_points table (transaction_type='bonus_target_achievement') when a
+    // TP hits all 4 weekly advance-payment thresholds for a month. That table
+    // keys user_id on territory_partners.tp_id (the string TP ID), not the
+    // internal id every other query here groups by — so this is joined back to
+    // territory_partners to translate it into the same id space as
+    // $purchase_data/$daily_data/etc. A rollback in the calculator deletes the
+    // row outright, so no separate "reversed" flag needs to be excluded here;
+    // is_expired/deleted_at are excluded so an expired or since-removed bonus
+    // doesn't keep counting.
+    $stmt = $pdo->prepare("
+        SELECT tp.id AS user_id, COALESCE(SUM(rp.points), 0) AS advance_bonus_points
+        FROM reward_points rp
+        INNER JOIN territory_partners tp ON tp.tp_id = rp.user_id
+        WHERE rp.user_type = 'territory_partner'
+          AND rp.transaction_type = 'bonus_target_achievement'
+          AND rp.is_expired = 0
+          AND rp.deleted_at IS NULL
+          AND rp.transaction_date BETWEEN :from_date AND :to_date_end
+        GROUP BY tp.id
+    ");
+    $stmt->execute([':from_date' => $current_from_date, ':to_date_end' => $current_to_date . ' 23:59:59']);
+    $advance_bonus_data = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $advance_bonus_data[$row['user_id']] = (float)$row['advance_bonus_points'];
+    }
+
     // ── Collect all TP IDs that have any data ─────────────────────────────────
     // array_values() is required here: array_unique() preserves the original
     // (gapped) keys after removing duplicates, but $stmt->execute() below binds
@@ -143,7 +171,8 @@ try {
         array_keys($purchase_data),
         array_keys($daily_data),
         array_keys($return_data),
-        array_keys($team_data)
+        array_keys($team_data),
+        array_keys($advance_bonus_data)
     )));
 
     if (!empty($all_ids)) {
@@ -165,13 +194,15 @@ try {
             $daily_pts    = $daily_data[$uid]    ?? 0;
             $return_pts   = $return_data[$uid]   ?? 0;
             $team_pts     = $team_data[$uid]     ?? 0;
-            $total        = max(0, $purchase_pts + $daily_pts + $team_pts - $return_pts);
+            $advance_pts  = $advance_bonus_data[$uid] ?? 0;
+            $total        = max(0, $purchase_pts + $daily_pts + $team_pts + $advance_pts - $return_pts);
 
             $combined_users[] = [
                 'user_id'         => $uid,
                 'purchase_points' => $purchase_pts,
                 'daily_points'    => $daily_pts,
                 'team_points'     => $team_pts,
+                'advance_points'  => $advance_pts,
                 'return_points'   => $return_pts,
                 'total_points'    => $total,
                 'details'         => $tp_details[$uid] ?? null,
@@ -209,6 +240,7 @@ try {
         .badge-purchase { background:#10b981; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         .badge-daily { background:#3b82f6; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         .badge-team { background:#8b5cf6; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
+        .badge-advance { background:#f59e0b; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         .badge-return { background:#ef4444; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         table.dataTable thead th { background:#f8f9fa; font-weight:600; }
     </style>
@@ -286,6 +318,7 @@ try {
                                             <th>Purchase Pts</th>
                                             <th>Login Pts</th>
                                             <th>Team Pts</th>
+                                            <th>Advance Bonus Pts</th>
                                             <th>Returns (–)</th>
                                             <th>Total Points</th>
                                         </tr>
@@ -301,6 +334,7 @@ try {
                                             <td><span class="badge-purchase"><?php echo inr_format($u['purchase_points'], 2); ?></span></td>
                                             <td><span class="badge-daily"><?php echo inr_format($u['daily_points'], 2); ?></span></td>
                                             <td><?php if ($u['team_points'] > 0): ?><span class="badge-team"><?php echo inr_format($u['team_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
+                                            <td><?php if ($u['advance_points'] > 0): ?><span class="badge-advance"><?php echo inr_format($u['advance_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><?php if ($u['return_points'] > 0): ?><span class="badge-return"><?php echo inr_format($u['return_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><span class="badge-total"><?php echo inr_format($u['total_points'], 2); ?></span></td>
                                         </tr>
@@ -330,7 +364,7 @@ try {
 <script>
 $(function(){
     $('#rpTable').DataTable({
-        order: [[8, 'desc']],
+        order: [[9, 'desc']],
         pageLength: 25,
         language: { emptyTable: 'No data found' }
     });

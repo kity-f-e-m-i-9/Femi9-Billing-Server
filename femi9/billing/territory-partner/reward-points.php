@@ -98,24 +98,44 @@ $returnResult = executeQueryRow_tp($db_conn, $returnQuery, [(int)$userId, $curre
 $returnPoints = (float)($returnResult['return_points'] ?? 0);
 $returnCount  = (int)($returnResult['return_count'] ?? 0);
 
-// 4. No advance bonus for TPs
+// 4. Advance Bonus Points (Monthly Target Achievement Bonus) — awarded
+// separately by tp-bonus-points-calculator.php into the shared reward_points
+// table (transaction_type='bonus_target_achievement') when this TP hits all 4
+// weekly advance-payment thresholds for a month. That table keys user_id on
+// territory_partners.tp_id (the string TP ID), not the internal id
+// ($Login_user_IDvl) every other query on this page uses — so tp_id is
+// looked up first and used for this query alone. is_expired/deleted_at are
+// excluded so an expired or since-rolled-back bonus doesn't keep counting.
+$tpIdResult = executeQueryRow_tp($db_conn, "SELECT tp_id FROM territory_partners WHERE id = ?", [(int)$userId], 'i');
+$tpIdString = $tpIdResult['tp_id'] ?? null;
+
 $totalAdvanceBonusPoints = 0.0;
-$isAdvanceEligibleType   = false;
+if ($tpIdString !== null) {
+    $advanceBonusQuery = "
+        SELECT COALESCE(SUM(points), 0) AS advance_bonus_points
+        FROM reward_points
+        WHERE user_id = ? AND user_type = 'territory_partner'
+          AND transaction_type = 'bonus_target_achievement'
+          AND is_expired = 0 AND deleted_at IS NULL
+          AND transaction_date BETWEEN ? AND ?
+    ";
+    $advanceBonusResult = executeQueryRow_tp($db_conn, $advanceBonusQuery, [$tpIdString, $currentFromDate . ' 00:00:00', $currentToDate . ' 23:59:59'], 'sss');
+    $totalAdvanceBonusPoints = (float)($advanceBonusResult['advance_bonus_points'] ?? 0);
+}
 
 // 5. Grand Total
-$totalPoints = max(0, $purchasePoints + $dailyPoints - $returnPoints);
+$totalPoints = max(0, $purchasePoints + $dailyPoints + $totalAdvanceBonusPoints - $returnPoints);
 
 $fmt = static fn(float $v): string => inr_format($v, 2);
 $formattedTotal    = $fmt($totalPoints);
 $formattedPurchase = $fmt($purchasePoints);
 $formattedDaily    = $fmt($dailyPoints);
+$formattedAdvance  = $fmt($totalAdvanceBonusPoints);
 $formattedReturn   = $fmt($returnPoints);
 
 $displayFrom      = date('d M', strtotime($currentFromDate));
 $displayTo        = date('d M Y', strtotime($currentToDate));
 $safeBusinessName = htmlspecialchars($business_name, ENT_QUOTES, 'UTF-8');
-
-$advBalance = 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -231,6 +251,15 @@ $advBalance = 0;
                                     </div>
                                     <div class="breakdown-value">+<?php echo $formattedDaily; ?></div>
                                 </div>
+                                <?php if ($totalAdvanceBonusPoints > 0): ?>
+                                <div class="breakdown-item">
+                                    <div class="breakdown-label">
+                                        <div class="breakdown-icon" style="background:#fef3c7; color:#d97706;"><i class="material-icons">military_tech</i></div>
+                                        <span>Advance Bonus (Target Achievement)</span>
+                                    </div>
+                                    <div class="breakdown-value">+<?php echo $formattedAdvance; ?></div>
+                                </div>
+                                <?php endif; ?>
                                 <?php if ($returnPoints > 0): ?>
                                 <div class="breakdown-item">
                                     <div class="breakdown-label">
