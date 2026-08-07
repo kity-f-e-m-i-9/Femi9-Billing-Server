@@ -346,59 +346,72 @@ $revenue_growth = $prev_rev > 0
 // ═══════════════════════════════════════════════════════════════════════════
 // 1b. GROSS PROFIT & NET PROFIT
 //
-// Gross Profit = Σ (MRP − reference tier price for the buyer's counterparty
-// type) × qty, across every sold line item in the current scope. TP-channel
-// sales use stockist_price as the reference (TP is priced like a Stockiest);
-// shop sales use outlet_price. Unmapped counterparty types (company/customer)
-// contribute NULL and are ignored by SUM().
+// Gross Profit = Σ (Sold Price − sale-to-LLP rate effective on that sale's
+// date) × qty, across every sold line item in the current scope. The
+// sale-to-LLP rate is the price at which Femi9 LLP/Neksomo "sells" the
+// product into the company's own stock — i.e. the company's real cost basis
+// — sourced from whichever rate table covers the product:
+//   - neksomo_llp_piece_rates (via neksomo_product_mapping) for products
+//     mapped into the Neksomo piece-rate system, same table the Neksomo
+//     view's own Napkin/Diaper Gross Profit cards use;
+//   - femi9_llp_sale_rates for every other product, entered from the normal
+//     company login's own "Sale to Femi9 LLP" page (llp-sale-rate.php) —
+//     built specifically because most company products have no Neksomo
+//     mapping at all.
+// A line item with no rate in either table on its sale date is excluded
+// from Gross Profit entirely (no cost to subtract, so it can't be priced) —
+// same "unrated == excluded" convention the piece-rate section already uses.
+// GST is backed out of an inclusive-type rate so Gross Profit stays on a
+// pre-tax basis, same convention as the piece-rate section.
 //
 // Net Profit = Gross Profit − Expense Tracker's net expense total for the
 // same period, and is only meaningful for the "Income to Company" scope
 // (expenses are a company-wide cost, not attributable to a single TP).
 // ═══════════════════════════════════════════════════════════════════════════
-$gp_case = "CASE d.ctype
-        WHEN 'super_stockiest'   THEN p.supersstock_price
-        WHEN 'stockiest'         THEN p.stockist_price
-        WHEN 'super_distributor' THEN p.super_distributor_price
-        WHEN 'distributor'       THEN p.distributor_price
-        WHEN 'territory_partner' THEN p.stockist_price
-        WHEN 'shop'              THEN p.outlet_price
-        ELSE NULL
-    END";
-// OT channel sales are retail/direct-to-consumer, same pricing tier as shop
-// sales, so they reuse the 'shop' -> outlet_price mapping. Company scope only.
+$gp_rate_subq = "COALESCE(
+        (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+         FROM neksomo_llp_piece_rates r
+         WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+           AND r.effective_date <= d.sale_date
+         ORDER BY r.effective_date DESC LIMIT 1),
+        (SELECT CASE WHEN fr.gst_type = 'inclusive' THEN fr.rate_per_piece / (1 + fr.gst_rate/100) ELSE fr.rate_per_piece END
+         FROM femi9_llp_sale_rates fr
+         WHERE fr.product_id = d.pr_id
+           AND fr.effective_date <= d.sale_date
+         ORDER BY fr.effective_date DESC LIMIT 1)
+    )";
+// OT channel sales are retail/direct-to-consumer. Company scope only.
 $gp_ot_union = '';
 $gp_params = [$utype, $from, $to, $utype, $from, $to];
 if ($scope === 'company') {
-    $gp_ot_union = "UNION ALL SELECT os.prid, os.qty, 'shop' AS ctype
+    $gp_ot_union = "UNION ALL SELECT os.prid, os.qty, os.total, os.date
          FROM ot_sales os WHERE os.date BETWEEN ? AND ?";
     $gp_params[] = $from;
     $gp_params[] = $to;
 }
-// tp_invoices: a tp_invoice is always billed TO a TP, so ctype is always
-// 'territory_partner' (stockist_price tier, same as the CASE above already
-// does for user_invoice/invoice TP rows). See memory "neksomo-sold-by-company-calc".
+// See memory "neksomo-sold-by-company-calc".
 $gp_tp_union = '';
 if ($tpinv_source_sql) {
-    $gp_tp_union = "UNION ALL SELECT tpii.product_id, tpii.quantity, 'territory_partner' AS ctype
+    $gp_tp_union = "UNION ALL SELECT tpii.product_id, tpii.quantity, tpii.amount, tpi.invoice_date
          FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
          WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}";
     $gp_params[] = $from;
     $gp_params[] = $to;
 }
 $gross_profit = (float)cval($db_conn,
-    "SELECT COALESCE(SUM((p.mrp - {$gp_case}) * d.qty), 0)
+    "SELECT COALESCE(SUM(d.line_total - {$gp_rate_subq} * d.qty), 0)
      FROM (
-         SELECT ii.pr_id, ii.qty, i.user_type AS ctype
+         SELECT ii.pr_id, ii.qty, ii.total AS line_total, i.date AS sale_date
          FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
          WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
          UNION ALL
-         SELECT uii.pr_id, uii.qty, ui.to_user_type AS ctype
+         SELECT uii.pr_id, uii.qty, uii.total AS line_total, ui.date AS sale_date
          FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
          WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii}
          {$gp_ot_union}
          {$gp_tp_union}
-     ) d JOIN products p ON p.id = d.pr_id",
+     ) d
+     WHERE {$gp_rate_subq} IS NOT NULL",
     str_repeat('s', count($gp_params)), $gp_params);
 
 $total_expenses = 0.0;

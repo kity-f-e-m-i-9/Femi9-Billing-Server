@@ -807,6 +807,13 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 
 					<?php if($resultusertypeGET['report']==1){?>
 					<li>
+                        <a href="#"><i class="material-icons-two-tone">sell</i>Sale to Femi9 LLP<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="llp-sale-rate.php">Add Entry</a></li>
+						<li><a href="llp-sale-rate-manage.php">Manage Entries</a></li>
+                        </ul>
+                    </li>
+					<li>
                         <a href="#"><i class="material-icons-two-tone">wallet</i>Reports<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="mis-report"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;">assessment</i>MIS Report</a></li>
