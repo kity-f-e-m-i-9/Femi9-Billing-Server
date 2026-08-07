@@ -122,7 +122,7 @@ try {
                                 </div>
                                 <div class="col-auto">
                                     <label class="form-label mb-1">Monthly Target</label>
-                                    <select name="target_range" class="form-control form-control-sm">
+                                    <select name="target_range" class="form-control form-control-sm" style="min-width:190px;">
                                         <?php foreach ($target_ranges as $key => $label): ?>
                                         <option value="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $key === $current_target_range ? 'selected' : ''; ?>><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></option>
                                         <?php endforeach; ?>

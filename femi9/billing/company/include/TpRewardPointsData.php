@@ -12,17 +12,18 @@
 // under admins as new TPs/targets are added.
 function getTpTargetAmountRanges(): array {
     return [
-        ''             => 'All',
-        '10000-30000'  => '≥ ₹10,000 and < ₹30,000',
-        '30000-60000'  => '≥ ₹30,000 and < ₹60,000',
-        '60000-100000' => '≥ ₹60,000 and < ₹1,00,000',
-        '100000-200000' => '≥ ₹1,00,000 and < ₹2,00,000',
-        '200000-300000' => '≥ ₹2,00,000 and < ₹3,00,000',
+        ''              => 'All',
+        '10000-30000'   => '₹10,000 – ₹30,000',
+        '30001-60000'   => '₹30,001 – ₹60,000',
+        '60001-100000'  => '₹60,001 – ₹1,00,000',
+        '100001-200000' => '₹1,00,001 – ₹2,00,000',
+        '200001-300000' => '₹2,00,001 – ₹3,00,000',
     ];
 }
 
 // Parses one of the keys from getTpTargetAmountRanges() into [min, max]
-// (max === null means "no upper bound"). Returns null for an unknown/empty key.
+// (max === null means "no upper bound"). Both bounds are inclusive.
+// Returns null for an unknown/empty key.
 function parseTpTargetAmountRange(string $key): ?array {
     if ($key === '' || !array_key_exists($key, getTpTargetAmountRanges())) return null;
     [$minStr, $maxStr] = array_pad(explode('-', $key, 2), 2, '');
@@ -269,7 +270,7 @@ function getTpRewardPointsData(string $current_from_date, string $current_to_dat
     if ($range !== null) {
         [$min, $max] = $range;
         $combined_users = array_values(array_filter($combined_users, function ($u) use ($min, $max) {
-            return $u['target_amount'] >= $min && ($max === null || $u['target_amount'] < $max);
+            return $u['target_amount'] >= $min && ($max === null || $u['target_amount'] <= $max);
         }));
     }
 
