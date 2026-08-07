@@ -674,7 +674,7 @@ $grand_combined_gross_profit = 0.0;
 $grand_combined_expense = 0.0;
 $grand_combined_net_profit = 0.0;
 $grand_combined_net_gst = 0.0;
-if ($scope === 'company') {
+if ($is_neksomo_view) {
     // Self-migrating: this block is the only thing standing between a
     // neksomo login and dashboard.php's `include("mis-report.php")` — with
     // error_reporting(0) above, any of these tables/columns missing turns
@@ -2553,94 +2553,6 @@ if ($is_neksomo_view) {
                             </div>
                         </div>
                     </div>
-
-                    <?php if ($scope === 'company'): ?>
-                    <!-- ══ PIECES SOLD (BY ENTITY) ═══════════════════════════ -->
-                    <div class="row mis-section" id="sec-pieces">
-                        <div class="col-12">
-                            <div class="card">
-                                <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-                                    <h5 class="card-title">Pieces Sold — <?php echo htmlspecialchars($selected_entity_name); ?></h5>
-                                    <?php if (count($all_entities) > 1): ?>
-                                    <form method="get" style="display:flex;gap:8px;align-items:center;">
-                                        <input type="hidden" name="scope" value="company">
-                                        <input type="hidden" name="preset" value="<?php echo htmlspecialchars($preset); ?>">
-                                        <input type="hidden" name="from" value="<?php echo htmlspecialchars($from); ?>">
-                                        <input type="hidden" name="to" value="<?php echo htmlspecialchars($to); ?>">
-                                        <select name="entity_id" class="form-control form-control-sm" onchange="this.form.submit()">
-                                            <option value="0" <?php echo $filter_entity === 0 ? 'selected' : ''; ?>>All Visible Entities</option>
-                                            <?php foreach ($all_entities as $ent): ?>
-                                            <option value="<?php echo (int)$ent['id']; ?>" <?php echo $filter_entity === (int)$ent['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($ent['gname']); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </form>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="card-body" style="overflow-x:auto">
-                                    <div class="row mb-3">
-                                        <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Total Pack Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_pack_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_pieces, 0); ?> pieces sold</div></div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Return Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_return_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_return_pieces, 0); ?> pieces returned</div></div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Consolidated Qty</div><div class="kpi-v"><?php echo inr_format($grand_total_net_qty, 0); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;"><?php echo inr_format($grand_total_net_pieces, 0); ?> pieces net</div></div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Period</div><div class="kpi-v" style="font-size:15px;"><?php echo date('d M Y', strtotime($from)); ?> – <?php echo date('d M Y', strtotime($to)); ?></div></div>
-                                        </div>
-                                    </div>
-                                    <div class="row mb-3">
-                                        <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Sold Price</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_value, 2); ?></div><div style="font-size:15px;color:#52514e;margin-top:4px;">Return: &#8377;<?php echo inr_format($grand_total_return_value, 2); ?></div></div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_gross_profit, 2); ?></div></div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_total_expense, 2); ?></div></div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_net_profit < 0 ? 'color:#dc2626;' : ''; ?>">&#8377;<?php echo inr_format($grand_net_profit, 2); ?></div></div>
-                                        </div>
-                                    </div>
-                                    <p class="snote">(Sold Price − Return Value) − (Purchase Value − Return Purchase Value) = Gross Profit. Gross Profit − Expense (this entity, this period) = Net Profit.</p>
-                                    <?php if ($grand_total_unrated_pieces > 0): ?>
-                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_total_unrated_pieces, 0); ?> pieces sold before any Femi9 LLP rate was set for their product — excluded from Sold Price.</div>
-                                    <?php endif; ?>
-                                    <?php if ($grand_total_unpriced_pieces > 0): ?>
-                                    <div class="alert alert-warning" style="font-size:13px;"><?php echo inr_format($grand_total_unpriced_pieces, 0); ?> pieces sold before any purchase rate was set for their product — treated as ₹0 cost, so Gross Profit may be overstated.</div>
-                                    <?php endif; ?>
-                                    <?php if (empty($pieces_sold)): ?>
-                                        <p class="text-muted text-center py-3">No data.</p>
-                                    <?php else: ?>
-                                    <table class="mt">
-                                        <thead><tr><th>Product</th><th>Pack Qty Sold</th><th>Pieces/Pack</th><th>Total Pieces Sold</th><th>Value &#8377;</th></tr></thead>
-                                        <tbody>
-                                        <?php foreach ($pieces_sold as $row): ?>
-                                            <tr>
-                                                <td><b><?php echo htmlspecialchars($row['productName']); ?></b></td>
-                                                <td><span class="bq"><?php echo inr_format((int)$row['total_qty'], 0); ?></span></td>
-                                                <td><?php echo $row['pieces_per_pack'] !== null ? (int)$row['pieces_per_pack'] : '1 *'; ?></td>
-                                                <td><b><?php echo inr_format((int)$row['total_pieces'], 0); ?></b></td>
-                                                <td>
-                                                    &#8377;<?php echo inr_format((float)$row['total_value'], 2); ?>
-                                                    <?php if ((float)$row['unrated_pieces'] > 0): ?>
-                                                    <div style="font-size:11px;color:#dc2626;"><?php echo inr_format((int)$row['unrated_pieces'], 0); ?> pcs unrated</div>
-                                                    <?php endif; ?>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                    <p class="snote" style="margin-top:8px;">* Pack size not set for this product — pieces shown equal pack quantity. Value uses whichever Femi9 LLP rate was effective on each sale's actual date.</p>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
 
                     <!-- ══ STATE / DISTRICT ══════════════════════════════════ -->
                     <div class="row mis-section" id="sec-geo">
