@@ -30,6 +30,8 @@ register_shutdown_function(function () {
     }
 });
 
+date_default_timezone_set("Asia/Kolkata");
+
 $tp_id = (int)$Login_user_IDvl;
 
 // Submission details are collected once on the form and carried on every
