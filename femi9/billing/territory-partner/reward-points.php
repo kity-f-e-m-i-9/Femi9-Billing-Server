@@ -74,6 +74,20 @@ $purchaseResult = executeQueryRow_tp($db_conn, $purchaseQuery, [(int)$userId, $c
 $purchasePoints = (float)($purchaseResult['purchase_points'] ?? 0);
 $invoiceCount   = (int)($purchaseResult['invoice_count'] ?? 0);
 
+// 1b. Sales Points — what this TP sold onward to a shop/customer
+// (user_invoice, from_user_type='territory_partner'), separate from Purchase
+// Points above (which is what the TP bought FROM the company). Same
+// total/100 convention as Purchase Points. Shown as its own figure and
+// deliberately NOT included in Total Points, same as the company view.
+$salesQuery = "
+    SELECT COALESCE(SUM(total) / 100, 0) AS sales_points, COUNT(*) AS sales_invoice_count
+    FROM user_invoice
+    WHERE from_user_type = ? AND from_user_id = ? AND sub_total > 0 AND date BETWEEN ? AND ?
+";
+$salesResult = executeQueryRow_tp($db_conn, $salesQuery, [$userType, $userId, $currentFromDate, $currentToDate], 'ssss');
+$salesPoints = (float)($salesResult['sales_points'] ?? 0);
+$salesInvoiceCount = (int)($salesResult['sales_invoice_count'] ?? 0);
+
 // 2. Daily Login Points
 $dailyQuery = "
     SELECT COALESCE(SUM(points_awarded), 0) AS daily_points, COUNT(*) AS days_rewarded, MAX(reward_date) AS last_reward_date
@@ -132,6 +146,7 @@ $formattedPurchase = $fmt($purchasePoints);
 $formattedDaily    = $fmt($dailyPoints);
 $formattedAdvance  = $fmt($totalAdvanceBonusPoints);
 $formattedReturn   = $fmt($returnPoints);
+$formattedSales    = $fmt($salesPoints);
 
 $displayFrom      = date('d M', strtotime($currentFromDate));
 $displayTo        = date('d M Y', strtotime($currentToDate));
@@ -234,6 +249,16 @@ $safeBusinessName = htmlspecialchars($business_name, ENT_QUOTES, 'UTF-8');
                         </div>
                     </div>
                     <div class="row">
+                        <div class="col-md-4">
+                            <div class="stats-card" style="border-color:#bae6fd;">
+                                <i class="material-icons stats-icon" style="color:#bae6fd;">storefront</i>
+                                <div class="stats-label">Sales Points</div>
+                                <div class="stats-value" style="color:#0284c7;"><?php echo $formattedSales; ?></div>
+                                <div class="stats-meta"><?php echo $salesInvoiceCount; ?> sale<?php echo $salesInvoiceCount !== 1 ? 's' : ''; ?> — separate from Total Reward Points</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
                         <div class="col-12">
                             <div class="breakdown-card">
                                 <h5 class="section-title"><i class="material-icons">analytics</i>Points Breakdown</h5>
@@ -275,6 +300,13 @@ $safeBusinessName = htmlspecialchars($business_name, ENT_QUOTES, 'UTF-8');
                                         <strong style="font-size:16px;">Total Reward Points</strong>
                                     </div>
                                     <div class="breakdown-value" style="font-size:32px;"><?php echo $formattedTotal; ?></div>
+                                </div>
+                                <div class="breakdown-item" style="border-bottom:none; padding-top:8px;">
+                                    <div class="breakdown-label">
+                                        <div class="breakdown-icon" style="background:#e0f2fe; color:#0284c7;"><i class="material-icons">storefront</i></div>
+                                        <span>Sales Points <small class="text-muted">(shown separately — not included above)</small></span>
+                                    </div>
+                                    <div class="breakdown-value" style="color:#0284c7;"><?php echo $formattedSales; ?></div>
                                 </div>
                             </div>
                         </div>
