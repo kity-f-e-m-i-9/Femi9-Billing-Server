@@ -2,7 +2,16 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms');
 require_once("include/TeamLevelColors.php");
+require_once("include/TeamTargetRollup.php");
 error_reporting(0);
+
+// Target/achieved period — defaults to the current calendar month (matching
+// marketing/my-team.php's own default), optionally overridden via ?from=&to=
+// so company can look at a different month the same way.
+$_tgtFrom = $_GET['from'] ?? '';
+$_tgtTo   = $_GET['to'] ?? '';
+$targetFromDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_tgtFrom) ? $_tgtFrom : date('Y-m-01');
+$targetToDate   = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_tgtTo)   ? $_tgtTo   : date('Y-m-t');
 
 $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -123,6 +132,37 @@ foreach ($staffRows as $row) {
     $entry['manager_id'] = $row['manager_id'] ? (int)$row['manager_id'] : 0;
     $allStaffMap[(int)$row['id']] = $entry;
 }
+
+// ── Team target/achieved roll-up, for the modal's "Team Target" section ────
+$_allMsIds = array_keys($allStaffMap);
+$_rawTargetStats = getRawTargetAchievedStats($db_conn, $_allMsIds, $targetFromDate, $targetToDate);
+
+function msTeamViewSubtreeTargetSum(int $id, array $byManager, array $rawTargetStats): array {
+    $sum = $rawTargetStats[$id] ?? ['target' => 0.0, 'achieved' => 0.0];
+    foreach (($byManager[$id] ?? []) as $child) {
+        $childSum = msTeamViewSubtreeTargetSum((int)$child['id'], $byManager, $rawTargetStats);
+        $sum['target']   += $childSum['target'];
+        $sum['achieved'] += $childSum['achieved'];
+    }
+    return $sum;
+}
+
+foreach ($allStaffMap as $id => &$entry) {
+    $sum = msTeamViewSubtreeTargetSum($id, $byManager, $_rawTargetStats);
+    $entry['target']   = round($sum['target'], 2);
+    $entry['achieved'] = round($sum['achieved'], 2);
+    $entry['percent']  = $sum['target'] > 0 ? round(min(100, ($sum['achieved'] / $sum['target']) * 100), 1) : 0;
+
+    $directReports = $byManager[$id] ?? [];
+    $completed = 0;
+    foreach ($directReports as $dr) {
+        $drSum = msTeamViewSubtreeTargetSum((int)$dr['id'], $byManager, $_rawTargetStats);
+        if ($drSum['target'] > 0 && ($drSum['achieved'] / $drSum['target']) * 100 >= 100) { $completed++; }
+    }
+    $entry['direct_report_count'] = count($directReports);
+    $entry['completed_count']     = $completed;
+}
+unset($entry);
 
 // ── Trunk + branch clusters: one root (SM) per cluster, its direct reports as
 // circles around it, connected by a simple trunk→bar→stem line. Deeper levels
@@ -358,7 +398,18 @@ $smRoots = $byManager[0] ?? [];
 
                     <div class="row mb-2">
                         <div class="col">
-                            <p class="text-muted" style="font-size:13px;">Click a card to see everyone at that level, then click a person to drill into their team.</p>
+                            <p class="text-muted" style="font-size:13px;">Click a card to see everyone at that level, then click a person to drill into their team. Team Target/Achieved shown per person is for <b><?php echo date('d M Y', strtotime($targetFromDate)); ?> to <?php echo date('d M Y', strtotime($targetToDate)); ?></b>.</p>
+                            <form method="get" style="display:flex;gap:8px;align-items:end;">
+                                <div>
+                                    <label class="form-label" style="font-size:11px;font-weight:600;display:block;margin-bottom:2px;">From</label>
+                                    <input type="date" name="from" value="<?php echo htmlspecialchars($targetFromDate); ?>" class="form-control form-control-sm">
+                                </div>
+                                <div>
+                                    <label class="form-label" style="font-size:11px;font-weight:600;display:block;margin-bottom:2px;">To</label>
+                                    <input type="date" name="to" value="<?php echo htmlspecialchars($targetToDate); ?>" class="form-control form-control-sm">
+                                </div>
+                                <div><button type="submit" class="btn btn-primary btn-sm">Apply</button></div>
+                            </form>
                         </div>
                     </div>
 
@@ -536,6 +587,25 @@ var msAllStaff = <?php echo json_encode($allStaffMap); ?>;
                 $chainRow.append($pill);
             });
             $body.append($chainRow);
+        }
+
+        // Target/achieved is always for the person actually clicked (frame.id),
+        // not the possibly-flipped display node, so it reflects whoever's name
+        // is on the org node the user clicked, not their manager.
+        var clickedNode = msAllStaff[frame.id];
+        if (clickedNode) {
+            var $tgtWrap = $('<div style="margin:0 0 16px;text-align:center;"></div>');
+            $tgtWrap.append($('<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;"></div>').text(clickedNode.name + '’s Team Target'));
+            var $tgtRow = $('<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;"></div>');
+            var pctColor = clickedNode.percent >= 100 ? '#0ca30c' : '#333';
+            $tgtRow.append($('<span class="chain-pill" style="background:#eee;color:#333;"></span>').text('Target: ₹' + Number(clickedNode.target).toLocaleString('en-IN')));
+            $tgtRow.append($('<span class="chain-pill" style="background:#eee;color:#333;"></span>').text('Achieved: ₹' + Number(clickedNode.achieved).toLocaleString('en-IN')));
+            $tgtRow.append($('<span class="chain-pill" style="background:#eee;"></span>').css('color', pctColor).text(clickedNode.percent + '% Achieved'));
+            if (clickedNode.direct_report_count > 0) {
+                $tgtRow.append($('<span class="chain-pill" style="background:#eee;color:#333;"></span>').text(clickedNode.completed_count + ' / ' + clickedNode.direct_report_count + ' Teams Hit Target'));
+            }
+            $tgtWrap.append($tgtRow);
+            $body.append($tgtWrap);
         }
 
         var $cluster = $('<div class="sm-cluster"></div>').css('--trunk-color', node.color);

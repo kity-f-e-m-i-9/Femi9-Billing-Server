@@ -1,7 +1,8 @@
 <?php
 include("checksession.php");
 include("config.php");
-error_reporting(0);
+error_reporting(E_ALL);          // TEMP DEBUG — set back to 0 once the 500 is diagnosed
+ini_set('display_errors', '1');  // TEMP DEBUG
 date_default_timezone_set("Asia/Kolkata");
 
 // ── Date range filter ──────────────────────────────────────────────────────
@@ -235,7 +236,7 @@ $top_customers = mis_all($db_conn,
      LEFT JOIN customers c ON c.id = i.customer_id
      LEFT JOIN invoice_items ii ON ii.inv_id = i.inv_id AND ii.user_id=? AND ii.user_type=?
      WHERE i.user_id=? AND i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?
-     GROUP BY i.customer_id ORDER BY revenue DESC LIMIT 10",
+     GROUP BY i.customer_id, c.name ORDER BY revenue DESC LIMIT 10",
     'isisss', [$uid, $utype, $uid, $utype, $from, $to]);
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -349,7 +350,7 @@ $returns_list = mis_all($db_conn,
 $return_by_month = mis_all($db_conn,
     "SELECT DATE_FORMAT(`date`, '%b %Y') lbl, COUNT(*) cnt, COALESCE(SUM(total),0) amount
      FROM user_return_stock WHERE to_usertype=? AND to_userid=? AND `date` BETWEEN ? AND ?
-     GROUP BY DATE_FORMAT(`date`, '%Y-%m') ORDER BY DATE_FORMAT(`date`, '%Y-%m') ASC",
+     GROUP BY DATE_FORMAT(`date`, '%b %Y') ORDER BY MIN(`date`) ASC",
     'siss', [$utype, $uid, $from, $to]);
 
 // ═══════════════════════════════════════════════════════════════════════════

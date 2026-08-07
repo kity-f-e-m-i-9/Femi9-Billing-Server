@@ -45,6 +45,11 @@ $_chk4 = $db_conn->query("SHOW COLUMNS FROM partner_location_layers LIKE 'is_ms_
 if ($_chk4 && $_chk4->num_rows === 0) {
     $db_conn->query("ALTER TABLE partner_location_layers ADD COLUMN is_ms_filter_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER is_tp_filter_enabled");
 }
+// Ensure is_salesbdm_filter_enabled column exists
+$_chk5 = $db_conn->query("SHOW COLUMNS FROM partner_location_layers LIKE 'is_salesbdm_filter_enabled'");
+if ($_chk5 && $_chk5->num_rows === 0) {
+    $db_conn->query("ALTER TABLE partner_location_layers ADD COLUMN is_salesbdm_filter_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER is_ms_filter_enabled");
+}
 
 // ── INSERT ────────────────────────────────────────────────────────────────────
 if (isset($_POST['insert-partner-location-layer'])) {
@@ -59,6 +64,7 @@ if (isset($_POST['insert-partner-location-layer'])) {
     $is_cp_filter_enabled = isset($_POST['is_cp_filter_enabled']) ? 1 : 0;
     $is_tp_filter_enabled = isset($_POST['is_tp_filter_enabled']) ? 1 : 0;
     $is_ms_filter_enabled = isset($_POST['is_ms_filter_enabled']) ? 1 : 0;
+    $is_salesbdm_filter_enabled = isset($_POST['is_salesbdm_filter_enabled']) ? 1 : 0;
 
     if (!$pll_depth || $pll_depth < 1 || $pll_depth > 20 || empty($pll_name)) {
         redirectPLL('add-partner-location-layer', 'invalidparameters');
@@ -75,8 +81,8 @@ if (isset($_POST['insert-partner-location-layer'])) {
         redirectPLL('add-partner-location-layer', 'alreadyexists&depth=' . $pll_depth);
     }
 
-    $stmt_ins = $db_conn->prepare("INSERT INTO partner_location_layers (depth, layer_name, is_stock_location, is_cp_filter_enabled, is_tp_filter_enabled, is_ms_filter_enabled) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt_ins->bind_param("isiiii", $pll_depth, $pll_name, $is_stock_location, $is_cp_filter_enabled, $is_tp_filter_enabled, $is_ms_filter_enabled);
+    $stmt_ins = $db_conn->prepare("INSERT INTO partner_location_layers (depth, layer_name, is_stock_location, is_cp_filter_enabled, is_tp_filter_enabled, is_ms_filter_enabled, is_salesbdm_filter_enabled) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt_ins->bind_param("isiiiii", $pll_depth, $pll_name, $is_stock_location, $is_cp_filter_enabled, $is_tp_filter_enabled, $is_ms_filter_enabled, $is_salesbdm_filter_enabled);
 
     if ($stmt_ins->execute()) {
         $stmt_ins->close();
@@ -101,13 +107,14 @@ if (isset($_POST['update-partner-location-layer'])) {
     $is_cp_filter_enabled = isset($_POST['is_cp_filter_enabled']) ? 1 : 0;
     $is_tp_filter_enabled = isset($_POST['is_tp_filter_enabled']) ? 1 : 0;
     $is_ms_filter_enabled = isset($_POST['is_ms_filter_enabled']) ? 1 : 0;
+    $is_salesbdm_filter_enabled = isset($_POST['is_salesbdm_filter_enabled']) ? 1 : 0;
 
     if (!$update_id || empty($pll_name)) {
         redirectPLL('manage-partner-location-layers', 'invalidparameters');
     }
 
-    $stmt_upd = $db_conn->prepare("UPDATE partner_location_layers SET layer_name = ?, is_stock_location = ?, is_cp_filter_enabled = ?, is_tp_filter_enabled = ?, is_ms_filter_enabled = ? WHERE id = ?");
-    $stmt_upd->bind_param("siiiii", $pll_name, $is_stock_location, $is_cp_filter_enabled, $is_tp_filter_enabled, $is_ms_filter_enabled, $update_id);
+    $stmt_upd = $db_conn->prepare("UPDATE partner_location_layers SET layer_name = ?, is_stock_location = ?, is_cp_filter_enabled = ?, is_tp_filter_enabled = ?, is_ms_filter_enabled = ?, is_salesbdm_filter_enabled = ? WHERE id = ?");
+    $stmt_upd->bind_param("siiiiii", $pll_name, $is_stock_location, $is_cp_filter_enabled, $is_tp_filter_enabled, $is_ms_filter_enabled, $is_salesbdm_filter_enabled, $update_id);
 
     if ($stmt_upd->execute()) {
         $stmt_upd->close();

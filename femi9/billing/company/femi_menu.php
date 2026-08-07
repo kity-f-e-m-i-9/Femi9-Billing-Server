@@ -644,6 +644,22 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="ms_expenses">Expenses Report</a></li>
                         </ul>
                     </li>
+
+					<!----------------------Sales BDM--------------------------->
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">badge</i>Sales BDM<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+                            <li><a href="salesbdm_add">Add Sales BDM</a></li>
+                            <li><a href="salesbdm_manage">Manage Sales BDM</a></li>
+                            <li>
+                                <a href="#">Manage Team<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                                <ul class="sub-menu">
+                                    <li><a href="manage-salesbdm-team-levels">Manage Team Levels</a></li>
+                                    <li><a href="salesbdm-team-view">Tree View</a></li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
 					
 					<!-----<li>
                         <a href="#"><i class="material-icons-two-tone">sentiment_satisfied_alt</i>Users<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>

@@ -282,17 +282,17 @@ if (!empty($tempids)) {
     $hdrRows = dbQuery($db_conn,
         "SELECT
              tempid,
-             ANY_VALUE(godownid)          AS godownid,
-             ANY_VALUE(cat)               AS cat,
-             ANY_VALUE(date)              AS date,
-             ANY_VALUE(order_number)      AS order_number,
-             ANY_VALUE(customer_name)     AS customer_name,
-             ANY_VALUE(customer_mobile)   AS customer_mobile,
-             ANY_VALUE(customer_address)  AS customer_address
+             MIN(godownid)         AS godownid,
+             MIN(cat)              AS cat,
+             MIN(date)             AS date,
+             MIN(order_number)     AS order_number,
+             MIN(customer_name)    AS customer_name,
+             MIN(customer_mobile)  AS customer_mobile,
+             MIN(customer_address) AS customer_address
          FROM ot_sales
          WHERE tempid IN ($ph)
          GROUP BY tempid
-         ORDER BY ANY_VALUE(date) DESC",
+         ORDER BY MIN(date) DESC",
         $ttype, $tempids
     );
     foreach ($hdrRows as $row) {

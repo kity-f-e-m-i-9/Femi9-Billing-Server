@@ -17,6 +17,79 @@ else
 $from_date=$_REQUEST['frdate'];
 $to_date=$_REQUEST['todate'];
 $catname=base64_decode($_REQUEST['cat']);
+
+// ── Products (fetched once, reused for the header row and every data row's
+// product-qty columns — the old version re-ran this same query once per
+// order, on top of one qty lookup per order per product) ───────────────────
+$products = [];
+$prRes = mysqli_query($db_conn, "select * from `products` order by `id` asc");
+while ($pr = mysqli_fetch_assoc($prRes)) { $products[] = $pr; }
+
+// ── Orders (tempid) in range — one row per tempid, mirroring the old
+// "select * from ot_sales where tempid=X" + fetch_array (first row) — made
+// deterministic via MIN(id) instead of relying on implicit row order ───────
+$catFilterSql = ($catname !== null && $catname !== '') ? " and cat=?" : "";
+$baseWhere = "date between ? and ?" . $catFilterSql . " and godownid IN (" . godown_ids_subquery($db_conn) . ")";
+
+$ordersSql = "
+    select o.*
+    from ot_sales o
+    inner join (
+        select tempid, MIN(id) as min_id
+        from ot_sales
+        where $baseWhere
+        group by tempid
+    ) first_row on first_row.min_id = o.id
+    order by o.id asc
+";
+$stmt = mysqli_prepare($db_conn, $ordersSql);
+if ($catname !== null && $catname !== '') {
+    mysqli_stmt_bind_param($stmt, "sss", $from_date, $to_date, $catname);
+} else {
+    mysqli_stmt_bind_param($stmt, "ss", $from_date, $to_date);
+}
+mysqli_stmt_execute($stmt);
+$orders = mysqli_stmt_get_result($stmt)->fetch_all(MYSQLI_ASSOC);
+mysqli_stmt_close($stmt);
+
+// ── Per-order total, per-order-per-product qty, and company_godown lookups —
+// all fetched in one query each instead of one query per order (and, for
+// qty, one query per order PER PRODUCT) ─────────────────────────────────────
+$totalsByTempid    = [];
+$qtyByTempidProduct = [];
+$godownById         = [];
+
+if ($orders) {
+    $tempids      = array_column($orders, 'tempid');
+    $placeholders = implode(',', array_fill(0, count($tempids), '?'));
+    $types        = str_repeat('s', count($tempids));
+
+    $stmt = mysqli_prepare($db_conn, "select tempid, sum(total) as total_sum from ot_sales where tempid IN ($placeholders) group by tempid");
+    mysqli_stmt_bind_param($stmt, $types, ...$tempids);
+    mysqli_stmt_execute($stmt);
+    $res = mysqli_stmt_get_result($stmt);
+    while ($row = mysqli_fetch_assoc($res)) { $totalsByTempid[$row['tempid']] = $row['total_sum']; }
+    mysqli_stmt_close($stmt);
+
+    $stmt = mysqli_prepare($db_conn, "select tempid, prid, sum(qty) as qty from ot_sales where tempid IN ($placeholders) group by tempid, prid");
+    mysqli_stmt_bind_param($stmt, $types, ...$tempids);
+    mysqli_stmt_execute($stmt);
+    $res = mysqli_stmt_get_result($stmt);
+    while ($row = mysqli_fetch_assoc($res)) { $qtyByTempidProduct[$row['tempid']][$row['prid']] = $row['qty']; }
+    mysqli_stmt_close($stmt);
+
+    $godownIds = array_values(array_unique(array_column($orders, 'godownid')));
+    if ($godownIds) {
+        $gph    = implode(',', array_fill(0, count($godownIds), '?'));
+        $gtypes = str_repeat('i', count($godownIds));
+        $stmt = mysqli_prepare($db_conn, "select * from company_godown where id IN ($gph) AND " . godown_finance_filter_sql($db_conn));
+        mysqli_stmt_bind_param($stmt, $gtypes, ...$godownIds);
+        mysqli_stmt_execute($stmt);
+        $res = mysqli_stmt_get_result($stmt);
+        while ($row = mysqli_fetch_assoc($res)) { $godownById[$row['id']] = $row; }
+        mysqli_stmt_close($stmt);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -38,7 +111,7 @@ $catname=base64_decode($_REQUEST['cat']);
 <body>
     <h1>OT Sales Report</h1>
 	<h3><?=date("d/m/Y",strtotime($from_date));?> (to) <?=date("d/m/Y",strtotime($to_date));?></h3>
-	
+
                                          <table class="table">
                                             <thead>
                                                 <tr>
@@ -51,117 +124,63 @@ $catname=base64_decode($_REQUEST['cat']);
 													<th>Customer Mobile</th>
 													<th>Address</th>
 													<th>Total Amount</th>
-													
-				<?php $select_prdetails_header="select * from `products` order by `id` asc";
-				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
-				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
+
+				<?php foreach ($products as $result_prdetails_header) { ?>
 				<th><?=$result_prdetails_header['productName'];?></th>
 				<?php }?>
-				
+
 												</tr>
                                             </thead>
-											
+
 											<tbody>
 										<?php
-										$select_Count_records="select count(*) as numRecords from ot_sales where date between '$from_date' and '$to_date'";
-										$fetch_Count_records=mysqli_query($db_conn,$select_Count_records);
-										$result_Count_records=mysqli_fetch_array($fetch_Count_records);
-										if($result_Count_records['numRecords']>0)
-										{
-										
-										
-										if($catname==NULL)
-										{
-										$select_product_list="select distinct tempid from ot_sales where date between '$from_date' and '$to_date' and godownid IN (" . godown_ids_subquery($db_conn) . ")";
-										}else{
-										$select_product_list="select distinct tempid from ot_sales where date between '$from_date' and '$to_date' and cat='$catname' and godownid IN (" . godown_ids_subquery($db_conn) . ")";
-										}
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
-										while($result_product_list=mysqli_fetch_array($fetch_product_list))
-										{
-											
-											$ot_tempid=$result_product_list['tempid'];
+										foreach ($orders as $resultrecords) {
+											$ot_tempid = $resultrecords['tempid'];
 
-										$selectrecords="select * from ot_sales where tempid='$ot_tempid'";
-										$fetchrecords=mysqli_query($db_conn,$selectrecords);
-										$resultrecords=mysqli_fetch_array($fetchrecords);
-											
 											//company profile details
-											$godownid=$resultrecords['godownid'];
-$select_Customers="select * from company_godown where id='$godownid' AND " . godown_finance_filter_sql($db_conn);
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
-										$result_Customers=mysqli_fetch_array($fetch_Customers);
-?>
-                                            
+											$godownid = $resultrecords['godownid'];
+											$result_Customers = $godownById[$godownid] ?? null;
+										?>
+
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?=$result_Customers["gname"];?></td>
+                                                    <td><?=$result_Customers["gname"] ?? '';?></td>
 													<td><?=$resultrecords['cat'];?></td>
 													<td><?=date("d/M/Y",strtotime($resultrecords["date"]));?></td>
-													
+
 													<td><?php echo $resultrecords["order_number"];?></td>
-					
+
 					<td><?php echo $resultrecords["customer_name"];?></td>
 					<td><?php echo $resultrecords["customer_mobile"];?></td>
 					<td><?php echo $resultrecords["customer_address"];?></td>
-													
+
 				<?php
-				$selectsumTotalAmount="select sum(total) from ot_sales where tempid='$ot_tempid'";
-				$fetchsumTotalAmount=mysqli_query($db_conn,$selectsumTotalAmount);
-				$resultsumTotalAmount=mysqli_fetch_array($fetchsumTotalAmount);
-				if($resultsumTotalAmount[0]!=NULL){
-				$TotalAmount=$resultsumTotalAmount[0];}else{$TotalAmount="0";}
-				$TotalAmount123+=$TotalAmount;
-				
-				/*$selectsumTotalQTY="select sum(qty) from ot_sales where tempid='$ot_tempid'";
-				$fetchsumTotalQTY=mysqli_query($db_conn,$selectsumTotalQTY);
-				$resultsumTotalQTY=mysqli_fetch_array($fetchsumTotalQTY);
-				if($resultsumTotalQTY[0]!=NULL){
-				$TotalPrQty=$resultsumTotalQTY[0];}else{$TotalPrQty="0";}
-				$TotalPrQty123+=$TotalPrQty;*/
+				$TotalAmount = $totalsByTempid[$ot_tempid] ?? '0';
+				if ($TotalAmount === null) { $TotalAmount = '0'; }
+				$TotalAmount123 += $TotalAmount;
 				?>
 				<td align="right"><?php echo inr_format($TotalAmount, 2);?></td>
-				
-				
+
+
 				<!------------------------PRODUCT WISE SALES QTY------------------------------->
-				<?php $select_prdetails_header="select * from `products` order by `id` asc";
-				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
-				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){
-					
-					$prid_header=$result_prdetails_header['id'];
-					
-					//SALES QTY
-					$select_SUM_QTY="select qty from ot_sales where tempid='$ot_tempid' and prid='$prid_header'";
-					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
-					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
-					if($result_SUM_QTY['qty']!=NULL){ $slsqty=$result_SUM_QTY['qty'];} else{ $slsqty="0";}
-					
-					//SALES Return QTY
-					/*$select_Return_QTY="select qty from ot_sales_return where tempid='$ot_tempid' and prid='$prid_header'";
-					$fetch_Return_QTY=mysqli_query($db_conn,$select_Return_QTY);
-					$result_Return_QTY=mysqli_fetch_array($fetch_Return_QTY);
-					if($result_Return_QTY['qty']!=NULL){ $slsRtnqty=$result_Return_QTY['qty'];} else{ $slsRtnqty="0";}*/
-					
-					//$net_sls_qty=$slsqty-$slsRtnqty;
-					
-					$net_sls_qty=$slsqty;
-						
+				<?php foreach ($products as $result_prdetails_header) {
+					$prid_header = $result_prdetails_header['id'];
+					$net_sls_qty = $qtyByTempidProduct[$ot_tempid][$prid_header] ?? '0';
 				?>
 				<td><b><?=$net_sls_qty;?></b></td>
 				<?php }?>
 				<!-------------------------------------------------------------------->
-				
-				
-				
+
+
+
                                         </tr>
-                                        
-                                        
-                                           
+
+
+
 										<?php }?>
-										<?php }?>
-										
+
 										</tbody>
-										 
+
 										 <?php /*?>
 										 <tfoot>
 										 <tr>
@@ -171,8 +190,8 @@ $select_Customers="select * from company_godown where id='$godownid' AND " . god
 										 </tr>
 										 </tfoot>
 										 <?php */?>
-										 
+
                                         </table>
-										
-										
+
+
 										<script>window.print();</script>
