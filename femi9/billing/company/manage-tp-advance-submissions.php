@@ -12,6 +12,19 @@ if (empty($_SESSION['csrf_token'])) {
 date_default_timezone_set("Asia/Kolkata");
 $today = date("Y-m-d");
 
+// Arriving from tp-today-orders.php's "View This TP's Submissions" button
+// with a specific tp_id — show every one of that TP's submissions (not just
+// pending) so staff can find whichever one actually covers the order in
+// question, since there's no hard link between an order and a submission.
+$filterTpId = (int)($_GET['tp_id'] ?? 0);
+
+// Only true when the reviewer arrived from tp-today-orders.php specifically
+// (that link appends &from=po) — used later to send them straight back
+// there after converting a submission, instead of the normal advance
+// payments list. A direct visit to this page (sidebar/menu, even with a
+// tp_id manually filtered in) never sets this, so that flow is untouched.
+$fromPo = ($_GET['from'] ?? '') === 'po';
+
 $filterSubmitted = isset($_GET['from_date']) || isset($_GET['to_date']) || isset($_GET['status_filter']);
 
 if ($filterSubmitted) {
@@ -25,7 +38,7 @@ if ($filterSubmitted) {
 } else {
     $from_date = '';
     $to_date = '';
-    $statusFilter = 'pending_review';
+    $statusFilter = $filterTpId > 0 ? 'all' : 'pending_review';
 }
 
 // Drafts (status='draft') are still-in-progress TP uploads not yet
@@ -44,6 +57,11 @@ if ($statusFilter !== 'all') {
     $whereSql .= ' AND sub.status = ?';
     $bindTypes .= 's';
     $bindValues[] = $statusFilter;
+}
+if ($filterTpId > 0) {
+    $whereSql .= ' AND sub.territory_partner_id = ?';
+    $bindTypes .= 'i';
+    $bindValues[] = $filterTpId;
 }
 
 $stmt = $db_conn->prepare(
@@ -229,9 +247,21 @@ $companyProfiles = $db_conn->query(
                             </div>
                         </div>
 
+                        <?php if ($filterTpId > 0): ?>
+                        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                            <span style="font-size:13.5px;color:#1e3a8a;">
+                                <i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">filter_alt</i>
+                                Showing submissions for one Territory Partner only.
+                            </span>
+                            <a href="manage-tp-advance-submissions.php" style="font-size:12.5px;font-weight:600;color:#1e40af;">Clear filter — show all TPs</a>
+                        </div>
+                        <?php endif; ?>
+
                         <!-- Filters -->
                         <div class="po-filter-card">
                             <form method="get" class="row g-2 align-items-end">
+                                <?php if ($filterTpId > 0): ?><input type="hidden" name="tp_id" value="<?=(int)$filterTpId?>"><?php endif; ?>
+                                <?php if ($fromPo): ?><input type="hidden" name="from" value="po"><?php endif; ?>
                                 <div class="col-md-3">
                                     <label class="form-label">From Date</label>
                                     <input type="date" name="from_date" value="<?=htmlspecialchars($from_date)?>" class="form-control">
@@ -349,6 +379,7 @@ $companyProfiles = $db_conn->query(
     <script>
     var CSRF_TOKEN = <?=json_encode($_SESSION['csrf_token'])?>;
     var COMPANY_PROFILES = <?=json_encode($companyProfiles, JSON_UNESCAPED_UNICODE)?>;
+    var fromPo = <?=json_encode($fromPo)?>;
 
     var currentProofButton = null;
     var currentSubmission = null;
@@ -593,7 +624,30 @@ $companyProfiles = $db_conn->query(
                 currentSubmission.advance_payment_id = data.advance_payment_id;
                 updateProofButton();
                 renderProofModal();
-                tasShowAlert('Added to TP advance balance (Advance Payment #' + data.advance_payment_id + ').', 'success');
+
+                var tpId = currentSubmission && currentSubmission.territory_partner_id ? currentSubmission.territory_partner_id : '';
+
+                if (fromPo) {
+                    // Reached here from tp-today-orders.php's "View This TP's
+                    // Submissions" link (excess-balance purchase order) — once
+                    // the payment is added to the TP's advance balance, go
+                    // straight back to that order instead of the advance
+                    // payments list, since that's the task the reviewer was
+                    // actually in the middle of.
+                    tasShowAlert('Added to TP advance balance (Advance Payment #' + data.advance_payment_id + '). Returning to their purchase orders…', 'success');
+                    setTimeout(function () {
+                        window.location.href = 'tp-today-orders.php';
+                    }, 900);
+                } else {
+                    // Direct visit to this page — land the reviewer directly
+                    // on the new advance payment entry instead of leaving
+                    // them to search the full list for it.
+                    tasShowAlert('Added to TP advance balance (Advance Payment #' + data.advance_payment_id + '). Taking you to the entry now…', 'success');
+                    setTimeout(function () {
+                        window.location.href = 'manage-tp-advance-payments.php?highlight=' + encodeURIComponent(data.advance_payment_id)
+                            + (tpId ? '&tp_id=' + encodeURIComponent(tpId) : '');
+                    }, 900);
+                }
             })
             .fail(function () {
                 alert('Could not reach the server. Please try again.');

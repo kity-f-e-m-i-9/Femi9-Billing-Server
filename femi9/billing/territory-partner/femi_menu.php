@@ -44,6 +44,9 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
         <li>
             <a href="wallet-history.php"><i class="material-icons-outlined">wallet</i>Wallet History</a>
         </li>
+        <li>
+            <a href="my-referrals.php"><i class="material-icons-outlined">groups</i>My Referrals</a>
+        </li>
 
         <li>
             <a href="#"><i class="material-icons-two-tone">analytics</i>GST Reports<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
@@ -83,6 +86,7 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
                 <li><a href="shop-manage.php">Manage Shop</a></li>
                 <?php if ($_tp_can_invoice): ?><li><a href="shop-invoice-add.php?invuser=shop">Add Invoice</a></li><?php endif; ?>
                 <li><a href="shop-manage-invoice.php">Manage Invoice</a></li>
+                <li><a href="shop-report.php">Shop Report</a></li>
             </ul>
         </li>
 

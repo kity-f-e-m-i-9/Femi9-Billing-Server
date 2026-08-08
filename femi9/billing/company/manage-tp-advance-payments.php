@@ -125,6 +125,11 @@ $i = 0;
         .status-active { background:#d1fae5; color:#065f46; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600; }
         .status-partially { background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600; }
         .status-fully { background:#dbeafe; color:#1e40af; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+        @keyframes advPayHighlightFlash {
+            0%, 100% { background-color: #fef9c3; }
+            50% { background-color: #fde68a; }
+        }
+        tr.adv-pay-highlight td { animation: advPayHighlightFlash 1.2s ease-in-out 2; background-color: #fef9c3; }
     </style>
 </head>
 <body>
@@ -266,7 +271,7 @@ $i = 0;
                                             </thead>
                                             <tbody>
                                             <?php foreach ($payments as $p): ?>
-                                                <tr>
+                                                <tr id="advPayRow<?php echo (int)$p['id']; ?>">
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo htmlspecialchars($p['tp_name']); ?></td>
                                                     <td><code style="font-size:12px;"><?php echo htmlspecialchars($p['tp_code']); ?></code></td>
@@ -359,13 +364,43 @@ $i = 0;
 <script src="../../assets/js/custom.js"></script>
 <script>
 $(document).ready(function () {
-    $('#datatable1').DataTable({
+    var advPayTable = $('#datatable1').DataTable({
         dom: '<"row"<"col-sm-6"l><"col-sm-6"f>><"row"<"col-sm-12"B>><"row"<"col-sm-12"tr>><"row"<"col-sm-5"i><"col-sm-7"p>>',
         buttons: [
             { extend: 'excel', text: '<i class="material-icons" style="vertical-align:middle">download</i> Excel', className: 'btn btn-success' },
             { extend: 'print', text: '<i class="material-icons" style="vertical-align:middle">print</i> Print', className: 'btn btn-info' }
         ]
     });
+
+    // Deep-link support: ?highlight=<tp_advance_payments.id> jumps straight
+    // to that row (paging to whichever DataTables page it landed on) and
+    // flashes it — used when a screenshot/submission is just converted into
+    // an advance payment, so the reviewer lands exactly on the new entry
+    // instead of having to search for it in the full list.
+    var highlightId = new URLSearchParams(window.location.search).get('highlight');
+    if (highlightId) {
+        var $row = $('#advPayRow' + highlightId);
+        if ($row.length) {
+            var rowNode = advPayTable.row($row).node();
+            if (rowNode) {
+                var pageInfo = advPayTable.page.info();
+                var rowIndexInFullList = advPayTable.rows().indexes().toArray().findIndex(function (idx) {
+                    return advPayTable.row(idx).node() === rowNode;
+                });
+                if (rowIndexInFullList > -1) {
+                    advPayTable.page(Math.floor(rowIndexInFullList / pageInfo.length)).draw(false);
+                }
+            }
+            setTimeout(function () {
+                var target = $('#advPayRow' + highlightId);
+                if (target.length) {
+                    target.addClass('adv-pay-highlight');
+                    target[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(function () { target.removeClass('adv-pay-highlight'); }, 3000);
+                }
+            }, 150);
+        }
+    }
 
     $('#datatable1').on('click', '.edit-btn', function () {
         const id = $(this).data('id');

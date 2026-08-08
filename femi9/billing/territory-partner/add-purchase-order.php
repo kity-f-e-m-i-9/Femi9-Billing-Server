@@ -44,29 +44,49 @@ mysqli_stmt_close($reservedStmt);
 
 $advBalance = max(0, round($advBalance - $reservedAmount, 2));
 
-// Screenshots uploaded for this TP's in-progress order (not yet linked to a
-// submitted PO) — resumable if the TP reloads the page mid-upload.
-//
-// Excludes 'rejected' rows: those are dead ends the TP already saw (nothing
-// further to resume — the only action was "remove and re-upload", which a
-// fresh visit effectively already is). Without this filter, a rejected
-// screenshot the TP never explicitly removed would resurface on every
-// future visit to this page indefinitely, even days/weeks later, looking
-// like a stuck upload rather than settled history.
-$existingScreenshots = [];
-$acceptedScreenshotTotal = 0.0;
-$scrStmt = mysqli_prepare($db_conn,
-    "SELECT id, status, detected_amount, reference_number, rejection_reason, file_path
-     FROM tp_purchase_order_screenshots WHERE territory_partner_id = ? AND po_id IS NULL AND status != 'rejected' ORDER BY id ASC"
-);
-mysqli_stmt_bind_param($scrStmt, "i", $Login_user_IDvl);
-mysqli_stmt_execute($scrStmt);
-$scrRes = mysqli_stmt_get_result($scrStmt);
-while ($s = mysqli_fetch_assoc($scrRes)) {
-    $existingScreenshots[] = $s;
-    if ($s['status'] === 'accepted') $acceptedScreenshotTotal += (float)$s['detected_amount'];
+// Self-migrating: ensure used_for_po_id exists so an already-consumed
+// submission (one that already unlocked a different order) can be told
+// apart from one still available to cover this order's excess.
+$_usedForPoCol = $db_conn->query("SHOW COLUMNS FROM tp_advance_payment_submissions LIKE 'used_for_po_id'");
+if ($_usedForPoCol && $_usedForPoCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_advance_payment_submissions ADD COLUMN used_for_po_id INT UNSIGNED NULL AFTER advance_payment_id");
 }
-mysqli_stmt_close($scrStmt);
+
+// Advance-payment submission(s) made specifically to cover this order's
+// excess. A TP is redirected to add-advance-payment.php when their order
+// exceeds the available balance, then bounced back here — so a submission
+// still 'pending_review' AND not yet claimed by another order
+// (used_for_po_id IS NULL) means the excess is covered and the PO can go
+// ahead; company reviews the actual payment before the order is invoiced,
+// same checkpoint the old inline screenshot upload used to provide.
+//
+// Deliberately excludes status='accepted': once company accepts a
+// submission it becomes a real row in tp_advance_payments (via
+// advance_payment_id) and its amount is already inside $advBalance above —
+// counting it again here as a separate "still covering the excess" pool
+// double-counts the same money and can make an order look covered when the
+// balance was never actually enough (e.g. an old accepted ₹10,000
+// submission, whose money is already spent as part of the visible balance,
+// otherwise kept "covering" every future unrelated order indefinitely).
+$eligibleAdvanceSubmissionTotal = 0.0;
+$hasEligibleAdvanceSubmission = false;
+$advSubStmt = mysqli_prepare($db_conn,
+    "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt
+     FROM tp_advance_payment_submissions
+     WHERE territory_partner_id = ? AND status = 'pending_review' AND used_for_po_id IS NULL"
+);
+mysqli_stmt_bind_param($advSubStmt, "i", $Login_user_IDvl);
+mysqli_stmt_execute($advSubStmt);
+$advSubRow = mysqli_stmt_get_result($advSubStmt)->fetch_assoc();
+$eligibleAdvanceSubmissionTotal = (float)($advSubRow['total'] ?? 0);
+$hasEligibleAdvanceSubmission = (int)($advSubRow['cnt'] ?? 0) > 0;
+mysqli_stmt_close($advSubStmt);
+
+// Restore an in-progress cart/delivery draft saved right before the TP was
+// sent to add-advance-payment.php (see stash-po-draft.php) — cleared once
+// read so it doesn't resurface on unrelated future visits.
+$poDraft = $_SESSION['po_draft_' . (int)$Login_user_IDvl] ?? null;
+unset($_SESSION['po_draft_' . (int)$Login_user_IDvl]);
 
 // TP's own registered delivery address — shown as the default when the
 // "use existing delivery address" checkbox is left checked.
@@ -367,26 +387,20 @@ $tpDeliveryAddressParts = array_filter([
                             <div id="poExcessWarning" class="apo-excess-card" style="display:none;">
                                 <div class="apo-excess-title">Your order total exceeds your available advance balance by &#8377;<span id="poExcessAmount">0.00</span></div>
                                 <div class="apo-excess-desc">
-                                    Upload proof of payment (UPI/NEFT/RTGS/net banking) for the excess amount — up to 5 screenshots.
-                                    Each is checked automatically for a readable amount and UTR/transaction number; unclear ones are
-                                    sent for manual review instead of being rejected outright.
+                                    Submit an advance payment for review to cover the difference. Your cart and delivery details will be
+                                    saved and restored automatically when you come back to finish this order.
                                 </div>
 
-                                <div style="font-size:13px;color:#78716c;">Uploaded towards excess (accepted + pending review): <strong id="poAcceptedTotal" style="color:#065f46;">0.00</strong> / &#8377;<span id="poExcessAmount2">0.00</span></div>
-                                <div class="apo-progress-track"><div class="apo-progress-fill" id="poProgressFill" style="width:0%;"></div></div>
-                                <div id="poReadyNote" style="display:none;font-size:12.5px;color:#065f46;margin:-8px 0 12px;">
-                                    <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">check_circle</i>
-                                    A screenshot has been uploaded and is awaiting/passed verification — you can submit; company will review the amount before invoicing.
+                                <div id="poAdvanceCoveredNote" style="display:none;font-size:13px;color:#065f46;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:10px 14px;margin-bottom:12px;">
+                                    <i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">check_circle</i>
+                                    An advance payment of &#8377;<span id="poAdvanceCoveredAmt">0.00</span> is already submitted and awaiting/passed company review —
+                                    you can submit this order now; the payment will be verified before invoicing.
                                 </div>
 
-                                <div id="poScreenshotList"></div>
-
-                                <div class="apo-upload-row" id="poScreenshotUploadRow">
-                                    <input type="file" id="po_screenshot_file" accept="image/*,.heic,.heif" class="form-control d-inline-block mb-2" style="max-width:320px;">
-                                    <button type="button" class="btn btn-secondary btn-sm" id="poScreenshotUploadBtn" onclick="uploadPoScreenshot()">Upload</button>
-                                    <small class="text-muted d-block mt-1">Max file size: 10 MB per image, up to 5 images.</small>
-                                    <div id="poScreenshotStatus" class="mt-1" style="font-size:12.5px;"></div>
-                                </div>
+                                <button type="button" class="btn-submit-po" id="poGoToAdvanceBtn" onclick="goToAdvancePayment()">
+                                    <i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;">account_balance_wallet</i>
+                                    Submit Advance Payment for &#8377;<span id="poExcessAmount2">0.00</span>
+                                </button>
                             </div>
 
                             <button type="submit" name="submit_po" id="poSubmitBtn" onclick="return confirm('Submit this purchase order?');" class="btn-submit-po">
@@ -511,41 +525,12 @@ $tpDeliveryAddressParts = array_filter([
         updatePoSummary();
     }
 
-    var MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024; // 10 MB
-    var MAX_SCREENSHOTS = 5;
-    var poScreenshots = <?=json_encode(array_map(function ($s) {
-        return [
-            'id' => (int)$s['id'],
-            'status' => $s['status'],
-            'detected_amount' => $s['detected_amount'] !== null ? (float)$s['detected_amount'] : null,
-            'reference_number' => $s['reference_number'],
-            'reason' => $s['rejection_reason'],
-            'file_url' => $s['file_path'] ? ('po_screenshots/' . $s['file_path']) : null,
-        ];
-    }, $existingScreenshots))?>;
-    var poAcceptedTotal = <?=json_encode($acceptedScreenshotTotal)?>;
-
-    // A screenshot still "Pending Review" hasn't been rejected — it's just
-    // waiting on a human to confirm what OCR couldn't read confidently. That
-    // shouldn't block the TP from submitting; company can already see
-    // pending items on their end (tp-today-orders.php) before invoicing, so
-    // this is a checkpoint, not a hard requirement at submission time.
-    function poEligibleTotal() {
-        return poScreenshots
-            .filter(function(s) { return (s.status === 'accepted' || s.status === 'pending_review') && s.detected_amount !== null; })
-            .reduce(function(sum, s) { return sum + (parseFloat(s.detected_amount) || 0); }, 0);
-    }
-
-    // Some pending_review screenshots have no detected_amount at all (OCR
-    // couldn't confidently read a single amount — e.g. "found more than one
-    // possible amount"), so poEligibleTotal() undercounts them as ₹0 even
-    // though a real upload attempt exists. Submission shouldn't hinge on
-    // OCR having successfully parsed a number — only on the TP actually
-    // having uploaded something that isn't rejected. Company still reviews
-    // and can act on anything pending before ever invoicing.
-    function poHasEligibleProof() {
-        return poScreenshots.some(function(s) { return s.status === 'accepted' || s.status === 'pending_review'; });
-    }
+    // Whether an advance-payment submission already exists (pending review
+    // or accepted) that can cover the excess — set server-side by checking
+    // tp_advance_payment_submissions, refreshed on every page load including
+    // the redirect back from add-advance-payment.php.
+    var hasEligibleAdvanceSubmission = <?=json_encode($hasEligibleAdvanceSubmission)?>;
+    var eligibleAdvanceSubmissionTotal = <?=json_encode($eligibleAdvanceSubmissionTotal)?>;
 
     function poGrandTotal() {
         var total = 0;
@@ -559,205 +544,110 @@ $tpDeliveryAddressParts = array_filter([
         var advBalance = parseFloat(document.getElementById('advBalanceVal').value) || 0;
         var total = poGrandTotal();
         var excess = total - advBalance;
-        var eligible = poEligibleTotal();
 
         document.getElementById('poGrandTotal').textContent = '₹' + total.toFixed(2);
 
         var warning = document.getElementById('poExcessWarning');
-        if (excess > 0.001 || poScreenshots.length > 0) {
-            var excessAmt = Math.max(excess, 0);
-            document.getElementById('poExcessAmount').textContent = excessAmt.toFixed(2);
-            document.getElementById('poExcessAmount2').textContent = excessAmt.toFixed(2);
+        if (excess > 0.001) {
+            document.getElementById('poExcessAmount').textContent = excess.toFixed(2);
+            document.getElementById('poExcessAmount2').textContent = excess.toFixed(2);
             warning.style.display = '';
-            var pct = excessAmt > 0 ? Math.min(100, (eligible / excessAmt) * 100) : 100;
-            document.getElementById('poProgressFill').style.width = pct + '%';
+
+            var coveredNote = document.getElementById('poAdvanceCoveredNote');
+            var goToAdvanceBtn = document.getElementById('poGoToAdvanceBtn');
+            if (hasEligibleAdvanceSubmission) {
+                document.getElementById('poAdvanceCoveredAmt').textContent = eligibleAdvanceSubmissionTotal.toFixed(2);
+                coveredNote.style.display = '';
+                goToAdvanceBtn.style.display = 'none';
+            } else {
+                coveredNote.style.display = 'none';
+                goToAdvanceBtn.style.display = '';
+            }
         } else {
             warning.style.display = 'none';
         }
-
-        document.getElementById('poAcceptedTotal').textContent = eligible.toFixed(2);
-        document.getElementById('poReadyNote').style.display = (excess > 0.001 && poHasEligibleProof()) ? '' : 'none';
-
-        var uploadRow = document.getElementById('poScreenshotUploadRow');
-        uploadRow.style.display = poScreenshots.length >= MAX_SCREENSHOTS ? 'none' : '';
     }
 
-    function statusBadge(status) {
-        if (status === 'accepted') return '<span class="apo-status-pill accepted">Accepted</span>';
-        if (status === 'rejected') return '<span class="apo-status-pill rejected">Rejected</span>';
-        // "Pending Review" reads like the upload is still in progress —
-        // this status only ever appears once verification has already
-        // finished and needs a human decision, so the label says that
-        // explicitly instead of looking like a stuck/incomplete upload.
-        return '<span class="apo-status-pill pending">Awaiting Company Review</span>';
-    }
-
-    function renderPoScreenshotList() {
-        var list = document.getElementById('poScreenshotList');
-        list.innerHTML = '';
-        poScreenshots.forEach(function(s) {
-            var detail = '';
-            if (s.status === 'accepted') {
-                detail = 'Amount: ₹' + s.detected_amount.toFixed(2) + ', Ref: ' + s.reference_number;
-            } else if (s.reason) {
-                detail = s.reason;
-            }
-            var isHeic = s.file_url && /\.hei[cf]$/i.test(s.file_url);
-            var thumbHtml = '<div class="thumb-placeholder"><i class="material-icons-outlined" style="font-size:20px;">image</i></div>';
-            if (s.file_url && !isHeic) {
-                thumbHtml = '<a href="' + s.file_url + '" target="_blank"><img class="thumb" src="' + s.file_url + '"></a>';
-            } else if (s.file_url && isHeic) {
-                thumbHtml = '<a href="' + s.file_url + '" target="_blank" class="thumb-placeholder" title="Download HEIC"><i class="material-icons-outlined" style="font-size:20px;">description</i></a>';
-            }
-
-            var card = document.createElement('div');
-            card.className = 'apo-screenshot-card';
-            card.innerHTML =
-                thumbHtml +
-                '<div class="details">' + statusBadge(s.status) + '<div class="mt-1">' + detail + '</div></div>' +
-                '<button type="button" class="apo-remove-chip" onclick="removePoScreenshot(' + s.id + ')">Remove</button>';
-            list.appendChild(card);
-        });
-        updatePoSummary();
-    }
-
-    function isHeicFile(file) {
-        var name = (file.name || '').toLowerCase();
-        var type = (file.type || '').toLowerCase();
-        return type === 'image/heic' || type === 'image/heif' ||
-            name.endsWith('.heic') || name.endsWith('.heif');
-    }
-
-    // Safari/iOS decode HEIC natively at the OS level — createImageBitmap()
-    // exposes that directly and handles camera profiles the pure-JS/WASM
-    // libheif port (heic2any) sometimes can't (e.g. "ERR_LIBHEIF format not
-    // supported" on some newer iPhones). Try this first; it's a no-op
-    // rejection on browsers without native HEIC support (most non-Safari).
-    function nativeHeicToJpeg(file) {
-        if (typeof createImageBitmap !== 'function') return Promise.reject(new Error('createImageBitmap unsupported'));
-        return createImageBitmap(file).then(function(bitmap) {
-            var canvas = document.createElement('canvas');
-            canvas.width = bitmap.width;
-            canvas.height = bitmap.height;
-            canvas.getContext('2d').drawImage(bitmap, 0, 0);
-            return new Promise(function(resolve, reject) {
-                canvas.toBlob(function(blob) {
-                    if (blob) resolve(blob); else reject(new Error('canvas export failed'));
-                }, 'image/jpeg', 0.9);
-            });
-        });
-    }
-
-    function uploadPoScreenshot() {
-        var input = document.getElementById('po_screenshot_file');
-        var statusEl = document.getElementById('poScreenshotStatus');
-        statusEl.textContent = '';
-
-        if (poScreenshots.length >= MAX_SCREENSHOTS) {
-            alert('You can upload a maximum of ' + MAX_SCREENSHOTS + ' screenshots.');
+    // Saves the current cart + delivery details into the session, then sends
+    // the TP to submit an advance payment for the excess. add-advance-payment.php
+    // is told to bounce back here (return_to=po) once that submission is made.
+    function goToAdvancePayment() {
+        if (poLines.length === 0) {
+            alert('Add at least one product before submitting an advance payment.');
             return;
         }
-        var file = input.files[0];
-        if (!file) { alert('Choose an image first.'); return; }
-        var heic = isHeicFile(file);
-        if (!heic && !file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
-        if (file.size > MAX_SCREENSHOT_BYTES) { alert('Image is too large. Maximum allowed size is 10 MB.'); return; }
+        var total = poGrandTotal();
+        var advBalance = parseFloat(document.getElementById('advBalanceVal').value) || 0;
+        var excess = Math.max(0, total - advBalance);
 
-        if (heic) {
-            statusEl.textContent = 'Converting HEIC image…';
-            var jpegName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
+        var useDefault = document.getElementById('useDefaultDeliveryAddress').checked;
+        var payload = {
+            lines: poLines,
+            use_default_delivery_address: useDefault,
+            custom_delivery_line1: document.getElementById('custom_delivery_line1') ? document.getElementById('custom_delivery_line1').value : '',
+            custom_delivery_line2: document.querySelector('[name="custom_delivery_line2"]') ? document.querySelector('[name="custom_delivery_line2"]').value : '',
+            custom_delivery_city: document.querySelector('[name="custom_delivery_city"]') ? document.querySelector('[name="custom_delivery_city"]').value : '',
+            custom_delivery_district: document.querySelector('[name="custom_delivery_district"]') ? document.querySelector('[name="custom_delivery_district"]').value : '',
+            custom_delivery_state: document.querySelector('[name="custom_delivery_state"]') ? document.querySelector('[name="custom_delivery_state"]').value : '',
+            custom_delivery_country: document.querySelector('[name="custom_delivery_country"]') ? document.querySelector('[name="custom_delivery_country"]').value : '',
+            custom_delivery_pincode: document.querySelector('[name="custom_delivery_pincode"]') ? document.querySelector('[name="custom_delivery_pincode"]').value : ''
+        };
 
-            nativeHeicToJpeg(file)
-                .catch(function(nativeErr) {
-                    console.warn('Native HEIC decode unavailable, trying heic2any:', nativeErr);
-                    return heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 })
-                        .then(function(converted) {
-                            return Array.isArray(converted) ? converted[0] : converted;
-                        });
-                })
-                .then(function(jpegBlob) {
-                    sendPoScreenshot(jpegBlob, jpegName);
-                })
-                .catch(function(err) {
-                    console.error('HEIC conversion failed:', err);
-                    var reason = (err && err.message) ? err.message : String(err);
-                    if (confirm('Could not auto-convert this HEIC image (' + reason + ').\n\n' +
-                        'Upload the original file anyway for manual review by the company? ' +
-                        '(Or press Cancel to try a JPG/PNG instead.)')) {
-                        sendPoScreenshot(file, file.name);
-                    } else {
-                        statusEl.textContent = 'Please try a JPG/PNG instead.';
-                    }
-                });
-            return;
-        }
-
-        sendPoScreenshot(file, file.name);
-    }
-
-    function sendPoScreenshot(fileOrBlob, filename) {
-        var input = document.getElementById('po_screenshot_file');
-        var statusEl = document.getElementById('poScreenshotStatus');
-        var btn = document.getElementById('poScreenshotUploadBtn');
+        var btn = document.getElementById('poGoToAdvanceBtn');
         btn.disabled = true;
-        statusEl.textContent = 'Uploading and verifying…';
 
-        var formData = new FormData();
-        formData.append('screenshot', fileOrBlob, filename);
-
-        fetch('upload-po-screenshot.php', { method: 'POST', body: formData })
-            .then(function(r) {
-                return r.text().then(function(text) {
-                    try {
-                        return JSON.parse(text);
-                    } catch (parseErr) {
-                        console.error('Upload response was not valid JSON:', text);
-                        throw new Error('bad_response');
-                    }
-                });
-            })
-            .then(function(data) {
-                btn.disabled = false;
-                if (!data.success) {
-                    statusEl.textContent = data.message || 'Upload failed.';
-                    return;
-                }
-                poScreenshots.push(data.screenshot);
-                poAcceptedTotal = parseFloat(data.accepted_total) || 0;
-                input.value = '';
-                statusEl.textContent = '';
-                renderPoScreenshotList();
-            })
-            .catch(function(err) {
-                btn.disabled = false;
-                statusEl.textContent = (err && err.message === 'bad_response')
-                    ? 'Upload could not be verified automatically — please try again.'
-                    : 'Upload failed — please check your connection and try again.';
-            });
-    }
-
-    function removePoScreenshot(id) {
-        fetch('remove-po-screenshot.php', {
+        fetch('stash-po-draft.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'screenshot_id=' + encodeURIComponent(id)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         })
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                if (!data.success) { alert(data.message || 'Could not remove screenshot.'); return; }
-                poScreenshots = poScreenshots.filter(function(s) { return s.id !== id; });
-                poAcceptedTotal = parseFloat(data.accepted_total) || 0;
-                renderPoScreenshotList();
+                if (!data.success) {
+                    alert(data.message || 'Could not save your order. Please try again.');
+                    btn.disabled = false;
+                    return;
+                }
+                window.location.href = 'add-advance-payment.php?return_to=po&amount=' + encodeURIComponent(excess.toFixed(2));
             })
-            .catch(function() { alert('Could not remove screenshot — please check your connection.'); });
+            .catch(function() {
+                alert('Could not reach the server — please try again.');
+                btn.disabled = false;
+            });
     }
 
     $(function() {
         if ($('#pr_select').length) {
             $('#pr_select').select2({ placeholder: 'Search product…', allowClear: true, width: '100%' });
         }
-        renderPoScreenshotList();
         toggleDeliveryFields();
+
+        // Restore a draft saved before being sent to add-advance-payment.php.
+        var draft = <?=json_encode($poDraft)?>;
+        if (draft && draft.lines && draft.lines.length) {
+            poLines = draft.lines;
+            renderPoLines();
+
+            if (!draft.use_default_delivery_address) {
+                document.getElementById('useDefaultDeliveryAddress').checked = false;
+                toggleDeliveryFields();
+                var fieldMap = {
+                    custom_delivery_line1: draft.custom_delivery_line1,
+                    custom_delivery_line2: draft.custom_delivery_line2,
+                    custom_delivery_city: draft.custom_delivery_city,
+                    custom_delivery_district: draft.custom_delivery_district,
+                    custom_delivery_state: draft.custom_delivery_state,
+                    custom_delivery_country: draft.custom_delivery_country,
+                    custom_delivery_pincode: draft.custom_delivery_pincode
+                };
+                Object.keys(fieldMap).forEach(function(name) {
+                    var el = document.querySelector('[name="' + name + '"]');
+                    if (el && fieldMap[name]) el.value = fieldMap[name];
+                });
+            }
+        } else {
+            updatePoSummary();
+        }
     });
 
     function validatePoLines() {
@@ -776,9 +666,9 @@ $tpDeliveryAddressParts = array_filter([
         var total = poGrandTotal();
         var excess = total - advBalance;
 
-        if (excess > 0.001 && !poHasEligibleProof()) {
+        if (excess > 0.001 && !hasEligibleAdvanceSubmission) {
             alert('Your order total exceeds your available advance balance by ₹' + excess.toFixed(2) +
-                '. Please upload at least one payment screenshot for the excess amount before submitting.');
+                '. Please submit an advance payment for review before submitting this order.');
             return false;
         }
         return true;

@@ -20,12 +20,21 @@ mysqli_stmt_execute($balStmt);
 $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
 mysqli_stmt_close($balStmt);
 
+// Self-migrating: see upload-advance-payment-screenshot.php for the full
+// rationale — tracks whether a draft originated from a PO redirect vs a
+// direct visit, so a PO's excess amount never resurfaces on an unrelated
+// later visit.
+$_sourceCol = $db_conn->query("SHOW COLUMNS FROM tp_advance_payment_submissions LIKE 'source'");
+if ($_sourceCol && $_sourceCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_advance_payment_submissions ADD COLUMN source VARCHAR(10) NOT NULL DEFAULT 'direct' AFTER note");
+}
+
 // This TP's most recent in-progress draft submission (if any) — resumable
 // if the TP reloads mid-upload, same as add-purchase-order.php's unlinked
 // (po_id IS NULL) screenshot draft.
 $draftSubmission = null;
 $draftStmt = mysqli_prepare($db_conn,
-    "SELECT id, amount, payment_date, payment_mode, reference_number, note
+    "SELECT id, amount, payment_date, payment_mode, reference_number, note, source
      FROM tp_advance_payment_submissions
      WHERE territory_partner_id = ? AND status = 'draft' ORDER BY id DESC LIMIT 1"
 );
@@ -47,8 +56,31 @@ if ($draftSubmission) {
     mysqli_stmt_close($scrStmt);
 }
 
+// A draft with zero screenshots was never really started — most often it's
+// leftover from a previous visit that was abandoned before uploading
+// anything. Only a draft that already has proof attached represents a
+// genuinely in-progress submission worth continuing (mode/note/screenshots
+// resume from it). The row itself is still reused (via currentSubmissionId
+// in JS) so uploading doesn't create yet another orphan draft either way.
+$hasResumableDraft = $draftSubmission && !empty($draftScreenshots);
+
 $today = date("Y-m-d");
 $minDate = date("Y-m-d", strtotime("-2 days"));
+
+// When arriving from add-purchase-order.php (order total exceeds available
+// balance), prefill the amount with the shortfall and remember to bounce
+// the TP back to the PO page — with their cart already restored there via
+// stash-po-draft.php — once this submission is made.
+$returnToPo = ($_GET['return_to'] ?? '') === 'po';
+$prefillAmount = $returnToPo ? (float)($_GET['amount'] ?? 0) : 0;
+
+// Amount and UTR/reference specifically must NOT resume from a draft that
+// originated on a PO redirect (source='po') unless the *current* visit is
+// also that same PO-return flow — a PO's excess amount has nothing to do
+// with an unrelated later direct visit, even if the TP did upload a
+// screenshot for it before abandoning. A 'direct'-sourced draft's amount is
+// always safe to resume, since it was never tied to any specific order.
+$canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' || $returnToPo);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -139,6 +171,16 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
                         </div>
                         <br/>
 
+                        <?php if ($returnToPo): ?>
+                        <div class="apo-card" style="background:#eff6ff;border-color:#bfdbfe;">
+                            <div class="apo-card-title" style="margin-bottom:6px;"><i class="material-icons-outlined">info</i>Continuing Your Purchase Order</div>
+                            <div style="font-size:13.5px;color:#1e3a8a;">
+                                Your order total exceeds your available advance balance<?php if ($prefillAmount > 0): ?> by &#8377;<?=inr_format($prefillAmount, 2)?><?php endif; ?>.
+                                Submit this payment for review and you'll be sent straight back to finish your order — your cart is saved.
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <div class="apo-balance-card">
                             <i class="material-icons-outlined">account_balance_wallet</i>
                             <div>
@@ -166,36 +208,26 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
                         </div>
 
                         <div class="apo-card">
-                            <div class="apo-card-title"><i class="material-icons-outlined">payments</i>Payment Details</div>
+                            <div class="apo-card-title"><i class="material-icons-outlined">receipt_long</i>1. Upload Payment Screenshot</div>
+                            <div style="font-size:12.5px;color:#6b7280;margin-bottom:14px;margin-top:-6px;">
+                                Upload your payment screenshot first — the amount and UTR/reference number below will be
+                                read automatically from it. You can still review and correct them before submitting.
+                            </div>
 
-                            <div class="row g-2 mb-2">
-                                <div class="col-md-3">
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-4">
                                     <label class="form-label">Payment Date</label>
-                                    <input type="date" id="adv_payment_date" class="form-control" value="<?=htmlspecialchars($draftSubmission['payment_date'] ?? $today)?>" min="<?=$minDate?>" max="<?=$today?>">
+                                    <input type="date" id="adv_payment_date" class="form-control" value="<?=htmlspecialchars(($hasResumableDraft ? $draftSubmission['payment_date'] : null) ?? $today)?>" min="<?=$minDate?>" max="<?=$today?>">
                                     <small class="text-muted">Up to 2 days back only.</small>
                                 </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Amount Paid</label>
-                                    <input type="number" min="0" step="0.01" id="adv_amount" class="form-control" placeholder="0.00" value="<?=$draftSubmission ? htmlspecialchars($draftSubmission['amount']) : ''?>">
-                                </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label">Payment Mode</label>
                                     <select id="adv_payment_mode" class="form-control">
                                         <option value="">Select</option>
                                         <?php foreach (['UPI','NEFT','RTGS','IMPS','Bank Transfer','Cash','Cheque','Demand Draft','Other'] as $mode): ?>
-                                        <option value="<?=$mode?>" <?=($draftSubmission['payment_mode'] ?? '') === $mode ? 'selected' : ''?>><?=$mode?></option>
+                                        <option value="<?=$mode?>" <?=($hasResumableDraft && $draftSubmission['payment_mode'] === $mode) ? 'selected' : ''?>><?=$mode?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">UTR / Reference Number</label>
-                                    <input type="text" id="adv_reference" class="form-control" placeholder="UTR / Transaction ID" value="<?=$draftSubmission ? htmlspecialchars($draftSubmission['reference_number']) : ''?>">
-                                </div>
-                            </div>
-                            <div class="row g-2 mb-2">
-                                <div class="col-md-12">
-                                    <label class="form-label">Note (optional)</label>
-                                    <input type="text" id="adv_note" class="form-control" maxlength="500" placeholder="Any additional note for the reviewer" value="<?=$draftSubmission ? htmlspecialchars($draftSubmission['note'] ?? '') : ''?>">
                                 </div>
                             </div>
 
@@ -207,8 +239,34 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
                                 <small class="text-muted d-block mt-1">Max file size: 10 MB per image, up to 5 images. Each screenshot is verified individually.</small>
                                 <div id="advScreenshotStatus" class="mt-1" style="font-size:12.5px;"></div>
                             </div>
+                        </div>
 
-                            <div id="advReadyNote" style="display:none;font-size:12.5px;color:#065f46;margin-top:12px;">
+                        <div class="apo-card">
+                            <div class="apo-card-title"><i class="material-icons-outlined">payments</i>2. Confirm Payment Details</div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-6">
+                                    <label class="form-label">Amount Paid <span id="advAmountAutoTag" style="display:none;font-size:10.5px;font-weight:700;color:#0ea5e9;background:#e0f2fe;padding:1px 7px;border-radius:10px;margin-left:4px;">Auto-filled</span></label>
+                                    <?php
+                                    $amountValue = $canResumeAmount
+                                        ? $draftSubmission['amount']
+                                        : ($prefillAmount > 0 ? number_format($prefillAmount, 2, '.', '') : '');
+                                    ?>
+                                    <input type="number" min="0" step="0.01" id="adv_amount" class="form-control" placeholder="Detected automatically from your screenshot" value="<?=htmlspecialchars($amountValue)?>">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">UTR / Reference Number <span id="advRefAutoTag" style="display:none;font-size:10.5px;font-weight:700;color:#0ea5e9;background:#e0f2fe;padding:1px 7px;border-radius:10px;margin-left:4px;">Auto-filled</span></label>
+                                    <input type="text" id="adv_reference" class="form-control" placeholder="Detected automatically from your screenshot" value="<?=$canResumeAmount ? htmlspecialchars($draftSubmission['reference_number']) : ''?>">
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-12">
+                                    <label class="form-label">Note (optional)</label>
+                                    <input type="text" id="adv_note" class="form-control" maxlength="500" placeholder="Any additional note for the reviewer" value="<?=$hasResumableDraft ? htmlspecialchars($draftSubmission['note'] ?? '') : ''?>">
+                                </div>
+                            </div>
+
+                            <div id="advReadyNote" style="display:none;font-size:12.5px;color:#065f46;margin-top:4px;">
                                 <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">check_circle</i>
                                 At least one screenshot has been uploaded — you can submit for review.
                             </div>
@@ -236,6 +294,7 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
     <script>
     var MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024;
     var MAX_SCREENSHOTS = 5;
+    var returnToPo = <?=json_encode($returnToPo)?>;
     var currentSubmissionId = <?=$draftSubmission ? (int)$draftSubmission['id'] : 'null'?>;
     var advScreenshots = <?=json_encode(array_map(function($s) {
         return [
@@ -314,6 +373,20 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
         });
     }
 
+    // Only what can't be read from the screenshot itself needs to be picked
+    // before uploading — amount and UTR/reference get auto-filled from the
+    // detected result instead of being required up front.
+    function validateBeforeUpload() {
+        var mode = document.getElementById('adv_payment_mode').value;
+        var date = document.getElementById('adv_payment_date').value;
+
+        if (!date) { alert('Select a payment date.'); return false; }
+        if (!mode) { alert('Select a payment mode.'); return false; }
+        return true;
+    }
+
+    // Full check before actually submitting the draft for review — by this
+    // point amount/reference should be filled (auto or manually).
     function validateAdvanceForm() {
         var amount = parseFloat(document.getElementById('adv_amount').value);
         var mode = document.getElementById('adv_payment_mode').value;
@@ -336,7 +409,7 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
             alert('You can upload a maximum of ' + MAX_SCREENSHOTS + ' screenshots.');
             return;
         }
-        if (!validateAdvanceForm()) return;
+        if (!validateBeforeUpload()) return;
 
         var file = input.files[0];
         if (!file) { alert('Choose an image first.'); return; }
@@ -376,6 +449,39 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
         sendAdvanceScreenshot(file, file.name);
     }
 
+    // Fills Amount / UTR from whatever the just-uploaded screenshot detected
+    // — only into fields the TP hasn't already typed into themselves, so a
+    // second screenshot upload never silently overwrites a value they
+    // already reviewed/corrected. Rejected screenshots never carry a
+    // trustworthy amount/reference, so they're skipped entirely.
+    function autoFillFromScreenshot(screenshot) {
+        if (screenshot.status === 'rejected') return;
+
+        var amountEl = document.getElementById('adv_amount');
+        var refEl = document.getElementById('adv_reference');
+
+        if (screenshot.detected_amount !== null && screenshot.detected_amount !== undefined && !amountEl.value.trim()) {
+            amountEl.value = parseFloat(screenshot.detected_amount).toFixed(2);
+            document.getElementById('advAmountAutoTag').style.display = '';
+        }
+        if (screenshot.reference_number && !refEl.value.trim()) {
+            refEl.value = screenshot.reference_number;
+            document.getElementById('advRefAutoTag').style.display = '';
+        }
+    }
+
+    // Auto-filled fields are meant to be reviewed, not treated as locked —
+    // once the TP actually edits one by hand, drop the "Auto-filled" tag so
+    // it doesn't keep claiming credit for a value they've since changed.
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('adv_amount').addEventListener('input', function() {
+            document.getElementById('advAmountAutoTag').style.display = 'none';
+        });
+        document.getElementById('adv_reference').addEventListener('input', function() {
+            document.getElementById('advRefAutoTag').style.display = 'none';
+        });
+    });
+
     function sendAdvanceScreenshot(fileOrBlob, filename) {
         var input = document.getElementById('adv_screenshot_file');
         var statusEl = document.getElementById('advScreenshotStatus');
@@ -391,6 +497,7 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
         formData.append('reference_number', document.getElementById('adv_reference').value.trim());
         formData.append('note', document.getElementById('adv_note').value.trim());
         if (currentSubmissionId) formData.append('submission_id', currentSubmissionId);
+        if (returnToPo) formData.append('source', 'po');
 
         fetch('upload-advance-payment-screenshot.php', { method: 'POST', body: formData })
             .then(function(r) {
@@ -413,6 +520,7 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
                 advScreenshots.push(data.screenshot);
                 input.value = '';
                 statusEl.textContent = '';
+                autoFillFromScreenshot(data.screenshot);
                 renderAdvScreenshotList();
             })
             .catch(function(err) {
@@ -460,7 +568,10 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
                     btn.disabled = false;
                     return;
                 }
-                window.location.href = 'manage-advance-payments.php';
+                // Sent here from the PO page (excess over balance) — the
+                // cart/delivery draft is still saved server-side, so bounce
+                // straight back instead of the normal "My Advance Payments" list.
+                window.location.href = returnToPo ? 'add-purchase-order.php' : 'manage-advance-payments.php';
             })
             .catch(function() {
                 alert('Could not reach the server — please try again.');

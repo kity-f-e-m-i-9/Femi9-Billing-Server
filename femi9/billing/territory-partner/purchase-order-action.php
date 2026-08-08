@@ -91,32 +91,48 @@ $advBalance = max(0, round($advBalance - $reservedAmount, 2));
 
 $excessAmount = round(max(0, $grandTotal - $advBalance), 2);
 
+// Self-migrating: see add-purchase-order.php for the full rationale — this
+// column tells "already unlocked a different order" apart from "still
+// available," so one old submission can't silently cover every subsequent
+// over-balance order forever.
+$_usedForPoCol = $db_conn->query("SHOW COLUMNS FROM tp_advance_payment_submissions LIKE 'used_for_po_id'");
+if ($_usedForPoCol && $_usedForPoCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_advance_payment_submissions ADD COLUMN used_for_po_id INT UNSIGNED NULL AFTER advance_payment_id");
+}
+
+$claimSubmissionIds = [];
 if ($excessAmount > 0) {
     // Authoritative server-side gate — the total shown to the TP in the
-    // browser is a courtesy preview, not the source of truth. This only
-    // requires SOME non-rejected upload to exist, not that its amount adds
-    // up to the excess — a pending_review screenshot often has no
-    // detected_amount at all (OCR found it ambiguous, not necessarily
-    // wrong), and gating on a sum here just blocks genuine attempts.
-    // Company can still see and act on every screenshot via
-    // tp-today-orders.php before ever invoicing, so this isn't the only
-    // checkpoint. Rejected screenshots never count.
-    $scrStmt = mysqli_prepare($db_conn,
-        "SELECT COUNT(*) AS cnt
-         FROM tp_purchase_order_screenshots
-         WHERE territory_partner_id = ? AND po_id IS NULL AND status IN ('accepted', 'pending_review')"
+    // browser is a courtesy preview, not the source of truth. Only
+    // submissions not yet claimed by another order (used_for_po_id IS NULL)
+    // count; company reviews the actual payment before invoicing, so this
+    // isn't the only checkpoint. Rejected/draft submissions never count.
+    //
+    // Deliberately excludes status='accepted': its amount is already inside
+    // $advBalance above (an accepted submission becomes a real
+    // tp_advance_payments row via advance_payment_id) — counting it again
+    // here would double-count the same money against a second, unrelated
+    // order's excess. See the matching comment in add-purchase-order.php.
+    //
+    // Smallest-first so a small excess doesn't needlessly tie up a large
+    // submission that a bigger future order might actually need.
+    $advSubStmt = mysqli_prepare($db_conn,
+        "SELECT id, amount FROM tp_advance_payment_submissions
+         WHERE territory_partner_id = ? AND status = 'pending_review' AND used_for_po_id IS NULL
+         ORDER BY amount ASC"
     );
-    mysqli_stmt_bind_param($scrStmt, "i", $tp_id);
-    mysqli_stmt_execute($scrStmt);
-    $eligibleCount = (int)(mysqli_stmt_get_result($scrStmt)->fetch_assoc()['cnt'] ?? 0);
-    mysqli_stmt_close($scrStmt);
+    mysqli_stmt_bind_param($advSubStmt, "i", $tp_id);
+    mysqli_stmt_execute($advSubStmt);
+    $eligibleSubs = mysqli_stmt_get_result($advSubStmt)->fetch_all(MYSQLI_ASSOC);
+    mysqli_stmt_close($advSubStmt);
 
-    if ($eligibleCount < 1) {
+    if (empty($eligibleSubs)) {
         $_SESSION['errorMessage'] = 'Your order total exceeds your available advance balance by ₹' . number_format($excessAmount, 2)
-            . '. Please upload at least one payment screenshot for the excess amount before submitting.';
+            . '. Please submit an advance payment for review before submitting this order.';
         header("Location: add-purchase-order.php");
         exit;
     }
+    $claimSubmissionIds = array_column($eligibleSubs, 'id');
 }
 
 $db_conn->begin_transaction();
@@ -152,6 +168,23 @@ try {
     $link->bind_param("ii", $po_id, $tp_id);
     $link->execute();
     $link->close();
+
+    // Claim every advance-payment submission this order's excess-balance
+    // gate relied on, so none of them can silently unlock a later,
+    // unrelated order too. Re-checks used_for_po_id IS NULL here (not just
+    // in the SELECT above) to close the race window between that read and
+    // this write — if another request already claimed one in between, its
+    // UPDATE simply affects 0 rows for that id, which is fine.
+    if (!empty($claimSubmissionIds)) {
+        $claimStmt = $db_conn->prepare(
+            "UPDATE tp_advance_payment_submissions SET used_for_po_id = ? WHERE id = ? AND used_for_po_id IS NULL"
+        );
+        foreach ($claimSubmissionIds as $subId) {
+            $claimStmt->bind_param("ii", $po_id, $subId);
+            $claimStmt->execute();
+        }
+        $claimStmt->close();
+    }
 
     $db_conn->commit();
     $_SESSION['successMessage'] = 'Purchase order submitted successfully.';

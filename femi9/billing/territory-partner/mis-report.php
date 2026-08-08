@@ -102,6 +102,30 @@ $adv_balance = (float)mis_val($db_conn,
      WHERE territory_partner_id=? AND status='active' AND deleted_at IS NULL",
     'i', [$uid]);
 
+// ── Purchases (tp_invoices — TP buying stock from company/super-stockist)
+$purch_row = mis_row($db_conn,
+    "SELECT COUNT(*) cnt, COALESCE(SUM(total_amount),0) amount, COALESCE(SUM(courier_charges),0) courier
+     FROM tp_invoices WHERE territory_partner_id=? AND invoice_date BETWEEN ? AND ?",
+    'iss', [$uid, $from, $to]);
+$total_purch_invoices = (int)$purch_row['cnt'];
+$total_purch_amount   = (float)$purch_row['amount'];
+$total_purch_net      = $total_purch_amount - (float)$purch_row['courier'];
+
+$purch_units = (int)mis_val($db_conn,
+    "SELECT COALESCE(SUM(ii.quantity),0) FROM tp_invoice_items ii
+     JOIN tp_invoices i ON i.id = ii.tp_invoice_id
+     WHERE i.territory_partner_id=? AND i.invoice_date BETWEEN ? AND ?",
+    'iss', [$uid, $from, $to]);
+
+$prev_purch_amount = (float)mis_val($db_conn,
+    "SELECT COALESCE(SUM(total_amount),0) FROM tp_invoices
+     WHERE territory_partner_id=? AND invoice_date BETWEEN ? AND ?",
+    'iss', [$uid, $prev_from, $prev_to]);
+$purch_growth = $prev_purch_amount > 0
+    ? round((($total_purch_amount - $prev_purch_amount) / $prev_purch_amount) * 100, 1) : 0;
+
+$net_position = $total_revenue - $total_purch_amount;
+
 // Previous period KPI (for growth %)
 $prev_cust = mis_row($db_conn,
     "SELECT COALESCE(SUM(total),0) revenue FROM invoice
@@ -133,15 +157,24 @@ $daily_map = [];
 foreach ($daily_cust as $r) $daily_map[$r['d']]['cust'] = (float)$r['rev'];
 foreach ($daily_shop as $r) $daily_map[$r['d']]['shop'] = (float)$r['rev'];
 
+$daily_purch = mis_all($db_conn,
+    "SELECT invoice_date d, COALESCE(SUM(total_amount),0) amt FROM tp_invoices
+     WHERE territory_partner_id=? AND invoice_date BETWEEN ? AND ?
+     GROUP BY invoice_date ORDER BY invoice_date ASC",
+    'iss', [$uid, $from, $to]);
+$daily_purch_map = [];
+foreach ($daily_purch as $r) $daily_purch_map[$r['d']] = (float)$r['amt'];
+
 // Fill every date in range
 $ptr = strtotime($from);
 $end = strtotime($to);
-$chart_labels = $chart_cust = $chart_shop = [];
+$chart_labels = $chart_cust = $chart_shop = $chart_purch = [];
 while ($ptr <= $end) {
     $d = date('Y-m-d', $ptr);
     $chart_labels[] = date('d M', $ptr);
     $chart_cust[]   = $daily_map[$d]['cust'] ?? 0;
     $chart_shop[]   = $daily_map[$d]['shop'] ?? 0;
+    $chart_purch[]  = $daily_purch_map[$d] ?? 0;
     $ptr = strtotime('+1 day', $ptr);
 }
 
@@ -192,6 +225,60 @@ $product_sales = mis_all($db_conn,
     'isssisss', [$uid, $utype, $from, $to, $uid, $utype, $from, $to]);
 $grand_qty = array_sum(array_column($product_sales, 'total_qty')) ?: 1;
 $grand_rev = array_sum(array_column($product_sales, 'total_rev')) ?: 1;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4b. PURCHASES — period breakdown, product-wise, invoice list w/ payment status
+// ═══════════════════════════════════════════════════════════════════════════
+function period_purchases($db, $uid, $from, $to, $group_fmt, $label_fmt) {
+    $rows = mis_all($db,
+        "SELECT DATE_FORMAT(invoice_date, '$group_fmt') g, DATE_FORMAT(MIN(invoice_date), '$label_fmt') lbl,
+                COUNT(*) cnt, COALESCE(SUM(total_amount),0) amt
+         FROM tp_invoices WHERE territory_partner_id=? AND invoice_date BETWEEN ? AND ?
+         GROUP BY g ORDER BY g ASC",
+        'iss', [$uid, $from, $to]);
+    $map = [];
+    foreach ($rows as $r) $map[$r['g']] = ['lbl' => $r['lbl'], 'cnt' => (int)$r['cnt'], 'amt' => (float)$r['amt']];
+    return $map;
+}
+$daily_purch_periods   = period_purchases($db_conn, $uid, $from, $to, '%Y-%m-%d', '%d %b');
+$weekly_purch_periods  = period_purchases($db_conn, $uid, $from, $to, '%Y-%u', 'W%u %Y');
+$monthly_purch_periods = period_purchases($db_conn, $uid, $from, $to, '%Y-%m', '%b %Y');
+$yearly_purch_periods  = period_purchases($db_conn, $uid, $from, $to, '%Y', '%Y');
+
+$product_purchases = mis_all($db_conn,
+    "SELECT p.productName,
+            COALESCE(SUM(ii.quantity),0) total_qty,
+            COALESCE(SUM(ii.amount),0) total_amt
+     FROM tp_invoice_items ii
+     JOIN tp_invoices i ON i.id = ii.tp_invoice_id
+     JOIN products p ON p.id = ii.product_id
+     WHERE i.territory_partner_id=? AND i.invoice_date BETWEEN ? AND ?
+     GROUP BY p.id, p.productName ORDER BY total_qty DESC LIMIT 25",
+    'iss', [$uid, $from, $to]);
+$grand_purch_qty = array_sum(array_column($product_purchases, 'total_qty')) ?: 1;
+
+// Purchase invoice list with payment status (mirrors tpBillInfo() logic in manage-purchase-orders.php)
+$purchase_invoices = mis_all($db_conn,
+    "SELECT id, invoice_number, invoice_date, total_amount, courier_charges
+     FROM tp_invoices WHERE territory_partner_id=? AND invoice_date BETWEEN ? AND ?
+     ORDER BY invoice_date DESC, id DESC LIMIT 50",
+    'iss', [$uid, $from, $to]);
+foreach ($purchase_invoices as &$pi) {
+    $netAmount = round((float)$pi['total_amount'] - (float)$pi['courier_charges'], 2);
+    $paid = (float)mis_val($db_conn,
+        "SELECT COALESCE(SUM(deducted_amount),0) FROM tp_invoice_advance_log WHERE tp_invoice_id=?",
+        'i', [$pi['id']]);
+    if ($paid <= 0) {
+        $pi['payment_status'] = 'not_paid';
+    } elseif ($netAmount > 0 && ($paid + 0.01) >= $netAmount) {
+        $pi['payment_status'] = 'fully_paid';
+    } else {
+        $pi['payment_status'] = 'partially_paid';
+    }
+    $pi['net_amount'] = $netAmount;
+    $pi['paid_amount'] = $paid;
+}
+unset($pi);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. STATE / DISTRICT-WISE SALES (shop invoices only, via partner_location_nodes)
@@ -270,7 +357,14 @@ foreach ($target_rows as &$tr) {
     $tr['pct'] = $tr['target'] > 0 ? min(round($achieved / $tr['target'] * 100, 1), 999) : 0;
 }
 unset($tr);
-$total_achieved = array_sum(array_column($target_rows, 'achieved'));
+
+// Customer-invoice revenue has no state/district on the `customers` table, so it can
+// never match a specific location row above (those are shop-sale-only, via shop.state_id/
+// district_id). It still counts toward the TP's overall target, so it's added to the
+// grand total here rather than silently dropped.
+$located_achieved   = array_sum(array_column($target_rows, 'achieved'));
+$unlocated_achieved = (float)($cust_row['revenue'] ?? 0);
+$total_achieved      = $located_achieved + $unlocated_achieved;
 $overall_pct    = $total_target > 0 ? min(round($total_achieved / $total_target * 100, 1), 999) : 0;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -359,6 +453,7 @@ $return_by_month = mis_all($db_conn,
 $j_labels  = json_encode($chart_labels);
 $j_cust    = json_encode($chart_cust);
 $j_shop    = json_encode($chart_shop);
+$j_purch   = json_encode($chart_purch);
 $j_glabels = json_encode($growth_labels);
 $j_gvals   = json_encode(array_map('floatval', $growth_values));
 
@@ -382,49 +477,174 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" href="../../assets/images/neptune.png">
     <style>
-        .mis-section { margin-bottom: 32px; }
-        .mis-section-title {
-            font-size: 16px; font-weight: 700; color: #1a237e;
-            border-left: 4px solid #3f51b5; padding-left: 10px;
-            margin-bottom: 14px;
+        :root {
+            --ink: #1a1d29; --ink-soft: #5c6072; --ink-faint: #9598a6;
+            --line: #eceef4; --surface: #ffffff; --canvas: #f4f5fa;
+            --indigo: #4338ca; --indigo-soft: #eef0fd;
+            --teal: #0d9488; --teal-soft: #e6f7f5;
+            --amber: #d97706; --amber-soft: #fef3e2;
+            --rose: #dc2626; --rose-soft: #fdeaea;
+            --violet: #7c3aed; --violet-soft: #f3ecfe;
+            --green: #16a34a; --green-soft: #e8f8ed;
+            --shadow-sm: 0 1px 2px rgba(20,20,43,.04), 0 1px 1px rgba(20,20,43,.03);
+            --shadow-md: 0 4px 16px rgba(24,24,60,.06), 0 1px 3px rgba(24,24,60,.04);
+            --shadow-hover: 0 10px 28px rgba(24,24,60,.10), 0 2px 6px rgba(24,24,60,.05);
         }
-        .kpi-card { border-radius: 10px; padding: 18px 20px; color: #fff; position: relative; overflow: hidden; }
-        .kpi-card .kpi-icon { font-size: 40px; opacity: 0.25; position: absolute; right: 14px; top: 10px; }
-        .kpi-card .kpi-title { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; opacity: .85; }
-        .kpi-card .kpi-value { font-size: 26px; font-weight: 700; margin-top: 4px; line-height: 1.2; }
-        .kpi-card .kpi-sub { font-size: 12px; margin-top: 6px; opacity: .85; }
-        .bg-indigo   { background: linear-gradient(135deg, #3f51b5, #5c6bc0); }
-        .bg-teal     { background: linear-gradient(135deg, #00897b, #26a69a); }
-        .bg-orange   { background: linear-gradient(135deg, #ef6c00, #ffa726); }
-        .bg-crimson  { background: linear-gradient(135deg, #c62828, #e53935); }
-        .bg-purple   { background: linear-gradient(135deg, #7b1fa2, #ab47bc); }
-        .mis-filter-bar { background: #f5f6fa; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; }
-        .mis-filter-bar .preset-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .preset-btn { padding: 5px 14px; border-radius: 20px; border: 1.5px solid #3f51b5;
-                      color: #3f51b5; background: #fff; font-size: 12px; cursor: pointer; }
-        .preset-btn.active, .preset-btn:hover { background: #3f51b5; color: #fff; }
-        .tab-nav { display: flex; gap: 0; border-bottom: 2px solid #e0e0e0; margin-bottom: 16px; }
-        .tab-nav .tab-item { padding: 8px 20px; cursor: pointer; font-size: 13px; font-weight: 600;
-                             color: #666; border-bottom: 3px solid transparent; margin-bottom: -2px; }
-        .tab-nav .tab-item.active { color: #3f51b5; border-bottom-color: #3f51b5; }
-        .tab-content { display: none; } .tab-content.active { display: block; }
-        .mis-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .mis-table th { background: #f5f6fa; font-weight: 700; padding: 9px 12px; text-align: left; border-bottom: 2px solid #e0e0e0; }
-        .mis-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-        .mis-table tr:hover td { background: #fafbff; }
-        .progress-bar-mis { height: 8px; border-radius: 4px; background: #e8eaf6; overflow: hidden; min-width: 80px; }
-        .progress-fill { height: 100%; border-radius: 4px; transition: width .3s; }
-        .badge-rev { background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
-        .badge-qty { background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
-        .badge-paid     { background: #e8f5e9; color: #2e7d32; }
-        .badge-partial  { background: #fff8e1; color: #e65100; }
-        .badge-unpaid   { background: #ffebee; color: #c62828; }
-        .status-badge   { padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
-        .growth-pos { color: #2e7d32; font-weight: 700; }
-        .growth-neg { color: #c62828; font-weight: 700; }
+        body { background: var(--canvas); }
+        .container-fluid { max-width: 1440px; }
+
+        /* ── Page header ─────────────────────────────────────────── */
+        .mis-page-title {
+            font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -.3px;
+            display: flex; align-items: center; gap: 10px; margin-bottom: 2px;
+        }
+        .mis-page-title .icon-chip {
+            width: 38px; height: 38px; border-radius: 11px; display: inline-flex;
+            align-items: center; justify-content: center; background: var(--indigo-soft); color: var(--indigo);
+            flex-shrink: 0;
+        }
+        .mis-page-sub { font-size: 13px; color: var(--ink-faint); margin: 0 0 20px 48px; }
+
+        /* ── Filter bar ──────────────────────────────────────────── */
+        .mis-filter-bar {
+            background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+            padding: 16px 20px; margin-bottom: 28px; box-shadow: var(--shadow-sm);
+        }
+        .mis-filter-bar .preset-btns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .mis-filter-bar label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .4px; color: var(--ink-faint); display: block; margin-bottom: 4px; }
+        .mis-filter-bar .form-control-sm {
+            border-radius: 8px; border: 1px solid #dfe1eb; font-size: 13px;
+        }
+        .mis-filter-bar .form-control-sm:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-soft); }
+        .mis-filter-bar .btn-primary {
+            background: var(--indigo); border-color: var(--indigo); border-radius: 8px;
+            font-size: 13px; font-weight: 600; padding: 6px 16px;
+        }
+        .mis-filter-bar .btn-primary:hover { background: #372ea8; border-color: #372ea8; }
+        .preset-btn {
+            padding: 6px 15px; border-radius: 20px; border: 1px solid #e2e4ee;
+            color: var(--ink-soft); background: var(--surface); font-size: 12.5px; font-weight: 600;
+            cursor: pointer; text-decoration: none; transition: all .15s ease;
+        }
+        .preset-btn:hover { border-color: var(--indigo); color: var(--indigo); text-decoration: none; }
+        .preset-btn.active { background: var(--indigo); color: #fff; border-color: var(--indigo); }
+        .mis-range-pill {
+            font-size: 12px; color: var(--ink-soft); margin-top: 12px; padding-top: 12px;
+            border-top: 1px dashed var(--line); display: flex; align-items: center; gap: 6px;
+        }
+        .mis-range-pill .material-icons-outlined { font-size: 15px; color: var(--ink-faint); }
+
+        /* ── Section grouping ────────────────────────────────────── */
+        .mis-section { margin-bottom: 30px; }
+        .mis-subhead {
+            font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px;
+            color: var(--ink-soft); margin: 2px 2px 12px; display: flex; align-items: center; gap: 8px;
+        }
+        .mis-subhead::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+        .mis-subhead .dot { width: 7px; height: 7px; border-radius: 50%; }
+        .mis-subhead .dot.sales { background: var(--indigo); }
+        .mis-subhead .dot.purch { background: var(--violet); }
+
+        /* ── KPI tiles ───────────────────────────────────────────── */
+        .kpi-card {
+            border-radius: 14px; padding: 16px 18px; background: var(--surface);
+            border: 1px solid var(--line); box-shadow: var(--shadow-sm);
+            position: relative; overflow: hidden; height: 100%;
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+        .kpi-card .kpi-icon-chip {
+            width: 34px; height: 34px; border-radius: 9px; display: inline-flex;
+            align-items: center; justify-content: center; margin-bottom: 10px;
+        }
+        .kpi-card .kpi-icon-chip .material-icons-outlined { font-size: 18px; }
+        .kpi-card .kpi-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .4px; color: var(--ink-faint); }
+        .kpi-card .kpi-value { font-size: 24px; font-weight: 800; margin-top: 3px; line-height: 1.2; color: var(--ink); }
+        .kpi-card .kpi-sub { font-size: 12px; margin-top: 7px; color: var(--ink-faint); font-weight: 500; }
+        .kpi-card .kpi-sub .up { color: var(--green); font-weight: 700; }
+        .kpi-card .kpi-sub .down { color: var(--rose); font-weight: 700; }
+        .chip-indigo { background: var(--indigo-soft); color: var(--indigo); }
+        .chip-teal   { background: var(--teal-soft); color: var(--teal); }
+        .chip-amber  { background: var(--amber-soft); color: var(--amber); }
+        .chip-rose   { background: var(--rose-soft); color: var(--rose); }
+        .chip-violet { background: var(--violet-soft); color: var(--violet); }
+        .chip-green  { background: var(--green-soft); color: var(--green); }
+        .kpi-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+        .kpi-card.negative .kpi-value { color: var(--rose); }
+        .kpi-card.positive .kpi-value { color: var(--green); }
+
+        /* ── Cards / panels ──────────────────────────────────────── */
+        .card { border-radius: 14px !important; border: 1px solid var(--line) !important;
+            box-shadow: var(--shadow-sm) !important; }
+        .card-header {
+            background: transparent !important; border-bottom: 1px solid var(--line) !important;
+            padding: 16px 20px !important; display: flex; align-items: center; gap: 10px;
+        }
+        .card-header .card-title { font-size: 14.5px !important; font-weight: 700 !important; color: var(--ink); margin: 0; }
+        .card-header .hdr-icon {
+            width: 28px; height: 28px; border-radius: 8px; display: inline-flex;
+            align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .card-header .hdr-icon .material-icons-outlined { font-size: 16px; }
+        .card-body { padding: 18px 20px !important; }
+
+        /* ── Tabs ────────────────────────────────────────────────── */
+        .tab-nav { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+        .tab-nav .tab-item { padding: 8px 18px; cursor: pointer; font-size: 13px; font-weight: 600;
+                             color: var(--ink-faint); border-bottom: 2px solid transparent; margin-bottom: -1px;
+                             border-radius: 8px 8px 0 0; transition: all .12s ease; }
+        .tab-nav .tab-item:hover { color: var(--indigo); background: var(--indigo-soft); }
+        .tab-nav .tab-item.active { color: var(--indigo); border-bottom-color: var(--indigo); background: transparent; }
+        .tab-content { display: none; } .tab-content.active { display: block; animation: fadein .2s ease; }
+        @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+
+        /* ── Tables ──────────────────────────────────────────────── */
+        .mis-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+        .mis-table th {
+            background: var(--canvas); font-weight: 700; font-size: 11.5px; text-transform: uppercase;
+            letter-spacing: .3px; color: var(--ink-soft); padding: 10px 14px; text-align: left;
+            position: sticky; top: 0; z-index: 1;
+        }
+        .mis-table th:first-child { border-radius: 8px 0 0 8px; }
+        .mis-table th:last-child { border-radius: 0 8px 8px 0; }
+        .mis-table td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; color: var(--ink); }
+        .mis-table tbody tr:last-child td { border-bottom: none; }
+        .mis-table tbody tr:hover td { background: var(--indigo-soft); }
+        .mis-table tbody tr:nth-child(even) td { background: #fbfbfe; }
+        .mis-table tbody tr:nth-child(even):hover td { background: var(--indigo-soft); }
+
+        /* ── Misc chips / badges ─────────────────────────────────── */
+        .progress-bar-mis { height: 7px; border-radius: 6px; background: var(--canvas); overflow: hidden; min-width: 70px; }
+        .progress-fill { height: 100%; border-radius: 6px; transition: width .4s ease; }
+        .badge-rev { background: var(--green-soft); color: var(--green); padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+        .badge-qty { background: var(--indigo-soft); color: var(--indigo); padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+        .badge-paid     { background: var(--green-soft); color: var(--green); }
+        .badge-partial  { background: var(--amber-soft); color: var(--amber); }
+        .badge-unpaid   { background: var(--rose-soft); color: var(--rose); }
+        .status-badge   { padding: 4px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+        .growth-pos { color: var(--green); font-weight: 700; }
+        .growth-neg { color: var(--rose); font-weight: 700; }
+        .rank-badge {
+            display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+            border-radius: 7px; background: var(--canvas); color: var(--ink-soft); font-size: 11.5px; font-weight: 800;
+        }
+        .rank-badge.top1 { background: #fff4d6; color: #b45309; }
+        .rank-badge.top2 { background: #eef0f4; color: #52525b; }
+        .rank-badge.top3 { background: #fbe4d5; color: #9a3412; }
         .chart-container { position: relative; height: 260px; }
-        .section-note { font-size: 12px; color: #888; margin-bottom: 8px; }
-        @media(max-width: 768px) { .kpi-card .kpi-value { font-size: 20px; } }
+        .section-note { font-size: 12px; color: var(--ink-faint); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .empty-state { text-align: center; padding: 36px 20px; color: var(--ink-faint); }
+        .empty-state .material-icons-outlined { font-size: 32px; opacity: .4; display: block; margin: 0 auto 8px; }
+        .stat-tile { background: var(--canvas); padding: 16px; border-radius: 12px; text-align: center; }
+        .stat-tile .stat-label { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; font-weight: 700; letter-spacing: .4px; }
+        .stat-tile .stat-value { font-size: 22px; font-weight: 800; color: var(--ink); margin-top: 4px; }
+
+        @media(max-width: 768px) {
+            .kpi-card .kpi-value { font-size: 19px; }
+            .mis-page-title { font-size: 18px; }
+        }
     </style>
 </head>
 <body>
@@ -440,28 +660,27 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                 <div class="container-fluid">
 
                     <!-- Page header -->
-                    <div class="row mb-2">
-                        <div class="col">
-                            <div class="page-description" style="margin-left:-10px;">
-                                <h1><i class="material-icons-outlined" style="vertical-align:middle;margin-right:6px;">assessment</i>MIS Report</h1>
-                            </div>
-                        </div>
+                    <div class="mis-page-title">
+                        <span class="icon-chip"><i class="material-icons-outlined">assessment</i></span>
+                        MIS Report — Sales &amp; Purchases
                     </div>
+                    <div class="mis-page-sub">A complete view of your sales, purchases, targets and outstanding dues.</div>
 
                     <!-- ── FILTER BAR ──────────────────────────────────────── -->
                     <div class="mis-filter-bar">
-                        <form method="get" id="filterForm" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+                        <form method="get" id="filterForm" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
                             <div>
-                                <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px;">From</label>
-                                <input type="date" name="from" class="form-control form-control-sm" value="<?php echo $from; ?>" style="width:150px;">
+                                <label>From</label>
+                                <input type="date" name="from" class="form-control form-control-sm" value="<?php echo $from; ?>" style="width:155px;">
                             </div>
                             <div>
-                                <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px;">To</label>
-                                <input type="date" name="to" class="form-control form-control-sm" value="<?php echo $to; ?>" style="width:150px;">
+                                <label>To</label>
+                                <input type="date" name="to" class="form-control form-control-sm" value="<?php echo $to; ?>" style="width:155px;">
                             </div>
                             <div>
-                                <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px;">&nbsp;</label>
-                                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="material-icons-outlined" style="font-size:14px;vertical-align:-2px;">search</i> Apply
+                                </button>
                             </div>
                             <div class="preset-btns" style="margin-left:auto;align-self:flex-end;">
                                 <a href="?preset=today"  class="preset-btn <?php echo $preset==='today'  ? 'active':'' ?>">Today</a>
@@ -470,68 +689,114 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                 <a href="?preset=year"   class="preset-btn <?php echo $preset==='year'   ? 'active':'' ?>">This Year</a>
                             </div>
                         </form>
-                        <div style="font-size:12px;color:#888;margin-top:8px;">
-                            Showing data for: <b><?php echo date('d M Y', strtotime($from)); ?></b>
-                            to <b><?php echo date('d M Y', strtotime($to)); ?></b>
+                        <div class="mis-range-pill">
+                            <i class="material-icons-outlined">event</i>
+                            Showing <b><?php echo date('d M Y', strtotime($from)); ?></b> to <b><?php echo date('d M Y', strtotime($to)); ?></b>
+                            <span style="color:var(--ink-faint);">(<?php echo $days_diff + 1; ?> days)</span>
                         </div>
                     </div>
 
                     <!-- ══════════════════════════════════════════════════════
                          KPI CARDS
                     ═══════════════════════════════════════════════════════ -->
+                    <div class="mis-subhead"><span class="dot sales"></span>Sales</div>
                     <div class="row mis-section">
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="kpi-card bg-indigo">
-                                <i class="material-icons-outlined kpi-icon">payments</i>
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip chip-indigo"><i class="material-icons-outlined">payments</i></span>
                                 <div class="kpi-title">Total Revenue</div>
                                 <div class="kpi-value">&#x20B9;<?php echo inr_format($total_revenue, 0); ?></div>
                                 <div class="kpi-sub">
                                     <?php if ($revenue_growth != 0): ?>
-                                    <span style="<?php echo $revenue_growth >= 0 ? 'color:#b2ff59' : 'color:#ff8a80'; ?>">
-                                        <?php echo $revenue_growth >= 0 ? '▲' : '▼'; ?> <?php echo abs($revenue_growth); ?>% vs prev
-                                    </span>
+                                    <span class="<?php echo $revenue_growth >= 0 ? 'up' : 'down'; ?>">
+                                        <?php echo $revenue_growth >= 0 ? '▲' : '▼'; ?> <?php echo abs($revenue_growth); ?>%
+                                    </span> vs prev period
                                     <?php else: ?>vs previous period<?php endif; ?>
                                 </div>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="kpi-card bg-teal">
-                                <i class="material-icons-outlined kpi-icon">receipt_long</i>
-                                <div class="kpi-title">Invoices</div>
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip chip-teal"><i class="material-icons-outlined">receipt_long</i></span>
+                                <div class="kpi-title">Sales Invoices</div>
                                 <div class="kpi-value"><?php echo inr_format($total_invoices, 0); ?></div>
-                                <div class="kpi-sub">Cust: <?php echo $cust_row['cnt'] ?? 0; ?> &nbsp;|&nbsp; Shop: <?php echo $shop_row['cnt'] ?? 0; ?></div>
+                                <div class="kpi-sub">Cust: <b><?php echo $cust_row['cnt'] ?? 0; ?></b> &nbsp;·&nbsp; Shop: <b><?php echo $shop_row['cnt'] ?? 0; ?></b></div>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="kpi-card bg-orange">
-                                <i class="material-icons-outlined kpi-icon">inventory_2</i>
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip chip-amber"><i class="material-icons-outlined">inventory_2</i></span>
                                 <div class="kpi-title">Units Sold</div>
                                 <div class="kpi-value"><?php echo inr_format($total_units, 0); ?></div>
-                                <div class="kpi-sub">Cust: <?php echo inr_format($cust_units, 0); ?> &nbsp;|&nbsp; Shop: <?php echo inr_format($shop_units, 0); ?></div>
+                                <div class="kpi-sub">Cust: <b><?php echo inr_format($cust_units, 0); ?></b> &nbsp;·&nbsp; Shop: <b><?php echo inr_format($shop_units, 0); ?></b></div>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="kpi-card bg-crimson">
-                                <i class="material-icons-outlined kpi-icon">keyboard_return</i>
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip chip-rose"><i class="material-icons-outlined">keyboard_return</i></span>
                                 <div class="kpi-title">Returns</div>
                                 <div class="kpi-value"><?php echo inr_format($total_returns, 0); ?></div>
                                 <div class="kpi-sub">&#x20B9;<?php echo inr_format($total_return_amt, 0); ?> returned</div>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="kpi-card bg-purple">
-                                <i class="material-icons-outlined kpi-icon">account_balance_wallet</i>
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip chip-violet"><i class="material-icons-outlined">account_balance_wallet</i></span>
                                 <div class="kpi-title">Advance Balance</div>
                                 <div class="kpi-value">&#x20B9;<?php echo inr_format($adv_balance, 0); ?></div>
-                                <div class="kpi-sub">Available advance</div>
+                                <div class="kpi-sub">Available to use</div>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="kpi-card" style="background:linear-gradient(135deg,#00695c,#00897b);">
-                                <i class="material-icons-outlined kpi-icon">flag</i>
-                                <div class="kpi-title">Target vs Achieved</div>
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip chip-green"><i class="material-icons-outlined">flag</i></span>
+                                <div class="kpi-title">Target Achieved</div>
                                 <div class="kpi-value"><?php echo $overall_pct; ?>%</div>
-                                <div class="kpi-sub">&#x20B9;<?php echo inr_format($total_achieved, 0); ?> / &#x20B9;<?php echo inr_format($total_target, 0); ?></div>
+                                <div class="kpi-sub">&#x20B9;<?php echo inr_format($total_achieved, 0); ?> of &#x20B9;<?php echo inr_format($total_target, 0); ?></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mis-subhead"><span class="dot purch"></span>Purchases</div>
+                    <div class="row mis-section">
+                        <div class="col-xl-3 col-md-6 col-6 mb-3">
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip chip-violet"><i class="material-icons-outlined">shopping_cart</i></span>
+                                <div class="kpi-title">Total Purchases</div>
+                                <div class="kpi-value">&#x20B9;<?php echo inr_format($total_purch_amount, 0); ?></div>
+                                <div class="kpi-sub">
+                                    <?php if ($purch_growth != 0): ?>
+                                    <span class="<?php echo $purch_growth >= 0 ? 'down' : 'up'; ?>">
+                                        <?php echo $purch_growth >= 0 ? '▲' : '▼'; ?> <?php echo abs($purch_growth); ?>%
+                                    </span> vs prev period
+                                    <?php else: ?>vs previous period<?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6 col-6 mb-3">
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip chip-teal"><i class="material-icons-outlined">receipt</i></span>
+                                <div class="kpi-title">Purchase Invoices</div>
+                                <div class="kpi-value"><?php echo inr_format($total_purch_invoices, 0); ?></div>
+                                <div class="kpi-sub"><?php echo inr_format((int)$purch_units, 0); ?> units purchased</div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6 col-6 mb-3">
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip" style="background:#eceff1;color:#455a64;"><i class="material-icons-outlined">local_shipping</i></span>
+                                <div class="kpi-title">Net Purchase</div>
+                                <div class="kpi-value">&#x20B9;<?php echo inr_format($total_purch_net, 0); ?></div>
+                                <div class="kpi-sub">Excl. courier &#x20B9;<?php echo inr_format($purch_row['courier'] ?? 0, 0); ?></div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6 col-6 mb-3">
+                            <div class="kpi-card <?php echo $net_position >= 0 ? 'positive' : 'negative'; ?>">
+                                <span class="kpi-icon-chip <?php echo $net_position >= 0 ? 'chip-green' : 'chip-rose'; ?>">
+                                    <i class="material-icons-outlined"><?php echo $net_position >= 0 ? 'trending_up' : 'trending_down'; ?></i>
+                                </span>
+                                <div class="kpi-title">Net Position</div>
+                                <div class="kpi-value"><?php echo $net_position >= 0 ? '+' : '−'; ?>&#x20B9;<?php echo inr_format(abs($net_position), 0); ?></div>
+                                <div class="kpi-sub">Sales − Purchases</div>
                             </div>
                         </div>
                     </div>
@@ -540,31 +805,31 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                          SALES TREND CHART
                     ═══════════════════════════════════════════════════════ -->
                     <div class="row mis-section">
-                        <div class="col-xl-8">
+                        <div class="col-xl-8 mb-4">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">Daily Sales Trend</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-indigo"><i class="material-icons-outlined">show_chart</i></span><h5 class="card-title">Daily Sales &amp; Purchase Trend</h5></div>
                                 <div class="card-body">
                                     <div class="chart-container"><canvas id="trendChart"></canvas></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-4">
+                        <div class="col-xl-4 mb-4">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">Order Status</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-amber"><i class="material-icons-outlined">pie_chart</i></span><h5 class="card-title">Order Status</h5></div>
                                 <div class="card-body">
                                     <div class="chart-container"><canvas id="statusChart"></canvas></div>
-                                    <div class="mt-3">
-                                        <div class="d-flex justify-content-between mb-2">
+                                    <div class="mt-3" style="display:flex;flex-direction:column;gap:8px;">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-soft);border-radius:10px;padding:8px 12px;">
                                             <span class="status-badge badge-paid">Fully Paid</span>
-                                            <span><?php echo $os_paid; ?> invoices — &#x20B9;<?php echo inr_format($os_paid_amt, 0); ?></span>
+                                            <span style="font-size:12.5px;font-weight:600;color:var(--ink);"><?php echo $os_paid; ?> inv · &#x20B9;<?php echo inr_format($os_paid_amt, 0); ?></span>
                                         </div>
-                                        <div class="d-flex justify-content-between mb-2">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--amber-soft);border-radius:10px;padding:8px 12px;">
                                             <span class="status-badge badge-partial">Partially Paid</span>
-                                            <span><?php echo $os_partial; ?> invoices — &#x20B9;<?php echo inr_format($os_partial_amt, 0); ?></span>
+                                            <span style="font-size:12.5px;font-weight:600;color:var(--ink);"><?php echo $os_partial; ?> inv · &#x20B9;<?php echo inr_format($os_partial_amt, 0); ?></span>
                                         </div>
-                                        <div class="d-flex justify-content-between">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--rose-soft);border-radius:10px;padding:8px 12px;">
                                             <span class="status-badge badge-unpaid">Unpaid</span>
-                                            <span><?php echo $os_unpaid; ?> invoices — &#x20B9;<?php echo inr_format($os_unpaid_amt, 0); ?></span>
+                                            <span style="font-size:12.5px;font-weight:600;color:var(--ink);"><?php echo $os_unpaid; ?> inv · &#x20B9;<?php echo inr_format($os_unpaid_amt, 0); ?></span>
                                         </div>
                                     </div>
                                 </div>
@@ -576,9 +841,10 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                          PERIOD BREAKDOWN (tabs)
                     ═══════════════════════════════════════════════════════ -->
                     <div class="row mis-section">
-                        <div class="col-xl-12">
+                        <div class="col-xl-12 mb-4">
                             <div class="card">
                                 <div class="card-header">
+                                    <span class="hdr-icon chip-indigo"><i class="material-icons-outlined">calendar_view_week</i></span>
                                     <h5 class="card-title">Sales Breakdown by Period</h5>
                                 </div>
                                 <div class="card-body">
@@ -594,7 +860,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                         $active = $tab_id === 'daily' ? 'active' : '';
                                         echo "<div class='tab-content $active' id='tab-$tab_id'>";
                                         if (empty($data)) {
-                                            echo "<p class='text-muted text-center py-3'>No data for this period.</p>";
+                                            echo "<div class='empty-state'><i class='material-icons-outlined'>event_busy</i>No data for this period.</div>";
                                             echo "</div>"; return;
                                         }
                                         $grand_rev = array_sum(array_map(fn($r) => ($r['cust'] ?? 0) + ($r['shop'] ?? 0), $data));
@@ -605,10 +871,12 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             $cnt  = ($r['cust_cnt'] ?? 0) + ($r['shop_cnt'] ?? 0);
                                             $pct  = $grand_rev > 0 ? round($rev / $grand_rev * 100, 1) : 0;
                                             $lbl  = $r['lbl'] ?? $g;
+                                            $cust_cnt = $r['cust_cnt'] ?? 0;
+                                            $shop_cnt = $r['shop_cnt'] ?? 0;
                                             echo "<tr>
                                                 <td><b>$lbl</b></td>
-                                                <td>&#x20B9;" . inr_format($r['cust'] ?? 0, 2) . " <small>({$r['cust_cnt']})</small></td>
-                                                <td>&#x20B9;" . inr_format($r['shop'] ?? 0, 2) . " <small>({$r['shop_cnt']})</small></td>
+                                                <td>&#x20B9;" . inr_format($r['cust'] ?? 0, 2) . " <small>($cust_cnt)</small></td>
+                                                <td>&#x20B9;" . inr_format($r['shop'] ?? 0, 2) . " <small>($shop_cnt)</small></td>
                                                 <td><b>&#x20B9;" . inr_format($rev, 2) . "</b></td>
                                                 <td>$cnt</td>
                                                 <td><div class='d-flex align-items-center gap-2'>
@@ -633,12 +901,12 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                          PRODUCT-WISE SALES
                     ═══════════════════════════════════════════════════════ -->
                     <div class="row mis-section">
-                        <div class="col-xl-7">
+                        <div class="col-xl-7 mb-4">
                             <div class="card h-100">
-                                <div class="card-header"><h5 class="card-title">Product-wise Sales</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-teal"><i class="material-icons-outlined">inventory_2</i></span><h5 class="card-title">Product-wise Sales</h5></div>
                                 <div class="card-body" style="overflow-x:auto">
                                     <?php if (empty($product_sales)): ?>
-                                        <p class="text-muted text-center py-3">No product sales in this period.</p>
+                                        <div class="empty-state"><i class="material-icons-outlined">inventory_2</i>No product sales in this period.</div>
                                     <?php else: ?>
                                     <table class="mis-table">
                                         <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Revenue (incl. GST)</th><th>% Qty</th></tr></thead>
@@ -649,7 +917,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             $bar_color = $i === 0 ? '#f44336' : ($i === 1 ? '#ff9800' : ($i === 2 ? '#4caf50' : '#3f51b5'));
                                             ?>
                                             <tr>
-                                                <td><?php echo $i+1; ?></td>
+                                                <td><span class="rank-badge <?php echo $i===0?'top1':($i===1?'top2':($i===2?'top3':'')); ?>"><?php echo $i+1; ?></span></td>
                                                 <td><b><?php echo htmlspecialchars($p['productName']); ?></b></td>
                                                 <td><span class="badge-qty"><?php echo inr_format((int)$p['total_qty'], 0); ?> u</span></td>
                                                 <td><span class="badge-rev">&#x20B9;<?php echo inr_format($p['total_rev'], 2); ?></span></td>
@@ -667,11 +935,134 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-5">
+                        <div class="col-xl-5 mb-4">
                             <div class="card h-100">
-                                <div class="card-header"><h5 class="card-title">Product Mix (Top 8)</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-teal"><i class="material-icons-outlined">donut_small</i></span><h5 class="card-title">Product Mix (Top 8)</h5></div>
                                 <div class="card-body">
                                     <div class="chart-container"><canvas id="productChart"></canvas></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ══════════════════════════════════════════════════════
+                         PURCHASES — Period Breakdown
+                    ═══════════════════════════════════════════════════════ -->
+                    <div class="row mis-section">
+                        <div class="col-xl-12 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <span class="hdr-icon chip-violet"><i class="material-icons-outlined">calendar_view_week</i></span>
+                                    <h5 class="card-title">Purchases Breakdown by Period</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="tab-nav" id="purchPeriodTabs">
+                                        <div class="tab-item active" data-tab="pdaily">Daily</div>
+                                        <div class="tab-item" data-tab="pweekly">Weekly</div>
+                                        <div class="tab-item" data-tab="pmonthly">Monthly</div>
+                                        <div class="tab-item" data-tab="pyearly">Yearly</div>
+                                    </div>
+
+                                    <?php
+                                    function render_purch_period_table($data, $tab_id) {
+                                        $active = $tab_id === 'pdaily' ? 'active' : '';
+                                        echo "<div class='tab-content $active' id='tab-$tab_id'>";
+                                        if (empty($data)) {
+                                            echo "<div class='empty-state'><i class='material-icons-outlined'>event_busy</i>No purchases for this period.</div>";
+                                            echo "</div>"; return;
+                                        }
+                                        $grand = array_sum(array_column($data, 'amt')) ?: 1;
+                                        echo "<div style='overflow-x:auto'><table class='mis-table'>";
+                                        echo "<thead><tr><th>Period</th><th>Purchase Invoices</th><th>Amount</th><th>Share</th></tr></thead><tbody>";
+                                        foreach ($data as $g => $r) {
+                                            $pct = $grand > 0 ? round($r['amt'] / $grand * 100, 1) : 0;
+                                            echo "<tr>
+                                                <td><b>{$r['lbl']}</b></td>
+                                                <td>{$r['cnt']}</td>
+                                                <td><b>&#x20B9;" . inr_format($r['amt'], 2) . "</b></td>
+                                                <td><div class='d-flex align-items-center gap-2'>
+                                                    <div class='progress-bar-mis' style='width:80px'><div class='progress-fill' style='width:{$pct}%;background:#7e57c2'></div></div>
+                                                    <span style='font-size:12px'>$pct%</span>
+                                                </div></td>
+                                            </tr>";
+                                        }
+                                        echo "</tbody></table></div></div>";
+                                    }
+                                    render_purch_period_table($daily_purch_periods, 'pdaily');
+                                    render_purch_period_table($weekly_purch_periods, 'pweekly');
+                                    render_purch_period_table($monthly_purch_periods, 'pmonthly');
+                                    render_purch_period_table($yearly_purch_periods, 'pyearly');
+                                    ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ══════════════════════════════════════════════════════
+                         PURCHASES — Product-wise & Invoice List
+                    ═══════════════════════════════════════════════════════ -->
+                    <div class="row mis-section">
+                        <div class="col-xl-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header"><span class="hdr-icon chip-violet"><i class="material-icons-outlined">shopping_cart</i></span><h5 class="card-title">Product-wise Purchases</h5></div>
+                                <div class="card-body" style="overflow-x:auto">
+                                    <?php if (empty($product_purchases)): ?>
+                                        <div class="empty-state"><i class="material-icons-outlined">shopping_cart</i>No product purchases in this period.</div>
+                                    <?php else: ?>
+                                    <table class="mis-table">
+                                        <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Amount</th><th>% Qty</th></tr></thead>
+                                        <tbody>
+                                        <?php foreach ($product_purchases as $i => $p): ?>
+                                            <?php $pct_qty = $grand_purch_qty > 0 ? round($p['total_qty'] / $grand_purch_qty * 100, 1) : 0; ?>
+                                            <tr>
+                                                <td><span class="rank-badge <?php echo $i===0?'top1':($i===1?'top2':($i===2?'top3':'')); ?>"><?php echo $i+1; ?></span></td>
+                                                <td><b><?php echo htmlspecialchars($p['productName']); ?></b></td>
+                                                <td><span class="badge-qty"><?php echo inr_format((int)$p['total_qty'], 0); ?> u</span></td>
+                                                <td><span class="badge-rev">&#x20B9;<?php echo inr_format($p['total_amt'], 2); ?></span></td>
+                                                <td>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <div class="progress-bar-mis" style="width:70px"><div class="progress-fill" style="width:<?php echo $pct_qty; ?>%;background:#7e57c2"></div></div>
+                                                        <span style="font-size:12px"><?php echo $pct_qty; ?>%</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header"><span class="hdr-icon chip-violet"><i class="material-icons-outlined">receipt_long</i></span><h5 class="card-title">Purchase Invoices <small class="text-muted">(latest 50)</small></h5></div>
+                                <div class="card-body" style="overflow-x:auto">
+                                    <?php if (empty($purchase_invoices)): ?>
+                                        <div class="empty-state"><i class="material-icons-outlined">receipt_long</i>No purchase invoices in this period.</div>
+                                    <?php else: ?>
+                                    <table class="mis-table">
+                                        <thead><tr><th>Invoice #</th><th>Date</th><th>Amount</th><th>Paid</th><th>Status</th></tr></thead>
+                                        <tbody>
+                                        <?php foreach ($purchase_invoices as $pi): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($pi['invoice_number']); ?></td>
+                                                <td><?php echo date('d M Y', strtotime($pi['invoice_date'])); ?></td>
+                                                <td>&#x20B9;<?php echo inr_format($pi['total_amount'], 2); ?></td>
+                                                <td>&#x20B9;<?php echo inr_format($pi['paid_amount'], 2); ?></td>
+                                                <td>
+                                                    <?php if ($pi['payment_status'] === 'fully_paid'): ?>
+                                                        <span class="status-badge badge-paid">Fully Paid</span>
+                                                    <?php elseif ($pi['payment_status'] === 'partially_paid'): ?>
+                                                        <span class="status-badge badge-partial">Partial</span>
+                                                    <?php else: ?>
+                                                        <span class="status-badge badge-unpaid">Not Paid</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -681,13 +1072,13 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                          STATE / DISTRICT-WISE SALES
                     ═══════════════════════════════════════════════════════ -->
                     <div class="row mis-section">
-                        <div class="col-xl-6">
+                        <div class="col-xl-6 mb-4">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">State-wise Sales</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-teal"><i class="material-icons-outlined">public</i></span><h5 class="card-title">State-wise Sales</h5></div>
                                 <div class="card-body" style="overflow-x:auto">
                                     <p class="section-note">Based on shop invoices only (customer invoices have no geographic data).</p>
                                     <?php if (empty($state_sales)): ?>
-                                        <p class="text-muted text-center py-3">No geographic data available.</p>
+                                        <div class="empty-state"><i class="material-icons-outlined">public_off</i>No geographic data available.</div>
                                     <?php else:
                                         $max_state = max(array_column($state_sales, 'revenue')) ?: 1;
                                     ?>
@@ -715,12 +1106,12 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-6">
+                        <div class="col-xl-6 mb-4">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">District-wise Sales</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-violet"><i class="material-icons-outlined">location_on</i></span><h5 class="card-title">District-wise Sales</h5></div>
                                 <div class="card-body" style="overflow-x:auto">
                                     <?php if (empty($district_sales)): ?>
-                                        <p class="text-muted text-center py-3">No district data available.</p>
+                                        <div class="empty-state"><i class="material-icons-outlined">location_off</i>No district data available.</div>
                                     <?php else:
                                         $total_dist_rev = array_sum(array_column($district_sales, 'revenue')) ?: 1;
                                     ?>
@@ -753,12 +1144,12 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                          TOP SHOPS & CUSTOMERS (Salesperson Performance)
                     ═══════════════════════════════════════════════════════ -->
                     <div class="row mis-section">
-                        <div class="col-xl-6">
+                        <div class="col-xl-6 mb-4">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">Top 10 Shops by Revenue</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-amber"><i class="material-icons-outlined">storefront</i></span><h5 class="card-title">Top 10 Shops by Revenue</h5></div>
                                 <div class="card-body" style="overflow-x:auto">
                                     <?php if (empty($top_shops)): ?>
-                                        <p class="text-muted text-center py-3">No shop sales in this period.</p>
+                                        <div class="empty-state"><i class="material-icons-outlined">storefront</i>No shop sales in this period.</div>
                                     <?php else:
                                         $max_shop_rev = (float)$top_shops[0]['revenue'] ?: 1;
                                     ?>
@@ -767,7 +1158,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                         <tbody>
                                         <?php foreach ($top_shops as $i => $s): ?>
                                             <tr>
-                                                <td><?php echo $i+1; ?></td>
+                                                <td><span class="rank-badge <?php echo $i===0?'top1':($i===1?'top2':($i===2?'top3':'')); ?>"><?php echo $i+1; ?></span></td>
                                                 <td><b><?php echo htmlspecialchars($s['shop_name']); ?></b></td>
                                                 <td><?php echo $s['inv_cnt']; ?></td>
                                                 <td><span class="badge-qty"><?php echo inr_format((int)$s['units'], 0); ?></span></td>
@@ -783,12 +1174,12 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-6">
+                        <div class="col-xl-6 mb-4">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">Top 10 Customers by Revenue</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-indigo"><i class="material-icons-outlined">person</i></span><h5 class="card-title">Top 10 Customers by Revenue</h5></div>
                                 <div class="card-body" style="overflow-x:auto">
                                     <?php if (empty($top_customers)): ?>
-                                        <p class="text-muted text-center py-3">No customer sales in this period.</p>
+                                        <div class="empty-state"><i class="material-icons-outlined">person_off</i>No customer sales in this period.</div>
                                     <?php else:
                                         $max_cust_rev = (float)$top_customers[0]['revenue'] ?: 1;
                                     ?>
@@ -797,7 +1188,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                         <tbody>
                                         <?php foreach ($top_customers as $i => $c): ?>
                                             <tr>
-                                                <td><?php echo $i+1; ?></td>
+                                                <td><span class="rank-badge <?php echo $i===0?'top1':($i===1?'top2':($i===2?'top3':'')); ?>"><?php echo $i+1; ?></span></td>
                                                 <td><b><?php echo htmlspecialchars($c['cust_name']); ?></b></td>
                                                 <td><?php echo $c['inv_cnt']; ?></td>
                                                 <td><span class="badge-qty"><?php echo inr_format((int)$c['units'], 0); ?></span></td>
@@ -819,32 +1210,39 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                          TARGET VS ACHIEVEMENT
                     ═══════════════════════════════════════════════════════ -->
                     <div class="row mis-section">
-                        <div class="col-xl-12">
+                        <div class="col-xl-12 mb-4">
                             <div class="card">
                                 <div class="card-header">
+                                    <span class="hdr-icon chip-green"><i class="material-icons-outlined">flag</i></span>
                                     <h5 class="card-title">Target vs Achievement — by Location</h5>
                                 </div>
                                 <div class="card-body">
                                     <?php if (empty($target_rows)): ?>
-                                        <p class="text-muted text-center py-3">No assigned locations with targets found.</p>
+                                        <div class="empty-state"><i class="material-icons-outlined">flag</i>No assigned locations with targets found.</div>
                                     <?php else: ?>
+                                    <?php if ($unlocated_achieved > 0): ?>
+                                    <p class="section-note">
+                                        <i class="material-icons-outlined">info</i>
+                                        Includes &#x20B9;<?php echo inr_format($unlocated_achieved, 0); ?> from customer invoices, which have no state/district on file and so can't be split by location below — it's added to the overall total only.
+                                    </p>
+                                    <?php endif; ?>
                                     <div class="row mb-3">
-                                        <div class="col-md-4">
-                                            <div style="background:#f5f6fa;padding:14px;border-radius:8px;text-align:center;">
-                                                <div style="font-size:12px;color:#888;text-transform:uppercase;font-weight:600;">Total Target</div>
-                                                <div style="font-size:24px;font-weight:700;color:#1a237e;">&#x20B9;<?php echo inr_format($total_target, 0); ?></div>
+                                        <div class="col-md-4 mb-2">
+                                            <div class="stat-tile">
+                                                <div class="stat-label">Total Target</div>
+                                                <div class="stat-value" style="color:var(--indigo);">&#x20B9;<?php echo inr_format($total_target, 0); ?></div>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
-                                            <div style="background:#f5f6fa;padding:14px;border-radius:8px;text-align:center;">
-                                                <div style="font-size:12px;color:#888;text-transform:uppercase;font-weight:600;">Total Achieved</div>
-                                                <div style="font-size:24px;font-weight:700;color:#2e7d32;">&#x20B9;<?php echo inr_format($total_achieved, 0); ?></div>
+                                        <div class="col-md-4 mb-2">
+                                            <div class="stat-tile">
+                                                <div class="stat-label">Total Achieved</div>
+                                                <div class="stat-value" style="color:var(--green);">&#x20B9;<?php echo inr_format($total_achieved, 0); ?></div>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
-                                            <div style="background:#f5f6fa;padding:14px;border-radius:8px;text-align:center;">
-                                                <div style="font-size:12px;color:#888;text-transform:uppercase;font-weight:600;">Achievement %</div>
-                                                <div style="font-size:24px;font-weight:700;color:<?php echo $overall_pct >= 100 ? '#2e7d32' : ($overall_pct >= 50 ? '#e65100' : '#c62828'); ?>;">
+                                        <div class="col-md-4 mb-2">
+                                            <div class="stat-tile">
+                                                <div class="stat-label">Achievement %</div>
+                                                <div class="stat-value" style="color:<?php echo $overall_pct >= 100 ? 'var(--green)' : ($overall_pct >= 50 ? 'var(--amber)' : 'var(--rose)'); ?>;">
                                                     <?php echo $overall_pct; ?>%
                                                 </div>
                                             </div>
@@ -876,6 +1274,16 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
+                                        <?php if ($unlocated_achieved > 0): ?>
+                                        <tr>
+                                            <td><b>Customer Sales</b> <span style="font-size:11px;color:var(--ink-faint);">(unassigned)</span></td>
+                                            <td><span style="font-size:11px;background:#f1f0fb;color:var(--ink-faint);padding:2px 6px;border-radius:4px;">—</span></td>
+                                            <td style="color:var(--ink-faint);">—</td>
+                                            <td>&#x20B9;<?php echo inr_format($unlocated_achieved, 2); ?></td>
+                                            <td style="color:var(--ink-faint);">—</td>
+                                            <td style="color:var(--ink-faint);">Counted in overall total only</td>
+                                        </tr>
+                                        <?php endif; ?>
                                         </tbody>
                                     </table>
                                     </div>
@@ -889,20 +1297,20 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                          6-MONTH GROWTH TREND
                     ═══════════════════════════════════════════════════════ -->
                     <div class="row mis-section">
-                        <div class="col-xl-7">
+                        <div class="col-xl-7 mb-4">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">6-Month Growth Trend</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-indigo"><i class="material-icons-outlined">trending_up</i></span><h5 class="card-title">6-Month Growth Trend</h5></div>
                                 <div class="card-body">
                                     <div class="chart-container"><canvas id="growthChart"></canvas></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-5">
+                        <div class="col-xl-5 mb-4">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title">Month-over-Month Summary</h5></div>
+                                <div class="card-header"><span class="hdr-icon chip-teal"><i class="material-icons-outlined">table_chart</i></span><h5 class="card-title">Month-over-Month Summary</h5></div>
                                 <div class="card-body" style="overflow-x:auto">
                                     <?php if (empty($six_months)): ?>
-                                        <p class="text-muted text-center py-3">No data.</p>
+                                        <div class="empty-state"><i class="material-icons-outlined">bar_chart</i>No data available.</div>
                                     <?php else: ?>
                                     <table class="mis-table">
                                         <thead><tr><th>Month</th><th>Revenue</th><th>Invoices</th><th>Growth</th></tr></thead>
@@ -935,18 +1343,19 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                          RETURNS & CANCELLATIONS
                     ═══════════════════════════════════════════════════════ -->
                     <div class="row mis-section">
-                        <div class="col-xl-12">
+                        <div class="col-xl-12 mb-4">
                             <div class="card">
                                 <div class="card-header">
+                                    <span class="hdr-icon chip-rose"><i class="material-icons-outlined">keyboard_return</i></span>
                                     <h5 class="card-title">Returns &amp; Credit Notes
-                                        <span class="badge badge-style-light badge-danger" style="margin-left:8px;">
+                                        <span class="status-badge badge-unpaid" style="margin-left:8px;">
                                             <?php echo $total_returns; ?> returns — &#x20B9;<?php echo inr_format($total_return_amt, 2); ?>
                                         </span>
                                     </h5>
                                 </div>
                                 <div class="card-body">
                                     <?php if (empty($returns_list)): ?>
-                                        <p class="text-muted text-center py-3">No returns in this period.</p>
+                                        <div class="empty-state"><i class="material-icons-outlined">check_circle</i>No returns in this period.</div>
                                     <?php else: ?>
                                     <div style="overflow-x:auto">
                                     <table class="mis-table">
@@ -993,14 +1402,18 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
-// ── Tab switching
-document.querySelectorAll('.tab-item').forEach(function(t) {
-    t.addEventListener('click', function() {
-        document.querySelectorAll('#periodTabs .tab-item').forEach(function(x) { x.classList.remove('active'); });
-        document.querySelectorAll('.tab-content').forEach(function(x) { x.classList.remove('active'); });
-        t.classList.add('active');
-        var tab = document.getElementById('tab-' + t.dataset.tab);
-        if (tab) tab.classList.add('active');
+// ── Tab switching (scoped per tab-nav group so Sales and Purchase tabs don't clash)
+document.querySelectorAll('.tab-nav').forEach(function(nav) {
+    nav.querySelectorAll('.tab-item').forEach(function(t) {
+        t.addEventListener('click', function() {
+            nav.querySelectorAll('.tab-item').forEach(function(x) { x.classList.remove('active'); });
+            t.classList.add('active');
+            var tab = document.getElementById('tab-' + t.dataset.tab);
+            if (tab) {
+                tab.parentElement.querySelectorAll(':scope > .tab-content').forEach(function(x) { x.classList.remove('active'); });
+                tab.classList.add('active');
+            }
+        });
     });
 });
 
@@ -1027,6 +1440,13 @@ Chart.defaults.font.size   = 12;
                     label: 'Shop Sales',
                     data: <?php echo $j_shop; ?>,
                     borderColor: '#ef6c00', backgroundColor: 'rgba(239,108,0,0.08)',
+                    tension: 0.3, fill: true, pointRadius: 3
+                },
+                {
+                    label: 'Purchases',
+                    data: <?php echo $j_purch; ?>,
+                    borderColor: '#7e57c2', backgroundColor: 'rgba(126,87,194,0.08)',
+                    borderDash: [5,3],
                     tension: 0.3, fill: true, pointRadius: 3
                 }
             ]

@@ -139,6 +139,44 @@ if (!empty($orderIds)) {
     $stmtS->close();
 }
 
+// Each TP's current advance balance, batched for every TP appearing in this
+// result set — same three-condition filter used everywhere else this figure
+// is shown (add-purchase-order.php, dashboard.php, mis-report.php).
+$tpBalances = [];
+$tpPendingSubmissions = []; // territory_partner_id => count of pending_review/accepted submissions
+$tpDbIds = array_values(array_unique(array_column($orders, 'tp_db_id')));
+if (!empty($tpDbIds)) {
+    $placeholders = implode(',', array_fill(0, count($tpDbIds), '?'));
+    $types = str_repeat('i', count($tpDbIds));
+
+    $stmtB = $db_conn->prepare(
+        "SELECT territory_partner_id, COALESCE(SUM(balance_amount), 0) AS bal
+         FROM tp_advance_payments
+         WHERE territory_partner_id IN ($placeholders) AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
+         GROUP BY territory_partner_id"
+    );
+    $stmtB->bind_param($types, ...$tpDbIds);
+    $stmtB->execute();
+    $resB = $stmtB->get_result();
+    while ($br = $resB->fetch_assoc()) { $tpBalances[(int)$br['territory_partner_id']] = (float)$br['bal']; }
+    $stmtB->close();
+
+    // Whether the TP has a live advance-payment submission at all (any
+    // status other than draft) — shown as a nudge to check for it, since
+    // there's no direct FK from an order to a specific submission.
+    $stmtP = $db_conn->prepare(
+        "SELECT territory_partner_id, COUNT(*) AS cnt
+         FROM tp_advance_payment_submissions
+         WHERE territory_partner_id IN ($placeholders) AND status IN ('pending_review', 'accepted')
+         GROUP BY territory_partner_id"
+    );
+    $stmtP->bind_param($types, ...$tpDbIds);
+    $stmtP->execute();
+    $resP = $stmtP->get_result();
+    while ($pr = $resP->fetch_assoc()) { $tpPendingSubmissions[(int)$pr['territory_partner_id']] = (int)$pr['cnt']; }
+    $stmtP->close();
+}
+
 // Company profiles for the "Add to TP Payment Entry" form — same source/filter
 // as add-tp-advance-payment.php's Company Profile dropdown.
 $companyProfiles = $db_conn->query(
@@ -455,26 +493,53 @@ $companyProfiles = $db_conn->query(
                                                 </button>
                                             </td>
                                             <td><span style="font-weight:700;color:#10b981;font-size:13.5px;">₹<?=number_format($o['total'], 2)?></span></td>
-                                            <td>
+                                            <td style="min-width:190px;">
+                                                <?php
+                                                $tpBal = $tpBalances[$o['tp_db_id']] ?? 0.0;
+                                                $coveredByBalance = min($o['total'], max(0, $o['total'] - $o['excess_amount']));
+                                                $pendingSubCount = $tpPendingSubmissions[$o['tp_db_id']] ?? 0;
+                                                ?>
+                                                <div style="font-size:11px;color:#6b7280;line-height:1.6;margin-bottom:4px;">
+                                                    From balance: <b style="color:#1f2937;">₹<?=number_format($coveredByBalance, 2)?></b>
+                                                    <span title="This TP's current available advance balance (all orders/purposes, not reserved for this one specifically).">
+                                                        <i class="material-icons-outlined" style="font-size:12px;vertical-align:-2px;color:#9ca3af;">info</i>
+                                                    </span>
+                                                    <br>Balance now: ₹<?=number_format($tpBal, 2)?>
+                                                </div>
                                                 <?php if ($o['excess_amount'] <= 0): ?>
-                                                <span style="color:#9ca3af;">—</span>
-                                                <?php elseif (empty($o['screenshots'])): ?>
-                                                <span style="background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;" title="This order required proof of payment but no screenshot record is on file — likely predates the OCR-verification system.">No Proof on File</span>
-                                                <?php else:
+                                                <span style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;">Fully within balance</span>
+                                                <?php else: ?>
+                                                <div style="font-size:11px;color:#b45309;font-weight:600;margin-bottom:6px;">
+                                                    Excess needing proof: ₹<?=number_format($o['excess_amount'], 2)?>
+                                                </div>
+                                                <?php if (!empty($o['screenshots'])):
                                                     $pendingCount = count(array_filter($o['screenshots'], fn($s) => $s['status'] === 'pending_review'));
                                                     $proof_json = htmlspecialchars(json_encode($o['screenshots'], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
                                                 ?>
                                                 <button type="button" class="proof-view-trigger"
-                                                        style="border:none;cursor:pointer;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;<?= $pendingCount > 0 ? 'background:#fef3c7;color:#92400e;' : 'background:#d1fae5;color:#065f46;' ?>"
+                                                        style="border:none;cursor:pointer;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;margin-bottom:4px;<?= $pendingCount > 0 ? 'background:#fef3c7;color:#92400e;' : 'background:#d1fae5;color:#065f46;' ?>"
                                                         data-partner="<?php echo htmlspecialchars($o['tp_name'], ENT_QUOTES); ?>"
+                                                        data-tp-db-id="<?php echo (int)$o['tp_db_id']; ?>"
                                                         data-excess="<?php echo (float)$o['excess_amount']; ?>"
                                                         data-screenshots="<?php echo $proof_json; ?>">
                                                     <?php if ($pendingCount > 0): ?>
-                                                    Pending Review (<?=$pendingCount?>)
+                                                    Screenshot: Pending Review (<?=$pendingCount?>)
                                                     <?php else: ?>
-                                                    Verified ₹<?=number_format($o['excess_amount'], 2)?>
+                                                    Screenshot: Verified ₹<?=number_format($o['excess_amount'], 2)?>
                                                     <?php endif; ?>
                                                 </button>
+                                                <br>
+                                                <?php else: ?>
+                                                <div style="font-size:10.5px;color:#9ca3af;margin-bottom:4px;">No screenshot on file for this order.</div>
+                                                <?php endif; ?>
+                                                <a href="manage-tp-advance-submissions.php?tp_id=<?php echo (int)$o['tp_db_id']; ?>&from=po"
+                                                   style="display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;text-decoration:none;<?= $pendingSubCount > 0 ? 'background:#dbeafe;color:#1e40af;' : 'background:#f3f4f6;color:#6b7280;' ?>">
+                                                    <?php if ($pendingSubCount > 0): ?>
+                                                    <?=$pendingSubCount?> Advance Submission<?=$pendingSubCount !== 1 ? 's' : ''?> →
+                                                    <?php else: ?>
+                                                    View Advance Submissions →
+                                                    <?php endif; ?>
+                                                </a>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
@@ -824,6 +889,13 @@ $(document).on('click', '.advance-save-btn', function () {
             if (screenshot) screenshot.advance_payment_id = data.advance_payment_id;
             if (currentProofButton) currentProofButton.attr('data-screenshots', JSON.stringify(currentProofScreenshots));
             renderProofModal();
+
+            // Land the reviewer directly on the new advance payment entry
+            // instead of leaving them to search the full list for it.
+            var tpDbId = currentProofButton ? currentProofButton.data('tp-db-id') : '';
+            alert('Added to TP advance payments. Taking you to the entry now…');
+            window.location.href = 'manage-tp-advance-payments.php?highlight=' + encodeURIComponent(data.advance_payment_id)
+                + (tpDbId ? '&tp_id=' + encodeURIComponent(tpDbId) : '');
         })
         .fail(function () {
             alert('Could not reach the server. Please try again.');

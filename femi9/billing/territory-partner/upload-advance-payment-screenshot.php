@@ -44,20 +44,64 @@ $paymentMode = trim($_POST['payment_mode'] ?? '');
 $referenceNumber = trim($_POST['reference_number'] ?? '');
 $note = trim($_POST['note'] ?? '');
 $submissionId = (int)($_POST['submission_id'] ?? 0);
+// 'po' when this upload happened on a visit redirected here from an
+// over-balance purchase order (add-purchase-order.php); 'direct' otherwise.
+// Used only to decide, on a later direct visit, whether a resumed draft's
+// amount/reference are still meaningful — a PO's excess has nothing to do
+// with an unrelated future visit, so those two fields must never resume
+// from a po-sourced draft (see add-advance-payment.php's $hasResumableDraft
+// / $isPoSourcedDraft split). Mode/note/screenshots still resume regardless.
+$source = ($_POST['source'] ?? '') === 'po' ? 'po' : 'direct';
 
 $allowedModes = ['Cash', 'Bank Transfer', 'Cheque', 'UPI', 'NEFT', 'RTGS', 'IMPS', 'Demand Draft', 'Other'];
 
+// The TP can now upload a screenshot before typing amount/UTR — those get
+// auto-filled from whatever OCR/vision detects on the image, then the TP
+// reviews/edits them. So amount and reference are only required once this
+// draft already has at least one screenshot attached — i.e. this genuinely
+// isn't the first upload, so auto-fill already had its chance to run and
+// this catches a later screenshot being sent with those fields cleared back
+// out. Payment mode and date can't be detected from an image, so those
+// stay required from the start.
+//
+// Deliberately checked by "has a screenshot yet", not merely "submission_id
+// was passed" — a TP who abandoned an earlier draft before ever uploading
+// anything (page reload, browser closed, etc.) has that draft's id resumed
+// on their next visit, which would otherwise make every upload look like a
+// "second" one and silently reintroduce the old must-fill-first requirement.
+$existingScreenshotCountForGate = 0;
+if ($submissionId > 0) {
+    $gateStmt = $db_conn->prepare("SELECT COUNT(*) AS cnt FROM tp_advance_payment_screenshots WHERE submission_id = ?");
+    $gateStmt->bind_param('i', $submissionId);
+    $gateStmt->execute();
+    $existingScreenshotCountForGate = (int)($gateStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+    $gateStmt->close();
+}
+
 $errors = [];
-if ($amount <= 0 || $amount > 99999999.99) $errors[] = 'Enter a valid amount.';
-if ($referenceNumber === '') $errors[] = 'Reference number / UTR is required.';
 if (!in_array($paymentMode, $allowedModes, true)) $errors[] = 'Select a valid payment mode.';
+if ($existingScreenshotCountForGate > 0) {
+    if ($amount <= 0 || $amount > 99999999.99) $errors[] = 'Enter a valid amount.';
+    if ($referenceNumber === '') $errors[] = 'Reference number / UTR is required.';
+} elseif ($amount > 99999999.99) {
+    $errors[] = 'Enter a valid amount.';
+}
 
 $today = new DateTime('today');
 $earliestAllowed = (clone $today)->modify('-2 days');
 if ($paymentDate === '') {
     $errors[] = 'Payment date is required.';
 } else {
+    // createFromFormat('Y-m-d', ...) only fills the date fields — any
+    // fields not in the format string (hour/minute/second) are inherited
+    // from the current wall-clock time instead of defaulting to midnight.
+    // So $d for today's date ends up as "today at right-now", which
+    // compares greater than $today (today at 00:00:00) purely because of
+    // the leftover time-of-day — rejecting today's own date as "in the
+    // future". setTime(0,0,0) normalizes both sides to midnight so the
+    // comparison is date-only, as intended.
     $d = DateTime::createFromFormat('Y-m-d', $paymentDate);
+    if ($d) $d->setTime(0, 0, 0);
     if (!$d || $d->format('Y-m-d') !== $paymentDate) {
         $errors[] = 'Invalid payment date format.';
     } elseif ($d > $today || $d < $earliestAllowed) {
@@ -67,6 +111,13 @@ if ($paymentDate === '') {
 
 if (!empty($errors)) {
     respond(['success' => false, 'message' => implode(' ', $errors)], 400);
+}
+
+// Self-migrating: tracks whether a draft originated from a PO redirect vs a
+// direct visit — see the $source comment above for why this matters.
+$_sourceCol = $db_conn->query("SHOW COLUMNS FROM tp_advance_payment_submissions LIKE 'source'");
+if ($_sourceCol && $_sourceCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_advance_payment_submissions ADD COLUMN source VARCHAR(10) NOT NULL DEFAULT 'direct' AFTER note");
 }
 
 // Resolve (or create) the draft submission this screenshot belongs to.
@@ -106,10 +157,10 @@ if ($submissionId > 0) {
 
     $ins = $db_conn->prepare(
         "INSERT INTO tp_advance_payment_submissions
-            (territory_partner_id, amount, payment_date, payment_mode, reference_number, note, status)
-         VALUES (?, ?, ?, ?, ?, ?, 'draft')"
+            (territory_partner_id, amount, payment_date, payment_mode, reference_number, note, source, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'draft')"
     );
-    $ins->bind_param('idssss', $tp_id, $amount, $paymentDate, $paymentMode, $referenceNumber, $note);
+    $ins->bind_param('idsssss', $tp_id, $amount, $paymentDate, $paymentMode, $referenceNumber, $note, $source);
     $ins->execute();
     $submissionId = $db_conn->insert_id;
     $ins->close();
