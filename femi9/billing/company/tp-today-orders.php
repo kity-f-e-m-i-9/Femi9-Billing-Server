@@ -494,6 +494,7 @@ $companyProfiles = $db_conn->query(
                                             <th>Delivery Address</th>
                                             <th>Payment Proof</th>
                                             <th>Status</th>
+                                            <th>Dispatch Slip</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -609,6 +610,11 @@ $companyProfiles = $db_conn->query(
                                                 <span class="badge-waiting">Waiting</span>
                                                 <button type="button" class="btn-cancel-order cancel-order-trigger" data-po-id="<?=(int)$oid?>">Cancel</button>
                                                 <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <a href="dispatch-slip-print.php?po_id=<?=urlencode($oid)?>" target="_blank" title="Print Dispatch Slip" style="display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;text-decoration:none;background:#eef2ff;color:#4338ca;white-space:nowrap;">
+                                                    <i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">local_shipping</i> Dispatch Slip
+                                                </a>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
