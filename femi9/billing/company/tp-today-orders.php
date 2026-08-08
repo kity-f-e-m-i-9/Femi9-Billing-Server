@@ -54,7 +54,14 @@ if ($statusFilter === 'active') {
 $stmt = $db_conn->prepare(
     "SELECT o.id, o.order_date, o.status, o.tp_invoice_id, o.excess_amount,
             o.cancelled_at, o.cancelled_by, o.cancel_reason,
+            o.use_default_delivery_address, o.custom_delivery_line1, o.custom_delivery_line2,
+            o.custom_delivery_city, o.custom_delivery_district, o.custom_delivery_state,
+            o.custom_delivery_country, o.custom_delivery_pincode,
             tp.id AS tp_db_id, tp.name AS tp_name, tp.tp_id AS tp_code,
+            tp.delivery_line1 AS tp_delivery_line1, tp.delivery_line2 AS tp_delivery_line2,
+            tp.delivery_city AS tp_delivery_city, tp.delivery_district AS tp_delivery_district,
+            tp.delivery_state AS tp_delivery_state, tp.delivery_country AS tp_delivery_country,
+            tp.delivery_pincode AS tp_delivery_pincode,
             i.product_id, i.qty, i.price, i.amount, p.productName
      FROM tp_purchase_orders o
      JOIN territory_partners tp ON tp.id = o.territory_partner_id
@@ -75,6 +82,31 @@ $productTotals = []; // productName => qty
 foreach ($rows as $r) {
     $oid = $r['id'];
     if (!isset($orders[$oid])) {
+        // Effective delivery address: the PO's own one-off address if the TP
+        // typed one at submission time, otherwise the TP's registered
+        // default — same use_default_delivery_address / custom_delivery_*
+        // fields add-purchase-order.php already writes at submit time.
+        $useDefault = (int)$r['use_default_delivery_address'] === 1;
+        $deliveryParts = $useDefault
+            ? [
+                'line1'    => $r['tp_delivery_line1'],
+                'line2'    => $r['tp_delivery_line2'],
+                'city'     => $r['tp_delivery_city'],
+                'district' => $r['tp_delivery_district'],
+                'state'    => $r['tp_delivery_state'],
+                'country'  => $r['tp_delivery_country'],
+                'pincode'  => $r['tp_delivery_pincode'],
+              ]
+            : [
+                'line1'    => $r['custom_delivery_line1'],
+                'line2'    => $r['custom_delivery_line2'],
+                'city'     => $r['custom_delivery_city'],
+                'district' => $r['custom_delivery_district'],
+                'state'    => $r['custom_delivery_state'],
+                'country'  => $r['custom_delivery_country'],
+                'pincode'  => $r['custom_delivery_pincode'],
+              ];
+
         $orders[$oid] = [
             'tp_db_id'      => $r['tp_db_id'],
             'tp_name'       => $r['tp_name'],
@@ -85,6 +117,7 @@ foreach ($rows as $r) {
             'cancelled_at'  => $r['cancelled_at'],
             'cancelled_by'  => $r['cancelled_by'],
             'cancel_reason' => $r['cancel_reason'],
+            'delivery'      => $deliveryParts,
             'lines'         => [],
             'total'         => 0,
             'screenshots'   => [],
@@ -458,6 +491,7 @@ $companyProfiles = $db_conn->query(
                                             <th>Invoice</th>
                                             <th>Products</th>
                                             <th>Total</th>
+                                            <th>Delivery Address</th>
                                             <th>Payment Proof</th>
                                             <th>Status</th>
                                         </tr>
@@ -493,6 +527,30 @@ $companyProfiles = $db_conn->query(
                                                 </button>
                                             </td>
                                             <td><span style="font-weight:700;color:#10b981;font-size:13.5px;">₹<?=number_format($o['total'], 2)?></span></td>
+                                            <td>
+                                                <?php
+                                                $d = $o['delivery'];
+                                                $hasAddress = trim(($d['line1'] ?? '') . ($d['city'] ?? '') . ($d['pincode'] ?? '')) !== '';
+                                                $addressLines = array_values(array_filter([
+                                                    $d['line1'] ?? '',
+                                                    $d['line2'] ?? '',
+                                                    implode(', ', array_filter([$d['city'] ?? '', $d['district'] ?? ''])),
+                                                    implode(', ', array_filter([$d['state'] ?? '', $d['country'] ?? ''])),
+                                                    !empty($d['pincode']) ? 'Pincode: ' . $d['pincode'] : '',
+                                                ]));
+                                                $addressText = implode("\n", $addressLines);
+                                                ?>
+                                                <?php if ($hasAddress): ?>
+                                                <button type="button" class="delivery-address-trigger"
+                                                        style="border:none;cursor:pointer;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;background:#eef2ff;color:#4338ca;"
+                                                        data-partner="<?php echo htmlspecialchars($o['tp_name'], ENT_QUOTES); ?>"
+                                                        data-address="<?php echo htmlspecialchars($addressText, ENT_QUOTES); ?>">
+                                                    <i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">location_on</i> View Address
+                                                </button>
+                                                <?php else: ?>
+                                                <span style="color:#9ca3af;font-size:11px;">No address on file</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td style="min-width:190px;">
                                                 <?php
                                                 $tpBal = $tpBalances[$o['tp_db_id']] ?? 0.0;
@@ -581,6 +639,35 @@ $companyProfiles = $db_conn->query(
             </div>
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delivery Address Modal -->
+<div class="modal fade" id="deliveryAddressModal" tabindex="-1" aria-labelledby="deliveryAddressModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-md">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                <h6 class="modal-title" id="deliveryAddressModalLabel" style="font-weight:600;color:#1f2937;">
+                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#4338ca;">location_on</i>
+                    Delivery Address
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding:18px 20px;">
+                <div id="deliveryAddressPartner" style="font-size:12.5px;color:#6b7280;margin-bottom:10px;"></div>
+                <div id="deliveryAddressText" style="font-size:13.5px;color:#1f2937;line-height:1.7;background:#f8f9fb;border:1px solid #e9ecef;border-radius:10px;padding:14px 16px;white-space:pre-line;"></div>
+                <div id="deliveryAddressCopyStatus" style="font-size:12px;color:#059669;margin-top:8px;display:none;">
+                    <i class="material-icons-outlined" style="font-size:14px;vertical-align:-2px;">check_circle</i> Copied to clipboard
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-sm" id="deliveryAddressCopyBtn"
+                        style="background:#4338ca;color:#fff;font-weight:600;">
+                    <i class="material-icons-outlined" style="font-size:15px;vertical-align:-3px;">content_copy</i> Copy Address
+                </button>
             </div>
         </div>
     </div>
@@ -678,6 +765,54 @@ $(document).on('click', '.items-view-trigger', function () {
     }
     $('#itemsViewModalBody').html(html || '<div style="color:#9ca3af;">No items.</div>');
     $('#itemsViewModal').modal('show');
+});
+
+var currentDeliveryAddress = '';
+
+$(document).on('click', '.delivery-address-trigger', function () {
+    var partner = $(this).data('partner');
+    var address = $(this).data('address');
+
+    currentDeliveryAddress = address || '';
+    $('#deliveryAddressPartner').text(partner || '');
+    $('#deliveryAddressText').text(currentDeliveryAddress);
+    $('#deliveryAddressCopyStatus').hide();
+    $('#deliveryAddressModal').modal('show');
+});
+
+$('#deliveryAddressCopyBtn').on('click', function () {
+    if (!currentDeliveryAddress) return;
+
+    function showCopied() {
+        $('#deliveryAddressCopyStatus').stop(true, true).show().delay(1800).fadeOut(200);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(currentDeliveryAddress).then(showCopied).catch(function () {
+            fallbackCopyDeliveryAddress();
+        });
+    } else {
+        fallbackCopyDeliveryAddress();
+    }
+
+    // Fallback for browsers/contexts without the async Clipboard API
+    // (e.g. non-HTTPS) — a temporary offscreen textarea + execCommand.
+    function fallbackCopyDeliveryAddress() {
+        var ta = document.createElement('textarea');
+        ta.value = currentDeliveryAddress;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+            document.execCommand('copy');
+            showCopied();
+        } catch (e) {
+            alert('Could not copy automatically — please select and copy the address manually.');
+        }
+        document.body.removeChild(ta);
+    }
 });
 
 var currentProofButton = null;

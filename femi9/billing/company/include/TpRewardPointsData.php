@@ -30,6 +30,67 @@ function parseTpTargetAmountRange(string $key): ?array {
     return [(float)$minStr, $maxStr === '' ? null : (float)$maxStr];
 }
 
+// Per-member detail behind one referrer's Team Points total — same filters
+// (referral_type='TP', referral_percentage=10, rwpoints_enable=1, gst=0) as
+// the aggregate query in getTpRewardPointsData(), just grouped by member
+// instead of collapsed to the referrer. Powers the click-to-drill-down
+// popup on both the company and TP-facing reward points pages so a
+// referrer can see exactly which downline TP contributed how much.
+function getTpTeamPointsBreakdown(int $referrer_id, string $current_from_date, string $current_to_date): array {
+    global $servername, $db_port, $dbname, $username, $password;
+
+    $pdo = new PDO(
+        "mysql:host={$servername};port={$db_port};dbname={$dbname};charset=utf8mb4",
+        $username,
+        $password,
+        [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ]);
+
+    $stmt = $pdo->prepare("
+        SELECT member.id AS member_id, member.tp_id AS member_tp_code, member.name AS member_name,
+               member.mobile AS member_mobile,
+               COUNT(DISTINCT tpi.id) AS invoice_count,
+               COALESCE(SUM(tii.amount), 0) AS member_amount,
+               COALESCE(SUM(tii.amount) / 100, 0) AS member_points
+        FROM territory_partners member
+        INNER JOIN territory_partners referrer ON referrer.tp_id = member.referral_id
+        INNER JOIN tp_invoices tpi        ON tpi.territory_partner_id = member.id
+        INNER JOIN tp_invoice_items tii   ON tii.tp_invoice_id = tpi.id
+        INNER JOIN products p             ON p.id = tii.product_id
+        WHERE referrer.id = :referrer_id
+          AND member.referral_type = 'TP'
+          AND member.referral_percentage = 10
+          AND tpi.rwpoints_enable = 1
+          AND tpi.invoice_date BETWEEN :from_date AND :to_date
+          AND p.gst = 0
+        GROUP BY member.id, member.tp_id, member.name, member.mobile
+        ORDER BY member_points DESC
+    ");
+    $stmt->execute([
+        ':referrer_id' => $referrer_id,
+        ':from_date'   => $current_from_date,
+        ':to_date'     => $current_to_date,
+    ]);
+
+    $members = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $members[] = [
+            'member_id'      => (int)$row['member_id'],
+            'tp_code'        => $row['member_tp_code'],
+            'name'           => $row['member_name'],
+            'mobile'         => $row['member_mobile'],
+            'invoice_count'  => (int)$row['invoice_count'],
+            'amount'         => (float)$row['member_amount'],
+            'points'         => (float)$row['member_points'],
+        ];
+    }
+
+    return $members;
+}
+
 function getTpRewardPointsData(string $current_from_date, string $current_to_date, string $target_range = ''): array {
     global $servername, $db_port, $dbname, $username, $password;
 

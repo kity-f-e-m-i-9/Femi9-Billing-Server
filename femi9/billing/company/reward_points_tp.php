@@ -184,7 +184,7 @@ try {
                                             <td><?php echo $u['target_amount'] > 0 ? '₹' . inr_format($u['target_amount'], 2) : '–'; ?></td>
                                             <td><span class="badge-purchase"><?php echo inr_format($u['purchase_points'], 2); ?></span></td>
                                             <td><span class="badge-daily"><?php echo inr_format($u['daily_points'], 2); ?></span></td>
-                                            <td><?php if ($u['team_points'] > 0): ?><span class="badge-team"><?php echo inr_format($u['team_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
+                                            <td><?php if ($u['team_points'] > 0): ?><button type="button" class="badge-team team-points-trigger" style="border:none;cursor:pointer;" data-referrer-id="<?php echo (int)$u['user_id']; ?>" data-referrer-name="<?php echo htmlspecialchars($d['name'] ?? '–', ENT_QUOTES, 'UTF-8'); ?>" title="Click to see the breakdown"><?php echo inr_format($u['team_points'], 2); ?></button><?php else: ?>–<?php endif; ?></td>
                                             <td><?php if ($u['advance_points'] > 0): ?><span class="badge-advance"><?php echo inr_format($u['advance_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><?php if ($u['return_points'] > 0): ?><span class="badge-return"><?php echo inr_format($u['return_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><span class="badge-total"><?php echo inr_format($u['total_points'], 2); ?></span></td>
@@ -199,6 +199,26 @@ try {
                     </div>
 
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Team Points Breakdown Modal -->
+<div class="modal fade" id="teamPointsModal" tabindex="-1" aria-labelledby="teamPointsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="teamPointsModalLabel" style="font-weight:700;">
+                    <i class="material-icons" style="vertical-align:middle;font-size:19px;color:#8b5cf6;">groups</i>
+                    Team Points Breakdown
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="teamPointsModalBody" style="min-height:120px;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -220,6 +240,71 @@ $(function(){
         pageLength: 25,
         language: { emptyTable: 'No data found' }
     });
+});
+
+var TP_RP_FROM_DATE = <?php echo json_encode($current_from_date); ?>;
+var TP_RP_TO_DATE   = <?php echo json_encode($current_to_date); ?>;
+
+$(document).on('click', '.team-points-trigger', function () {
+    var referrerId   = $(this).data('referrer-id');
+    var referrerName = $(this).data('referrer-name');
+
+    $('#teamPointsModalLabel').html(
+        '<i class="material-icons" style="vertical-align:middle;font-size:19px;color:#8b5cf6;">groups</i> ' +
+        'Team Points Breakdown — ' + $('<span>').text(referrerName).html()
+    );
+    $('#teamPointsModalBody').html('<div style="text-align:center;padding:30px;color:#9ca3af;">Loading…</div>');
+    $('#teamPointsModal').modal('show');
+
+    $.get('get-tp-team-points-breakdown.php', {
+        referrer_id: referrerId,
+        frdate: TP_RP_FROM_DATE,
+        todate: TP_RP_TO_DATE
+    })
+        .done(function (data) {
+            if (!data.success) {
+                $('#teamPointsModalBody').html('<div style="color:#dc2626;padding:20px;">' + (data.message || 'Could not load breakdown.') + '</div>');
+                return;
+            }
+            if (!data.members.length) {
+                $('#teamPointsModalBody').html('<div style="text-align:center;padding:30px;color:#9ca3af;">No team member purchases found for this range.</div>');
+                return;
+            }
+
+            var totalPoints = 0;
+            var html = '<div style="font-size:12.5px;color:#6b7280;margin-bottom:14px;">' +
+                'Team members whose purchases (0% GST products, reward-points-enabled invoices) contributed to this Team Points total, ' +
+                data.from_date + ' to ' + data.to_date + '.</div>';
+            html += '<table style="width:100%;font-size:13.5px;border-collapse:collapse;">' +
+                    '<thead><tr style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #f3f4f6;">' +
+                    '<th style="text-align:left;padding:8px 10px 8px 0;">Territory Partner</th>' +
+                    '<th style="text-align:center;padding:8px 10px;">Invoices</th>' +
+                    '<th style="text-align:right;padding:8px 10px;">0% GST Amount</th>' +
+                    '<th style="text-align:right;padding:8px 0;">Points Contributed</th>' +
+                    '</tr></thead><tbody>';
+            $.each(data.members, function (_, m) {
+                totalPoints += parseFloat(m.points) || 0;
+                html += '<tr style="border-bottom:1px dotted #f3f4f6;">' +
+                        '<td style="padding:10px 10px 10px 0;">' +
+                            '<div style="font-weight:600;color:#1f2937;">' + $('<span>').text(m.name || '–').html() + '</div>' +
+                            '<div style="font-size:11px;color:#8b5cf6;font-weight:700;">' + $('<span>').text(m.tp_code || '').html() + '</div>' +
+                            '<div style="font-size:11.5px;color:#9ca3af;">' + $('<span>').text(m.mobile || '').html() + '</div>' +
+                        '</td>' +
+                        '<td style="text-align:center;padding:10px;color:#374151;">' + m.invoice_count + '</td>' +
+                        '<td style="text-align:right;padding:10px;color:#374151;">₹' + (parseFloat(m.amount) || 0).toFixed(2) + '</td>' +
+                        '<td style="text-align:right;padding:10px 0;"><span class="badge-team">' + (parseFloat(m.points) || 0).toFixed(2) + '</span></td>' +
+                        '</tr>';
+            });
+            html += '</tbody><tfoot><tr>' +
+                    '<td colspan="3" style="text-align:right;padding:14px 10px 0 0;font-weight:700;color:#374151;">Total Team Points</td>' +
+                    '<td style="text-align:right;padding:14px 0 0;font-weight:700;color:#8b5cf6;font-size:16px;">' + totalPoints.toFixed(2) + '</td>' +
+                    '</tr></tfoot></table>';
+
+            $('#teamPointsModalBody').html(html);
+        })
+        .fail(function () {
+            $('#teamPointsModalBody').html('<div style="color:#dc2626;padding:20px;">Could not reach the server. Please try again.</div>');
+        });
 });
 </script>
 </body>
