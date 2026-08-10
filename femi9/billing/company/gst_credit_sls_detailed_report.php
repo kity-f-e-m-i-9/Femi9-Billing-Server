@@ -26,31 +26,38 @@ elseif ($gst_type == "outer" && $buyer_gsttype == "register")
 else
     $lable_header = "Inter-state (Unregistered person)";
 
-// ✅ BLOCK 1: Non-customer returns (ss/st/dt/shop) — JOINs all customer tables + invoice in one query
+// ✅ BLOCK 1: Non-customer returns (ss/st/dt/shop) — aggregated from items
+// (not the parent return) so embedded GST on an 'inclusive'-priced product
+// can be stripped via gstamount_total; see gst_details_credit.php.
 $select_Report = "
     SELECT
-        rs.date        AS return_date,
-        rs.total       AS total_sls_amount,
-        rs.from_usertype AS customer_usertype,
+        rsi.date        AS return_date,
+        SUM(rsi.total - rsi.gstamount_total) AS total_sls_amount,
+        rsi.from_usertype AS customer_usertype,
         COALESCE(ss.name,   st.name,   dt.name,   sh.name)                        AS cust_name,
         COALESCE(ss.mobile_number, st.mobile_number, dt.mobile_number, sh.mobile_number) AS cust_mobile,
         COALESCE(ss.gstin,  st.gstin,  dt.gstin,  sh.gstin)                       AS cust_gstin,
         ui.inv_number,
         ui.date AS invoice_date
-    FROM user_return_stock rs
-    LEFT JOIN super_stockiest ss ON rs.from_usertype='super_stockiest' AND ss.temp_id = rs.from_userid
-    LEFT JOIN stockiest        st ON rs.from_usertype='stockiest'       AND st.temp_id = rs.from_userid
-    LEFT JOIN distributor      dt ON rs.from_usertype='distributor'     AND dt.temp_id = rs.from_userid
-    LEFT JOIN shop             sh ON rs.from_usertype='shop'            AND sh.temp_id = rs.from_userid
-    LEFT JOIN user_invoice     ui ON ui.inv_id = rs.invnumber
-    WHERE rs.to_usertype   = '$Login_user_TYPEvl'
-      AND rs.to_userid     = '$get_godown_id'
-      AND rs.buyer_gsttype = '$buyer_gsttype'
-      AND rs.gst_type      = '$gst_type'
-      AND rs.date BETWEEN '$from_date' AND '$to_date'
-      AND rs.total > 0
-      AND rs.from_usertype != 'customer'
-    ORDER BY rs.date ASC
+    FROM user_return_stock_items rsi
+    LEFT JOIN super_stockiest ss ON rsi.from_usertype='super_stockiest' AND ss.temp_id = rsi.from_userid
+    LEFT JOIN stockiest        st ON rsi.from_usertype='stockiest'       AND st.temp_id = rsi.from_userid
+    LEFT JOIN distributor      dt ON rsi.from_usertype='distributor'     AND dt.temp_id = rsi.from_userid
+    LEFT JOIN shop             sh ON rsi.from_usertype='shop'            AND sh.temp_id = rsi.from_userid
+    LEFT JOIN user_invoice     ui ON ui.inv_id = rsi.invnumber
+    WHERE rsi.to_usertype   = '$Login_user_TYPEvl'
+      AND rsi.to_userid     = '$get_godown_id'
+      AND rsi.buyer_gsttype = '$buyer_gsttype'
+      AND rsi.gst_type      = '$gst_type'
+      AND rsi.date BETWEEN '$from_date' AND '$to_date'
+      AND rsi.total > 0
+      AND rsi.from_usertype != 'customer'
+    GROUP BY rsi.returnid, rsi.date, rsi.from_usertype,
+             ss.name, st.name, dt.name, sh.name,
+             ss.mobile_number, st.mobile_number, dt.mobile_number, sh.mobile_number,
+             ss.gstin, st.gstin, dt.gstin, sh.gstin,
+             ui.inv_number, ui.date
+    ORDER BY rsi.date ASC
 ";
 $fetch_Report = mysqli_query($db_conn, $select_Report);
 $rows1 = [];
@@ -60,28 +67,29 @@ while ($row = mysqli_fetch_assoc($fetch_Report)) {
     $rows1[] = $row;
 }
 
-// ✅ BLOCK 2: Customer returns — JOIN with customers table + invoice table
+// ✅ BLOCK 2: Customer returns — same taxable-value fix.
 $select_Report2 = "
     SELECT
-        rs.date        AS return_date,
-        rs.total       AS total_sls_amount,
+        rsi.date        AS return_date,
+        SUM(rsi.total - rsi.gstamount_total) AS total_sls_amount,
         'customer'     AS customer_usertype,
         c.name         AS cust_name,
         c.mobile       AS cust_mobile,
         c.gstin        AS cust_gstin,
         i.inv_number,
         i.date         AS invoice_date
-    FROM user_return_stock rs
-    LEFT JOIN customers c ON c.id = rs.from_userid
-    LEFT JOIN invoice   i ON i.inv_id = rs.invnumber
-    WHERE rs.to_usertype   = '$Login_user_TYPEvl'
-      AND rs.to_userid     = '$get_godown_id'
-      AND rs.buyer_gsttype = '$buyer_gsttype'
-      AND rs.gst_type      = '$gst_type'
-      AND rs.date BETWEEN '$from_date' AND '$to_date'
-      AND rs.total > 0
-      AND rs.from_usertype = 'customer'
-    ORDER BY rs.date ASC
+    FROM user_return_stock_items rsi
+    LEFT JOIN customers c ON c.id = rsi.from_userid
+    LEFT JOIN invoice   i ON i.inv_id = rsi.invnumber
+    WHERE rsi.to_usertype   = '$Login_user_TYPEvl'
+      AND rsi.to_userid     = '$get_godown_id'
+      AND rsi.buyer_gsttype = '$buyer_gsttype'
+      AND rsi.gst_type      = '$gst_type'
+      AND rsi.date BETWEEN '$from_date' AND '$to_date'
+      AND rsi.total > 0
+      AND rsi.from_usertype = 'customer'
+    GROUP BY rsi.returnid, rsi.date, c.name, c.mobile, c.gstin, i.inv_number, i.date
+    ORDER BY rsi.date ASC
 ";
 $fetch_Report2 = mysqli_query($db_conn, $select_Report2);
 $rows2 = [];

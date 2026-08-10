@@ -432,64 +432,88 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<?php $select_hsnwise_total="SELECT DISTINCT hsn FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY hsn ASC";
 							$fetch_hsnwise_total=mysqli_query($db_conn,$select_hsnwise_total);
 							while($result_hsnwise_total=mysqli_fetch_array($fetch_hsnwise_total)){
-								
+
 								$hsn_code=$result_hsnwise_total['hsn'];
-								
+
 								//Total sls qty
 								$Total_HSN_sls="select sum(qty) from user_invoice_items where hsn='$hsn_code' and date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id'";
 								$fetch_HSN_sls=mysqli_query($db_conn,$Total_HSN_sls);
 								$result_HSN_sls=mysqli_fetch_array($fetch_HSN_sls);
 								if($result_HSN_sls[0]!=NULL){ $show_HSN_sls_qty=$result_HSN_sls[0];}
 								else{$show_HSN_sls_qty="0";}
-								
-								//Total sls return qty
-								$Total_HSN_sls_rtn="select sum(qty) from user_return_stock_items where hsn='$hsn_code' and date between '$from_date' and '$to_date' and to_usertype='$Login_user_TYPEvl' and to_usertype='$get_godown_id'";
+
+								//Total sls taxable value (total - gstamount_total strips embedded GST
+								//from 'inclusive'-priced products; see gst_details.php for the same fix)
+								$Total_HSN_sls_val="select sum(total-gstamount_total) from user_invoice_items where hsn='$hsn_code' and date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id'";
+								$fetch_HSN_sls_val=mysqli_query($db_conn,$Total_HSN_sls_val);
+								$result_HSN_sls_val=mysqli_fetch_array($fetch_HSN_sls_val);
+								$show_HSN_sls_val = $result_HSN_sls_val[0]!=NULL ? $result_HSN_sls_val[0] : 0;
+
+								//Total customer sls qty + taxable value
+								$Total_HSN_cust="select sum(qty), sum(total-gstamount_total) from invoice_items where hsn='$hsn_code' and date between '$from_date' and '$to_date' and user_type='$Login_user_TYPEvl' and user_id='$get_godown_id'";
+								$fetch_HSN_cust=mysqli_query($db_conn,$Total_HSN_cust);
+								$result_HSN_cust=mysqli_fetch_array($fetch_HSN_cust);
+								$show_HSN_cust_qty = $result_HSN_cust[0]!=NULL ? $result_HSN_cust[0] : 0;
+								$show_HSN_cust_val = $result_HSN_cust[1]!=NULL ? $result_HSN_cust[1] : 0;
+
+								//Total sls return qty + taxable value
+								$Total_HSN_sls_rtn="select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn='$hsn_code' and date between '$from_date' and '$to_date' and to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id'";
 								$fetch_HSN_sls_rtn=mysqli_query($db_conn,$Total_HSN_sls_rtn);
 								$result_HSN_sls_rtn=mysqli_fetch_array($fetch_HSN_sls_rtn);
-								if($result_HSN_sls_rtn[0]!=NULL){ $show_HSN_sls_rtn_qty=$result_HSN_sls_rtn[0];}
-								else{$show_HSN_sls_rtn_qty="0";}
-								
-								$Net_HSN_sls_qty=$show_HSN_sls_qty-$show_HSN_sls_rtn_qty;
-								
-								
-								//Total OT sls qty
-								$Total_HSN_slsOT="select sum(qty) from ot_sales where hsn='$hsn_code' and date between '$from_date' and '$to_date' and godownid='$get_godown_id'";
+								$show_HSN_sls_rtn_qty = $result_HSN_sls_rtn[0]!=NULL ? $result_HSN_sls_rtn[0] : 0;
+								$show_HSN_sls_rtn_val = $result_HSN_sls_rtn[1]!=NULL ? $result_HSN_sls_rtn[1] : 0;
+
+								$Net_HSN_sls_qty=($show_HSN_sls_qty+$show_HSN_cust_qty)-$show_HSN_sls_rtn_qty;
+								$Net_HSN_sls_val=($show_HSN_sls_val+$show_HSN_cust_val)-$show_HSN_sls_rtn_val;
+
+
+								//Total OT sls qty + taxable value
+								$Total_HSN_slsOT="select sum(qty), sum(total-gst_amount) from ot_sales where hsn='$hsn_code' and date between '$from_date' and '$to_date' and godownid='$get_godown_id'";
 								$fetch_HSN_slsOT=mysqli_query($db_conn,$Total_HSN_slsOT);
 								$result_HSN_slsOT=mysqli_fetch_array($fetch_HSN_slsOT);
-								if($result_HSN_slsOT[0]!=NULL){ $show_HSN_sls_qty_OT=$result_HSN_slsOT[0];}
-								else{$show_HSN_sls_qty_OT="0";}
-								
-								//Total OT sls qty
-								$Total_HSN_slsOT_rtn="select sum(qty) from ot_sales_return where return_date between '$from_date' and '$to_date' and godownid='$get_godown_id' and hsn='$hsn_code'";
+								$show_HSN_sls_qty_OT = $result_HSN_slsOT[0]!=NULL ? $result_HSN_slsOT[0] : 0;
+								$show_HSN_sls_val_OT = $result_HSN_slsOT[1]!=NULL ? $result_HSN_slsOT[1] : 0;
+
+								//Total OT sls return qty (ot_sales_return has no GST breakdown column)
+								$Total_HSN_slsOT_rtn="select sum(qty), sum(total) from ot_sales_return where return_date between '$from_date' and '$to_date' and godownid='$get_godown_id' and hsn='$hsn_code'";
 								$fetch_HSN_slsOT_rtn=mysqli_query($db_conn,$Total_HSN_slsOT_rtn);
 								$result_HSN_slsOT_rtn=mysqli_fetch_array($fetch_HSN_slsOT_rtn);
-								if($result_HSN_slsOT_rtn[0]!=NULL){ $show_HSN_sls_qty_OT_rtn=$result_HSN_slsOT_rtn[0];}
-								else{$show_HSN_sls_qty_OT_rtn="0";}
-								
+								$show_HSN_sls_qty_OT_rtn = $result_HSN_slsOT_rtn[0]!=NULL ? $result_HSN_slsOT_rtn[0] : 0;
+								$show_HSN_sls_val_OT_rtn = $result_HSN_slsOT_rtn[1]!=NULL ? $result_HSN_slsOT_rtn[1] : 0;
+
 								$Net_HSN_sls_qty_OT=$show_HSN_sls_qty_OT-$show_HSN_sls_qty_OT_rtn;
-								
-								//Total Internal Transfer sls qty
-								$Total_HSN_sls_inter="select sum(qty) from internal_transfer where hsn='$hsn_code' and date between '$from_date' and '$to_date' and send_from='$get_godown_id'";
+								$Net_HSN_sls_val_OT=$show_HSN_sls_val_OT-$show_HSN_sls_val_OT_rtn;
+
+								//Total Internal Transfer sls qty + taxable value (stored taxable_value
+								//column is unreliable/unpopulated, so total-gst_amount is used instead)
+								$Total_HSN_sls_inter="select sum(qty), sum(total-gst_amount) from internal_transfer where hsn='$hsn_code' and date between '$from_date' and '$to_date' and send_from='$get_godown_id'";
 								$fetch_HSN_sls_inter=mysqli_query($db_conn,$Total_HSN_sls_inter);
 								$result_HSN_sls_inter=mysqli_fetch_array($fetch_HSN_sls_inter);
-								if($result_HSN_sls_inter[0]!=NULL){ $show_HSN_sls_qty_inter=$result_HSN_sls_inter[0];}
-								else{$show_HSN_sls_qty_inter="0";}
+								$show_HSN_sls_qty_inter = $result_HSN_sls_inter[0]!=NULL ? $result_HSN_sls_inter[0] : 0;
+								$show_HSN_sls_val_inter = $result_HSN_sls_inter[1]!=NULL ? $result_HSN_sls_inter[1] : 0;
 
-								//Total TP sls qty (company -> territory partner transfers, godown-sourced only)
-								$Total_HSN_sls_TP="select sum(tpii.quantity) from tp_invoices tpi join tp_invoice_items tpii on tpii.tp_invoice_id=tpi.id join products p on p.id=tpii.product_id where p.hsn='$hsn_code' and tpi.invoice_date between '$from_date' and '$to_date' and tpi.source_godown_id='$get_godown_id'";
+								//Total TP sls qty + taxable value (company -> territory partner
+								//transfers, godown-sourced only) — tpii.amount is the gross line total,
+								//so the same inclusive/exclusive-aware helper used elsewhere is reused.
+								require_once __DIR__ . '/include/TpGstHelper.php';
+								$Total_HSN_sls_TP="select tpii.quantity, tpii.amount, p.gst as gst_percentage, p.gst_type as product_gst_type from tp_invoices tpi join tp_invoice_items tpii on tpii.tp_invoice_id=tpi.id join products p on p.id=tpii.product_id where p.hsn='$hsn_code' and tpi.invoice_date between '$from_date' and '$to_date' and tpi.source_godown_id='$get_godown_id'";
 								$fetch_HSN_sls_TP=mysqli_query($db_conn,$Total_HSN_sls_TP);
-								$result_HSN_sls_TP=mysqli_fetch_array($fetch_HSN_sls_TP);
-								if($result_HSN_sls_TP[0]!=NULL){ $show_HSN_sls_qty_TP=$result_HSN_sls_TP[0];}
-								else{$show_HSN_sls_qty_TP="0";}
+								$show_HSN_sls_qty_TP=0; $show_HSN_sls_val_TP=0;
+								while($row_HSN_sls_TP=mysqli_fetch_array($fetch_HSN_sls_TP)){
+									$show_HSN_sls_qty_TP += (int)$row_HSN_sls_TP['quantity'];
+									[$tp_taxable, ] = tp_line_taxable_and_gst((float)$row_HSN_sls_TP['amount'], $row_HSN_sls_TP['gst_percentage'], $row_HSN_sls_TP['product_gst_type']);
+									$show_HSN_sls_val_TP += $tp_taxable;
+								}
 
 								$overall_HSN_sls_qty=$Net_HSN_sls_qty+$Net_HSN_sls_qty_OT+$show_HSN_sls_qty_inter+$show_HSN_sls_qty_TP;
-								
+								$overall_HSN_sls_val=$Net_HSN_sls_val+$Net_HSN_sls_val_OT+$show_HSN_sls_val_inter+$show_HSN_sls_val_TP;
+
 								?>
-							
+
 							<tr>
 							<td style="text-align:left;"><?=$hsn_code;?></td>
 							<td style="text-align:left;"><?=$overall_HSN_sls_qty;?></td>
-							<td style="text-align:left;"><?=inr_format($Nil_rated_total, 2);?></td>
+							<td style="text-align:left;"><?=inr_format($overall_HSN_sls_val, 2);?></td>
 							</tr>
 							
 							<?php }?>

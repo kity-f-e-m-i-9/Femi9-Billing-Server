@@ -1,15 +1,16 @@
 <?php
-//return from registered person
-$select_sum_total_inter_register_credit="select sum(total) from user_return_stock where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and buyer_gsttype='register' and gst_type='outer' and date between '$from_date' and '$to_date'";
+//return from registered person — sum from *_items so embedded GST on an
+// 'inclusive'-priced product's total can be stripped via gstamount_total.
+$select_sum_total_inter_register_credit="select sum(total-gstamount_total) from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and buyer_gsttype='register' and gst_type='outer' and date between '$from_date' and '$to_date'";
 $fetch_sum_total_inter_register_credit=mysqli_query($db_conn,$select_sum_total_inter_register_credit);
 $result_sum_total_inter_register_credit=mysqli_fetch_array($fetch_sum_total_inter_register_credit);
-							   
+
 							   if($result_sum_total_inter_register_credit[0]!=NULL)
 							   {$total_inter_register_credit=$result_sum_total_inter_register_credit[0];
 							   }else{$total_inter_register_credit="0";}
-							   
+
 							   //return from unregistered person
-$select_sum_total_inter_unregister_credit="select sum(total) from user_return_stock where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and buyer_gsttype='unregister' and gst_type='outer' and date between '$from_date' and '$to_date'";
+$select_sum_total_inter_unregister_credit="select sum(total-gstamount_total) from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and buyer_gsttype='unregister' and gst_type='outer' and date between '$from_date' and '$to_date'";
 $fetch_sum_total_inter_unregister_credit=mysqli_query($db_conn,$select_sum_total_inter_unregister_credit);
 $result_sum_total_inter_unregister_credit=mysqli_fetch_array($fetch_sum_total_inter_unregister_credit);
 							   
