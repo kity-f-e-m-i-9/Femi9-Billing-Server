@@ -21,7 +21,7 @@ else
 
 // Same "intra-state" convention used on gstr1.php: any non-'outer' value
 // counts as intra, since some legacy invoice rows carry gst_type='0'.
-$intraSql = $gst_type == 'outer' ? "gst_type = 'outer'" : "gst_type != 'outer'";
+$intraOp = $gst_type == 'outer' ? '=' : '!=';
 
 // BLOCK 1: Shop returns — items carry the GST-corrected taxable value
 // (total - gstamount_total; see gstr1.php for why), joined back to the
@@ -41,7 +41,7 @@ $select_Report = "
     WHERE rsi.to_usertype   = ?
       AND rsi.to_userid     = ?
       AND rsi.buyer_gsttype = ?
-      AND ($intraSql)
+      AND rsi.gst_type $intraOp 'outer'
       AND rsi.date BETWEEN ? AND ?
       AND rsi.total > 0
       AND rsi.from_usertype != 'customer'
@@ -72,7 +72,7 @@ $select_Report2 = "
     WHERE rsi.to_usertype   = ?
       AND rsi.to_userid     = ?
       AND rsi.buyer_gsttype = ?
-      AND ($intraSql)
+      AND rsi.gst_type $intraOp 'outer'
       AND rsi.date BETWEEN ? AND ?
       AND rsi.total > 0
       AND rsi.from_usertype = 'customer'

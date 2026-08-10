@@ -21,7 +21,11 @@ else
 
 // Same "intra-state" convention used on gstr1.php: any non-'outer' value
 // counts as intra, since some legacy invoice rows carry gst_type='0'.
-$intraSql = $gst_type == 'outer' ? "gst_type = 'outer'" : "gst_type != 'outer'";
+// gst_type exists on both the items table and the joined parent invoice
+// table, so each block below builds its own alias-qualified condition
+// rather than sharing one unqualified string (which is ambiguous once
+// both tables are in scope).
+$intraOp = $gst_type == 'outer' ? '=' : '!=';
 
 // BLOCK 1: Shop/order sales — items carry the GST-corrected taxable value
 // (total - gstamount_total; see gstr1.php for why), joined back to
@@ -40,7 +44,7 @@ $select_Report = "
     WHERE uii.from_user_type = ?
       AND uii.from_user_id   = ?
       AND uii.buyer_gsttype  = ?
-      AND ($intraSql)
+      AND uii.gst_type $intraOp 'outer'
       AND uii.date BETWEEN ? AND ?
     GROUP BY uii.inv_id, ui.inv_number, uii.date, sh.name, sh.mobile_number, sh.gstin
     ORDER BY uii.date ASC
@@ -69,7 +73,7 @@ $select_Report2 = "
     WHERE ii.user_type = ?
       AND ii.user_id   = ?
       AND ii.buyer_gsttype = ?
-      AND ($intraSql)
+      AND ii.gst_type $intraOp 'outer'
       AND ii.date BETWEEN ? AND ?
     GROUP BY ii.inv_id, i.inv_number, ii.date, c.name, c.mobile, c.gstin
     ORDER BY ii.date ASC
