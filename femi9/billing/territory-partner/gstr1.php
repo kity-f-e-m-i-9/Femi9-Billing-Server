@@ -203,8 +203,8 @@ if ($from_month != '') {
                         </tr>
                         <tr>
                         <th>Total Sales</th>
-                        <td><?=inr_format($Total_sls_register_intra, 2);?></td>
-                        <td><?=inr_format($Total_sls_unregister_intra, 2);?></td>
+                        <td><a href="gst_sls_detailed_report?data1=inner&data2=register&frd=<?=$from_date;?>&tod=<?=$to_date;?>" target="_blank"><?=inr_format($Total_sls_register_intra, 2);?></a></td>
+                        <td><a href="gst_sls_detailed_report?data1=inner&data2=unregister&frd=<?=$from_date;?>&tod=<?=$to_date;?>" target="_blank"><?=inr_format($Total_sls_unregister_intra, 2);?></a></td>
                         </tr>
                         <tfoot>
                         <tr>
@@ -224,8 +224,8 @@ if ($from_month != '') {
                         </tr>
                         <tr>
                         <th>Sales Return</th>
-                        <td><?=inr_format($Total_intra_register_credit, 2);?></td>
-                        <td><?=inr_format($Total_intra_unregister_credit, 2);?></td>
+                        <td><a href="gst_credit_sls_detailed_report?data1=inner&data2=register&frd=<?=$from_date;?>&tod=<?=$to_date;?>" target="_blank"><?=inr_format($Total_intra_register_credit, 2);?></a></td>
+                        <td><a href="gst_credit_sls_detailed_report?data1=inner&data2=unregister&frd=<?=$from_date;?>&tod=<?=$to_date;?>" target="_blank"><?=inr_format($Total_intra_unregister_credit, 2);?></a></td>
                         </tr>
                         <tfoot>
                         <tr>
@@ -254,8 +254,8 @@ if ($from_month != '') {
                         </tr>
                         <tr>
                         <th>Total Sales</th>
-                        <td><?=inr_format($Total_sls_register_inter, 2);?></td>
-                        <td><?=inr_format($Total_sls_unregister_inter, 2);?></td>
+                        <td><a href="gst_sls_detailed_report?data1=outer&data2=register&frd=<?=$from_date;?>&tod=<?=$to_date;?>" target="_blank"><?=inr_format($Total_sls_register_inter, 2);?></a></td>
+                        <td><a href="gst_sls_detailed_report?data1=outer&data2=unregister&frd=<?=$from_date;?>&tod=<?=$to_date;?>" target="_blank"><?=inr_format($Total_sls_unregister_inter, 2);?></a></td>
                         </tr>
                         <tfoot>
                         <tr>
@@ -275,8 +275,8 @@ if ($from_month != '') {
                         </tr>
                         <tr>
                         <th>Sales Return</th>
-                        <td><?=inr_format($Total_inter_register_credit, 2);?></td>
-                        <td><?=inr_format($Total_inter_unregister_credit, 2);?></td>
+                        <td><a href="gst_credit_sls_detailed_report?data1=outer&data2=register&frd=<?=$from_date;?>&tod=<?=$to_date;?>" target="_blank"><?=inr_format($Total_inter_register_credit, 2);?></a></td>
+                        <td><a href="gst_credit_sls_detailed_report?data1=outer&data2=unregister&frd=<?=$from_date;?>&tod=<?=$to_date;?>" target="_blank"><?=inr_format($Total_inter_unregister_credit, 2);?></a></td>
                         </tr>
                         <tfoot>
                         <tr>
