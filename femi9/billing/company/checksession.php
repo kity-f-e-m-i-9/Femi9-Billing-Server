@@ -30,6 +30,13 @@ if (!empty($_COOKIE['femi9_bdm_bridge']) && in_array(basename($_SERVER['SCRIPT_N
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
+    // sales_bdm_staff.zone may not exist yet on every environment (self-migrated
+    // lazily by company/salesbdm-team-report.php) — guard here too so this bridge
+    // query never 500s on a host that hasn't hit that page yet.
+    $_chkZoneCS = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'zone'");
+    if ($_chkZoneCS && $_chkZoneCS->num_rows === 0) {
+        $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN zone VARCHAR(100) NULL DEFAULT NULL AFTER monthly_target_amount");
+    }
     $stmt_bridge = $db_conn->prepare("
         SELECT b.bdm_id, s.bdm_name, s.bdm_mobile, s.zone, s.account_status
         FROM salesbdm_company_bridge b
