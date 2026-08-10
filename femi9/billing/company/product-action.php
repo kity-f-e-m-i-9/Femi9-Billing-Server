@@ -72,6 +72,8 @@ if (isset($_POST['add-product'])) {
     $hsn = sanitizeInput($_POST['hsn'] ?? '');
     $pieces_per_pack = trim($_POST['pieces_per_pack'] ?? '');
     $pieces_per_pack = ($pieces_per_pack === '') ? null : (int) $pieces_per_pack;
+    $packs_per_carton = trim($_POST['packs_per_carton'] ?? '');
+    $packs_per_carton = ($packs_per_carton === '') ? null : (int) $packs_per_carton;
 
     // Check if product already exists
     $stmt = $db_conn->prepare("SELECT COUNT(*) as numProducts FROM products WHERE temp_id = ?");
@@ -83,14 +85,14 @@ if (isset($_POST['add-product'])) {
     if ($result['numProducts'] == 0) {
         // Insert new product
         $stmt = $db_conn->prepare(
-            "INSERT INTO products (temp_id, productName, pieces_per_pack, mrp, supersstock_price, super_distributor_price,
+            "INSERT INTO products (temp_id, productName, pieces_per_pack, packs_per_carton, mrp, supersstock_price, super_distributor_price,
             stockist_price, distributor_price, outlet_price, gst, gst_type, hsn, rwpoints, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
         );
 
         $stmt->bind_param(
-            "ssidddddddssd",
-            $temp_id, $productName, $pieces_per_pack, $mrp, $supersstock_price, $super_distributor_price,
+            "ssiidddddddssd",
+            $temp_id, $productName, $pieces_per_pack, $packs_per_carton, $mrp, $supersstock_price, $super_distributor_price,
             $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints
         );
         
@@ -136,18 +138,20 @@ if (isset($_POST['update-product'])) {
     $hsn = sanitizeInput($_POST['hsn'] ?? '');
     $pieces_per_pack = trim($_POST['pieces_per_pack'] ?? '');
     $pieces_per_pack = ($pieces_per_pack === '') ? null : (int) $pieces_per_pack;
+    $packs_per_carton = trim($_POST['packs_per_carton'] ?? '');
+    $packs_per_carton = ($packs_per_carton === '') ? null : (int) $packs_per_carton;
 
     // Update product
     $stmt = $db_conn->prepare(
-        "UPDATE products SET productName = ?, pieces_per_pack = ?, mrp = ?, supersstock_price = ?,
+        "UPDATE products SET productName = ?, pieces_per_pack = ?, packs_per_carton = ?, mrp = ?, supersstock_price = ?,
         super_distributor_price = ?, stockist_price = ?, distributor_price = ?,
         outlet_price = ?, gst = ?, gst_type = ?, hsn = ?, rwpoints = ?, updated_at = NOW()
         WHERE id = ?"
     );
 
     $stmt->bind_param(
-        "sidddddddssdi",
-        $productName, $pieces_per_pack, $mrp, $supersstock_price, $super_distributor_price,
+        "siidddddddssdi",
+        $productName, $pieces_per_pack, $packs_per_carton, $mrp, $supersstock_price, $super_distributor_price,
         $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $update_id
     );
     
