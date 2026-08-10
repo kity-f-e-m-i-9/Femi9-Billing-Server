@@ -93,12 +93,19 @@ if ($from_month != '') {
     $hsn_list = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
+    // Per-HSN net quantity and taxable value (subtotal = pre-GST amount),
+    // each netted as sales (user_invoice_items + invoice_items) minus
+    // returns (user_return_stock_items) for that HSN.
     $hsn_qty_stmt = $db_conn->prepare(
         "SELECT
             COALESCE((SELECT SUM(qty) FROM user_invoice_items WHERE hsn = ? AND date BETWEEN ? AND ? AND from_user_type = ? AND from_user_id = ?), 0) +
             COALESCE((SELECT SUM(qty) FROM invoice_items       WHERE hsn = ? AND date BETWEEN ? AND ? AND user_type = ?      AND user_id = ?), 0) -
             COALESCE((SELECT SUM(qty) FROM user_return_stock_items WHERE hsn = ? AND date BETWEEN ? AND ? AND to_usertype = ? AND to_userid = ?), 0)
-            AS net_qty"
+            AS net_qty,
+            COALESCE((SELECT SUM(subtotal) FROM user_invoice_items WHERE hsn = ? AND date BETWEEN ? AND ? AND from_user_type = ? AND from_user_id = ?), 0) +
+            COALESCE((SELECT SUM(subtotal) FROM invoice_items       WHERE hsn = ? AND date BETWEEN ? AND ? AND user_type = ?      AND user_id = ?), 0) -
+            COALESCE((SELECT SUM(subtotal) FROM user_return_stock_items WHERE hsn = ? AND date BETWEEN ? AND ? AND to_usertype = ? AND to_userid = ?), 0)
+            AS net_taxable_value"
     );
 }
 ?>
@@ -349,18 +356,23 @@ if ($from_month != '') {
                         <?php foreach ($hsn_list as $h):
                             $hsn_code = $h['hsn'];
                             $hsn_qty_stmt->bind_param(
-                                "sssssssssssssss",
+                                "ssssssssssssssssssssssssssssss",
+                                $hsn_code, $from_date, $to_date, $Login_user_TYPEvl, $tp_id,
+                                $hsn_code, $from_date, $to_date, $Login_user_TYPEvl, $tp_id,
+                                $hsn_code, $from_date, $to_date, $Login_user_TYPEvl, $tp_id,
                                 $hsn_code, $from_date, $to_date, $Login_user_TYPEvl, $tp_id,
                                 $hsn_code, $from_date, $to_date, $Login_user_TYPEvl, $tp_id,
                                 $hsn_code, $from_date, $to_date, $Login_user_TYPEvl, $tp_id
                             );
                             $hsn_qty_stmt->execute();
-                            $net_qty = (int)($hsn_qty_stmt->get_result()->fetch_assoc()['net_qty'] ?? 0);
+                            $hsn_row = $hsn_qty_stmt->get_result()->fetch_assoc();
+                            $net_qty = (int)($hsn_row['net_qty'] ?? 0);
+                            $net_taxable_value = (float)($hsn_row['net_taxable_value'] ?? 0);
                         ?>
                         <tr>
                         <td style="text-align:left;"><?=htmlspecialchars($hsn_code);?></td>
                         <td style="text-align:left;"><?=$net_qty;?></td>
-                        <td style="text-align:left;"><?=inr_format($Nil_rated_total, 2);?></td>
+                        <td style="text-align:left;"><?=inr_format($net_taxable_value, 2);?></td>
                         </tr>
                         <?php endforeach; ?>
                         </table>
