@@ -353,7 +353,12 @@ if ($hasTps) {
                                                         <a href="tp-invoice-print.php?id=<?php echo base64_encode($o['tp_invoice_id']); ?>" class="btn btn-sm btn-outline-secondary">
                                                             <i class="material-icons" style="font-size:14px;vertical-align:middle;">print</i> Print
                                                         </a>
-                                                        <?php else: ?>
+                                                        <?php endif; ?>
+                                                        <?php if (!empty($rowItems)): ?>
+                                                        <a href="dispatch-slip-print.php?po_id=<?php echo (int)$o['po_id']; ?>" target="_blank" class="btn btn-sm btn-outline-dark">
+                                                            <i class="material-icons" style="font-size:14px;vertical-align:middle;">local_shipping</i> Dispatch Slip
+                                                        </a>
+                                                        <?php elseif (!$isCompleted): ?>
                                                         <span class="text-muted">&mdash;</span>
                                                         <?php endif; ?>
                                                     </td>
