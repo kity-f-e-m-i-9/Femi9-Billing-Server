@@ -135,7 +135,7 @@ foreach ($staffRows as $r) {
                     <div class="card">
                         <div class="card-header"><h5 class="card-title" style="margin:0;font-size:14px;">All Sales BDM — Target vs Achieved (Napkin only)</h5></div>
                         <div class="card-body" style="overflow-x:auto;">
-                            <p class="snote">Click a name for their role/manager, click % for their district/TP breakdown.</p>
+                            <p class="snote">Click a name or the % to open their own dashboard (read-only).</p>
                             <table class="mt" id="teamReportTable">
                                 <thead>
                                     <tr>
@@ -156,8 +156,9 @@ foreach ($staffRows as $r) {
                                 <?php else: foreach ($rows as $r):
                                     $bc = $r['pct'] >= 100 ? 'var(--good)' : ($r['pct'] >= 50 ? '#eab308' : 'var(--critical)');
                                 ?>
+                                    <?php $viewUrl = 'view-bdm-dashboard.php?bdm_id=' . $r['id']; ?>
                                     <tr>
-                                        <td><span class="team-name-cell" data-bdm-id="<?php echo $r['id']; ?>"><?php echo htmlspecialchars($r['name']); ?></span></td>
+                                        <td><a class="team-name-cell" href="<?php echo $viewUrl; ?>"><?php echo htmlspecialchars($r['name']); ?></a></td>
                                         <td><span class="lvl-badge" style="background:<?php echo $r['color']; ?>;"><?php echo htmlspecialchars($r['level_name']); ?></span></td>
                                         <td><?php echo $r['manager_name'] ? htmlspecialchars($r['manager_name']) : '<span class="text-muted">—</span>'; ?></td>
                                         <td><?php echo $r['zone'] ? htmlspecialchars($r['zone']) : '<span class="text-muted">—</span>'; ?></td>
@@ -166,12 +167,12 @@ foreach ($staffRows as $r) {
                                         <td>&#8377;<?php echo inr_format($r['target'], 0); ?></td>
                                         <td>&#8377;<?php echo inr_format($r['achieved'], 0); ?></td>
                                         <td>
-                                            <span class="team-name-cell" data-bdm-id="<?php echo $r['id']; ?>" style="text-decoration:none;">
+                                            <a href="<?php echo $viewUrl; ?>" style="text-decoration:none;">
                                                 <div style="display:flex;align-items:center;gap:5px;">
                                                     <div class="pbar" style="width:70px;"><div class="pf" style="width:<?php echo min($r['pct'],100); ?>%;background:<?php echo $bc; ?>;"></div></div>
                                                     <span style="font-size:12.5px;font-weight:700;color:<?php echo $bc; ?>;"><?php echo $r['pct']; ?>%</span>
                                                 </div>
-                                            </span>
+                                            </a>
                                         </td>
                                     </tr>
                                 <?php endforeach; endif; ?>
@@ -186,18 +187,6 @@ foreach ($staffRows as $r) {
     </div>
 </div>
 
-<div class="modal fade" id="bdmNodeModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="bdmNodeModalTitle">Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="bdmNodeModalBody"></div>
-        </div>
-    </div>
-</div>
-
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -205,57 +194,5 @@ foreach ($staffRows as $r) {
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
-<script>
-var bdmAllStaff = <?php echo json_encode($allStaffMap); ?>;
-var REPORT_FROM = <?php echo json_encode($fromDate); ?>;
-var REPORT_TO = <?php echo json_encode($toDate); ?>;
-
-(function ($) {
-    $(document).on('click', '.team-name-cell', function () {
-        var id = $(this).data('bdm-id');
-        var node = bdmAllStaff[id];
-        if (!node) return;
-        $('#bdmNodeModalTitle').text(node.level_name + ': ' + node.name);
-        var $body = $('#bdmNodeModalBody').empty();
-
-        var $head = $('<div style="text-align:center;margin-bottom:14px;"></div>');
-        $head.append($('<span class="chain-pill"></span>').css('background', node.color).text(node.level_name));
-        if (node.manager_name) {
-            $head.append(' <span class="chain-pill" style="background:#eee;color:#333;">Reports to: ' + $('<div>').text(node.manager_name).html() + '</span>');
-        }
-        if (node.zone) {
-            $head.append(' <span class="chain-pill" style="background:#fff8e1;color:#92400e;">Zone: ' + $('<div>').text(node.zone).html() + '</span>');
-        }
-        $body.append($head);
-
-        var $tpWrap = $('<div><div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;text-align:center;margin-bottom:8px;">Loading district/TP breakdown…</div></div>');
-        $body.append($tpWrap);
-        $('#bdmNodeModal').modal('show');
-
-        $.getJSON('get-salesbdm-team-member-detail.php', { bdm_id: id, from: REPORT_FROM, to: REPORT_TO }, function (resp) {
-            if (resp.error) { $tpWrap.html('<div class="text-muted text-center">Could not load details.</div>'); return; }
-            var pct = resp.pct;
-            var bc = pct >= 100 ? '#0ca30c' : (pct >= 50 ? '#eab308' : '#d03b3b');
-            var html = '<div style="text-align:center;margin-bottom:12px;font-size:13px;">' +
-                'Target: <b>₹' + Number(resp.target).toLocaleString('en-IN') + '</b> &nbsp;|&nbsp; ' +
-                'Achieved: <b>₹' + Number(resp.achieved).toLocaleString('en-IN') + '</b> &nbsp;|&nbsp; ' +
-                '<b style="color:' + bc + ';">' + pct + '%</b></div>';
-            if (resp.tps && resp.tps.length) {
-                html += '<div style="overflow-x:auto;"><table class="mt"><thead><tr><th>TP</th><th>District</th><th>Target</th><th>Achieved</th><th>%</th></tr></thead><tbody>';
-                $.each(resp.tps, function (_, tp) {
-                    var tbc = tp.pct >= 100 ? '#0ca30c' : (tp.pct >= 50 ? '#eab308' : '#d03b3b');
-                    html += '<tr><td>' + $('<div>').text(tp.name).html() + '</td><td style="font-size:12px;color:#666;">' + $('<div>').text(tp.district || '—').html() + '</td>' +
-                        '<td>₹' + Number(tp.target).toLocaleString('en-IN') + '</td><td>₹' + Number(tp.achieved).toLocaleString('en-IN') + '</td>' +
-                        '<td style="color:' + tbc + ';font-weight:700;">' + tp.pct + '%</td></tr>';
-                });
-                html += '</tbody></table></div>';
-            } else {
-                html += '<div class="text-muted text-center">No TPs assigned.</div>';
-            }
-            $tpWrap.html(html);
-        }).fail(function () { $tpWrap.html('<div class="text-muted text-center">Could not load details.</div>'); });
-    });
-})(jQuery);
-</script>
 </body>
 </html>
