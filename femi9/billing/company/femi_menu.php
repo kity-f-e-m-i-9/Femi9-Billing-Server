@@ -301,6 +301,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="cp-stock">CP Stock</a></li>
 							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
+							<li><a href="cp-district-sales-report">District Sales Report</a></li>
                         </ul>
                     </li>
 					<!----------------------Territory Partner--------------------------->
@@ -785,6 +786,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="cp-stock">CP Stock</a></li>
 							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
+							<li><a href="cp-district-sales-report">District Sales Report</a></li>
                         </ul>
                     </li>
 					<?php }?>
