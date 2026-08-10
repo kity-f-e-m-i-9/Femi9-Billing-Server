@@ -168,7 +168,15 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 <input type="number" step="0.01" min="0" name="monthly_target_amount" class="form-control" placeholder="optional">
 </br>
 
+<label class="form-label">Zone</label>
+<input type="text" name="zone" class="form-control" placeholder="optional" onkeypress="restrictSpecialChars(event)">
+</br>
+
 <?php
+$_chkZone = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'zone'");
+if ($_chkZone && $_chkZone->num_rows === 0) {
+    $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN zone VARCHAR(100) NULL DEFAULT NULL AFTER monthly_target_amount");
+}
 $_chkTL = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'team_level_id'");
 if ($_chkTL && $_chkTL->num_rows === 0) {
     $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN team_level_id INT NULL DEFAULT NULL AFTER user_position");

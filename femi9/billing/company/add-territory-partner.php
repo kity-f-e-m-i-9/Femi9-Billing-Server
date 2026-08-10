@@ -133,12 +133,12 @@ try {
 <div class="app align-content-stretch d-flex flex-wrap">
 
     <div class="app-sidebar">
-        <?php include("logo.php"); ?>
-        <?php include("femi_menu.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/logo.php' : 'logo.php'); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/femi_menu.php' : 'femi_menu.php'); ?>
     </div>
 
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/app-header.php' : 'app-header.php'); ?>
 
         <div class="app-content">
             <div class="content-wrapper">

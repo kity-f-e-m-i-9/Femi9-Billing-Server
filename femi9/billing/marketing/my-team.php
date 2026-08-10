@@ -52,6 +52,10 @@ $fromDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate) ? $fromDate : '';
 $toDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $toDate) ? $toDate : '';
 $hasDateFilter = ($fromDate !== '' && $toDate !== '');
 $dateParam = $hasDateFilter ? ('&from_date=' . urlencode($fromDate) . '&to_date=' . urlencode($toDate)) : '';
+// manage_order_product.php (this filter's own detail page) uses frdate/todate,
+// not from_date/to_date — without this, its "Orders" link silently defaults
+// to today only, showing 0s for anyone with no orders on the current day.
+$ordersDateParam = $hasDateFilter ? ('&frdate=' . urlencode($fromDate) . '&todate=' . urlencode($toDate)) : '';
 
 function msInitials(string $name): string {
     $words = array_filter(preg_split('/\s+/', trim($name)));
@@ -78,11 +82,24 @@ foreach ($staffRows as $row) {
 
 // ── Raw per-person shop/order counts across the whole team, in one pass ────
 $rawStats = [];
-foreach ($subtreeIds as $id) { $rawStats[$id] = ['shops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0]; }
+foreach ($subtreeIds as $id) { $rawStats[$id] = ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0]; }
 $shopDateWhere = $hasDateFilter ? " AND DATE(created_at) BETWEEN '$fromDate' AND '$toDate'" : '';
 $orderDateWhere = $hasDateFilter ? " AND order_date BETWEEN '$fromDate' AND '$toDate'" : '';
 $_rs = $db_conn->query("SELECT ms_id, COUNT(*) AS cnt FROM ms_shop WHERE ms_id IN ($idList)$shopDateWhere GROUP BY ms_id");
 if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['shops'] = (int)$r['cnt']; } }
+// Old Shop — shops added BEFORE the range that actually got an order WITHIN
+// it (existing shops still active this period), not just a headcount.
+if ($hasDateFilter) {
+    $_rs = $db_conn->query(
+        "SELECT o.ms_id, COUNT(DISTINCT o.shop_id) AS cnt
+         FROM ms_orders o JOIN ms_shop s ON s.id = o.shop_id
+         WHERE o.ms_id IN ($idList) AND o.new_order='yes'
+               AND o.order_date BETWEEN '$fromDate' AND '$toDate'
+               AND DATE(s.created_at) < '$fromDate'
+         GROUP BY o.ms_id"
+    );
+    if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['oldshops'] = (int)$r['cnt']; } }
+}
 $_rs = $db_conn->query("SELECT ms_id, COUNT(DISTINCT order_id) AS cnt FROM ms_orders WHERE ms_id IN ($idList) AND new_order='yes'$orderDateWhere GROUP BY ms_id");
 if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['got'] = (int)$r['cnt']; } }
 $_rs = $db_conn->query("SELECT ms_id, COUNT(*) AS cnt FROM ms_orders WHERE ms_id IN ($idList) AND new_order='no'$orderDateWhere GROUP BY ms_id");
@@ -103,11 +120,12 @@ foreach ($subtreeIds as $id) {
 // Sum a person's own stats + everyone below them, and collect the id list
 // that "View Shop List" should link to.
 function subtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
-    $sum = $rawStats[$id] ?? ['shops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0];
+    $sum = $rawStats[$id] ?? ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0];
     $ids = [$id];
     foreach (($byManager[$id] ?? []) as $child) {
         [$childSum, $childIds] = subtreeSumAndIds((int)$child['id'], $byManager, $rawStats);
         $sum['shops']    += $childSum['shops'];
+        $sum['oldshops'] += $childSum['oldshops'];
         $sum['got']      += $childSum['got'];
         $sum['no']       += $childSum['no'];
         $sum['target']   += $childSum['target'];
@@ -135,34 +153,60 @@ foreach ($directReports as $dr) {
     }
 }
 $directReportCount = count($directReports);
-$kpiShops = $kpiSum['shops'];
-$kpiGot   = $kpiSum['got'];
-$kpiNo    = $kpiSum['no'];
+$kpiShops    = $kpiSum['shops'];
+$kpiOldShops = $kpiSum['oldshops'];
+$kpiGot      = $kpiSum['got'];
+$kpiNo       = $kpiSum['no'];
 
-function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, int $rank = 0, bool $indent = false, string $dateParam = '', array $districtsByMs = []): string {
+function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, int $rank = 0, bool $indent = false, string $dateParam = '', array $districtsByMs = [], string $ordersDateParam = ''): string {
     $id = (int)$row['id'];
     $color = $levelColorMap[(int)$row['team_level_id']] ?? '#999999';
     [$sum, $ids] = subtreeSumAndIds($id, $byManager, $rawStats);
     $idsParam = implode(',', $ids);
     $district = $districtsByMs[$id] ?? '';
+    // SM/ASM rows don't carry their own location assignment (only individual
+    // DMs do) — show the union of districts their whole team covers instead
+    // of a blank dash.
+    if ($district === '' && count($ids) > 1) {
+        $teamDistricts = [];
+        foreach ($ids as $memberId) {
+            if (empty($districtsByMs[$memberId])) { continue; }
+            foreach (explode(', ', $districtsByMs[$memberId]) as $d) { $teamDistricts[$d] = true; }
+        }
+        $district = implode(', ', array_keys($teamDistricts));
+    }
 
     $html = '<tr' . ($indent ? '' : ' style="background:#f8fafc;"') . '>';
     $html .= '<td>' . ($rank > 0 ? $rank : '') . '</td>';
     $html .= '<td>' . ($indent ? '&#8618;&nbsp;' : '') . ($indent ? '' : '<b>') . htmlspecialchars($row['ms_name']) . ($indent ? '' : '</b>') . '</td>';
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
-    $html .= '<td>' . ($district !== '' ? htmlspecialchars($district) : '<span class="text-muted" style="font-size:11px;">&mdash;</span>') . '</td>';
+    $html .= '<td style="max-width:220px;">' . ($district !== '' ? '<span style="display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;" title="' . htmlspecialchars($district) . '">' . htmlspecialchars($district) . '</span>' : '<span class="text-muted" style="font-size:11px;">&mdash;</span>') . '</td>';
     $html .= '<td><span class="stat-pill">' . $sum['shops'] . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . $sum['oldshops'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['got'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['no'] . '</span></td>';
-    $html .= '<td style="white-space:nowrap;">';
-    $html .= '<span style="display:inline-block; width:90px;">';
+    $html .= '<td>';
+    $html .= '<div class="actions-cell">';
     if ($sum['shops'] > 0) {
         $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" href="ms-team-shops.php?ms_ids=' . htmlspecialchars($idsParam) . htmlspecialchars($dateParam) . '">Shop List</a>';
     } else {
         $html .= '<span class="text-muted" style="font-size:11px;">&mdash;</span>';
     }
-    $html .= '</span>';
-    $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" href="manage_order_product.php?view_ms_id=' . $id . '">Orders</a>';
+    // A manager's "Orders" link must aggregate their whole subtree — same ids
+    // used for the Get Order count in this row and for Shop List — otherwise
+    // the KPI number (team total) and the linked detail page (one person's
+    // own orders only) silently disagree for anyone above the leaf level.
+    $ordersHref = (count($ids) > 1)
+        ? 'manage_order_product.php?view_ms_ids=' . htmlspecialchars($idsParam) . htmlspecialchars($ordersDateParam)
+        : 'manage_order_product.php?view_ms_id=' . $id . htmlspecialchars($ordersDateParam);
+    $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" href="' . $ordersHref . '">Orders</a>';
+    // "Total Orders" — every get-order this person/team placed, TP-assigned
+    // or not, with the assigned TP's name and their invoice status per row.
+    // The "Orders" link above shows the same rows already (this page never
+    // restricted by tp_id), just without those two extra columns.
+    $totalOrdersHref = $ordersHref . (strpos($ordersHref, '?') !== false ? '&' : '?') . 'view=all';
+    $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);" href="' . $totalOrdersHref . '">Total Orders</a>';
+    $html .= '</div>';
     $html .= '</td>';
     $html .= '</tr>';
     return $html;
@@ -207,6 +251,7 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
             padding:5px 12px; border-radius:6px; text-decoration:none; display:inline-block;
         }
         .btn-view-shop-list:hover { color:#fff; opacity:.9; }
+        .actions-cell { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 
         .tp-tag { font-size:11px; padding:2px 8px; border-radius:6px; font-weight:600; white-space:nowrap; }
 
@@ -278,8 +323,17 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
                             <div class="col-md-3 col-sm-6 mb-3">
                                 <div class="kpi-card">
                                     <i class="material-icons-outlined kpi-ico">storefront</i>
-                                    <div class="kpi-t">Total Shops</div>
+                                    <div class="kpi-t"><?php echo $hasDateFilter ? 'New Shop' : 'Total Shops'; ?></div>
                                     <div class="kpi-v"><?php echo (int)$kpiShops; ?></div>
+                                    <?php if ($hasDateFilter): ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Added in this date range</div><?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="kpi-card">
+                                    <i class="material-icons-outlined kpi-ico">store</i>
+                                    <div class="kpi-t">Old Shop</div>
+                                    <div class="kpi-v"><?php echo (int)$kpiOldShops; ?></div>
+                                    <?php if ($hasDateFilter): ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Existing shops that got an order in this range</div><?php else: ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Apply a date filter to see this</div><?php endif; ?>
                                 </div>
                             </div>
                             <div class="col-md-3 col-sm-6 mb-3">
@@ -365,18 +419,19 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
                                                     <th>Level</th>
                                                     <th>District</th>
                                                     <th>Total Shops</th>
+                                                    <th>Old Shop</th>
                                                     <th>Get Order</th>
                                                     <th>No Order</th>
-                                                    <th>Shop List</th>
+                                                    <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                             <?php $rank = 0; foreach ($byManager[$rootId] as $asm):
                                                 $asmId = (int)$asm['id'];
                                                 $rank++;
-                                                echo renderStatRow($asm, $byManager, $rawStats, $levelColorMap, $rank, false, $dateParam, $districtsByMs);
+                                                echo renderStatRow($asm, $byManager, $rawStats, $levelColorMap, $rank, false, $dateParam, $districtsByMs, $ordersDateParam);
                                                 $dmList = $byManager[$asmId] ?? [];
-                                                foreach ($dmList as $dm): echo renderStatRow($dm, $byManager, $rawStats, $levelColorMap, 0, true, $dateParam, $districtsByMs); endforeach;
+                                                foreach ($dmList as $dm): echo renderStatRow($dm, $byManager, $rawStats, $levelColorMap, 0, true, $dateParam, $districtsByMs, $ordersDateParam); endforeach;
                                             endforeach; ?>
                                             </tbody>
                                         </table>

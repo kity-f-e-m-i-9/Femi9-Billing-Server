@@ -108,6 +108,32 @@ if ($hasTps) {
     }
 
     $grand_total = array_sum(array_map(fn($o) => $o['status']==='completed' ? (float)$o['invoice_total'] : (float)$o['po_item_total'], $orders));
+
+    // ── Item breakdown per row, for the "Items" click modal ────────────────
+    // Waiting/cancelled rows read their products from tp_purchase_order_items
+    // (the TP's own request); completed rows read from tp_invoice_items (the
+    // actual billed invoice) instead, matching which figure drives $amount above.
+    $itemsByPo = []; $itemsByInvoice = [];
+    $poIds = array_map(fn($o) => (int)$o['po_id'], $orders);
+    $invIds = array_values(array_filter(array_map(fn($o) => $o['status']==='completed' ? (int)$o['tp_invoice_id'] : 0, $orders)));
+    if (!empty($poIds)) {
+        $poIdList = implode(',', $poIds);
+        $res = $db_conn->query("
+            SELECT poi.po_id, p.productName, poi.qty, poi.amount
+            FROM tp_purchase_order_items poi JOIN products p ON p.id = poi.product_id
+            WHERE poi.po_id IN ($poIdList) ORDER BY poi.po_id, p.productName
+        ");
+        if ($res) while ($r = $res->fetch_assoc()) { $itemsByPo[(int)$r['po_id']][] = $r; }
+    }
+    if (!empty($invIds)) {
+        $invIdList = implode(',', $invIds);
+        $res = $db_conn->query("
+            SELECT tii.tp_invoice_id, p.productName, tii.quantity AS qty, tii.amount
+            FROM tp_invoice_items tii JOIN products p ON p.id = tii.product_id
+            WHERE tii.tp_invoice_id IN ($invIdList) ORDER BY tii.tp_invoice_id, p.productName
+        ");
+        if ($res) while ($r = $res->fetch_assoc()) { $itemsByInvoice[(int)$r['tp_invoice_id']][] = $r; }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -152,6 +178,20 @@ if ($hasTps) {
         .po-status-pill.waiting   { background:#fef3c7; color:#92400e; }
         .po-status-pill.completed { background:#d1fae5; color:#065f46; }
         .po-status-pill.cancelled { background:#fee2e2; color:#991b1b; }
+        .items-view-trigger {
+            border: none; cursor: pointer; background: #667eea; color: #fff;
+            font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            .stat-card { margin-bottom: 12px; }
+            #searchBox { max-width: 100%; }
+            .filter-card .col-lg-2, .filter-card .col-lg-3 { margin-bottom: 10px; }
+        }
+        @media (max-width: 480px) {
+            .page-description h1 { font-size: 20px; }
+            .stat-card h3 { font-size: 20px; }
+        }
     </style>
 </head>
 <body>
@@ -286,12 +326,21 @@ if ($hasTps) {
                                                 $amount = $isCompleted ? (float)$o['invoice_total'] : (float)$o['po_item_total'];
                                                 $itemCount = $isCompleted ? (int)$o['invoice_item_count'] : (int)$o['po_item_count'];
                                                 $searchKey = strtolower(($o['invoice_number'] ?? '') . ' ' . $o['tp_name'] . ' ' . $o['tp_code']);
+                                                $rowItems = $isCompleted ? ($itemsByInvoice[(int)$o['tp_invoice_id']] ?? []) : ($itemsByPo[(int)$o['po_id']] ?? []);
+                                                $itemsForJs = array_map(fn($it) => ['product' => $it['productName'], 'qty' => (int)$it['qty'], 'amount' => (float)$it['amount']], $rowItems);
+                                                $items_json = htmlspecialchars(json_encode($itemsForJs, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
                                             ?>
                                                 <tr data-search="<?php echo htmlspecialchars($searchKey); ?>">
                                                     <td><?php echo $o['invoice_number'] ? '<code>'.htmlspecialchars($o['invoice_number']).'</code>' : '#'.(int)$o['po_id']; ?></td>
                                                     <td><?php echo htmlspecialchars($o['order_date']); ?></td>
                                                     <td><?php echo htmlspecialchars($o['tp_name']); ?> <small class="text-muted">(<?php echo htmlspecialchars($o['tp_code']); ?>)</small></td>
-                                                    <td class="text-right"><?php echo $itemCount; ?></td>
+                                                    <td class="text-right">
+                                                        <button type="button" class="items-view-trigger"
+                                                                data-partner="<?php echo htmlspecialchars($o['tp_name'], ENT_QUOTES); ?>"
+                                                                data-items="<?php echo $items_json; ?>">
+                                                            <?php echo $itemCount; ?> item<?php echo $itemCount !== 1 ? 's' : ''; ?>
+                                                        </button>
+                                                    </td>
                                                     <td class="text-right"><b>&#8377;<?php echo inr_format($amount, 2); ?></b></td>
                                                     <td>
                                                         <span class="po-status-pill <?php echo htmlspecialchars($o['status']); ?>" <?php echo $o['status']==='cancelled' && $o['cancel_reason'] ? 'title="'.htmlspecialchars($o['cancel_reason'], ENT_QUOTES).'"' : ''; ?>><?php echo ucfirst($o['status']); ?></span>
@@ -334,6 +383,27 @@ if ($hasTps) {
         </div>
     </div>
 </div>
+
+<!-- Order Items Modal -->
+<div class="modal fade" id="itemsViewModal" tabindex="-1" aria-labelledby="itemsViewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-md">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                <h6 class="modal-title" id="itemsViewModalLabel" style="font-weight:600;color:#1f2937;">
+                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#667eea;">inventory_2</i>
+                    Order Items
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="itemsViewModalBody" style="padding:16px 20px;">
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -349,6 +419,26 @@ document.getElementById('searchInput').addEventListener('input', function () {
         if (hay === null) return;
         row.classList.toggle('no-match', q !== '' && hay.indexOf(q) === -1);
     });
+});
+
+$(document).on('click', '.items-view-trigger', function () {
+    var partner = $(this).data('partner');
+    var items   = $(this).data('items');
+    $('#itemsViewModalLabel').html(
+        '<i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#667eea;">inventory_2</i>' +
+        $('<span>').text(partner).html()
+    );
+    var html = '';
+    $.each(items, function (_, item) {
+        html += '<div style="padding:7px 0;font-size:13.5px;color:#1f2937;border-bottom:1px dotted #f3f4f6;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+                '<span>' + $('<div>').text(item.product || '-').html() + '</span>' +
+                '<span style="display:flex;align-items:center;gap:14px;white-space:nowrap;">' +
+                '<span style="color:#6b7280;">x' + $('<div>').text(item.qty).html() + '</span>' +
+                '<strong>&#8377;' + Number(item.amount || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</strong>' +
+                '</span></div>';
+    });
+    $('#itemsViewModalBody').html(html || '<div style="color:#9ca3af;">No items.</div>');
+    $('#itemsViewModal').modal('show');
 });
 </script>
 </body>

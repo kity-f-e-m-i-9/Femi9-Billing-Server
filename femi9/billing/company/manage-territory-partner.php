@@ -20,6 +20,17 @@ if ($_col && $_col->num_rows === 0) {
     $db_conn->query("ALTER TABLE partner_location_nodes ADD COLUMN target_amount DECIMAL(12,2) DEFAULT NULL AFTER deposit_amount");
 }
 
+// A Sales BDM session only sees Territory Partners inside their own assigned
+// districts (including inactive ones, since this page is also how they'd
+// reactivate one) — company staff see everyone, unfiltered.
+$_isBdm = ($Login_user_TYPEvl ?? '') === 'salesbdm';
+$_bdmTpWhere = '';
+if ($_isBdm) {
+    require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
+    $_bdmTpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
+    $_bdmTpWhere = 'WHERE tp.id IN (' . (empty($_bdmTpIds) ? '0' : implode(',', array_map('intval', $_bdmTpIds))) . ')';
+}
+
 $result = $db_conn->query("
     SELECT tp.*,
            COUNT(tpl.id) AS location_count,
@@ -32,6 +43,7 @@ $result = $db_conn->query("
     LEFT JOIN partner_location_nodes pn ON pn.id = n.parent_id
     LEFT JOIN partner_location_nodes ppn ON ppn.id = pn.parent_id
     LEFT JOIN partner_location_layers pll ON pll.depth = n.depth
+    $_bdmTpWhere
     GROUP BY tp.id
     ORDER BY tp.name
 ");
@@ -184,11 +196,11 @@ $i = 0;
 <body>
 <div class="app align-content-stretch d-flex flex-wrap">
     <div class="app-sidebar">
-        <?php include("logo.php"); ?>
-        <?php include("femi_menu.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/logo.php' : 'logo.php'); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/femi_menu.php' : 'femi_menu.php'); ?>
     </div>
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/app-header.php' : 'app-header.php'); ?>
         <div class="app-content">
             <div class="content-wrapper">
                 <div class="container-fluid">

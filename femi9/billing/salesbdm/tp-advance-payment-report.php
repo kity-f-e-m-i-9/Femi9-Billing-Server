@@ -15,9 +15,12 @@ if ($filter_tp > 0 && !in_array($filter_tp, $tpIds, true)) { $filter_tp = 0; }
 $filter_status = $_GET['status'] ?? '';
 $allowed_statuses = ['active','partially_adjusted','fully_adjusted',''];
 if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = '';
+$filter_type = $_GET['type'] ?? '';
+if (!in_array($filter_type, ['', 'napkin', 'diaper'], true)) $filter_type = '';
 
 $payments = [];
 $tpTargets = [];
+$tpInvoiced = [];
 $tps = [];
 $total_count = 0; $total_amount = 0; $total_balance = 0; $total_adjusted = 0;
 
@@ -59,6 +62,23 @@ if ($hasTps) {
         while ($tr = $resTgt->fetch_assoc()) {
             $tpTargets[$tr['territory_partner_id']] = (int)$tr['set_count'] > 0 ? (float)$tr['total_target'] : null;
         }
+
+        // Invoiced amount per TP for the selected product Type (Napkin / Lumi
+        // Diaper), same date range as the payments filter — Napkin match uses
+        // COALESCE since existing Napkin products carry a NULL category, not
+        // the literal string 'napkin' (Diaper is the only explicitly-tagged one).
+        $typeWhere = '';
+        if ($filter_type === 'diaper') { $typeWhere = " AND p.category = 'diaper'"; }
+        elseif ($filter_type === 'napkin') { $typeWhere = " AND COALESCE(p.category,'') != 'diaper'"; }
+        $resInv = call_rows_local($db_conn, "
+            SELECT ti.territory_partner_id, COALESCE(SUM(tii.amount),0) AS inv_amt
+            FROM tp_invoice_items tii
+            JOIN tp_invoices ti ON ti.id = tii.tp_invoice_id
+            JOIN products p ON p.id = tii.product_id
+            WHERE ti.territory_partner_id IN ($idList) AND ti.invoice_date BETWEEN ? AND ?$typeWhere
+            GROUP BY ti.territory_partner_id
+        ", 'ss', [$filter_from, $filter_to]);
+        foreach ($resInv as $ir) { $tpInvoiced[(int)$ir['territory_partner_id']] = (float)$ir['inv_amt']; }
     }
 
     $total_count = count($payments);
@@ -111,6 +131,18 @@ $i = 0;
         .mt { width:100%; border-collapse:collapse; font-size:13px; }
         .mt th { background:#f7f7f6; font-weight:600; color:#52514e; padding:8px 11px; text-align:left; border-bottom:1px solid #e1e0d9; white-space:nowrap; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px; }
         .mt td { padding:7px 11px; border-bottom:1px solid #e1e0d9; vertical-align:middle; }
+
+        @media (max-width: 768px) {
+            .mis-filter form { flex-direction: column; align-items: stretch !important; }
+            .mis-filter form > div { width: 100% !important; }
+            .mis-filter select, .mis-filter input { width: 100% !important; }
+            .stats-card { margin-bottom: 12px; }
+            .mt { font-size: 12px; }
+        }
+        @media (max-width: 480px) {
+            .page-description h1 { font-size: 20px; }
+            .stats-card h3 { font-size: 20px; }
+        }
     </style>
 </head>
 <body>
@@ -185,6 +217,14 @@ $i = 0;
                                     <option value="fully_adjusted" <?php echo $filter_status==='fully_adjusted'?'selected':''; ?>>Fully Adjusted</option>
                                 </select>
                             </div>
+                            <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Type</label>
+                                <select name="type" class="form-control form-control-sm">
+                                    <option value="">All Products</option>
+                                    <option value="napkin" <?php echo $filter_type==='napkin'?'selected':''; ?>>Napkin</option>
+                                    <option value="diaper" <?php echo $filter_type==='diaper'?'selected':''; ?>>Lumi Diaper</option>
+                                </select>
+                            </div>
                             <div><button type="submit" class="btn btn-primary btn-sm">Apply</button></div>
                         </form>
                     </div>
@@ -198,6 +238,7 @@ $i = 0;
                                         <th>TP Name</th>
                                         <th>TP ID</th>
                                         <th>TP Target (&#8377;)</th>
+                                        <th>Invoiced<?php echo $filter_type ? ' &mdash; ' . ($filter_type === 'napkin' ? 'Napkin' : 'Lumi Diaper') : ''; ?> (&#8377;)</th>
                                         <th>Receiver Name</th>
                                         <th>Date</th>
                                         <th>Amount (&#8377;)</th>
@@ -210,7 +251,7 @@ $i = 0;
                                 </thead>
                                 <tbody>
                                 <?php if (empty($payments)): ?>
-                                    <tr><td colspan="12" class="text-muted">No advance payments in this period.</td></tr>
+                                    <tr><td colspan="13" class="text-muted">No advance payments in this period.</td></tr>
                                 <?php else: foreach ($payments as $p): ?>
                                     <tr>
                                         <td><?php echo ++$i; ?></td>
@@ -224,6 +265,7 @@ $i = 0;
                                                 <span class="text-muted">Not set</span>
                                             <?php endif; ?>
                                         </td>
+                                        <td>&#8377;<?php echo inr_format($tpInvoiced[$p['territory_partner_id']] ?? 0, 2); ?></td>
                                         <td><?php echo htmlspecialchars($p['receiver_name'] ?: '—'); ?></td>
                                         <td><?php echo htmlspecialchars($p['payment_date']); ?></td>
                                         <td class="text-right font-weight-bold"><?php echo inr_format($p['amount'], 2); ?></td>

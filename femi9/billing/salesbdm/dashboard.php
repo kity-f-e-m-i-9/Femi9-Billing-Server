@@ -2,8 +2,29 @@
 include("checksession.php");
 include("config.php");
 require_once("include/BdmTpScope.php");
+require_once("include/TeamSubtree.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
+
+// "View as" mode — a manager drilling into a team member's own dashboard
+// from Our Team Report sees this exact page, scoped to that person instead
+// of themselves. Only allowed for someone in the viewer's own reporting
+// chain (never an arbitrary id typed into the URL).
+$effectiveBdmId = (int)$salesBdmID;
+$viewingOther = false;
+$viewBdmName = '';
+if (!empty($_GET['view_bdm_id'])) {
+    $requestedId = (int)$_GET['view_bdm_id'];
+    if ($requestedId > 0 && $requestedId !== (int)$salesBdmID) {
+        $mySubtree = getBdmSubtreeIds($db_conn, (int)$salesBdmID);
+        if (in_array($requestedId, $mySubtree, true)) {
+            $effectiveBdmId = $requestedId;
+            $viewingOther = true;
+            $nameRow = $db_conn->query("SELECT bdm_name FROM sales_bdm_staff WHERE id=" . $requestedId)->fetch_assoc();
+            $viewBdmName = $nameRow['bdm_name'] ?? '';
+        }
+    }
+}
 
 // ── DB helpers (copied verbatim from company/mis-report.php) ───────────────
 function cq($db, $sql, $types = '', $params = []) {
@@ -33,7 +54,7 @@ function call_rows($db, $sql, $types = '', $params = []) {
 }
 
 // ── This BDM's assigned TPs (district-name matched, see BdmTpScope.php) ────
-$tpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID);
+$tpIds = getBdmAssignedTpIds($db_conn, $effectiveBdmId);
 $hasTps = !empty($tpIds);
 $tpIdList = $hasTps ? implode(',', array_map('intval', $tpIds)) : '0';
 
@@ -139,8 +160,53 @@ if ($hasTps) {
         "SELECT COALESCE(SUM(pln.target_amount),0) FROM territory_partner_locations tpl
          JOIN partner_location_nodes pln ON pln.id = tpl.location_id
          WHERE tpl.territory_partner_id IN ($tpIdList)");
-    $overall_achieved = $gross_revenue;
+    // Target achievement counts Napkin-category products only — Lumi Baby
+    // Diaper sales/purchases don't count toward the Firka target, even though
+    // they still show in Sales/Turnover/Purchases figures elsewhere on this page.
+    $napkin_achieved_cust = (float)cval($db_conn,
+        "SELECT COALESCE(SUM(ii.total),0) FROM invoice_items ii
+         JOIN invoice i ON i.inv_id=ii.inv_id JOIN products p ON p.id=ii.pr_id
+         WHERE i.user_type='territory_partner' AND i.sub_total>0 AND i.date BETWEEN ? AND ?
+           AND i.user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'",
+        'ss', [$from, $to]);
+    $napkin_achieved_shop = (float)cval($db_conn,
+        "SELECT COALESCE(SUM(uii.total),0) FROM user_invoice_items uii
+         JOIN user_invoice ui ON ui.inv_id=uii.inv_id JOIN products p ON p.id=uii.pr_id
+         WHERE ui.from_user_type='territory_partner' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
+           AND ui.from_user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'",
+        'ss', [$from, $to]);
+    $overall_achieved = $napkin_achieved_cust + $napkin_achieved_shop;
     $overall_target_pct = $overall_target > 0 ? min(round($overall_achieved / $overall_target * 100, 1), 999) : 0;
+
+    // ═══ District Total Target — every Firka's target_amount within this
+    // BDM's assigned districts, regardless of whether that Firka currently
+    // has a TP, or whether that TP is active/inactive. Unlike $overall_target
+    // above (which is scoped to only active-TP-assigned locations), this is
+    // the full district-level potential. Restricted to pll.is_tp_filter_enabled=1
+    // + pln.is_active=1 to match exactly what company's Add Territory Partner
+    // location picker (get-tp-flat-nodes.php) shows/lets a TP be assigned —
+    // otherwise target_amount set at a non-assignable depth (e.g. Division)
+    // gets double-counted on top of the Firka figure.
+    $district_total_target = 0.0;
+    $_districtDepthRow = crow($db_conn, "SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'district%' ORDER BY depth ASC LIMIT 1");
+    $_districtDepth = (int)($_districtDepthRow['depth'] ?? 0);
+    $_districtNames = getBdmAssignedDistrictNames($db_conn, $effectiveBdmId);
+    if ($_districtDepth && !empty($_districtNames)) {
+        $_dn = array_map(fn($n) => mb_strtolower(trim($n)), $_districtNames);
+        $_ph = implode(',', array_fill(0, count($_dn), '?'));
+        $_types = 'i' . str_repeat('s', count($_dn));
+        $_params = array_merge([$_districtDepth], $_dn);
+        $district_total_target = (float)cval($db_conn,
+            "WITH RECURSIVE district_tree AS (
+                SELECT id FROM partner_location_nodes WHERE depth = ? AND LOWER(TRIM(name)) IN ($_ph)
+                UNION ALL
+                SELECT n.id FROM partner_location_nodes n JOIN district_tree dt ON n.parent_id = dt.id
+             )
+             SELECT COALESCE(SUM(pln.target_amount),0) FROM partner_location_nodes pln
+             JOIN partner_location_layers pll ON pll.depth = pln.depth
+             WHERE pln.id IN (SELECT id FROM district_tree) AND pll.is_tp_filter_enabled = 1 AND pln.is_active = 1",
+            $_types, $_params);
+    }
 
     // ═══ Products — downstream sold + returned, across all assigned TPs ═══
     // Split by channel (Customer via `invoice`, Shop via `user_invoice`) so the
@@ -220,7 +286,8 @@ if ($hasTps) {
                 COALESCE(SUM(tii.amount),0) amt
          FROM tp_invoice_items tii JOIN tp_invoices ti ON ti.id=tii.tp_invoice_id
          WHERE ti.territory_partner_id IN ($tpIdList) AND ti.invoice_date BETWEEN ? AND ?
-         GROUP BY ti.territory_partner_id",
+         GROUP BY ti.territory_partner_id
+         ORDER BY amt DESC",
         'ss', [$from, $to]);
 
     $purchaseReturnRows = call_rows($db_conn,
@@ -230,6 +297,36 @@ if ($hasTps) {
          GROUP BY ri.from_userid",
         'ss', [$from, $to]);
     foreach ($purchaseReturnRows as $r) { $purchaseReturnByTp[(int)$r['tp_id']] = (float)$r['qty']; }
+
+    // Napkin-only purchased amount per TP — used for the Target/Achievement/
+    // Balance columns below (Lumi Baby Diaper purchases don't count toward
+    // the Firka target); "Value Purchased" itself still shows the full amount.
+    $napkinPurchaseByTp = [];
+    $napkinPurchaseRows = call_rows($db_conn,
+        "SELECT ti.territory_partner_id tp_id, COALESCE(SUM(tii.amount),0) amt
+         FROM tp_invoice_items tii JOIN tp_invoices ti ON ti.id=tii.tp_invoice_id
+         JOIN products p ON p.id = tii.product_id
+         WHERE ti.territory_partner_id IN ($tpIdList) AND ti.invoice_date BETWEEN ? AND ? AND COALESCE(p.category,'') != 'diaper'
+         GROUP BY ti.territory_partner_id",
+        'ss', [$from, $to]);
+    foreach ($napkinPurchaseRows as $r) { $napkinPurchaseByTp[(int)$r['tp_id']] = (float)$r['amt']; }
+
+    // Per-TP Firka/location name + target amount — same join pattern as the
+    // page-wide $overall_target calc, just grouped per TP instead of summed.
+    $tpTargetByTp = []; $tpLocByTp = [];
+    $tpTargetRows = call_rows($db_conn,
+        "SELECT tpl.territory_partner_id tp_id,
+                COALESCE(SUM(pln.target_amount),0) target,
+                GROUP_CONCAT(DISTINCT pln.name ORDER BY pln.name SEPARATOR ', ') loc_names
+         FROM territory_partner_locations tpl
+         JOIN partner_location_nodes pln ON pln.id = tpl.location_id
+         WHERE tpl.territory_partner_id IN ($tpIdList)
+         GROUP BY tpl.territory_partner_id");
+    foreach ($tpTargetRows as $r) {
+        $tid = (int)$r['tp_id'];
+        $tpTargetByTp[$tid] = (float)$r['target'];
+        $tpLocByTp[$tid] = $r['loc_names'];
+    }
 
     // ═══ "Your Sales via TP" — downstream sales + returns, per assigned TP ═══
     $downstreamCust = call_rows($db_conn,
@@ -333,6 +430,26 @@ if ($hasTps) {
         .snote { font-size:12px; color:var(--text-muted); margin-bottom:10px; }
         .col-toggle-btn { border:1px solid var(--blue); background:#fff; color:var(--blue); font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:10px; cursor:pointer; margin-top:3px; }
         .col-toggle-btn.active, .col-toggle-btn:hover { background:var(--blue); color:#fff; }
+        .pbar { height:7px; border-radius:4px; background: var(--blue-tint); overflow:hidden; }
+        .pbar .pf { height:100%; border-radius:4px; background: var(--blue); }
+
+        /* ── Mobile responsiveness ─────────────────────────────────────── */
+        @media (max-width: 768px) {
+            .mis-filter form { flex-direction: column; align-items: stretch !important; }
+            .mis-filter form > div { width: 100% !important; }
+            .mis-filter select, .mis-filter input { width: 100% !important; }
+            .mis-filter form > div[style*="margin-left:auto"] { margin-left: 0 !important; justify-content: flex-start !important; }
+            .kpi-card { margin-bottom: 12px; }
+            .section-nav { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+            .section-nav a { white-space: nowrap; }
+            .equation-row { flex-direction: column; }
+            .equation-row .equation-op { display: none; }
+            .mt { font-size: 12px; }
+        }
+        @media (max-width: 480px) {
+            .page-description h1 { font-size: 20px; }
+            .kpi-multi b { font-size: 15px; }
+        }
     </style>
 </head>
 <body>
@@ -351,11 +468,18 @@ if ($hasTps) {
                             <div class="page-description" style="margin-left:-10px;">
                                 <h1>
                                     <i class="material-icons-outlined" style="vertical-align:middle;margin-right:6px;">dashboard</i>
-                                    Dashboard — Your TPs
+                                    Dashboard — <?php echo $viewingOther ? htmlspecialchars($viewBdmName) . "'s TPs" : 'Your TPs'; ?>
                                 </h1>
                             </div>
                         </div>
                     </div>
+
+                    <?php if ($viewingOther): ?>
+                        <div class="alert alert-info" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
+                            <span><i class="material-icons-outlined" style="vertical-align:middle;font-size:17px;">visibility</i> Viewing <b><?php echo htmlspecialchars($viewBdmName); ?>'s</b> dashboard (read-only).</span>
+                            <a href="my-team-report.php" class="btn btn-sm" style="background:#fff;color:#0b5ed7;font-weight:700;border:none;box-shadow:0 1px 4px rgba(0,0,0,.15);">&larr; Back to Our Team Report</a>
+                        </div>
+                    <?php endif; ?>
 
                     <?php if (!$hasTps): ?>
                         <div class="alert alert-info">No Territory Partners are assigned to your districts yet. Contact your admin if this looks wrong.</div>
@@ -459,6 +583,17 @@ if ($hasTps) {
                                     <div><span>Target</span><b>&#8377;<?php echo inr_format($overall_target, 0); ?></b></div>
                                     <div><span>%</span><b style="color:<?php echo $tgtAccent; ?>;"><?php echo $overall_target_pct; ?>%</b></div>
                                 </div>
+                                <p class="snote" style="margin:6px 0 0;">Achieved counts Napkin products only — Lumi Baby Diaper sales don't count toward the Firka target.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-5 col-sm-12">
+                            <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
+                                <i class="material-icons-outlined kpi-ico">map</i>
+                                <div class="kpi-t">District Total Target</div>
+                                <div class="kpi-multi">
+                                    <div><span>All Firkas in your districts</span><b>&#8377;<?php echo inr_format($district_total_target, 0); ?></b></div>
+                                </div>
+                                <p class="snote" style="margin:6px 0 0;">Includes every Firka's target in your assigned districts — even ones with no TP, or an inactive TP.</p>
                             </div>
                         </div>
                     </div>
@@ -527,21 +662,39 @@ if ($hasTps) {
                             <div class="card">
                                 <div class="card-header"><h5 class="card-title" style="margin:0;font-size:14px;">Purchases from Company — by TP</h5></div>
                                 <div class="card-body" style="overflow-x:auto;">
-                                    <p class="snote">Hover a TP name to see their product-wise purchase &amp; return breakdown.</p>
+                                    <p class="snote">Hover a TP name to see their product-wise purchase &amp; return breakdown. Achievement/Balance count Napkin products only &mdash; Lumi Baby Diaper purchases don't count toward the Firka target.</p>
                                     <table class="mt">
-                                        <thead><tr><th>TP</th><th>Qty Purchased</th><th>Value Purchased</th><th>Qty Returned to Company</th></tr></thead>
+                                        <thead><tr><th>TP</th><th>District (Firka)</th><th>Qty Purchased</th><th>Value Purchased</th><th>Qty Returned to Company</th><th>Target Amount</th><th>Achievement</th><th>Balance</th></tr></thead>
                                         <tbody>
                                         <?php if (empty($purchaseRows)): ?>
-                                            <tr><td colspan="4" class="text-muted">No purchases in this period.</td></tr>
+                                            <tr><td colspan="8" class="text-muted">No purchases in this period.</td></tr>
                                         <?php else: foreach ($purchaseRows as $pr):
                                             $tid = (int)$pr['tp_id'];
                                             $tname = $tpNameMap[$tid] ?? ('TP #' . $tid);
+                                            $tp_target = $tpTargetByTp[$tid] ?? 0;
+                                            $tp_napkin_amt = $napkinPurchaseByTp[$tid] ?? 0;
+                                            $tp_pct = $tp_target > 0 ? min(round($tp_napkin_amt / $tp_target * 100, 1), 999) : 0;
+                                            $tp_bc = $tp_pct >= 100 ? 'var(--good)' : ($tp_pct >= 50 ? '#eab308' : 'var(--critical)');
+                                            $tp_balance = $tp_target - $tp_napkin_amt;
                                         ?>
                                             <tr>
                                                 <td><span class="tp-name-cell" data-tp-id="<?php echo $tid; ?>" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true" data-type="purchase"><?php echo htmlspecialchars($tname); ?></span></td>
+                                                <td style="font-size:12px;color:#666;"><?php echo htmlspecialchars($tpLocByTp[$tid] ?? '—'); ?></td>
                                                 <td><?php echo inr_format($pr['qty'], 0); ?></td>
                                                 <td>&#8377;<?php echo inr_format($pr['amt'], 2); ?></td>
                                                 <td><?php echo inr_format($purchaseReturnByTp[$tid] ?? 0, 0); ?></td>
+                                                <td><?php echo $tp_target > 0 ? '&#8377;' . inr_format($tp_target, 0) : '—'; ?></td>
+                                                <td>
+                                                    <?php if ($tp_target > 0): ?>
+                                                    <div style="display:flex;align-items:center;gap:5px;">
+                                                        <div class="pbar" style="width:70px;"><div class="pf" style="width:<?php echo min($tp_pct, 100); ?>%;background:<?php echo $tp_bc; ?>;"></div></div>
+                                                        <span style="font-size:12.5px;font-weight:700;color:<?php echo $tp_bc; ?>;"><?php echo $tp_pct; ?>%</span>
+                                                    </div>
+                                                    <?php else: ?>—<?php endif; ?>
+                                                </td>
+                                                <td style="<?php echo $tp_target > 0 ? 'color:' . ($tp_balance > 0 ? 'var(--critical)' : 'var(--good)') . ';' : ''; ?>">
+                                                    <?php echo $tp_target > 0 ? ($tp_balance > 0 ? '&minus;' : '+') . '&#8377;' . inr_format(abs($tp_balance), 0) : '—'; ?>
+                                                </td>
                                             </tr>
                                         <?php endforeach; endif; ?>
                                         </tbody>

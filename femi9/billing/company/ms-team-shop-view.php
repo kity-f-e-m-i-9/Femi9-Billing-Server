@@ -58,13 +58,28 @@ $smRoots = $byManager[0] ?? [];
 
 // ── Raw per-person shop/order counts, in one pass ───────────────────────────
 $rawStats = [];
-foreach ($allIds as $id) { $rawStats[$id] = ['shops' => 0, 'got' => 0, 'no' => 0]; }
+foreach ($allIds as $id) { $rawStats[$id] = ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0]; }
 if (!empty($allIds)) {
     $idList = implode(',', $allIds);
     $shopDateWhere = $hasDateFilter ? " AND DATE(created_at) BETWEEN '$fromDate' AND '$toDate'" : '';
     $orderDateWhere = $hasDateFilter ? " AND order_date BETWEEN '$fromDate' AND '$toDate'" : '';
     $_rs = $db_conn->query("SELECT ms_id, COUNT(*) AS cnt FROM ms_shop WHERE ms_id IN ($idList)$shopDateWhere GROUP BY ms_id");
     if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['shops'] = (int)$r['cnt']; } }
+    // Old Shop — shops that were already added BEFORE the selected range (not
+    // new) but actually placed an order (got order) WITHIN the range — i.e.
+    // existing shops still active in this period, not just a historical
+    // headcount. Not meaningful without a date range, so left at 0 without one.
+    if ($hasDateFilter) {
+        $_rs = $db_conn->query(
+            "SELECT o.ms_id, COUNT(DISTINCT o.shop_id) AS cnt
+             FROM ms_orders o JOIN ms_shop s ON s.id = o.shop_id
+             WHERE o.ms_id IN ($idList) AND o.new_order='yes'
+                   AND o.order_date BETWEEN '$fromDate' AND '$toDate'
+                   AND DATE(s.created_at) < '$fromDate'
+             GROUP BY o.ms_id"
+        );
+        if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['oldshops'] = (int)$r['cnt']; } }
+    }
     $_rs = $db_conn->query("SELECT ms_id, COUNT(DISTINCT order_id) AS cnt FROM ms_orders WHERE ms_id IN ($idList) AND new_order='yes'$orderDateWhere GROUP BY ms_id");
     if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['got'] = (int)$r['cnt']; } }
     $_rs = $db_conn->query("SELECT ms_id, COUNT(*) AS cnt FROM ms_orders WHERE ms_id IN ($idList) AND new_order='no'$orderDateWhere GROUP BY ms_id");
@@ -72,25 +87,27 @@ if (!empty($allIds)) {
 }
 
 function subtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
-    $sum = $rawStats[$id] ?? ['shops' => 0, 'got' => 0, 'no' => 0];
+    $sum = $rawStats[$id] ?? ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0];
     $ids = [$id];
     foreach (($byManager[$id] ?? []) as $child) {
         [$childSum, $childIds] = subtreeSumAndIds((int)$child['id'], $byManager, $rawStats);
-        $sum['shops'] += $childSum['shops'];
-        $sum['got']   += $childSum['got'];
-        $sum['no']    += $childSum['no'];
+        $sum['shops']    += $childSum['shops'];
+        $sum['oldshops'] += $childSum['oldshops'];
+        $sum['got']      += $childSum['got'];
+        $sum['no']       += $childSum['no'];
         $ids = array_merge($ids, $childIds);
     }
     return [$sum, $ids];
 }
 
 // ── Company-wide KPI totals ─────────────────────────────────────────────────
-$kpiShops = 0; $kpiGot = 0; $kpiNo = 0;
+$kpiShops = 0; $kpiOldShops = 0; $kpiGot = 0; $kpiNo = 0;
 foreach ($smRoots as $sm) {
     [$sum] = subtreeSumAndIds((int)$sm['id'], $byManager, $rawStats);
-    $kpiShops += $sum['shops'];
-    $kpiGot   += $sum['got'];
-    $kpiNo    += $sum['no'];
+    $kpiShops    += $sum['shops'];
+    $kpiOldShops += $sum['oldshops'];
+    $kpiGot      += $sum['got'];
+    $kpiNo       += $sum['no'];
 }
 $teamCount = count($allIds);
 
@@ -106,18 +123,32 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
     $html .= '<td style="padding-left:' . (12 + $indentPx) . 'px;">' . ($indentLevel > 0 ? '&#8618;&nbsp;' : '') . ($indentLevel === 0 ? '<b>' : '') . htmlspecialchars($row['ms_name']) . ($indentLevel === 0 ? '</b>' : '') . '</td>';
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['shops'] . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . ($sum['got'] + $sum['no']) . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . $sum['oldshops'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['got'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['no'] . '</span></td>';
-    $html .= '<td style="white-space:nowrap;">';
-    $html .= '<span style="display:inline-block; width:90px;">';
+    $html .= '<td><span class="stat-pill">' . ($sum['got'] + $sum['no']) . '</span></td>';
+    $html .= '<td>';
+    $html .= '<div class="actions-cell">';
     if ($sum['shops'] > 0) {
         $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" href="ms-team-shops.php?ms_ids=' . htmlspecialchars($idsParam) . htmlspecialchars($dateParam) . '">Shop List</a>';
     } else {
         $html .= '<span class="text-muted" style="font-size:11px;">&mdash;</span>';
     }
-    $html .= '</span>';
-    $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" href="ms_prorders.php?se_msid=' . $id . htmlspecialchars($ordersDateParam) . '">Orders</a>';
+    // A manager's "Orders" link must aggregate their whole subtree — same ids
+    // used for the Get Order count in this row and for Shop List — otherwise
+    // the KPI number (team total) and the linked detail page (one person's
+    // own orders only) silently disagree for anyone above the leaf level.
+    $ordersHref = (count($ids) > 1)
+        ? 'ms_prorders.php?se_msids=' . htmlspecialchars($idsParam) . htmlspecialchars($ordersDateParam)
+        : 'ms_prorders.php?se_msid=' . $id . htmlspecialchars($ordersDateParam);
+    $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" href="' . $ordersHref . '">Orders</a>';
+    // "Total Get Order" — every get-order this person/team placed, TP-assigned
+    // or not, with the assigned TP's name and their invoice status per row.
+    // The "Orders" link above only ever shows the subset still needing
+    // company follow-up (no TP has picked it up yet).
+    $totalGetOrderHref = $ordersHref . (strpos($ordersHref, '?') !== false ? '&' : '?') . 'view=all';
+    $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);" href="' . $totalGetOrderHref . '">Total Orders</a>';
+    $html .= '</div>';
     $html .= '</td>';
     $html .= '</tr>';
     return $html;
@@ -173,6 +204,7 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
             padding:5px 12px; border-radius:6px; text-decoration:none; display:inline-block;
         }
         .btn-view-shop-list:hover { color:#fff; opacity:.9; }
+        .actions-cell { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 
         .mt { width:100%; border-collapse:collapse; font-size:13px; }
         .mt th {
@@ -248,6 +280,14 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
                             <div class="kpi-card">
+                                <i class="material-icons-outlined kpi-ico">store</i>
+                                <div class="kpi-t">Old Shop</div>
+                                <div class="kpi-v"><?php echo (int)$kpiOldShops; ?></div>
+                                <?php if ($hasDateFilter): ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Existing shops that got an order in this range</div><?php else: ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Apply a date filter to see this</div><?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="kpi-card">
                                 <i class="material-icons-outlined kpi-ico">assignment_turned_in</i>
                                 <div class="kpi-t">Total Order Shop</div>
                                 <div class="kpi-v"><?php echo (int)($kpiGot + $kpiNo); ?></div>
@@ -289,10 +329,11 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                                                     <th>Name</th>
                                                     <th>Level</th>
                                                     <th>New Shop</th>
-                                                    <th>Total Order Shop</th>
+                                                    <th>Old Shop</th>
                                                     <th>Get Order</th>
                                                     <th>No Order</th>
-                                                    <th>Shop List</th>
+                                                    <th>Total Order Shop</th>
+                                                    <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>

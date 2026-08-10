@@ -66,8 +66,12 @@ $levelCounts = $db_conn->query("
 $levelColorMap = getSalesBdmTeamLevelColorMap($db_conn);
 
 // ── Staff, grouped by level (for card click) and by manager (for drill-down) ──
+$_chkZoneTV = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'zone'");
+if ($_chkZoneTV && $_chkZoneTV->num_rows === 0) {
+    $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN zone VARCHAR(100) NULL DEFAULT NULL AFTER monthly_target_amount");
+}
 $staffRows = $db_conn->query("
-    SELECT bs.id, bs.bdm_name, bs.manager_id, bs.team_level_id, tl.level_name, tl.level_rank
+    SELECT bs.id, bs.bdm_name, bs.manager_id, bs.team_level_id, bs.zone, tl.level_name, tl.level_rank
     FROM sales_bdm_staff bs
     LEFT JOIN salesbdm_team_levels tl ON tl.id = bs.team_level_id
     ORDER BY tl.level_rank ASC, bs.bdm_name ASC
@@ -104,6 +108,7 @@ function toBdmEntry(array $row, array $levelColorMap, array $depthToLevelName = 
         'level_name' => $displayLevel,
         'color'      => $levelColorMap[$lvlId] ?? '#999999',
         'initials'   => bdmInitials($row['bdm_name']),
+        'zone'       => $row['zone'] ?? '',
     ];
 }
 
@@ -555,6 +560,12 @@ var bdmAllStaff = <?php echo json_encode($allStaffMap); ?>;
         $trunk.append($('<div class="trunk-level"></div>').text(node.level_name));
         $trunk.append($('<div class="trunk-name"></div>').text(node.name));
         $cluster.append($trunk);
+
+        if (node.zone) {
+            $cluster.append($('<div style="text-align:center;margin:8px 0;"></div>').append(
+                $('<span class="chain-pill" style="background:#fff8e1;color:#92400e;"></span>').text('Zone: ' + node.zone)
+            ));
+        }
 
         if (kids.length) {
             $cluster.append($('<div class="sm-trunk-stem"></div>'));

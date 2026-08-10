@@ -10,6 +10,14 @@ $enc_id   = $_GET['tpid'] ?? '';
 $tp_db_id = (int)base64_decode($enc_id);
 if (!$tp_db_id) { header("Location: manage-territory-partner"); exit; }
 
+// A Sales BDM session may only edit a TP inside their own assigned districts.
+$_isBdm = ($Login_user_TYPEvl ?? '') === 'salesbdm';
+if ($_isBdm) {
+    require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
+    $_myTpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
+    if (!in_array($tp_db_id, $_myTpIds, true)) { header("Location: manage-territory-partner"); exit; }
+}
+
 // Referral percentage options — distinct values already saved across both partner tables
 $pct_opts = [];
 try {
@@ -180,12 +188,12 @@ $preselected_json = json_encode(array_map(function($loc) {
 <div class="app align-content-stretch d-flex flex-wrap">
 
     <div class="app-sidebar">
-        <?php include("logo.php"); ?>
-        <?php include("femi_menu.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/logo.php' : 'logo.php'); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/femi_menu.php' : 'femi_menu.php'); ?>
     </div>
 
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/app-header.php' : 'app-header.php'); ?>
 
         <div class="app-content">
             <div class="content-wrapper">

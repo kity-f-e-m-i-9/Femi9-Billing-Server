@@ -27,6 +27,9 @@ if(isset($_REQUEST['add-salesbdm']))
 	$manager_id = !empty($_REQUEST['manager_id']) ? (int)$_REQUEST['manager_id'] : 0;
 	$monthly_target_amount = ($_REQUEST['monthly_target_amount'] !== '' && isset($_REQUEST['monthly_target_amount'])) ? (float)$_REQUEST['monthly_target_amount'] : null;
 
+	$zone=str_replace("'","&#39;",$_REQUEST['zone'] ?? '');
+	$zone = RemoveSpecialChar($zone);
+
 	// Every Sales BDM gets the same default password on creation ("salesbdm@123")
 	// rather than a random one — matches how Marketing Staff onboarding works.
 	$password="salesbdm@123";
@@ -53,15 +56,19 @@ if(isset($_REQUEST['add-salesbdm']))
 	if ($_chkTgt && $_chkTgt->num_rows === 0) {
 		$db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
 	}
+	$_chkZone = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'zone'");
+	if ($_chkZone && $_chkZone->num_rows === 0) {
+		$db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN zone VARCHAR(100) NULL DEFAULT NULL AFTER monthly_target_amount");
+	}
 
 	$select_count_product="select count(*) as numProducts from sales_bdm_staff where bdm_mobile='$bdm_mobile'";
 	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numProducts']==0)
 	{
-		$insert_products="insert into sales_bdm_staff (bdm_name,bdm_mobile,password,bdm_email,bdm_address,country_code,account_status,team_level_id,manager_id,monthly_target_amount)
+		$insert_products="insert into sales_bdm_staff (bdm_name,bdm_mobile,password,bdm_email,bdm_address,country_code,account_status,team_level_id,manager_id,monthly_target_amount,zone)
 		values ('$bdm_name','$bdm_mobile','$password','$bdm_email','$bdm_address',
-		'$country_code','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").")";
+		'$country_code','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").",'$zone')";
 		mysqli_query($db_conn,$insert_products);
 		$new_bdm_id = mysqli_insert_id($db_conn);
 
@@ -132,6 +139,9 @@ if(isset($_REQUEST['update-salesbdm']))
 	if ($manager_id === (int)$update_id) { $manager_id = 0; }
 	$monthly_target_amount = ($_REQUEST['monthly_target_amount'] !== '' && isset($_REQUEST['monthly_target_amount'])) ? (float)$_REQUEST['monthly_target_amount'] : null;
 
+	$zone=str_replace("'","&#39;",$_REQUEST['zone'] ?? '');
+	$zone = RemoveSpecialChar($zone);
+
 	$_chkTL = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'team_level_id'");
 	if ($_chkTL && $_chkTL->num_rows === 0) {
 		$db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN team_level_id INT NULL DEFAULT NULL AFTER user_position");
@@ -144,9 +154,13 @@ if(isset($_REQUEST['update-salesbdm']))
 	if ($_chkTgt && $_chkTgt->num_rows === 0) {
 		$db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
 	}
+	$_chkZone = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'zone'");
+	if ($_chkZone && $_chkZone->num_rows === 0) {
+		$db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN zone VARCHAR(100) NULL DEFAULT NULL AFTER monthly_target_amount");
+	}
 
 	$update_products="update sales_bdm_staff set bdm_name='$bdm_name',bdm_email='$bdm_email',
-	bdm_address='$bdm_address',country_code='$country_code',team_level_id=".($team_level_id > 0 ? $team_level_id : "NULL").",manager_id=".($manager_id > 0 ? $manager_id : "NULL").",monthly_target_amount=".($monthly_target_amount !== null ? $monthly_target_amount : "NULL")." where id='$update_id'";
+	bdm_address='$bdm_address',country_code='$country_code',team_level_id=".($team_level_id > 0 ? $team_level_id : "NULL").",manager_id=".($manager_id > 0 ? $manager_id : "NULL").",monthly_target_amount=".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").",zone='$zone' where id='$update_id'";
 	mysqli_query($db_conn,$update_products);
 
 		$db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_locations (

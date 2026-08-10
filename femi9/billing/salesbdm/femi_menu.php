@@ -1,3 +1,24 @@
+<?php
+// This file is now included from two different folders: normally from
+// salesbdm/ itself, but also from company/'s shared Territory Partner pages
+// (see company/add-territory-partner.php etc.) when a BDM session is using
+// them — the sidebar should look identical either way. Relative links below
+// need a different prefix depending on which folder is actually serving the
+// current request, so both link groups resolve correctly from either origin.
+$_inCompanyFolder = (strpos($_SERVER['SCRIPT_NAME'], '/company/') !== false);
+$_bdmBase = $_inCompanyFolder ? '../salesbdm/' : '';
+$_companyBase = $_inCompanyFolder ? '' : '../company/';
+
+// "Our Team" only shows for a BDM who actually has someone reporting to
+// them (e.g. a Chief BDM) — a plain individual-contributor BDM has no team
+// to view, so the link (and the page itself, my-team.php guards it too)
+// stays hidden for them.
+$_hasReports = false;
+if (!empty($salesBdmID)) {
+    $_repChk = $db_conn->query("SELECT 1 FROM sales_bdm_staff WHERE manager_id = " . (int)$salesBdmID . " LIMIT 1");
+    $_hasReports = $_repChk && $_repChk->num_rows > 0;
+}
+?>
 <div class="app-menu">
 
 <style>
@@ -34,23 +55,34 @@
 
 <ul class="accordion-menu">
     <li>
-        <a href="dashboard"><i class="material-icons-two-tone">dashboard</i>Dashboard</a>
+        <a href="<?php echo $_bdmBase; ?>dashboard"><i class="material-icons-two-tone">dashboard</i>Dashboard</a>
     </li>
 
     <li>
-        <a href="tp-purchase-order"><i class="material-icons-two-tone">receipt_long</i>TP Purchase Order</a>
+        <a href="<?php echo $_bdmBase; ?>tp-purchase-order"><i class="material-icons-two-tone">receipt_long</i>TP Purchase Order</a>
     </li>
 
     <li>
-        <a href="tp-advance-payment-report"><i class="material-icons-two-tone">payments</i>TP Advance Payment Report</a>
+        <a href="<?php echo $_bdmBase; ?>tp-advance-payment-report"><i class="material-icons-two-tone">payments</i>TP Advance Payment Report</a>
     </li>
+
+    <?php if ($_hasReports): ?>
+    <li>
+        <a href=""><i class="material-icons-two-tone">groups</i>Our Team
+            <i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+        <ul class="sub-menu">
+            <li><a href="<?php echo $_bdmBase; ?>my-team">Tree View</a></li>
+            <li><a href="<?php echo $_bdmBase; ?>my-team-report">Our Team Report</a></li>
+        </ul>
+    </li>
+    <?php endif; ?>
 
     <li>
         <a href=""><i class="material-icons-two-tone">map</i>Territory Partner
             <i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
         <ul class="sub-menu">
-            <li><a href="add-tp">Add Territory Partner</a></li>
-            <li><a href="manage-tp">Manage Territory Partner</a></li>
+            <li><a href="<?php echo $_companyBase; ?>add-territory-partner">Add Territory Partner</a></li>
+            <li><a href="<?php echo $_companyBase; ?>manage-territory-partner">Manage Territory Partner</a></li>
         </ul>
     </li>
 
@@ -58,7 +90,7 @@
         <a href=""><i class="material-icons-two-tone">security</i>Security<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
         <ul class="sub-menu">
             <li>
-                <a href="logout" onclick="return confirm('You want to logout confirm?');">Logout</a>
+                <a href="<?php echo $_bdmBase; ?>logout" onclick="return confirm('You want to logout confirm?');">Logout</a>
             </li>
         </ul>
     </li>

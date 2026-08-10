@@ -4,28 +4,49 @@ require_once("include/TeamSubtree.php");
 error_reporting(0);
 
 // A manager (SM/ASM) can view a report scoped to any person in their own
-// downline via ?view_ms_id=<id> — enforced server-side against their real
-// subtree, never trusted from the request alone. Defaults to viewing your
-// own orders, same as before.
-$viewMsId = (int)$markeingSTFID;
-$viewingSelf = true;
-$viewMsName = '';
-if (isset($_REQUEST['view_ms_id']) && $_REQUEST['view_ms_id'] !== '') {
-    $requestedMsId = (int)$_REQUEST['view_ms_id'];
-    if ($requestedMsId !== (int)$markeingSTFID) {
-        $allowedSubtree = getMsSubtreeIds($db_conn, (int)$markeingSTFID);
-        if (in_array($requestedMsId, $allowedSubtree, true)) {
-            $viewMsId = $requestedMsId;
-            $viewingSelf = false;
-        }
+// downline via ?view_ms_id=<id> (single) or ?view_ms_ids=<id,id,...> (a whole
+// subtree — e.g. my-team.php's "Orders"/"Total Orders" buttons pass a
+// manager's whole team so the totals shown there match what this page
+// reports; a single view_ms_id only ever covered that one person, silently
+// under-reporting for anyone with a team under them). Every id is enforced
+// server-side against the caller's real subtree (getMsSubtreeIds() already
+// includes the caller's own id) — never trusted from the request alone.
+// Any id not in that subtree is silently dropped, same defensive posture as
+// the original single-id check. Defaults to viewing your own orders.
+$ownId = (int)$markeingSTFID;
+$allowedSubtree = getMsSubtreeIds($db_conn, $ownId);
+$allowedSubtreeSet = array_flip($allowedSubtree);
+
+$viewMsIds = [];
+if (!empty($_REQUEST['view_ms_ids'])) {
+    $requestedIds = array_values(array_unique(array_filter(array_map('intval', explode(',', $_REQUEST['view_ms_ids'])))));
+    foreach ($requestedIds as $rid) {
+        if (isset($allowedSubtreeSet[$rid])) { $viewMsIds[] = $rid; }
     }
+} elseif (isset($_REQUEST['view_ms_id']) && $_REQUEST['view_ms_id'] !== '') {
+    $requestedMsId = (int)$_REQUEST['view_ms_id'];
+    if (isset($allowedSubtreeSet[$requestedMsId])) { $viewMsIds = [$requestedMsId]; }
 }
+if (empty($viewMsIds)) { $viewMsIds = [$ownId]; }
+
+$viewMsId = $viewMsIds[0]; // kept for legacy single-id references (hidden field, export/reset links)
+$isTeamMode = count($viewMsIds) > 1;
+$viewingSelf = ($viewMsIds === [$ownId]);
+$msIdListSql = implode(',', array_map('intval', $viewMsIds));
+
+// "Total Orders" (view=all) shows every get-order regardless of TP
+// assignment/invoice status, same as company/ms_prorders.php's view=all.
+$showAllOrders = (($_REQUEST['view'] ?? '') === 'all');
+
+$viewMsName = '';
+$teamRootName = null;
 if (!$viewingSelf) {
     $stmtName = $db_conn->prepare("SELECT ms_name FROM marketing_staff WHERE id=?");
     $stmtName->bind_param('i', $viewMsId);
     $stmtName->execute();
     $viewMsName = $stmtName->get_result()->fetch_assoc()['ms_name'] ?? '';
     $stmtName->close();
+    $teamRootName = $viewMsName;
 }
 ?>
 <!DOCTYPE html>
@@ -137,7 +158,7 @@ $successMessage = $_SESSION['successMessage'];
 $getOrderCount = 0; $noOrderCount = 0;
 $resGN = $db_conn->query(
     "SELECT new_order, COUNT(DISTINCT order_id) c FROM ms_orders
-     WHERE ms_id='" . mysqli_real_escape_string($db_conn, $viewMsId) . "' AND order_date BETWEEN '$from_date' AND '$to_date'
+     WHERE ms_id IN ($msIdListSql) AND order_date BETWEEN '$from_date' AND '$to_date'
      GROUP BY new_order"
 );
 while ($gr = mysqli_fetch_assoc($resGN)) {
@@ -157,9 +178,9 @@ $resPQ = $db_conn->query(
     "SELECT mo.pr_id, p.productName, p.outlet_price, SUM(mo.qty) totalqty,
             SUM(mo.qty * p.outlet_price * (1 - mo.discount_percentage/100)) totalvalue
      FROM ms_orders mo LEFT JOIN products p ON p.id=mo.pr_id
-     WHERE mo.ms_id='" . mysqli_real_escape_string($db_conn, $viewMsId) . "' AND mo.new_order='yes'
+     WHERE mo.ms_id IN ($msIdListSql) AND mo.new_order='yes'
            AND mo.order_date BETWEEN '$from_date' AND '$to_date'
-     GROUP BY mo.pr_id ORDER BY totalqty DESC"
+     GROUP BY mo.pr_id, p.productName, p.outlet_price ORDER BY totalqty DESC"
 );
 while ($pr = mysqli_fetch_assoc($resPQ)) {
     $qty = (int)$pr['totalqty'];
@@ -174,7 +195,7 @@ $invoiceIds = [];
 $resInv = $db_conn->query(
     "SELECT DISTINCT t.invoiced_inv_id
      FROM ms_orders o JOIN tp_orders t ON t.order_id=o.order_id
-     WHERE o.ms_id='" . mysqli_real_escape_string($db_conn, $viewMsId) . "' AND o.new_order='yes'
+     WHERE o.ms_id IN ($msIdListSql) AND o.new_order='yes'
            AND o.order_date BETWEEN '$from_date' AND '$to_date'
            AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''"
 );
@@ -224,7 +245,7 @@ function getProductBreakdownForInvoices($db_conn, array $invIds): array {
         "SELECT uii.pr_id, p.productName, SUM(uii.qty) totalqty
          FROM user_invoice_items uii LEFT JOIN products p ON p.id=uii.pr_id
          WHERE uii.inv_id IN ($idList)
-         GROUP BY uii.pr_id ORDER BY totalqty DESC"
+         GROUP BY uii.pr_id, p.productName ORDER BY totalqty DESC"
     );
     $out = [];
     while ($row = mysqli_fetch_assoc($res)) {
@@ -252,19 +273,18 @@ while ($apr = mysqli_fetch_assoc($resAllProd)) {
     $productPriceMap[(int)$apr['id']] = (float)$apr['outlet_price'];
 }
 
-$viewMsIdEsc = mysqli_real_escape_string($db_conn, $viewMsId);
-
 // One row per order line (shop_id/date/etc repeat per line, qty is per pr_id) —
 // build both the order-level metadata map and the per-product qty map from it.
 $orderIdsInRange = [];
 $orderMeta = [];
 $qtyMap = [];
 $shopIds = [];
+$msIdsInRange = [];
 $orderValueMap = [];
 $resOrders = $db_conn->query(
-    "SELECT order_id, shop_id, order_date, marketing_tool, latitude, longitude, pr_id, qty, discount_percentage
+    "SELECT order_id, shop_id, ms_id, order_date, marketing_tool, latitude, longitude, pr_id, qty, discount_percentage
      FROM ms_orders
-     WHERE ms_id='$viewMsIdEsc' AND new_order='yes' AND order_date BETWEEN '$from_date' AND '$to_date'
+     WHERE ms_id IN ($msIdListSql) AND new_order='yes' AND order_date BETWEEN '$from_date' AND '$to_date'
      ORDER BY order_date DESC, order_id DESC"
 );
 while ($orow = mysqli_fetch_assoc($resOrders)) {
@@ -273,6 +293,7 @@ while ($orow = mysqli_fetch_assoc($resOrders)) {
         $orderMeta[$oid] = $orow;
         $orderIdsInRange[] = $oid;
         if (!empty($orow['shop_id'])) { $shopIds[$orow['shop_id']] = true; }
+        if (!empty($orow['ms_id']))   { $msIdsInRange[$orow['ms_id']] = true; }
     }
     $qtyMap[$oid][$orow['pr_id']] = (int)$orow['qty'];
     $lineQty = (int)$orow['qty'];
@@ -288,12 +309,61 @@ if (!empty($shopIds)) {
     while ($srow = mysqli_fetch_assoc($resShops)) { $shopMeta[$srow['id']] = $srow; }
 }
 
+// Team mode only — which staff member placed each order, so rows from
+// different team members can be told apart in the table below.
+$msMeta = [];
+if ($isTeamMode && !empty($msIdsInRange)) {
+    $msIdList2 = implode(',', array_map('intval', array_keys($msIdsInRange)));
+    $resMs = $db_conn->query("SELECT id, ms_name FROM marketing_staff WHERE id IN ($msIdList2)");
+    while ($mrow = mysqli_fetch_assoc($resMs)) { $msMeta[$mrow['id']] = $mrow; }
+}
+
 $tpOrderMeta = [];
 if (!empty($orderIdsInRange)) {
     $oidList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $orderIdsInRange)) . "'";
     $resTp = $db_conn->query("SELECT order_id, tp_id, invoiced_inv_id, voided_at, void_reason FROM tp_orders WHERE order_id IN ($oidList)");
     while ($trow = mysqli_fetch_assoc($resTp)) {
         if (!isset($tpOrderMeta[$trow['order_id']])) { $tpOrderMeta[$trow['order_id']] = $trow; }
+    }
+}
+
+// "Total Orders" (view=all) — Assigned TP name + a simplified TP Invoice
+// Status badge (Completed / Invoice Pending / Not Invoiced Yet), same as
+// company/ms_prorders.php's view=all. The existing $tpOrderMeta-driven
+// "TP Status" column already gives the fuller picture (payment status,
+// diff counts, etc.) for whichever single order is being looked at, so
+// these two extra columns are additive, not a replacement.
+$tpNameMap = [];
+$tpInvoiceStatusMap = [];
+if ($showAllOrders && !empty($orderIdsInRange)) {
+    $tpIdsSeen = [];
+    foreach ($orderIdsInRange as $oid) {
+        $tpid = $tpOrderMeta[$oid]['tp_id'] ?? null;
+        if (!empty($tpid)) { $tpIdsSeen[$tpid] = true; }
+    }
+    if (!empty($tpIdsSeen)) {
+        $tpIdList = implode(',', array_map('intval', array_keys($tpIdsSeen)));
+        $resTpNames = $db_conn->query("SELECT id, name FROM territory_partners WHERE id IN ($tpIdList)");
+        while ($tnr = mysqli_fetch_assoc($resTpNames)) { $tpNameMap[$tnr['id']] = $tnr['name']; }
+    }
+
+    $tpInvIds = [];
+    foreach ($orderIdsInRange as $oid) {
+        $invId = $tpOrderMeta[$oid]['invoiced_inv_id'] ?? null;
+        if (!empty($invId)) { $tpInvIds[$invId] = true; }
+    }
+    $completedTpInvIds = [];
+    if (!empty($tpInvIds)) {
+        $tpInvIdList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), array_keys($tpInvIds))) . "'";
+        $resReceipt = $db_conn->query("SELECT DISTINCT inv_id FROM receipt WHERE inv_id IN ($tpInvIdList)");
+        while ($rr = mysqli_fetch_assoc($resReceipt)) { $completedTpInvIds[$rr['inv_id']] = true; }
+    }
+    foreach ($orderIdsInRange as $oid) {
+        $tpid = $tpOrderMeta[$oid]['tp_id'] ?? null;
+        if (empty($tpid)) { $tpInvoiceStatusMap[$oid] = null; continue; }
+        $invId = $tpOrderMeta[$oid]['invoiced_inv_id'] ?? null;
+        if (empty($invId)) { $tpInvoiceStatusMap[$oid] = 'not_invoiced'; continue; }
+        $tpInvoiceStatusMap[$oid] = isset($completedTpInvIds[$invId]) ? 'completed' : 'pending';
     }
 }
 
@@ -319,13 +389,11 @@ $_chkTgtCol = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'monthly_t
 if ($_chkTgtCol && $_chkTgtCol->num_rows === 0) {
     $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
 }
-$monthlyTarget = 0.0;
-$stmtTgt = $db_conn->prepare("SELECT monthly_target_amount FROM marketing_staff WHERE id=?");
-$stmtTgt->bind_param('i', $viewMsId);
-$stmtTgt->execute();
-$tgtRow = $stmtTgt->get_result()->fetch_assoc();
-$stmtTgt->close();
-$monthlyTarget = (float)($tgtRow['monthly_target_amount'] ?? 0);
+// Team mode: sum every team member's own monthly target instead of one
+// person's — mirrors summing their get-order/invoice numbers above.
+$resTgt = $db_conn->query("SELECT COALESCE(SUM(monthly_target_amount),0) t FROM marketing_staff WHERE id IN ($msIdListSql)");
+$tgtRow = $resTgt->fetch_assoc();
+$monthlyTarget = (float)($tgtRow['t'] ?? 0);
 
 $daysInMonth  = (int)date('t', strtotime($from_date));
 $perDayTarget = $daysInMonth > 0 ? $monthlyTarget / $daysInMonth : 0.0;
@@ -339,16 +407,20 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
                                     <h1>
 									<table class="headertble">
 									<tr>
-									<td>Manage Orders <font size="3">(Product Orders)</font></td>
+									<td>Manage Orders <font size="3">(<?php echo $showAllOrders ? 'All Get Orders, incl. TP-assigned' : 'Product Orders'; ?>)</font><?php if ($isTeamMode): ?> &mdash; <?php echo htmlspecialchars($teamRootName ?: 'Team'); ?>'s team (<?php echo count($viewMsIds); ?>)<?php endif; ?></td>
 									<td>
-									<a href="manager_order_csv?frd=<?=$from_date;?>&&tod=<?=$to_date;?><?=!$viewingSelf ? '&&view_ms_id='.(int)$viewMsId : '';?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
+									<a href="manager_order_csv?frd=<?=$from_date;?>&&tod=<?=$to_date;?><?=!$viewingSelf ? ($isTeamMode ? '&&view_ms_ids='.htmlspecialchars(implode(',', $viewMsIds)) : '&&view_ms_id='.(int)$viewMsId) : '';?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
 									</td>
 									</tr>
 									</table>
 									</h1>
 									<?php if (!$viewingSelf): ?>
 									<div class="alert alert-info" style="margin-top:10px;">
+										<?php if ($isTeamMode): ?>
+										Viewing orders for <b><?=htmlspecialchars($teamRootName ?: 'this team')?></b>'s team (<?=count($viewMsIds);?> people)
+										<?php else: ?>
 										Viewing orders for <b><?=htmlspecialchars($viewMsName ?: 'this team member')?></b>
+										<?php endif; ?>
 										&mdash; <a href="manage_order_product.php">Back to my own orders</a>
 									</div>
 									<?php endif; ?>
@@ -358,7 +430,12 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
 
 
 <form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<?php if ($isTeamMode): ?>
+<input type="hidden" name="view_ms_ids" value="<?=htmlspecialchars(implode(',', $viewMsIds));?>">
+<?php else: ?>
 <input type="hidden" name="view_ms_id" value="<?=(int)$viewMsId;?>">
+<?php endif; ?>
+<?php if ($showAllOrders): ?><input type="hidden" name="view" value="all"><?php endif; ?>
 <?php if (!$viewingSelf): ?><input type="hidden" name="__keep_view" value="1"><?php endif; ?>
 
 							<div class="overviewcontainar">
@@ -374,7 +451,12 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
 </div>
 <div id="searchbuttoncont">
-<a href="manage_order_product.php<?=!$viewingSelf ? '?view_ms_id='.(int)$viewMsId : '';?>" style="margin-left:10px;" class="btn btn-primary">Reset</a>
+<a href="manage_order_product.php<?php
+    if (!$viewingSelf) {
+        echo $isTeamMode ? '?view_ms_ids='.htmlspecialchars(implode(',', $viewMsIds)) : '?view_ms_id='.(int)$viewMsId;
+        if ($showAllOrders) { echo '&view=all'; }
+    }
+?>" style="margin-left:10px;" class="btn btn-primary">Reset</a>
 </div>
 
 							</div>
@@ -591,6 +673,7 @@ $i= $start_from;
                                             <thead>
                                                 <tr>
                                                     <th>#</th>
+													<?php if ($isTeamMode): ?><th>Marketing Staff</th><?php endif; ?>
 													<th>Shop Name</th>
 													<th>Shop Contact Number</th>
 													<th>Address</th>
@@ -601,6 +684,10 @@ $i= $start_from;
 
 													<th>Location</th>
 													<th>TP Status</th>
+													<?php if ($showAllOrders): ?>
+													<th>Assigned TP</th>
+													<th>TP Invoice Status</th>
+													<?php endif; ?>
 													<th>Edit</th>
                                                 </tr>
                                             </thead>
@@ -614,6 +701,9 @@ $result_product_list = $orderMeta[$orderid];
 //shop category
 $shop_id=$result_product_list['shop_id'];
 $result_shopcatt = $shopMeta[$shop_id] ?? [];
+
+$ms_id_for_row = $result_product_list['ms_id'] ?? null;
+$result_msDetailsRow = $msMeta[$ms_id_for_row] ?? [];
 
 // TP status — what (if anything) happened to this order on the TP side
 // after it was assigned (bridged into tp_orders by order_action_get.php).
@@ -694,6 +784,9 @@ $tpStatusHtml = "<div class='tp-status-box'>{$headerHtml}{$detailHtml}</div>";
                                             
                                                <tr>
                     <td><?php echo ++$i; ?></td>
+					<?php if ($isTeamMode): ?>
+					<td><?=htmlspecialchars($result_msDetailsRow['ms_name'] ?? '');?></td>
+					<?php endif; ?>
 					<td><?=$result_shopcatt['name'];?></td>
 					<td><?=$result_shopcatt['mobile_number'];?></td>
 					<td><?=ucwords($result_shopcatt["address"]);?></td>
@@ -734,6 +827,24 @@ $tpStatusHtml = "<div class='tp-status-box'>{$headerHtml}{$detailHtml}</div>";
 					</td>
 
 					<td><?=$tpStatusHtml;?></td>
+
+					<?php if ($showAllOrders):
+						$tpidRow = $tpOrderMeta[$orderid]['tp_id'] ?? null;
+						$tpStatusRow = $tpInvoiceStatusMap[$orderid] ?? null;
+					?>
+					<td><?php echo empty($tpidRow) ? '<span class="text-muted">&mdash; not picked up &mdash;</span>' : htmlspecialchars($tpNameMap[$tpidRow] ?? ('TP #' . $tpidRow)); ?></td>
+					<td>
+						<?php if (empty($tpidRow)): ?>
+						<span class="text-muted">&mdash;</span>
+						<?php elseif ($tpStatusRow === 'completed'): ?>
+						<span class="badge badge-style-bordered badge-success">Completed</span>
+						<?php elseif ($tpStatusRow === 'pending'): ?>
+						<span class="badge badge-style-bordered badge-warning">Invoice Pending</span>
+						<?php else: ?>
+						<span class="badge badge-style-bordered badge-secondary">Not Invoiced Yet</span>
+						<?php endif; ?>
+					</td>
+					<?php endif; ?>
 
 			<td>
 			<a href="edit_order_product.php?orderid=<?php echo $orderid;?>&&actionupdate" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Details">

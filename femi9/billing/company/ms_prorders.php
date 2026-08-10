@@ -108,29 +108,68 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 						$from_date=date("Y-m-d", strtotime("-2 days", strtotime($to_date)));;	
 								}
 						
-						$se_msid=$_REQUEST['se_msid'];
+						$se_msid=$_REQUEST['se_msid'] ?? '';
+						// A manager's row on ms-team-shop-view.php links here with se_msids (their
+						// whole subtree, comma-separated) so the totals shown there match what this
+						// page reports — a single se_msid only ever covered that one person, silently
+						// under-reporting for anyone with a team under them.
+						$se_msids = [];
+						if (!empty($_REQUEST['se_msids'])) {
+						    $se_msids = array_values(array_unique(array_filter(array_map('intval', explode(',', $_REQUEST['se_msids'])))));
+						} elseif ($se_msid !== '') {
+						    $se_msids = [(int)$se_msid];
+						}
+						$isTeamMode = count($se_msids) > 1;
+						$msIdListSql = implode(',', $se_msids ?: [0]);
+						// "Total Get Order" link (view=all) shows every get-order — TP-assigned
+						// or not, and that TP's invoice status — instead of just the ones still
+						// needing company follow-up (the default/"Orders" link's tp_id IS NULL view).
+						$showAllOrders = (($_REQUEST['view'] ?? '') === 'all');
 						//
 						$select_msDetails12="select * from marketing_staff where id='$se_msid'";
 $fetch_msDetails12=mysqli_query($db_conn,$select_msDetails12);
 $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 
-// ── Per-DM summary cards ────────────────────────────────────────────────
-// Same 6 KPI cards the DM sees on their own manage_order_product.php,
-// shown here too once the company narrows the view down to one DM —
-// scoped by $se_msid instead of the DM's own session id.
-if ($se_msid != NULL) {
-    $se_msidEsc = mysqli_real_escape_string($db_conn, $se_msid);
+// Team-mode header — name of the manager whose subtree this is (always
+// first in the ids list, see subtreeSumAndIds() in ms-team-shop-view.php).
+$teamRootName = null;
+if ($isTeamMode) {
+    $resRoot = mysqli_query($db_conn, "SELECT ms_name FROM marketing_staff WHERE id=" . (int)$se_msids[0]);
+    $rootRow = mysqli_fetch_assoc($resRoot);
+    $teamRootName = $rootRow['ms_name'] ?? null;
+}
 
+// ── Per-DM / per-team summary cards ─────────────────────────────────────
+// Same 6 KPI cards the DM sees on their own manage_order_product.php,
+// shown here too once the company narrows the view down to one DM (or a
+// whole manager's subtree) — scoped by $se_msids instead of the DM's own
+// session id.
+if (!empty($se_msids)) {
     $getOrderCount = 0; $noOrderCount = 0;
     $resGN = mysqli_query($db_conn,
         "SELECT new_order, COUNT(DISTINCT order_id) c FROM ms_orders
-         WHERE ms_id='$se_msidEsc' AND order_date BETWEEN '$from_date' AND '$to_date'
+         WHERE ms_id IN ($msIdListSql) AND order_date BETWEEN '$from_date' AND '$to_date'
          GROUP BY new_order"
     );
     while ($gr = mysqli_fetch_assoc($resGN)) {
         if ($gr['new_order'] === 'yes') { $getOrderCount = (int)$gr['c']; }
         else { $noOrderCount = (int)$gr['c']; }
     }
+
+    // Of the "get order" total above, how many already have a TP handling
+    // them? Those don't show in the table below (see $whereExtra further
+    // down) — they show on that TP's own Manage Field Orders page instead —
+    // so this KPI is what explains the gap between this number and the
+    // row count in the table.
+    $assignedToTpCount = 0;
+    $resAssigned = mysqli_query($db_conn,
+        "SELECT COUNT(DISTINCT order_id) c FROM ms_orders
+         WHERE ms_id IN ($msIdListSql) AND new_order='yes' AND tp_id IS NOT NULL
+               AND order_date BETWEEN '$from_date' AND '$to_date'"
+    );
+    $arow = mysqli_fetch_assoc($resAssigned);
+    $assignedToTpCount = (int)($arow['c'] ?? 0);
+    $unassignedGetOrderCount = max(0, $getOrderCount - $assignedToTpCount);
 
     $productNeeded = [];
     $totalQtyNeeded = 0;
@@ -139,9 +178,9 @@ if ($se_msid != NULL) {
         "SELECT mo.pr_id, p.productName, p.outlet_price, SUM(mo.qty) totalqty,
                 SUM(mo.qty * p.outlet_price * (1 - mo.discount_percentage/100)) totalvalue
          FROM ms_orders mo LEFT JOIN products p ON p.id=mo.pr_id
-         WHERE mo.ms_id='$se_msidEsc' AND mo.new_order='yes'
+         WHERE mo.ms_id IN ($msIdListSql) AND mo.new_order='yes'
                AND mo.order_date BETWEEN '$from_date' AND '$to_date'
-         GROUP BY mo.pr_id ORDER BY totalqty DESC"
+         GROUP BY mo.pr_id, p.productName, p.outlet_price ORDER BY totalqty DESC"
     );
     while ($pr = mysqli_fetch_assoc($resPQ)) {
         $qty = (int)$pr['totalqty'];
@@ -155,7 +194,7 @@ if ($se_msid != NULL) {
     $resInv = mysqli_query($db_conn,
         "SELECT DISTINCT t.invoiced_inv_id
          FROM ms_orders o JOIN tp_orders t ON t.order_id=o.order_id
-         WHERE o.ms_id='$se_msidEsc' AND o.new_order='yes'
+         WHERE o.ms_id IN ($msIdListSql) AND o.new_order='yes'
                AND o.order_date BETWEEN '$from_date' AND '$to_date'
                AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''"
     );
@@ -203,7 +242,7 @@ if ($se_msid != NULL) {
             "SELECT uii.pr_id, p.productName, SUM(uii.qty) totalqty
              FROM user_invoice_items uii LEFT JOIN products p ON p.id=uii.pr_id
              WHERE uii.inv_id IN ($idList)
-             GROUP BY uii.pr_id ORDER BY totalqty DESC"
+             GROUP BY uii.pr_id, p.productName ORDER BY totalqty DESC"
         );
         $out = [];
         while ($row = mysqli_fetch_assoc($res)) {
@@ -221,7 +260,11 @@ if ($se_msid != NULL) {
     if ($_chkTgtCol && $_chkTgtCol->num_rows === 0) {
         $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
     }
-    $monthlyTarget = (float)($result_msDetails12['monthly_target_amount'] ?? 0);
+    // Team mode: sum every team member's own monthly target instead of one
+    // person's — mirrors summing their get-order/invoice numbers above.
+    $resTgt = mysqli_query($db_conn, "SELECT COALESCE(SUM(monthly_target_amount),0) t FROM marketing_staff WHERE id IN ($msIdListSql)");
+    $tgtRow = mysqli_fetch_assoc($resTgt);
+    $monthlyTarget = (float)($tgtRow['t'] ?? 0);
     $daysInMonth  = (int)date('t', strtotime($from_date));
     $perDayTarget = $daysInMonth > 0 ? $monthlyTarget / $daysInMonth : 0.0;
     $daysInRange  = (int)floor((strtotime($to_date) - strtotime($from_date)) / 86400) + 1;
@@ -235,9 +278,9 @@ if ($se_msid != NULL) {
                                     <h1>
 									<table class="headertble">
 									<tr>
-									<td>Marketing Staff > Product Orders</td>
+									<td>Marketing Staff > <?php echo $showAllOrders ? 'Total Get Orders (all, incl. TP-assigned)' : 'Product Orders'; ?><?php if ($isTeamMode): ?> &mdash; <?php echo htmlspecialchars($teamRootName ?? 'Team'); ?>'s team (<?php echo count($se_msids); ?>)<?php endif; ?></td>
 									<td>
-									<a href="ms_orders_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=$se_msid;?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
+									<a href="ms_orders_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=$se_msid;?>&&se_msids=<?=htmlspecialchars(implode(',', $se_msids));?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
 									</td>
 									</tr>
 									</table>
@@ -266,6 +309,12 @@ if ($se_msid != NULL) {
     <option value="dm" <?=($se_msid!=NULL)?'selected':''?>>Specific DM</option>
 </select>
 </div>
+<?php if ($isTeamMode): ?>
+<div id="searchleftcont" class="ms-picker-wrap">
+<label class="form-label">Team</label>
+<div class="form-control" style="background:#f8fafc;">Viewing <b><?php echo htmlspecialchars($teamRootName ?? 'Team'); ?></b>'s team &mdash; <?php echo count($se_msids); ?> people. Re-searching below switches to a single DM.</div>
+</div>
+<?php else: ?>
 <div id="searchleftcont" class="ms-picker-wrap" style="<?=($se_msid==NULL)?'display:none;':''?>">
 <label class="form-label">Marketing Staff</label>
 <select name="se_msid" id="msPickerSelect" class="form-control">
@@ -283,6 +332,7 @@ while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 <?php }?>
 </select>
 </div>
+<?php endif; ?>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
 </div>
@@ -295,7 +345,7 @@ while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 							<br/>
 							</form>
 
-							<?php if ($se_msid != NULL): ?>
+							<?php if (!empty($se_msids)): ?>
 							<div class="row mb-3">
 							    <div class="col-md-3 col-sm-6 mb-3">
 							        <div class="mskpi-card-wrap">
@@ -395,6 +445,7 @@ while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 							            <i class="material-icons-outlined mskpi-ico">assignment_turned_in</i>
 							            <div class="mskpi-t">Get Order / No Order</div>
 							            <div class="mskpi-v"><span style="color:#0ca30c;"><?php echo (int)$getOrderCount; ?></span> / <span style="color:#d03b3b;"><?php echo (int)$noOrderCount; ?></span></div>
+							            <div class="mskpi-sub"><?php echo $showAllOrders ? ($getOrderCount . ' in table below (all)') : ($unassignedGetOrderCount . ' in table below'); ?> &middot; <?php echo $assignedToTpCount; ?> picked up by a TP</div>
 							        </div>
 							    </div>
 
@@ -503,22 +554,28 @@ $i= $start_from;
 													<th>Address</th>
 													<th>Date</th>
 													<th>Product Qty</th>
+													<?php if ($showAllOrders): ?>
+													<th>Assigned TP</th>
+													<th>TP Invoice Status</th>
+													<?php endif; ?>
 													<th>Invoice</th>
                                                 </tr>
                                             </thead>
 
 											<tbody>
 <?php
-// Only orders with no TP assigned — this report exists so the company can
-// pick up DM orders that don't have anyone else already handling them
-// (e.g. no TP covers that area yet). Orders already assigned to a TP show
-// up in that TP's own field-order pipeline instead, not here.
+// Default view: only orders with no TP assigned — this report exists so the
+// company can pick up DM orders that don't have anyone else already handling
+// them (e.g. no TP covers that area yet). Orders already assigned to a TP
+// show up in that TP's own field-order pipeline instead, not here.
+// "Total Get Order" view (view=all): every get-order regardless of TP
+// assignment, with the assigned TP + their invoice status shown per row.
 //
 // Everything below is batched once instead of the old per-row (and
 // per-row-per-product) queries, which made this page very slow to load.
-$whereExtra = " and tp_id IS NULL";
+$whereExtra = $showAllOrders ? "" : " and tp_id IS NULL";
 if ($from_date != NULL) { $whereExtra = " and order_date between '$from_date' and '$to_date'" . $whereExtra; }
-if ($se_msid != NULL)   { $whereExtra .= " and ms_id='$se_msid'"; }
+if (!empty($se_msids))  { $whereExtra .= " and ms_id IN ($msIdListSql)"; }
 
 $allProducts = [];
 $resAllProd = mysqli_query($db_conn, "SELECT id, productName FROM products ORDER BY id ASC");
@@ -563,6 +620,47 @@ if (!empty($orderIdsInRange)) {
     while ($ir = mysqli_fetch_assoc($resInvoiced)) { $invoicedMap[$ir['source_ms_order_id']] = true; }
 }
 
+// "Total Get Order" view only — which TP (if any) picked up each order, and
+// whether that TP has actually submitted the invoice yet. A tp_orders row
+// only gets a `receipt` once "Submit Invoice" is clicked (see
+// shop-invoice-submit.php) — same rule territory-partner/manage-orders.php
+// uses to distinguish "Continue Invoice" (still mid-way) from "Completed".
+$tpNameMap = [];
+$tpInvoiceStatusMap = [];
+if ($showAllOrders && !empty($orderIdsInRange)) {
+    $tpIds = [];
+    foreach ($orderIdsInRange as $oid) {
+        $tpid = $orderMeta[$oid]['tp_id'] ?? null;
+        if (!empty($tpid)) { $tpIds[$tpid] = true; }
+    }
+    if (!empty($tpIds)) {
+        $tpIdList = implode(',', array_map('intval', array_keys($tpIds)));
+        $resTp = mysqli_query($db_conn, "SELECT id, name FROM territory_partners WHERE id IN ($tpIdList)");
+        while ($trow = mysqli_fetch_assoc($resTp)) { $tpNameMap[$trow['id']] = $trow['name']; }
+    }
+
+    $oidList2 = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $orderIdsInRange)) . "'";
+    $resTpOrders = mysqli_query($db_conn, "SELECT order_id, invoiced_inv_id FROM tp_orders WHERE order_id IN ($oidList2) AND invoiced_inv_id IS NOT NULL AND invoiced_inv_id <> ''");
+    $tpInvIdByOrder = [];
+    $tpInvIds = [];
+    while ($tor = mysqli_fetch_assoc($resTpOrders)) {
+        $tpInvIdByOrder[$tor['order_id']] = $tor['invoiced_inv_id'];
+        $tpInvIds[$tor['invoiced_inv_id']] = true;
+    }
+    $completedTpInvIds = [];
+    if (!empty($tpInvIds)) {
+        $tpInvIdList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), array_keys($tpInvIds))) . "'";
+        $resReceipt = mysqli_query($db_conn, "SELECT DISTINCT inv_id FROM receipt WHERE inv_id IN ($tpInvIdList)");
+        while ($rr = mysqli_fetch_assoc($resReceipt)) { $completedTpInvIds[$rr['inv_id']] = true; }
+    }
+    foreach ($orderIdsInRange as $oid) {
+        $tpid = $orderMeta[$oid]['tp_id'] ?? null;
+        if (empty($tpid)) { $tpInvoiceStatusMap[$oid] = null; continue; }
+        if (!isset($tpInvIdByOrder[$oid])) { $tpInvoiceStatusMap[$oid] = 'not_invoiced'; continue; }
+        $tpInvoiceStatusMap[$oid] = isset($completedTpInvIds[$tpInvIdByOrder[$oid]]) ? 'completed' : 'pending';
+    }
+}
+
 foreach ($orderIdsInRange as $orderid) {
 $result_product_list = $orderMeta[$orderid];
 
@@ -601,6 +699,23 @@ $orderTotalQty = array_sum($orderProducts);
 							</div>
 						</div>
 					</td>
+					<?php if ($showAllOrders):
+						$tpid = $result_product_list['tp_id'] ?? null;
+						$tpStatus = $tpInvoiceStatusMap[$orderid] ?? null;
+					?>
+					<td><?php echo empty($tpid) ? '<span class="text-muted">&mdash; not picked up &mdash;</span>' : htmlspecialchars($tpNameMap[$tpid] ?? ('TP #' . $tpid)); ?></td>
+					<td>
+						<?php if (empty($tpid)): ?>
+						<span class="text-muted">&mdash;</span>
+						<?php elseif ($tpStatus === 'completed'): ?>
+						<span class="badge badge-style-bordered badge-success">Completed</span>
+						<?php elseif ($tpStatus === 'pending'): ?>
+						<span class="badge badge-style-bordered badge-warning">Invoice Pending</span>
+						<?php else: ?>
+						<span class="badge badge-style-bordered badge-secondary">Not Invoiced Yet</span>
+						<?php endif; ?>
+					</td>
+					<?php endif; ?>
 					<td>
 						<?php if (isset($invoicedMap[$orderid])): ?>
 						<a href="ms-order-invoice-add.php?order_id=<?=urlencode($orderid)?>" class="btn btn-sm btn-outline-secondary">View Invoice</a>
