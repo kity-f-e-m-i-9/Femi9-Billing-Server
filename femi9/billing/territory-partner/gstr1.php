@@ -16,13 +16,23 @@ if ($from_month != '') {
     // Sales — a TP sells onward via two paths depending on buyer type:
     // shop/order sales land in user_invoice(_items), direct customer sales
     // in invoice(_items). Both are tagged with this TP's identity as seller.
+    //
+    // GSTR1 wants taxable value, not the GST-inclusive total. A product can
+    // be priced 'inclusive' (GST baked into the entered rate) or 'exclusive'
+    // (GST added on top) — see shop-invoice-action.php/customer-invoice-
+    // action.php — so `total` alone isn't taxable value in either case.
+    // gstamount_total is computed correctly for both cases at insert time
+    // but only exists on the *_items tables, not the parent invoice tables,
+    // so the sums below run against items: (total - gstamount_total) always
+    // yields the true taxable value without re-deriving it from the
+    // product's current GST type.
     $stmt = $db_conn->prepare(
         "SELECT
-            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type!='outer' THEN total ELSE 0 END) AS intra_reg,
-            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type!='outer' THEN total ELSE 0 END) AS intra_unreg,
-            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='outer' THEN total ELSE 0 END) AS inter_reg,
-            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='outer' THEN total ELSE 0 END) AS inter_unreg
-         FROM user_invoice
+            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type!='outer' THEN total-gstamount_total ELSE 0 END) AS intra_reg,
+            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type!='outer' THEN total-gstamount_total ELSE 0 END) AS intra_unreg,
+            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='outer' THEN total-gstamount_total ELSE 0 END) AS inter_reg,
+            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='outer' THEN total-gstamount_total ELSE 0 END) AS inter_unreg
+         FROM user_invoice_items
          WHERE from_user_type = ? AND from_user_id = ? AND date BETWEEN ? AND ?"
     );
     $stmt->bind_param("siss", $Login_user_TYPEvl, $tp_id, $from_date, $to_date);
@@ -32,11 +42,11 @@ if ($from_month != '') {
 
     $stmt = $db_conn->prepare(
         "SELECT
-            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type!='outer' THEN total ELSE 0 END) AS intra_reg,
-            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type!='outer' THEN total ELSE 0 END) AS intra_unreg,
-            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='outer' THEN total ELSE 0 END) AS inter_reg,
-            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='outer' THEN total ELSE 0 END) AS inter_unreg
-         FROM invoice
+            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type!='outer' THEN total-gstamount_total ELSE 0 END) AS intra_reg,
+            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type!='outer' THEN total-gstamount_total ELSE 0 END) AS intra_unreg,
+            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='outer' THEN total-gstamount_total ELSE 0 END) AS inter_reg,
+            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='outer' THEN total-gstamount_total ELSE 0 END) AS inter_unreg
+         FROM invoice_items
          WHERE user_type = ? AND user_id = ? AND date BETWEEN ? AND ?"
     );
     $stmt->bind_param("siss", $Login_user_TYPEvl, $tp_id, $from_date, $to_date);
@@ -51,13 +61,14 @@ if ($from_month != '') {
 
     // Credit Note — TP-side stock returns (customers/shops returning goods
     // to this TP), the same buyer_gsttype/gst_type tagging as sales above.
+    // Same taxable-value fix: aggregate from items, subtract gstamount_total.
     $stmt = $db_conn->prepare(
         "SELECT
-            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type!='outer' THEN total ELSE 0 END) AS intra_reg,
-            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type!='outer' THEN total ELSE 0 END) AS intra_unreg,
-            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='outer' THEN total ELSE 0 END) AS inter_reg,
-            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='outer' THEN total ELSE 0 END) AS inter_unreg
-         FROM user_return_stock
+            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type!='outer' THEN total-gstamount_total ELSE 0 END) AS intra_reg,
+            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type!='outer' THEN total-gstamount_total ELSE 0 END) AS intra_unreg,
+            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='outer' THEN total-gstamount_total ELSE 0 END) AS inter_reg,
+            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='outer' THEN total-gstamount_total ELSE 0 END) AS inter_unreg
+         FROM user_return_stock_items
          WHERE to_usertype = ? AND to_userid = ? AND date BETWEEN ? AND ?"
     );
     $stmt->bind_param("siss", $Login_user_TYPEvl, $tp_id, $from_date, $to_date);
@@ -93,18 +104,21 @@ if ($from_month != '') {
     $hsn_list = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    // Per-HSN net quantity and taxable value (subtotal = pre-GST amount),
-    // each netted as sales (user_invoice_items + invoice_items) minus
-    // returns (user_return_stock_items) for that HSN.
+    // Per-HSN net quantity and taxable value, each netted as sales
+    // (user_invoice_items + invoice_items) minus returns
+    // (user_return_stock_items) for that HSN. Taxable value uses
+    // (total - gstamount_total) rather than subtotal — see the note above
+    // the sales query — since subtotal is only pre-GST for 'exclusive'
+    // products; for 'inclusive' products it still has GST baked in.
     $hsn_qty_stmt = $db_conn->prepare(
         "SELECT
             COALESCE((SELECT SUM(qty) FROM user_invoice_items WHERE hsn = ? AND date BETWEEN ? AND ? AND from_user_type = ? AND from_user_id = ?), 0) +
             COALESCE((SELECT SUM(qty) FROM invoice_items       WHERE hsn = ? AND date BETWEEN ? AND ? AND user_type = ?      AND user_id = ?), 0) -
             COALESCE((SELECT SUM(qty) FROM user_return_stock_items WHERE hsn = ? AND date BETWEEN ? AND ? AND to_usertype = ? AND to_userid = ?), 0)
             AS net_qty,
-            COALESCE((SELECT SUM(subtotal) FROM user_invoice_items WHERE hsn = ? AND date BETWEEN ? AND ? AND from_user_type = ? AND from_user_id = ?), 0) +
-            COALESCE((SELECT SUM(subtotal) FROM invoice_items       WHERE hsn = ? AND date BETWEEN ? AND ? AND user_type = ?      AND user_id = ?), 0) -
-            COALESCE((SELECT SUM(subtotal) FROM user_return_stock_items WHERE hsn = ? AND date BETWEEN ? AND ? AND to_usertype = ? AND to_userid = ?), 0)
+            COALESCE((SELECT SUM(total-gstamount_total) FROM user_invoice_items WHERE hsn = ? AND date BETWEEN ? AND ? AND from_user_type = ? AND from_user_id = ?), 0) +
+            COALESCE((SELECT SUM(total-gstamount_total) FROM invoice_items       WHERE hsn = ? AND date BETWEEN ? AND ? AND user_type = ?      AND user_id = ?), 0) -
+            COALESCE((SELECT SUM(total-gstamount_total) FROM user_return_stock_items WHERE hsn = ? AND date BETWEEN ? AND ? AND to_usertype = ? AND to_userid = ?), 0)
             AS net_taxable_value"
     );
 }

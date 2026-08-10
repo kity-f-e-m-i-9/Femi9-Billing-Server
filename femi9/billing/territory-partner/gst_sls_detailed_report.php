@@ -23,23 +23,27 @@ else
 // counts as intra, since some legacy invoice rows carry gst_type='0'.
 $intraSql = $gst_type == 'outer' ? "gst_type = 'outer'" : "gst_type != 'outer'";
 
-// BLOCK 1: Shop/order sales — user_invoice, buyer is always the 'shop' table.
+// BLOCK 1: Shop/order sales — items carry the GST-corrected taxable value
+// (total - gstamount_total; see gstr1.php for why), joined back to
+// user_invoice for the invoice number and to shop for buyer details.
 $select_Report = "
     SELECT
         ui.inv_number,
-        ui.date,
-        ui.total AS total_sls_amount,
+        uii.date,
+        SUM(uii.total - uii.gstamount_total) AS total_sls_amount,
         sh.name          AS cust_name,
         sh.mobile_number AS cust_mobile,
         sh.gstin         AS cust_gstin
-    FROM user_invoice ui
-    LEFT JOIN shop sh ON sh.temp_id = ui.to_user_id
-    WHERE ui.from_user_type = ?
-      AND ui.from_user_id   = ?
-      AND ui.buyer_gsttype  = ?
+    FROM user_invoice_items uii
+    LEFT JOIN user_invoice ui ON ui.inv_id = uii.inv_id
+    LEFT JOIN shop sh ON sh.temp_id = uii.to_user_id
+    WHERE uii.from_user_type = ?
+      AND uii.from_user_id   = ?
+      AND uii.buyer_gsttype  = ?
       AND ($intraSql)
-      AND ui.date BETWEEN ? AND ?
-    ORDER BY ui.date ASC
+      AND uii.date BETWEEN ? AND ?
+    GROUP BY uii.inv_id, ui.inv_number, uii.date, sh.name, sh.mobile_number, sh.gstin
+    ORDER BY uii.date ASC
 ";
 $stmt = $db_conn->prepare($select_Report);
 $stmt->bind_param("sisss", $Login_user_TYPEvl, $tp_id, $buyer_gsttype, $from_date, $to_date);
@@ -49,23 +53,26 @@ $stmt->close();
 $total1 = 0;
 foreach ($rows1 as $row) { $total1 += (float)$row['total_sls_amount']; }
 
-// BLOCK 2: Direct customer sales — invoice + customers.
+// BLOCK 2: Direct customer sales — invoice_items + customers, same
+// taxable-value correction.
 $select_Report2 = "
     SELECT
         i.inv_number,
-        i.date,
-        i.total AS total_sls_amount,
+        ii.date,
+        SUM(ii.total - ii.gstamount_total) AS total_sls_amount,
         c.name   AS cust_name,
         c.mobile AS cust_mobile,
         c.gstin  AS cust_gstin
-    FROM invoice i
-    LEFT JOIN customers c ON c.id = i.customer_id
-    WHERE i.user_type = ?
-      AND i.user_id   = ?
-      AND i.buyer_gsttype = ?
+    FROM invoice_items ii
+    LEFT JOIN invoice i ON i.inv_id = ii.inv_id
+    LEFT JOIN customers c ON c.id = ii.customer_id
+    WHERE ii.user_type = ?
+      AND ii.user_id   = ?
+      AND ii.buyer_gsttype = ?
       AND ($intraSql)
-      AND i.date BETWEEN ? AND ?
-    ORDER BY i.date ASC
+      AND ii.date BETWEEN ? AND ?
+    GROUP BY ii.inv_id, i.inv_number, ii.date, c.name, c.mobile, c.gstin
+    ORDER BY ii.date ASC
 ";
 $stmt2 = $db_conn->prepare($select_Report2);
 $stmt2->bind_param("sisss", $Login_user_TYPEvl, $tp_id, $buyer_gsttype, $from_date, $to_date);

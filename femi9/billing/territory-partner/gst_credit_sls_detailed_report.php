@@ -23,28 +23,30 @@ else
 // counts as intra, since some legacy invoice rows carry gst_type='0'.
 $intraSql = $gst_type == 'outer' ? "gst_type = 'outer'" : "gst_type != 'outer'";
 
-// BLOCK 1: Shop returns — user_return_stock, joined back to the shop table
-// and the originating user_invoice for its invoice number/date.
+// BLOCK 1: Shop returns — items carry the GST-corrected taxable value
+// (total - gstamount_total; see gstr1.php for why), joined back to the
+// shop table and the originating user_invoice for invoice number/date.
 $select_Report = "
     SELECT
-        rs.date        AS return_date,
-        rs.total       AS total_sls_amount,
+        rsi.date        AS return_date,
+        SUM(rsi.total - rsi.gstamount_total) AS total_sls_amount,
         sh.name          AS cust_name,
         sh.mobile_number AS cust_mobile,
         sh.gstin         AS cust_gstin,
         ui.inv_number,
         ui.date AS invoice_date
-    FROM user_return_stock rs
-    LEFT JOIN shop sh          ON sh.temp_id = rs.from_userid
-    LEFT JOIN user_invoice ui  ON ui.inv_id = rs.invnumber
-    WHERE rs.to_usertype   = ?
-      AND rs.to_userid     = ?
-      AND rs.buyer_gsttype = ?
+    FROM user_return_stock_items rsi
+    LEFT JOIN shop sh          ON sh.temp_id = rsi.from_userid
+    LEFT JOIN user_invoice ui  ON ui.inv_id = rsi.invnumber
+    WHERE rsi.to_usertype   = ?
+      AND rsi.to_userid     = ?
+      AND rsi.buyer_gsttype = ?
       AND ($intraSql)
-      AND rs.date BETWEEN ? AND ?
-      AND rs.total > 0
-      AND rs.from_usertype != 'customer'
-    ORDER BY rs.date ASC
+      AND rsi.date BETWEEN ? AND ?
+      AND rsi.total > 0
+      AND rsi.from_usertype != 'customer'
+    GROUP BY rsi.returnid, rsi.date, sh.name, sh.mobile_number, sh.gstin, ui.inv_number, ui.date
+    ORDER BY rsi.date ASC
 ";
 $stmt = $db_conn->prepare($select_Report);
 $stmt->bind_param("sisss", $Login_user_TYPEvl, $tp_id, $buyer_gsttype, $from_date, $to_date);
@@ -54,27 +56,28 @@ $stmt->close();
 $total1 = 0;
 foreach ($rows1 as $row) { $total1 += (float)$row['total_sls_amount']; }
 
-// BLOCK 2: Customer returns — user_return_stock + customers + invoice.
+// BLOCK 2: Customer returns — same taxable-value correction.
 $select_Report2 = "
     SELECT
-        rs.date        AS return_date,
-        rs.total       AS total_sls_amount,
+        rsi.date        AS return_date,
+        SUM(rsi.total - rsi.gstamount_total) AS total_sls_amount,
         c.name   AS cust_name,
         c.mobile AS cust_mobile,
         c.gstin  AS cust_gstin,
         i.inv_number,
         i.date AS invoice_date
-    FROM user_return_stock rs
-    LEFT JOIN customers c ON c.id = rs.from_userid
-    LEFT JOIN invoice   i ON i.inv_id = rs.invnumber
-    WHERE rs.to_usertype   = ?
-      AND rs.to_userid     = ?
-      AND rs.buyer_gsttype = ?
+    FROM user_return_stock_items rsi
+    LEFT JOIN customers c ON c.id = rsi.from_userid
+    LEFT JOIN invoice   i ON i.inv_id = rsi.invnumber
+    WHERE rsi.to_usertype   = ?
+      AND rsi.to_userid     = ?
+      AND rsi.buyer_gsttype = ?
       AND ($intraSql)
-      AND rs.date BETWEEN ? AND ?
-      AND rs.total > 0
-      AND rs.from_usertype = 'customer'
-    ORDER BY rs.date ASC
+      AND rsi.date BETWEEN ? AND ?
+      AND rsi.total > 0
+      AND rsi.from_usertype = 'customer'
+    GROUP BY rsi.returnid, rsi.date, c.name, c.mobile, c.gstin, i.inv_number, i.date
+    ORDER BY rsi.date ASC
 ";
 $stmt2 = $db_conn->prepare($select_Report2);
 $stmt2->bind_param("sisss", $Login_user_TYPEvl, $tp_id, $buyer_gsttype, $from_date, $to_date);
