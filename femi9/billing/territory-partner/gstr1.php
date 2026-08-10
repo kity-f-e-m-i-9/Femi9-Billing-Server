@@ -18,8 +18,8 @@ if ($from_month != '') {
     // in invoice(_items). Both are tagged with this TP's identity as seller.
     $stmt = $db_conn->prepare(
         "SELECT
-            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='inner' THEN total ELSE 0 END) AS intra_reg,
-            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='inner' THEN total ELSE 0 END) AS intra_unreg,
+            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type!='outer' THEN total ELSE 0 END) AS intra_reg,
+            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type!='outer' THEN total ELSE 0 END) AS intra_unreg,
             SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='outer' THEN total ELSE 0 END) AS inter_reg,
             SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='outer' THEN total ELSE 0 END) AS inter_unreg
          FROM user_invoice
@@ -32,8 +32,8 @@ if ($from_month != '') {
 
     $stmt = $db_conn->prepare(
         "SELECT
-            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='inner' THEN total ELSE 0 END) AS intra_reg,
-            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='inner' THEN total ELSE 0 END) AS intra_unreg,
+            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type!='outer' THEN total ELSE 0 END) AS intra_reg,
+            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type!='outer' THEN total ELSE 0 END) AS intra_unreg,
             SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='outer' THEN total ELSE 0 END) AS inter_reg,
             SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='outer' THEN total ELSE 0 END) AS inter_unreg
          FROM invoice
@@ -53,8 +53,8 @@ if ($from_month != '') {
     // to this TP), the same buyer_gsttype/gst_type tagging as sales above.
     $stmt = $db_conn->prepare(
         "SELECT
-            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='inner' THEN total ELSE 0 END) AS intra_reg,
-            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='inner' THEN total ELSE 0 END) AS intra_unreg,
+            SUM(CASE WHEN buyer_gsttype='register'   AND gst_type!='outer' THEN total ELSE 0 END) AS intra_reg,
+            SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type!='outer' THEN total ELSE 0 END) AS intra_unreg,
             SUM(CASE WHEN buyer_gsttype='register'   AND gst_type='outer' THEN total ELSE 0 END) AS inter_reg,
             SUM(CASE WHEN buyer_gsttype='unregister' AND gst_type='outer' THEN total ELSE 0 END) AS inter_unreg
          FROM user_return_stock
