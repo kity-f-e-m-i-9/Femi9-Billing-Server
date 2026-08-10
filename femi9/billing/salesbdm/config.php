@@ -18,9 +18,13 @@ $userTable = $userConfig['table'];
 $userDisplayName = $userConfig['display_name'];
 $business_name = "Femi9 - Happy day Everyday";
 
-$select_LoGuserDtails="select * from sales_bdm_staff where bdm_mobile='".$_SESSION['LOGIN_USER']."'";
-$fetch_LoGuserDtails=mysqli_query($db_conn,$select_LoGuserDtails);
-$result_LoGuserDtails=mysqli_fetch_array($fetch_LoGuserDtails);
+// checksession.php's read-only company "view a BDM's dashboard" bridge
+// already resolves this for its one allowed page — don't overwrite it.
+if (empty($result_LoGuserDtails)) {
+    $select_LoGuserDtails="select * from sales_bdm_staff where bdm_mobile='".$_SESSION['LOGIN_USER']."'";
+    $fetch_LoGuserDtails=mysqli_query($db_conn,$select_LoGuserDtails);
+    $result_LoGuserDtails=mysqli_fetch_array($fetch_LoGuserDtails);
+}
 
 $Login_user_TYPEvl="salesbdm";
 $salesBdmID=$result_LoGuserDtails['id'];

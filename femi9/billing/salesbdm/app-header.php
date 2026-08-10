@@ -26,7 +26,7 @@ $_bdmBase = $_inCompanyFolder ? '../salesbdm/' : '';
                         </td>
                         <td>
                             <h1><?php echo strtoupper($result_LoGuserDtails['bdm_name'] ?? ''); ?></h1>
-                            <h2><?=$_SESSION['LOGIN_USER'];?></h2>
+                            <h2><?php echo htmlspecialchars($_SESSION['LOGIN_USER'] ?? ($result_LoGuserDtails['bdm_mobile'] ?? '')); ?></h2>
                             <h3>Sales BDM<?php if (!empty($result_LoGuserDtails['zone'])): ?> &middot; Zone: <?php echo htmlspecialchars($result_LoGuserDtails['zone']); ?><?php endif; ?></h3>
                         </td>
                     </tr>
@@ -40,7 +40,7 @@ $_bdmBase = $_inCompanyFolder ? '../salesbdm/' : '';
                             <img src="../../assets/images/femi-logo.png"/>
                         </a>
                         <div class="dropdown-menu dropdown-menu-end notifications-dropdown" aria-labelledby="bdmDropDown">
-                            <h6 class="dropdown-header">Sales BDM (<?php echo htmlspecialchars($_SESSION['LOGIN_USER']); ?>)</h6>
+                            <h6 class="dropdown-header">Sales BDM (<?php echo htmlspecialchars($_SESSION['LOGIN_USER'] ?? ($result_LoGuserDtails['bdm_mobile'] ?? '')); ?>)</h6>
                             <div class="notifications-dropdown-list">
                                 <a href="<?php echo $_bdmBase; ?>logout" onclick="return confirm('You want to logout confirm?');">
                                     <div class="notifications-dropdown-item">

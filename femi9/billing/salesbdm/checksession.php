@@ -10,6 +10,37 @@ if (session_status() === PHP_SESSION_NONE) {
 // Include database connection
 require_once __DIR__ . '/include/db-connect.php';
 
+// Company "view a BDM's dashboard" bridge — read-only, single-page only.
+// Never touches $_SESSION (so it can't leak into a persistent salesbdm
+// login for any other page) — it just resolves $result_LoGuserDtails for
+// THIS request, and config.php (included right after) picks it up instead
+// of re-querying by $_SESSION['LOGIN_USER'].
+if (basename($_SERVER['SCRIPT_NAME']) === 'dashboard.php' && !empty($_COOKIE['femi9_company_bdm_view'])) {
+    $db_conn->query("CREATE TABLE IF NOT EXISTS company_bdm_view_bridge (
+        token VARCHAR(64) PRIMARY KEY,
+        bdm_id INT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
+    $stmt_cbv = $db_conn->prepare("
+        SELECT s.* FROM company_bdm_view_bridge b
+        JOIN sales_bdm_staff s ON s.id = b.bdm_id
+        WHERE b.token = ? AND b.expires_at > NOW() LIMIT 1
+    ");
+    $stmt_cbv->bind_param('s', $_COOKIE['femi9_company_bdm_view']);
+    $stmt_cbv->execute();
+    $bridgeStaffRow = $stmt_cbv->get_result()->fetch_assoc();
+    $stmt_cbv->close();
+    if ($bridgeStaffRow && ($bridgeStaffRow['account_status'] ?? '') === 'active') {
+        $result_LoGuserDtails = $bridgeStaffRow;
+        $log_username = $bridgeStaffRow['bdm_mobile'];
+        $Login_user_IDvl = (int)$bridgeStaffRow['id'];
+        $Login_user_TYPEvl = 'salesbdm';
+        $_companyBridgeView = true;
+        return;
+    }
+}
+
 // Check if user is logged in - Use isset() instead of empty()
 if (!isset($_SESSION['LOGIN_USER']) || $_SESSION['LOGIN_USER'] === '' || ($_SESSION['LOGIN_USER_TYPE'] ?? '') !== 'salesbdm') {
     $_SESSION['errorMessage'] = 'Session Expired. Please login again.';

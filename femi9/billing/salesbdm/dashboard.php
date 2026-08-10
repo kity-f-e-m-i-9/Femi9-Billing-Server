@@ -13,6 +13,15 @@ date_default_timezone_set("Asia/Kolkata");
 $effectiveBdmId = (int)$salesBdmID;
 $viewingOther = false;
 $viewBdmName = '';
+$viewBackUrl = 'my-team-report.php';
+// Company staff viewing this BDM's own dashboard via the read-only bridge
+// (checksession.php) — already resolved to this BDM's own id, so treat it
+// the same as a manager's "view as", just with a different back-link.
+if (!empty($_companyBridgeView)) {
+    $viewingOther = true;
+    $viewBdmName = $result_LoGuserDtails['bdm_name'] ?? '';
+    $viewBackUrl = '../company/salesbdm-team-report.php';
+}
 if (!empty($_GET['view_bdm_id'])) {
     $requestedId = (int)$_GET['view_bdm_id'];
     if ($requestedId > 0 && $requestedId !== (int)$salesBdmID) {
@@ -477,7 +486,7 @@ if ($hasTps) {
                     <?php if ($viewingOther): ?>
                         <div class="alert alert-info" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
                             <span><i class="material-icons-outlined" style="vertical-align:middle;font-size:17px;">visibility</i> Viewing <b><?php echo htmlspecialchars($viewBdmName); ?>'s</b> dashboard (read-only).</span>
-                            <a href="my-team-report.php" class="btn btn-sm" style="background:#fff;color:#0b5ed7;font-weight:700;border:none;box-shadow:0 1px 4px rgba(0,0,0,.15);">&larr; Back to Our Team Report</a>
+                            <a href="<?php echo htmlspecialchars($viewBackUrl); ?>" class="btn btn-sm" style="background:#fff;color:#0b5ed7;font-weight:700;border:none;box-shadow:0 1px 4px rgba(0,0,0,.15);">&larr; Back to Our Team Report</a>
                         </div>
                     <?php endif; ?>
 
