@@ -78,9 +78,12 @@ $stmtTP->close();
 $gst_type = (strtolower($shop_state_name) === strtolower($tp_state)) ? 'inner' : 'outer';
 
 // Validate every line up front — matches shop-invoice-action.php's per-item
-// stock check, but here we refuse to create a half-stocked invoice: either
-// every line has enough closing_qty, or nothing is created and the TP is
-// told what's short so they can restock or trim the order first.
+// stock check. Lines without enough closing_qty are left out of the invoice
+// (not blocked entirely) — the invoice still gets created for whatever DOES
+// have stock, and the TP sees which product(s) were skipped as out of stock
+// on the invoice screen itself (via $_SESSION['errorMessage'] below), so they
+// can restock and add that product back separately instead of the whole
+// order being stuck.
 $shortfalls = [];
 $validLines = [];
 foreach ($lines as $ln) {
@@ -113,16 +116,19 @@ foreach ($lines as $ln) {
     ];
 }
 
-if (!empty($shortfalls)) {
-    $_SESSION['errorMessage'] = "Not enough stock to invoice: " . implode(', ', $shortfalls) . ". Restock or edit the order, then try again.";
+if (empty($validLines)) {
+    $_SESSION['errorMessage'] = !empty($shortfalls)
+        ? "None of the products in this order have enough stock to invoice: " . implode(', ', $shortfalls) . ". Restock, then try again."
+        : "This visit has no valid product lines to invoice.";
     header('Location: manage-orders.php');
     exit;
 }
 
-if (empty($validLines)) {
-    $_SESSION['errorMessage'] = "This visit has no valid product lines to invoice.";
-    header('Location: manage-orders.php');
-    exit;
+// Shown as a banner on the invoice screen (shop-invoice-add.php reads
+// $_SESSION['errorMessage']) — not a redirect/block, since $validLines still
+// has at least one invoiceable product.
+if (!empty($shortfalls)) {
+    $_SESSION['errorMessage'] = "Out of stock — left out of this invoice: " . implode(', ', $shortfalls) . ". Restock and add separately if needed.";
 }
 
 function GeraHashInvOrder($qtd) {

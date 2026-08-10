@@ -1,4 +1,4 @@
-<?php 
+<?php
 $selectusertypeGET="select * from admin_log where username='".$_SESSION['LOGIN_USER']."'";
 $fetchusertypeGET=mysqli_query($db_conn,$selectusertypeGET);
 $resultusertypeGET=mysqli_fetch_array($fetchusertypeGET);
@@ -656,6 +656,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                                 <ul class="sub-menu">
                                     <li><a href="manage-salesbdm-team-levels">Manage Team Levels</a></li>
                                     <li><a href="salesbdm-team-view">Tree View</a></li>
+                                    <li><a href="salesbdm-team-report">Our Team Report</a></li>
                                 </ul>
                             </li>
                         </ul>

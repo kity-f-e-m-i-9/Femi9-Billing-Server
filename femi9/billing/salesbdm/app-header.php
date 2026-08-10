@@ -1,3 +1,11 @@
+<?php
+// Included from both salesbdm/ and company/'s shared Territory Partner pages
+// (see femi_menu.php for the same context-detection) — the Logout link
+// needs a different relative prefix depending on which folder is serving
+// the current request.
+$_inCompanyFolder = (strpos($_SERVER['SCRIPT_NAME'], '/company/') !== false);
+$_bdmBase = $_inCompanyFolder ? '../salesbdm/' : '';
+?>
 <div class="app-header">
     <nav class="navbar navbar-light navbar-expand-lg">
         <div class="container-fluid">
@@ -19,7 +27,7 @@
                         <td>
                             <h1><?php echo strtoupper($result_LoGuserDtails['bdm_name'] ?? ''); ?></h1>
                             <h2><?=$_SESSION['LOGIN_USER'];?></h2>
-                            <h3>Sales BDM</h3>
+                            <h3>Sales BDM<?php if (!empty($result_LoGuserDtails['zone'])): ?> &middot; Zone: <?php echo htmlspecialchars($result_LoGuserDtails['zone']); ?><?php endif; ?></h3>
                         </td>
                     </tr>
                 </table>
@@ -34,7 +42,7 @@
                         <div class="dropdown-menu dropdown-menu-end notifications-dropdown" aria-labelledby="bdmDropDown">
                             <h6 class="dropdown-header">Sales BDM (<?php echo htmlspecialchars($_SESSION['LOGIN_USER']); ?>)</h6>
                             <div class="notifications-dropdown-list">
-                                <a href="logout" onclick="return confirm('You want to logout confirm?');">
+                                <a href="<?php echo $_bdmBase; ?>logout" onclick="return confirm('You want to logout confirm?');">
                                     <div class="notifications-dropdown-item">
                                         <div class="notifications-dropdown-item-text">
                                             <p class="bold-notifications-text">Logout</p>

@@ -36,6 +36,14 @@ foreach ($_tp_cols as $_col => $_def) {
     }
 }
 
+// A Sales BDM session may only insert/edit within their own assigned
+// districts — used below to filter submitted location_ids and, on update,
+// to verify the TP being edited actually belongs to this BDM.
+$_isBdm = ($Login_user_TYPEvl ?? '') === 'salesbdm';
+if ($_isBdm) {
+    require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
+}
+
 $action = $_POST['action'] ?? '';
 
 // ── INSERT ────────────────────────────────────────────────────────────────────
@@ -68,6 +76,9 @@ if ($action === 'insert-territory-partner') {
     $password_hash     = password_hash($raw_password, PASSWORD_DEFAULT);
     $created_by        = $_SESSION['LOGIN_USER'] ?? '';
     $location_ids      = array_filter(array_map('intval', $_POST['location_ids'] ?? []));
+    if ($_isBdm) {
+        $location_ids = array_values(array_filter($location_ids, fn($lid) => isLocationInBdmDistricts($db_conn, (int)$salesBdmID, $lid)));
+    }
 
     if (!$name || !$company_name || !$mobile || !$branch_line1 || !$delivery_line1) {
         header("Location: add-territory-partner?error=1");
@@ -185,6 +196,12 @@ if ($action === 'update-territory-partner') {
     $is_active         = (int)($_POST['tp_active'] ?? 1);
     $created_by        = $_SESSION['LOGIN_USER'] ?? '';
     $location_ids      = array_filter(array_map('intval', $_POST['location_ids'] ?? []));
+
+    if ($_isBdm) {
+        $_myTpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
+        if (!in_array($tp_db_id, $_myTpIds, true)) { header("Location: manage-territory-partner"); exit; }
+        $location_ids = array_values(array_filter($location_ids, fn($lid) => isLocationInBdmDistricts($db_conn, (int)$salesBdmID, $lid)));
+    }
 
     if (!$tp_db_id || !$name || !$company_name || !$mobile || !$branch_line1 || !$delivery_line1) {
         header("Location: manage-territory-partner?error=1");

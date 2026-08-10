@@ -10,6 +10,62 @@ if (session_status() === PHP_SESSION_NONE) {
 // Include database connection
 require_once __DIR__ . '/include/db-connect.php';
 
+// Sales BDM access to a narrow allowlist of Territory Partner pages —
+// verified via a DB-backed bridge token (see salesbdm/CheckLogin.php), not
+// a mirrored PHP session, since PHP session portability across the
+// salesbdm/ vs company/ session stores (different session.name per
+// company/.htaccess) isn't guaranteed across hosting environments. Looked
+// up fresh on every request — no dependency on $_SESSION at all for this
+// path, so it runs before the normal company-staff login check below,
+// which would otherwise reject a BDM outright (they aren't in admin_log).
+$_bdmAllowedScripts = [
+    'add-territory-partner.php', 'manage-territory-partner.php', 'edit-territory-partner.php',
+    'territory-partner-action.php', 'delete-territory-partner.php', 'toggle-partner-status.php',
+    'get-tp-flat-nodes.php', 'search-referral-user.php',
+];
+if (!empty($_COOKIE['femi9_bdm_bridge']) && in_array(basename($_SERVER['SCRIPT_NAME']), $_bdmAllowedScripts, true)) {
+    $db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_company_bridge (
+        token VARCHAR(64) PRIMARY KEY,
+        bdm_id INT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
+    $stmt_bridge = $db_conn->prepare("
+        SELECT b.bdm_id, s.bdm_name, s.bdm_mobile, s.zone, s.account_status
+        FROM salesbdm_company_bridge b
+        JOIN sales_bdm_staff s ON s.id = b.bdm_id
+        WHERE b.token = ? AND b.expires_at > NOW()
+        LIMIT 1
+    ");
+    $stmt_bridge->bind_param('s', $_COOKIE['femi9_bdm_bridge']);
+    $stmt_bridge->execute();
+    $bridgeRow = $stmt_bridge->get_result()->fetch_assoc();
+    $stmt_bridge->close();
+
+    if (!$bridgeRow || ($bridgeRow['account_status'] ?? '') !== 'active') {
+        setcookie('femi9_bdm_bridge', '', ['expires' => time() - 3600, 'path' => '/']);
+        header('Location: ../salesbdm/index.php?sessionexpiry');
+        exit;
+    }
+
+    // Sliding 30-minute expiry, extended on every valid request.
+    $stmt_touch = $db_conn->prepare("UPDATE salesbdm_company_bridge SET expires_at = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE token = ?");
+    $stmt_touch->bind_param('s', $_COOKIE['femi9_bdm_bridge']);
+    $stmt_touch->execute();
+    $stmt_touch->close();
+
+    $Login_user_IDvl = (int)$bridgeRow['bdm_id'];
+    $Login_user_TYPEvl = 'salesbdm';
+    $salesBdmID = (int)$bridgeRow['bdm_id'];
+    $_SESSION['LOGIN_USER_NAME'] = $bridgeRow['bdm_name'];
+    $_SESSION['LOGIN_USER'] = $bridgeRow['bdm_mobile'];
+    // Mirrors what salesbdm/checksession.php's own `SELECT *` produces, so
+    // salesbdm/app-header.php (included on these shared pages too) can read
+    // bdm_name/zone the same way regardless of which folder served the page.
+    $result_LoGuserDtails = $bridgeRow;
+    return;
+}
+
 // Check if user is logged in
 if (!isset($_SESSION['LOGIN_USER']) || $_SESSION['LOGIN_USER'] === '') {
     $_SESSION['errorMessage'] = 'Session Expired. Please login again.';
@@ -22,7 +78,7 @@ $timeout_duration = 1800; // 30 minutes
 
 if (isset($_SESSION['last_activity'])) {
     $elapsed_time = time() - $_SESSION['last_activity'];
-    
+
     if ($elapsed_time > $timeout_duration) {
         // Session expired due to inactivity
         session_unset();

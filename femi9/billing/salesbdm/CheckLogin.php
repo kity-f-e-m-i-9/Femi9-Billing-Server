@@ -121,6 +121,32 @@ try {
     $_SESSION['LOGIN_USER_TYPE'] = 'salesbdm';
     $_SESSION['last_activity'] = time();
 
+    // company/ runs its own session cookie name (see company/.htaccess —
+    // isolates it from other portals' session files to avoid lock
+    // contention across tabs), so it can't see this session at all. A BDM
+    // uses a handful of shared Territory Partner pages there (add/manage/
+    // edit) — rather than mirroring into a second PHP session (fragile:
+    // depends on session.serialize_handler and session.save_path matching
+    // between the two, which can silently differ per-hosting-environment),
+    // hand off via a small DB-backed token instead: a random cookie that
+    // company/checksession.php looks up fresh on every request. No
+    // dependency on PHP's session internals at all for this bridge.
+    $db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_company_bridge (
+        token VARCHAR(64) PRIMARY KEY,
+        bdm_id INT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
+    // expires_at computed via MySQL's own NOW() (not PHP's date()) — the two
+    // can be in different timezones, which would make expires_at compare
+    // wrong against NOW() on every later lookup.
+    $_bridgeToken = bin2hex(random_bytes(32));
+    $_bridgeStmt = $db_conn->prepare("INSERT INTO salesbdm_company_bridge (token, bdm_id, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))");
+    $_bridgeStmt->bind_param('si', $_bridgeToken, $user['id']);
+    $_bridgeStmt->execute();
+    $_bridgeStmt->close();
+    setcookie('femi9_bdm_bridge', $_bridgeToken, ['path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+
     // Update last login time
     $updateLoginStmt = mysqli_prepare($db_conn,
         "UPDATE sales_bdm_staff SET last_login = NOW() WHERE bdm_mobile = ?"

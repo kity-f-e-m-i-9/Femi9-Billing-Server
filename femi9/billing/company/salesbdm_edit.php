@@ -16,6 +16,10 @@ $_chkTgt = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'monthly_targ
 if ($_chkTgt && $_chkTgt->num_rows === 0) {
     $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
 }
+$_chkZone = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'zone'");
+if ($_chkZone && $_chkZone->num_rows === 0) {
+    $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN zone VARCHAR(100) NULL DEFAULT NULL AFTER monthly_target_amount");
+}
 
 //fetch product details
 $select_product_list="select * from sales_bdm_staff where id='$prid'";
@@ -241,6 +245,10 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 
 <label class="form-label">Monthly Target Amount (&#8377;)</label>
 <input type="number" step="0.01" min="0" name="monthly_target_amount" value="<?=$result_product_list['monthly_target_amount'] !== null ? htmlspecialchars($result_product_list['monthly_target_amount']) : '';?>" class="form-control" placeholder="optional">
+</br>
+
+<label class="form-label">Zone</label>
+<input type="text" name="zone" value="<?=htmlspecialchars($result_product_list['zone'] ?? '');?>" class="form-control" placeholder="optional" onkeypress="restrictSpecialChars(event)">
 </br>
 
 <?php

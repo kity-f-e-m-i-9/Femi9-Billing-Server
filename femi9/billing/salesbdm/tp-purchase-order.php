@@ -108,6 +108,43 @@ if ($hasTps) {
     }
 
     $grand_total = array_sum(array_map(fn($o) => $o['status']==='completed' ? (float)$o['invoice_total'] : (float)$o['po_item_total'], $orders));
+
+    // ── Item breakdown per row, for the "Items" hover popover ──────────────
+    // Waiting/cancelled rows read their products from tp_purchase_order_items
+    // (the TP's own request); completed rows read from tp_invoice_items (the
+    // actual billed invoice) instead, matching which figure drives $amount above.
+    $itemsByPo = []; $itemsByInvoice = [];
+    $poIds = array_map(fn($o) => (int)$o['po_id'], $orders);
+    $invIds = array_values(array_filter(array_map(fn($o) => $o['status']==='completed' ? (int)$o['tp_invoice_id'] : 0, $orders)));
+    if (!empty($poIds)) {
+        $poIdList = implode(',', $poIds);
+        $res = $db_conn->query("
+            SELECT poi.po_id, p.productName, poi.qty, poi.amount
+            FROM tp_purchase_order_items poi JOIN products p ON p.id = poi.product_id
+            WHERE poi.po_id IN ($poIdList) ORDER BY poi.po_id, p.productName
+        ");
+        if ($res) while ($r = $res->fetch_assoc()) { $itemsByPo[(int)$r['po_id']][] = $r; }
+    }
+    if (!empty($invIds)) {
+        $invIdList = implode(',', $invIds);
+        $res = $db_conn->query("
+            SELECT tii.tp_invoice_id, p.productName, tii.quantity AS qty, tii.amount
+            FROM tp_invoice_items tii JOIN products p ON p.id = tii.product_id
+            WHERE tii.tp_invoice_id IN ($invIdList) ORDER BY tii.tp_invoice_id, p.productName
+        ");
+        if ($res) while ($r = $res->fetch_assoc()) { $itemsByInvoice[(int)$r['tp_invoice_id']][] = $r; }
+    }
+    function buildItemsPopoverHtml(array $items): string {
+        if (empty($items)) return '<div class="text-muted" style="font-size:12px;">No items.</div>';
+        $html = '<table style="font-size:12px;width:100%;"><tbody>';
+        foreach ($items as $it) {
+            $html .= '<tr><td style="padding:2px 8px 2px 0;">' . htmlspecialchars($it['productName']) . '</td>'
+                   . '<td style="padding:2px 6px;text-align:right;white-space:nowrap;">x' . (int)$it['qty'] . '</td>'
+                   . '<td style="padding:2px 0;text-align:right;white-space:nowrap;">&#8377;' . inr_format((float)$it['amount'], 2) . '</td></tr>';
+        }
+        $html .= '</tbody></table>';
+        return $html;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -152,6 +189,16 @@ if ($hasTps) {
         .po-status-pill.waiting   { background:#fef3c7; color:#92400e; }
         .po-status-pill.completed { background:#d1fae5; color:#065f46; }
         .po-status-pill.cancelled { background:#fee2e2; color:#991b1b; }
+
+        @media (max-width: 768px) {
+            .stat-card { margin-bottom: 12px; }
+            #searchBox { max-width: 100%; }
+            .filter-card .col-lg-2, .filter-card .col-lg-3 { margin-bottom: 10px; }
+        }
+        @media (max-width: 480px) {
+            .page-description h1 { font-size: 20px; }
+            .stat-card h3 { font-size: 20px; }
+        }
     </style>
 </head>
 <body>
@@ -286,12 +333,16 @@ if ($hasTps) {
                                                 $amount = $isCompleted ? (float)$o['invoice_total'] : (float)$o['po_item_total'];
                                                 $itemCount = $isCompleted ? (int)$o['invoice_item_count'] : (int)$o['po_item_count'];
                                                 $searchKey = strtolower(($o['invoice_number'] ?? '') . ' ' . $o['tp_name'] . ' ' . $o['tp_code']);
+                                                $rowItems = $isCompleted ? ($itemsByInvoice[(int)$o['tp_invoice_id']] ?? []) : ($itemsByPo[(int)$o['po_id']] ?? []);
+                                                $itemsPopoverHtml = htmlspecialchars(buildItemsPopoverHtml($rowItems), ENT_QUOTES);
                                             ?>
                                                 <tr data-search="<?php echo htmlspecialchars($searchKey); ?>">
                                                     <td><?php echo $o['invoice_number'] ? '<code>'.htmlspecialchars($o['invoice_number']).'</code>' : '#'.(int)$o['po_id']; ?></td>
                                                     <td><?php echo htmlspecialchars($o['order_date']); ?></td>
                                                     <td><?php echo htmlspecialchars($o['tp_name']); ?> <small class="text-muted">(<?php echo htmlspecialchars($o['tp_code']); ?>)</small></td>
-                                                    <td class="text-right"><?php echo $itemCount; ?></td>
+                                                    <td class="text-right">
+                                                        <span class="items-hover-cell" style="cursor:pointer;border-bottom:1px dotted #999;" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true" data-bs-placement="left" data-bs-content="<?php echo $itemsPopoverHtml; ?>"><?php echo $itemCount; ?></span>
+                                                    </td>
                                                     <td class="text-right"><b>&#8377;<?php echo inr_format($amount, 2); ?></b></td>
                                                     <td>
                                                         <span class="po-status-pill <?php echo htmlspecialchars($o['status']); ?>" <?php echo $o['status']==='cancelled' && $o['cancel_reason'] ? 'title="'.htmlspecialchars($o['cancel_reason'], ENT_QUOTES).'"' : ''; ?>><?php echo ucfirst($o['status']); ?></span>
@@ -349,6 +400,10 @@ document.getElementById('searchInput').addEventListener('input', function () {
         if (hay === null) return;
         row.classList.toggle('no-match', q !== '' && hay.indexOf(q) === -1);
     });
+});
+
+document.querySelectorAll('.items-hover-cell').forEach(function (el) {
+    new bootstrap.Popover(el, { sanitize: false });
 });
 </script>
 </body>

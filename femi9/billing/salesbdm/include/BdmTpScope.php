@@ -1,11 +1,19 @@
 <?php
-// Resolves which Territory Partners fall under a Sales BDM's assigned
-// locations. There's no FK between the location tree and territory_partners
-// — TPs only carry a free-text branch_district — so this matches district
-// NAMES (case-insensitive, trimmed) rather than ids. A BDM's assigned
-// locations can sit at any depth (state, district, or a dual-role district),
-// so each one is first resolved down/up to its enclosing set of district
-// names before the TP match runs.
+// Resolves which Territory Partners fall under a Sales BDM's own PERSONAL
+// district assignment(s) — used everywhere except "Our Team" (dashboard, TP
+// Purchase Order, Advance Payment Report, Add/Manage/Edit Territory
+// Partner). A Chief BDM's broader state-level assignment represents which
+// region their TEAM covers, not their own personal territory, so a
+// shallower-than-district entry (e.g. State) is intentionally NOT expanded
+// into every child district here — only that Chief BDM's own direct
+// district-or-deeper assignments count. Their team's combined footprint
+// still shows in full under "Our Team" (my-team.php), which walks each
+// team member's own assignment individually rather than going through this
+// function's state-node handling at all.
+//
+// There's no FK between the location tree and territory_partners — TPs only
+// carry a free-text branch_district — so this matches district NAMES
+// (case-insensitive, trimmed) rather than ids.
 
 function getBdmAssignedDistrictNames($db_conn, int $bdmId): array {
     $db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_locations (
@@ -38,13 +46,10 @@ function getBdmAssignedDistrictNames($db_conn, int $bdmId): array {
         if ($depth === $districtDepth) {
             $names[] = $node['name'];
         } elseif ($depth < $districtDepth) {
-            // Shallower than district (e.g. State) — pull every child district.
-            $childStmt = $db_conn->prepare("SELECT name FROM partner_location_nodes WHERE parent_id = ? AND depth = ? AND is_active = 1");
-            $childStmt->bind_param('ii', $node['id'], $districtDepth);
-            $childStmt->execute();
-            $children = $childStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-            $childStmt->close();
-            foreach ($children as $c) { $names[] = $c['name']; }
+            // Shallower than district (e.g. State) — represents the region
+            // this person's TEAM covers, not their own personal territory,
+            // so it deliberately contributes nothing to this personal scope.
+            continue;
         } else {
             // Deeper than district (e.g. Taluk/Firka) — walk parent_id up to
             // the enclosing district.
@@ -69,7 +74,7 @@ function getBdmAssignedDistrictNames($db_conn, int $bdmId): array {
     return array_values(array_unique($names));
 }
 
-function getBdmAssignedTpIds($db_conn, int $bdmId): array {
+function getBdmAssignedTpIds($db_conn, int $bdmId, bool $includeInactive = false): array {
     $districtNames = getBdmAssignedDistrictNames($db_conn, $bdmId);
     if (empty($districtNames)) return [];
 
@@ -77,9 +82,10 @@ function getBdmAssignedTpIds($db_conn, int $bdmId): array {
     $types = str_repeat('s', count($districtNames));
     $normalized = array_map(fn($n) => mb_strtolower(trim($n)), $districtNames);
 
+    $activeClause = $includeInactive ? '' : 'is_active = 1 AND ';
     $stmt = $db_conn->prepare("
         SELECT id FROM territory_partners
-        WHERE is_active = 1 AND LOWER(TRIM(branch_district)) IN ($placeholders)
+        WHERE {$activeClause}LOWER(TRIM(branch_district)) IN ($placeholders)
     ");
     $stmt->bind_param($types, ...$normalized);
     $stmt->execute();

@@ -16,7 +16,7 @@
 
 function requirePermission(string $perm): void
 {
-    global $db_conn;
+    global $db_conn, $Login_user_TYPEvl;
 
     static $allowedPerms = [
         'dash', 'report', 'company_profile', 'users_demo', 'reward_points', 'demo_free',
@@ -34,6 +34,14 @@ function requirePermission(string $perm): void
     if (!in_array($perm, $allowedPerms, true)) {
         http_response_code(403);
         die('Access denied: unknown permission.');
+    }
+
+    // Sales BDM sessions never appear in admin_log — checksession.php already
+    // scoped which pages they can even reach, so a BDM session hitting the
+    // one perm those pages check ('territory_partner') is always allowed here.
+    if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
+        if ($perm === 'territory_partner') { return; }
+        denyAccess();
     }
 
     $username = $_SESSION['LOGIN_USER'] ?? '';

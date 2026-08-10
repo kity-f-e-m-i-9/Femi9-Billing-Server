@@ -6,6 +6,13 @@ $enc_id   = $_GET['tpid'] ?? '';
 $tp_db_id = (int)base64_decode($enc_id);
 if (!$tp_db_id) { header("Location: manage-territory-partner"); exit; }
 
+// A Sales BDM session may only delete a TP inside their own assigned districts.
+if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
+    require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
+    $_myTpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
+    if (!in_array($tp_db_id, $_myTpIds, true)) { header("Location: manage-territory-partner"); exit; }
+}
+
 // Verify exists
 $stmt = $db_conn->prepare("SELECT id, photo FROM territory_partners WHERE id = ?");
 $stmt->bind_param("i", $tp_db_id);

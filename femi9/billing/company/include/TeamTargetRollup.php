@@ -28,16 +28,18 @@ function getRawTargetAchievedStats($db_conn, array $ids, string $fromDate, strin
         }
     }
 
-    // Achieved — sum of invoice totals for orders this person got converted,
-    // in the same date range. Dedups (ms_id, invoiced_inv_id) BEFORE summing
-    // user_invoice.total, since tp_orders has one row per product line —
-    // joining straight through would add the same invoice's total once per
-    // line item instead of once per invoice (matches
-    // manage_order_product.php's distinct-invoice-ids-then-sum approach).
+    // Achieved — sum of Napkin-category line items (Lumi Baby Diaper doesn't
+    // count toward target) for orders this person got converted, in the same
+    // date range. Dedups (ms_id, invoiced_inv_id) BEFORE joining to
+    // user_invoice_items, since tp_orders has one row per product line —
+    // joining straight through would double up which invoices count once
+    // per person (matches manage_order_product.php's distinct-invoice-ids
+    // approach); summing the invoice's own line items (rather than its
+    // header total) is what lets Diaper lines be excluded per-item.
     $fromEsc = $db_conn->real_escape_string($fromDate);
     $toEsc   = $db_conn->real_escape_string($toDate);
     $resA = $db_conn->query("
-        SELECT x.ms_id, COALESCE(SUM(ui.total), 0) AS achieved
+        SELECT x.ms_id, COALESCE(SUM(uii.total), 0) AS achieved
         FROM (
             SELECT DISTINCT o.ms_id, t.invoiced_inv_id
             FROM ms_orders o
@@ -46,7 +48,9 @@ function getRawTargetAchievedStats($db_conn, array $ids, string $fromDate, strin
               AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
               AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
         ) x
-        JOIN user_invoice ui ON ui.inv_id = x.invoiced_inv_id
+        JOIN user_invoice_items uii ON uii.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
+        JOIN products p ON p.id = uii.pr_id
+        WHERE COALESCE(p.category,'') != 'diaper'
         GROUP BY x.ms_id
     ");
     if ($resA) {
