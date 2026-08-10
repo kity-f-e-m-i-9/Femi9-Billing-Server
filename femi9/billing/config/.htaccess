@@ -1,0 +1,3 @@
+<Files "wa_po_secrets.php">
+    Require all denied
+</Files>
