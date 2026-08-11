@@ -346,19 +346,39 @@ $revenue_growth = $prev_rev > 0
 // ═══════════════════════════════════════════════════════════════════════════
 // 1b. GROSS PROFIT & NET PROFIT
 //
-// Gross Profit = Σ (Sold Price − sale-to-LLP rate effective on that sale's
-// date) × qty, across every sold line item in the current scope. The
-// sale-to-LLP rate is the price at which Femi9 LLP/Neksomo "sells" the
-// product into the company's own stock — i.e. the company's real cost basis
-// — sourced from whichever rate table covers the product:
+// Gross Profit is computed per product on the same NET quantity that drives
+// Total Turnover (qty sold − qty returned in the period), not as two
+// separately-scoped sums of sold lines and returned lines:
+//
+//   net_qty   = qty_sold − qty_returned                      (per product)
+//   sold_rate = total sale revenue / qty_sold                (per product,
+//               the effective average price actually realized this period)
+//   Gross Profit = Σ (sold_rate − llp_cost_rate) × net_qty    (across products)
+//
+// This mirrors Total Turnover exactly: same net_qty, same population of
+// transactions, so a heavy-return period that pushes Total Turnover negative
+// pushes Gross Profit in the same direction by construction, rather than by
+// coincidence of two independently-scoped totals landing on the same sign.
+//
+// llp_cost_rate is the price at which Femi9 LLP/Neksomo "sells" the product
+// into the company's own stock — i.e. the company's real cost basis —
+// sourced from whichever rate table covers the product, looked up as of the
+// period's end date ($to), same "latest effective_date <= as-of date"
+// convention used everywhere else in this report:
 //   - neksomo_llp_piece_rates (via neksomo_product_mapping) for products
-//     mapped into the Neksomo piece-rate system, same table the Neksomo
-//     view's own Napkin/Diaper Gross Profit cards use;
+//     mapped into the Neksomo piece-rate system. This rate is always
+//     genuine per-single-piece (see the Pieces Sold section above), while
+//     qty here is pack-counted for a piece-type company SKU — so this
+//     branch is scaled by products.pieces_per_pack, same as the Pieces Sold
+//     section's `qty * COALESCE(NULLIF(p.pieces_per_pack,0),1) * rate`.
+//     Diaper-category Neksomo mappings are pack-based even though priced
+//     via this same table (see DIAPER comment further down), so they're
+//     excluded from the multiplier.
 //   - femi9_llp_sale_rates for every other product, entered from the normal
-//     company login's own "Sale to Femi9 LLP" page (llp-sale-rate.php) —
-//     built specifically because most company products have no Neksomo
-//     mapping at all.
-// A line item with no rate in either table on its sale date is excluded
+//     company login's own "Sale to Femi9 LLP" page (llp-sale-rate.php),
+//     already priced per the product's native selling unit — so this
+//     branch is never scaled.
+// A product with no rate in either table as of the period end is excluded
 // from Gross Profit entirely (no cost to subtract, so it can't be priced) —
 // same "unrated == excluded" convention the piece-rate section already uses.
 // GST is backed out of an inclusive-type rate so Gross Profit stays on a
@@ -368,51 +388,83 @@ $revenue_growth = $prev_rev > 0
 // same period, and is only meaningful for the "Income to Company" scope
 // (expenses are a company-wide cost, not attributable to a single TP).
 // ═══════════════════════════════════════════════════════════════════════════
-$gp_rate_subq = "COALESCE(
+$gp_cost_rate_subq = "COALESCE(
         (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+             * COALESCE(NULLIF(p.pieces_per_pack,0),1)
          FROM neksomo_llp_piece_rates r
-         WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
-           AND r.effective_date <= d.sale_date
+         WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m
+                                WHERE m.company_product_id = p.id
+                                  AND m.neksomo_product_id NOT IN (SELECT np.id FROM products np WHERE np.category = 'diaper')
+                                LIMIT 1)
+           AND r.effective_date <= ?
          ORDER BY r.effective_date DESC LIMIT 1),
         (SELECT CASE WHEN fr.gst_type = 'inclusive' THEN fr.rate_per_piece / (1 + fr.gst_rate/100) ELSE fr.rate_per_piece END
          FROM femi9_llp_sale_rates fr
-         WHERE fr.product_id = d.pr_id
-           AND fr.effective_date <= d.sale_date
+         WHERE fr.product_id = p.id
+           AND fr.effective_date <= ?
          ORDER BY fr.effective_date DESC LIMIT 1)
     )";
 // OT channel sales are retail/direct-to-consumer. Company scope only.
-$gp_ot_union = '';
+$gp_ot_sold_union = '';
+$gp_ot_ret_union = '';
 $gp_params = [$utype, $from, $to, $utype, $from, $to];
 if ($scope === 'company') {
-    $gp_ot_union = "UNION ALL SELECT os.prid, os.qty, os.total, os.date
-         FROM ot_sales os WHERE os.date BETWEEN ? AND ?";
+    $gp_ot_sold_union = "UNION ALL SELECT os.prid pr_id, os.qty, os.total FROM ot_sales os WHERE os.date BETWEEN ? AND ?";
+    $gp_ot_ret_union   = "UNION ALL SELECT osr.prid pr_id, osr.qty FROM ot_sales_return osr WHERE osr.return_date BETWEEN ? AND ?";
     $gp_params[] = $from;
     $gp_params[] = $to;
 }
 // See memory "neksomo-sold-by-company-calc".
 $gp_tp_union = '';
 if ($tpinv_source_sql) {
-    $gp_tp_union = "UNION ALL SELECT tpii.product_id, tpii.quantity, tpii.amount, tpi.invoice_date
+    $gp_tp_union = "UNION ALL SELECT tpii.product_id pr_id, tpii.quantity qty, tpii.amount total
          FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
          WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}";
     $gp_params[] = $from;
     $gp_params[] = $to;
 }
+$gp_return_params = [$utype, $from, $to];
+if ($scope === 'company') {
+    $gp_return_params[] = $from;
+    $gp_return_params[] = $to;
+}
+// $gp_cost_rate_subq is interpolated twice below (once in the SELECT's
+// margin expression, once in the trailing WHERE ... IS NOT NULL filter),
+// so its two `effective_date <= ?` placeholders need binding twice over —
+// once ahead of $gp_params (the sold subquery) and once after
+// $gp_return_params (the return subquery), matching placeholder order in
+// the SQL text below exactly.
+$gp_all_params = array_merge([$to, $to], $gp_params, $gp_return_params, [$to, $to]);
 $gross_profit = (float)cval($db_conn,
-    "SELECT COALESCE(SUM(d.line_total - {$gp_rate_subq} * d.qty), 0)
+    "SELECT COALESCE(SUM((sold.sold_rate - {$gp_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
      FROM (
-         SELECT ii.pr_id, ii.qty, ii.total AS line_total, i.date AS sale_date
-         FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
-         WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
-         UNION ALL
-         SELECT uii.pr_id, uii.qty, uii.total AS line_total, ui.date AS sale_date
-         FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
-         WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii}
-         {$gp_ot_union}
-         {$gp_tp_union}
-     ) d
-     WHERE {$gp_rate_subq} IS NOT NULL",
-    str_repeat('s', count($gp_params)), $gp_params);
+         SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total)/NULLIF(SUM(s.qty),0) sold_rate
+         FROM (
+             SELECT ii.pr_id, ii.qty, ii.total AS line_total
+             FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+             WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
+             UNION ALL
+             SELECT uii.pr_id, uii.qty, uii.total AS line_total
+             FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+             WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii}
+             {$gp_ot_sold_union}
+             {$gp_tp_union}
+         ) s
+         GROUP BY s.pr_id
+     ) sold
+     JOIN products p ON p.id = sold.pr_id
+     LEFT JOIN (
+         SELECT r.pr_id, SUM(r.qty) qty_returned
+         FROM (
+             SELECT ri.prid pr_id, ri.qty
+             FROM user_return_stock_items ri
+             WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+             {$gp_ot_ret_union}
+         ) r
+         GROUP BY r.pr_id
+     ) ret ON ret.pr_id = sold.pr_id
+     WHERE {$gp_cost_rate_subq} IS NOT NULL",
+    str_repeat('s', count($gp_all_params)), $gp_all_params);
 
 $total_expenses = 0.0;
 $net_profit = null;
@@ -2267,7 +2319,7 @@ if ($is_neksomo_view) {
                          '₹'.inr_format($total_achieved_all, 0).' / ₹'.inr_format($total_target_all, 0), ''];
                     }
                     $kpis[] = ['orange','trending_up','Gross Profit','₹'.inr_format($gross_profit, 0),
-                         'MRP vs tier price given', ''];
+                         'Total Turnover − LLP cost basis', ''];
                     if ($scope === 'company') {
                         $kpis[] = ['critical','receipt','Expenses','₹'.inr_format($total_expenses, 0),
                          'for selected period', ''];
