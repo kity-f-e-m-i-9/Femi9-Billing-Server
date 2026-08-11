@@ -71,19 +71,55 @@ while ($row = mysqli_fetch_array($result)) {
 
     $type = $row['user_type'];
     $uid = $row['user_id'];
+    $uid_esc = mysqli_real_escape_string($db_conn, $uid);
 
-    if($type=="candf"){$table="c_and_f";}
-    elseif($type=="super_stockiest"){$table="super_stockiest";}
-    elseif($type=="stockiest"){$table="stockiest";}
-    elseif($type=="distributor"){$table="distributor";}
-    else{$table="super_distributor";}
+    $district = [];
+    $taluk = [];
+    $state = [];
 
-    $user = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $table WHERE temp_id='$uid'"));
-    if (!$user) continue;
+    // territory_partner/channel_partner aren't in the onboard-user tables
+    // this export otherwise reads from (they have no temp_id/district_id/
+    // taluk_id/state_id/target columns) — resolved the same way
+    // wallet_request.php's listing page already does, so exported rows
+    // match what's shown on screen instead of being silently dropped.
+    if ($type === 'territory_partner') {
+        $user = mysqli_fetch_array(mysqli_query($db_conn,
+            "SELECT id, name, mobile, tp_id AS useridtext FROM territory_partners WHERE id='$uid_esc' LIMIT 1"));
+        if (!$user) continue;
+        $user['country_code'] = '';
+        $user['mobile_number'] = $user['mobile'] ?? '';
+        $user['target'] = '';
 
-    $district = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM district WHERE id='".$user['district_id']."'"));
-    $taluk = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM taluk WHERE id='".$user['taluk_id']."'"));
-    $state = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM state WHERE id='".$user['state_id']."'"));
+        $r_dist = mysqli_fetch_assoc(mysqli_query($db_conn,
+            "SELECT GROUP_CONCAT(DISTINCT district.name ORDER BY district.name SEPARATOR ', ') AS district_names
+             FROM territory_partner_locations tpl
+             JOIN partner_location_nodes leaf     ON leaf.id = tpl.location_id
+             JOIN partner_location_nodes taluk_n  ON taluk_n.id = leaf.parent_id
+             JOIN partner_location_nodes division ON division.id = taluk_n.parent_id
+             JOIN partner_location_nodes district  ON district.id = division.parent_id
+             WHERE tpl.territory_partner_id='$uid_esc'"));
+        $district['dist_name'] = $r_dist['district_names'] ?? '';
+    } elseif ($type === 'channel_partner') {
+        $user = mysqli_fetch_array(mysqli_query($db_conn,
+            "SELECT id, name, mobile, cp_id AS useridtext FROM channel_partners WHERE id='$uid_esc' LIMIT 1"));
+        if (!$user) continue;
+        $user['country_code'] = '';
+        $user['mobile_number'] = $user['mobile'] ?? '';
+        $user['target'] = '';
+    } else {
+        if($type=="candf"){$table="c_and_f";}
+        elseif($type=="super_stockiest"){$table="super_stockiest";}
+        elseif($type=="stockiest"){$table="stockiest";}
+        elseif($type=="distributor"){$table="distributor";}
+        else{$table="super_distributor";}
+
+        $user = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $table WHERE temp_id='$uid_esc'"));
+        if (!$user) continue;
+
+        $district = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM district WHERE id='".$user['district_id']."'")) ?: [];
+        $taluk = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM taluk WHERE id='".$user['taluk_id']."'")) ?: [];
+        $state = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM state WHERE id='".$user['state_id']."'")) ?: [];
+    }
 
     $amount = $row['amount'];
     $tds = $amount * $tds_percentage / 100;
