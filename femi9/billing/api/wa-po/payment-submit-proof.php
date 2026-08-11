@@ -146,7 +146,18 @@ if ($classification['status'] !== 'pending_review') {
     mysqli_stmt_close($updSub);
 }
 
+// Same public status vocabulary as GET /payment/verify-status (§1.7) —
+// pending|approved|rejected, not the submission row's internal
+// pending_review/accepted/rejected — so an agent that only reads this
+// immediate response (Vision can resolve accepted/rejected instantly,
+// without waiting on the §2 outbound webhook or a poll) still gets a value
+// it recognizes, rather than a silently-unmatched 'accepted'.
+$statusMap = ['pending_review' => 'pending', 'accepted' => 'approved', 'rejected' => 'rejected'];
+$publicStatus = $statusMap[$classification['status']] ?? 'pending';
+
 echo json_encode([
     'proof_id' => 'PRF-' . $submissionId,
-    'status' => $classification['status'] === 'accepted' ? 'accepted' : ($classification['status'] === 'rejected' ? 'rejected' : 'pending_review'),
+    'status' => $publicStatus,
+    'verified_amount' => $publicStatus === 'approved' ? $amountVal : null,
+    'remarks' => $publicStatus === 'rejected' ? $reason : null,
 ]);
