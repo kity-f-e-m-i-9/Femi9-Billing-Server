@@ -60,15 +60,24 @@ $rows = crr($db_conn,
            x.territory_partner_id, tp.name AS tp_name, tp.tp_id AS tp_code,
            COUNT(DISTINCT x.tp_invoice_id) AS inv_cnt,
            COALESCE(SUM(x.qty), 0) AS total_qty,
-           COALESCE(SUM(x.amount), 0) AS total_amount
+           COALESCE(SUM(x.net_amount), 0) AS total_amount
     FROM (
+        -- net_amount = this line's amount, less its own line-level discount,
+        -- less its proportional share of the invoice-level discount (spread
+        -- across lines by each line's share of the invoice's gross amount) —
+        -- matches how tp-invoice-action.php derives tp_invoices.total_amount,
+        -- so this report's sales figure reconciles with manage-tp-invoices.
         SELECT tii.tp_invoice_id, tii.quantity AS qty, tii.amount, ti.source_cp_id, ti.territory_partner_id,
+               (tii.amount - tii.discount_amount)
+               - COALESCE(ti.discount_amount, 0) * (tii.amount / NULLIF(inv_gross.gross, 0)) AS net_amount,
                (SELECT tpl.location_id FROM territory_partner_locations tpl
                 WHERE tpl.territory_partner_id = ti.territory_partner_id
                 ORDER BY tpl.assigned_at ASC, tpl.id ASC LIMIT 1) AS location_id
         FROM tp_invoices ti
         JOIN tp_invoice_items tii ON tii.tp_invoice_id = ti.id
         JOIN products p ON p.id = tii.product_id
+        JOIN (SELECT tp_invoice_id, SUM(amount) AS gross FROM tp_invoice_items GROUP BY tp_invoice_id) inv_gross
+             ON inv_gross.tp_invoice_id = ti.id
         WHERE {$company_tp_cond} AND ti.invoice_date BETWEEN ? AND ?{$gst_cond}
     ) x
     JOIN danc ON danc.node_id = x.location_id
