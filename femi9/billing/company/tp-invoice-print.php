@@ -473,16 +473,16 @@ Terms of Delivery<br/>&nbsp;
 <td>Description of Goods</td>
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
+<?php if ($has_carton_data): ?>
+<td id="rightlaign">Packs/Carton</td>
+<td id="rightlaign">Cartons</td>
+<?php endif; ?>
 <td id="rightlaign">MRP</td>
 <td id="rightlaign">Rate</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
 <td id="rightlaign">Amount</td>
-<?php if ($has_carton_data): ?>
-<td id="rightlaign">Packs/Carton</td>
-<td id="rightlaign">Cartons</td>
-<?php endif; ?>
 </tr>
 
 <?php $invno = 0; foreach ($invoice_items as $item):
@@ -505,36 +505,37 @@ Terms of Delivery<br/>&nbsp;
 <td><b><?= htmlspecialchars($item['productName']); ?></b><?= $gst_type === 'inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
 <td id="rightlaign"><?= htmlspecialchars($item['hsn']); ?></td>
 <td id="rightlaign"><?= inr_format($qty, 0); ?> Packs</td>
+<?php if ($has_carton_data): ?>
+<td id="rightlaign"><?= ($item['packs_per_carton'] !== null && $item['packs_per_carton'] !== '') ? inr_format((int)$item['packs_per_carton'], 0) : '—'; ?></td>
+<td id="rightlaign"><?= $item['carton_display']; ?></td>
+<?php endif; ?>
 <td id="rightlaign"><?= inr_format($mrp, 2); ?></td>
 <td id="rightlaign"><?= inr_format($rate, 2); ?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?= $gst_pct; ?>%</td>
 <td id="rightlaign"><?= inr_format($item_disc_amt, 2); ?><br/>(<?= fmt_gst_pct($item_disc_pct); ?>%)</td>
 <td id="rightlaign"><?= inr_format($taxable_value, 2); ?></td>
-<?php if ($has_carton_data): ?>
-<td id="rightlaign"><?= ($item['packs_per_carton'] !== null && $item['packs_per_carton'] !== '') ? inr_format((int)$item['packs_per_carton'], 0) : '—'; ?></td>
-<td id="rightlaign"><?= $item['carton_display']; ?></td>
-<?php endif; ?>
 </tr>
 <?php endforeach; ?>
 
 <tr>
 <td></td><td></td><td></td>
 <td id="rightlaign"><b><?= inr_format($Totalquantity123, 0); ?> Packs</b></td>
-<td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></b></td>
 <?php if ($has_carton_data): ?>
 <td></td>
 <td id="rightlaign"><b><?= inr_format($TotalCartons123, 0); ?> ctn</b></td>
 <?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 
 <?php if ($discount_amount > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Discount</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
 </tr>
 <?php endif; ?>
 <?php if ($totalgstamount > 0):
@@ -544,32 +545,36 @@ Terms of Delivery<br/>&nbsp;
 ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>SGST (<?= $__half_pct; ?>%)</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
+<td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>CGST (<?= $__half_pct; ?>%)</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
+<td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
 </tr>
 <?php endif; ?>
 
 <?php if ($courier_charges > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
+<td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Total</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
+<td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
 </tr>
 </table>
 <div style="clear:both;"></div>
