@@ -103,6 +103,12 @@ $tempID="".$randum_number."/".$temp_date."/".$temp_time."";?>
                                                 <label for="exampleInputEmail1" class="form-label">Product Name</label>
                                                 <input type="text" required="" name="productName" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
 
+												<label for="exampleInputEmail1" class="form-label">Product Type</label>
+                                                <select name="category" class="form-control" required="">
+                                                    <option value="napkin">Napkin</option>
+                                                    <option value="diaper">Lumi Baby Diaper</option>
+                                                </select>
+
 												<label for="exampleInputEmail1" class="form-label">Pieces per Pack <small class="text-muted">(optional)</small></label>
                                                 <input type="number" min="0" name="pieces_per_pack" class="form-control" onkeypress="restrictnumber(event)" placeholder="e.g. 12">
 
