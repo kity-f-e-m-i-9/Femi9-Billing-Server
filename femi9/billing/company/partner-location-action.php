@@ -35,6 +35,12 @@ $col_check = $db_conn->query("SHOW COLUMNS FROM partner_location_nodes LIKE 'tar
 if ($col_check && $col_check->num_rows === 0) {
     $db_conn->query("ALTER TABLE partner_location_nodes ADD COLUMN target_amount DECIMAL(12,2) DEFAULT NULL AFTER deposit_amount");
 }
+// ── Schema migration: add diaper_target_amount if missing — a separate Lumi9
+// Diaper target per Firka, independent of the existing (Napkin) target_amount.
+$col_check2 = $db_conn->query("SHOW COLUMNS FROM partner_location_nodes LIKE 'diaper_target_amount'");
+if ($col_check2 && $col_check2->num_rows === 0) {
+    $db_conn->query("ALTER TABLE partner_location_nodes ADD COLUMN diaper_target_amount DECIMAL(12,2) DEFAULT NULL AFTER target_amount");
+}
 
 // ── INSERT ───────────────────────────────────────────────────────────────────
 if (isset($_POST['insert-partner-location'])) {
@@ -48,6 +54,8 @@ if (isset($_POST['insert-partner-location'])) {
     $pl_deposit  = $_POST['pl_deposit'] ?? '';
     $pl_deposit  = ($pl_deposit !== '' && is_numeric($pl_deposit)) ? (float)$pl_deposit : null;
     $pl_target   = $pl_deposit; // same value: CP sees it as deposit, TP sees it as target
+    $pl_diaper_target = $_POST['pl_diaper_target'] ?? '';
+    $pl_diaper_target = ($pl_diaper_target !== '' && is_numeric($pl_diaper_target)) ? (float)$pl_diaper_target : null;
     $is_active   = filter_var($_POST['is_active'] ?? 1, FILTER_VALIDATE_INT);
     $depth       = filter_var($_POST['depth']     ?? 1, FILTER_VALIDATE_INT);
     $raw_pid     = $_POST['parent_id'] ?? '';
@@ -100,16 +108,16 @@ if (isset($_POST['insert-partner-location'])) {
 
     if ($parent_id !== null) {
         $stmt_ins = $db_conn->prepare(
-            "INSERT INTO partner_location_nodes (parent_id, depth, name, code, deposit_amount, target_amount, is_active, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO partner_location_nodes (parent_id, depth, name, code, deposit_amount, target_amount, diaper_target_amount, is_active, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
-        $stmt_ins->bind_param("iissddss", $parent_id, $depth, $pl_name, $pl_code, $pl_deposit, $pl_target, $is_active, $created_by);
+        $stmt_ins->bind_param("iissdddss", $parent_id, $depth, $pl_name, $pl_code, $pl_deposit, $pl_target, $pl_diaper_target, $is_active, $created_by);
     } else {
         $stmt_ins = $db_conn->prepare(
-            "INSERT INTO partner_location_nodes (parent_id, depth, name, code, deposit_amount, target_amount, is_active, created_by)
-             VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO partner_location_nodes (parent_id, depth, name, code, deposit_amount, target_amount, diaper_target_amount, is_active, created_by)
+             VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
-        $stmt_ins->bind_param("issddss", $depth, $pl_name, $pl_code, $pl_deposit, $pl_target, $is_active, $created_by);
+        $stmt_ins->bind_param("issdddss", $depth, $pl_name, $pl_code, $pl_deposit, $pl_target, $pl_diaper_target, $is_active, $created_by);
     }
 
     if ($stmt_ins->execute()) {
@@ -138,6 +146,8 @@ if (isset($_POST['update-partner-location'])) {
     $pl_deposit  = $_POST['pl_deposit'] ?? '';
     $pl_deposit  = ($pl_deposit !== '' && is_numeric($pl_deposit)) ? (float)$pl_deposit : null;
     $pl_target   = $pl_deposit; // same value: CP sees it as deposit, TP sees it as target
+    $pl_diaper_target = $_POST['pl_diaper_target'] ?? '';
+    $pl_diaper_target = ($pl_diaper_target !== '' && is_numeric($pl_diaper_target)) ? (float)$pl_diaper_target : null;
     $is_active   = filter_var($_POST['is_active'] ?? 1, FILTER_VALIDATE_INT);
 
     if (!$update_id || empty($pl_name)) {
@@ -179,9 +189,9 @@ if (isset($_POST['update-partner-location'])) {
     }
 
     $stmt_upd = $db_conn->prepare(
-        "UPDATE partner_location_nodes SET name = ?, code = ?, deposit_amount = ?, target_amount = ?, is_active = ? WHERE id = ?"
+        "UPDATE partner_location_nodes SET name = ?, code = ?, deposit_amount = ?, target_amount = ?, diaper_target_amount = ?, is_active = ? WHERE id = ?"
     );
-    $stmt_upd->bind_param("ssddii", $pl_name, $pl_code, $pl_deposit, $pl_target, $is_active, $update_id);
+    $stmt_upd->bind_param("ssdddii", $pl_name, $pl_code, $pl_deposit, $pl_target, $pl_diaper_target, $is_active, $update_id);
 
     if ($stmt_upd->execute()) {
         $stmt_upd->close();

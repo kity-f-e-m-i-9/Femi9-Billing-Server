@@ -151,8 +151,16 @@ if (!empty($all_layer_names) && $depth > $max_layer_depth) {
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">Amount <span class="text-muted" style="font-size:12px;">(optional)</span></label>
+                                                    <label class="form-label">Amount <span class="text-muted" style="font-size:12px;">(optional &mdash; Deposit for Channel Partner locations, Napkin Target for Territory Partner Firkas)</span></label>
                                                     <input type="number" name="pl_deposit"
+                                                           class="form-control"
+                                                           placeholder="0.00"
+                                                           min="0" step="0.01">
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Lumi9 Diaper Target Amount <span class="text-muted" style="font-size:12px;">(optional)</span></label>
+                                                    <input type="number" name="pl_diaper_target"
                                                            class="form-control"
                                                            placeholder="0.00"
                                                            min="0" step="0.01">
