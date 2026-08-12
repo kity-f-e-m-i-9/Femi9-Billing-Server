@@ -13,13 +13,20 @@ $filter_tp_id     = (int)($_GET['tp_id'] ?? 0);
 $filter_date_from = trim($_GET['date_from'] ?? '');
 $filter_date_to   = trim($_GET['date_to']   ?? '');
 $filter_status    = $_GET['status'] ?? '';
+$filter_type      = $_GET['type'] ?? '';
 if ($filter_tp_id > 0 && !in_array($filter_tp_id, $tpIds, true)) { $filter_tp_id = 0; }
 if (!in_array($filter_status, ['', 'waiting', 'completed', 'cancelled'], true)) { $filter_status = ''; }
+if (!in_array($filter_type, ['', 'napkin', 'diaper'], true)) { $filter_type = ''; }
+// Napkin match uses COALESCE since existing Napkin products carry a NULL
+// category, not the literal string 'napkin' — Diaper is the only explicitly-tagged one.
+$typeWhere = '';
+if ($filter_type === 'diaper') { $typeWhere = "AND p.category = 'diaper'"; }
+elseif ($filter_type === 'napkin') { $typeWhere = "AND COALESCE(p.category,'') != 'diaper'"; }
 
 $tps = [];
 $orders = [];
 $grand_total = 0;
-$filters_active = $filter_tp_id || $filter_date_from || $filter_date_to || $filter_status;
+$filters_active = $filter_tp_id || $filter_date_from || $filter_date_to || $filter_status || $filter_type;
 $po_waiting = 0; $po_completed = 0; $po_cancelled = 0;
 
 if ($hasTps) {
@@ -76,22 +83,42 @@ if ($hasTps) {
         $params[] = $filter_status;
         $types   .= 's';
     }
+    if ($filter_type !== '') {
+        // Only list orders that actually contain at least one item of the
+        // selected type — waiting POs checked via their own items, completed
+        // ones via the resulting invoice's items (same as the amount columns below).
+        $where[] = "(
+            EXISTS (SELECT 1 FROM tp_purchase_order_items poi2 JOIN products p ON p.id = poi2.product_id WHERE poi2.po_id = po.id $typeWhere)
+            OR EXISTS (SELECT 1 FROM tp_invoice_items tii2 JOIN products p ON p.id = tii2.product_id WHERE tii2.tp_invoice_id = po.tp_invoice_id $typeWhere)
+        )";
+    }
     $where_sql = 'WHERE ' . implode(' AND ', $where);
 
     $sql = "
         SELECT po.id AS po_id, po.order_date, po.status, po.cancel_reason, po.tp_invoice_id,
                tp.name AS tp_name, tp.tp_id AS tp_code,
-               ti.invoice_number, ti.total_amount AS invoice_total,
-               (SELECT COUNT(*) FROM tp_invoice_items tii WHERE tii.tp_invoice_id = ti.id) AS invoice_item_count,
+               ti.invoice_number,
+               COALESCE(tinv.item_total, 0) AS invoice_total,
+               COALESCE(tinv.item_count, 0) AS invoice_item_count,
                COALESCE(poi.item_count, 0) AS po_item_count,
                COALESCE(poi.item_total, 0) AS po_item_total
         FROM tp_purchase_orders po
         JOIN territory_partners tp ON tp.id = po.territory_partner_id
         LEFT JOIN tp_invoices ti ON ti.id = po.tp_invoice_id
         LEFT JOIN (
-            SELECT po_id, COUNT(*) item_count, SUM(amount) item_total
-            FROM tp_purchase_order_items GROUP BY po_id
+            SELECT poi.po_id, COUNT(*) item_count, SUM(poi.amount) item_total
+            FROM tp_purchase_order_items poi
+            JOIN products p ON p.id = poi.product_id
+            WHERE 1=1 $typeWhere
+            GROUP BY poi.po_id
         ) poi ON poi.po_id = po.id
+        LEFT JOIN (
+            SELECT tii.tp_invoice_id, COUNT(*) item_count, SUM(tii.amount) item_total
+            FROM tp_invoice_items tii
+            JOIN products p ON p.id = tii.product_id
+            WHERE 1=1 $typeWhere
+            GROUP BY tii.tp_invoice_id
+        ) tinv ON tinv.tp_invoice_id = po.tp_invoice_id
         $where_sql
         ORDER BY po.order_date DESC, po.id DESC
         LIMIT 200
@@ -259,6 +286,17 @@ if ($hasTps) {
                                         <option value="cancelled" <?php echo $filter_status==='cancelled'?'selected':''; ?>>Cancelled</option>
                                     </select>
                                 </div>
+                                <div class="col-lg-2 col-sm-6">
+                                    <label class="form-label">
+                                        <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">category</i>
+                                        Type
+                                    </label>
+                                    <select name="type" class="form-control">
+                                        <option value="">All</option>
+                                        <option value="napkin" <?php echo $filter_type==='napkin'?'selected':''; ?>>Napkin</option>
+                                        <option value="diaper" <?php echo $filter_type==='diaper'?'selected':''; ?>>Lumi Diaper</option>
+                                    </select>
+                                </div>
                                 <div class="col-lg-3 col-sm-6">
                                     <label class="form-label">
                                         <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">event</i>
@@ -313,7 +351,7 @@ if ($hasTps) {
                                                     <th>Date</th>
                                                     <th>Territory Partner</th>
                                                     <th class="text-right">Items</th>
-                                                    <th class="text-right">Amount (&#8377;)</th>
+                                                    <th class="text-right">Amount<?php echo $filter_type ? ' &mdash; ' . ($filter_type === 'napkin' ? 'Napkin' : 'Lumi Diaper') : ''; ?> (&#8377;)</th>
                                                     <th>Status</th>
                                                     <th></th>
                                                 </tr>
