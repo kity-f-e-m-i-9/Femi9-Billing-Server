@@ -105,6 +105,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="ot-sale-cat">Category</a></li>
 						<li><a href="ot-sale-add">Add Sale</a></li>
+						<li><a href="ot-sale-import">Import Sales</a></li>
 						<li><a href="ot-sale-view">Manage Sales</a></li>
 						<li><a href="ot-sale-manage-return">Manage Return</a></li>
                         </ul>
@@ -238,6 +239,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="ot-sale-cat">Category</a></li>
 						<li><a href="ot-sale-add">Add Sale</a></li>
+						<li><a href="ot-sale-import">Import Sales</a></li>
 						<li><a href="ot-sale-view">Manage Sales</a></li>
 						<li><a href="ot-sale-manage-return">Manage Return</a></li>
                         </ul>
@@ -482,11 +484,12 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="ot-sale-cat">Category</a></li>
 						<li><a href="ot-sale-add">Add Sale</a></li>
+						<li><a href="ot-sale-import">Import Sales</a></li>
 						<li><a href="ot-sale-view">Manage Sales</a></li>
 						<li><a href="ot-sale-manage-return">Manage Return</a></li>
                         </ul>
                     </li>
-					
+
 					<!----------------------Locations--------------------------->
 					<li>
                         <a href="#"><i class="material-icons-two-tone">cloud_queue</i>Location<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
@@ -987,6 +990,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="ot-sale-cat">Category</a></li>
 						<li><a href="ot-sale-add">Add Sale</a></li>
+						<li><a href="ot-sale-import">Import Sales</a></li>
 						<li><a href="ot-sale-view">Manage Sales</a></li>
 						<li><a href="ot-sale-manage-return">Manage Return</a></li>
                         </ul>
