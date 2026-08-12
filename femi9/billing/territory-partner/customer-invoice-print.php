@@ -444,21 +444,6 @@ while ($TAXi < $TAXdigits_1) {
 $TAXstr    = array_reverse($TAXstr);
 $TAXresult = implode('', $TAXstr);
 
-// Taxable amount in words — same three-way (chargeable/taxable/tax) word
-// breakdown as tp-invoice-print.php.
-$TXBnumber = $TotalAMount123;
-$TXBno = floor($TXBnumber); $TXBdigits_1 = strlen((string)$TXBno); $TXBi = 0; $TXBstr = [];
-while ($TXBi < $TXBdigits_1) {
-    $TXBdivider = ($TXBi == 2) ? 10 : 100; $TXBnum = floor($TXBno % $TXBdivider); $TXBno = floor($TXBno / $TXBdivider);
-    $TXBi += ($TXBdivider == 10) ? 1 : 2;
-    if ($TXBnum) {
-        $TXBplural = (($TXBcounter = count($TXBstr)) && $TXBnum > 9) ? 's' : null;
-        $TXBhundred = ($TXBcounter == 1 && $TXBstr[0]) ? ' and ' : null;
-        $TXBstr[] = ($TXBnum < 21) ? $words[$TXBnum]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred
-                    : $words[floor($TXBnum/10)*10]." ".$words[$TXBnum%10]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred;
-    } else { $TXBstr[] = null; }
-}
-$TXBstr = array_reverse($TXBstr); $TXBresult = implode('', $TXBstr);
 ?>
 
 <table width="100%">
@@ -469,16 +454,7 @@ $TXBstr = array_reverse($TXBstr); $TXBresult = implode('', $TXBstr);
 <tr>
 <td><b><?php echo $Currency_Name; ?> <?php echo ucwords($result); ?> Only</b></td>
 <td></td>
-</tr>
-<tr>
-<td style="padding-top:6px;font-size:13px;">Amount Taxable (in words)</td>
-<td align="right" style="font-size:13px;"><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($TotalAMount123, 2); ?></td>
-</tr>
-<tr>
-<td><b><?php echo $Currency_Name; ?> <?php echo ucwords($TXBresult); ?> Only</b></td>
-<td></td>
-</tr>
-</table>
+</tr></table>
 
 <!---------------------HSN WISE TOTAL------------------------------>
 <?php if ($gsttype == "inner"): ?>

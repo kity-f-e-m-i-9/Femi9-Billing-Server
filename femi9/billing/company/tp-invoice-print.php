@@ -196,20 +196,6 @@ if (trim($TAXresult) !== '' && $TAXpaise_words !== '') {
     $TAXresult = 'Zero';
 }
 
-// Taxable amount in words
-$TXBnumber = $TotalAMount123;
-$TXBno = floor($TXBnumber); $TXBdigits_1 = strlen($TXBno); $TXBi = 0; $TXBstr = [];
-while ($TXBi < $TXBdigits_1) {
-    $TXBdivider = ($TXBi == 2) ? 10 : 100; $TXBnum = floor($TXBno % $TXBdivider); $TXBno = floor($TXBno / $TXBdivider);
-    $TXBi += ($TXBdivider == 10) ? 1 : 2;
-    if ($TXBnum) {
-        $TXBplural = (($TXBcounter = count($TXBstr)) && $TXBnum > 9) ? 's' : null;
-        $TXBhundred = ($TXBcounter == 1 && $TXBstr[0]) ? ' and ' : null;
-        $TXBstr[] = ($TXBnum < 21) ? $words[$TXBnum]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred
-                    : $words[floor($TXBnum/10)*10]." ".$words[$TXBnum%10]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred;
-    } else $TXBstr[] = null;
-}
-$TXBstr = array_reverse($TXBstr); $TXBresult = implode('', $TXBstr);
 
 $Currency_symbol = "&#8377;";
 $Currency_Name   = "INR";
@@ -545,14 +531,14 @@ Terms of Delivery<br/>&nbsp;
 ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>SGST (<?= $__half_pct; ?>%)</i></b></td>
-<td></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>CGST (<?= $__half_pct; ?>%)</i></b></td>
-<td></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
@@ -562,7 +548,7 @@ Terms of Delivery<br/>&nbsp;
 <?php if ($courier_charges > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
-<td></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
@@ -571,7 +557,7 @@ Terms of Delivery<br/>&nbsp;
 
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Total</i></b></td>
-<td></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
@@ -586,14 +572,6 @@ Terms of Delivery<br/>&nbsp;
 </tr>
 <tr>
 <td><b><?= $Currency_Name; ?> <?= ucwords($result); ?> Only</b></td>
-<td></td>
-</tr>
-<tr>
-<td style="padding-top:6px;font-size:13px;">Amount Taxable (in words)</td>
-<td align="right" style="font-size:13px;"><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></td>
-</tr>
-<tr>
-<td><b><?= $Currency_Name; ?> <?= ucwords($TXBresult); ?> Only</b></td>
 <td></td>
 </tr>
 </table>

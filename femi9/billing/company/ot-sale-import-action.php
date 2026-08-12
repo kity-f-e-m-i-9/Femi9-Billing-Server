@@ -105,6 +105,8 @@ $fixedFieldMap = [
     'ship date'        => 'ship_date',
     'courier charges'  => 'courier_charges',
     'state'            => 'state',
+    'coupon code'      => 'coupon_code',
+    'wallet amount'    => 'wallet_amount',
 ];
 
 function ot_import_normalize_header($raw) {
@@ -142,6 +144,7 @@ $markerRow = ($marker_row_num !== null) ? $rows[$marker_row_num] : [];
 $colToFixedField = [];
 $colToProductId = []; // col => product_id, for Qty columns
 $rateColForQtyCol = []; // qty col => rate col
+$discColForQtyCol = []; // qty col => discount col (optional — template may omit it)
 
 $activeProductByName = [];
 $res = $db_conn->query(
@@ -167,6 +170,7 @@ foreach ($colKeys as $idx => $col) {
     if (preg_match('/^(.*)\s+qty$/i', trim($rawHeader), $m)) {
         $productLabel = trim($m[1]);
         $nextCol = $colKeys[$idx + 1] ?? null;
+        $afterNextCol = $colKeys[$idx + 2] ?? null;
 
         $pid = 0;
         $markerVal = (string)($markerRow[$col] ?? '');
@@ -180,6 +184,14 @@ foreach ($colKeys as $idx => $col) {
             $colToProductId[$col] = $pid;
             if ($nextCol !== null) {
                 $rateColForQtyCol[$col] = $nextCol;
+            }
+            // Discount column is optional — only wire it up if the next
+            // header actually says "<Product> Discount" for this same product.
+            if ($afterNextCol !== null) {
+                $afterNextHeader = trim((string)($headerRowData[$afterNextCol] ?? ''));
+                if (strcasecmp($afterNextHeader, $productLabel . ' Discount') === 0) {
+                    $discColForQtyCol[$col] = $afterNextCol;
+                }
             }
         }
     }
@@ -234,6 +246,11 @@ while ($row = $res->fetch_assoc()) {
     $stateByName[strtolower(trim($row['st_name']))] = (int)$row['id'];
 }
 $admin_state_id = $Result_Log_users_Dtails134['state_id'] ?? 0;
+
+// Wallet Amount only applies to these categories — same restriction as
+// ot-sale-add.php / ot-sale-action.php; silently ignored (treated as 0) for
+// any other category rather than rejecting the row.
+$wallet_eligible_cats = ['website', 'id concept'];
 
 // ---------------------------------------------------------------------
 // Parse + validate rows. One row = one invoice group.
@@ -364,13 +381,16 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
         }
         $product = $productById[$pid];
 
+        $discCol = $discColForQtyCol[$qtyCol] ?? null;
+        $discount = $discCol !== null ? max(0, (float)trim((string)($rowData[$discCol] ?? '0'))) : 0.0;
+
         $lines[] = [
             'product_id' => $pid,
             'gst'        => (float)$product['gst'],
             'hsn'        => $product['hsn'] ?? '',
             'qty'        => $qty,
             'rate'       => $rate,
-            'discount'   => 0.0,
+            'discount'   => $discount,
         ];
     }
 
@@ -401,6 +421,14 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
     $gst_number = RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'gst_number'));
     $buyer_gsttype = (strlen($gst_number) === 15) ? 'register' : 'unregister';
 
+    // Wallet Amount only applies to Website/ID Concept categories — same
+    // restriction as the manual Add Sale form; other categories force it to 0.
+    $wallet_amount = in_array($catKey, $wallet_eligible_cats, true)
+        ? max(0, (float) ot_import_val($rowData, $colToFixedField, 'wallet_amount', '0'))
+        : 0.00;
+
+    $coupon_code = RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'coupon_code'));
+
     $groups[$groupKey] = [
         'godownid'         => $godownid,
         'cat'              => $catname,
@@ -417,6 +445,8 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
         'ship_date'        => (($v = ot_import_val($rowData, $colToFixedField, 'ship_date')) !== '' && strtotime($v) !== false) ? date('Y-m-d', strtotime($v)) : '1991-01-01',
         'courier_charges'  => (float) ot_import_val($rowData, $colToFixedField, 'courier_charges', '0'),
         'state_id'         => $state_id,
+        'wallet_amount'    => $wallet_amount,
+        'coupon_code'      => $coupon_code,
         'lines'            => $lines,
     ];
 }
@@ -482,9 +512,9 @@ try {
             "INSERT INTO ot_sales_invoice
                 (tempid, inv_id, inv_number, courier_charges, wallet_amount,
                  subtotal, round_off, total, buyer_gsttype, cat)
-             VALUES (?, '0', ?, ?, '0.00', '0', '0', '0', ?, ?)"
+             VALUES (?, '0', ?, ?, ?, '0', '0', '0', ?, ?)"
         );
-        $stmt->bind_param('ssdss', $tempid, $g['inv_number'], $g['courier_charges'], $g['buyer_gsttype'], $g['cat']);
+        $stmt->bind_param('ssddss', $tempid, $g['inv_number'], $g['courier_charges'], $g['wallet_amount'], $g['buyer_gsttype'], $g['cat']);
         $stmt->execute();
         $stmt->close();
         $invoiceCount++;
@@ -525,7 +555,8 @@ try {
             );
         }
 
-        // Recompute rounded total, same formula as ot-sale-action.php.
+        // Recompute rounded total, same formula as ot-sale-action.php:
+        // total = round(subtotal + courier_charges) - wallet_amount, floored at 0.
         $stmt = $db_conn->prepare("SELECT SUM(total) AS s FROM ot_sales WHERE tempid = ?");
         $stmt->bind_param('s', $tempid);
         $stmt->execute();
@@ -535,11 +566,85 @@ try {
         $with_courier = $subtotal + $g['courier_charges'];
         $roundvalue = round($with_courier);
         $roundoff = $roundvalue - $with_courier;
+        $net_total = max(0, $roundvalue - $g['wallet_amount']);
 
-        $stmt = $db_conn->prepare("UPDATE ot_sales_invoice SET subtotal=?, round_off=?, total=? WHERE tempid=?");
-        $stmt->bind_param('ddds', $subtotal, $roundoff, $roundvalue, $tempid);
+        $stmt = $db_conn->prepare("UPDATE ot_sales_invoice SET subtotal=?, round_off=?, total=?, wallet_amount=?, courier_charges=? WHERE tempid=?");
+        $stmt->bind_param('ddddds', $subtotal, $roundoff, $net_total, $g['wallet_amount'], $g['courier_charges'], $tempid);
         $stmt->execute();
         $stmt->close();
+
+        // Coupon commission — identical logic to ot-sale-action.php: resolves
+        // the coupon code to a CP account, computes commission = per-unit
+        // amount × total qty, and logs it to wallet_monthly_sls_report keyed
+        // by this invoice's tempid (one row per tempid, never duplicated).
+        if ($g['coupon_code'] !== '') {
+            $coupon_code = $g['coupon_code'];
+            preg_match('/-(.*?)-/', $coupon_code, $matches);
+            $coupon_usertype = $matches[1] ?? '';
+
+            $tablenameCP = '';
+            $usertype_print = '';
+            if ($coupon_usertype === 'SS')     { $tablenameCP = 'super_stockiest';   $usertype_print = 'super_stockiest'; }
+            elseif ($coupon_usertype === 'S')  { $tablenameCP = 'stockiest';         $usertype_print = 'stockiest'; }
+            elseif ($coupon_usertype === 'SD') { $tablenameCP = 'super_distributor'; $usertype_print = 'super_distributor'; }
+            elseif ($coupon_usertype === 'D')  { $tablenameCP = 'distributor';       $usertype_print = 'distributor'; }
+
+            if ($tablenameCP !== '') {
+                $stmtCp = $db_conn->prepare("SELECT temp_id FROM $tablenameCP WHERE useridtext = ?");
+                $stmtCp->bind_param('s', $coupon_code);
+                $stmtCp->execute();
+                $cpRows = $stmtCp->get_result()->fetch_all(MYSQLI_ASSOC);
+                $stmtCp->close();
+
+                if (count($cpRows) === 1) {
+                    $userid_print = $cpRows[0]['temp_id'];
+
+                    $stmtQty = $db_conn->prepare("SELECT SUM(qty) AS s FROM ot_sales WHERE tempid = ?");
+                    $stmtQty->bind_param('s', $tempid);
+                    $stmtQty->execute();
+                    $qty_total_result = (int)($stmtQty->get_result()->fetch_assoc()['s'] ?? 0);
+                    $stmtQty->close();
+
+                    $stmtComm = $db_conn->prepare("SELECT amount FROM admin_website_coupon_commission WHERE usertype = ?");
+                    $stmtComm->bind_param('s', $usertype_print);
+                    $stmtComm->execute();
+                    $cp_amount = (float)($stmtComm->get_result()->fetch_assoc()['amount'] ?? 0);
+                    $stmtComm->close();
+
+                    $total_coupon_commission = $cp_amount * $qty_total_result;
+                    $remarks_cb = "Invoice Number : " . $g['inv_number'] . "<br/>Date : " . date('d/m/Y');
+
+                    $stmtExists = $db_conn->prepare("SELECT id FROM wallet_monthly_sls_report WHERE user_type = ?");
+                    $stmtExists->bind_param('s', $tempid);
+                    $stmtExists->execute();
+                    $reportExists = $stmtExists->get_result()->num_rows > 0;
+                    $stmtExists->close();
+
+                    if (!$reportExists) {
+                        $today = date('Y-m-d');
+                        $stmtIns = $db_conn->prepare(
+                            "INSERT INTO wallet_monthly_sls_report
+                                (user_type, user_id, from_date, to_date, month, year, total_sls_amount,
+                                 target_sls_amount, target_reached, refer_by_usertype, refer_by_userid,
+                                 commission_percentage, commission_amount, commission_type, remarks)
+                             VALUES (?, 'Nill', ?, ?, '0', '0', '0', '0', 'yes', ?, ?, '0', ?, 'Website Order Commission', ?)"
+                        );
+                        $stmtIns->bind_param(
+                            'sssssds',
+                            $tempid, $today, $today, $usertype_print, $userid_print,
+                            $total_coupon_commission, $remarks_cb
+                        );
+                        $stmtIns->execute();
+                        $stmtIns->close();
+                    }
+
+                    $stmtUpdCoupon = $db_conn->prepare("UPDATE ot_sales_invoice SET coupon_code=?, website_commission=? WHERE tempid=?");
+                    $stmtUpdCoupon->bind_param('sds', $coupon_code, $total_coupon_commission, $tempid);
+                    $stmtUpdCoupon->execute();
+                    $stmtUpdCoupon->close();
+                }
+            }
+        }
     }
 
     $db_conn->commit();

@@ -450,7 +450,6 @@ if($discountamount>0){?>
 <td></td>
 <td></td>
 <td></td>
-<td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=inr_format($result_Invoice_Details['courier_charges'], 2);?></b></td>
 </tr>
 <?php }?>

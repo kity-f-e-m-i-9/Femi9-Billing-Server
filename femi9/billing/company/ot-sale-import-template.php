@@ -65,7 +65,8 @@ $fixedHeaders = [
     'Company Profile*', 'Category*', 'Date* (YYYY-MM-DD)', 'Invoice Number*',
     'Customer Name', 'Customer Mobile', 'Customer Address', 'Shipping Address',
     'GST Number', 'Order Number', 'Order Date (YYYY-MM-DD)', 'Ship Date (YYYY-MM-DD)',
-    'Courier Charges', 'State',
+    'Courier Charges', 'State', 'Coupon Code',
+    'Wallet Amount (Website/ID Concept only)',
 ];
 
 $spreadsheet = new Spreadsheet();
@@ -78,19 +79,22 @@ foreach ($fixedHeaders as $h) {
     $col++;
 }
 
-// One "<Product> Qty" + "<Product> Rate" pair per active product. The exact
-// product id is embedded in a hidden row 2 so the importer can match columns
-// back to products even if a product is later renamed — the header text
-// alone (row 1) is what the user reads and fills in.
+// One "<Product> Qty" + "<Product> Rate" + "<Product> Discount" triple per
+// active product. The exact product id is embedded in a hidden row 2 so the
+// importer can match columns back to products even if a product is later
+// renamed — the header text alone (row 1) is what the user reads and fills in.
 $productColStart = $col;
 foreach ($activeProducts as $p) {
     $qtyCol = Coordinate::stringFromColumnIndex($col);
     $rateCol = Coordinate::stringFromColumnIndex($col + 1);
+    $discCol = Coordinate::stringFromColumnIndex($col + 2);
     $sheet->setCellValue($qtyCol . '1', $p['productName'] . ' Qty');
     $sheet->setCellValue($rateCol . '1', $p['productName'] . ' Rate');
+    $sheet->setCellValue($discCol . '1', $p['productName'] . ' Discount');
     $sheet->setCellValue($qtyCol . '2', 'product_id:' . $p['id']);
     $sheet->setCellValue($rateCol . '2', 'product_id:' . $p['id']);
-    $col += 2;
+    $sheet->setCellValue($discCol . '2', 'product_id:' . $p['id']);
+    $col += 3;
 }
 $lastCol = $col - 1;
 
@@ -104,25 +108,38 @@ $sheet->getRowDimension(2)->setRowHeight(14);
 
 // Example data row on row 3, pre-filled with each product's current default
 // price in its Rate column so the uploader only has to type quantities.
+// Written by fixed-header position rather than hardcoded column letters, so
+// the mapping stays correct if $fixedHeaders is ever reordered/extended.
 $exampleRowNum = 3;
-$sheet->setCellValue('A' . $exampleRowNum, $example_godown);
-$sheet->setCellValue('B' . $exampleRowNum, $example_cat);
-$sheet->setCellValue('C' . $exampleRowNum, date('Y-m-d'));
-$sheet->setCellValue('D' . $exampleRowNum, 'EXAMPLE/001');
-$sheet->setCellValue('E' . $exampleRowNum, 'John Doe');
-$sheet->setCellValue('F' . $exampleRowNum, '9999999999');
-$sheet->setCellValue('G' . $exampleRowNum, 'Sample address');
-$sheet->setCellValue('H' . $exampleRowNum, 'Sample address');
+$exampleFixedValues = [
+    'Company Profile*' => $example_godown,
+    'Category*' => $example_cat,
+    'Date* (YYYY-MM-DD)' => date('Y-m-d'),
+    'Invoice Number*' => 'EXAMPLE/001',
+    'Customer Name' => 'John Doe',
+    'Customer Mobile' => '9999999999',
+    'Customer Address' => 'Sample address',
+    'Shipping Address' => 'Sample address',
+    'Coupon Code' => '',
+    'Wallet Amount (Website/ID Concept only)' => 0,
+];
+foreach ($fixedHeaders as $i => $h) {
+    if (array_key_exists($h, $exampleFixedValues)) {
+        $sheet->setCellValue(Coordinate::stringFromColumnIndex($i + 1) . $exampleRowNum, $exampleFixedValues[$h]);
+    }
+}
 
 $col = $productColStart;
 $firstProduct = true;
 foreach ($activeProducts as $p) {
     $qtyCol = Coordinate::stringFromColumnIndex($col);
     $rateCol = Coordinate::stringFromColumnIndex($col + 1);
+    $discCol = Coordinate::stringFromColumnIndex($col + 2);
     $sheet->setCellValue($qtyCol . $exampleRowNum, $firstProduct ? 2 : 0);
     $sheet->setCellValue($rateCol . $exampleRowNum, $p['outlet_price']);
+    $sheet->setCellValue($discCol . $exampleRowNum, 0);
     $firstProduct = false;
-    $col += 2;
+    $col += 3;
 }
 
 foreach (range(1, $lastCol) as $i) {
