@@ -1,8 +1,5 @@
 <?php
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
-require_once("include/GodownAccess.php");
-include("config.php");
 error_reporting(0);
 
 header('Content-Type: application/json');
@@ -13,17 +10,21 @@ function respond(array $payload, int $httpCode = 200): void {
     exit;
 }
 
+if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
+    respond(['success' => false, 'message' => 'Unauthorized.'], 403);
+}
 if (empty($_POST['csrf_token']) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
     respond(['success' => false, 'message' => 'Session expired — please reload the page and try again.'], 400);
 }
 
+$ss_temp_id    = $Login_user_IDvl;
+$ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
+
 $screenshotId = (int)($_POST['screenshot_id'] ?? 0);
-$companyId    = (int)($_POST['company_id'] ?? 0);
 $amount       = round((float)($_POST['amount'] ?? 0), 2);
 $paymentDate  = trim($_POST['payment_date'] ?? '');
 $paymentMode  = trim($_POST['payment_mode'] ?? '');
 $referenceNum = trim($_POST['reference_number'] ?? '');
-$bankName     = trim($_POST['bank_name'] ?? '');
 $remarks      = trim($_POST['remarks'] ?? '');
 $createdBy    = $_SESSION['LOGIN_USER'] ?? '';
 
@@ -31,7 +32,6 @@ $allowedModes = ['Cash', 'Bank Transfer', 'Cheque', 'UPI', 'NEFT', 'RTGS', 'IMPS
 
 $errors = [];
 if ($screenshotId <= 0)                             $errors[] = 'Invalid screenshot.';
-if ($companyId <= 0)                                $errors[] = 'Please select a company profile.';
 if ($amount <= 0 || $amount > 99999999.99)          $errors[] = 'Invalid amount.';
 if ($referenceNum === '')                           $errors[] = 'Reference number is required.';
 if (!in_array($paymentMode, $allowedModes, true))   $errors[] = 'Invalid payment mode.';
@@ -50,10 +50,18 @@ if (!empty($errors)) {
     respond(['success' => false, 'message' => implode(' ', $errors)], 400);
 }
 
+// Screenshot must belong to a PO actually routed to this SS — joins through
+// tp_purchase_orders rather than trusting the screenshot row's own
+// territory_partner_id alone, since that alone doesn't prove approver
+// routing or SS ownership.
 $stmt = $db_conn->prepare(
-    "SELECT id, territory_partner_id, status, advance_payment_id FROM tp_purchase_order_screenshots WHERE id = ?"
+    "SELECT s.id, s.territory_partner_id, s.status, s.advance_payment_id
+     FROM tp_purchase_order_screenshots s
+     JOIN tp_purchase_orders po ON po.id = s.po_id
+     JOIN territory_partners tp ON tp.id = s.territory_partner_id
+     WHERE s.id = ? AND tp.onboard_ss_id = ? AND po.approver_type = 'ss' AND po.approver_ss_id = ?"
 );
-$stmt->bind_param('i', $screenshotId);
+$stmt->bind_param('isi', $screenshotId, $ss_temp_id, $ss_account_id);
 $stmt->execute();
 $screenshot = $stmt->get_result()->fetch_assoc();
 $stmt->close();
@@ -70,38 +78,24 @@ if ($screenshot['advance_payment_id'] !== null) {
 
 $tpId = (int)$screenshot['territory_partner_id'];
 
-$chkCompany = $db_conn->prepare("SELECT id FROM company_godown WHERE id = ? LIMIT 1");
-$chkCompany->bind_param('i', $companyId);
-$chkCompany->execute();
-if (!$chkCompany->get_result()->fetch_assoc()) {
-    respond(['success' => false, 'message' => 'Company profile not found.'], 400);
-}
-$chkCompany->close();
-
-if (!is_godown_allowed($db_conn, $companyId)) {
-    respond(['success' => false, 'message' => 'You are not authorized to record payments for this company profile.'], 403);
-}
-
 $db_conn->begin_transaction();
 try {
     $adjusted = 0.00;
     $balance = $amount;
     $status = 'active';
+    $approverType = 'ss';
 
-    // Company-side conversion — the screenshot's parent PO is guaranteed
-    // company-routed (company/tp-today-orders.php only shows those), so this
-    // always credits the company-approved pool.
-    $approverType = 'company';
-    $approverSsId = null;
+    // No company_id/company_godown here — that's Company's own GST/finance
+    // bookkeeping concept, unrelated to SS-routed advance payments.
     $ins = $db_conn->prepare(
         "INSERT INTO tp_advance_payments
-            (company_id, territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
+            (territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, remarks,
              adjusted_amount, balance_amount, status, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
     );
     $ins->bind_param(
-        'iisidsssssddss',
-        $companyId, $tpId, $approverType, $approverSsId, $amount, $paymentDate, $paymentMode, $referenceNum, $bankName, $remarks,
+        'isidssssddss',
+        $tpId, $approverType, $ss_account_id, $amount, $paymentDate, $paymentMode, $referenceNum, $remarks,
         $adjusted, $balance, $status, $createdBy
     );
     if (!$ins->execute()) throw new \Exception('Insert failed: ' . $ins->error);

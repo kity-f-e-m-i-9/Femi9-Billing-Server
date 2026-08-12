@@ -4,6 +4,7 @@ include("checksession.php");
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
 require_once __DIR__ . '/../shared/TpInvoiceNumberService.php';
+require_once __DIR__ . '/../shared/TpApproverContext.php';
 require_once __DIR__ . '/include/GodownAccess.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
@@ -97,21 +98,30 @@ function insertTpLedger(mysqli $db, int $tp_id, int $pid, int $qty, int $before,
 
 // ── Helpers: advance payment ───────────────────────────────────────────────────
 
-function getTpAdvanceBalance(mysqli $db, int $tp_id, int $godown_id = 0): float {
+function getTpAdvanceBalance(mysqli $db, int $tp_id, int $godown_id = 0, ?array $approver = null): float {
+    $sql = "SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted'";
+    $types = "i";
+    $params = [$tp_id];
     if ($godown_id > 0) {
-        $s = $db->prepare("SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND company_id=? AND balance_amount>0 AND status!='fully_adjusted'");
-        $s->bind_param("ii", $tp_id, $godown_id);
-    } else {
-        $s = $db->prepare("SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted'");
-        $s->bind_param("i", $tp_id);
+        $sql .= " AND company_id=?";
+        $types .= "i";
+        $params[] = $godown_id;
     }
+    if ($approver !== null) {
+        $sql .= " AND approver_type=? AND approver_ss_id<=>?";
+        $types .= "si";
+        $params[] = $approver['type'];
+        $params[] = $approver['ss_id'];
+    }
+    $s = $db->prepare($sql);
+    $s->bind_param($types, ...$params);
     $s->execute();
     $r = $s->get_result()->fetch_assoc(); $s->close();
     return round((float)$r['bal'], 2);
 }
 
-function deductTpAdvance(mysqli $db, int $tp_id, float $required, string $inv_num, int $godown_id = 0, int $tp_invoice_id = 0): void {
-    tpAdvanceDeduct($db, $tp_invoice_id, $inv_num, $tp_id, $required, $godown_id);
+function deductTpAdvance(mysqli $db, int $tp_id, float $required, string $inv_num, int $godown_id = 0, int $tp_invoice_id = 0, ?array $approver = null): void {
+    tpAdvanceDeduct($db, $tp_invoice_id, $inv_num, $tp_id, $required, $godown_id, $approver);
 }
 
 // ── Schema migration (runs once, safe to repeat) ──────────────────────────────
@@ -221,8 +231,17 @@ if (!$stk_row || !(int)$stk_row['stock_initialized']) {
     header("Location: add-tp-invoice?error=no_input_stock"); exit;
 }
 
+// This is the company-side invoicing action (gated above to
+// $Login_user_TYPEvl === 'company') — it only ever draws from the TP's
+// company-approved advance pool, never an SS-scoped one, regardless of
+// whether the originating PO happened to be SS-routed (tp-today-orders.php
+// already hides SS-routed POs from Company's queue, so po_id here should
+// never point at one, but this pins the pool explicitly rather than relying
+// on that alone).
+$invoiceApprover = ['type' => 'company', 'ss_id' => null];
+
 // Pre-validate advance balance (courier charges collected separately, not from advance)
-$avail_balance = getTpAdvanceBalance($db_conn, $tp_id, $use_godown ? $source_godown_id : 0);
+$avail_balance = getTpAdvanceBalance($db_conn, $tp_id, $use_godown ? $source_godown_id : 0, $invoiceApprover);
 if ($avail_balance < $net_amount) {
     header("Location: add-tp-invoice?error=nobalance&need=" . urlencode(inr_format($net_amount, 2)) . "&have=" . urlencode(inr_format($avail_balance, 2))); exit;
 }
@@ -330,7 +349,7 @@ try {
     $s_item->close();
 
     // Deduct net amount (after discount) from advance; courier is collected separately via receipt
-    deductTpAdvance($db_conn, $tp_id, $net_amount, $inv_num, $use_godown ? $source_godown_id : 0, $invoice_id);
+    deductTpAdvance($db_conn, $tp_id, $net_amount, $inv_num, $use_godown ? $source_godown_id : 0, $invoice_id, $invoiceApprover);
 
     // Mark the originating purchase order (if this invoice was raised from
     // tp-today-orders.php's "Invoice" button) as completed and link it.

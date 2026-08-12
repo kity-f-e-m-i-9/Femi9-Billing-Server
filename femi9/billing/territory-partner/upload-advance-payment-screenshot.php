@@ -7,6 +7,7 @@ require_once __DIR__ . '/include/AdvancePaymentScreenshotHelper.php';
 require_once __DIR__ . '/../shared/OcrService.php';
 require_once __DIR__ . '/../shared/PaymentScreenshotParser.php';
 require_once __DIR__ . '/../shared/ClaudeVisionService.php';
+require_once __DIR__ . '/../shared/TpApproverContext.php';
 
 header('Content-Type: application/json');
 
@@ -52,6 +53,13 @@ $submissionId = (int)($_POST['submission_id'] ?? 0);
 // from a po-sourced draft (see add-advance-payment.php's $hasResumableDraft
 // / $isPoSourcedDraft split). Mode/note/screenshots still resume regardless.
 $source = ($_POST['source'] ?? '') === 'po' ? 'po' : 'direct';
+
+// Never trust the client-submitted approver type on its own — re-verify the
+// TP actually has that SS assignment before honoring 'ss'. Only applied when
+// this call is actually creating a new draft submission below; an existing
+// draft keeps whatever approver it was created with (a draft is never
+// re-routed mid-upload).
+$approver = tpResolveApprover($db_conn, $tp_id, $_POST['approver_type'] ?? null);
 
 $allowedModes = ['Cash', 'Bank Transfer', 'Cheque', 'UPI', 'NEFT', 'RTGS', 'IMPS', 'Demand Draft', 'Other'];
 
@@ -157,10 +165,10 @@ if ($submissionId > 0) {
 
     $ins = $db_conn->prepare(
         "INSERT INTO tp_advance_payment_submissions
-            (territory_partner_id, amount, payment_date, payment_mode, reference_number, note, source, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'draft')"
+            (territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, note, source, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')"
     );
-    $ins->bind_param('idsssss', $tp_id, $amount, $paymentDate, $paymentMode, $referenceNumber, $note, $source);
+    $ins->bind_param('isidsssss', $tp_id, $approver['type'], $approver['ss_id'], $amount, $paymentDate, $paymentMode, $referenceNumber, $note, $source);
     $ins->execute();
     $submissionId = $db_conn->insert_id;
     $ins->close();

@@ -1,24 +1,24 @@
 <?php
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
-include("config.php");
 error_reporting(0);
 
-// A screenshot uploaded before its PO exists yet (po_id IS NULL, still a
-// draft cart on add-purchase-order.php) has no approver of its own — it's
-// scoped to the submitting TP's session either way and gets linked to a PO
-// (and inherits that PO's approver) once submitted, so it's safe to keep
-// showing those here alongside company-routed ones; only an already-linked
-// SS-routed screenshot needs to be excluded.
+if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
+    header("Location: dashboard.php?error=unauthorized"); exit;
+}
+
+$ss_temp_id    = $Login_user_IDvl;
+$ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
+
 $stmt = $db_conn->prepare(
     "SELECT s.id, s.territory_partner_id, s.po_id, s.file_path, s.detected_amount, s.reference_number,
             s.ocr_raw_text, s.rejection_reason, s.created_at, tp.name AS tp_name, tp.mobile AS tp_mobile
      FROM tp_purchase_order_screenshots s
-     LEFT JOIN territory_partners tp ON tp.id = s.territory_partner_id
-     LEFT JOIN tp_purchase_orders po ON po.id = s.po_id
-     WHERE s.status = 'pending_review' AND (po.id IS NULL OR po.approver_type = 'company')
+     JOIN tp_purchase_orders po ON po.id = s.po_id
+     JOIN territory_partners tp ON tp.id = s.territory_partner_id
+     WHERE s.status = 'pending_review' AND tp.onboard_ss_id = ? AND po.approver_type = 'ss' AND po.approver_ss_id = ?
      ORDER BY s.created_at ASC"
 );
+$stmt->bind_param('si', $ss_temp_id, $ss_account_id);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();

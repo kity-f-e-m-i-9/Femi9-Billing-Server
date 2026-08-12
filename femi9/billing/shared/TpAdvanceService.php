@@ -12,7 +12,10 @@
 /**
  * Deduct $required from the TP's advance payments (FIFO) and log each touch.
  *
- * @param int    $godown_id  Pass > 0 to scope deductions to a specific company_id.
+ * @param int        $godown_id  Pass > 0 to scope deductions to a specific company_id.
+ * @param ?array{type:'company'|'ss',ss_id:?int} $approver  Pass to scope
+ *   deductions to a specific approver's balance pool (Company vs a specific
+ *   SS) — omitted, this behaves exactly as before (no approver filter).
  * @throws Exception if balance is insufficient during processing.
  */
 function tpAdvanceDeduct(
@@ -21,24 +24,29 @@ function tpAdvanceDeduct(
     string $inv_num,
     int    $tp_id,
     float  $required,
-    int    $godown_id = 0
+    int    $godown_id = 0,
+    ?array $approver = null
 ): void {
+    $sql = "SELECT id, balance_amount FROM tp_advance_payments
+              WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted' AND deleted_at IS NULL";
+    $types = "i";
+    $params = [$tp_id];
+
     if ($godown_id > 0) {
-        $s = $db->prepare(
-            "SELECT id, balance_amount FROM tp_advance_payments
-              WHERE territory_partner_id=? AND company_id=?
-                AND balance_amount>0 AND status!='fully_adjusted' AND deleted_at IS NULL
-              ORDER BY payment_date ASC, id ASC FOR UPDATE"
-        );
-        $s->bind_param("ii", $tp_id, $godown_id);
-    } else {
-        $s = $db->prepare(
-            "SELECT id, balance_amount FROM tp_advance_payments
-              WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted' AND deleted_at IS NULL
-              ORDER BY payment_date ASC, id ASC FOR UPDATE"
-        );
-        $s->bind_param("i", $tp_id);
+        $sql .= " AND company_id=?";
+        $types .= "i";
+        $params[] = $godown_id;
     }
+    if ($approver !== null) {
+        $sql .= " AND approver_type=? AND approver_ss_id<=>?";
+        $types .= "si";
+        $params[] = $approver['type'];
+        $params[] = $approver['ss_id'];
+    }
+    $sql .= " ORDER BY payment_date ASC, id ASC FOR UPDATE";
+
+    $s = $db->prepare($sql);
+    $s->bind_param($types, ...$params);
     $s->execute();
     $rows = $s->get_result()->fetch_all(MYSQLI_ASSOC);
     $s->close();
@@ -84,8 +92,14 @@ function tpAdvanceDeduct(
  *
  * After restoring each payment row the log entries are deleted.
  * Safe to call even if no log entries exist (e.g. zero-amount invoice).
+ *
+ * @param ?array{type:'company'|'ss',ss_id:?int} $approver  Accepted for
+ *   signature symmetry with tpAdvanceDeduct(), but unused — each log entry
+ *   already points at the exact tp_advance_payments.id row it deducted from
+ *   (via tp_advance_id), so which approver pool that row belongs to is
+ *   already implicit and never needs re-filtering here.
  */
-function tpAdvanceRestore(mysqli $db, int $tp_invoice_id): void
+function tpAdvanceRestore(mysqli $db, int $tp_invoice_id, ?array $approver = null): void
 {
     $s = $db->prepare(
         "SELECT id, tp_advance_id, deducted_amount
@@ -159,9 +173,12 @@ function tpAdvanceRestore(mysqli $db, int $tp_invoice_id): void
  * portion is restored — the excess has nowhere to go back to and is
  * silently capped, not credited as new free money.
  *
+ * @param ?array{type:'company'|'ss',ss_id:?int} $approver  Accepted for
+ *   signature symmetry with tpAdvanceDeduct() — see tpAdvanceRestore()'s
+ *   docblock for why it's unused here too.
  * @return float The amount actually restored (may be less than $amount).
  */
-function tpAdvanceRestorePartial(mysqli $db, int $tp_invoice_id, float $amount): float
+function tpAdvanceRestorePartial(mysqli $db, int $tp_invoice_id, float $amount, ?array $approver = null): float
 {
     if ($amount <= 0) return 0.0;
 

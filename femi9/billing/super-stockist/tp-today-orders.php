@@ -1,12 +1,20 @@
 <?php
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
-require_once("include/GodownAccess.php");
 error_reporting(0);
+
+if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
+    header("Location: dashboard.php?error=unauthorized"); exit;
+}
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
+
+// This SS's own numeric id — approver_ss_id on tp_purchase_orders and
+// tp_advance_payments is always stored as this, never the varchar temp_id
+// used for the onboard_ss_id assignment link.
+$ss_temp_id    = $Login_user_IDvl;
+$ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
 
 date_default_timezone_set("Asia/Kolkata");
 $today = date("Y-m-d");
@@ -23,7 +31,7 @@ if ($filterSubmitted) {
     if (strtotime($from_date) > strtotime($to_date)) { [$from_date, $to_date] = [$to_date, $from_date]; }
 
     // Default view (once filtering) hides cancelled orders so they don't
-    // clutter the daily work queue; the status filter lets company
+    // clutter the daily work queue; the status filter lets the SS
     // specifically pull them up.
     $statusFilter = $_GET['status_filter'] ?? 'active';
     $allowedStatusFilters = ['active', 'waiting', 'completed', 'cancelled', 'all'];
@@ -34,12 +42,12 @@ if ($filterSubmitted) {
     $statusFilter = 'waiting';
 }
 
-// SS-routed orders belong exclusively to that SS's own queue
-// (super-stockist/tp-today-orders.php) — excluded here so they never appear
-// twice or get double-approved.
-$whereSql = "WHERE o.approver_type = 'company'";
-$bindTypes = '';
-$bindValues = [];
+// Scoped to this SS's own assigned TPs and only orders actually routed to
+// this SS — a TP with onboard_ss_id set to this SS but who chose "Company"
+// for a given order must never show up here, and vice versa.
+$whereSql = "WHERE tp.onboard_ss_id = ? AND o.approver_type = 'ss' AND o.approver_ss_id = ?";
+$bindTypes = 'si';
+$bindValues = [$ss_temp_id, $ss_account_id];
 if ($filterSubmitted) {
     $whereSql .= ' AND o.order_date BETWEEN ? AND ?';
     $bindTypes .= 'ss';
@@ -73,9 +81,7 @@ $stmt = $db_conn->prepare(
      $whereSql
      ORDER BY o.id DESC, i.id ASC"
 );
-if ($bindTypes !== '') {
-    $stmt->bind_param($bindTypes, ...$bindValues);
-}
+$stmt->bind_param($bindTypes, ...$bindValues);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
@@ -175,9 +181,10 @@ if (!empty($orderIds)) {
     $stmtS->close();
 }
 
-// Each TP's current advance balance, batched for every TP appearing in this
-// result set — same three-condition filter used everywhere else this figure
-// is shown (add-purchase-order.php, dashboard.php, mis-report.php).
+// Each TP's current advance balance with THIS SS, batched for every TP
+// appearing in this result set — same three-condition filter used
+// elsewhere, plus the approver-pool scoping so a TP's Company balance never
+// leaks into this SS's own view.
 $tpBalances = [];
 $tpPendingSubmissions = []; // territory_partner_id => count of pending_review/accepted submissions
 $tpDbIds = array_values(array_unique(array_column($orders, 'tp_db_id')));
@@ -189,7 +196,7 @@ if (!empty($tpDbIds)) {
         "SELECT territory_partner_id, COALESCE(SUM(balance_amount), 0) AS bal
          FROM tp_advance_payments
          WHERE territory_partner_id IN ($placeholders) AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
-           AND approver_type = 'company'
+           AND approver_type = 'ss' AND approver_ss_id = $ss_account_id
          GROUP BY territory_partner_id"
     );
     $stmtB->bind_param($types, ...$tpDbIds);
@@ -198,14 +205,14 @@ if (!empty($tpDbIds)) {
     while ($br = $resB->fetch_assoc()) { $tpBalances[(int)$br['territory_partner_id']] = (float)$br['bal']; }
     $stmtB->close();
 
-    // Whether the TP has a live advance-payment submission at all (any
-    // status other than draft) — shown as a nudge to check for it, since
-    // there's no direct FK from an order to a specific submission.
+    // Whether the TP has a live advance-payment submission with this SS at
+    // all (any status other than draft) — shown as a nudge to check for it,
+    // since there's no direct FK from an order to a specific submission.
     $stmtP = $db_conn->prepare(
         "SELECT territory_partner_id, COUNT(*) AS cnt
          FROM tp_advance_payment_submissions
          WHERE territory_partner_id IN ($placeholders) AND status IN ('pending_review', 'accepted')
-           AND approver_type = 'company'
+           AND approver_type = 'ss' AND approver_ss_id = $ss_account_id
          GROUP BY territory_partner_id"
     );
     $stmtP->bind_param($types, ...$tpDbIds);
@@ -214,12 +221,6 @@ if (!empty($tpDbIds)) {
     while ($pr = $resP->fetch_assoc()) { $tpPendingSubmissions[(int)$pr['territory_partner_id']] = (int)$pr['cnt']; }
     $stmtP->close();
 }
-
-// Company profiles for the "Add to TP Payment Entry" form — same source/filter
-// as add-tp-advance-payment.php's Company Profile dropdown.
-$companyProfiles = $db_conn->query(
-    "SELECT id, gname FROM company_godown WHERE gname LIKE '%Femi%' AND " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC"
-)->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -227,7 +228,7 @@ $companyProfiles = $db_conn->query(
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Today Order : <?php echo $business_name; ?></title>
+    <title>Territory Partner Orders : <?php echo $business_name; ?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
@@ -385,7 +386,7 @@ $companyProfiles = $db_conn->query(
                             <div class="page-description">
                                 <h1>
                                     <table class="headertble"><tr>
-                                        <td>Purchase Order</td>
+                                        <td>Territory Partner Orders</td>
                                     </tr></table>
                                 </h1>
                             </div>
@@ -499,7 +500,6 @@ $companyProfiles = $db_conn->query(
                                             <th>Delivery Address</th>
                                             <th>Payment Proof</th>
                                             <th>Status</th>
-                                            <th>Dispatch Slip</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -565,7 +565,7 @@ $companyProfiles = $db_conn->query(
                                                 ?>
                                                 <div style="font-size:11px;color:#6b7280;line-height:1.6;margin-bottom:4px;">
                                                     From balance: <b style="color:#1f2937;">₹<?=number_format($coveredByBalance, 2)?></b>
-                                                    <span title="This TP's current available advance balance (all orders/purposes, not reserved for this one specifically).">
+                                                    <span title="This TP's current available advance balance with you (all orders/purposes, not reserved for this one specifically).">
                                                         <i class="material-icons-outlined" style="font-size:12px;vertical-align:-2px;color:#9ca3af;">info</i>
                                                     </span>
                                                     <br>Balance now: ₹<?=number_format($tpBal, 2)?>
@@ -615,11 +615,6 @@ $companyProfiles = $db_conn->query(
                                                 <span class="badge-waiting">Waiting</span>
                                                 <button type="button" class="btn-cancel-order cancel-order-trigger" data-po-id="<?=(int)$oid?>">Cancel</button>
                                                 <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <a href="dispatch-slip-print.php?po_id=<?=urlencode($oid)?>" target="_blank" title="Print Dispatch Slip" style="display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;text-decoration:none;background:#eef2ff;color:#4338ca;white-space:nowrap;">
-                                                    <i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">local_shipping</i> Dispatch Slip
-                                                </a>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -716,7 +711,6 @@ $companyProfiles = $db_conn->query(
 <script src="../../assets/js/pages/datatables.js"></script>
 <script>
 var CSRF_TOKEN = <?=json_encode($_SESSION['csrf_token'])?>;
-var COMPANY_PROFILES = <?=json_encode($companyProfiles, JSON_UNESCAPED_UNICODE)?>;
 
 $(document).on('click', '.cancel-order-trigger', function () {
     var $btn = $(this);
@@ -883,17 +877,11 @@ function renderProofModal() {
                     '<span class="proof-confirmed-badge"><i class="material-icons-outlined" style="font-size:16px;">check_circle</i>Added as Advance Payment #' + s.advance_payment_id + '</span>' +
                     '</div>';
             } else {
-                var companyOptions = '<option value="">Select company profile…</option>';
-                COMPANY_PROFILES.forEach(function (cp) {
-                    companyOptions += '<option value="' + cp.id + '">' + $('<div>').text(cp.gname).html() + '</option>';
-                });
                 var today = new Date().toISOString().slice(0, 10);
                 actionsHtml = '<div class="proof-action-panel" data-screenshot-id="' + s.id + '">' +
                     '<button type="button" class="btn btn-outline-primary add-advance-toggle-btn">' +
                     '<i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px;">add_card</i>Add to TP Payment Entry</button>' +
                     '<div class="advance-form proof-field-row mt-3" style="display:none;">' +
-                        '<div class="proof-field"><label>Company Profile</label>' +
-                        '<select class="form-select advance-company-select" style="width:180px;">' + companyOptions + '</select></div>' +
                         '<div class="proof-field"><label>Amount</label>' +
                         '<input type="number" step="0.01" min="0" class="form-control advance-amount-input" style="width:110px;" value="' + (s.detected_amount !== null ? s.detected_amount : '') + '"></div>' +
                         '<div class="proof-field"><label>Reference</label>' +
@@ -1009,14 +997,10 @@ $(document).on('click', '.advance-save-btn', function () {
     var $btn = $(this);
     var $row = $btn.closest('[data-screenshot-id]');
     var screenshotId = parseInt($row.data('screenshot-id'), 10);
-    var companyId = $row.find('.advance-company-select').val();
-
-    if (!companyId) { alert('Please select a company profile.'); return; }
 
     var payload = {
         csrf_token: CSRF_TOKEN,
         screenshot_id: screenshotId,
-        company_id: companyId,
         amount: $row.find('.advance-amount-input').val(),
         reference_number: $row.find('.advance-ref-input').val(),
         payment_mode: $row.find('.advance-mode-select').val(),
@@ -1039,9 +1023,8 @@ $(document).on('click', '.advance-save-btn', function () {
             // Land the reviewer directly on the new advance payment entry
             // instead of leaving them to search the full list for it.
             var tpDbId = currentProofButton ? currentProofButton.data('tp-db-id') : '';
-            alert('Added to TP advance payments. Taking you to the entry now…');
-            window.location.href = 'manage-tp-advance-payments.php?highlight=' + encodeURIComponent(data.advance_payment_id)
-                + (tpDbId ? '&tp_id=' + encodeURIComponent(tpDbId) : '');
+            alert('Added to TP advance payments. Taking you back to their orders…');
+            window.location.href = 'tp-today-orders.php';
         })
         .fail(function () {
             alert('Could not reach the server. Please try again.');

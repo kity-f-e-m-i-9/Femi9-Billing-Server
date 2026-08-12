@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpApproverContext.php';
 error_reporting(0);
 
 date_default_timezone_set("Asia/Kolkata");
@@ -13,36 +14,60 @@ $productList = [];
 $resProd = mysqli_query($db_conn, "SELECT id, productName, stockist_price FROM products WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 if ($resProd) while ($p = mysqli_fetch_assoc($resProd)) $productList[] = $p;
 
-// Available advance balance
-$balStmt = mysqli_prepare($db_conn,
-    "SELECT COALESCE(SUM(balance_amount), 0) AS bal
-     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL"
-);
-mysqli_stmt_bind_param($balStmt, "i", $Login_user_IDvl);
-mysqli_stmt_execute($balStmt);
-$advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
-mysqli_stmt_close($balStmt);
+// If this TP is assigned to a Super Stockist, they get a choice of approver
+// per order — otherwise everything routes to Company exactly as before, and
+// $assignedSs stays null so the selector never renders.
+$assignedSs = tpGetAssignedSs($db_conn, (int)$Login_user_IDvl);
 
-// Orders still "waiting" (not yet invoiced/fulfilled, not cancelled) already
-// have their advance-covered portion (order total minus any excess covered
-// by uploaded payment proof) implicitly earmarked, even though
-// tp_advance_payments.balance_amount is only actually decremented once the
-// order is fulfilled. Without subtracting this, a TP could place several
-// pending orders that each look "within budget" individually while
-// cumulatively over-committing the real balance.
-$reservedStmt = mysqli_prepare($db_conn,
-    "SELECT COALESCE(SUM(poi.total - po.excess_amount), 0) AS reserved
-     FROM tp_purchase_orders po
-     JOIN (SELECT po_id, SUM(amount) AS total FROM tp_purchase_order_items GROUP BY po_id) poi
-       ON poi.po_id = po.id
-     WHERE po.territory_partner_id = ? AND po.status = 'waiting'"
-);
-mysqli_stmt_bind_param($reservedStmt, "i", $Login_user_IDvl);
-mysqli_stmt_execute($reservedStmt);
-$reservedAmount = (float)(mysqli_stmt_get_result($reservedStmt)->fetch_assoc()['reserved'] ?? 0);
-mysqli_stmt_close($reservedStmt);
+// Available advance balance and reserved-by-waiting-orders amount, computed
+// per approver pool — reused as-is (same query, just filtered by approver)
+// so the existing single-pool math for TPs with no SS assignment is
+// byte-for-byte unchanged.
+function tpApoBalanceFor(mysqli $db_conn, int $tpId, array $approver): array {
+    $balStmt = mysqli_prepare($db_conn,
+        "SELECT COALESCE(SUM(balance_amount), 0) AS bal
+         FROM tp_advance_payments
+         WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
+           AND approver_type = ? AND approver_ss_id <=> ?"
+    );
+    mysqli_stmt_bind_param($balStmt, "isi", $tpId, $approver['type'], $approver['ss_id']);
+    mysqli_stmt_execute($balStmt);
+    $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
+    mysqli_stmt_close($balStmt);
 
-$advBalance = max(0, round($advBalance - $reservedAmount, 2));
+    // Orders still "waiting" (not yet invoiced/fulfilled, not cancelled) already
+    // have their advance-covered portion (order total minus any excess covered
+    // by uploaded payment proof) implicitly earmarked, even though
+    // tp_advance_payments.balance_amount is only actually decremented once the
+    // order is fulfilled. Without subtracting this, a TP could place several
+    // pending orders that each look "within budget" individually while
+    // cumulatively over-committing the real balance. Scoped to the same
+    // approver pool the order itself was routed to.
+    $reservedStmt = mysqli_prepare($db_conn,
+        "SELECT COALESCE(SUM(poi.total - po.excess_amount), 0) AS reserved
+         FROM tp_purchase_orders po
+         JOIN (SELECT po_id, SUM(amount) AS total FROM tp_purchase_order_items GROUP BY po_id) poi
+           ON poi.po_id = po.id
+         WHERE po.territory_partner_id = ? AND po.status = 'waiting'
+           AND po.approver_type = ? AND po.approver_ss_id <=> ?"
+    );
+    mysqli_stmt_bind_param($reservedStmt, "isi", $tpId, $approver['type'], $approver['ss_id']);
+    mysqli_stmt_execute($reservedStmt);
+    $reservedAmount = (float)(mysqli_stmt_get_result($reservedStmt)->fetch_assoc()['reserved'] ?? 0);
+    mysqli_stmt_close($reservedStmt);
+
+    return [max(0, round($advBalance - $reservedAmount, 2))];
+}
+
+[$advBalanceCompany] = tpApoBalanceFor($db_conn, (int)$Login_user_IDvl, ['type' => 'company', 'ss_id' => null]);
+$advBalanceSs = null;
+if ($assignedSs !== null) {
+    [$advBalanceSs] = tpApoBalanceFor($db_conn, (int)$Login_user_IDvl, ['type' => 'ss', 'ss_id' => $assignedSs['id']]);
+}
+
+// Default selection and displayed balance — Company unless the TP has an SS
+// assignment, matching "routes to Company exactly as today" for TPs without one.
+$advBalance = $advBalanceCompany;
 
 // Self-migrating: ensure used_for_po_id exists so an already-consumed
 // submission (one that already unlocked a different order) can be told
@@ -68,19 +93,30 @@ if ($_usedForPoCol && $_usedForPoCol->num_rows === 0) {
 // balance was never actually enough (e.g. an old accepted ₹10,000
 // submission, whose money is already spent as part of the visible balance,
 // otherwise kept "covering" every future unrelated order indefinitely).
-$eligibleAdvanceSubmissionTotal = 0.0;
-$hasEligibleAdvanceSubmission = false;
-$advSubStmt = mysqli_prepare($db_conn,
-    "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt
-     FROM tp_advance_payment_submissions
-     WHERE territory_partner_id = ? AND status = 'pending_review' AND used_for_po_id IS NULL"
-);
-mysqli_stmt_bind_param($advSubStmt, "i", $Login_user_IDvl);
-mysqli_stmt_execute($advSubStmt);
-$advSubRow = mysqli_stmt_get_result($advSubStmt)->fetch_assoc();
-$eligibleAdvanceSubmissionTotal = (float)($advSubRow['total'] ?? 0);
-$hasEligibleAdvanceSubmission = (int)($advSubRow['cnt'] ?? 0) > 0;
-mysqli_stmt_close($advSubStmt);
+function tpApoEligibleSubmissionFor(mysqli $db_conn, int $tpId, array $approver): array {
+    $advSubStmt = mysqli_prepare($db_conn,
+        "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt
+         FROM tp_advance_payment_submissions
+         WHERE territory_partner_id = ? AND status = 'pending_review' AND used_for_po_id IS NULL
+           AND approver_type = ? AND approver_ss_id <=> ?"
+    );
+    mysqli_stmt_bind_param($advSubStmt, "isi", $tpId, $approver['type'], $approver['ss_id']);
+    mysqli_stmt_execute($advSubStmt);
+    $advSubRow = mysqli_stmt_get_result($advSubStmt)->fetch_assoc();
+    mysqli_stmt_close($advSubStmt);
+    return [(float)($advSubRow['total'] ?? 0), (int)($advSubRow['cnt'] ?? 0) > 0];
+}
+
+[$eligibleAdvanceSubmissionTotalCompany, $hasEligibleAdvanceSubmissionCompany] =
+    tpApoEligibleSubmissionFor($db_conn, (int)$Login_user_IDvl, ['type' => 'company', 'ss_id' => null]);
+$eligibleAdvanceSubmissionTotalSs = 0.0;
+$hasEligibleAdvanceSubmissionSs = false;
+if ($assignedSs !== null) {
+    [$eligibleAdvanceSubmissionTotalSs, $hasEligibleAdvanceSubmissionSs] =
+        tpApoEligibleSubmissionFor($db_conn, (int)$Login_user_IDvl, ['type' => 'ss', 'ss_id' => $assignedSs['id']]);
+}
+$eligibleAdvanceSubmissionTotal = $eligibleAdvanceSubmissionTotalCompany;
+$hasEligibleAdvanceSubmission = $hasEligibleAdvanceSubmissionCompany;
 
 // Restore an in-progress cart/delivery draft saved right before the TP was
 // sent to add-advance-payment.php (see stash-po-draft.php) — cleared once
@@ -248,12 +284,31 @@ $tpDeliveryAddressParts = array_filter([
 
                         <form action="purchase-order-action.php" method="post" id="uploadForm" onsubmit="return validatePoLines();">
                             <input type="hidden" id="advBalanceVal" value="<?=$advBalance?>">
+                            <input type="hidden" name="approver_type" id="approver_type_input" value="company">
+
+                            <?php if ($assignedSs !== null): ?>
+                            <div class="apo-card">
+                                <div class="apo-card-title"><i class="material-icons-outlined">alt_route</i>Submit To</div>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
+                                            <input type="radio" name="approver_choice" value="company" checked onchange="onApproverChange()"> Company
+                                        </label>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
+                                            <input type="radio" name="approver_choice" value="ss" onchange="onApproverChange()"> <?=htmlspecialchars($assignedSs['name'])?> (Super Stockist)
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
 
                             <div class="apo-balance-card">
                                 <i class="material-icons-outlined">account_balance_wallet</i>
                                 <div>
                                     <div class="label">Available Advance Balance</div>
-                                    <div class="value">&#8377;<?=inr_format($advBalance, 2)?></div>
+                                    <div class="value">&#8377;<span id="advBalanceDisplay"><?=inr_format($advBalance, 2)?></span></div>
                                 </div>
                             </div>
 
@@ -380,7 +435,7 @@ $tpDeliveryAddressParts = array_filter([
                                 <div class="apo-summary-row">
                                     <span>Order Total: <span class="amt" id="poGrandTotal">&#8377;0.00</span></span>
                                     <span style="color:#d1d5db;">|</span>
-                                    <span>Available Advance Balance: <span class="amt">&#8377;<?=inr_format($advBalance, 2)?></span></span>
+                                    <span>Available Advance Balance: <span class="amt">&#8377;<span id="advBalanceDisplay2"><?=inr_format($advBalance, 2)?></span></span></span>
                                 </div>
                             </div>
 
@@ -528,9 +583,37 @@ $tpDeliveryAddressParts = array_filter([
     // Whether an advance-payment submission already exists (pending review
     // or accepted) that can cover the excess — set server-side by checking
     // tp_advance_payment_submissions, refreshed on every page load including
-    // the redirect back from add-advance-payment.php.
-    var hasEligibleAdvanceSubmission = <?=json_encode($hasEligibleAdvanceSubmission)?>;
-    var eligibleAdvanceSubmissionTotal = <?=json_encode($eligibleAdvanceSubmissionTotal)?>;
+    // the redirect back from add-advance-payment.php. Both pools are sent
+    // down so the radio toggle can swap between them without a reload —
+    // company is the default/fallback and the only pool that exists at all
+    // when this TP has no SS assignment.
+    var advBalanceByApprover = {
+        company: <?=json_encode($advBalanceCompany)?>,
+        ss: <?=json_encode($advBalanceSs)?>
+    };
+    var eligibleSubmissionByApprover = {
+        company: { has: <?=json_encode($hasEligibleAdvanceSubmissionCompany)?>, total: <?=json_encode($eligibleAdvanceSubmissionTotalCompany)?> },
+        ss: { has: <?=json_encode($hasEligibleAdvanceSubmissionSs)?>, total: <?=json_encode($eligibleAdvanceSubmissionTotalSs)?> }
+    };
+    var hasEligibleAdvanceSubmission = eligibleSubmissionByApprover.company.has;
+    var eligibleAdvanceSubmissionTotal = eligibleSubmissionByApprover.company.total;
+
+    function onApproverChange() {
+        var choice = document.querySelector('input[name="approver_choice"]:checked');
+        var approver = choice ? choice.value : 'company';
+        document.getElementById('approver_type_input').value = approver;
+
+        var bal = advBalanceByApprover[approver];
+        if (bal === null || bal === undefined) bal = 0;
+        document.getElementById('advBalanceVal').value = bal;
+        document.getElementById('advBalanceDisplay').textContent = bal.toFixed(2);
+        document.getElementById('advBalanceDisplay2').textContent = bal.toFixed(2);
+
+        hasEligibleAdvanceSubmission = eligibleSubmissionByApprover[approver].has;
+        eligibleAdvanceSubmissionTotal = eligibleSubmissionByApprover[approver].total;
+
+        updatePoSummary();
+    }
 
     function poGrandTotal() {
         var total = 0;
@@ -608,7 +691,8 @@ $tpDeliveryAddressParts = array_filter([
                     btn.disabled = false;
                     return;
                 }
-                window.location.href = 'add-advance-payment.php?return_to=po&amount=' + encodeURIComponent(excess.toFixed(2));
+                var approver = document.getElementById('approver_type_input').value || 'company';
+                window.location.href = 'add-advance-payment.php?return_to=po&amount=' + encodeURIComponent(excess.toFixed(2)) + '&approver=' + encodeURIComponent(approver);
             })
             .catch(function() {
                 alert('Could not reach the server — please try again.');

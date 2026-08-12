@@ -11,11 +11,15 @@ $tp_id     = (int)($_GET['tp_id']     ?? 0);
 $godown_id = (int)($_GET['godown_id'] ?? 0);
 if (!$tp_id) { echo json_encode(['balance' => 0.00, 'count' => 0]); exit; }
 
+// Scoped to the Company-approved pool only — an SS-assigned TP may also hold
+// a separate SS-approved balance (see super-stockist/get-tp-advance-balance.php),
+// which tp-invoice-action.php never draws from for a company-side invoice, so
+// showing it here would preview a balance the submit-time check would reject.
 if ($godown_id > 0) {
-    $stmt = $db_conn->prepare("SELECT COALESCE(SUM(balance_amount), 0) AS balance, COUNT(*) AS cnt FROM tp_advance_payments WHERE territory_partner_id = ? AND company_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL");
+    $stmt = $db_conn->prepare("SELECT COALESCE(SUM(balance_amount), 0) AS balance, COUNT(*) AS cnt FROM tp_advance_payments WHERE territory_partner_id = ? AND company_id = ? AND approver_type = 'company' AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL");
     $stmt->bind_param("ii", $tp_id, $godown_id);
 } else {
-    $stmt = $db_conn->prepare("SELECT COALESCE(SUM(balance_amount), 0) AS balance, COUNT(*) AS cnt FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL");
+    $stmt = $db_conn->prepare("SELECT COALESCE(SUM(balance_amount), 0) AS balance, COUNT(*) AS cnt FROM tp_advance_payments WHERE territory_partner_id = ? AND approver_type = 'company' AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL");
     $stmt->bind_param("i", $tp_id);
 }
 $stmt->execute();

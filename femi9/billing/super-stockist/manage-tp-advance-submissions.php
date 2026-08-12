@@ -1,13 +1,17 @@
 <?php
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
-require_once("include/GodownAccess.php");
-include("config.php");
 error_reporting(0);
+
+if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
+    header("Location: dashboard.php?error=unauthorized"); exit;
+}
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
+
+$ss_temp_id    = $Login_user_IDvl;
+$ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
 
 date_default_timezone_set("Asia/Kolkata");
 $today = date("Y-m-d");
@@ -42,13 +46,11 @@ if ($filterSubmitted) {
 }
 
 // Drafts (status='draft') are still-in-progress TP uploads not yet
-// submitted for review — never shown here, same as a PO's po_id IS NULL
-// screenshots never appearing on tp-today-orders.php. SS-routed submissions
-// belong exclusively to that SS's own queue
-// (super-stockist/manage-tp-advance-submissions.php).
-$whereSql = "WHERE sub.status != 'draft' AND sub.approver_type = 'company'";
-$bindTypes = '';
-$bindValues = [];
+// submitted for review — never shown here. Scoped to this SS's own TPs and
+// only submissions actually routed to this SS.
+$whereSql = "WHERE sub.status != 'draft' AND tp.onboard_ss_id = ? AND sub.approver_type = 'ss' AND sub.approver_ss_id = ?";
+$bindTypes = 'si';
+$bindValues = [$ss_temp_id, $ss_account_id];
 if ($filterSubmitted) {
     $whereSql .= ' AND DATE(sub.created_at) BETWEEN ? AND ?';
     $bindTypes .= 'ss';
@@ -71,13 +73,11 @@ $stmt = $db_conn->prepare(
             sub.status, sub.rejection_reason, sub.reviewed_by, sub.reviewed_at, sub.advance_payment_id, sub.created_at,
             tp.name AS tp_name, tp.mobile AS tp_mobile, tp.tp_id AS tp_code
      FROM tp_advance_payment_submissions sub
-     LEFT JOIN territory_partners tp ON tp.id = sub.territory_partner_id
+     JOIN territory_partners tp ON tp.id = sub.territory_partner_id
      $whereSql
      ORDER BY (sub.status = 'pending_review') DESC, sub.created_at DESC"
 );
-if ($bindTypes !== '') {
-    $stmt->bind_param($bindTypes, ...$bindValues);
-}
+$stmt->bind_param($bindTypes, ...$bindValues);
 $stmt->execute();
 $submissions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
@@ -109,10 +109,6 @@ $totalCount    = count($submissions);
 $pendingCount  = count(array_filter($submissions, fn($r) => $r['status'] === 'pending_review'));
 $acceptedCount = count(array_filter($submissions, fn($r) => $r['status'] === 'accepted'));
 $totalAmount   = array_sum(array_column($submissions, 'amount'));
-
-$companyProfiles = $db_conn->query(
-    "SELECT id, gname FROM company_godown WHERE gname LIKE '%Femi%' AND " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC"
-)->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -380,7 +376,6 @@ $companyProfiles = $db_conn->query(
     <script src="../../assets/js/main.min.js"></script>
     <script>
     var CSRF_TOKEN = <?=json_encode($_SESSION['csrf_token'])?>;
-    var COMPANY_PROFILES = <?=json_encode($companyProfiles, JSON_UNESCAPED_UNICODE)?>;
     var fromPo = <?=json_encode($fromPo)?>;
 
     var currentProofButton = null;
@@ -454,18 +449,12 @@ $companyProfiles = $db_conn->query(
                     '<span class="proof-confirmed-badge"><i class="material-icons-outlined" style="font-size:16px;">check_circle</i>Added as Advance Payment #' + sub.advance_payment_id + '</span>' +
                     '</div>';
             } else {
-                var companyOptions = '<option value="">Select company profile…</option>';
-                COMPANY_PROFILES.forEach(function (cp) {
-                    companyOptions += '<option value="' + cp.id + '">' + $('<div>').text(cp.gname).html() + '</option>';
-                });
                 var todayStr = new Date().toISOString().slice(0, 10);
                 actionsHtml = '<div class="proof-action-panel" data-submission-id="' + sub.id + '">' +
                     '<button type="button" class="btn btn-outline-primary add-advance-toggle-btn">' +
                     '<i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px;">add_card</i>Add to TP Payment Entry</button> ' +
                     '<button type="button" class="btn btn-outline-danger proof-cancel-btn">Cancel Submission</button>' +
                     '<div class="advance-form proof-field-row mt-3" style="display:none;">' +
-                        '<div class="proof-field"><label>Company Profile</label>' +
-                        '<select class="form-select advance-company-select" style="width:180px;">' + companyOptions + '</select></div>' +
                         '<div class="proof-field"><label>Amount</label>' +
                         '<input type="number" step="0.01" min="0" class="form-control advance-amount-input" style="width:110px;" value="' + sub.amount + '"></div>' +
                         '<div class="proof-field"><label>Reference</label>' +
@@ -600,14 +589,10 @@ $companyProfiles = $db_conn->query(
         var $btn = $(this);
         var $row = $btn.closest('[data-submission-id]');
         var submissionId = parseInt($row.data('submission-id'), 10);
-        var companyId = $row.find('.advance-company-select').val();
-
-        if (!companyId) { alert('Please select a company profile.'); return; }
 
         var payload = {
             csrf_token: CSRF_TOKEN,
             submission_id: submissionId,
-            company_id: companyId,
             amount: $row.find('.advance-amount-input').val(),
             reference_number: $row.find('.advance-ref-input').val(),
             payment_mode: $row.find('.advance-mode-select').val(),
@@ -627,8 +612,6 @@ $companyProfiles = $db_conn->query(
                 updateProofButton();
                 renderProofModal();
 
-                var tpId = currentSubmission && currentSubmission.territory_partner_id ? currentSubmission.territory_partner_id : '';
-
                 if (fromPo) {
                     // Reached here from tp-today-orders.php's "View This TP's
                     // Submissions" link (excess-balance purchase order) — once
@@ -641,14 +624,7 @@ $companyProfiles = $db_conn->query(
                         window.location.href = 'tp-today-orders.php';
                     }, 900);
                 } else {
-                    // Direct visit to this page — land the reviewer directly
-                    // on the new advance payment entry instead of leaving
-                    // them to search the full list for it.
-                    tasShowAlert('Added to TP advance balance (Advance Payment #' + data.advance_payment_id + '). Taking you to the entry now…', 'success');
-                    setTimeout(function () {
-                        window.location.href = 'manage-tp-advance-payments.php?highlight=' + encodeURIComponent(data.advance_payment_id)
-                            + (tpId ? '&tp_id=' + encodeURIComponent(tpId) : '');
-                    }, 900);
+                    tasShowAlert('Added to TP advance balance (Advance Payment #' + data.advance_payment_id + ').', 'success');
                 }
             })
             .fail(function () {

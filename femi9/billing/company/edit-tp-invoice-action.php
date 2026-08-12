@@ -3,6 +3,7 @@ ob_start();
 include("checksession.php");
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
+require_once __DIR__ . '/../shared/TpApproverContext.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
     header("Location: manage-tp-invoices?error=unauthorized"); exit;
@@ -240,8 +241,11 @@ try {
     tpAdvanceRestore($db_conn, $inv_id);
 
     // 3. Validate new advance balance (net amount after discount; courier collected separately)
-    $bs = $db_conn->prepare("SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted'");
-    $bs->bind_param("i", $tp_id); $bs->execute();
+    // Company-side edit action — always scoped to this TP's company-approved
+    // pool, same reasoning as tp-invoice-action.php.
+    $editApprover = ['type' => 'company', 'ss_id' => null];
+    $bs = $db_conn->prepare("SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted' AND approver_type=? AND approver_ss_id<=>?");
+    $bs->bind_param("isi", $tp_id, $editApprover['type'], $editApprover['ss_id']); $bs->execute();
     $avail_balance = round((float)$bs->get_result()->fetch_assoc()['bal'], 2); $bs->close();
     if ($avail_balance < $new_net) {
         throw new \Exception("Insufficient advance balance. Available: " . inr_format($avail_balance, 2) . ", Required: " . inr_format($new_net, 2));
@@ -302,7 +306,7 @@ try {
     }
 
     // 5. Deduct new advance (FIFO, net amount after discount) and log for future restore
-    tpAdvanceDeduct($db_conn, $inv_id, $inv_num, $tp_id, $new_net);
+    tpAdvanceDeduct($db_conn, $inv_id, $inv_num, $tp_id, $new_net, 0, $editApprover);
 
     // 6. Update invoice header (discount_amount preserved/updated so total stays consistent)
     // Note: existence is already guaranteed by the FOR UPDATE lock above (within this same
