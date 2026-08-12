@@ -183,6 +183,21 @@ if (empty($items)) {
     header("Location: add-tp-invoice?error=noproducts"); exit;
 }
 
+// GST products stay under Company regardless of who invoices them — an SS
+// creating an invoice with even one GST line item still gets tagged
+// approver_type='company' here, same rule the historical backfill applied
+// (see db_migrations/2026_08_12_tp_invoice_approver_gst_backfill.sql).
+$pidPlaceholders = implode(',', array_fill(0, count($items), '?'));
+$pidTypes = str_repeat('i', count($items));
+$gstStmt = $db_conn->prepare("SELECT COUNT(*) AS cnt FROM products WHERE id IN ($pidPlaceholders) AND gst > 0");
+$gstStmt->bind_param($pidTypes, ...array_column($items, 'pid'));
+$gstStmt->execute();
+$hasGstItem = (int)($gstStmt->get_result()->fetch_assoc()['cnt'] ?? 0) > 0;
+$gstStmt->close();
+
+$invoiceApproverType   = $hasGstItem ? 'company' : 'ss';
+$invoiceApproverSsId   = $hasGstItem ? null : $ss_account_id;
+
 // Gross subtotal minus each line's own discount, then the invoice-level
 // "Additional Discount" field on top of that.
 $gross_subtotal   = round(array_sum(array_column($items, 'amount')), 2);
@@ -231,8 +246,8 @@ try {
     $null_src = null;
     $zero_src = 0;
     $created_by_user_type = 'super_stockiest';
-    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by,created_by_user_type,created_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("siiiisdddsss", $inv_num, $tp_id, $null_src, $zero_src, $zero_src, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type, $ss_account_id);
+    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,approver_type,approver_ss_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by,created_by_user_type,created_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $s->bind_param("sisiiiisdddsss", $inv_num, $tp_id, $invoiceApproverType, $invoiceApproverSsId, $null_src, $zero_src, $zero_src, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type, $ss_account_id);
     $s->execute();
     $invoice_id = $db_conn->insert_id;
     $s->close();

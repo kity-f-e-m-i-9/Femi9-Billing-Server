@@ -10,6 +10,11 @@ if ($col && $col->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN courier_charges DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER invoice_date");
 }
 
+// This SS's own numeric id — approver_ss_id is always stored as this, never
+// the varchar temp_id used for the onboard_ss_id assignment link. See
+// tp-today-orders.php for the same pattern.
+$ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
+
 $filter_tp_id = (int)($_GET['tp_id'] ?? 0);
 
 // TPs belonging to this SS that have invoices
@@ -17,18 +22,21 @@ $tp_filter_res = $db_conn->prepare("
     SELECT DISTINCT tp.id, tp.name, tp.tp_id AS tp_code
     FROM tp_invoices tpi
     JOIN territory_partners tp ON tp.id = tpi.territory_partner_id
-    WHERE tp.onboard_ss_id = ?
+    WHERE tp.onboard_ss_id = ? AND tpi.approver_type = 'ss' AND tpi.approver_ss_id = ?
     ORDER BY tp.name
 ");
-$tp_filter_res->bind_param("s", $Login_user_IDvl);
+$tp_filter_res->bind_param("si", $Login_user_IDvl, $ss_account_id);
 $tp_filter_res->execute();
 $tp_filter_list = $tp_filter_res->get_result()->fetch_all(MYSQLI_ASSOC);
 $tp_filter_res->close();
 
-// Main query — scoped to SS's TPs
-$where  = ["tp.onboard_ss_id = ?"];
-$params = [$Login_user_IDvl];
-$types  = 's';
+// Main query — scoped to SS's TPs. Invoices tagged approver_type='company'
+// (including every GST-product invoice, forced there regardless of who
+// created it — see db_migrations/2026_08_12_tp_invoice_approver_gst_backfill.sql
+// and the GST check in tp-invoice-action.php) never show here.
+$where  = ["tp.onboard_ss_id = ?", "tpi.approver_type = 'ss'", "tpi.approver_ss_id = ?"];
+$params = [$Login_user_IDvl, $ss_account_id];
+$types  = 'si';
 
 if ($filter_tp_id > 0) {
     $where[]  = "tpi.territory_partner_id = ?";
