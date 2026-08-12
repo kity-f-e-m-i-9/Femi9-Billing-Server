@@ -568,6 +568,40 @@ if ($hasTps) {
                         <a href="#sec-yoursales">Your Sales via TP</a>
                     </nav>
 
+                    <!-- ══ District / Firka coverage — how much of your territory has a TP yet ══ -->
+                    <div class="row mb-3">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
+                                <i class="material-icons-outlined kpi-ico">public</i>
+                                <div class="kpi-t">Districts Assigned</div>
+                                <div class="kpi-multi"><div><b><?php echo $district_count; ?></b></div></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:#6b7280;--kpi-tint:#f3f4f6;">
+                                <i class="material-icons-outlined kpi-ico">grid_view</i>
+                                <div class="kpi-t">Total Firkas</div>
+                                <div class="kpi-multi"><div><b><?php echo $firka_total_count; ?></b></div></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
+                                <i class="material-icons-outlined kpi-ico">check_circle</i>
+                                <div class="kpi-t">Filled Firkas</div>
+                                <div class="kpi-multi"><div><b><?php echo $firka_filled_count; ?></b></div></div>
+                                <p class="snote" style="margin:6px 0 0;">Has at least one Territory Partner assigned.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:var(--critical);--kpi-tint:var(--critical-tint);">
+                                <i class="material-icons-outlined kpi-ico">error_outline</i>
+                                <div class="kpi-t">Unassigned Firkas</div>
+                                <div class="kpi-multi"><div><b><?php echo $firka_unassigned_count; ?></b></div></div>
+                                <p class="snote" style="margin:6px 0 0;">No Territory Partner assigned yet.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- ══ Overview — Sales / Returns / Total Turnover (your TPs' downstream sales) ══ -->
                     <div class="mis-section" id="sec-overview">
                     <h3 style="font-size:16px;font-weight:700;margin:6px 0 8px;">Overview — Your TPs' Downstream Sales</h3>
@@ -633,39 +667,6 @@ if ($hasTps) {
                         </div>
                     </div>
 
-                    <!-- ══ District / Firka coverage — how much of your territory has a TP yet ══ -->
-                    <div class="row mb-3">
-                        <div class="col-md-3 col-sm-6">
-                            <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
-                                <i class="material-icons-outlined kpi-ico">public</i>
-                                <div class="kpi-t">Districts Assigned</div>
-                                <div class="kpi-multi"><div><b><?php echo $district_count; ?></b></div></div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="kpi-card" style="--kpi-accent:#6b7280;--kpi-tint:#f3f4f6;">
-                                <i class="material-icons-outlined kpi-ico">grid_view</i>
-                                <div class="kpi-t">Total Firkas</div>
-                                <div class="kpi-multi"><div><b><?php echo $firka_total_count; ?></b></div></div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
-                                <i class="material-icons-outlined kpi-ico">check_circle</i>
-                                <div class="kpi-t">Filled Firkas</div>
-                                <div class="kpi-multi"><div><b><?php echo $firka_filled_count; ?></b></div></div>
-                                <p class="snote" style="margin:6px 0 0;">Has at least one Territory Partner assigned.</p>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="kpi-card" style="--kpi-accent:var(--critical);--kpi-tint:var(--critical-tint);">
-                                <i class="material-icons-outlined kpi-ico">error_outline</i>
-                                <div class="kpi-t">Unassigned Firkas</div>
-                                <div class="kpi-multi"><div><b><?php echo $firka_unassigned_count; ?></b></div></div>
-                                <p class="snote" style="margin:6px 0 0;">No Territory Partner assigned yet.</p>
-                            </div>
-                        </div>
-                    </div>
                     </div><!-- /#sec-overview -->
 
                     <!-- ══ Products ══ -->
