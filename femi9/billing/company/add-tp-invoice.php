@@ -333,6 +333,9 @@ if ($prefill_po_id > 0) {
                                     <label class="form-label" id="sourceLabel">Channel Partner</label>
                                     <div id="sourceContent"></div>
                                     <div class="field-hint" id="sourceHint">Auto-resolved from territory assignment</div>
+                                    <div id="sourceToggle" style="display:none;margin-top:4px;">
+                                        <a href="#" id="sourceToggleLink" style="font-size:12px;font-weight:600;text-decoration:underline;">Use company godown instead</a>
+                                    </div>
                                 </div>
 
                                 <div class="col-lg-3 col-md-4">
@@ -566,6 +569,8 @@ $(document).ready(function() {
     var currentCpId       = null;
     var currentGodownId   = null;
     var currentTpId       = null;
+    var currentCpSources  = [];
+    var sourceMode        = 'cp'; // 'cp' or 'godown' — which source type is currently shown
     var advanceBalance    = 0;
 
     /* ── Godown list (pre-loaded from PHP) ── */
@@ -667,18 +672,12 @@ $(document).ready(function() {
 
         $.getJSON('get-tp-source-locations.php?tp_id=' + tp_id, function (res) {
             if (res.status === 'ok' && res.sources.length) {
-                $('#sourceLabel').text('Channel Partner');
-                $('#sourceHint').text('Auto-resolved from territory assignment');
-                if (res.sources.length === 1) {
-                    useSource(res.sources[0]);
-                } else {
-                    renderSourceDropdown(res.sources);
-                }
+                currentCpSources = res.sources;
+                showCpSource();
             } else {
                 // No CP found — fall back to godown selection
-                $('#sourceLabel').text('Source Godown');
-                $('#sourceHint').text('No CP assigned — select a company godown');
-                renderGodownDropdown();
+                currentCpSources = [];
+                showGodownSource();
             }
         }).fail(function () {
             $('#sourceContent').html('<div class="alert alert-danger mb-0" style="font-size:13px;">Failed to resolve source. Please try again.</div>');
@@ -686,11 +685,64 @@ $(document).ready(function() {
         }); // end checkTpStock callback
     });
 
+    /* ── Show CP source (auto-resolved), with option to switch to godown ── */
+    function showCpSource() {
+        sourceMode = 'cp';
+        $('#sourceLabel').text('Channel Partner');
+        $('#sourceHint').text('Auto-resolved from territory assignment');
+        if (currentCpSources.length === 1) {
+            useSource(currentCpSources[0]);
+        } else {
+            renderSourceDropdown(currentCpSources);
+        }
+        $('#sourceToggleLink').text('Use company godown instead');
+        $('#sourceToggle').show();
+    }
+
+    /* ── Show godown source, with option to switch back to CP (if resolved) ── */
+    function showGodownSource() {
+        sourceMode = 'godown';
+        $('#sourceLabel').text('Source Godown');
+        currentLocationId = null;
+        currentCpId = null;
+        $('#sourceLocationId').val('');
+        $('#sourceCpId').val('');
+        if (currentCpSources.length) {
+            $('#sourceHint').text('Select a company godown to source this invoice from');
+            $('#sourceToggleLink').text('Use channel partner instead');
+            $('#sourceToggle').show();
+        } else {
+            $('#sourceHint').text('No CP assigned — select a company godown');
+            $('#sourceToggle').hide();
+        }
+        renderGodownDropdown();
+    }
+
+    $('#sourceToggleLink').on('click', function (e) {
+        e.preventDefault();
+        resetProducts();
+        if (sourceMode === 'godown') {
+            // currently on godown → switch back to CP
+            $('#sourceGodownId').val('');
+            currentGodownId = null;
+            showCpSource();
+        } else {
+            // currently on CP → switch to godown
+            $('#sourceCpId').val('');
+            $('#sourceLocationId').val('');
+            currentCpId = null;
+            currentLocationId = null;
+            showGodownSource();
+        }
+    });
+
     function useSource(src) {
         currentLocationId = src.location_id;
         currentCpId       = src.cp_db_id;
+        currentGodownId   = null;
         $('#sourceLocationId').val(src.location_id);
         $('#sourceCpId').val(src.cp_db_id);
+        $('#sourceGodownId').val('');
         $('#sourceContent').html(
             '<div class="source-info">' +
             '<span class="loc-name">' + escHtml(src.cp_name) + '</span>' +
@@ -1054,6 +1106,8 @@ $(document).ready(function() {
         currentCpId       = null;
         currentGodownId   = null;
         currentTpId       = null;
+        currentCpSources  = [];
+        sourceMode        = 'cp';
         advanceBalance    = 0;
         $('#sourceLocationId').val('');
         $('#sourceCpId').val('');
@@ -1065,6 +1119,7 @@ $(document).ready(function() {
         $('#sourceContent').empty();
         $('#sourceLabel').text('Channel Partner');
         $('#sourceHint').text('Auto-resolved from territory assignment');
+        $('#sourceToggle').hide();
         $('#balancePanel').hide();
         resetProducts();
         $('#productAddWrapper').hide();
