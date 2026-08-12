@@ -40,6 +40,23 @@ if (empty($items)) {
     exit;
 }
 
+// GST products stay under Company regardless of which approver the TP
+// picked — same rule applied to tp_invoices (see
+// db_migrations/2026_08_12_tp_invoice_approver_gst_backfill.sql) and
+// backfilled onto tp_purchase_orders in
+// db_migrations/2026_08_12_tp_purchase_order_gst_backfill.sql.
+$pidPlaceholders = implode(',', array_fill(0, count($items), '?'));
+$pidTypes = str_repeat('i', count($items));
+$gstStmt = $db_conn->prepare("SELECT COUNT(*) AS cnt FROM products WHERE id IN ($pidPlaceholders) AND gst > 0");
+$gstStmt->bind_param($pidTypes, ...array_column($items, 'pid'));
+$gstStmt->execute();
+$hasGstItem = (int)($gstStmt->get_result()->fetch_assoc()['cnt'] ?? 0) > 0;
+$gstStmt->close();
+
+if ($hasGstItem) {
+    $approver = ['type' => 'company', 'ss_id' => null];
+}
+
 // Delivery address — either the TP's existing registered address, or a
 // one-off address typed for this order. Stored on the PO itself (not just a
 // pointer back to territory_partners) so it stays correct even if the TP's
