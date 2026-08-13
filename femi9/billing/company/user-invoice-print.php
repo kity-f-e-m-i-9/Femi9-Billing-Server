@@ -667,7 +667,7 @@ $number = $result_Invoice_Details['total'];
 <td align="center">HSN/SAC</td>
 <td align="right">Taxable<br/>Value</td>
 <td align="right" colspan="2">CGST</td>
-<td align="right" colspan="2">SGST/UTGST</td>
+<td align="right" colspan="2">SGST</td>
 <td align="right">Total<br/>Tax Amount</td>
 </tr>
 <tr>

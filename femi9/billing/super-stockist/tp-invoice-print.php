@@ -356,7 +356,7 @@ Terms of Delivery<br/>&nbsp;
 ?>
 <tr>
 <td><?= $invno; ?></td>
-<td><b><?= htmlspecialchars($item['productName']); ?></b><?= $gst_type === 'inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
+<td><b><?= htmlspecialchars($item['productName']); ?></b></td>
 <td id="rightlaign"><?= htmlspecialchars($item['hsn']); ?></td>
 <td id="rightlaign"><?= inr_format($qty, 0); ?> Packs</td>
 <td id="rightlaign"><?= inr_format($mrp, 2); ?></td>

@@ -285,7 +285,7 @@ Terms of Delivery<br/>
 	?>
 <tr>
 <td><?=$intr=$intr+1;?></td>
-<td><b><?=$result_ProductDetails123['productName'];?></b><?php if (($result_INVProductDetails['gst_type'] ?? '') === 'inclusive') { ?> <small>(GST incl.)</small><?php } ?></td>
+<td><b><?=$result_ProductDetails123['productName'];?></b></td>
 <td id="rightlaign"><?=$result_ProductDetails123['hsn'];?></td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2);?></td>

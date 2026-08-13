@@ -488,7 +488,7 @@ Terms of Delivery<br/>&nbsp;
 ?>
 <tr>
 <td><?= $invno; ?></td>
-<td><b><?= htmlspecialchars($item['productName']); ?></b><?= $gst_type === 'inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
+<td><b><?= htmlspecialchars($item['productName']); ?></b></td>
 <td id="rightlaign"><?= htmlspecialchars($item['hsn']); ?></td>
 <td id="rightlaign"><?= inr_format($qty, 0); ?> Packs</td>
 <?php if ($has_carton_data): ?>
@@ -582,7 +582,7 @@ Terms of Delivery<br/>&nbsp;
 <td align="center">HSN/SAC</td>
 <td align="right">Taxable<br/>Value</td>
 <td align="right" colspan="2">CGST</td>
-<td align="right" colspan="2">SGST/UTGST</td>
+<td align="right" colspan="2">SGST</td>
 <td align="right">Total<br/>Tax Amount</td>
 </tr>
 <tr>

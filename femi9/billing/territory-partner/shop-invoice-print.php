@@ -322,7 +322,7 @@ Terms of Delivery<br/>
 ?>
 <tr>
 <td><?php echo ++$invno; ?></td>
-<td><b><?php echo htmlspecialchars($result_INVProductDetails['productName']); ?></b><?php echo $result_INVProductDetails['gst_type_item'] === 'inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
+<td><b><?php echo htmlspecialchars($result_INVProductDetails['productName']); ?></b></td>
 <td id="rightlaign"><?php echo htmlspecialchars($result_INVProductDetails['p_hsn']); ?></td>
 <td id="rightlaign"><?php echo $qty; ?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_INVProductDetails['p_mrp'], 2); ?></td>
@@ -457,7 +457,7 @@ $TAXresult = implode('', $TAXstr);
 <td align="center">HSN/SAC</td>
 <td align="right">Taxable<br/>Value</td>
 <td align="right" colspan="2">CGST</td>
-<td align="right" colspan="2">SGST/UTGST</td>
+<td align="right" colspan="2">SGST</td>
 <td align="right">Total<br/>Tax Amount</td>
 </tr>
 <tr>

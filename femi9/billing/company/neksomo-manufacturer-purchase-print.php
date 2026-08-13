@@ -323,7 +323,7 @@ $invoice_heading = $has_gst_product ? 'Manufacturer Purchase Tax Invoice' : 'Man
 ?>
 <tr>
 <td><?= $sl; ?></td>
-<td><b><?= htmlspecialchars($item['productName']); ?></b><?= $item['gst_type'] === 'inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
+<td><b><?= htmlspecialchars($item['productName']); ?></b></td>
 <td id="rightlaign"><?= htmlspecialchars($item['hsn'] ?? ''); ?></td>
 <td id="rightlaign"><?= inr_format($item['display_qty'], 0); ?> <?= $item['per_label']; ?><?= $item['display_qty'] == 1 ? '' : 's'; ?><?php if ($item['is_pack']): ?> (<?= inr_format((int)$item['quantity_pieces'], 0); ?> pcs)<?php endif; ?></td>
 <td id="rightlaign"><?= inr_format($item['rate'], 2); ?></td>
@@ -382,7 +382,7 @@ $invoice_heading = $has_gst_product ? 'Manufacturer Purchase Tax Invoice' : 'Man
 <td align="center">HSN/SAC</td>
 <td align="right">Taxable<br/>Value</td>
 <td align="right" colspan="2">CGST</td>
-<td align="right" colspan="2">SGST/UTGST</td>
+<td align="right" colspan="2">SGST</td>
 <td align="right">Total<br/>Tax Amount</td>
 </tr>
 <tr>

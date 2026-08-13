@@ -249,7 +249,7 @@ $gsttype=$result_Invoice_Details['gst_type'] ?: 'inner';
 		$ItemRowid=base64_encode($result_INVProductDetails['id']);
 	?>
 				<tr class="item">
-					<td><?=$result_INVProductDetails['productName'];?><?= $result_INVProductDetails['gst_type_item']==='inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
+					<td><?=$result_INVProductDetails['productName'];?></td>
 					<td align="right">&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td align="right"><?=$result_INVProductDetails['qty'];?></td>
 <td align="right">&#8377;<?php echo inr_format($result_INVProductDetails['total'], 2);?></td>
