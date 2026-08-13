@@ -35,6 +35,18 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
+// Indian financial year (Apr–Mar) for a given date, e.g. 2026-07-22 -> "26-27".
+// Same convention as ot-invoice-helper.php's numbering — used here to scope
+// the duplicate-invoice-number check so a number legitimately reused in a
+// later financial year isn't rejected as a clash with an old invoice.
+function ot_import_financial_year(string $ymd): string {
+    $ts = strtotime($ymd);
+    $month = (int)date('n', $ts);
+    $year  = (int)date('Y', $ts);
+    $fyStartYear = $month >= 4 ? $year : $year - 1;
+    return substr((string)$fyStartYear, -2) . '-' . substr((string)($fyStartYear + 1), -2);
+}
+
 function ot_import_back($params) {
     $query = http_build_query($params);
     header("Location: ot-sale-import.php" . ($query ? "?$query" : ""));
@@ -401,20 +413,36 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
         continue;
     }
 
-    // Reject invoice numbers that already exist for this category.
-    $stmt = $db_conn->prepare("SELECT COUNT(*) AS n FROM ot_sales_invoice WHERE cat = ? AND inv_number = ?");
+    // Reject invoice numbers that already exist for this category IN THE SAME
+    // FINANCIAL YEAR as this row's own Date — invoice numbers like "IN-708"
+    // are legitimately reused year to year (e.g. Amazon/Flipkart order-derived
+    // numbers with no year tag baked in), so a same-numbered invoice from a
+    // prior financial year is not a real clash. ot_sales_invoice has no date
+    // of its own; the date lives on ot_sales (one value per tempid).
+    $rowFy = ot_import_financial_year($date);
+    $stmt = $db_conn->prepare("
+        SELECT DISTINCT os.date
+        FROM ot_sales_invoice osi
+        JOIN ot_sales os ON os.tempid = osi.tempid
+        WHERE osi.cat = ? AND osi.inv_number = ?
+    ");
     $stmt->bind_param('ss', $catname, $inv_number);
     $stmt->execute();
-    $exists = (int)$stmt->get_result()->fetch_assoc()['n'];
+    $existingDates = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
-    if ($exists > 0) {
-        $errors[] = "$excelRowLabel: Invoice Number '$inv_number' already exists for category '$catname' — skipped";
+
+    $fyClash = false;
+    foreach ($existingDates as $ed) {
+        if (ot_import_financial_year((string)$ed['date']) === $rowFy) { $fyClash = true; break; }
+    }
+    if ($fyClash) {
+        $errors[] = "$excelRowLabel: Invoice Number '$inv_number' already exists for category '$catname' in FY $rowFy — skipped";
         continue;
     }
 
-    $groupKey = $catKey . '|' . strtolower($inv_number);
+    $groupKey = $catKey . '|' . strtolower($inv_number) . '|' . $rowFy;
     if (isset($groups[$groupKey])) {
-        $errors[] = "$excelRowLabel: duplicate Invoice Number '$inv_number' within this file for category '$catname'";
+        $errors[] = "$excelRowLabel: duplicate Invoice Number '$inv_number' within this file for category '$catname' in FY $rowFy";
         continue;
     }
 
