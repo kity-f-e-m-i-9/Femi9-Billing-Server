@@ -1287,10 +1287,44 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
         <!-- Invoice Number -->
         <div class="col-md-6 mb-3">
             <label class="form-label">Invoice Number <span class="required">*</span></label>
-            <input type="text" onKeyup="showInvoiceDuplicate(this.value)" name="inv_number" autofocus required onkeypress="restrictSpecialChars(event)" class="form-control" placeholder="Enter invoice number">
+            <input type="text" id="inv_number" onKeyup="invNumberEdited(); showInvoiceDuplicate(this.value)" name="inv_number" autofocus required onkeypress="restrictSpecialChars(event)" class="form-control" placeholder="Enter invoice number">
             <span id="txtHintInvoice"></span>
         </div>
-        
+
+        <script>
+        // Auto-suggest next invoice number (per downstream channel prefix,
+        // e.g. ST/FY/LLP{n} napkin / STD/FY/LLP{n} diaper for stockist).
+        // Suggested on page load (napkin default, since no product is picked
+        // yet) and re-suggested once a product is selected via showPrice()
+        // below — see invNumberSuggest(). Only ever fills/overwrites while the
+        // field still holds an auto-suggested value; stops touching it the
+        // moment the user types anything themselves.
+        var invNumberAutoFilled = false;
+        function invNumberEdited() {
+            invNumberAutoFilled = false;
+        }
+        function invNumberSuggest(productId) {
+            var invField = document.getElementById('inv_number');
+            if (!invField) { return; }
+            if (invField.value.trim() !== '' && !invNumberAutoFilled) { return; }
+            var invuser = '<?=$getinvuser;?>';
+            var url = 'load_next_invoice_number.php?invuser=' + encodeURIComponent(invuser) + (productId ? '&pid=' + encodeURIComponent(productId) : '');
+            fetch(url)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data && data.number && (invField.value.trim() === '' || invNumberAutoFilled)) {
+                        invField.value = data.number;
+                        invNumberAutoFilled = true;
+                        if (typeof showInvoiceDuplicate === 'function') {
+                            showInvoiceDuplicate(data.number);
+                        }
+                    }
+                })
+                .catch(function() {});
+        }
+        invNumberSuggest();
+        </script>
+
         <script type="text/javascript">
         function showInvoiceDuplicate(str){
             if (str==""){document.getElementById("txtHint").innerHTML="";return;}
@@ -1379,9 +1413,9 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
         <div class="product-add-grid">
             <div class="input-group-modern">
                 <label>Product <span class="required">*</span></label>
-                <select required name="pr_id" class="form-control" onchange="showPrice(this.value)">
+                <select required name="pr_id" class="form-control" onchange="showPrice(this.value); invNumberSuggest(this.value);">
                     <option value="" hidden>Select Product</option>
-                    <?php 
+                    <?php
                     $select_Products_list="select * from products order by id asc";
                     $fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
                     while($result_Products_list=mysqli_fetch_array($fetch_Products_list)) {

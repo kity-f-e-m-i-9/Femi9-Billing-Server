@@ -780,9 +780,41 @@ xmlhttp.open("GET","loadInvoiceNumberUSER.php?q="+str,true);
 xmlhttp.send();}
 </script>
 			<label class="form-label">Invoice Number *</label>
-            <input type="text" onKeyup="showInvoiceDuplicate(this.value)"; name="inv_number" autofocus required="" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" id="inv_number" onKeyup="invNumberEdited(); showInvoiceDuplicate(this.value)"; name="inv_number" autofocus required="" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>
 			<span id="txtHintInvoice"></span>
+			<script>
+			// Auto-suggest next invoice number (DTSH/FY/LLP{n} napkin /
+			// DTSHD/FY/LLP{n} diaper). Suggested on page load (napkin default,
+			// since no product is picked yet) and re-suggested once a product
+			// is selected via showPrice() below — see invNumberSuggest(). Only
+			// ever fills/overwrites while the field still holds an
+			// auto-suggested value; stops touching it the moment the user
+			// types anything themselves.
+			var invNumberAutoFilled = false;
+			function invNumberEdited() {
+			    invNumberAutoFilled = false;
+			}
+			function invNumberSuggest(productId) {
+			    var invField = document.getElementById('inv_number');
+			    if (!invField) { return; }
+			    if (invField.value.trim() !== '' && !invNumberAutoFilled) { return; }
+			    var url = 'load_next_invoice_number.php' + (productId ? '?pid=' + encodeURIComponent(productId) : '');
+			    fetch(url)
+			        .then(function(r) { return r.json(); })
+			        .then(function(data) {
+			            if (data && data.number && (invField.value.trim() === '' || invNumberAutoFilled)) {
+			                invField.value = data.number;
+			                invNumberAutoFilled = true;
+			                if (typeof showInvoiceDuplicate === 'function') {
+			                    showInvoiceDuplicate(data.number);
+			                }
+			            }
+			        })
+			        .catch(function() {});
+			}
+			invNumberSuggest();
+			</script>
 
 <label class="form-label"><?=$lablenamedisplay;?>*</label>
 <select required="" name="customer_id" class="form-control" autofocus>
@@ -813,7 +845,7 @@ flatpickr("#bookingDate", {
 
 <?php if($amount_received_fully==0){?>
 <div class="item">
-<select required="" name="pr_id" style="width:100%;" required="" onChange="showPrice(this.value)" class="prinput">
+<select required="" name="pr_id" style="width:100%;" required="" onChange="showPrice(this.value); invNumberSuggest(this.value);" class="prinput">
 <option value="" hidden="">Select Product</option>
 <?php $select_Products_list="select * from products order by id asc";
 $fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
