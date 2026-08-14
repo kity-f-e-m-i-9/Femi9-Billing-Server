@@ -44,6 +44,16 @@ $result_TOT_intra_unregister_creditOT=mysqli_fetch_array($fetch_TOT_intra_unregi
 	$total_reg_TP_credit = $tp_credit_totals['reg_intra'];
 	$total_unreg_TP_credit = $tp_credit_totals['unreg_intra'];
 
+	// ---- Nil-rated-only credit note totals (gst_percentage=0), intra-state ----
+	// Needed to net nil-rated returns out of the gross nil-rated sales total in
+	// GSTR1.php's filing summary table (otherwise taxable = grand_total - gross_nil
+	// double-subtracts nil-rated credit notes and can go negative).
+	$nil_intra_register_credit = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and buyer_gsttype='register' and gst_type='inner' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_intra_register_credit += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(osr.total) from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$get_godown_id' and osr.buyer_gsttype='register' and osr.gst_type='inner' and p.gst=0 and osr.return_date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_intra_register_credit += tp_gst_bucket_totals(array_filter($tp_credit_lines, fn($l) => $l['gst_percentage'] == 0))['reg_intra'] ?? 0;
 
+	$nil_intra_unregister_credit = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and buyer_gsttype='unregister' and gst_type='inner' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_intra_unregister_credit += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(osr.total) from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$get_godown_id' and osr.buyer_gsttype='unregister' and osr.gst_type='inner' and p.gst=0 and osr.return_date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_intra_unregister_credit += tp_gst_bucket_totals(array_filter($tp_credit_lines, fn($l) => $l['gst_percentage'] == 0))['unreg_intra'] ?? 0;
 
 ?>

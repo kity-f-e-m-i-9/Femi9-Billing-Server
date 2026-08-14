@@ -66,5 +66,18 @@ $select_sum_total_inter_OTSLSUN="select sum(total-gst_amount) from ot_sales wher
 	$total_reg_TP_inter = $tp_sls_totals_inter['reg_inter'];
 	$total_unreg_TP_inter = $tp_sls_totals_inter['unreg_inter'];
 
+	// ---- Nil-rated-only totals (gst_percentage/gst = 0), inter-state ----
+	// The "Total Sales" figures above mix nil-rated and taxable-rate lines together;
+	// the Nil Rated Supplies filing table needs only the gst_percentage=0 portion.
+	$nil_inter_register = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='register' and gst_type='outer' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_inter_register += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='register' and gst_type='outer' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_inter_register += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gst_amount) from ot_sales where buyer_gsttype='register' and gst_type='outer' and gst=0 and date between '$from_date' and '$to_date' and godownid='$get_godown_id'"))[0] ?? 0);
+	$nil_inter_register += tp_gst_bucket_totals(array_filter($tp_sls_lines_inter, fn($l) => $l['gst_percentage'] == 0))['reg_inter'] ?? 0;
+
+	$nil_inter_unregister = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='unregister' and gst_type='outer' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_inter_unregister += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='unregister' and gst_type='outer' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_inter_unregister += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gst_amount) from ot_sales where buyer_gsttype='unregister' and gst_type='outer' and gst=0 and date between '$from_date' and '$to_date' and godownid='$get_godown_id'"))[0] ?? 0);
+	$nil_inter_unregister += tp_gst_bucket_totals(array_filter($tp_sls_lines_inter, fn($l) => $l['gst_percentage'] == 0))['unreg_inter'] ?? 0;
+
 
 							   ?>

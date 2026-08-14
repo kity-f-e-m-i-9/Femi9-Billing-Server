@@ -44,5 +44,14 @@ $result_TOT_inter_unregister_creditOT=mysqli_fetch_array($fetch_TOT_inter_unregi
 	$total_reg_TP_credit_inter = $tp_credit_totals_inter['reg_inter'];
 	$total_unreg_TP_credit_inter = $tp_credit_totals_inter['unreg_inter'];
 
+	// ---- Nil-rated-only credit note totals (gst_percentage=0), inter-state ----
+	// See gst_details_credit.php for why this is needed.
+	$nil_inter_register_credit = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and buyer_gsttype='register' and gst_type='outer' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_inter_register_credit += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(osr.total) from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$get_godown_id' and osr.buyer_gsttype='register' and osr.gst_type='outer' and p.gst=0 and osr.return_date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_inter_register_credit += tp_gst_bucket_totals(array_filter($tp_credit_lines_inter, fn($l) => $l['gst_percentage'] == 0))['reg_inter'] ?? 0;
+
+	$nil_inter_unregister_credit = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and buyer_gsttype='unregister' and gst_type='outer' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_inter_unregister_credit += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(osr.total) from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$get_godown_id' and osr.buyer_gsttype='unregister' and osr.gst_type='outer' and p.gst=0 and osr.return_date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_inter_unregister_credit += tp_gst_bucket_totals(array_filter($tp_credit_lines_inter, fn($l) => $l['gst_percentage'] == 0))['unreg_inter'] ?? 0;
 
 ?>
