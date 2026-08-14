@@ -1168,6 +1168,13 @@ $availableExecutions = getAvailableTpExecutions($dbConn);
                                                                     &nbsp;|&nbsp; 🔴 <?php echo (int)$exec['total_accounts_deactivated']; ?> deactivated
                                                                 <?php endif; ?>
                                                             </small>
+                                                            <div class="mt-1">
+                                                                <a href="tp-bonus-points-export-xlsx.php?execution_id=<?php echo urlencode($exec['execution_id']); ?>"
+                                                                   style="font-size:11.5px;font-weight:600;color:#1d6f42;text-decoration:none;">
+                                                                    <i class="material-icons-outlined" style="vertical-align:middle;font-size:14px">download</i>
+                                                                    Export Excel
+                                                                </a>
+                                                            </div>
                                                         </div>
                                                     <?php endforeach; ?>
                                                 </div>
@@ -1247,11 +1254,20 @@ $availableExecutions = getAvailableTpExecutions($dbConn);
                             <div class="row">
                                 <div class="col-12">
                                     <div class="card">
-                                        <div class="card-header">
-                                            <i class="material-icons-outlined" style="vertical-align:middle;margin-right:8px">analytics</i>
-                                            Detailed Results
-                                            <?php if ($isDryRun): ?>
-                                                <span style="font-size:0.85rem;font-weight:400;opacity:0.85;margin-left:8px">(Preview — no data saved)</span>
+                                        <div class="card-header d-flex justify-content-between align-items-center flex-wrap" style="gap:8px;">
+                                            <div>
+                                                <i class="material-icons-outlined" style="vertical-align:middle;margin-right:8px">analytics</i>
+                                                Detailed Results
+                                                <?php if ($isDryRun): ?>
+                                                    <span style="font-size:0.85rem;font-weight:400;opacity:0.85;margin-left:8px">(Preview — no data saved)</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if (!$isDryRun && !empty($actionResult['execution_id'])): ?>
+                                            <a href="tp-bonus-points-export-xlsx.php?execution_id=<?php echo urlencode($actionResult['execution_id']); ?>"
+                                               class="btn btn-sm" style="background:#1d6f42;color:#fff;">
+                                                <i class="material-icons-outlined" style="vertical-align:middle;font-size:16px">download</i>
+                                                Export Excel
+                                            </a>
                                             <?php endif; ?>
                                         </div>
                                         <div class="card-body">

@@ -12,11 +12,16 @@ $gd_result = $db_conn->query("SELECT id, gname FROM company_godown WHERE gname L
 $godowns_list = $gd_result ? $gd_result->fetch_all(MYSQLI_ASSOC) : [];
 
 // ── Prefill from a TP purchase order (tp-today-orders.php "Invoice" button) ──
+// Accepts 'waiting' (the normal case) and 'cancelled' (re-invoicing a PO
+// that was cancelled by mistake — tp-invoice-action.php completes/relinks
+// it on submit, same as a waiting PO). 'completed' is intentionally
+// excluded: that PO already has an invoice, so re-prefilling from it here
+// would silently orphan the first one when this new invoice gets linked.
 $prefill_po_id = (int)($_GET['po_id'] ?? 0);
 $prefill_tp_id = 0;
 $prefill_items = [];
 if ($prefill_po_id > 0) {
-    $poStmt = $db_conn->prepare("SELECT territory_partner_id FROM tp_purchase_orders WHERE id=? AND status='waiting'");
+    $poStmt = $db_conn->prepare("SELECT territory_partner_id FROM tp_purchase_orders WHERE id=? AND status IN ('waiting','cancelled')");
     $poStmt->bind_param("i", $prefill_po_id);
     $poStmt->execute();
     $poRow = $poStmt->get_result()->fetch_assoc();
@@ -199,6 +204,14 @@ if ($prefill_po_id > 0) {
             font-size: 12px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; transition: all 0.2s;
         }
         .badge-remove:hover { background: #fecaca; transform: scale(1.05); }
+
+        .row-edit-input {
+            width: 80px; padding: 6px 8px; font-size: 13.5px; font-weight: 600; color: #1e293b;
+            border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; transition: border-color .15s, box-shadow .15s;
+        }
+        .row-edit-input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.12); }
+        .row-edit-input.is-invalid { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.1); }
+        td.rate-cell .row-edit-input { width: 90px; }
 
         /* ── Summary Card ── */
         .invoice-summary-card {
@@ -890,16 +903,16 @@ $(document).ready(function() {
         }
 
         $.each(invoiceItems, function (i, item) {
-            var $tr = $('<tr></tr>');
+            var $tr = $('<tr></tr>').attr('data-idx', i);
             $tr.html(
                 '<td><span class="row-num">' + (i + 1) + '</span></td>' +
                 '<td><strong>' + escHtml(item.name) + '</strong></td>' +
                 '<td><span class="avail-chip' + (item.avail > 0 ? '' : ' none') + '">' + item.avail + '</span></td>' +
-                '<td>' + item.qty + '</td>' +
-                '<td>₹' + item.rate.toFixed(2) + '</td>' +
+                '<td class="qty-cell"><input type="number" class="row-edit-input row-qty-input" min="1" max="' + item.avail + '" step="1" value="' + item.qty + '"></td>' +
+                '<td class="rate-cell"><input type="number" class="row-edit-input row-rate-input" min="0.01" step="0.01" value="' + item.rate.toFixed(2) + '"></td>' +
                 '<td>' + item.discPct.toFixed(2) + '%</td>' +
-                '<td>₹' + item.discAmt.toFixed(2) + '</td>' +
-                '<td><strong>₹' + item.amount.toFixed(2) + '</strong></td>' +
+                '<td class="disc-amt-cell">₹' + item.discAmt.toFixed(2) + '</td>' +
+                '<td class="amount-cell"><strong>₹' + item.amount.toFixed(2) + '</strong></td>' +
                 '<td><button type="button" class="badge-remove" onclick="removeProduct(' + i + ')"><i class="material-icons" style="font-size:14px;vertical-align:middle;">delete</i> Remove</button></td>'
             );
             $body.append($tr);
@@ -908,6 +921,46 @@ $(document).ready(function() {
         updateSummary();
         buildHiddenInputs();
     }
+
+    // Editing Qty/Rate on an already-added row recalculates that row's
+    // discount amount from its existing Disc(%) (so the percentage stays
+    // fixed and the rupee discount follows — same convention as the
+    // Disc(%)->Disc(₹) relationship in the add-product form above) and the
+    // line amount, without a full table re-render (which would blow away
+    // focus/cursor position mid-keystroke).
+    $('#productBody').on('input', '.row-qty-input, .row-rate-input', function () {
+        var $input = $(this);
+        var $tr = $input.closest('tr');
+        var idx = parseInt($tr.data('idx'), 10);
+        var item = invoiceItems[idx];
+        if (!item) return;
+
+        var $qtyInput = $tr.find('.row-qty-input');
+        var $rateInput = $tr.find('.row-rate-input');
+        var qty = parseInt($qtyInput.val()) || 0;
+        var rate = parseFloat($rateInput.val()) || 0;
+
+        var qtyInvalid = qty < 1 || qty > item.avail;
+        var rateInvalid = rate <= 0;
+        $qtyInput.toggleClass('is-invalid', qtyInvalid);
+        $rateInput.toggleClass('is-invalid', rateInvalid);
+        if (qtyInvalid || rateInvalid) return;
+
+        var gross = parseFloat((qty * rate).toFixed(2));
+        var discAmt = parseFloat((gross * item.discPct / 100).toFixed(2));
+        var amount = parseFloat(Math.max(0, gross - discAmt).toFixed(2));
+
+        item.qty = qty;
+        item.rate = rate;
+        item.discAmt = discAmt;
+        item.amount = amount;
+
+        $tr.find('.disc-amt-cell').text('₹' + discAmt.toFixed(2));
+        $tr.find('.amount-cell').html('<strong>₹' + amount.toFixed(2) + '</strong>');
+
+        updateSummary();
+        buildHiddenInputs();
+    });
 
     /* ── Courier input triggers recalc ── */
     $('#courierInput').on('input change', function () { updateSummary(); });
@@ -990,6 +1043,7 @@ $(document).ready(function() {
     $('#invoiceForm').on('submit', function (e) {
         if (!$('#sourceCpId').val() && !$('#sourceGodownId').val()) { e.preventDefault(); alert('Please select a channel partner or godown.'); return; }
         if (!invoiceItems.length)          { e.preventDefault(); alert('Please add at least one product.'); return; }
+        if ($('#productBody .row-edit-input.is-invalid').length) { e.preventDefault(); alert('Fix the highlighted Qty/Rate value(s) before submitting.'); return; }
         buildHiddenInputs();
         $('#submitBtn').prop('disabled', true).html('<i class="material-icons" style="animation:spin 1s linear infinite;font-size:18px;">refresh</i> Submitting…');
     });

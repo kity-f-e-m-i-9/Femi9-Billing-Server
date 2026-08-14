@@ -30,12 +30,13 @@ $s->close();
 $gst_type      = $invRow['gst_type']      ?? 'inner';
 $buyer_gsttype = $invRow['buyer_gsttype'] ?? 'unregister';
 
-$s = $db_conn->prepare("SELECT gst,hsn,rwpoints FROM products WHERE id=?");
+$s = $db_conn->prepare("SELECT gst,gst_type,hsn,rwpoints FROM products WHERE id=?");
 $s->bind_param('i', $pr_id);
 $s->execute();
 $prod = $s->get_result()->fetch_assoc();
 $s->close();
 $gst_percentage     = $prod['gst']      ?? 0;
+$gst_type_item      = $prod['gst_type'] ?: 'exclusive';
 $hsn                = $prod['hsn']      ?? '';
 $rwpoints           = ($prod['rwpoints'] ?? 0) * $qty;
 $gstamount_singlepr = '0';
@@ -49,9 +50,20 @@ if (($_POST['discount_percentage'] ?? 0) > 0) {
     $discount_percentage = $totalamount > 0 ? inr_format($discount_amount * 100 / $totalamount, 2) : 0;
 }
 
-$subtotal        = number_format($totalamount - $discount_amount, 2, '.', '');
-$gstamount_total = $subtotal * $gst_percentage / 100;
-$total           = $subtotal + $gstamount_total;
+$subtotal = number_format($totalamount - $discount_amount, 2, '.', '');
+
+// Inclusive-tax products already have GST baked into the entered price, so
+// the tax is carved out of subtotal (and NOT added again into total);
+// exclusive-tax products get GST added on top — same convention as
+// tp-invoice-print.php / shop-invoice-print.php.
+if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
+    $taxable_value   = $subtotal * 100 / (100 + $gst_percentage);
+    $gstamount_total = $subtotal - $taxable_value;
+    $total           = $subtotal;
+} else {
+    $gstamount_total = $subtotal * $gst_percentage / 100;
+    $total           = $subtotal + $gstamount_total;
+}
 
 // Check TP stock
 $s = $db_conn->prepare("SELECT closing_qty FROM territory_partner_stock WHERE territory_partner_id=? AND product_id=?");

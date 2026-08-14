@@ -128,6 +128,20 @@ if ($colD && $colD->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_invoice_items ADD COLUMN discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER discount_percentage");
 }
 
+// Per-order delivery address override, carried from tp_purchase_orders — see
+// db_migrations/2026_08_04_tp_po_delivery_address.sql
+$colDel = $db_conn->query("SHOW COLUMNS FROM tp_invoices LIKE 'use_default_delivery_address'");
+if ($colDel && $colDel->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN use_default_delivery_address TINYINT(1) NOT NULL DEFAULT 1 AFTER total_amount");
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN custom_delivery_line1 VARCHAR(255) NULL AFTER use_default_delivery_address");
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN custom_delivery_line2 VARCHAR(255) NULL AFTER custom_delivery_line1");
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN custom_delivery_city VARCHAR(100) NULL AFTER custom_delivery_line2");
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN custom_delivery_district VARCHAR(100) NULL AFTER custom_delivery_city");
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN custom_delivery_state VARCHAR(100) NULL AFTER custom_delivery_district");
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN custom_delivery_country VARCHAR(100) NULL AFTER custom_delivery_state");
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN custom_delivery_pincode VARCHAR(20) NULL AFTER custom_delivery_country");
+}
+
 // ── Input & validation ─────────────────────────────────────────────────────────
 
 $po_id            = (int)($_POST['po_id'] ?? 0);
@@ -223,6 +237,35 @@ foreach ($items as $item) {
     }
 }
 
+// Delivery address for this invoice — inherited from the originating
+// purchase order's own selection (default TP address vs. a typed one-off
+// address), if this invoice was raised from tp-today-orders.php. Invoices
+// created without a PO keep the default (falls back to the TP's registered
+// delivery address at print time).
+$useDefaultDelivery = 1;
+$customDeliveryLine1 = $customDeliveryLine2 = $customDeliveryCity = $customDeliveryDistrict = $customDeliveryState = $customDeliveryCountry = $customDeliveryPincode = null;
+if ($po_id > 0) {
+    $poDelStmt = $db_conn->prepare(
+        "SELECT use_default_delivery_address, custom_delivery_line1, custom_delivery_line2, custom_delivery_city,
+                custom_delivery_district, custom_delivery_state, custom_delivery_country, custom_delivery_pincode
+         FROM tp_purchase_orders WHERE id=? AND territory_partner_id=?"
+    );
+    $poDelStmt->bind_param("ii", $po_id, $tp_id);
+    $poDelStmt->execute();
+    $poDelRow = $poDelStmt->get_result()->fetch_assoc();
+    $poDelStmt->close();
+    if ($poDelRow) {
+        $useDefaultDelivery    = (int)$poDelRow['use_default_delivery_address'];
+        $customDeliveryLine1    = $poDelRow['custom_delivery_line1'];
+        $customDeliveryLine2    = $poDelRow['custom_delivery_line2'];
+        $customDeliveryCity     = $poDelRow['custom_delivery_city'];
+        $customDeliveryDistrict = $poDelRow['custom_delivery_district'];
+        $customDeliveryState    = $poDelRow['custom_delivery_state'];
+        $customDeliveryCountry  = $poDelRow['custom_delivery_country'];
+        $customDeliveryPincode  = $poDelRow['custom_delivery_pincode'];
+    }
+}
+
 // ── Transaction ────────────────────────────────────────────────────────────────
 
 $db_conn->begin_transaction();
@@ -238,8 +281,20 @@ try {
     // Report), even though it was already relied on elsewhere in this file
     // ($tpinv_source_sql-style callers) and by super-stockist's own insert.
     $created_by_user_type = 'company';
-    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by,created_by_user_type) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("siiiisdddss", $inv_num, $tp_id, $source_loc_id, $source_cp_id, $source_godown_id, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type);
+    $s = $db_conn->prepare(
+        "INSERT INTO tp_invoices
+            (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,
+             courier_charges,discount_amount,total_amount,created_by,created_by_user_type,
+             use_default_delivery_address,custom_delivery_line1,custom_delivery_line2,custom_delivery_city,
+             custom_delivery_district,custom_delivery_state,custom_delivery_country,custom_delivery_pincode)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    );
+    $s->bind_param(
+        "siiiisdddssisssssss", $inv_num, $tp_id, $source_loc_id, $source_cp_id, $source_godown_id, $invoice_date,
+        $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type,
+        $useDefaultDelivery, $customDeliveryLine1, $customDeliveryLine2, $customDeliveryCity,
+        $customDeliveryDistrict, $customDeliveryState, $customDeliveryCountry, $customDeliveryPincode
+    );
     $s->execute();
     $invoice_id = $db_conn->insert_id;
     $s->close();
@@ -279,8 +334,15 @@ try {
 
     // Mark the originating purchase order (if this invoice was raised from
     // tp-today-orders.php's "Invoice" button) as completed and link it.
+    // Also allows re-invoicing a 'cancelled' PO (the company clicked
+    // "Invoice" on one cancelled by mistake and is now actually fulfilling
+    // it) — clears any stale cancellation fields left over from that.
     if ($po_id > 0) {
-        $s_po = $db_conn->prepare("UPDATE tp_purchase_orders SET status='completed', tp_invoice_id=? WHERE id=? AND territory_partner_id=? AND status='waiting'");
+        $s_po = $db_conn->prepare(
+            "UPDATE tp_purchase_orders
+             SET status='completed', tp_invoice_id=?, cancelled_at=NULL, cancelled_by=NULL, cancel_reason=NULL
+             WHERE id=? AND territory_partner_id=? AND status IN ('waiting','cancelled')"
+        );
         $s_po->bind_param("iii", $invoice_id, $po_id, $tp_id);
         $s_po->execute();
         $s_po->close();

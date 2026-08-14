@@ -285,7 +285,7 @@ Terms of Delivery<br/>
 	?>
 <tr>
 <td><?=$intr=$intr+1;?></td>
-<td><b><?=$result_ProductDetails123['productName'];?></b></td>
+<td><b><?=$result_ProductDetails123['productName'];?></b><?php if (($result_INVProductDetails['gst_type'] ?? '') === 'inclusive') { ?> <small>(GST incl.)</small><?php } ?></td>
 <td id="rightlaign"><?=$result_ProductDetails123['hsn'];?></td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2);?></td>
@@ -317,11 +317,18 @@ Terms of Delivery<br/>
 
 <!------------------------------------------------------------------>
 <!------------------------------GST--------------------------------->
-<?php 
-$totalgstamount=$result_Invoice_Details['gst_amount'];
+<?php
+// Sums gst_amount across every product line for this tempid — previously
+// this only read $result_Invoice_Details, a single mysqli_fetch_array() row
+// (the first product added), silently understating the printed GST total
+// for any transfer with more than one product line.
+$select_SUm_gstamount = "select sum(gst_amount) from internal_transfer where tempid='$tempid'";
+$fetch_SUm_gstamount = mysqli_query($db_conn, $select_SUm_gstamount);
+$result_SUm_gstamount = mysqli_fetch_array($fetch_SUm_gstamount);
+$totalgstamount = $result_SUm_gstamount[0] !== NULL ? (float)$result_SUm_gstamount[0] : 0;
 
 if($totalgstamount>0)
-{	
+{
 $SGST=$totalgstamount/2;
 $SGST=inr_format($SGST, 2);
 

@@ -218,6 +218,22 @@ if ($WD_user_type === 'territory_partner') {
     $result_onbaord_user_records = $r ?: [];
     $result_onbaord_user_records['mobile_number'] = $r['mobile'] ?? '';
     $result_onbaord_user_records['country_code']  = '';
+
+    // A TP's district isn't a direct column — it's derived from their
+    // assigned locations (territory_partner_locations), walked up from the
+    // FIRKA/AREA leaf 3 parent_id hops to the DISTRICT layer. Same pattern
+    // as reward_points_tp.php / TpRewardPointsData.php.
+    if ($r) {
+        $r_dist = mysqli_fetch_assoc(mysqli_query($db_conn,
+            "SELECT GROUP_CONCAT(DISTINCT district.name ORDER BY district.name SEPARATOR ', ') AS district_names
+             FROM territory_partner_locations tpl
+             JOIN partner_location_nodes leaf     ON leaf.id = tpl.location_id
+             JOIN partner_location_nodes taluk     ON taluk.id = leaf.parent_id
+             JOIN partner_location_nodes division  ON division.id = taluk.parent_id
+             JOIN partner_location_nodes district   ON district.id = division.parent_id
+             WHERE tpl.territory_partner_id='$WD_user_id_esc'"));
+        $district_name = $r_dist['district_names'] ?? '';
+    }
 } elseif ($WD_user_type === 'channel_partner') {
     $r = mysqli_fetch_assoc(mysqli_query($db_conn,
         "SELECT id, name, mobile, cp_id AS useridtext FROM channel_partners WHERE id='$WD_user_id_esc' LIMIT 1"));
@@ -243,7 +259,7 @@ if ($WD_user_type === 'territory_partner') {
 
                     <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$WD_user_type;?></td>
+					<td><?=htmlspecialchars(ucwords(str_replace('_', ' ', $WD_user_type)));?></td>
 					<td><?=htmlspecialchars($result_onbaord_user_records['useridtext'] ?? '');?></td>
 					<td>
 					<b><?php echo ucwords($result_onbaord_user_records['name'] ?? '');?></b><br/>

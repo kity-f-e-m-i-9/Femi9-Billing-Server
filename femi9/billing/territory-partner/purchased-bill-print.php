@@ -4,7 +4,7 @@ include("config.php");
 
 $enc_id = $_GET['id'] ?? '';
 $inv_id = (int)base64_decode($enc_id);
-if (!$inv_id) { header("Location: purchased-bill.php"); exit; }
+if (!$inv_id) { header("Location: manage-purchase-orders.php"); exit; }
 
 // Invoice header — verify it belongs to the logged-in TP
 $stmt = $db_conn->prepare("
@@ -40,7 +40,7 @@ $stmt->bind_param("ii", $inv_id, $tp_id);
 $stmt->execute();
 $result_Invoice_Details = $stmt->get_result()->fetch_assoc();
 $stmt->close();
-if (!$result_Invoice_Details) { header("Location: purchased-bill.php"); exit; }
+if (!$result_Invoice_Details) { header("Location: manage-purchase-orders.php"); exit; }
 
 // Godown
 $_gd_id = (int)($result_Invoice_Details['source_godown_id'] ?? 0);
@@ -207,8 +207,8 @@ $Currency_Name   = "INR";
                 <table align="right">
                 <tr>
                     <td><button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button></td>
+                    <td><button type="button" onClick="javascript:window.location='manage-purchase-orders.php';" class="btn btn-primary m-b-xs m-r-xs">My Purchase Orders</button></td>
                     <td><button type="button" id="waShareBtn" onclick="shareInvoiceToWhatsApp({elementId:'divToPrint', mobile:'<?= htmlspecialchars($result_Invoice_Details['tp_mobile'] ?? '', ENT_QUOTES) ?>', invoiceNumber:'<?= htmlspecialchars($result_Invoice_Details['invoice_number'] ?? '', ENT_QUOTES) ?>', fileName:'PurchaseBill_<?= htmlspecialchars($result_Invoice_Details['invoice_number'] ?? '', ENT_QUOTES) ?>', businessName:'<?= htmlspecialchars($business_name ?? '', ENT_QUOTES) ?>', button:this});" class="btn btn-success m-b-xs m-r-xs"><i class="material-icons" style="font-size:16px;vertical-align:middle;">share</i> Share to WhatsApp</button></td>
-                    <td><button type="button" onClick="javascript:window.location='purchased-bill.php';" class="btn btn-primary m-b-xs m-r-xs">Purchased Bills</button></td>
                 </tr>
                 </table>
 
@@ -326,7 +326,15 @@ $cp_seller_parts = array_filter([
 
 <?php
 $d = $result_Invoice_Details;
-$delivery_parts = array_filter([
+// Build delivery address lines — use the one-off address typed at PO time
+// if the TP chose not to ship to their default registered address.
+$useCustomDelivery = empty($d['use_default_delivery_address']) && !empty($d['custom_delivery_line1']);
+$delivery_parts = $useCustomDelivery ? array_filter([
+    $d['custom_delivery_line1'],
+    $d['custom_delivery_line2'],
+    implode(', ', array_filter([$d['custom_delivery_city'], $d['custom_delivery_district']])),
+    implode(', ', array_filter([$d['custom_delivery_state'], $d['custom_delivery_country']])),
+]) : array_filter([
     $d['delivery_line1'],
     $d['delivery_line2'],
     implode(', ', array_filter([$d['delivery_city'], $d['delivery_district']])),

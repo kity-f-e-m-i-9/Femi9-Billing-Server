@@ -175,29 +175,58 @@ $i= $start_from;
 
 									$WD_user_type=$result_product_list['user_type'];
 									$WD_user_id=$result_product_list['user_id'];
-									
-if($WD_user_type=="candf"){$tablenameWE="c_and_f";}
-elseif($WD_user_type=="super_stockiest") {$tablenameWE="super_stockiest";}
-elseif($WD_user_type=="stockiest") {$tablenameWE="stockiest";}
-elseif($WD_user_type=="distributor") {$tablenameWE="distributor";}
-else{$tablenameWE="super_distributor";}
 
-$select_onbaord_user_records="select * from ".$tablenameWE." where temp_id='$WD_user_id'";
-$fetch_onbaord_user_records=mysqli_query($db_conn,$select_onbaord_user_records);
-$result_onbaord_user_records=mysqli_fetch_array($fetch_onbaord_user_records);
+$WD_user_id_esc = mysqli_real_escape_string($db_conn, $WD_user_id);
+$district_name = '';
+if ($WD_user_type === 'territory_partner') {
+    $r = mysqli_fetch_assoc(mysqli_query($db_conn,
+        "SELECT id, name, mobile, tp_id AS useridtext FROM territory_partners WHERE id='$WD_user_id_esc' LIMIT 1"));
+    $result_onbaord_user_records = $r ?: [];
+    $result_onbaord_user_records['mobile_number'] = $r['mobile'] ?? '';
+    $result_onbaord_user_records['country_code']  = '';
 
+    // A TP's district isn't a direct column — it's derived from their
+    // assigned locations (territory_partner_locations), walked up from the
+    // FIRKA/AREA leaf 3 parent_id hops to the DISTRICT layer. Same pattern
+    // as reward_points_tp.php / TpRewardPointsData.php.
+    if ($r) {
+        $r_dist = mysqli_fetch_assoc(mysqli_query($db_conn,
+            "SELECT GROUP_CONCAT(DISTINCT district.name ORDER BY district.name SEPARATOR ', ') AS district_names
+             FROM territory_partner_locations tpl
+             JOIN partner_location_nodes leaf     ON leaf.id = tpl.location_id
+             JOIN partner_location_nodes taluk     ON taluk.id = leaf.parent_id
+             JOIN partner_location_nodes division  ON division.id = taluk.parent_id
+             JOIN partner_location_nodes district   ON district.id = division.parent_id
+             WHERE tpl.territory_partner_id='$WD_user_id_esc'"));
+        $district_name = $r_dist['district_names'] ?? '';
+    }
+} elseif ($WD_user_type === 'channel_partner') {
+    $r = mysqli_fetch_assoc(mysqli_query($db_conn,
+        "SELECT id, name, mobile, cp_id AS useridtext FROM channel_partners WHERE id='$WD_user_id_esc' LIMIT 1"));
+    $result_onbaord_user_records = $r ?: [];
+    $result_onbaord_user_records['mobile_number'] = $r['mobile'] ?? '';
+    $result_onbaord_user_records['country_code']  = '';
+} else {
+    if ($WD_user_type=="candf")               { $tablenameWE = "c_and_f"; }
+    elseif ($WD_user_type=="super_stockiest") { $tablenameWE = "super_stockiest"; }
+    elseif ($WD_user_type=="stockiest")       { $tablenameWE = "stockiest"; }
+    elseif ($WD_user_type=="distributor")     { $tablenameWE = "distributor"; }
+    else                                       { $tablenameWE = "super_distributor"; }
 
-//district details		
-$district_id=$result_onbaord_user_records['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
-$result_district=mysqli_fetch_array($fetch_district);
-$district_name=	$result_district['dist_name'];
+    $result_onbaord_user_records = mysqli_fetch_array(mysqli_query($db_conn,
+        "SELECT * FROM $tablenameWE WHERE temp_id='$WD_user_id_esc'")) ?: [];
+
+    $district_id = $result_onbaord_user_records['district_id'] ?? 0;
+    if ($district_id) {
+        $r_dist = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='$district_id'"));
+        $district_name = $r_dist['dist_name'] ?? '';
+    }
+}
 ?>
                                             
                     <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$WD_user_type;?></td>
+					<td><?=htmlspecialchars(ucwords(str_replace('_', ' ', $WD_user_type)));?></td>
 					<td><?=$result_onbaord_user_records['useridtext'];?></td>
 					<td>
 					<b><?php echo ucwords($result_onbaord_user_records['name']);?></b><br/>

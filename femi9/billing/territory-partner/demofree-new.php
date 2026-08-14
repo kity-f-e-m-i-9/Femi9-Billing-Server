@@ -162,7 +162,7 @@ function deleteRow(tableID) {
                     "SELECT p.id, p.productName, tps.closing_qty
                      FROM products p
                      JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = ?
-                     WHERE tps.closing_qty > 0
+                     WHERE tps.closing_qty > 0 AND (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
                      ORDER BY p.productName"
                 );
                 $fetch_product_list->bind_param('i', $tp_id_esc);

@@ -96,6 +96,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
                             <li><a href="overall-stock">Company Overall Stock</a></li>
                             <li><a href="overall-stock-users">Overall Stock - Users</a></li>
+                            <li><a href="neksomo-purchase-stock">Neksomo Purchase Stock</a></li>
                         </ul>
                     </li>
 
@@ -298,6 +299,9 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="add-channel-partner">Add Channel Partner</a></li>
 							<li><a href="manage-channel-partner">Manage Channel Partner</a></li>
 							<li><a href="cp-stock">CP Stock</a></li>
+							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
+							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
+							<li><a href="cp-district-sales-report">District Sales Report</a></li>
                         </ul>
                     </li>
 					<!----------------------Territory Partner--------------------------->
@@ -312,7 +316,10 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-tp-invoices">TP Invoices</a></li>
 								<li><a href="tp-cnote-manage">TP Credit Notes</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
+							<li><a href="manage-tp-advance-submissions">TP Advance Payment Submissions</a></li>
+							<li><a href="tp-po-screenshot-review">PO Screenshot Review</a></li>
 							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
+							<li><a href="tp-bonus-advance-payments">Manage TP Bonus Points</a></li>
 							<li><a href="tp-wallet-referral-calculator">TP Wallet Referral Calculator</a></li>
                         </ul>
                     </li>
@@ -777,6 +784,9 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="add-channel-partner">Add Channel Partner</a></li>
 							<li><a href="manage-channel-partner">Manage Channel Partner</a></li>
 							<li><a href="cp-stock">CP Stock</a></li>
+							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
+							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
+							<li><a href="cp-district-sales-report">District Sales Report</a></li>
                         </ul>
                     </li>
 					<?php }?>
@@ -793,7 +803,10 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-tp-invoices">TP Invoices</a></li>
 								<li><a href="tp-cnote-manage">TP Credit Notes</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
+							<li><a href="manage-tp-advance-submissions">TP Advance Payment Submissions</a></li>
+							<li><a href="tp-po-screenshot-review">PO Screenshot Review</a></li>
 							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
+							<li><a href="tp-bonus-advance-payments">Manage TP Bonus Points</a></li>
 							<li><a href="tp-wallet-referral-calculator">TP Wallet Referral Calculator</a></li>
                         </ul>
                     </li>
@@ -812,6 +825,13 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li><span class="divider"></span></li>
 
 					<?php if($resultusertypeGET['report']==1){?>
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">sell</i>Sale to Femi9 LLP<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+						<li><a href="llp-sale-rate.php">Add Entry</a></li>
+						<li><a href="llp-sale-rate-manage.php">Manage Entries</a></li>
+                        </ul>
+                    </li>
 					<li>
                         <a href="#"><i class="material-icons-two-tone">wallet</i>Reports<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">

@@ -141,11 +141,17 @@ if ($updatestatus === 'accept') {
             $qty  = (int) $item['qty'];
 
             // Credit receiver's input_qty ↑ and closing_qty ↑ (goods physically returned)
-            $stockService->acceptReturn(
+            $acceptResult = $stockService->acceptReturn(
                 $prid, $to_usertype, $to_userid,
                 $qty, $returnid, $createdBy,
                 true // externalTransaction
             );
+            if (empty($acceptResult['success'])) {
+                throw new \RuntimeException(
+                    "Stock credit failed for product {$prid} (to {$to_usertype}/{$to_userid}): "
+                    . ($acceptResult['reason'] ?? 'unknown reason')
+                );
+            }
 
             // Remove buyer's (from_user) credited stock — they physically handed goods back
             // (input_qty ↓, closing_qty ↓).  Only applies when buyer maintains a ledger.

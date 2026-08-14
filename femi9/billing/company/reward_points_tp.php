@@ -37,114 +37,15 @@ if (strtotime($current_from_date) > strtotime($current_to_date)) {
 
 $safe_business_name = htmlspecialchars($business_name ?? 'Femi9', ENT_QUOTES, 'UTF-8');
 
+require_once("include/TpRewardPointsData.php");
+
+$target_ranges = getTpTargetAmountRanges();
+$current_target_range = $_POST['target_range'] ?? $_GET['target_range'] ?? '';
+if (!array_key_exists($current_target_range, $target_ranges)) $current_target_range = '';
+
 $combined_users = [];
-
 try {
-    // PDO connection (uses $servername/$db_port/$username/$password/$dbname from config)
-    $pdo = new PDO(
-        "mysql:host={$servername};port={$db_port};dbname={$dbname};charset=utf8mb4",
-        $username,
-        $password,
-        [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ]);
-
-    // ── Purchase Points ────────────────────────────────────────────────────────
-    $stmt = $pdo->prepare("
-        SELECT territory_partner_id AS user_id,
-               COALESCE(SUM(total_amount) / 100, 0) AS purchase_points
-        FROM tp_invoices
-        WHERE invoice_date BETWEEN :from_date AND :to_date
-        GROUP BY territory_partner_id
-    ");
-    $stmt->execute([':from_date' => $current_from_date, ':to_date' => $current_to_date]);
-    $purchase_data = [];
-    foreach ($stmt->fetchAll() as $row) {
-        $purchase_data[$row['user_id']] = (float)$row['purchase_points'];
-    }
-
-    // ── Daily Login Points ─────────────────────────────────────────────────────
-    $stmt = $pdo->prepare("
-        SELECT user_id, COALESCE(SUM(points_awarded), 0) AS daily_points
-        FROM daily_login_rewards
-        WHERE user_type = 'territory_partner'
-          AND reward_date BETWEEN :from_date AND :to_date
-        GROUP BY user_id
-        HAVING daily_points > 0
-    ");
-    $stmt->execute([':from_date' => $current_from_date, ':to_date' => $current_to_date]);
-    $daily_data = [];
-    foreach ($stmt->fetchAll() as $row) {
-        $daily_data[$row['user_id']] = (float)$row['daily_points'];
-    }
-
-    // ── Return Deductions ─────────────────────────────────────────────────────
-    $stmt = $pdo->prepare("
-        SELECT r.from_userid AS user_id,
-               COALESCE(SUM(r.subtotal) / 100, 0) AS return_points
-        FROM user_return_stock_items r
-        WHERE r.from_usertype = 'territory_partner'
-          AND r.invnumber COLLATE utf8mb4_unicode_ci IN (
-              SELECT invoice_number
-              FROM tp_invoices
-              WHERE invoice_date BETWEEN :from_date AND :to_date
-          )
-        GROUP BY r.from_userid
-    ");
-    $stmt->execute([':from_date' => $current_from_date, ':to_date' => $current_to_date]);
-    $return_data = [];
-    foreach ($stmt->fetchAll() as $row) {
-        $return_data[$row['user_id']] = (float)$row['return_points'];
-    }
-
-    // ── Collect all TP IDs that have any data ─────────────────────────────────
-    // array_values() is required here: array_unique() preserves the original
-    // (gapped) keys after removing duplicates, but $stmt->execute() below binds
-    // this array positionally (?) — PDO needs a plain sequential 0-indexed
-    // array for that, or it throws "Invalid parameter number" the moment any
-    // TP appears in more than one of the three source arrays (i.e. almost
-    // always, since a TP that both purchased and logged in shows up in both).
-    $all_ids = array_values(array_unique(array_merge(
-        array_keys($purchase_data),
-        array_keys($daily_data),
-        array_keys($return_data)
-    )));
-
-    if (!empty($all_ids)) {
-        $placeholders = str_repeat('?,', count($all_ids) - 1) . '?';
-        $stmt = $pdo->prepare("
-            SELECT id, tp_id, name, mobile
-            FROM territory_partners
-            WHERE id IN ($placeholders)
-            ORDER BY name ASC
-        ");
-        $stmt->execute($all_ids);
-        $tp_details = [];
-        foreach ($stmt->fetchAll() as $row) {
-            $tp_details[$row['id']] = $row;
-        }
-
-        foreach ($all_ids as $uid) {
-            $purchase_pts = $purchase_data[$uid] ?? 0;
-            $daily_pts    = $daily_data[$uid]    ?? 0;
-            $return_pts   = $return_data[$uid]   ?? 0;
-            $total        = max(0, $purchase_pts + $daily_pts - $return_pts);
-
-            $combined_users[] = [
-                'user_id'         => $uid,
-                'purchase_points' => $purchase_pts,
-                'daily_points'    => $daily_pts,
-                'return_points'   => $return_pts,
-                'total_points'    => $total,
-                'details'         => $tp_details[$uid] ?? null,
-            ];
-        }
-
-        usort($combined_users, fn($a, $b) => $b['total_points'] <=> $a['total_points']);
-    }
-
+    $combined_users = getTpRewardPointsData($current_from_date, $current_to_date, $current_target_range);
 } catch (PDOException $e) {
     error_log("reward_points_tp error: " . $e->getMessage());
     $combined_users = [];
@@ -171,7 +72,10 @@ try {
         .filter-bar { background:#fff; border-radius:10px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:20px; }
         .badge-total { background:#4f46e5; color:#fff; font-size:13px; padding:5px 12px; border-radius:20px; font-weight:600; }
         .badge-purchase { background:#10b981; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
+        .badge-sales { background:#0ea5e9; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; border:1px dashed rgba(255,255,255,.6); }
         .badge-daily { background:#3b82f6; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
+        .badge-team { background:#8b5cf6; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
+        .badge-advance { background:#f59e0b; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         .badge-return { background:#ef4444; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         table.dataTable thead th { background:#f8f9fa; font-weight:600; }
     </style>
@@ -217,10 +121,21 @@ try {
                                            value="<?php echo htmlspecialchars($current_to_date, ENT_QUOTES, 'UTF-8'); ?>">
                                 </div>
                                 <div class="col-auto">
+                                    <label class="form-label mb-1">Monthly Target</label>
+                                    <select name="target_range" class="form-control form-control-sm" style="min-width:190px;">
+                                        <?php foreach ($target_ranges as $key => $label): ?>
+                                        <option value="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $key === $current_target_range ? 'selected' : ''; ?>><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-auto">
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="material-icons" style="vertical-align:middle;font-size:16px">search</i> Filter
                                     </button>
                                     <a href="reward_points_tp" class="btn btn-secondary btn-sm ms-1">Reset</a>
+                                    <a href="reward_points_tp_export_xlsx.php?frdate=<?php echo urlencode($current_from_date); ?>&todate=<?php echo urlencode($current_to_date); ?>&target_range=<?php echo urlencode($current_target_range); ?>" class="btn btn-success btn-sm ms-1">
+                                        <i class="material-icons" style="vertical-align:middle;font-size:16px">file_download</i> Export
+                                    </a>
                                 </div>
                                 <div class="col-auto ms-auto">
                                     <small class="text-muted">
@@ -246,10 +161,15 @@ try {
                                             <th>TP ID</th>
                                             <th>Name</th>
                                             <th>Mobile</th>
+                                            <th>District</th>
+                                            <th>Monthly Target</th>
                                             <th>Purchase Pts</th>
                                             <th>Login Pts</th>
+                                            <th>Team Pts</th>
+                                            <th>Advance Bonus Pts</th>
                                             <th>Returns (–)</th>
                                             <th>Total Points</th>
+                                            <th>Sales Pts <small class="text-muted">(not in total)</small></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -260,10 +180,15 @@ try {
                                             <td><?php echo htmlspecialchars($d['tp_id'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo htmlspecialchars($d['name'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo htmlspecialchars($d['mobile'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td><?php echo htmlspecialchars($u['district_names'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td><?php echo $u['target_amount'] > 0 ? '₹' . inr_format($u['target_amount'], 2) : '–'; ?></td>
                                             <td><span class="badge-purchase"><?php echo inr_format($u['purchase_points'], 2); ?></span></td>
                                             <td><span class="badge-daily"><?php echo inr_format($u['daily_points'], 2); ?></span></td>
+                                            <td><?php if ($u['team_points'] > 0): ?><button type="button" class="badge-team team-points-trigger" style="border:none;cursor:pointer;" data-referrer-id="<?php echo (int)$u['user_id']; ?>" data-referrer-name="<?php echo htmlspecialchars($d['name'] ?? '–', ENT_QUOTES, 'UTF-8'); ?>" title="Click to see the breakdown"><?php echo inr_format($u['team_points'], 2); ?></button><?php else: ?>–<?php endif; ?></td>
+                                            <td><?php if ($u['advance_points'] > 0): ?><span class="badge-advance"><?php echo inr_format($u['advance_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><?php if ($u['return_points'] > 0): ?><span class="badge-return"><?php echo inr_format($u['return_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><span class="badge-total"><?php echo inr_format($u['total_points'], 2); ?></span></td>
+                                            <td><?php if ($u['sales_points'] > 0): ?><span class="badge-sales"><?php echo inr_format($u['sales_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                         </tr>
                                         <?php endforeach; ?>
                                     </tbody>
@@ -274,6 +199,26 @@ try {
                     </div>
 
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Team Points Breakdown Modal -->
+<div class="modal fade" id="teamPointsModal" tabindex="-1" aria-labelledby="teamPointsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="teamPointsModalLabel" style="font-weight:700;">
+                    <i class="material-icons" style="vertical-align:middle;font-size:19px;color:#8b5cf6;">groups</i>
+                    Team Points Breakdown
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="teamPointsModalBody" style="min-height:120px;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -291,10 +236,75 @@ try {
 <script>
 $(function(){
     $('#rpTable').DataTable({
-        order: [[7, 'desc']],
+        order: [[11, 'desc']],
         pageLength: 25,
         language: { emptyTable: 'No data found' }
     });
+});
+
+var TP_RP_FROM_DATE = <?php echo json_encode($current_from_date); ?>;
+var TP_RP_TO_DATE   = <?php echo json_encode($current_to_date); ?>;
+
+$(document).on('click', '.team-points-trigger', function () {
+    var referrerId   = $(this).data('referrer-id');
+    var referrerName = $(this).data('referrer-name');
+
+    $('#teamPointsModalLabel').html(
+        '<i class="material-icons" style="vertical-align:middle;font-size:19px;color:#8b5cf6;">groups</i> ' +
+        'Team Points Breakdown — ' + $('<span>').text(referrerName).html()
+    );
+    $('#teamPointsModalBody').html('<div style="text-align:center;padding:30px;color:#9ca3af;">Loading…</div>');
+    $('#teamPointsModal').modal('show');
+
+    $.get('get-tp-team-points-breakdown.php', {
+        referrer_id: referrerId,
+        frdate: TP_RP_FROM_DATE,
+        todate: TP_RP_TO_DATE
+    })
+        .done(function (data) {
+            if (!data.success) {
+                $('#teamPointsModalBody').html('<div style="color:#dc2626;padding:20px;">' + (data.message || 'Could not load breakdown.') + '</div>');
+                return;
+            }
+            if (!data.members.length) {
+                $('#teamPointsModalBody').html('<div style="text-align:center;padding:30px;color:#9ca3af;">No team member purchases found for this range.</div>');
+                return;
+            }
+
+            var totalPoints = 0;
+            var html = '<div style="font-size:12.5px;color:#6b7280;margin-bottom:14px;">' +
+                'Team members whose purchases (0% GST products, reward-points-enabled invoices) contributed to this Team Points total, ' +
+                data.from_date + ' to ' + data.to_date + '.</div>';
+            html += '<table style="width:100%;font-size:13.5px;border-collapse:collapse;">' +
+                    '<thead><tr style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #f3f4f6;">' +
+                    '<th style="text-align:left;padding:8px 10px 8px 0;">Territory Partner</th>' +
+                    '<th style="text-align:center;padding:8px 10px;">Invoices</th>' +
+                    '<th style="text-align:right;padding:8px 10px;">0% GST Amount</th>' +
+                    '<th style="text-align:right;padding:8px 0;">Points Contributed</th>' +
+                    '</tr></thead><tbody>';
+            $.each(data.members, function (_, m) {
+                totalPoints += parseFloat(m.points) || 0;
+                html += '<tr style="border-bottom:1px dotted #f3f4f6;">' +
+                        '<td style="padding:10px 10px 10px 0;">' +
+                            '<div style="font-weight:600;color:#1f2937;">' + $('<span>').text(m.name || '–').html() + '</div>' +
+                            '<div style="font-size:11px;color:#8b5cf6;font-weight:700;">' + $('<span>').text(m.tp_code || '').html() + '</div>' +
+                            '<div style="font-size:11.5px;color:#9ca3af;">' + $('<span>').text(m.mobile || '').html() + '</div>' +
+                        '</td>' +
+                        '<td style="text-align:center;padding:10px;color:#374151;">' + m.invoice_count + '</td>' +
+                        '<td style="text-align:right;padding:10px;color:#374151;">₹' + (parseFloat(m.amount) || 0).toFixed(2) + '</td>' +
+                        '<td style="text-align:right;padding:10px 0;"><span class="badge-team">' + (parseFloat(m.points) || 0).toFixed(2) + '</span></td>' +
+                        '</tr>';
+            });
+            html += '</tbody><tfoot><tr>' +
+                    '<td colspan="3" style="text-align:right;padding:14px 10px 0 0;font-weight:700;color:#374151;">Total Team Points</td>' +
+                    '<td style="text-align:right;padding:14px 0 0;font-weight:700;color:#8b5cf6;font-size:16px;">' + totalPoints.toFixed(2) + '</td>' +
+                    '</tr></tfoot></table>';
+
+            $('#teamPointsModalBody').html(html);
+        })
+        .fail(function () {
+            $('#teamPointsModalBody').html('<div style="color:#dc2626;padding:20px;">Could not reach the server. Please try again.</div>');
+        });
 });
 </script>
 </body>

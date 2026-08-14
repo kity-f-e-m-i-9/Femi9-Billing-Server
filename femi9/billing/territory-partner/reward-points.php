@@ -74,6 +74,20 @@ $purchaseResult = executeQueryRow_tp($db_conn, $purchaseQuery, [(int)$userId, $c
 $purchasePoints = (float)($purchaseResult['purchase_points'] ?? 0);
 $invoiceCount   = (int)($purchaseResult['invoice_count'] ?? 0);
 
+// 1b. Sales Points — what this TP sold onward to a shop/customer
+// (user_invoice, from_user_type='territory_partner'), separate from Purchase
+// Points above (which is what the TP bought FROM the company). Same
+// total/100 convention as Purchase Points. Shown as its own figure and
+// deliberately NOT included in Total Points, same as the company view.
+$salesQuery = "
+    SELECT COALESCE(SUM(total) / 100, 0) AS sales_points, COUNT(*) AS sales_invoice_count
+    FROM user_invoice
+    WHERE from_user_type = ? AND from_user_id = ? AND sub_total > 0 AND date BETWEEN ? AND ?
+";
+$salesResult = executeQueryRow_tp($db_conn, $salesQuery, [$userType, $userId, $currentFromDate, $currentToDate], 'ssss');
+$salesPoints = (float)($salesResult['sales_points'] ?? 0);
+$salesInvoiceCount = (int)($salesResult['sales_invoice_count'] ?? 0);
+
 // 2. Daily Login Points
 $dailyQuery = "
     SELECT COALESCE(SUM(points_awarded), 0) AS daily_points, COUNT(*) AS days_rewarded, MAX(reward_date) AS last_reward_date
@@ -98,24 +112,68 @@ $returnResult = executeQueryRow_tp($db_conn, $returnQuery, [(int)$userId, $curre
 $returnPoints = (float)($returnResult['return_points'] ?? 0);
 $returnCount  = (int)($returnResult['return_count'] ?? 0);
 
-// 4. No advance bonus for TPs
+// 4. Advance Bonus Points (Monthly Target Achievement Bonus) — awarded
+// separately by tp-bonus-points-calculator.php into the shared reward_points
+// table (transaction_type='bonus_target_achievement') when this TP hits all 4
+// weekly advance-payment thresholds for a month. That table keys user_id on
+// territory_partners.tp_id (the string TP ID), not the internal id
+// ($Login_user_IDvl) every other query on this page uses — so tp_id is
+// looked up first and used for this query alone. is_expired/deleted_at are
+// excluded so an expired or since-rolled-back bonus doesn't keep counting.
+$tpIdResult = executeQueryRow_tp($db_conn, "SELECT tp_id FROM territory_partners WHERE id = ?", [(int)$userId], 'i');
+$tpIdString = $tpIdResult['tp_id'] ?? null;
+
 $totalAdvanceBonusPoints = 0.0;
-$isAdvanceEligibleType   = false;
+if ($tpIdString !== null) {
+    $advanceBonusQuery = "
+        SELECT COALESCE(SUM(points), 0) AS advance_bonus_points
+        FROM reward_points
+        WHERE user_id = ? AND user_type = 'territory_partner'
+          AND transaction_type = 'bonus_target_achievement'
+          AND is_expired = 0 AND deleted_at IS NULL
+          AND transaction_date BETWEEN ? AND ?
+    ";
+    $advanceBonusResult = executeQueryRow_tp($db_conn, $advanceBonusQuery, [$tpIdString, $currentFromDate . ' 00:00:00', $currentToDate . ' 23:59:59'], 'sss');
+    $totalAdvanceBonusPoints = (float)($advanceBonusResult['advance_bonus_points'] ?? 0);
+}
+
+// 4b. Team Points — points earned from other TPs who registered this TP as
+// their referrer with exactly a 10% referral_percentage (one level deep
+// only). Same formula as the company-side reward_points_tp.php view: only
+// 0%-GST product lines count, and only from the team member's invoices that
+// themselves have rwpoints_enable=1.
+$teamPointsQuery = "
+    SELECT COALESCE(SUM(tii.amount) / 100, 0) AS team_points
+    FROM territory_partners member
+    INNER JOIN territory_partners referrer ON referrer.tp_id = member.referral_id
+    INNER JOIN tp_invoices tpi        ON tpi.territory_partner_id = member.id
+    INNER JOIN tp_invoice_items tii   ON tii.tp_invoice_id = tpi.id
+    INNER JOIN products p             ON p.id = tii.product_id
+    WHERE referrer.id = ?
+      AND member.referral_type = 'TP'
+      AND member.referral_percentage = 10
+      AND tpi.rwpoints_enable = 1
+      AND tpi.invoice_date BETWEEN ? AND ?
+      AND p.gst = 0
+";
+$teamPointsResult = executeQueryRow_tp($db_conn, $teamPointsQuery, [(int)$userId, $currentFromDate, $currentToDate], 'iss');
+$teamPoints = (float)($teamPointsResult['team_points'] ?? 0);
 
 // 5. Grand Total
-$totalPoints = max(0, $purchasePoints + $dailyPoints - $returnPoints);
+$totalPoints = max(0, $purchasePoints + $dailyPoints + $totalAdvanceBonusPoints + $teamPoints - $returnPoints);
 
 $fmt = static fn(float $v): string => inr_format($v, 2);
 $formattedTotal    = $fmt($totalPoints);
 $formattedPurchase = $fmt($purchasePoints);
 $formattedDaily    = $fmt($dailyPoints);
+$formattedAdvance  = $fmt($totalAdvanceBonusPoints);
+$formattedTeam     = $fmt($teamPoints);
 $formattedReturn   = $fmt($returnPoints);
+$formattedSales    = $fmt($salesPoints);
 
 $displayFrom      = date('d M', strtotime($currentFromDate));
 $displayTo        = date('d M Y', strtotime($currentToDate));
 $safeBusinessName = htmlspecialchars($business_name, ENT_QUOTES, 'UTF-8');
-
-$advBalance = 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -214,6 +272,16 @@ $advBalance = 0;
                         </div>
                     </div>
                     <div class="row">
+                        <div class="col-md-4">
+                            <div class="stats-card" style="border-color:#bae6fd;">
+                                <i class="material-icons stats-icon" style="color:#bae6fd;">storefront</i>
+                                <div class="stats-label">Sales Points</div>
+                                <div class="stats-value" style="color:#0284c7;"><?php echo $formattedSales; ?></div>
+                                <div class="stats-meta"><?php echo $salesInvoiceCount; ?> sale<?php echo $salesInvoiceCount !== 1 ? 's' : ''; ?> — separate from Total Reward Points</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
                         <div class="col-12">
                             <div class="breakdown-card">
                                 <h5 class="section-title"><i class="material-icons">analytics</i>Points Breakdown</h5>
@@ -231,6 +299,26 @@ $advBalance = 0;
                                     </div>
                                     <div class="breakdown-value">+<?php echo $formattedDaily; ?></div>
                                 </div>
+                                <?php if ($totalAdvanceBonusPoints > 0): ?>
+                                <div class="breakdown-item">
+                                    <div class="breakdown-label">
+                                        <div class="breakdown-icon" style="background:#fef3c7; color:#d97706;"><i class="material-icons">military_tech</i></div>
+                                        <span>Advance Bonus (Target Achievement)</span>
+                                    </div>
+                                    <div class="breakdown-value">+<?php echo $formattedAdvance; ?></div>
+                                </div>
+                                <?php endif; ?>
+                                <?php if ($teamPoints > 0): ?>
+                                <div class="breakdown-item">
+                                    <div class="breakdown-label">
+                                        <div class="breakdown-icon" style="background:#ede9fe; color:#7c3aed;"><i class="material-icons">groups</i></div>
+                                        <span>Team Points<span class="info-badge" style="background:#ede9fe; color:#7c3aed;">from your referrals</span></span>
+                                    </div>
+                                    <button type="button" id="teamPointsTrigger" class="breakdown-value" style="border:none;background:none;cursor:pointer;color:#7c3aed;" title="Click to see the breakdown">
+                                        +<?php echo $formattedTeam; ?> <i class="material-icons-outlined" style="font-size:15px;vertical-align:-2px;">open_in_new</i>
+                                    </button>
+                                </div>
+                                <?php endif; ?>
                                 <?php if ($returnPoints > 0): ?>
                                 <div class="breakdown-item">
                                     <div class="breakdown-label">
@@ -247,6 +335,13 @@ $advBalance = 0;
                                     </div>
                                     <div class="breakdown-value" style="font-size:32px;"><?php echo $formattedTotal; ?></div>
                                 </div>
+                                <div class="breakdown-item" style="border-bottom:none; padding-top:8px;">
+                                    <div class="breakdown-label">
+                                        <div class="breakdown-icon" style="background:#e0f2fe; color:#0284c7;"><i class="material-icons">storefront</i></div>
+                                        <span>Sales Points <small class="text-muted">(shown separately — not included above)</small></span>
+                                    </div>
+                                    <div class="breakdown-value" style="color:#0284c7;"><?php echo $formattedSales; ?></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -255,12 +350,91 @@ $advBalance = 0;
         </div>
     </div>
 </div>
+
+<!-- Team Points Breakdown Modal -->
+<div class="modal fade" id="teamPointsModal" tabindex="-1" aria-labelledby="teamPointsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="teamPointsModalLabel" style="font-weight:700;">
+                    <i class="material-icons" style="vertical-align:middle;font-size:19px;color:#7c3aed;">groups</i>
+                    Team Points Breakdown
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="teamPointsModalBody" style="min-height:120px;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
 <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script>
+var TP_RP_FROM_DATE = <?php echo json_encode($currentFromDate); ?>;
+var TP_RP_TO_DATE   = <?php echo json_encode($currentToDate); ?>;
+
+$(document).on('click', '#teamPointsTrigger', function () {
+    $('#teamPointsModalBody').html('<div style="text-align:center;padding:30px;color:#9ca3af;">Loading…</div>');
+    $('#teamPointsModal').modal('show');
+
+    $.get('get-team-points-breakdown.php', {
+        frdate: TP_RP_FROM_DATE,
+        todate: TP_RP_TO_DATE
+    })
+        .done(function (data) {
+            if (!data.success) {
+                $('#teamPointsModalBody').html('<div style="color:#dc2626;padding:20px;">' + (data.message || 'Could not load breakdown.') + '</div>');
+                return;
+            }
+            if (!data.members.length) {
+                $('#teamPointsModalBody').html('<div style="text-align:center;padding:30px;color:#9ca3af;">No team member purchases found for this range.</div>');
+                return;
+            }
+
+            var totalPoints = 0;
+            var html = '<div style="font-size:12.5px;color:#6b7280;margin-bottom:14px;">' +
+                'Territory Partners who referred you and whose purchases (0% GST products, reward-points-enabled invoices) contributed to your Team Points, ' +
+                data.from_date + ' to ' + data.to_date + '.</div>';
+            html += '<table style="width:100%;font-size:13.5px;border-collapse:collapse;">' +
+                    '<thead><tr style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #f3f4f6;">' +
+                    '<th style="text-align:left;padding:8px 10px 8px 0;">Territory Partner</th>' +
+                    '<th style="text-align:center;padding:8px 10px;">Invoices</th>' +
+                    '<th style="text-align:right;padding:8px 10px;">0% GST Amount</th>' +
+                    '<th style="text-align:right;padding:8px 0;">Points Contributed</th>' +
+                    '</tr></thead><tbody>';
+            $.each(data.members, function (_, m) {
+                totalPoints += parseFloat(m.points) || 0;
+                html += '<tr style="border-bottom:1px dotted #f3f4f6;">' +
+                        '<td style="padding:10px 10px 10px 0;">' +
+                            '<div style="font-weight:600;color:#1f2937;">' + $('<span>').text(m.name || '–').html() + '</div>' +
+                            '<div style="font-size:11px;color:#7c3aed;font-weight:700;">' + $('<span>').text(m.tp_code || '').html() + '</div>' +
+                            '<div style="font-size:11.5px;color:#9ca3af;">' + $('<span>').text(m.mobile || '').html() + '</div>' +
+                        '</td>' +
+                        '<td style="text-align:center;padding:10px;color:#374151;">' + m.invoice_count + '</td>' +
+                        '<td style="text-align:right;padding:10px;color:#374151;">₹' + (parseFloat(m.amount) || 0).toFixed(2) + '</td>' +
+                        '<td style="text-align:right;padding:10px 0;color:#7c3aed;font-weight:700;">' + (parseFloat(m.points) || 0).toFixed(2) + '</td>' +
+                        '</tr>';
+            });
+            html += '</tbody><tfoot><tr>' +
+                    '<td colspan="3" style="text-align:right;padding:14px 10px 0 0;font-weight:700;color:#374151;">Total Team Points</td>' +
+                    '<td style="text-align:right;padding:14px 0 0;font-weight:700;color:#7c3aed;font-size:16px;">' + totalPoints.toFixed(2) + '</td>' +
+                    '</tr></tfoot></table>';
+
+            $('#teamPointsModalBody').html(html);
+        })
+        .fail(function () {
+            $('#teamPointsModalBody').html('<div style="color:#dc2626;padding:20px;">Could not reach the server. Please try again.</div>');
+        });
+});
+</script>
 </body>
 </html>
 <?php ob_end_flush(); ?>

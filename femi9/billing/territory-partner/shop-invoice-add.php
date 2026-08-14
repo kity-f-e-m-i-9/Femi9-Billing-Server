@@ -58,10 +58,10 @@ $invidprefix       = "CMPSHP";
 <?php if (isset($_REQUEST['InvoiceUpdatedSuccess'])): ?><div class="alert alert-success">Invoice Number Updated Success!.</div><?php endif; ?>
 <?php if (isset($_SESSION['errorMessage'])): ?><div class="alert alert-danger"><?php echo htmlspecialchars($_SESSION['errorMessage']); unset($_SESSION['errorMessage']); ?></div><?php endif; ?>
 
-<h1><table class="headertble"><tr>
-    <td><?php if ($get_action == "edit") { echo "Update >"; } ?><?php echo $displaytitle; ?></td>
-    <td><a href="shop-manage-invoice.php" title="Manage">&#9776;</a></td>
-</tr></table></h1>
+<div class="page-title-modern">
+    <h1><i class="material-icons">receipt_long</i><?php if ($get_action == "edit") { echo "Update "; } ?><?php echo $displaytitle; ?></h1>
+    <a href="shop-manage-invoice.php" class="menu-link" title="Manage Invoices"><i class="material-icons">list</i></a>
+</div>
 
 <?php { ?>
 
@@ -90,19 +90,122 @@ function totalkm() {
 </script>
 
 <style type="text/css">
+body { font-family: 'Poppins', sans-serif; }
+
+/* ── Alerts ── */
+.alert { border-radius: 10px; border: none; padding: 15px 20px; margin-bottom: 20px; }
+.alert-success { background: #d1fae5; color: #065f46; border-left: 4px solid #10b981; }
+.alert-danger  { background: #fee2e2; color: #991b1b; border-left: 4px solid #ef4444; }
+
+/* ── Page Title ── */
+.page-title-modern {
+    background: white; border: 2px solid #e5e7eb; border-radius: 12px;
+    padding: 18px 24px; margin-bottom: 22px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.page-title-modern h1 { color: #1e293b; font-size: 21px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px; }
+.page-title-modern h1 i { color: #2563eb; font-size: 24px; }
+.page-title-modern .menu-link {
+    background: #2563eb; color: white; width: 38px; height: 38px;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    text-decoration: none; font-size: 18px; transition: all 0.2s ease;
+}
+.page-title-modern .menu-link:hover { background: #1d4ed8; color: white; }
+
+/* ── Form Sections ── */
+.form-section {
+    background: white; border: 2px solid #e5e7eb; border-radius: 14px;
+    padding: 24px 28px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.section-header {
+    color: #475569; font-size: 12.5px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 18px; display: flex; align-items: center;
+    gap: 8px; padding-bottom: 12px; border-bottom: 2px solid #f1f5f9;
+}
+.section-header i { color: #2563eb; font-size: 18px; }
+.form-label { font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 13.5px; display: block; }
+.form-control, .form-select, select.prinput, input.numberinput,
+.product-add-grid input, .product-add-grid select {
+    border: 2px solid #e5e7eb !important; border-radius: 9px !important; padding: 10px 14px !important;
+    font-size: 14px !important; font-family: 'Poppins', sans-serif; transition: all 0.2s ease;
+    box-sizing: border-box !important;
+}
+.form-control:focus, select.prinput:focus, input.numberinput:focus,
+.product-add-grid input:focus, .product-add-grid select:focus {
+    border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.1) !important; background: #fff !important;
+    outline: none !important;
+}
+
+/* ── Product Add Section ── */
+.product-add-section {
+    background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px;
+    padding: 18px; margin-top: 16px;
+}
+.product-add-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px; align-items: end;
+}
+.product-add-grid .wide { grid-column: span 2; }
+@media (max-width: 992px) { .product-add-grid .wide { grid-column: 1 / -1; } }
+.input-group-modern { display: flex; flex-direction: column; }
+.input-group-modern label {
+    font-size: 11.5px; color: #64748b; font-weight: 600; margin-bottom: 5px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+}
+/* Element-type selectors (not just .form-control) — loadPrice.php's AJAX
+   response swaps #amount's markup for a bare, class-less <input>, so the
+   styling hook has to key off being inside .product-add-grid, not a class
+   that only exists on the initial page load. */
+.product-add-grid .input-group-modern, .product-add-grid span {
+    margin: 0 !important; float: none !important; width: 100% !important; display: flex; flex-direction: column;
+}
+.product-add-grid input, .product-add-grid select {
+    margin: 0 !important; float: none !important; width: 100% !important;
+}
+
+.btn-add, #add {
+    background: #10b981 !important; color: white !important; border: none !important; padding: 10px 18px;
+    border-radius: 8px; font-weight: 500; display: inline-flex; align-items: center;
+    gap: 6px; white-space: nowrap; font-family: 'Poppins', sans-serif; font-size: 14px;
+}
+.btn-add:hover, #add:hover, #add:focus { background: #059669 !important; color: white !important; }
+
+/* ── Products Table ── */
+.table-modern {
+    background: white; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-top: 18px; border: 1px solid #f1f5f9;
+}
+.table-modern table { margin: 0; width: 100%; }
+.table-modern thead { background: #f8fafc; }
+.table-modern thead th {
+    color: #475569; font-weight: 600; font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: 0.4px; padding: 12px 14px; border-bottom: 2px solid #e5e7eb; white-space: nowrap;
+}
+.table-modern tbody td, .table-modern tbody th {
+    padding: 11px 14px; vertical-align: middle; border-bottom: 1px solid #f1f5f9;
+    color: #1e293b; font-size: 13.5px;
+}
+.table-modern tbody tr:last-child td { border-bottom: none; }
+.table-modern tbody tr:hover { background: #f8fafc; }
+
+/* ── Summary Card ── */
+.invoice-summary-card {
+    background: white; border: 2px solid #e5e7eb; border-radius: 12px;
+    padding: 22px; margin-top: 18px;
+}
+.invoice-summary-card p { margin-bottom: 12px; }
+.invoice-summary-card p b { display: block; font-size: 12.5px; color: #64748b; font-weight: 600; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.3px; }
+.invoice-info-actions .btn-primary {
+    background: #2563eb; border: none; padding: 11px 20px; border-radius: 8px; font-weight: 500;
+}
+.invoice-info-actions .btn-primary:hover { background: #1d4ed8; }
+
 .curstockvl { width:100%; border-collapse:collapse; }
 .curstockvl th { font-weight:bold; padding:5px; font-size:16px; color:blue; }
 .curstockvl td { font-weight:bold; padding:5px; }
-#add { background:green; border:1px solid green; }
-#add:hover, #add:focus { background:#DDD; color:#000; border:1px solid #000; }
-.item { margin-bottom:6px; }
-.item select { margin-right:10px; float:left; padding:6px; width:400px; border-radius:4px; border:1px solid #000; }
-.item input[type=number] { margin-right:10px; float:left; width:100px; padding:5px; border-radius:4px; border:1px solid #000; }
-select:focus, input[type=number]:focus { background:#fffa8f; }
-@media(max-width:768px) {
-    .item select { width:100%; margin-bottom:10px; }
-    .item input[type=number] { width:100%; margin-bottom:10px; }
-}
+select:focus, input[type=number]:focus { background:#fff; }
 </style>
 
 <?php if (isset($_REQUEST['InvoiceID'])) {
@@ -155,8 +258,11 @@ select:focus, input[type=number]:focus { background:#fffa8f; }
 <form action="shop-invoice-action2.php" method="post" enctype="multipart/form-data">
 <input type="hidden" name="inv_id" value="<?php echo $Invoice_ID; ?>">
 <input type="hidden" name="invuser" value="<?php echo $getinvuser; ?>">
-<div class="example-container"><div class="example-content">
 
+<div class="form-section">
+<div class="section-header"><i class="material-icons">edit_document</i>Invoice Details</div>
+<div class="row g-3">
+<div class="col-md-6">
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
 <?php
 $totalcountitems = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id='$Invoice_ID'"))['n'];
@@ -169,26 +275,44 @@ $totalcountitems = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS
 <option value="<?php echo $r['temp_id']; ?>"><?php echo ucwords($r['name']); ?>, <?php echo $r['mobile_number']; ?></option>
 <?php } } ?>
 </select>
-
+</div>
+<div class="col-md-6">
 <label class="form-label">Invoice Date*</label>
 <input type="date" readonly name="date" value="<?php echo $result_InvoieDetails['date']; ?>" required class="form-control">
-<br/>
+</div>
+</div>
 
 <?php if ($amount_received_fully == 0) { ?>
-<div class="item">
+<div class="product-add-section">
+<div class="section-header" style="border:none;padding-bottom:10px;margin-bottom:12px;"><i class="material-icons">add_shopping_cart</i>Add Product</div>
+<div class="product-add-grid">
+<div class="input-group-modern wide">
+<label>Product</label>
 <select required name="pr_id" class="prinput" style="width:100%;" autofocus onchange="showPrice(this.value)">
 <option value="" hidden>Select Product</option>
 <?php
-$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 ORDER BY p.id ASC");
+$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) { ?>
 <option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
 <?php } ?>
 </select>
-<br/><br/>
+</div>
+<div class="input-group-modern">
+<label>Qty</label>
 <input type="number" min="0" name="qty" id="qty" onkeyup="totalkm()" required placeholder="Qty" class="numberinput">
+</div>
+<div class="input-group-modern">
+<label>Price</label>
 <span id="txtHintPrice"><input type="number" min="0" name="amount" step="any" id="amount" onkeyup="totalkm()" required placeholder="Price"></span>
+</div>
+<div class="input-group-modern">
+<label>MRP</label>
 <input type="text" id="mrpDisplayField" placeholder="MRP" class="numberinput" onkeydown="return false;" onpaste="return false;">
+</div>
+<div class="input-group-modern">
+<label>Total</label>
 <input type="number" min="0" step="any" name="total" id="output" class="numberinput" required placeholder="Total">
+</div>
 <script>
 function discamount() {
     var output = document.getElementById('output').value;
@@ -196,16 +320,27 @@ function discamount() {
     document.getElementById('discountamount').value = (output * discountpercentae / 100).toFixed(2);
 }
 </script>
+<div class="input-group-modern">
+<label>Disc (%)</label>
 <input type="number" min="0" step="any" id="discountpercentae" name="discount_percentage" onkeyup="discamount()" required placeholder="Disc(%)" class="numberinput">
+</div>
+<div class="input-group-modern">
+<label>Disc (₹)</label>
 <input type="number" min="0" id="discountamount" name="discount_amount" step="any" required placeholder="Disc(Rs.)" class="numberinput">
-<button type="submit" name="addInvoice2" class="btn btn-primary" id="add"><i class="material-icons">add</i>Add</button>
+</div>
+<div class="input-group-modern">
+<button type="submit" name="addInvoice2" class="btn-add" id="add"><i class="material-icons" style="font-size:18px;">add</i>Add</button>
+</div>
+</div>
 </div>
 <?php } ?>
 
-</div></div></form>
+</div>
+</form>
 
 <!-- Items table -->
-<div class="row"><div class="table-responsive">
+<div class="table-modern">
+<div class="table-responsive">
 <table class="table">
     <thead><tr>
         <th>#</th><th>Product Description</th><th>Qty</th><th>MRP</th><th>Shop Price</th>
@@ -268,7 +403,7 @@ while ($ri = mysqli_fetch_array($res_items)) {
                    onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
                    class="form-control form-control-sm" style="width:70px;">
             <?php } else { ?>
-            <?php echo $ri['gstamount_total']; ?>(<?php echo $ri['gst_percentage']; ?>%)
+            <?php echo inr_format((float)$ri['gstamount_total'], 2); ?>(<?php echo $ri['gst_percentage']; ?>%)
             <?php } ?>
         </td>
         <td align="right"><?php echo inr_format($TotalAMount, 2); ?></td>
@@ -343,7 +478,6 @@ function showInvoiceDuplicateReal(str) {
 <?php endif; ?>
 
 <!-- Submit form -->
-<div><div>
 <script>
 function validateForm() {
     const amountInput = document.getElementById('receivableamount');
@@ -361,41 +495,30 @@ function validateForm() {
 
 <form action="shop-invoice-submit.php" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
 
-<div><div class="invoice-info">
-<hr/>
-<table style="width:100%;">
+<div class="invoice-summary-card">
+<div class="row g-4">
+<div class="col-lg-5">
+<div class="invoice-info">
+<p style="margin:0 0 4px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;">Invoice Number</p>
 <?php if ($needs_inv_number): ?>
-<tr>
-    <td style="white-space:nowrap;">Invoice Number *</td>
-    <td>
-        <input type="text" name="invnumber" id="realInvNumber" onkeyup="showInvoiceDuplicateReal(this.value)"
-               onkeypress="restrictSpecialChars(event);"
-               autofocus required class="form-control" style="background:#fffa8f;display:inline-block;width:auto;"
-               placeholder="Enter a unique invoice number">
-        <span id="txtHintInvoiceReal"></span>
-    </td>
-</tr>
+<input type="text" name="invnumber" id="realInvNumber" onkeyup="showInvoiceDuplicateReal(this.value)"
+       onkeypress="restrictSpecialChars(event);"
+       autofocus required class="form-control" style="background:#fffbea;"
+       placeholder="Enter a unique invoice number">
+<span id="txtHintInvoiceReal"></span>
 <?php else: ?>
-<tr>
-    <td>Inv Num</td>
-    <td style="color:#bd2b0e;">:&nbsp;
-    <?php if ($get_action == "edit") { ?>
-    <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive"><span><?php echo $result_InvoieDetails['inv_number']; ?></span></a>
-    <?php } else { ?>
-    <span><?php echo $result_InvoieDetails['inv_number']; ?></span>
-    <?php } ?>
-    </td>
-</tr>
+<p style="font-weight:700;color:#1e293b;font-size:16px;margin-bottom:14px;">
+<?php if ($get_action == "edit") { ?>
+<a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive"><?php echo $result_InvoieDetails['inv_number']; ?></a>
+<?php } else { ?>
+<?php echo $result_InvoieDetails['inv_number']; ?>
+<?php } ?>
+</p>
 <?php endif; ?>
-<tr>
-    <td>Date</td>
-    <td style="color:#bd2b0e;">:&nbsp;<b><?php echo date("d/M/Y", strtotime($result_InvoieDetails['date'])); ?></b></td>
-</tr>
-</table>
-<hr/>
-</div></div>
-
-<div class="col-lg-5"></div>
+<p style="margin:0 0 4px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;">Invoice Date</p>
+<p style="font-weight:700;color:#1e293b;font-size:15px;"><?php echo date("d/M/Y", strtotime($result_InvoieDetails['date'])); ?></p>
+</div>
+</div>
 
 <?php
 $unround_value = $TotalAMount123 + $result_InvoieDetails['courier_charges'];
@@ -418,7 +541,7 @@ function totalamount() {
 }
 </script>
 
-<div class="col-lg-3"><div class="invoice-info">
+<div class="col-lg-7"><div class="invoice-info">
 
 <input type="hidden" name="invoice_id" value="<?php echo $Invoice_ID; ?>">
 <input type="hidden" name="SubTotal" value="<?php echo $TotalAMount123; ?>">
@@ -536,7 +659,8 @@ $inv_id = $inv_randum_number . $invidprefix . date("dmygis");
 <input type="hidden" name="inv_id" value="<?php echo $inv_id; ?>">
 <input type="hidden" name="invuser" value="<?php echo $getinvuser; ?>">
 
-<div class="example-container"><div class="example-content">
+<div class="form-section">
+<div class="section-header"><i class="material-icons">edit_document</i>Invoice Details</div>
 
 <script type="text/javascript">
 function showInvoiceDuplicate(str) {
@@ -553,11 +677,13 @@ function showInvoiceDuplicate(str) {
 }
 </script>
 
+<div class="row g-3">
+<div class="col-md-4">
 <label class="form-label">Invoice Number *</label>
 <input type="text" onkeyup="showInvoiceDuplicate(this.value)" name="inv_number" autofocus required onkeypress="restrictSpecialChars(event)" class="form-control">
-<br/>
 <span id="txtHintInvoice"></span>
-
+</div>
+<div class="col-md-4">
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
 <select required name="customer_id" class="form-control" autofocus>
 <option value="" hidden>Select</option>
@@ -567,10 +693,11 @@ while ($r = mysqli_fetch_array($res_shops)) { ?>
 <option value="<?php echo $r['temp_id']; ?>"><?php echo ucwords($r['name']); ?>, <?php echo $r['mobile_number']; ?>, <?php echo ucwords($r['address']); ?></option>
 <?php } ?>
 </select>
-
+</div>
+<div class="col-md-4">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <label class="form-label">Invoice Date*</label>
-<input id="bookingDate" style="margin-bottom:10px;" type="date" name="date" value="<?php echo date("Y-m-d"); ?>" required class="form-control">
+<input id="bookingDate" type="date" name="date" value="<?php echo date("Y-m-d"); ?>" required class="form-control">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 // Invoice date can only be today, yesterday, or the day before — no older
@@ -587,21 +714,39 @@ var invoiceDateOpts = {
 flatpickr("#bookingDate", invoiceDateOpts);
 </script>
 <style>.flatpickr-alt-input { margin-bottom: 10px; }</style>
+</div>
+</div>
 
-<div class="item">
+<div class="product-add-section">
+<div class="section-header" style="border:none;padding-bottom:10px;margin-bottom:12px;"><i class="material-icons">add_shopping_cart</i>Add Product</div>
+<div class="product-add-grid">
+<div class="input-group-modern wide">
+<label>Product</label>
 <select required name="pr_id" style="width:100%;" onchange="showPrice(this.value)" class="prinput">
 <option value="" hidden>Select Product</option>
 <?php
-$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 ORDER BY p.id ASC");
+$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) { ?>
 <option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
 <?php } ?>
 </select>
-<br/><br/>
+</div>
+<div class="input-group-modern">
+<label>Qty</label>
 <input type="number" min="0" name="qty" id="qty" onkeyup="totalkm()" required placeholder="Qty" class="numberinput">
+</div>
+<div class="input-group-modern">
+<label>Price</label>
 <span id="txtHintPrice"><input type="number" min="0" name="amount" step="any" id="amount" onkeyup="totalkm()" required placeholder="Price"></span>
+</div>
+<div class="input-group-modern">
+<label>MRP</label>
 <input type="text" id="mrpDisplayField" placeholder="MRP" class="numberinput" onkeydown="return false;" onpaste="return false;">
+</div>
+<div class="input-group-modern">
+<label>Total</label>
 <input type="number" min="0" step="any" name="total" id="output" required placeholder="Total" class="numberinput">
+</div>
 <script>
 function discamount() {
     var output = document.getElementById('output').value;
@@ -609,14 +754,24 @@ function discamount() {
     document.getElementById('discountamount').value = (output * discountpercentae / 100).toFixed(2);
 }
 </script>
+<div class="input-group-modern">
+<label>Disc (%)</label>
 <input type="number" min="0" step="any" id="discountpercentae" name="discount_percentage" onkeyup="discamount()" required placeholder="Disc(%)" class="numberinput">
+</div>
+<div class="input-group-modern">
+<label>Disc (₹)</label>
 <input type="number" min="0" id="discountamount" name="discount_amount" step="any" required placeholder="Disc(Rs.)" class="numberinput">
+</div>
+<div class="input-group-modern">
 <span id="txtHintstock">
-<button type="submit" name="addInvoice" class="btn btn-primary" id="add"><i class="material-icons">add</i>Add</button>
+<button type="submit" name="addInvoice" class="btn-add" id="add"><i class="material-icons" style="font-size:18px;">add</i>Add</button>
 </span>
 </div>
+</div>
+</div>
 
-</div></div></form>
+</div>
+</form>
 
 <?php } // end new/existing ?>
 

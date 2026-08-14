@@ -201,6 +201,13 @@ flatpickr("#bookingDate", {
 			var newcell = row.insertCell(i);
 			newcell.innerHTML = table.rows[0].cells[i].innerHTML;
 		}
+		// Cloning via innerHTML can carry over a stale GST hint if row 0
+		// already had a product selected -- clear it and reset the new
+		// row's product select to unselected so the hint stays in sync.
+		var newSelect = row.querySelector('.gst-product-select');
+		if (newSelect) newSelect.selectedIndex = 0;
+		var newHint = row.querySelector('.gst-hint');
+		if (newHint) newHint.textContent = '';
 	}else{
 		 alert("Maximum Passenger per ticket is 100.");
 			   
@@ -233,16 +240,17 @@ function deleteRow(tableID) {
                     <tr>
 						<td><input type="checkbox" name="chk[]"/></td>
 						 <td>
-							<select required="" name="product_id[]" class="form-control" required="">
+							<select required="" name="product_id[]" class="form-control gst-product-select" required="" onchange="showGstHint(this)">
 <option value="" hidden="">Select Product</option>
-<?php $select_product_list12="select * from products where (temp_id not like 'NKS-%' or temp_id is null)";
+<?php $select_product_list12="select id, productName, gst, gst_type from products where (temp_id not like 'NKS-%' or temp_id is null)";
 										$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
 										while($result_product_list12=mysqli_fetch_array($fetch_product_list12))
 										{
 											?>
-<option value="<?=$result_product_list12['id'];?>"><?=$result_product_list12['productName'];?></option>
+<option value="<?=$result_product_list12['id'];?>" data-gst="<?=htmlspecialchars($result_product_list12['gst']);?>" data-gst-type="<?=htmlspecialchars($result_product_list12['gst_type'] ?: 'exclusive');?>"><?=$result_product_list12['productName'];?></option>
 										<?php }?>
 </select>
+						 <div class="gst-hint" style="font-size:12px;color:#6c757d;margin-top:4px;"></div>
 					     </td>
 						 <td><input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control" required=""/></td>
 						 <td>
@@ -253,11 +261,30 @@ function deleteRow(tableID) {
 						 </td>
                     </tr>
                 </table>
-				<br/>					
+				<br/>
 
-			<span id="opstock">									
+			<span id="opstock">
 <button type="submit" name="add-record" class="btn btn-primary"><i class="material-icons">add</i>Add</button>
 </span>
+
+<script>
+// Shows whether the selected product's rate should be entered GST-inclusive
+// or GST-exclusive — mirrors the same hint pattern used on the Neksomo
+// manufacturer purchase form. The server (internal_transfer_action.php)
+// always recomputes from the product's live gst_type before saving; this is
+// informational only, not used in any calculation here.
+function showGstHint(selectEl) {
+    var opt = selectEl.options[selectEl.selectedIndex];
+    var hintEl = selectEl.parentElement.querySelector('.gst-hint');
+    if (!hintEl) return;
+    if (!selectEl.value) { hintEl.textContent = ''; return; }
+    var gstRate = parseFloat(opt.getAttribute('data-gst')) || 0;
+    var gstType = opt.getAttribute('data-gst-type') || 'exclusive';
+    hintEl.textContent = gstType === 'inclusive'
+        ? ('GST ' + gstRate + '% inclusive — this rate already has GST built in.')
+        : ('GST ' + gstRate + '% exclusive — GST will be added on top of this rate.');
+}
+</script>
 												
                                             </div>
                                         </div>

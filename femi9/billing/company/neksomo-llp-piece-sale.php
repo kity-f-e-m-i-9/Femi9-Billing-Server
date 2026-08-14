@@ -195,6 +195,14 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
     (function ($) {
         var rateItems = [];
 
+        // Shows the rate exactly as entered (up to 6 decimals, matching the
+        // DB column precision) instead of forcing it down to 2 decimals.
+        function fmtCost(n) {
+            var s = parseFloat(n).toFixed(6).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+            var decimals = s.indexOf('.') === -1 ? 0 : s.split('.')[1].length;
+            return decimals < 2 ? parseFloat(n).toFixed(2) : s;
+        }
+
         $('#productSelect').on('change', function () {
             var $opt   = $(this).find('option:selected');
             var isPack = $opt.data('unit-type') === 'pack';
@@ -249,7 +257,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
                     '<tr>' +
                     '<td><span class="row-num">' + (i + 1) + '</span></td>' +
                     '<td><strong>' + escHtml(item.name) + '</strong></td>' +
-                    '<td>₹' + item.rate.toFixed(2) + item.unitLabel + '</td>' +
+                    '<td>₹' + fmtCost(item.rate) + item.unitLabel + '</td>' +
                     '<td><button type="button" class="badge-remove" onclick="removeProduct(' + i + ')"><i class="material-icons" style="font-size:14px;vertical-align:middle;">delete</i> Remove</button></td>' +
                     '</tr>'
                 );

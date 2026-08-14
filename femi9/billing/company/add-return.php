@@ -94,7 +94,7 @@ $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 									   
 									   
 <?php include("validate-scripts.php");?>
-<form action="return-action" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
+<form action="stock_return_update" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
 
 
 <?php function GeraHash($qtd){ $Caracteres = '123456789'; 

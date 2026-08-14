@@ -109,6 +109,36 @@ try {
     // Restore advance balance — reverse exactly the payments that were deducted
     tpAdvanceRestore($db_conn, $inv_id);
 
+    // If this invoice originated from a Purchase Order, that PO's status was
+    // flipped to 'completed' when the invoice was created (tp-invoice-action.php).
+    // There is no FK between tp_purchase_orders.tp_invoice_id and tp_invoices.id,
+    // so deleting the invoice without this step leaves the PO permanently
+    // stranded at status='completed' pointing at a now-nonexistent invoice —
+    // both the TP and company PO lists keep showing "Completed" forever, with
+    // no way to cancel it (cancel-tp-purchase-order.php only accepts 'waiting').
+    // Reverting it here, in the same transaction, is the only place in the
+    // codebase this link is ever undone, so it must happen atomically with
+    // the invoice delete above.
+    $po = $db_conn->prepare(
+        "SELECT id FROM tp_purchase_orders WHERE tp_invoice_id = ? FOR UPDATE"
+    );
+    $po->bind_param("i", $inv_id);
+    $po->execute();
+    $poRow = $po->get_result()->fetch_assoc();
+    $po->close();
+    if ($poRow) {
+        $cancelReason = "Invoice {$inv_num} was deleted by company";
+        $poUpd = $db_conn->prepare(
+            "UPDATE tp_purchase_orders
+             SET status = 'cancelled', tp_invoice_id = NULL,
+                 cancelled_at = NOW(), cancelled_by = ?, cancel_reason = ?
+             WHERE id = ?"
+        );
+        $poUpd->bind_param("ssi", $created_by, $cancelReason, $poRow['id']);
+        $poUpd->execute();
+        $poUpd->close();
+    }
+
     // Delete receipts first (FK: tp_invoice_receipts → tp_invoices)
     $d0 = $db_conn->prepare("DELETE FROM tp_invoice_receipts WHERE tp_invoice_id=?");
     $d0->bind_param("i", $inv_id); $d0->execute(); $d0->close();

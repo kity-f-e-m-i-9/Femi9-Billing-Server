@@ -281,7 +281,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 													
 																										<td>
 													    <div class="actions-group">
-													        <a href="shop-user-invoice-add?invuser=<?=$vld1;?>&&action=edit&&InvoiceID=<?=$vld2;?>&&gid=<?=$vld3;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+													        <a href="shop-user-invoice-add?invuser=<?=$getinvuser;?>&&action=edit&&InvoiceID=<?=$INVID_encode;?>&&gid=<?=$result_product_list['from_user_id'];?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
 													    </div>
 													</td>
 													

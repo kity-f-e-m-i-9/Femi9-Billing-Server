@@ -61,14 +61,21 @@ if (isset($_REQUEST['add-return'])) {
     $buyer_gsttype = (strlen($cust['gstin'] ?? '') === 15) ? 'register' : 'unregister';
 
     // Invoice details
+    // "invoice" (customer-type) has no rwpoints_enable column — reward points
+    // aren't tracked on customer invoices, only on user_invoice (shop/stockist/
+    // distributor). Selecting it there throws and blanks the page.
     $inv_table = ($from_usertype === 'customer') ? 'invoice' : 'user_invoice';
-    $stmt = $db_conn->prepare("SELECT rwpoints_enable, gst_type FROM $inv_table WHERE inv_id=? LIMIT 1");
+    if ($from_usertype === 'customer') {
+        $stmt = $db_conn->prepare("SELECT gst_type FROM $inv_table WHERE inv_id=? LIMIT 1");
+    } else {
+        $stmt = $db_conn->prepare("SELECT rwpoints_enable, gst_type FROM $inv_table WHERE inv_id=? LIMIT 1");
+    }
     $stmt->bind_param('s', $invid);
     $stmt->execute();
     $inv = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$inv) { header("Location: cnote_new.php?error=invoice_not_found"); exit; }
-    $rwpoints_enable = (int)($inv['rwpoints_enable'] ?? 0);
+    $rwpoints_enable = ($from_usertype === 'customer') ? 0 : (int)($inv['rwpoints_enable'] ?? 0);
     $gst_type        = $inv['gst_type'];
 
     // Product details

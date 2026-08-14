@@ -27,6 +27,14 @@ if (!$purchase) {
     exit;
 }
 
+// Shows the cost with as many decimals as were actually entered (up to the
+// DB column's 6-decimal precision) instead of hard-rounding to 2.
+function fmt_cost($n) {
+    $s = rtrim(rtrim(number_format((float)$n, 6, '.', ''), '0'), '.');
+    $decimals = strpos($s, '.') === false ? 0 : strlen(substr($s, strpos($s, '.') + 1));
+    return $decimals < 2 ? number_format((float)$n, 2) : $s;
+}
+
 $itemStmt = $db_conn->prepare(
     "SELECT npi.product_id, npi.quantity_pieces, npi.cost_per_piece, npi.total_cost, p.productName
      FROM neksomo_purchase_items npi
@@ -129,7 +137,7 @@ $itemStmt->close();
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($it['productName']); ?></td>
                                                     <td><?php echo number_format((int)$it['quantity_pieces']); ?></td>
-                                                    <td>&#8377;<?php echo number_format((float)$it['cost_per_piece'], 2); ?></td>
+                                                    <td>&#8377;<?php echo fmt_cost($it['cost_per_piece']); ?></td>
                                                     <td>&#8377;<?php echo number_format((float)$it['total_cost'], 2); ?></td>
                                                 </tr>
                                             <?php endforeach; ?>

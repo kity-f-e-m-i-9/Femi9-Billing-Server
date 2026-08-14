@@ -14,6 +14,14 @@ $entries = $db_conn->query(
      JOIN products p ON p.id = r.product_id
      ORDER BY p.productName ASC, r.effective_date DESC"
 )->fetch_all(MYSQLI_ASSOC);
+
+// Shows the rate with as many decimals as were actually entered (up to the
+// DB column's 6-decimal precision) instead of hard-rounding to 2.
+function fmt_cost($n) {
+    $s = rtrim(rtrim(number_format((float)$n, 6, '.', ''), '0'), '.');
+    $decimals = strpos($s, '.') === false ? 0 : strlen(substr($s, strpos($s, '.') + 1));
+    return $decimals < 2 ? number_format((float)$n, 2) : $s;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -97,7 +105,7 @@ $entries = $db_conn->query(
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($e['productName']); ?></td>
                                                     <td><?php echo date('d M Y', strtotime($e['effective_date'])); ?></td>
-                                                    <td>&#8377;<?php echo number_format((float)$e['rate_per_piece'], 2); ?><?php echo $e['unit_type'] === 'pack' ? '/pack' : '/pc'; ?></td>
+                                                    <td>&#8377;<?php echo fmt_cost($e['rate_per_piece']); ?><?php echo $e['unit_type'] === 'pack' ? '/pack' : '/pc'; ?></td>
                                                     <td><?php echo number_format((float)$e['gst_rate'], 2); ?>% <?php echo $e['gst_type'] === 'inclusive' ? '(Incl.)' : '(Excl.)'; ?></td>
                                                     <td>
                                                         <div class="actions-group">

@@ -337,6 +337,15 @@ $title = "Report - B2B (Territory Partner)";
                                                     <input type="hidden" name="page" value="1">
                                                     <input type="text" name="q" value="<?=htmlspecialchars($search);?>" class="form-control form-control-sm" placeholder="Search invoice, buyer, TP, product..." style="min-width:280px">
                                                 </form>
+                                                <a href="export_tp_report.php?<?= http_build_query([
+                                                    'branch_state'   => $selected_branch_state,
+                                                    'branch_pincode' => $selected_pincode,
+                                                    'buyer_type'     => $selected_buyer_type,
+                                                    'frdate'         => $from_date,
+                                                    'todate'         => $to_date,
+                                                ]) ?>" title="Export to Excel">
+                                                    <img src="../../assets/images/excel-3-32.png" alt="Export" style="width:28px;height:28px;">
+                                                </a>
                                                 <div class="text-muted small">
                                                     <?php if ($is_search): ?>Showing all matches<?php else: ?>Page <?=$page;?> of <?=$total_pages;?><?php endif; ?>
                                                 </div>

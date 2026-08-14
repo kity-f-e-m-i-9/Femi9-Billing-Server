@@ -27,6 +27,8 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
             <ul class="sub-menu">
                 <li><a href="add-purchase-order.php">Purchase Order</a></li>
                 <li><a href="manage-purchase-orders.php">My Purchase Orders</a></li>
+                <li><a href="add-advance-payment.php">Advance Payment</a></li>
+                <li><a href="manage-advance-payments.php">My Advance Payments</a></li>
             </ul>
         </li>
 
@@ -41,6 +43,9 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
 
         <li>
             <a href="wallet-history.php"><i class="material-icons-outlined">wallet</i>Wallet History</a>
+        </li>
+        <li>
+            <a href="my-referrals.php"><i class="material-icons-outlined">groups</i>My Referrals</a>
         </li>
 
         <li>
@@ -81,6 +86,7 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
                 <li><a href="shop-manage.php">Manage Shop</a></li>
                 <?php if ($_tp_can_invoice): ?><li><a href="shop-invoice-add.php?invuser=shop">Add Invoice</a></li><?php endif; ?>
                 <li><a href="shop-manage-invoice.php">Manage Invoice</a></li>
+                <li><a href="shop-report.php">Shop Report</a></li>
             </ul>
         </li>
 
@@ -92,10 +98,6 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
                 <?php if ($_tp_can_invoice): ?><li><a href="customer-invoice-add.php?invuser=customer">Add Invoice</a></li><?php endif; ?>
                 <li><a href="customer-manage-invoice.php">Manage Invoice</a></li>
             </ul>
-        </li>
-
-        <li>
-            <a href="purchased-bill.php"><i class="material-icons-two-tone">inbox</i>Purchased Bill Copy</a>
         </li>
 
         <li>

@@ -49,6 +49,7 @@ $selectproducts="select * from products where id='$pr_id'";
 $fetchproducts=mysqli_query($db_conn,$selectproducts);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $gst_percentage=$resultproducts['gst'];
+$gst_type_item=$resultproducts['gst_type'] ?: 'exclusive';
 $hsn=$resultproducts['hsn'];
 $rwpoints="0";
 
@@ -69,9 +70,19 @@ $discount_percentage=number_format($discount_percentage,2,'.','');
 
 $subtotal=$totalamount-$discount_amount;
 $subtotal=number_format($subtotal,2,'.','');
- 
-$gstamount_total=($subtotal*$gst_percentage/100); 
-$total=$subtotal+$gstamount_total;
+
+// Inclusive-tax products already have GST baked into the entered price, so
+// the tax is carved out of subtotal (and NOT added again into total);
+// exclusive-tax products get GST added on top — same convention as
+// tp-invoice-print.php / shop-user-invoice-print.php.
+if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
+	$taxable_value = $subtotal * 100 / (100 + $gst_percentage);
+	$gstamount_total = $subtotal - $taxable_value;
+	$total = $subtotal;
+} else {
+	$gstamount_total=($subtotal*$gst_percentage/100);
+	$total=$subtotal+$gstamount_total;
+}
 //----------------------------------------------------------------
 	
 	//count available stock

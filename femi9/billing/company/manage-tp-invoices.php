@@ -12,6 +12,25 @@ if ($col && $col->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN courier_charges DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER invoice_date");
 }
 
+// Ensure reward-points columns exist (migration) — mirrors user_invoice /
+// user_invoice_items so TP invoices can use the same enable/disable toggle
+// as SS/Stockist/Distributor invoices on user-manage-invoice.php.
+$col = $db_conn->query("SHOW COLUMNS FROM tp_invoices LIKE 'rwpoints_enable'");
+if ($col && $col->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN rwpoints_enable TINYINT(1) NOT NULL DEFAULT 1 AFTER total_amount");
+}
+$col = $db_conn->query("SHOW COLUMNS FROM tp_invoice_items LIKE 'rwpoints'");
+if ($col && $col->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_invoice_items ADD COLUMN rwpoints DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER amount");
+    // Backfill existing line items so pre-existing invoices show correct
+    // points immediately instead of 0 until their next toggle.
+    $db_conn->query("
+        UPDATE tp_invoice_items tii
+        JOIN products p ON p.id = tii.product_id
+        SET tii.rwpoints = p.rwpoints * tii.quantity
+    ");
+}
+
 // ── Filters ───────────────────────────────────────────────────────────────────
 $filter_state_id    = (int)($_GET['state_id']    ?? 0);
 $filter_location_id = (int)($_GET['location_id'] ?? 0);
@@ -106,6 +125,7 @@ $where_sql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
 $sql = "
     SELECT tpi.id, tpi.invoice_number, tpi.invoice_date, tpi.total_amount,
+           tpi.rwpoints_enable,
            COALESCE(tpi.courier_charges, 0) AS courier_charges,
            tpi.created_by, tpi.created_at,
            tp.name AS tp_name, tp.tp_id AS tp_code, tp.mobile AS tp_mobile,
@@ -210,6 +230,7 @@ $i = 0;
         .pay-badge.na            { background:#f3f4f6; color:#9ca3af; cursor:default; }
         .action-btn.receipt { color:#059669; } .action-btn.receipt:hover { background:#d1fae5; }
         .action-btn.cn      { color:#7c3aed; } .action-btn.cn:hover      { background:#ede9fe; }
+        .btn-rwpoints-toggle { border:none; background:none; padding:0; cursor:pointer; }
 
         .filter-card { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-radius:10px; padding:18px 20px; margin-bottom:20px; }
         .filter-card .form-label { color:#fff; font-weight:500; margin-bottom:4px; font-size:12.5px; }
@@ -400,6 +421,7 @@ $i = 0;
                                             <th>Courier</th>
                                             <th>Payment</th>
                                             <th>Created By</th>
+                                            <th>Reward Points</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -463,6 +485,22 @@ $i = 0;
                                                 <?php endif; ?>
                                             </td>
                                             <td style="font-size:13px;color:#6b7280;"><?php echo htmlspecialchars($inv['created_by']); ?></td>
+                                            <td>
+                                                <form method="POST" action="update-tp-invoice-rwpermission" class="d-inline rwpoints-toggle-form" style="display:inline">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                                    <input type="hidden" name="invoice_enc" value="<?php echo $enc; ?>">
+                                                    <input type="hidden" name="current_state" value="<?php echo (int)$inv['rwpoints_enable']; ?>">
+                                                    <?php if ((int)$inv['rwpoints_enable'] === 1): ?>
+                                                        <button type="button" class="btn-rwpoints-toggle" data-inv="<?php echo htmlspecialchars($inv['invoice_number']); ?>" data-action="Disable">
+                                                            <span class="badge badge-style-bordered badge-success">Enable</span>
+                                                        </button>
+                                                    <?php else: ?>
+                                                        <button type="button" class="btn-rwpoints-toggle" data-inv="<?php echo htmlspecialchars($inv['invoice_number']); ?>" data-action="Enable">
+                                                            <span class="badge badge-style-bordered badge-danger">Disabled</span>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </form>
+                                            </td>
                                             <td style="white-space:nowrap;">
                                                 <a href="view-tp-invoice?id=<?php echo $enc; ?>" class="action-btn view" title="View Invoice">
                                                     <i class="material-icons-outlined" style="font-size:19px;">visibility</i>
@@ -588,6 +626,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 confirmButtonColor: '#dc2626',
                 cancelButtonColor: '#6b7280',
                 confirmButtonText: 'Yes, Delete',
+                cancelButtonText: 'Cancel',
+                reverseButtons: true
+            }).then(function (result) {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        });
+    });
+
+    document.querySelectorAll('.btn-rwpoints-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var inv    = this.dataset.inv;
+            var action = this.dataset.action;
+            var form   = this.closest('form');
+            Swal.fire({
+                title: action + ' Reward Points?',
+                html: 'Invoice <strong>' + inv + '</strong> — this will ' + action.toLowerCase() + ' reward points for this invoice.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#667eea',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes, ' + action,
                 cancelButtonText: 'Cancel',
                 reverseButtons: true
             }).then(function (result) {

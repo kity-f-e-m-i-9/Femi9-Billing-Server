@@ -87,17 +87,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Inject production DB credentials into .env
-        run: |
-          ENV_FILE="femi9/billing/shared/.env"
-          sed -i "s|^DB_HOST=.*|DB_HOST=${{ secrets.PROD_DB_HOST }}|" "$ENV_FILE"
-          sed -i "s|^DB_PORT=.*|DB_PORT=${{ secrets.PROD_DB_PORT }}|" "$ENV_FILE"
-          sed -i "s|^DB_USERNAME=.*|DB_USERNAME=${{ secrets.PROD_DB_USERNAME }}|" "$ENV_FILE"
-          sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}|" "$ENV_FILE"
-          sed -i "s|^DB_NAME=.*|DB_NAME=${{ secrets.PROD_DB_NAME }}|" "$ENV_FILE"
       - name: FTP-Deploy-Action
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          # .env files are untracked (they hold live secrets and can't be
+          # committed — GitHub's push protection blocks that outright).
+          # Without this exclude, FTP-Deploy-Action's sync-state diff sees
+          # "file was in a past deploy, now absent from the checkout" and
+          # DELETES it from the server to match — this is exactly what
+          # wiped production's shared/.env on 2026-08-06. Excluding these
+          # paths tells the action to never touch them, so production's
+          # manually-maintained secrets survive every future deploy.
+          exclude: |
+            **/.env
+            **/.env.*
+            !**/.env.example

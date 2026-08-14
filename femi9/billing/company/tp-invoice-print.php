@@ -66,7 +66,7 @@ if (empty($result_Godown)) {
 // Line items with product details
 $stmt2 = $db_conn->prepare("
     SELECT tpii.quantity, tpii.rate, tpii.amount, tpii.discount_percentage, tpii.discount_amount,
-           p.productName, p.hsn, p.gst AS gst_percentage, p.gst_type, p.mrp
+           p.productName, p.hsn, p.gst AS gst_percentage, p.gst_type, p.mrp, p.packs_per_carton
     FROM tp_invoice_items tpii
     JOIN products p ON p.id = tpii.product_id
     WHERE tpii.tp_invoice_id = ?
@@ -117,6 +117,25 @@ foreach ($invoice_items as &$item) {
     $__inv_gst_pct        = max($__inv_gst_pct, $gst_pct);
 }
 unset($item);
+// Carton breakdown per line — packs_per_carton is optional per-product metadata;
+// when unset for a product, that line is shown as '—' and excluded from the cartons total.
+$TotalCartons123 = 0;
+$has_carton_data = false;
+foreach ($invoice_items as &$item) {
+    $ppc = $item['packs_per_carton'];
+    $item['carton_display'] = '—';
+    if ($ppc !== null && $ppc !== '' && (int)$ppc > 0) {
+        $has_carton_data = true;
+        $ppc_int  = (int)$ppc;
+        $qty      = (int)$item['quantity'];
+        $cartons  = intdiv($qty, $ppc_int);
+        $leftover = $qty % $ppc_int;
+        $TotalCartons123 += $cartons;
+        $item['carton_display'] = $cartons . ' ctn' . ($leftover > 0 ? ' + ' . $leftover . ' pack' . ($leftover > 1 ? 's' : '') : '');
+    }
+}
+unset($item);
+
 $courier_charges  = (float)$result_Invoice_Details['courier_charges'];
 $discount_amount  = (float)($result_Invoice_Details['discount_amount'] ?? 0);
 $grand_total      = (float)$result_Invoice_Details['total_amount'];
@@ -368,8 +387,16 @@ $cp_seller_parts = array_filter([
 
 <?php
 $d = $result_Invoice_Details;
-// Build delivery address lines
-$delivery_parts = array_filter([
+// Build delivery address lines — use the one-off address typed at PO time
+// if the TP chose not to ship to their default registered address.
+$useCustomDelivery = empty($d['use_default_delivery_address']) && !empty($d['custom_delivery_line1']);
+$delivery_parts = $useCustomDelivery ? array_filter([
+    $d['custom_delivery_line1'],
+    $d['custom_delivery_line2'],
+    implode(', ', array_filter([$d['custom_delivery_city'], $d['custom_delivery_district']])),
+    implode(', ', array_filter([$d['custom_delivery_state'], $d['custom_delivery_country']])),
+    !empty($d['custom_delivery_pincode']) ? 'Pincode: ' . $d['custom_delivery_pincode'] : '',
+]) : array_filter([
     $d['delivery_line1'],
     $d['delivery_line2'],
     implode(', ', array_filter([$d['delivery_city'], $d['delivery_district']])),
@@ -452,6 +479,10 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
 <td id="rightlaign">Amount</td>
+<?php if ($has_carton_data): ?>
+<td id="rightlaign">Packs/Carton</td>
+<td id="rightlaign">Cartons</td>
+<?php endif; ?>
 </tr>
 
 <?php $invno = 0; foreach ($invoice_items as $item):
@@ -480,6 +511,10 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign"><?= $gst_pct; ?>%</td>
 <td id="rightlaign"><?= inr_format($item_disc_amt, 2); ?><br/>(<?= fmt_gst_pct($item_disc_pct); ?>%)</td>
 <td id="rightlaign"><?= inr_format($taxable_value, 2); ?></td>
+<?php if ($has_carton_data): ?>
+<td id="rightlaign"><?= ($item['packs_per_carton'] !== null && $item['packs_per_carton'] !== '') ? inr_format((int)$item['packs_per_carton'], 0) : '—'; ?></td>
+<td id="rightlaign"><?= $item['carton_display']; ?></td>
+<?php endif; ?>
 </tr>
 <?php endforeach; ?>
 
@@ -488,6 +523,10 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign"><b><?= inr_format($Totalquantity123, 0); ?> Packs</b></td>
 <td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></b></td>
+<?php if ($has_carton_data): ?>
+<td></td>
+<td id="rightlaign"><b><?= inr_format($TotalCartons123, 0); ?> ctn</b></td>
+<?php endif; ?>
 </tr>
 
 <?php if ($discount_amount > 0): ?>
@@ -495,6 +534,7 @@ Terms of Delivery<br/>&nbsp;
 <td></td><td id="rightlaign"><b><i>Discount</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
+<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
 </tr>
 <?php endif; ?>
 <?php if ($totalgstamount > 0):
@@ -506,11 +546,13 @@ Terms of Delivery<br/>&nbsp;
 <td></td><td id="rightlaign"><b><i>SGST (<?= $__half_pct; ?>%)</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
+<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
 </tr>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>CGST (<?= $__half_pct; ?>%)</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
+<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
 </tr>
 <?php endif; ?>
 
@@ -519,6 +561,7 @@ Terms of Delivery<br/>&nbsp;
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
+<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
 </tr>
 <?php endif; ?>
 
@@ -526,6 +569,7 @@ Terms of Delivery<br/>&nbsp;
 <td></td><td id="rightlaign"><b><i>Total</i></b></td>
 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
+<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
 </tr>
 </table>
 <div style="clear:both;"></div>

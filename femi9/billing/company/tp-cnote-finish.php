@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpAdvanceService.php';
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -175,6 +176,45 @@ try {
         $s = $db_conn->prepare("INSERT INTO tp_invoice_receipts (tp_invoice_id, invoice_number, amount, receipt_date, payment_mode, remarks, created_by) VALUES (?,?,?,?,'credit_note',?,?)");
         $s->bind_param('isdsss', $tp_invoice_id, $inv_number, $cn_total, $cn_date, $cn_remarks, $created_by);
         $s->execute(); $s->close();
+    }
+
+    // 5. Credit the return value back to the TP's advance balance — restores
+    // whatever was deducted from tp_advance_payments to pay for this
+    // invoice, up to the returned amount (LIFO: most recently deducted
+    // advance payment first). This is what actually increases the TP's
+    // spendable balance for future purchase orders; the receipt above only
+    // marks the original invoice as paid and doesn't touch the balance.
+    if ($cn_total > 0 && $tp_invoice_id) {
+        $cn_date = $cn_date ?? date('Y-m-d');
+        $restoredAmount = tpAdvanceRestorePartial($db_conn, $tp_invoice_id, $cn_total);
+
+        // If the invoice's deduction log couldn't fully account for the
+        // return (e.g. no log rows exist for it at all — this has happened
+        // for at least one invoice, cause unclear), the TP would otherwise
+        // silently lose that portion of their return value. Credit the
+        // shortfall as a brand-new advance payment instead, same shape as a
+        // real one, so the TP's balance always reflects what they're owed.
+        $shortfall = round($cn_total - $restoredAmount, 2);
+        if ($shortfall > 0.005) {
+            $fallbackCompanyId = $use_godown ? $source_godown_id : null;
+            $fallbackRemarks   = 'Credit Note (return) — Invoice: ' . $inv_number . ', Return ID: ' . $returnid
+                . ($restoredAmount > 0 ? '. Partially restored from original deduction log; remainder credited fresh.' : '. No deduction log found for the original invoice; credited fresh.');
+            $balance  = $shortfall;
+            $adjusted = 0.00;
+            $status   = 'active';
+            $s = $db_conn->prepare(
+                "INSERT INTO tp_advance_payments
+                    (company_id, territory_partner_id, amount, payment_date, payment_mode, reference_number, remarks,
+                     adjusted_amount, balance_amount, status, created_by)
+                 VALUES (?,?,?,?,'credit_note',?,?,?,?,?,?)"
+            );
+            $s->bind_param(
+                'iidsssdsss',
+                $fallbackCompanyId, $tp_db_id, $shortfall, $cn_date, $returnid, $fallbackRemarks,
+                $adjusted, $balance, $status, $created_by
+            );
+            $s->execute(); $s->close();
+        }
     }
 
     $db_conn->commit();

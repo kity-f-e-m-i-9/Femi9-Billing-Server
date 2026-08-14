@@ -1,10 +1,11 @@
 <?php include("checksession.php");
 require_once("include/GodownAccess.php");
 require_once("include/NeksomoStockHelper.php");
+require_once("include/NeksomoStockBridge.php");
 include("config.php");
 
 $__usertype = get_login_usertype($db_conn);
-if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
+if (!in_array($__usertype, ['neksomo', 'admin', 'finance'], true)) {
     header("Location: dashboard.php");
     exit;
 }
@@ -56,22 +57,32 @@ $product_rows = [];
 $total_closing_pieces = 0;
 $total_purchased_pieces = 0;
 $total_sold_pieces = 0;
+$total_converted_pieces = 0;
 $total_closing_packs = 0;
 $total_purchased_packs = 0;
 $total_sold_packs = 0;
+$total_converted_packs = 0;
 while ($Result_product = mysqli_fetch_assoc($Fetch_products)) {
     $pid = (int)$Result_product['id'];
     $isPack = ($Result_product['unit_type'] === 'pack');
     $PurchasedQty = $isPack ? ($purchasedPacksByProduct[$pid] ?? 0) : ($purchasedPiecesByProduct[$pid] ?? 0);
     $SoldQty      = $isPack ? ($soldPacksByProduct[$pid] ?? 0)     : ($soldPiecesByProduct[$pid] ?? 0);
+    // Shown as its own reference column (how much of this pool has been
+    // drawn into a mapped company product's real stock via a finance-side
+    // internal transfer) but deliberately NOT subtracted from Closing
+    // Stock — that transfer doesn't remove the goods from Neksomo's own
+    // purchased pool for this report's purposes.
+    $ConvertedQty = get_neksomo_converted_qty($db_conn, $pid);
     $ClosingStock = $PurchasedQty - $SoldQty;
     if ($isPack) {
         $total_purchased_packs += $PurchasedQty;
         $total_sold_packs      += $SoldQty;
+        $total_converted_packs += $ConvertedQty;
         $total_closing_packs   += $ClosingStock;
     } else {
         $total_purchased_pieces += $PurchasedQty;
         $total_sold_pieces      += $SoldQty;
+        $total_converted_pieces += $ConvertedQty;
         $total_closing_pieces   += $ClosingStock;
     }
     $product_rows[] = [
@@ -81,6 +92,7 @@ while ($Result_product = mysqli_fetch_assoc($Fetch_products)) {
         'unitLabel'    => $isPack ? 'packs' : 'pcs',
         'PurchasedQty' => $PurchasedQty,
         'SoldQty'      => $SoldQty,
+        'ConvertedQty' => $ConvertedQty,
         'ClosingStock' => $ClosingStock,
     ];
 }
@@ -181,6 +193,7 @@ $Result_closing_packs  = $total_closing_packs;
 										Closing Stock = Purchased Qty &minus; LLP + Healthcare Sales Qty (net of returns), all-time. Select a date range above to view a specific period.
 										Pieces-based products are converted to pieces via the product mapping; pack-based products are maintained in packs (mapped 1:1, no piece conversion) — each row shows its own unit.
 										A returned piece/pack goes back into available stock — it isn't gone twice. A product with no mapped company pack-product(s) shows 0 sold, regardless of what actually moved through LLP/Healthcare.
+										"Converted to Finance Stock" is shown for reference only (how much of this pool has been drawn into a mapped company product's real stock, e.g. via an internal transfer at the Neksomo godown) — it is not subtracted from Closing Stock.
 									</p>
 									<div style="background:#fff;overflow:scroll;width:100%;">
 
@@ -193,6 +206,7 @@ $Result_closing_packs  = $total_closing_packs;
 												<th>HSN</th>
 												<th style="text-align:right;">Purchased Qty</th>
 												<th style="text-align:right;">LLP + Healthcare Sales Qty (net of returns)</th>
+												<th style="text-align:right;">Converted to Finance Stock</th>
 												<th style="text-align:right;">Closing Stock</th>
 												</tr>
                                             </thead>
@@ -209,12 +223,15 @@ $Result_closing_packs  = $total_closing_packs;
 						<!-------LLP + HEALTHCARE SALES QTY------------->
 						<td align="right"><?php echo inr_format($r['SoldQty'], 0) . ' ' . $r['unitLabel'];?></td>
 
+						<!-------CONVERTED TO FINANCE STOCK------------->
+						<td align="right"><?php echo inr_format($r['ConvertedQty'], 0) . ' ' . $r['unitLabel'];?></td>
+
 						<td align="right"><b><?php echo inr_format($r['ClosingStock'], 0) . ' ' . $r['unitLabel'];?></b></td>
 
                                                 </tr>
 										<?php endforeach;
 										if (empty($product_rows)) { ?>
-										<tr><td colspan="5" style="text-align:center;color:#898781;">No products added yet.</td></tr>
+										<tr><td colspan="6" style="text-align:center;color:#898781;">No products added yet.</td></tr>
 										<?php } ?>
 
 										 </tbody>
@@ -224,12 +241,14 @@ $Result_closing_packs  = $total_closing_packs;
 										<td colspan="2" style="text-align:right;">Total (Pieces)</td>
 										<td align="right"><b><?=inr_format($total_purchased_pieces, 0);?> pcs</b></td>
 										<td align="right"><b><?=inr_format($total_sold_pieces, 0);?> pcs</b></td>
+										<td align="right"><b><?=inr_format($total_converted_pieces, 0);?> pcs</b></td>
 										<td align="right"><b><?=inr_format($total_closing_pieces, 0);?> pcs</b></td>
 										</tr>
 										 <tr>
 										<td colspan="2" style="text-align:right;">Total (Packs)</td>
 										<td align="right"><b><?=inr_format($total_purchased_packs, 0);?> packs</b></td>
 										<td align="right"><b><?=inr_format($total_sold_packs, 0);?> packs</b></td>
+										<td align="right"><b><?=inr_format($total_converted_packs, 0);?> packs</b></td>
 										<td align="right"><b><?=inr_format($total_closing_packs, 0);?> packs</b></td>
 										</tr>
 										 </tfoot>

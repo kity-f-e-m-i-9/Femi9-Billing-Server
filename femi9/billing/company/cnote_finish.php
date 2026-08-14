@@ -203,11 +203,17 @@ try {
 
         // Receiver (to_user, typically company): reverse the original sale
         // closing_qty ↑, sales_qty ↓  →  stock comes back
-        $stockService->reverseDeduct(
+        $deductResult = $stockService->reverseDeduct(
             $prid, $to_usertype, $to_userid, $returnqty,
             'return', $returnid, $createdBy,
             true // externalTransaction
         );
+        if (empty($deductResult['success'])) {
+            throw new \RuntimeException(
+                "Stock credit failed for product {$prid} (to {$to_usertype}/{$to_userid}): "
+                . ($deductResult['reason'] ?? 'unknown reason')
+            );
+        }
 
         // Sender (from_user, buyer): remove the returned goods from their ledger
         // closing_qty ↓, input_qty ↓  →  goods physically left buyer

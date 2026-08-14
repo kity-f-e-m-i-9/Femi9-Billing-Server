@@ -11,6 +11,35 @@ $customer_id=$result_Invoice_Details['customer_id'];
 $select_Cusotmer_Details="select * from customers where id='$customer_id'";
 $fetch_Customer_Details=mysqli_query($db_conn,$select_Cusotmer_Details);
 $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
+
+// GST computed fresh from the product master at print time (inclusive vs
+// exclusive tax treatment), the same convention as tp-invoice-print.php —
+// not trusted from any value frozen at add-time.
+$select_INVProductDetails="select ii.*, p.productName, p.gst as p_gst, p.gst_type as p_gst_type from invoice_items ii join products p on p.id = ii.pr_id where ii.inv_id='$Invoice_ID' order by ii.id desc";
+$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+$invoice_items=[];
+$TotalAMount123=0; $totalgstamount=0;
+while($row=mysqli_fetch_array($fetch_INVProductDetails)){
+	$qty=(int)$row['qty'];
+	$gross_amount=$qty*(float)$row['amount'];
+	$gst_pct=(int)$row['p_gst'];
+	$gst_type_item=$row['p_gst_type'] ?: 'exclusive';
+	if($gst_type_item==='inclusive' && $gst_pct>0){
+		$taxable_value=$gross_amount*100/(100+$gst_pct);
+		$gst_amount=$gross_amount-$taxable_value;
+	}else{
+		$taxable_value=$gross_amount;
+		$gst_amount=$gross_amount*$gst_pct/100;
+	}
+	$row['taxable_value']=$taxable_value;
+	$row['gst_amount']=$gst_amount;
+	$row['gst_pct']=$gst_pct;
+	$row['gst_type_item']=$gst_type_item;
+	$invoice_items[]=$row;
+	$TotalAMount123+=$taxable_value;
+	$totalgstamount+=$gst_amount;
+}
+$gsttype=$result_Invoice_Details['gst_type'] ?: 'inner';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -216,42 +245,45 @@ $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 					<td align="right">Total</td>
 				</tr>
 
-<?php
-	$select_INVProductDetails="select * from invoice_items where inv_id='$Invoice_ID' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
-	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
-	{
-	
-	//product dteails
-		$InV_Product_ID=$result_INVProductDetails['pr_id'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
-		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
-		
-		$TotalAMount=$result_INVProductDetails['total'];
-		$TotalAMount123+=$TotalAMount;
-		
+<?php foreach($invoice_items as $result_INVProductDetails):
 		$ItemRowid=base64_encode($result_INVProductDetails['id']);
 	?>
 				<tr class="item">
-					<td><?=$result_ProductDetails123['productName'];?></td>
+					<td><?=$result_INVProductDetails['productName'];?><?= $result_INVProductDetails['gst_type_item']==='inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
 					<td align="right">&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td align="right"><?=$result_INVProductDetails['qty'];?></td>
-<td align="right">&#8377;<?php echo inr_format($TotalAMount, 2);?></td>
+<td align="right">&#8377;<?php echo inr_format($result_INVProductDetails['total'], 2);?></td>
 				</tr>
 
-	<?php }?>
+	<?php endforeach; ?>
 	
 	
 	<tr class="topborder">
-					<td align="right" colspan="3">Sub Total</td>
+					<td align="right" colspan="3">Sub Total (Taxable)</td>
 					<td align="right">&#8377;<?php echo inr_format($TotalAMount123, 2);?></td>
 				</tr>
+				<?php if($totalgstamount>0): ?>
+					<?php if($gsttype==='inner'): ?>
+					<tr class="topborder">
+						<td align="right" colspan="3">SGST</td>
+						<td align="right">&#8377;<?php echo inr_format($totalgstamount/2, 2);?></td>
+					</tr>
+					<tr class="topborder">
+						<td align="right" colspan="3">CGST</td>
+						<td align="right">&#8377;<?php echo inr_format($totalgstamount/2, 2);?></td>
+					</tr>
+					<?php else: ?>
+					<tr class="topborder">
+						<td align="right" colspan="3">IGST</td>
+						<td align="right">&#8377;<?php echo inr_format($totalgstamount, 2);?></td>
+					</tr>
+					<?php endif; ?>
+				<?php else: ?>
 				<tr class="topborder">
-					<td align="right" colspan="3">GST(0%)</td>
+					<td align="right" colspan="3">GST</td>
 					<td align="right">&#8377;0.00</td>
 				</tr>
-			
+				<?php endif; ?>
 				<tr class="topborder">
 					<td align="right" colspan="3">Discount</td>
 					<td align="right">&#8377;<?php echo inr_format($result_Invoice_Details['discount'], 2);?></td>
