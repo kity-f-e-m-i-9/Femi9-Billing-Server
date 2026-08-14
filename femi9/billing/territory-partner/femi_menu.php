@@ -15,6 +15,10 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
         </li>
 
         <li>
+            <a href="invoice-report.php"><i class="material-icons-two-tone">receipt_long</i>Invoice Report</a>
+        </li>
+
+        <li>
             <a href="#"><i class="material-icons-two-tone">assignment_turned_in</i>Field Order<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
             <ul class="sub-menu">
                 <li><a href="add-order.php">Add Order</a></li>
