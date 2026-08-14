@@ -7,6 +7,8 @@ date_default_timezone_set("Asia/Kolkata");
 $today    = date("Y-m-d");
 $from_date = $_REQUEST['frdate'] ?? date("Y-m-d", strtotime("-6 days"));
 $to_date   = $_REQUEST['todate'] ?? $today;
+$status_filter = $_REQUEST['status_filter'] ?? 'pending';
+if (!in_array($status_filter, ['pending', 'incomplete', 'completed'], true)) { $status_filter = 'pending'; }
 
 $stmt = mysqli_prepare($db_conn,
     "SELECT o.id, o.order_id, o.order_date, o.new_order, o.noorder_reason, o.marketing_tool,
@@ -72,6 +74,24 @@ if (!empty($invIds)) {
     while ($rr = mysqli_fetch_assoc($resR)) { $completedInvIds[$rr['inv_id']] = true; }
     mysqli_stmt_close($stmtR);
 }
+
+// Invoice status per "Get Order" visit — matches the same 3 outcomes shown
+// in the Invoice column below. "No Order" visits and cancelled ones have no
+// invoice status at all, so they're left out of this filter entirely.
+foreach ($visits as $oid => &$v) {
+    if ($v['new_order'] !== 'yes' || !empty($v['voided_at'])) {
+        $v['invoice_status'] = null;
+    } elseif (empty($v['invoiced_inv_id'])) {
+        $v['invoice_status'] = 'pending';
+    } elseif (isset($completedInvIds[$v['invoiced_inv_id']])) {
+        $v['invoice_status'] = 'completed';
+    } else {
+        $v['invoice_status'] = 'incomplete';
+    }
+}
+unset($v);
+
+$visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filter);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -173,6 +193,14 @@ if (!empty($invIds)) {
                             <div class="col-auto">
                                 <label class="form-label">To Date</label>
                                 <input type="date" name="todate" value="<?=htmlspecialchars($to_date)?>" class="form-control">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label">Status</label>
+                                <select name="status_filter" class="form-control">
+                                    <option value="pending" <?=$status_filter==='pending'?'selected':''?>>Pending</option>
+                                    <option value="incomplete" <?=$status_filter==='incomplete'?'selected':''?>>Incomplete</option>
+                                    <option value="completed" <?=$status_filter==='completed'?'selected':''?>>Completed</option>
+                                </select>
                             </div>
                             <div class="col-auto">
                                 <button type="submit" class="btn btn-primary"><i class="material-icons">search</i> Search</button>
