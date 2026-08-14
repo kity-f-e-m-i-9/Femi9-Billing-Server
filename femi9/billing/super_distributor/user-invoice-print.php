@@ -9,6 +9,14 @@ if (isset($_SESSION['reward_notification'])) {
 
 $Invoice_ID=$_REQUEST['invoiceid'];
 $Invoice_ID=base64_decode($Invoice_ID);
+
+// Needed early for the Tax Invoice / Bill of Supply heading, as well as
+// later in the GST summary section — computed once here rather than twice.
+$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
+$fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
+$result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
+$totalgstamount=$result_sum_gstamount[0];
+$invoice_heading = $totalgstamount > 0 ? 'Tax Invoice' : 'Bill of Supply';
 //
 $select_Invoice_Details="select * from user_invoice where inv_id='$Invoice_ID'";
 $fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
@@ -245,7 +253,7 @@ while($result_currency=mysqli_fetch_array($fetch_currency))
 
 <table id="toptl">
 <tr>
-<td>Bill of Supply</td>
+<td><?=htmlspecialchars($invoice_heading);?></td>
 </tr>
 </table>
 
@@ -412,10 +420,8 @@ Terms of Delivery<br/>
 <?php 
 $gsttype=$result_Invoice_Details['gst_type'];
 
-$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
-$fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
-$result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
-$totalgstamount=$result_sum_gstamount[0];
+// $totalgstamount already computed near the top of the file (needed early
+// for the Tax Invoice / Bill of Supply heading).
 
 if($totalgstamount>0)
 {

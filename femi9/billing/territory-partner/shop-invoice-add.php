@@ -680,8 +680,39 @@ function showInvoiceDuplicate(str) {
 <div class="row g-3">
 <div class="col-md-4">
 <label class="form-label">Invoice Number *</label>
-<input type="text" onkeyup="showInvoiceDuplicate(this.value)" name="inv_number" autofocus required onkeypress="restrictSpecialChars(event)" class="form-control">
+<input type="text" id="inv_number" onkeyup="invNumberEdited(); showInvoiceDuplicate(this.value)" name="inv_number" autofocus required onkeypress="restrictSpecialChars(event)" class="form-control">
 <span id="txtHintInvoice"></span>
+<script>
+// Auto-suggest next invoice number (TPSH/FY/LLP{n} napkin / TPSHD/FY/LLP{n}
+// diaper). Suggested on page load (napkin default, since no product is
+// picked yet) and re-suggested once a product is selected via showPrice()
+// below — see invNumberSuggest(). Only ever fills/overwrites while the field
+// still holds an auto-suggested value; stops touching it the moment the user
+// types anything themselves.
+var invNumberAutoFilled = false;
+function invNumberEdited() {
+    invNumberAutoFilled = false;
+}
+function invNumberSuggest(productId) {
+    var invField = document.getElementById('inv_number');
+    if (!invField) { return; }
+    if (invField.value.trim() !== '' && !invNumberAutoFilled) { return; }
+    var url = 'load_next_invoice_number_shop.php' + (productId ? '?pid=' + encodeURIComponent(productId) : '');
+    fetch(url)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data && data.number && (invField.value.trim() === '' || invNumberAutoFilled)) {
+                invField.value = data.number;
+                invNumberAutoFilled = true;
+                if (typeof showInvoiceDuplicate === 'function') {
+                    showInvoiceDuplicate(data.number);
+                }
+            }
+        })
+        .catch(function() {});
+}
+invNumberSuggest();
+</script>
 </div>
 <div class="col-md-4">
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
@@ -722,7 +753,7 @@ flatpickr("#bookingDate", invoiceDateOpts);
 <div class="product-add-grid">
 <div class="input-group-modern wide">
 <label>Product</label>
-<select required name="pr_id" style="width:100%;" onchange="showPrice(this.value)" class="prinput">
+<select required name="pr_id" style="width:100%;" onchange="showPrice(this.value); invNumberSuggest(this.value);" class="prinput">
 <option value="" hidden>Select Product</option>
 <?php
 $res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
