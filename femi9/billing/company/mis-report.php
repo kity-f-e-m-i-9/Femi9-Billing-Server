@@ -3206,7 +3206,9 @@ document.querySelectorAll('.tab-item').forEach(function(t) {
         var k = d.kpis;
         var kpiHtml = '';
         kpiHtml += tfKpiCard('var(--blue)','var(--blue-tint)','map','Total Firkas', k.total_firkas.toLocaleString('en-IN'), 'Business Value ' + fmtInr(k.total_firkas_value));
-        kpiHtml += tfKpiCard('var(--good)','var(--good-tint)','check_circle','Filled Firkas', k.filled_firkas.toLocaleString('en-IN') + ' (' + k.filled_firkas_pct + '%)', 'Active ' + k.active_firkas.toLocaleString('en-IN') + ' &middot; Inactive ' + k.inactive_firkas.toLocaleString('en-IN') + ' &middot; ' + fmtInr(k.filled_firkas_value));
+        kpiHtml += tfKpiCard('var(--good)','var(--good-tint)','check_circle','Active Firkas', k.active_firkas.toLocaleString('en-IN'), 'Business Value ' + fmtInr(k.active_firkas_value));
+        kpiHtml += tfKpiCard('#eab308','#fef9c3','pause_circle','Inactive Firkas', k.inactive_firkas.toLocaleString('en-IN'), 'Business Value ' + fmtInr(k.inactive_firkas_value));
+        kpiHtml += tfKpiCard('var(--good)','var(--good-tint)','check_circle','Filled Firkas', k.filled_firkas.toLocaleString('en-IN') + ' (' + k.filled_firkas_pct + '%)', 'Business Value ' + fmtInr(k.filled_firkas_value));
         kpiHtml += tfKpiCard('var(--critical)','var(--critical-tint)','error_outline','Vacant Firkas', k.vacant_firkas.toLocaleString('en-IN') + ' (' + k.vacant_firkas_pct + '%)', 'Business Value ' + fmtInr(k.vacant_firkas_value));
         kpiHtml += tfKpiCard('var(--violet)','var(--violet-tint)','people','Active Territory Partners', k.active_tps.toLocaleString('en-IN'), '');
         kpiHtml += tfKpiCard('var(--aqua)','var(--aqua-tint)','account_tree','Total CP Divisions', k.total_divisions.toLocaleString('en-IN'), 'Total Districts: ' + k.total_districts);

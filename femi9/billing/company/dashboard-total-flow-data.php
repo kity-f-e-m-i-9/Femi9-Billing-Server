@@ -147,6 +147,8 @@ foreach ($zoneBdms as $bdmId => $z) {
     $filledFirkaValue = 0.0;
     $activeFirkas = 0;
     $inactiveFirkas = 0;
+    $activeFirkaValue = 0.0;
+    $inactiveFirkaValue = 0.0;
     $activeTpIds = [];
     foreach ($firkaIds as $fid) {
         $val = $nodesById[$fid]['target_amount'];
@@ -155,7 +157,8 @@ foreach ($zoneBdms as $bdmId => $z) {
             $filledFirkas++;
             $filledFirkaValue += $val;
             $activeTpIds[$filledFirkaTp[$fid]] = true;
-            if (!empty($filledFirkaHasActive[$fid])) { $activeFirkas++; } else { $inactiveFirkas++; }
+            if (!empty($filledFirkaHasActive[$fid])) { $activeFirkas++; $activeFirkaValue += $val; }
+            else { $inactiveFirkas++; $inactiveFirkaValue += $val; }
         }
     }
     $vacantFirkas = $totalFirkas - $filledFirkas;
@@ -189,7 +192,9 @@ foreach ($zoneBdms as $bdmId => $z) {
         'filled_firkas' => $filledFirkas,
         'filled_firkas_value' => $filledFirkaValue,
         'active_firkas' => $activeFirkas,
+        'active_firkas_value' => $activeFirkaValue,
         'inactive_firkas' => $inactiveFirkas,
+        'inactive_firkas_value' => $inactiveFirkaValue,
         'active_tps' => count($activeTpIds),
         'vacant_firkas' => $vacantFirkas,
         'vacant_firkas_value' => $vacantFirkaValue,
@@ -222,7 +227,9 @@ $totalFirkaValue = $sum($tpRows, 'total_firkas_value');
 $filledFirkas = $sum($tpRows, 'filled_firkas');
 $filledFirkaValue = $sum($tpRows, 'filled_firkas_value');
 $activeFirkas = $sum($tpRows, 'active_firkas');
+$activeFirkaValue = $sum($tpRows, 'active_firkas_value');
 $inactiveFirkas = $sum($tpRows, 'inactive_firkas');
+$inactiveFirkaValue = $sum($tpRows, 'inactive_firkas_value');
 $vacantFirkas = $sum($tpRows, 'vacant_firkas');
 $vacantFirkaValue = $sum($tpRows, 'vacant_firkas_value');
 $activeTps = $sum($tpRows, 'active_tps');
@@ -240,7 +247,8 @@ $pct = function($part, $total) { return $total > 0 ? round($part / $total * 100,
 $tpTotals = [
     'total_firkas' => $totalFirkas, 'total_firkas_value' => $totalFirkaValue,
     'filled_firkas' => $filledFirkas, 'filled_firkas_value' => $filledFirkaValue,
-    'active_firkas' => $activeFirkas, 'inactive_firkas' => $inactiveFirkas,
+    'active_firkas' => $activeFirkas, 'active_firkas_value' => $activeFirkaValue,
+    'inactive_firkas' => $inactiveFirkas, 'inactive_firkas_value' => $inactiveFirkaValue,
     'active_tps' => $activeTps,
     'vacant_firkas' => $vacantFirkas, 'vacant_firkas_value' => $vacantFirkaValue,
 ];
@@ -271,7 +279,8 @@ echo json_encode([
     'kpis' => [
         'total_firkas' => $totalFirkas, 'total_firkas_value' => $totalFirkaValue,
         'filled_firkas' => $filledFirkas, 'filled_firkas_pct' => $pct($filledFirkas, $totalFirkas), 'filled_firkas_value' => $filledFirkaValue,
-        'active_firkas' => $activeFirkas, 'inactive_firkas' => $inactiveFirkas,
+        'active_firkas' => $activeFirkas, 'active_firkas_value' => $activeFirkaValue,
+        'inactive_firkas' => $inactiveFirkas, 'inactive_firkas_value' => $inactiveFirkaValue,
         'vacant_firkas' => $vacantFirkas, 'vacant_firkas_pct' => $pct($vacantFirkas, $totalFirkas), 'vacant_firkas_value' => $vacantFirkaValue,
         'active_tps' => $activeTps,
         'total_divisions' => $totalDivisions, 'total_districts' => $totalDistricts,
