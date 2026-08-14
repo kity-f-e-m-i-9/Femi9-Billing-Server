@@ -142,7 +142,7 @@ try {
             $_SESSION['pending_switch_admin_id'] = $adminUser['id'];
             $_SESSION['pending_switch_admin_username'] = $mobileNumber;
             logLoginAttempt($mobileNumber, true, 'Dual account — sent to chooser');
-            header('Location: choose-login.php');
+            header('Location: index.php');
             exit;
         }
     }
