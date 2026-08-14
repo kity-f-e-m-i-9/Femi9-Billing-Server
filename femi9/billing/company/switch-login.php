@@ -2,6 +2,18 @@
 // Landing point for the Sales BDM "choose account → Company" switch. Runs
 // under company/'s own .htaccess, so session_start() here already picks up
 // the femi9_company_sess cookie name — no manual session_name() needed.
+// Whether a femi9_company_sess cookie already existed BEFORE this request's
+// session_start() — determines whether we need session_regenerate_id()
+// below at all. Doing it unconditionally here caused a real bug: on the
+// common case (no prior company session in this browser), session_start()
+// already issues a fresh, unguessable session id and its own Set-Cookie;
+// calling session_regenerate_id() straight after then issues a SECOND,
+// different Set-Cookie for the same cookie name in the same response —
+// which browser/session id ends up "winning" is not guaranteed, and if the
+// wrong one does, the next request finds no session data (the other one
+// was deleted) and gets bounced straight back to the login page, looking
+// exactly like a switch that logs you out instead of switching you in.
+$_hadExistingCompanySession = isset($_COOKIE[session_name() ?: 'femi9_company_sess']);
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -59,6 +71,8 @@ $updateStmt->bind_param('i', $user['id']);
 $updateStmt->execute();
 $updateStmt->close();
 
-session_regenerate_id(true);
+if ($_hadExistingCompanySession) {
+    session_regenerate_id(true);
+}
 header('Location: dashboard.php');
 exit;

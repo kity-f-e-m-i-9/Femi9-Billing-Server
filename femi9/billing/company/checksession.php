@@ -23,7 +23,12 @@ $_bdmAllowedScripts = [
     'territory-partner-action.php', 'delete-territory-partner.php', 'toggle-partner-status.php',
     'get-tp-flat-nodes.php', 'search-referral-user.php',
 ];
-if (!empty($_COOKIE['femi9_bdm_bridge']) && in_array(basename($_SERVER['SCRIPT_NAME']), $_bdmAllowedScripts, true)) {
+// A real, already-logged-in company session (e.g. a dual-role BDM who used
+// "Switch to Company Login") must always win over this narrow bridge — the
+// femi9_bdm_bridge cookie is path=/ and outlives the switch, so without this
+// guard it would keep silently downgrading a full company session back to
+// the BDM's own narrow TP scope on every one of these pages.
+if (!empty($_COOKIE['femi9_bdm_bridge']) && empty($_SESSION['LOGIN_USER']) && in_array(basename($_SERVER['SCRIPT_NAME']), $_bdmAllowedScripts, true)) {
     $db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_company_bridge (
         token VARCHAR(64) PRIMARY KEY,
         bdm_id INT NOT NULL,
