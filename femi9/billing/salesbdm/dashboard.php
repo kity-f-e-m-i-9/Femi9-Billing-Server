@@ -243,6 +243,35 @@ if ($hasTps) {
     }
     $firka_unassigned_count = $firka_total_count - $firka_filled_count;
 
+    // ═══ District Total Target, split by Firka TP status — Active (has an
+    // active TP), Inactive (TP assigned but none active), Unassigned (no TP
+    // at all). The three always add up to $district_total_target above.
+    $target_active_amount = 0.0;
+    $target_inactive_amount = 0.0;
+    $target_unassigned_amount = 0.0;
+    if ($_districtDepth && !empty($_districtNames)) {
+        $_targetSplitRows = call_rows($db_conn,
+            "WITH RECURSIVE district_tree AS (
+                SELECT id FROM partner_location_nodes WHERE depth = ? AND LOWER(TRIM(name)) IN ($_ph)
+                UNION ALL
+                SELECT n.id FROM partner_location_nodes n JOIN district_tree dt ON n.parent_id = dt.id
+             )
+             SELECT pln.id, pln.target_amount, MAX(tp.is_active) AS has_active_tp, COUNT(tpl.location_id) AS tp_count
+             FROM partner_location_nodes pln
+             JOIN partner_location_layers pll ON pll.depth = pln.depth
+             LEFT JOIN territory_partner_locations tpl ON tpl.location_id = pln.id
+             LEFT JOIN territory_partners tp ON tp.id = tpl.territory_partner_id
+             WHERE pln.id IN (SELECT id FROM district_tree) AND pll.is_tp_filter_enabled = 1 AND pln.is_active = 1
+             GROUP BY pln.id, pln.target_amount",
+            $_types, $_params);
+        foreach ($_targetSplitRows as $_r) {
+            $_val = (float)($_r['target_amount'] ?? 0);
+            if ((int)($_r['tp_count'] ?? 0) === 0) { $target_unassigned_amount += $_val; }
+            elseif ((int)($_r['has_active_tp'] ?? 0) === 1) { $target_active_amount += $_val; }
+            else { $target_inactive_amount += $_val; }
+        }
+    }
+
     // ═══ Products — downstream sold + returned, across all assigned TPs ═══
     // Split by channel (Customer via `invoice`, Shop via `user_invoice`) so the
     // Products table can show a Customer/Shop breakdown per product.
@@ -661,6 +690,9 @@ if ($hasTps) {
                                 <div class="kpi-t">District Total Target</div>
                                 <div class="kpi-multi">
                                     <div><span>All Firkas in your districts</span><b>&#8377;<?php echo inr_format($district_total_target, 0); ?></b></div>
+                                    <div><span style="color:var(--good);">Active Firkas</span><b style="color:var(--good);">&#8377;<?php echo inr_format($target_active_amount, 0); ?></b></div>
+                                    <div><span style="color:#eab308;">Inactive Firkas</span><b style="color:#eab308;">&#8377;<?php echo inr_format($target_inactive_amount, 0); ?></b></div>
+                                    <div><span style="color:var(--critical);">Unassigned Firkas</span><b style="color:var(--critical);">&#8377;<?php echo inr_format($target_unassigned_amount, 0); ?></b></div>
                                 </div>
                                 <p class="snote" style="margin:6px 0 0;">Includes every Firka's target in your assigned districts — even ones with no TP, or an inactive TP.</p>
                             </div>
