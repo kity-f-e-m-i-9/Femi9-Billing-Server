@@ -590,6 +590,90 @@ if ($scope === 'company' && !$is_neksomo_view) {
     $grand_combined_gross_profit_llp = $grand_gross_profit_llp + $grand_diaper_gross_profit_llp;
     $grand_combined_expense_llp      = $total_expenses;
     $grand_combined_net_profit_llp   = $grand_combined_gross_profit_llp - $grand_combined_expense_llp;
+
+    // Sales / Return / Turnover per category — same product population as
+    // the Gross Profit split above (only Neksomo-mapped products; an
+    // unmapped product has no resolvable category and is excluded here too,
+    // same convention), but summing sold/returned amount+qty directly
+    // instead of computing a per-product margin. $gp_all_params is reused
+    // as-is since this query has no cost-rate subquery at all (no `?`
+    // placeholders to add), unlike the Gross Profit queries above.
+    // $gp_ot_ret_union (built earlier for the Gross Profit queries) only
+    // selects pr_id+qty — no amount column, since gross profit only needed
+    // quantity for the returns side. This query needs the returned amount
+    // too, so it gets its own 3-column OT-return union instead of reusing
+    // that one (a UNION ALL with mismatched column counts would fail). It
+    // has the same two `?` placeholders (return_date BETWEEN ? AND ?) in the
+    // same position as $gp_ot_ret_union, so $gp_return_params (already built
+    // with a trailing [$from,$to] for that fragment) supplies the right
+    // values as-is — do NOT add extra params on top, or the bind count will
+    // overrun the placeholder count.
+    $gp_srt_ot_ret_union = $scope === 'company'
+        ? "UNION ALL SELECT osr.prid pr_id, osr.qty, osr.total amt FROM ot_sales_return osr WHERE osr.return_date BETWEEN ? AND ?"
+        : '';
+
+    $gp_srt_sold_params = $gp_params;
+    $gp_srt_ret_params  = $gp_return_params;
+    $gp_srt_sql = "
+        SELECT
+            COALESCE(SUM(CASE WHEN COALESCE(np.category,'') != 'diaper' THEN sold.amt_sold ELSE 0 END),0) napkin_sold_amt,
+            COALESCE(SUM(CASE WHEN COALESCE(np.category,'') != 'diaper' THEN sold.qty_sold ELSE 0 END),0) napkin_sold_qty,
+            COALESCE(SUM(CASE WHEN COALESCE(np.category,'') != 'diaper' THEN ret.amt_returned ELSE 0 END),0) napkin_return_amt,
+            COALESCE(SUM(CASE WHEN COALESCE(np.category,'') != 'diaper' THEN ret.qty_returned ELSE 0 END),0) napkin_return_qty,
+            COALESCE(SUM(CASE WHEN np.category = 'diaper' THEN sold.amt_sold ELSE 0 END),0) diaper_sold_amt,
+            COALESCE(SUM(CASE WHEN np.category = 'diaper' THEN sold.qty_sold ELSE 0 END),0) diaper_sold_qty,
+            COALESCE(SUM(CASE WHEN np.category = 'diaper' THEN ret.amt_returned ELSE 0 END),0) diaper_return_amt,
+            COALESCE(SUM(CASE WHEN np.category = 'diaper' THEN ret.qty_returned ELSE 0 END),0) diaper_return_qty
+        FROM (
+            SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total) amt_sold
+            FROM (
+                SELECT ii.pr_id, ii.qty, ii.total AS line_total
+                FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+                WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
+                UNION ALL
+                SELECT uii.pr_id, uii.qty, uii.total AS line_total
+                FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+                WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii}
+                {$gp_ot_sold_union}
+                {$gp_tp_union}
+            ) s
+            GROUP BY s.pr_id
+        ) sold
+        JOIN products p ON p.id = sold.pr_id
+        {$gp_cat_join}
+        LEFT JOIN (
+            SELECT r.pr_id, SUM(r.qty) qty_returned, SUM(r.amt) amt_returned
+            FROM (
+                SELECT ri.prid pr_id, ri.qty, ri.total amt
+                FROM user_return_stock_items ri
+                WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                {$gp_srt_ot_ret_union}
+            ) r
+            GROUP BY r.pr_id
+        ) ret ON ret.pr_id = sold.pr_id";
+    $gp_srt_params = array_merge($gp_srt_sold_params, $gp_srt_ret_params);
+    $gp_srt_row = crow($db_conn, $gp_srt_sql, str_repeat('s', count($gp_srt_params)), $gp_srt_params);
+
+    $grand_napkin_sold_amt_llp    = (float)($gp_srt_row['napkin_sold_amt'] ?? 0);
+    $grand_napkin_sold_qty_llp    = (float)($gp_srt_row['napkin_sold_qty'] ?? 0);
+    $grand_napkin_return_amt_llp  = (float)($gp_srt_row['napkin_return_amt'] ?? 0);
+    $grand_napkin_return_qty_llp  = (float)($gp_srt_row['napkin_return_qty'] ?? 0);
+    $grand_napkin_turnover_amt_llp = $grand_napkin_sold_amt_llp - $grand_napkin_return_amt_llp;
+    $grand_napkin_turnover_qty_llp = $grand_napkin_sold_qty_llp - $grand_napkin_return_qty_llp;
+
+    $grand_diaper_sold_amt_llp    = (float)($gp_srt_row['diaper_sold_amt'] ?? 0);
+    $grand_diaper_sold_qty_llp    = (float)($gp_srt_row['diaper_sold_qty'] ?? 0);
+    $grand_diaper_return_amt_llp  = (float)($gp_srt_row['diaper_return_amt'] ?? 0);
+    $grand_diaper_return_qty_llp  = (float)($gp_srt_row['diaper_return_qty'] ?? 0);
+    $grand_diaper_turnover_amt_llp = $grand_diaper_sold_amt_llp - $grand_diaper_return_amt_llp;
+    $grand_diaper_turnover_qty_llp = $grand_diaper_sold_qty_llp - $grand_diaper_return_qty_llp;
+
+    $grand_combined_sold_amt_llp     = $grand_napkin_sold_amt_llp + $grand_diaper_sold_amt_llp;
+    $grand_combined_sold_qty_llp     = $grand_napkin_sold_qty_llp + $grand_diaper_sold_qty_llp;
+    $grand_combined_return_amt_llp   = $grand_napkin_return_amt_llp + $grand_diaper_return_amt_llp;
+    $grand_combined_return_qty_llp   = $grand_napkin_return_qty_llp + $grand_diaper_return_qty_llp;
+    $grand_combined_turnover_amt_llp = $grand_napkin_turnover_amt_llp + $grand_diaper_turnover_amt_llp;
+    $grand_combined_turnover_qty_llp = $grand_napkin_turnover_qty_llp + $grand_diaper_turnover_qty_llp;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2530,6 +2614,101 @@ if ($is_neksomo_view) {
                         </div>
                         <?php endforeach; ?>
                     </div>
+
+                    <!-- ══ SALES / RETURN / TURNOVER — NAPKIN / DIAPER SPLIT (Income to Company scope only) ═ -->
+                    <?php if ($scope === 'company' && !$is_neksomo_view): ?>
+                    <div class="row mis-section" id="sec-srt-split">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header"><h5 class="card-title">Sales / Return / Turnover — Napkin / Diaper</h5></div>
+                                <div class="card-body">
+                                    <p class="snote">Only products mapped to a Neksomo product (Napkin/Diaper Product Mapping) are classified here — an unmapped product has no category and is excluded from this split, though it's still included in the combined Sales/Turnover figures above.</p>
+
+                                    <h3 style="font-size:16px;font-weight:700;margin:0 0 10px;">Napkin</h3>
+                                    <div class="equation-row">
+                                        <div class="kpi-card">
+                                            <div class="kpi-t">Sales</div>
+                                            <div class="kpi-multi">
+                                                <div><span>Amount</span><b>₹<?php echo inr_format($grand_napkin_sold_amt_llp, 0); ?></b></div>
+                                                <div><span>Quantity</span><b><?php echo inr_format($grand_napkin_sold_qty_llp, 0); ?></b></div>
+                                            </div>
+                                        </div>
+                                        <div class="equation-op">&minus;</div>
+                                        <div class="kpi-card">
+                                            <div class="kpi-t">Returns</div>
+                                            <div class="kpi-multi">
+                                                <div><span>Amount</span><b>₹<?php echo inr_format($grand_napkin_return_amt_llp, 0); ?></b></div>
+                                                <div><span>Quantity</span><b><?php echo inr_format($grand_napkin_return_qty_llp, 0); ?></b></div>
+                                            </div>
+                                        </div>
+                                        <div class="equation-op eq">=</div>
+                                        <div class="kpi-card">
+                                            <div class="kpi-t">Total Turnover</div>
+                                            <div class="kpi-multi">
+                                                <div><span>Amount</span><b>₹<?php echo inr_format($grand_napkin_turnover_amt_llp, 0); ?></b></div>
+                                                <div><span>Quantity</span><b><?php echo inr_format($grand_napkin_turnover_qty_llp, 0); ?></b></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <h3 style="font-size:16px;font-weight:700;margin:20px 0 10px;">Diaper</h3>
+                                    <div class="equation-row">
+                                        <div class="kpi-card">
+                                            <div class="kpi-t">Sales</div>
+                                            <div class="kpi-multi">
+                                                <div><span>Amount</span><b>₹<?php echo inr_format($grand_diaper_sold_amt_llp, 0); ?></b></div>
+                                                <div><span>Quantity</span><b><?php echo inr_format($grand_diaper_sold_qty_llp, 0); ?></b></div>
+                                            </div>
+                                        </div>
+                                        <div class="equation-op">&minus;</div>
+                                        <div class="kpi-card">
+                                            <div class="kpi-t">Returns</div>
+                                            <div class="kpi-multi">
+                                                <div><span>Amount</span><b>₹<?php echo inr_format($grand_diaper_return_amt_llp, 0); ?></b></div>
+                                                <div><span>Quantity</span><b><?php echo inr_format($grand_diaper_return_qty_llp, 0); ?></b></div>
+                                            </div>
+                                        </div>
+                                        <div class="equation-op eq">=</div>
+                                        <div class="kpi-card">
+                                            <div class="kpi-t">Total Turnover</div>
+                                            <div class="kpi-multi">
+                                                <div><span>Amount</span><b>₹<?php echo inr_format($grand_diaper_turnover_amt_llp, 0); ?></b></div>
+                                                <div><span>Quantity</span><b><?php echo inr_format($grand_diaper_turnover_qty_llp, 0); ?></b></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <h3 style="font-size:16px;font-weight:700;margin:20px 0 10px;">Combined</h3>
+                                    <div class="equation-row">
+                                        <div class="kpi-card">
+                                            <div class="kpi-t">Sales</div>
+                                            <div class="kpi-multi">
+                                                <div><span>Amount</span><b>₹<?php echo inr_format($grand_combined_sold_amt_llp, 0); ?></b></div>
+                                                <div><span>Quantity</span><b><?php echo inr_format($grand_combined_sold_qty_llp, 0); ?></b></div>
+                                            </div>
+                                        </div>
+                                        <div class="equation-op">&minus;</div>
+                                        <div class="kpi-card">
+                                            <div class="kpi-t">Returns</div>
+                                            <div class="kpi-multi">
+                                                <div><span>Amount</span><b>₹<?php echo inr_format($grand_combined_return_amt_llp, 0); ?></b></div>
+                                                <div><span>Quantity</span><b><?php echo inr_format($grand_combined_return_qty_llp, 0); ?></b></div>
+                                            </div>
+                                        </div>
+                                        <div class="equation-op eq">=</div>
+                                        <div class="kpi-card">
+                                            <div class="kpi-t">Total Turnover</div>
+                                            <div class="kpi-multi">
+                                                <div><span>Amount</span><b>₹<?php echo inr_format($grand_combined_turnover_amt_llp, 0); ?></b></div>
+                                                <div><span>Quantity</span><b><?php echo inr_format($grand_combined_turnover_qty_llp, 0); ?></b></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
                     <!-- ══ GROSS PROFIT — NAPKIN / DIAPER SPLIT (Income to Company scope only) ═ -->
                     <?php if ($scope === 'company' && !$is_neksomo_view): ?>
