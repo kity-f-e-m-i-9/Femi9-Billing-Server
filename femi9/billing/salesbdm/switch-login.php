@@ -3,6 +3,12 @@
 // single-use token from company/switch-to-salesbdm.php and starts a real
 // Sales BDM session (via the same finalizeSalesBdmSession() used by the
 // normal CheckLogin.php / choose-login.php flows).
+// See company/switch-login.php for why this matters: regenerating the
+// session id unconditionally right after a brand-new session_start() sends
+// two different Set-Cookie headers for the same cookie in one response,
+// and whichever one a browser doesn't keep leaves the next request with an
+// empty session — surfacing as "switching logs me out" instead of in.
+$_hadExistingSalesbdmSession = isset($_COOKIE[session_name() ?: 'PHPSESSID']);
 session_start();
 require_once __DIR__ . '/include/db-connect.php';
 require_once __DIR__ . '/include/LoginHelpers.php';
@@ -49,6 +55,8 @@ if (!$user || $user['account_status'] !== 'active') {
 }
 
 finalizeSalesBdmSession($db_conn, $user);
-session_regenerate_id(true);
+if ($_hadExistingSalesbdmSession) {
+    session_regenerate_id(true);
+}
 header('Location: dashboard.php');
 exit;

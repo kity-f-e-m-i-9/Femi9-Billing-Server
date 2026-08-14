@@ -625,11 +625,14 @@ if ($hasTps) {
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6">
-                            <div class="kpi-card" style="--kpi-accent:var(--critical);--kpi-tint:var(--critical-tint);">
+                            <div class="kpi-card" id="unassignedFirkasCard" style="--kpi-accent:var(--critical);--kpi-tint:var(--critical-tint);cursor:pointer;" title="Click to see the unassigned Firkas in your districts">
                                 <i class="material-icons-outlined kpi-ico">error_outline</i>
                                 <div class="kpi-t">Unassigned Firkas</div>
                                 <div class="kpi-multi"><div><b><?php echo $firka_unassigned_count; ?></b></div></div>
                                 <p class="snote" style="margin:6px 0 0;">No Territory Partner assigned yet.</p>
+                                <button type="button" style="margin-top:8px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px;">
+                                    <i class="material-icons-outlined" style="font-size:15px;">visibility</i> View Firkas
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -932,6 +935,30 @@ if ($hasTps) {
     </div>
 </div>
 
+<!-- Unassigned Firkas Modal -->
+<div class="modal fade" id="unassignedFirkasModal" tabindex="-1" aria-labelledby="unassignedFirkasModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-md">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                <h6 class="modal-title" id="unassignedFirkasModalLabel" style="font-weight:600;color:#1f2937;">
+                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#dc2626;">error_outline</i>
+                    Unassigned Firkas in your Districts
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding:14px 20px;">
+                <div id="ufListBody">
+                    <div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>
+                </div>
+                <div id="ufPagination" style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:12px;"></div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -1060,7 +1087,7 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
                     ? '<span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">On Track</span>'
                     : '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Behind</span>';
                 weeklyCell = '<span class="ff-weekly-trigger" style="cursor:pointer;" data-target="' + rowId + '">' + badge + ' <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">expand_more</i></span>' +
-                    '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">' + ffEsc(w.week_label) + ' &middot; ' + ffMoney(w.paid_so_far) + ' paid (' + (w.pct_of_target || 0) + '% of target)</div>';
+                    '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">' + ffEsc(w.week_label) + ' &middot; ' + ffMoney(w.paid_so_far) + ' Napkin sold (' + (w.pct_of_target || 0) + '% of target)</div>';
             }
             html += '<tr style="border-bottom:1px solid #f3f4f6;">' +
                 '<td style="padding:7px 8px;color:#9ca3af;">' + (serialStart + i + 1) + '</td>' +
@@ -1086,7 +1113,7 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         if (!w || !w.weeks) return 'No data';
         var html = '<div style="font-weight:600;margin-bottom:6px;color:#374151;">' + ffEsc(w.month_label) + ' &mdash; Weekly Purchases</div>' +
             '<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:520px;">' +
-            '<tr style="color:#6b7280;"><th style="text-align:left;padding:3px 8px;">Week</th><th style="text-align:right;padding:3px 8px;">Purchased this week</th><th style="text-align:right;padding:3px 8px;">Total so far</th><th style="text-align:right;padding:3px 8px;">Required so far</th><th style="text-align:center;padding:3px 8px;">Status</th></tr>';
+            '<tr style="color:#6b7280;"><th style="text-align:left;padding:3px 8px;">Week</th><th style="text-align:right;padding:3px 8px;">Napkin sold this week</th><th style="text-align:right;padding:3px 8px;">Total so far</th><th style="text-align:right;padding:3px 8px;">Required so far</th><th style="text-align:center;padding:3px 8px;">Status</th></tr>';
         $.each(['week1', 'week2', 'week3', 'week4'], function (_, key) {
             var wk = w.weeks[key];
             if (!wk) return;
@@ -1157,6 +1184,74 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         if ($(this).is(':disabled')) return;
         ffCurrentPage = parseInt($(this).data('page'), 10);
         ffLoad(ffCurrentTab, ffCurrentPage);
+    });
+})(jQuery);
+</script>
+<script>
+(function ($) {
+    var viewBdmId = <?php echo json_encode($_GET['view_bdm_id'] ?? ''); ?>;
+    var ufCache = {};
+    var ufCurrentPage = 1;
+
+    function ufEsc(s) { return $('<div/>').text(s == null ? '' : s).html(); }
+
+    function ufRenderRows(data) {
+        if (!data || !data.rows || !data.rows.length) {
+            return '<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">No unassigned Firkas &mdash; every Firka in your districts has a Territory Partner.</div>';
+        }
+        var serialStart = ((data.page || 1) - 1) * (data.per_page || 15);
+        var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+            '<thead><tr style="border-bottom:2px solid #e9ecef;text-align:left;color:#6b7280;">' +
+            '<th style="padding:6px 8px;">S.No</th><th style="padding:6px 8px;">District</th>' +
+            '<th style="padding:6px 8px;">Firka</th></tr></thead><tbody>';
+        $.each(data.rows, function (i, r) {
+            html += '<tr style="border-bottom:1px solid #f3f4f6;">' +
+                '<td style="padding:7px 8px;color:#9ca3af;">' + (serialStart + i + 1) + '</td>' +
+                '<td style="padding:7px 8px;">' + ufEsc(r.district_name) + '</td>' +
+                '<td style="padding:7px 8px;font-weight:600;color:#1f2937;">' + ufEsc(r.firka_name) + '</td>' +
+                '</tr>';
+        });
+        html += '</tbody></table></div>';
+        return html;
+    }
+
+    function ufRenderPagination(data) {
+        var totalPages = Math.max(1, Math.ceil((data.total || 0) / (data.per_page || 15)));
+        if (totalPages <= 1) return '';
+        return '<button type="button" class="btn btn-sm btn-outline-secondary uf-page-btn" data-page="' + (data.page - 1) + '"' + (data.page <= 1 ? ' disabled' : '') + '>Prev</button>' +
+            '<span style="font-size:12.5px;color:#6b7280;">Page ' + data.page + ' of ' + totalPages + ' &nbsp;(' + data.total + ' total)</span>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary uf-page-btn" data-page="' + (data.page + 1) + '"' + (data.page >= totalPages ? ' disabled' : '') + '>Next</button>';
+    }
+
+    function ufLoad(page) {
+        $('#ufListBody').html('<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>');
+        $('#ufPagination').html('');
+        if (ufCache[page]) {
+            $('#ufListBody').html(ufRenderRows(ufCache[page]));
+            $('#ufPagination').html(ufRenderPagination(ufCache[page]));
+            return;
+        }
+        var params = { page: page };
+        if (viewBdmId) { params.view_bdm_id = viewBdmId; }
+        $.getJSON('get-unassigned-firkas.php', params, function (data) {
+            ufCache[page] = data;
+            $('#ufListBody').html(ufRenderRows(data));
+            $('#ufPagination').html(ufRenderPagination(data));
+        }).fail(function () {
+            $('#ufListBody').html('<div style="color:#b91c1c;font-size:13px;padding:20px 0;text-align:center;">Could not load data.</div>');
+        });
+    }
+
+    $('#unassignedFirkasCard').on('click', function () {
+        ufCurrentPage = 1;
+        $('#unassignedFirkasModal').modal('show');
+        ufLoad(ufCurrentPage);
+    });
+
+    $(document).on('click', '.uf-page-btn', function () {
+        if ($(this).is(':disabled')) return;
+        ufCurrentPage = parseInt($(this).data('page'), 10);
+        ufLoad(ufCurrentPage);
     });
 })(jQuery);
 </script>
