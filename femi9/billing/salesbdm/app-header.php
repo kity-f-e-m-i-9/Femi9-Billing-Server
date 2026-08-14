@@ -5,6 +5,19 @@
 // the current request.
 $_inCompanyFolder = (strpos($_SERVER['SCRIPT_NAME'], '/company/') !== false);
 $_bdmBase = $_inCompanyFolder ? '../salesbdm/' : '';
+
+// A Sales BDM whose mobile number also has an active company login gets a
+// one-click switch — mirrors the "Switch to Sales BDM" link on the company
+// header dropdown.
+$_swMobile = $_SESSION['LOGIN_USER'] ?? ($result_LoGuserDtails['bdm_mobile'] ?? '');
+$_swAdminRow = null;
+if ($_swMobile && isset($db_conn)) {
+    $_swStmt = $db_conn->prepare("SELECT id FROM admin_log WHERE username = ? LIMIT 1");
+    $_swStmt->bind_param('s', $_swMobile);
+    $_swStmt->execute();
+    $_swAdminRow = $_swStmt->get_result()->fetch_assoc();
+    $_swStmt->close();
+}
 ?>
 <div class="app-header">
     <nav class="navbar navbar-light navbar-expand-lg">
@@ -42,6 +55,15 @@ $_bdmBase = $_inCompanyFolder ? '../salesbdm/' : '';
                         <div class="dropdown-menu dropdown-menu-end notifications-dropdown" aria-labelledby="bdmDropDown">
                             <h6 class="dropdown-header">Sales BDM (<?php echo htmlspecialchars($_SESSION['LOGIN_USER'] ?? ($result_LoGuserDtails['bdm_mobile'] ?? '')); ?>)</h6>
                             <div class="notifications-dropdown-list">
+                                <?php if ($_swAdminRow): ?>
+                                <a href="<?php echo $_bdmBase; ?>switch-to-company">
+                                    <div class="notifications-dropdown-item">
+                                        <div class="notifications-dropdown-item-text">
+                                            <p class="bold-notifications-text">Switch to Company Login</p>
+                                        </div>
+                                    </div>
+                                </a>
+                                <?php endif; ?>
                                 <a href="<?php echo $_bdmBase; ?>logout" onclick="return confirm('You want to logout confirm?');">
                                     <div class="notifications-dropdown-item">
                                         <div class="notifications-dropdown-item-text">

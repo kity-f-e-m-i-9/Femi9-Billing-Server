@@ -50,6 +50,22 @@
                                             </a>
 											<?php }?>
 
+											<?php
+											// A company user whose mobile number is also a Sales BDM
+											// account gets a one-click switch back.
+											$_swBdmRow = $db_conn->query(
+												"SELECT id FROM sales_bdm_staff WHERE bdm_mobile = '" . mysqli_real_escape_string($db_conn, $_SESSION['LOGIN_USER']) . "' AND account_status = 'active' LIMIT 1"
+											)->fetch_assoc();
+											if ($_swBdmRow) { ?>
+											<a href="switch-to-salesbdm">
+                                                <div class="notifications-dropdown-item">
+                                                    <div class="notifications-dropdown-item-text">
+                                                        <p class="bold-notifications-text">Switch to Sales BDM</p>
+                                                    </div>
+                                                </div>
+                                            </a>
+											<?php }?>
+
 											<?php if($LoginusertypeGET=="admin" || $LoginusertypeGET=="finance" || ($resultusertypeGET['ot_channels']??0)==1){?>
 											<a href="web-commission">
                                                 <div class="notifications-dropdown-item">
