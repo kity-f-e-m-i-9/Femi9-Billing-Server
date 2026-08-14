@@ -584,20 +584,31 @@ xmlhttp.open("GET","load_InvoiceNumber_customer.php?q="+str,true);
 xmlhttp.send();}
 </script>
 			<label class="form-label">Invoice Number *</label>
-            <input type="text" id="inv_number" onKeyup="showInvoiceDuplicate(this.value)"; name="inv_number" autofocus required="" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" id="inv_number" onKeyup="invNumberEdited(); showInvoiceDuplicate(this.value)"; name="inv_number" autofocus required="" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>
 			<span id="txtHintInvoice"></span>
 			<script>
-			// Auto-suggest next invoice number (Femi Nayan LLP: C/FY/LLP{n} sequence) —
-			// only fills if the field is still empty, never overwrites a typed value.
-			(function() {
+			// Auto-suggest next invoice number (Femi Nayan LLP: C/FY/LLP{n} napkin /
+			// CD/FY/LLP{n} diaper sequence). Suggested on page load (napkin default,
+			// since no product is picked yet) and re-suggested once a product is
+			// selected via showPrice() below — see invNumberSuggest(). Only ever
+			// fills/overwrites while the field still holds an auto-suggested value;
+			// stops touching it the moment the user types anything themselves.
+			var invNumberAutoFilled = false;
+			function invNumberEdited() {
+			    invNumberAutoFilled = false;
+			}
+			function invNumberSuggest(productId) {
 			    var invField = document.getElementById('inv_number');
-			    if (!invField || invField.value.trim() !== '') { return; }
-			    fetch('load_next_invoice_customer.php')
+			    if (!invField) { return; }
+			    if (invField.value.trim() !== '' && !invNumberAutoFilled) { return; }
+			    var url = 'load_next_invoice_customer.php' + (productId ? '?pid=' + encodeURIComponent(productId) : '');
+			    fetch(url)
 			        .then(function(r) { return r.json(); })
 			        .then(function(data) {
-			            if (data && data.number && invField.value.trim() === '') {
+			            if (data && data.number && (invField.value.trim() === '' || invNumberAutoFilled)) {
 			                invField.value = data.number;
+			                invNumberAutoFilled = true;
 			                // Auto-fill doesn't fire onKeyup, so the duplicate-check
 			                // (and its hidden invoice_number_accept=1 field) never runs
 			                // unless we trigger it manually — without this, submit
@@ -608,7 +619,8 @@ xmlhttp.send();}
 			            }
 			        })
 			        .catch(function() {});
-			})();
+			}
+			invNumberSuggest();
 			</script>
 			
 										 
@@ -668,7 +680,7 @@ flatpickr("#bookingDate", {
 
 
     <div class="item">
-	<select required="" name="pr_id" class="js-states form-control" tabindex="-1" style="display: none; width: 100%" onChange="showPrice(this.value)">
+	<select required="" name="pr_id" class="js-states form-control" tabindex="-1" style="display: none; width: 100%" onChange="showPrice(this.value); invNumberSuggest(this.value);">
 <option value="" hidden="">Select Product</option>
 <?php $select_Products_list="select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc";
 		$fetch_Products_list=mysqli_query($db_conn,$select_Products_list);

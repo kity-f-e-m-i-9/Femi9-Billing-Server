@@ -1,27 +1,19 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/InvoiceNumberSuggest.php';
 header('Content-Type: application/json');
 
 // Auto-suggest for Femi Nayan LLP customer invoices only — format: C/FY/LLP{n}
-$month = (int)date('n');
-$year  = (int)date('Y');
-$fyStartYear = $month >= 4 ? $year : $year - 1;
-$fy = substr($fyStartYear, -2) . '-' . substr($fyStartYear + 1, -2);
-
-$likePattern = 'C/' . $fy . '/LLP%';
-$stmt = $db_conn->prepare("SELECT inv_number FROM invoice WHERE user_type='company' AND inv_number LIKE ?");
-$stmt->bind_param('s', $likePattern);
-$stmt->execute();
-$result = $stmt->get_result();
-
-$max = 0;
-while ($row = $result->fetch_assoc()) {
-    $suffix = preg_replace('/^.*LLP/', '', $row['inv_number']);
-    if (ctype_digit($suffix)) {
-        $max = max($max, (int)$suffix);
-    }
+// (napkin) or CD/FY/LLP{n} (diaper), decided by whichever product type is
+// added FIRST to the invoice (this page has no cart to inspect up front —
+// see InvoiceNumberSuggest.php for why). ?pid= is the just-selected product id,
+// optional so this endpoint still works before any product is chosen.
+$category = 'napkin';
+if (isset($_GET['pid']) && ctype_digit((string)$_GET['pid'])) {
+    $category = invoiceProductCategory($db_conn, (int)$_GET['pid']);
 }
-$stmt->close();
 
-echo json_encode(['number' => 'C/' . $fy . '/LLP' . ($max + 1)]);
+$number = invoiceSuggestNextNumber($db_conn, 'invoice', "user_type='company'", 'C', 'CD', $category);
+
+echo json_encode(['number' => $number]);

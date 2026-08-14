@@ -12,6 +12,14 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 // down there.
 $gsttype=$result_Invoice_Details['gst_type'];
 
+// Also needed early for the Tax Invoice / Bill of Supply heading below —
+// same query the GST summary section further down reuses via $totalgstamount.
+$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
+$fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
+$result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
+$totalgstamount=$result_sum_gstamount[0];
+$invoice_heading = $totalgstamount > 0 ? 'Tax Invoice' : 'Bill of Supply';
+
 // Trims a rate like 1.50 down to "1.5" or 9.00 down to "9" — CGST/SGST is
 // always exactly half the item's GST%, which is often a non-whole number
 // (e.g. 3% GST -> 1.5% + 1.5%), so this avoids both misleading rounding
@@ -283,7 +291,7 @@ while($result_currency=mysqli_fetch_array($fetch_currency))
 
 <table id="toptl">
 <tr>
-<td>Bill of Supply</td>
+<td><?=htmlspecialchars($invoice_heading);?></td>
 </tr>
 </table>
 
@@ -477,11 +485,8 @@ Terms of Delivery<br/>
 <!------------------------------------------------------------------>
 <!------------------------------GST--------------------------------->
 <?php
-$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
-$fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
-$result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
-$totalgstamount=$result_sum_gstamount[0];
-
+// $totalgstamount already computed near the top of the file for the
+// Tax Invoice / Bill of Supply heading — reused here.
 if($totalgstamount>0)
 {
 // Rate shown alongside the SGST/CGST/IGST label below — MAX() rather than
