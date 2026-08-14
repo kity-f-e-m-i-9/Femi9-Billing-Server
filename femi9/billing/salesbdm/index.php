@@ -52,6 +52,22 @@ if (!isset($_SESSION['csrf_token'])) {
             </div>
             <p class="auth-description"><?php echo $userDisplayName; ?> Login</p>
 
+            <?php if (!empty($_SESSION['pending_switch_bdm_id']) && !empty($_SESSION['pending_switch_admin_id'])): ?>
+                <p style="font-size:13.5px;color:#6b7280;margin-bottom:18px;">
+                    <?php echo htmlspecialchars($_SESSION['pending_switch_bdm_name'] ?? ''); ?>, this mobile number is linked to two accounts. Which one do you want to open?
+                </p>
+                <form method="POST" action="choose-login.php">
+                    <button type="submit" name="choice" value="salesbdm" class="btn btn-primary" style="width:100%;display:flex;align-items:center;gap:10px;justify-content:flex-start;margin-bottom:12px;padding:14px 16px;">
+                        <i class="material-icons-outlined">person</i>
+                        <span style="text-align:left;">Sales BDM<br><small style="font-weight:400;opacity:.85;">Your BDM dashboard &amp; TPs</small></span>
+                    </button>
+                    <button type="submit" name="choice" value="company" class="btn btn-success" style="width:100%;display:flex;align-items:center;gap:10px;justify-content:flex-start;padding:14px 16px;">
+                        <i class="material-icons-outlined">business</i>
+                        <span style="text-align:left;">Company<br><small style="font-weight:400;opacity:.85;">Full company admin login</small></span>
+                    </button>
+                </form>
+            <?php else: ?>
+
             <?php
             if (isset($_SESSION['errorMessage'])) {
                 $errorMessage = htmlspecialchars($_SESSION['errorMessage']);
@@ -134,6 +150,7 @@ if (!isset($_SESSION['csrf_token'])) {
             <button type="button" onclick="window.location.href='https://femi9billing.com/femi9/';" class="btn btn-success">
                 Go Home Page
             </button>
+            <?php endif; ?>
         </div>
     </div>
 

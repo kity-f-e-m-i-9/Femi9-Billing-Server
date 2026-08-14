@@ -131,10 +131,19 @@ $manage_url    = "manage-partner-location" . ($return_parent !== '' ? "?parent_i
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label">Amount <span class="text-muted" style="font-size:12px;">(optional)</span></label>
+                                                    <label class="form-label">Amount <span class="text-muted" style="font-size:12px;">(optional &mdash; Deposit for Channel Partner locations, Napkin Target for Territory Partner Firkas)</span></label>
                                                     <input type="number" name="pl_deposit"
                                                            class="form-control"
                                                            value="<?php echo $node['deposit_amount'] !== null ? htmlspecialchars($node['deposit_amount']) : ''; ?>"
+                                                           placeholder="0.00"
+                                                           min="0" step="0.01">
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Lumi9 Diaper Target Amount <span class="text-muted" style="font-size:12px;">(optional)</span></label>
+                                                    <input type="number" name="pl_diaper_target"
+                                                           class="form-control"
+                                                           value="<?php echo $node['diaper_target_amount'] !== null ? htmlspecialchars($node['diaper_target_amount']) : ''; ?>"
                                                            placeholder="0.00"
                                                            min="0" step="0.01">
                                                 </div>

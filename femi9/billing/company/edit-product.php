@@ -95,6 +95,13 @@ $select_product_list="select * from products where id='$prid' and (temp_id not l
                                                 <label for="exampleInputEmail1" class="form-label">Product Name</label>
                                                 <input type="text" required="" name="productName" value="<?php echo $result_product_list["productName"]?>" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
 
+												<?php $_prodCategory = $result_product_list["category"] ?: 'napkin'; ?>
+												<label for="exampleInputEmail1" class="form-label">Product Type</label>
+                                                <select name="category" class="form-control" required="">
+                                                    <option value="napkin" <?php echo $_prodCategory==='napkin'?'selected':''; ?>>Napkin</option>
+                                                    <option value="diaper" <?php echo $_prodCategory==='diaper'?'selected':''; ?>>Lumi Baby Diaper</option>
+                                                </select>
+
 												<label for="exampleInputEmail1" class="form-label">Pieces per Pack <small class="text-muted">(optional)</small></label>
                                                 <input type="number" min="0" name="pieces_per_pack" class="form-control" value="<?=$result_product_list["pieces_per_pack"]?>" onkeypress="restrictnumber(event)" placeholder="e.g. 12">
 

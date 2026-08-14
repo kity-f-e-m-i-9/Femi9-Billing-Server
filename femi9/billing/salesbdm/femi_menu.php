@@ -89,6 +89,7 @@ if (!empty($salesBdmID)) {
     <li>
         <a href=""><i class="material-icons-two-tone">security</i>Security<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
         <ul class="sub-menu">
+            <li><a href="<?php echo $_bdmBase; ?>change-password">Change Password</a></li>
             <li>
                 <a href="<?php echo $_bdmBase; ?>logout" onclick="return confirm('You want to logout confirm?');">Logout</a>
             </li>

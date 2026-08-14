@@ -217,6 +217,61 @@ if ($hasTps) {
             $_types, $_params);
     }
 
+    // ═══ District / Firka coverage counts — how many districts are assigned
+    // to this BDM, how many Firkas exist across them in total, and of those,
+    // how many have at least one Territory Partner assigned vs none at all.
+    $district_count = count($_districtNames);
+    $firka_total_count = 0;
+    $firka_filled_count = 0;
+    if ($_districtDepth && !empty($_districtNames)) {
+        $_firkaRow = crow($db_conn,
+            "WITH RECURSIVE district_tree AS (
+                SELECT id FROM partner_location_nodes WHERE depth = ? AND LOWER(TRIM(name)) IN ($_ph)
+                UNION ALL
+                SELECT n.id FROM partner_location_nodes n JOIN district_tree dt ON n.parent_id = dt.id
+             )
+             SELECT
+                 COUNT(*) AS total_firkas,
+                 COUNT(DISTINCT tpl.location_id) AS filled_firkas
+             FROM partner_location_nodes pln
+             JOIN partner_location_layers pll ON pll.depth = pln.depth
+             LEFT JOIN territory_partner_locations tpl ON tpl.location_id = pln.id
+             WHERE pln.id IN (SELECT id FROM district_tree) AND pll.is_tp_filter_enabled = 1 AND pln.is_active = 1",
+            $_types, $_params);
+        $firka_total_count  = (int)($_firkaRow['total_firkas'] ?? 0);
+        $firka_filled_count = (int)($_firkaRow['filled_firkas'] ?? 0);
+    }
+    $firka_unassigned_count = $firka_total_count - $firka_filled_count;
+
+    // ═══ District Total Target, split by Firka TP status — Active (has an
+    // active TP), Inactive (TP assigned but none active), Unassigned (no TP
+    // at all). The three always add up to $district_total_target above.
+    $target_active_amount = 0.0;
+    $target_inactive_amount = 0.0;
+    $target_unassigned_amount = 0.0;
+    if ($_districtDepth && !empty($_districtNames)) {
+        $_targetSplitRows = call_rows($db_conn,
+            "WITH RECURSIVE district_tree AS (
+                SELECT id FROM partner_location_nodes WHERE depth = ? AND LOWER(TRIM(name)) IN ($_ph)
+                UNION ALL
+                SELECT n.id FROM partner_location_nodes n JOIN district_tree dt ON n.parent_id = dt.id
+             )
+             SELECT pln.id, pln.target_amount, MAX(tp.is_active) AS has_active_tp, COUNT(tpl.location_id) AS tp_count
+             FROM partner_location_nodes pln
+             JOIN partner_location_layers pll ON pll.depth = pln.depth
+             LEFT JOIN territory_partner_locations tpl ON tpl.location_id = pln.id
+             LEFT JOIN territory_partners tp ON tp.id = tpl.territory_partner_id
+             WHERE pln.id IN (SELECT id FROM district_tree) AND pll.is_tp_filter_enabled = 1 AND pln.is_active = 1
+             GROUP BY pln.id, pln.target_amount",
+            $_types, $_params);
+        foreach ($_targetSplitRows as $_r) {
+            $_val = (float)($_r['target_amount'] ?? 0);
+            if ((int)($_r['tp_count'] ?? 0) === 0) { $target_unassigned_amount += $_val; }
+            elseif ((int)($_r['has_active_tp'] ?? 0) === 1) { $target_active_amount += $_val; }
+            else { $target_inactive_amount += $_val; }
+        }
+    }
+
     // ═══ Products — downstream sold + returned, across all assigned TPs ═══
     // Split by channel (Customer via `invoice`, Shop via `user_invoice`) so the
     // Products table can show a Customer/Shop breakdown per product.
@@ -542,6 +597,40 @@ if ($hasTps) {
                         <a href="#sec-yoursales">Your Sales via TP</a>
                     </nav>
 
+                    <!-- ══ District / Firka coverage — how much of your territory has a TP yet ══ -->
+                    <div class="row mb-3">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
+                                <i class="material-icons-outlined kpi-ico">public</i>
+                                <div class="kpi-t">Districts Assigned</div>
+                                <div class="kpi-multi"><div><b><?php echo $district_count; ?></b></div></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:#6b7280;--kpi-tint:#f3f4f6;">
+                                <i class="material-icons-outlined kpi-ico">grid_view</i>
+                                <div class="kpi-t">Total Firkas</div>
+                                <div class="kpi-multi"><div><b><?php echo $firka_total_count; ?></b></div></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
+                                <i class="material-icons-outlined kpi-ico">check_circle</i>
+                                <div class="kpi-t">Filled Firkas</div>
+                                <div class="kpi-multi"><div><b><?php echo $firka_filled_count; ?></b></div></div>
+                                <p class="snote" style="margin:6px 0 0;">Has at least one Territory Partner assigned.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:var(--critical);--kpi-tint:var(--critical-tint);">
+                                <i class="material-icons-outlined kpi-ico">error_outline</i>
+                                <div class="kpi-t">Unassigned Firkas</div>
+                                <div class="kpi-multi"><div><b><?php echo $firka_unassigned_count; ?></b></div></div>
+                                <p class="snote" style="margin:6px 0 0;">No Territory Partner assigned yet.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- ══ Overview — Sales / Returns / Total Turnover (your TPs' downstream sales) ══ -->
                     <div class="mis-section" id="sec-overview">
                     <h3 style="font-size:16px;font-weight:700;margin:6px 0 8px;">Overview — Your TPs' Downstream Sales</h3>
@@ -601,11 +690,15 @@ if ($hasTps) {
                                 <div class="kpi-t">District Total Target</div>
                                 <div class="kpi-multi">
                                     <div><span>All Firkas in your districts</span><b>&#8377;<?php echo inr_format($district_total_target, 0); ?></b></div>
+                                    <div><span style="color:var(--good);">Active Firkas</span><b style="color:var(--good);">&#8377;<?php echo inr_format($target_active_amount, 0); ?></b></div>
+                                    <div><span style="color:#eab308;">Inactive Firkas</span><b style="color:#eab308;">&#8377;<?php echo inr_format($target_inactive_amount, 0); ?></b></div>
+                                    <div><span style="color:var(--critical);">Unassigned Firkas</span><b style="color:var(--critical);">&#8377;<?php echo inr_format($target_unassigned_amount, 0); ?></b></div>
                                 </div>
                                 <p class="snote" style="margin:6px 0 0;">Includes every Firka's target in your assigned districts — even ones with no TP, or an inactive TP.</p>
                             </div>
                         </div>
                     </div>
+
                     </div><!-- /#sec-overview -->
 
                     <!-- ══ Products ══ -->
