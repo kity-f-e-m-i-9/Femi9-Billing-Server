@@ -2134,6 +2134,43 @@ if ($is_neksomo_view) {
                         </div>
                     </div>
 
+                    <style>
+                        /* ── Main / Total Flow toggle ─────────────────── */
+                        .tf-toggle { display:inline-flex; gap:4px; background:var(--page-plane); border:1px solid var(--border); border-radius:22px; padding:4px; margin-bottom:14px; }
+                        .tf-toggle-btn { border:none; background:transparent; color:var(--text-secondary); font-size:13px; font-weight:600; padding:7px 20px; border-radius:18px; cursor:pointer; transition:background .12s,color .12s; }
+                        .tf-toggle-btn.active { background:var(--blue); color:#fff; }
+                        /* ── Total Flow panel ─────────────────────────── */
+                        .tf-banner { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:14px 20px; margin-bottom:14px; box-shadow:0 1px 2px rgba(11,11,11,0.03); }
+                        .tf-banner-title { font-size:16px; font-weight:800; letter-spacing:.3px; color:var(--text-primary); }
+                        .tf-banner-date { font-size:13px; font-weight:600; color:var(--text-secondary); }
+                        .tf-panel-title { font-size:13.5px; font-weight:700; margin:0 0 12px; color:var(--text-primary); }
+                        .tf-sidebar { display:flex; flex-direction:column; }
+                        .tf-team-list { list-style:none; margin:0 0 16px; padding:0; }
+                        .tf-team-list li { padding:8px 0; border-bottom:1px solid var(--gridline); font-size:12.5px; }
+                        .tf-team-list li b { display:block; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px; color:var(--blue); }
+                        .tf-team-overview h4 { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-secondary); margin:0 0 8px; }
+                        .tf-team-overview .tf-ov-row { display:flex; justify-content:space-between; font-size:12.5px; padding:4px 0; }
+                        .tf-callout { text-align:center; font-weight:700; font-size:13px; margin-top:10px; padding:8px; border-radius:8px; background:var(--critical-tint); color:var(--critical); }
+                        .tf-donut-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; font-weight:800; font-size:20px; color:var(--text-primary); pointer-events:none; }
+                        .tf-legend { display:flex; justify-content:center; gap:16px; margin-top:10px; font-size:12px; }
+                        .tf-legend span.dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
+                        .tf-insights { margin:0; padding-left:20px; font-size:13px; line-height:1.9; }
+                        .tf-table-total td { font-weight:700; background:var(--page-plane); }
+                    </style>
+
+                    <!-- ── MAIN / TOTAL FLOW TOGGLE ─────────────────────────
+                         Pure client-side show/hide of #mainPanel vs
+                         #totalFlowPanel — never reloads the page. The Total
+                         Flow panel's data is fetched lazily (only on first
+                         click) from dashboard-total-flow-data.php and cached
+                         in JS afterwards; it never runs on normal page load. -->
+                    <div class="tf-toggle" id="dashViewToggle">
+                        <button type="button" class="tf-toggle-btn active" id="btnDashMain" data-view="main">Main</button>
+                        <button type="button" class="tf-toggle-btn" id="btnDashTotalFlow" data-view="totalflow">Total Flow</button>
+                    </div>
+
+                    <div id="mainPanel">
+
                     <!-- ── FILTER ────────────────────────────────────────── -->
                     <div class="mis-filter">
                         <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
@@ -2867,6 +2904,118 @@ if ($is_neksomo_view) {
                         </div>
                     </div>
 
+                    </div><!-- /#mainPanel -->
+
+                    <!-- ══ TOTAL FLOW PANEL (zone-wise BDM performance) ═════
+                         Hidden until the "Total Flow" toggle is clicked.
+                         Empty on page load — filled in by JS via a lazy
+                         fetch to dashboard-total-flow-data.php the first
+                         time this panel is shown. -->
+                    <div id="totalFlowPanel" style="display:none;">
+                        <div class="tf-banner">
+                            <div class="tf-banner-title">FEMI9 LLP – TAMILNADU BDM DASHBOARD</div>
+                            <div class="tf-banner-date" id="tfDateLabel">Date : —</div>
+                        </div>
+
+                        <div id="tfLoading" style="padding:50px 0;text-align:center;color:var(--text-secondary);">
+                            <i class="material-icons-outlined" style="font-size:28px;vertical-align:middle;">hourglass_empty</i>
+                            &nbsp;Loading Total Flow dashboard…
+                        </div>
+                        <div id="tfError" style="display:none;color:var(--critical);padding:20px;"></div>
+
+                        <div id="tfContent" style="display:none;">
+                            <!-- KPI row -->
+                            <div class="row" id="tfKpiRow"></div>
+
+                            <div class="row">
+                                <!-- Sidebar: Business Development Team -->
+                                <div class="col-lg-3 mb-3">
+                                    <div class="kpi-card tf-sidebar">
+                                        <h3 class="tf-panel-title">Business Development Team</h3>
+                                        <ul class="tf-team-list" id="tfTeamList"></ul>
+                                        <div class="tf-team-overview">
+                                            <h4>Team Overview</h4>
+                                            <div id="tfTeamOverview"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Two zone-wise summary tables -->
+                                <div class="col-lg-9">
+                                    <div class="row">
+                                        <div class="col-lg-6 mb-3">
+                                            <div class="kpi-card">
+                                                <h3 class="tf-panel-title">Zone Wise – Territory Partner Summary</h3>
+                                                <div style="overflow-x:auto;">
+                                                <table class="mt">
+                                                    <thead><tr>
+                                                        <th>Zone</th><th>Total Firkas</th><th>Filled Firkas</th><th>Active / Inactive Firkas</th><th>Active TPs</th><th>Vacant Firkas</th>
+                                                    </tr></thead>
+                                                    <tbody id="tfTpTableBody"></tbody>
+                                                </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-6 mb-3">
+                                            <div class="kpi-card">
+                                                <h3 class="tf-panel-title">Zone Wise – Channel Partner Divisions Summary</h3>
+                                                <div style="overflow-x:auto;">
+                                                <table class="mt">
+                                                    <thead><tr>
+                                                        <th>Zone</th><th>Total Districts</th><th>Total Divisions</th><th>Filled Divisions</th><th>Vacant Divisions</th>
+                                                    </tr></thead>
+                                                    <tbody id="tfCpTableBody"></tbody>
+                                                </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Charts -->
+                            <div class="row">
+                                <div class="col-lg-4 mb-3">
+                                    <div class="kpi-card">
+                                        <h3 class="tf-panel-title">Vacant Business Opportunity (₹)</h3>
+                                        <div style="height:250px;"><canvas id="tfVacantChart"></canvas></div>
+                                        <div class="tf-callout" id="tfVacantTotal"></div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-3">
+                                    <div class="kpi-card">
+                                        <h3 class="tf-panel-title">Firkas Status (By Count)</h3>
+                                        <div style="height:200px;position:relative;">
+                                            <canvas id="tfFirkaDonut"></canvas>
+                                            <div class="tf-donut-center" id="tfFirkaDonutCenter"></div>
+                                        </div>
+                                        <div class="tf-legend" id="tfFirkaLegend"></div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-3">
+                                    <div class="kpi-card">
+                                        <h3 class="tf-panel-title">Channel Partner Divisions Status (By Count)</h3>
+                                        <div style="height:200px;position:relative;">
+                                            <canvas id="tfDivisionDonut"></canvas>
+                                            <div class="tf-donut-center" id="tfDivisionDonutCenter"></div>
+                                        </div>
+                                        <div class="tf-legend" id="tfDivisionLegend"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Key Insights -->
+                            <div class="row">
+                                <div class="col-12 mb-3">
+                                    <div class="kpi-card">
+                                        <h3 class="tf-panel-title">Key Insights</h3>
+                                        <ul class="tf-insights" id="tfInsights"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div><!-- /#totalFlowPanel -->
+
                 </div><!-- container-fluid -->
             </div>
         </div>
@@ -3019,6 +3168,208 @@ document.querySelectorAll('.tab-item').forEach(function(t) {
             plugins:{legend:{display:false}},
             scales:{y:{grid:{color:'#e1e0d9'},ticks:{callback:v=>'₹'+(v/1000).toFixed(0)+'k'}}, x:{grid:{display:false}}} }
     });
+})();
+
+// ── Main / Total Flow toggle ────────────────────────────────────────────
+// Pure client-side show/hide — no page reload. Total Flow data is fetched
+// lazily (only the first time the tab is clicked) and cached in tfCache so
+// switching back and forth afterwards never re-fetches.
+(function() {
+    var btnMain = document.getElementById('btnDashMain');
+    var btnFlow = document.getElementById('btnDashTotalFlow');
+    var mainPanel = document.getElementById('mainPanel');
+    var flowPanel = document.getElementById('totalFlowPanel');
+    if (!btnMain || !btnFlow || !mainPanel || !flowPanel) return;
+
+    var tfCache = null;
+    var tfCharts = {};
+
+    function fmtInr(n) {
+        n = Math.round(n || 0);
+        return '₹' + n.toLocaleString('en-IN');
+    }
+
+    function tfKpiCard(accent, tint, icon, label, value, sub) {
+        return '<div class="col-xl-3 col-lg-4 col-md-6 col-6 mb-3">' +
+            '<div class="kpi-card" style="--kpi-accent:' + accent + ';--kpi-tint:' + tint + ';">' +
+            '<i class="material-icons-outlined kpi-ico">' + icon + '</i>' +
+            '<div class="kpi-t">' + label + '</div>' +
+            '<div class="kpi-v">' + value + '</div>' +
+            (sub ? '<div class="kpi-s">' + sub + '</div>' : '') +
+            '</div></div>';
+    }
+
+    function renderTotalFlow(d) {
+        document.getElementById('tfDateLabel').textContent = 'Date : ' + d.date_label;
+
+        // KPI cards
+        var k = d.kpis;
+        var kpiHtml = '';
+        kpiHtml += tfKpiCard('var(--blue)','var(--blue-tint)','map','Total Firkas', k.total_firkas.toLocaleString('en-IN'), 'Business Value ' + fmtInr(k.total_firkas_value));
+        kpiHtml += tfKpiCard('var(--good)','var(--good-tint)','check_circle','Filled Firkas', k.filled_firkas.toLocaleString('en-IN') + ' (' + k.filled_firkas_pct + '%)', 'Active ' + k.active_firkas.toLocaleString('en-IN') + ' &middot; Inactive ' + k.inactive_firkas.toLocaleString('en-IN') + ' &middot; ' + fmtInr(k.filled_firkas_value));
+        kpiHtml += tfKpiCard('var(--critical)','var(--critical-tint)','error_outline','Vacant Firkas', k.vacant_firkas.toLocaleString('en-IN') + ' (' + k.vacant_firkas_pct + '%)', 'Business Value ' + fmtInr(k.vacant_firkas_value));
+        kpiHtml += tfKpiCard('var(--violet)','var(--violet-tint)','people','Active Territory Partners', k.active_tps.toLocaleString('en-IN'), '');
+        kpiHtml += tfKpiCard('var(--aqua)','var(--aqua-tint)','account_tree','Total CP Divisions', k.total_divisions.toLocaleString('en-IN'), 'Total Districts: ' + k.total_districts);
+        kpiHtml += tfKpiCard('var(--good)','var(--good-tint)','check_circle','Filled CP Divisions', k.filled_divisions.toLocaleString('en-IN') + ' (' + k.filled_divisions_pct + '%)', 'Business Value ' + fmtInr(k.filled_divisions_value));
+        kpiHtml += tfKpiCard('var(--critical)','var(--critical-tint)','error_outline','Vacant CP Divisions', k.vacant_divisions.toLocaleString('en-IN') + ' (' + k.vacant_divisions_pct + '%)', 'Business Value ' + fmtInr(k.vacant_divisions_value));
+        kpiHtml += tfKpiCard('var(--orange)','var(--orange-tint)','groups','Active Channel Partners', k.active_cps.toLocaleString('en-IN'), '');
+        document.getElementById('tfKpiRow').innerHTML = kpiHtml;
+
+        // Sidebar: team list
+        var teamHtml = '';
+        d.team.forEach(function(t) {
+            teamHtml += '<li><b>' + t.zone.toUpperCase() + '</b>' + t.bdm_name + '</li>';
+        });
+        document.getElementById('tfTeamList').innerHTML = teamHtml;
+
+        var ov = d.team_overview;
+        var ovRows = [
+            ['Zones', ov.zones], ['Team Members', ov.members],
+            ['Total Firkas', ov.total_firkas.toLocaleString('en-IN')],
+            ['Active TPs', ov.active_tps.toLocaleString('en-IN')],
+            ['Total CP Divisions', ov.total_divisions.toLocaleString('en-IN')],
+            ['Active CPs', ov.active_cps.toLocaleString('en-IN')],
+        ];
+        document.getElementById('tfTeamOverview').innerHTML = ovRows.map(function(r) {
+            return '<div class="tf-ov-row"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>';
+        }).join('');
+
+        // TP summary table
+        var tpBody = '';
+        d.tp_table.forEach(function(r) {
+            tpBody += '<tr>' +
+                '<td>' + r.zone + '<br><span style="color:var(--text-secondary);font-size:11px;">' + r.bdm_name + '</span></td>' +
+                '<td>' + r.total_firkas + '<br><span style="color:var(--text-secondary);font-size:11px;">' + fmtInr(r.total_firkas_value) + '</span></td>' +
+                '<td>' + r.filled_firkas + '<br><span style="color:var(--text-secondary);font-size:11px;">' + fmtInr(r.filled_firkas_value) + '</span></td>' +
+                '<td><span style="color:var(--good);">' + r.active_firkas + ' active</span><br><span style="color:var(--critical);font-size:11px;">' + r.inactive_firkas + ' inactive</span></td>' +
+                '<td>' + r.active_tps + '</td>' +
+                '<td>' + r.vacant_firkas + '<br><span style="color:var(--text-secondary);font-size:11px;">' + fmtInr(r.vacant_firkas_value) + '</span></td>' +
+                '</tr>';
+        });
+        var tt = d.tp_totals;
+        tpBody += '<tr class="tf-table-total">' +
+            '<td>TOTAL</td>' +
+            '<td>' + tt.total_firkas + '<br><span style="font-size:11px;">' + fmtInr(tt.total_firkas_value) + '</span></td>' +
+            '<td>' + tt.filled_firkas + '<br><span style="font-size:11px;">' + fmtInr(tt.filled_firkas_value) + '</span></td>' +
+            '<td>' + tt.active_firkas + ' active<br>' + tt.inactive_firkas + ' inactive</td>' +
+            '<td>' + tt.active_tps + '</td>' +
+            '<td>' + tt.vacant_firkas + '<br><span style="font-size:11px;">' + fmtInr(tt.vacant_firkas_value) + '</span></td>' +
+            '</tr>';
+        document.getElementById('tfTpTableBody').innerHTML = tpBody;
+
+        // CP summary table
+        var cpBody = '';
+        d.cp_table.forEach(function(r) {
+            cpBody += '<tr>' +
+                '<td>' + r.zone + '<br><span style="color:var(--text-secondary);font-size:11px;">' + r.bdm_name + '</span></td>' +
+                '<td>' + r.total_districts + '</td>' +
+                '<td>' + r.total_divisions + '</td>' +
+                '<td>' + r.filled_divisions + '<br><span style="color:var(--text-secondary);font-size:11px;">' + fmtInr(r.filled_divisions_value) + '</span></td>' +
+                '<td>' + r.vacant_divisions + '<br><span style="color:var(--text-secondary);font-size:11px;">' + fmtInr(r.vacant_divisions_value) + '</span></td>' +
+                '</tr>';
+        });
+        var ct = d.cp_totals;
+        cpBody += '<tr class="tf-table-total">' +
+            '<td>TOTAL</td>' +
+            '<td>' + ct.total_districts + '</td>' +
+            '<td>' + ct.total_divisions + '</td>' +
+            '<td>' + ct.filled_divisions + '<br><span style="font-size:11px;">' + fmtInr(ct.filled_divisions_value) + '</span></td>' +
+            '<td>' + ct.vacant_divisions + '<br><span style="font-size:11px;">' + fmtInr(ct.vacant_divisions_value) + '</span></td>' +
+            '</tr>';
+        document.getElementById('tfCpTableBody').innerHTML = cpBody;
+
+        // Charts
+        var vc = d.chart_vacant_business;
+        var vctx = document.getElementById('tfVacantChart');
+        if (vctx) {
+            tfCharts.vacant = new Chart(vctx, {
+                type: 'bar',
+                data: { labels: vc.labels, datasets: [{ data: vc.data, backgroundColor: '#d03b3b', borderRadius: 4, maxBarThickness: 22 }] },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#e1e0d9' }, ticks: { callback: v => '₹' + (v/1000).toFixed(0) + 'k' } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+        document.getElementById('tfVacantTotal').textContent = 'TOTAL VACANT BUSINESS POTENTIAL: ' + fmtInr(vc.total);
+
+        var fs = d.chart_firka_status;
+        var fctx = document.getElementById('tfFirkaDonut');
+        if (fctx) {
+            tfCharts.firka = new Chart(fctx, {
+                type: 'doughnut',
+                data: { labels: ['Filled', 'Vacant'], datasets: [{ data: [fs.filled, fs.vacant], backgroundColor: ['#0ca30c', '#d03b3b'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false } } }
+            });
+        }
+        document.getElementById('tfFirkaDonutCenter').textContent = (fs.filled + fs.vacant).toLocaleString('en-IN');
+        document.getElementById('tfFirkaLegend').innerHTML =
+            '<span><span class="dot" style="background:#0ca30c;"></span>Filled ' + fs.filled + '</span>' +
+            '<span><span class="dot" style="background:#d03b3b;"></span>Vacant ' + fs.vacant + '</span>';
+
+        var ds = d.chart_division_status;
+        var dctx = document.getElementById('tfDivisionDonut');
+        if (dctx) {
+            tfCharts.division = new Chart(dctx, {
+                type: 'doughnut',
+                data: { labels: ['Filled', 'Vacant'], datasets: [{ data: [ds.filled, ds.vacant], backgroundColor: ['#0ca30c', '#d03b3b'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false } } }
+            });
+        }
+        document.getElementById('tfDivisionDonutCenter').textContent = (ds.filled + ds.vacant).toLocaleString('en-IN');
+        document.getElementById('tfDivisionLegend').innerHTML =
+            '<span><span class="dot" style="background:#0ca30c;"></span>Filled ' + ds.filled + '</span>' +
+            '<span><span class="dot" style="background:#d03b3b;"></span>Vacant ' + ds.vacant + '</span>';
+
+        // Insights
+        document.getElementById('tfInsights').innerHTML = d.insights.map(function(i) { return '<li>' + i + '</li>'; }).join('');
+    }
+
+    function loadTotalFlow() {
+        var loading = document.getElementById('tfLoading');
+        var errorEl = document.getElementById('tfError');
+        var content = document.getElementById('tfContent');
+        loading.style.display = '';
+        errorEl.style.display = 'none';
+        content.style.display = 'none';
+
+        fetch('dashboard-total-flow-data.php')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) throw new Error(d.error);
+                tfCache = d;
+                renderTotalFlow(d);
+                loading.style.display = 'none';
+                content.style.display = '';
+            })
+            .catch(function(e) {
+                loading.style.display = 'none';
+                errorEl.style.display = '';
+                errorEl.textContent = 'Could not load Total Flow dashboard. Please try again.';
+            });
+    }
+
+    function showView(view) {
+        if (view === 'totalflow') {
+            btnFlow.classList.add('active');
+            btnMain.classList.remove('active');
+            mainPanel.style.display = 'none';
+            flowPanel.style.display = '';
+            if (!tfCache) loadTotalFlow();
+        } else {
+            btnMain.classList.add('active');
+            btnFlow.classList.remove('active');
+            flowPanel.style.display = 'none';
+            mainPanel.style.display = '';
+        }
+    }
+
+    btnMain.addEventListener('click', function() { showView('main'); });
+    btnFlow.addEventListener('click', function() { showView('totalflow'); });
 })();
 </script>
 </body>
