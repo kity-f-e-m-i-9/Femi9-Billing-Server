@@ -16,6 +16,10 @@ $prefixMap = array(
     'super_distributor'  => array('SD', 'SDD'),
     'distributor'        => array('DT', 'DTD'),
     'candf'              => array('CF', 'CFD'),
+    // 'outlet' is reachable through this same file (user-invoice-add?invuser=outlet,
+    // see femi_menu.php) — 'shop' is a different file (shop-user-invoice-add.php,
+    // see load_next_invoice_number_shop.php) and deliberately not listed here.
+    'outlet'             => array('OT', 'OTD'),
 );
 if (!isset($prefixMap[$invuser])) {
     http_response_code(400);
