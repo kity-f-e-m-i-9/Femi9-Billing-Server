@@ -478,6 +478,121 @@ if ($scope === 'company') {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 1b-2. GROSS PROFIT split by Napkin / Diaper (company scope, non-Neksomo
+// login only — a neksomo login gets its own dedicated split further down via
+// $is_neksomo_view instead).
+//
+// Same population, same filters, same cost-rate sourcing as $gross_profit
+// above (1b) — this just partitions that exact calculation into two buckets
+// instead of one, so Napkin GP + Diaper GP always reconciles to the combined
+// $gross_profit KPI card.
+//
+// Category comes from products.category, but only Neksomo "shadow" products
+// (temp_id LIKE 'NKS-%') ever have it set — the real LLP catalog row never
+// does. So a company product's category has to be read off whichever Neksomo
+// product it's mapped to via neksomo_product_mapping, same indirection the
+// $is_neksomo_view section uses at the top of this file. A company product
+// with no Neksomo mapping at all has no way to resolve a category and is
+// excluded from both buckets (and from Combined) — same "unrated == excluded"
+// convention as the rest of this report, confirmed as the intended behavior
+// rather than defaulting unmapped products to Napkin.
+// ═══════════════════════════════════════════════════════════════════════════
+$grand_gross_profit_llp = 0.0;
+$grand_diaper_gross_profit_llp = 0.0;
+$grand_combined_gross_profit_llp = 0.0;
+$grand_combined_expense_llp = 0.0;
+$grand_combined_net_profit_llp = 0.0;
+if ($scope === 'company' && !$is_neksomo_view) {
+    $gp_cat_join = "JOIN neksomo_product_mapping m ON m.company_product_id = p.id
+         JOIN products np ON np.id = m.neksomo_product_id";
+
+    // Diaper cost basis is NOT $gp_cost_rate_subq (that subquery is
+    // deliberately napkin-only — see its comment above — and its first
+    // branch explicitly excludes any mapping to a diaper-category Neksomo
+    // product, falling through to femi9_llp_sale_rates, which has no rows
+    // for anything). Diaper cost comes from neksomo_llp_piece_purchase_rates
+    // via the same mapping, same "latest effective_date <= as-of date"
+    // convention, but with NO pieces_per_pack scaling — diaper is pack-based
+    // even though priced through this piece-rate table, same convention the
+    // Neksomo view's own diaper section already uses (mis-report.php ~1276-1280).
+    $gp_diaper_cost_rate_subq = "
+        (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
+         FROM neksomo_llp_piece_purchase_rates pr
+         WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = p.id LIMIT 1)
+           AND pr.effective_date <= ?
+         ORDER BY pr.effective_date DESC LIMIT 1)";
+    $gp_diaper_all_params = array_merge([$to], $gp_params, $gp_return_params, [$to]);
+
+    $grand_gross_profit_llp = (float)cval($db_conn,
+        "SELECT COALESCE(SUM((sold.sold_rate - {$gp_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
+         FROM (
+             SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total)/NULLIF(SUM(s.qty),0) sold_rate
+             FROM (
+                 SELECT ii.pr_id, ii.qty, ii.total AS line_total
+                 FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+                 WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
+                 UNION ALL
+                 SELECT uii.pr_id, uii.qty, uii.total AS line_total
+                 FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+                 WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii}
+                 {$gp_ot_sold_union}
+                 {$gp_tp_union}
+             ) s
+             GROUP BY s.pr_id
+         ) sold
+         JOIN products p ON p.id = sold.pr_id
+         {$gp_cat_join}
+         LEFT JOIN (
+             SELECT r.pr_id, SUM(r.qty) qty_returned
+             FROM (
+                 SELECT ri.prid pr_id, ri.qty
+                 FROM user_return_stock_items ri
+                 WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                 {$gp_ot_ret_union}
+             ) r
+             GROUP BY r.pr_id
+         ) ret ON ret.pr_id = sold.pr_id
+         WHERE {$gp_cost_rate_subq} IS NOT NULL AND COALESCE(np.category,'') != 'diaper'",
+        str_repeat('s', count($gp_all_params)), $gp_all_params);
+
+    $grand_diaper_gross_profit_llp = (float)cval($db_conn,
+        "SELECT COALESCE(SUM((sold.sold_rate - {$gp_diaper_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
+         FROM (
+             SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total)/NULLIF(SUM(s.qty),0) sold_rate
+             FROM (
+                 SELECT ii.pr_id, ii.qty, ii.total AS line_total
+                 FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+                 WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
+                 UNION ALL
+                 SELECT uii.pr_id, uii.qty, uii.total AS line_total
+                 FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+                 WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii}
+                 {$gp_ot_sold_union}
+                 {$gp_tp_union}
+             ) s
+             GROUP BY s.pr_id
+         ) sold
+         JOIN products p ON p.id = sold.pr_id
+         {$gp_cat_join}
+         LEFT JOIN (
+             SELECT r.pr_id, SUM(r.qty) qty_returned
+             FROM (
+                 SELECT ri.prid pr_id, ri.qty
+                 FROM user_return_stock_items ri
+                 WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                 {$gp_ot_ret_union}
+             ) r
+             GROUP BY r.pr_id
+         ) ret ON ret.pr_id = sold.pr_id
+         WHERE {$gp_diaper_cost_rate_subq} IS NOT NULL AND np.category = 'diaper'",
+        str_repeat('s', count($gp_diaper_all_params)), $gp_diaper_all_params);
+
+    $grand_combined_gross_profit_llp = $grand_gross_profit_llp + $grand_diaper_gross_profit_llp;
+    $grand_combined_expense_llp      = $total_expenses;
+    $grand_combined_net_profit_llp   = $grand_combined_gross_profit_llp - $grand_combined_expense_llp;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 1c. CHANNEL BREAKDOWN — only for the "Income to Company" scope, so it's
 // visible that every channel (SS, S, SD, D, Customer, Shop, OT) is actually
 // being counted in the totals above, not just a single opaque figure.
@@ -2355,13 +2470,19 @@ if ($is_neksomo_view) {
                         $kpis[] = [$tgt_accent,'flag','Overall Target %',$overall_pct_all.'%',
                          '₹'.inr_format($total_achieved_all, 0).' / ₹'.inr_format($total_target_all, 0), ''];
                     }
-                    $kpis[] = ['orange','trending_up','Gross Profit','₹'.inr_format($gross_profit, 0),
-                         'Total Turnover − LLP cost basis', ''];
-                    if ($scope === 'company') {
-                        $kpis[] = ['critical','receipt','Expenses','₹'.inr_format($total_expenses, 0),
-                         'for selected period', ''];
-                        $kpis[] = [$net_profit>=0?'good':'critical','account_balance_wallet','Net Profit','₹'.inr_format($net_profit, 0),
-                         'Gross Profit − Expenses (₹'.inr_format($total_expenses, 0).')', $net_profit>=0?'good':'bad'];
+                    // Company scope (non-Neksomo) shows Gross Profit / Expenses / Net
+                    // Profit as the dedicated Napkin/Diaper split card further down the
+                    // page instead of here, so this generic trio is skipped there to
+                    // avoid showing the same figures twice.
+                    if (!($scope === 'company' && !$is_neksomo_view)) {
+                        $kpis[] = ['orange','trending_up','Gross Profit','₹'.inr_format($gross_profit, 0),
+                             'Total Turnover − LLP cost basis', ''];
+                        if ($scope === 'company') {
+                            $kpis[] = ['critical','receipt','Expenses','₹'.inr_format($total_expenses, 0),
+                             'for selected period', ''];
+                            $kpis[] = [$net_profit>=0?'good':'critical','account_balance_wallet','Net Profit','₹'.inr_format($net_profit, 0),
+                             'Gross Profit − Expenses (₹'.inr_format($total_expenses, 0).')', $net_profit>=0?'good':'bad'];
+                        }
                     }
                     ?>
                     <div class="row mis-section" id="sec-overview">
@@ -2409,6 +2530,36 @@ if ($is_neksomo_view) {
                         </div>
                         <?php endforeach; ?>
                     </div>
+
+                    <!-- ══ GROSS PROFIT — NAPKIN / DIAPER SPLIT (Income to Company scope only) ═ -->
+                    <?php if ($scope === 'company' && !$is_neksomo_view): ?>
+                    <div class="row mis-section" id="sec-gp-split">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header"><h5 class="card-title">Gross Profit — Napkin / Diaper</h5></div>
+                                <div class="card-body">
+                                    <p class="snote">Only products mapped to a Neksomo product (Napkin/Diaper Product Mapping) are classified here — an unmapped product has no category and is excluded from this split, though it's still included in the combined Gross Profit KPI card above.</p>
+
+                                    <div class="equation-row">
+                                        <div class="kpi-card"><div class="kpi-t">Napkin Gross Profit</div><div class="kpi-v" style="<?php echo $grand_gross_profit_llp < 0 ? 'color:#dc2626;' : ''; ?>">₹<?php echo inr_format($grand_gross_profit_llp, 2); ?></div></div>
+                                        <div class="equation-op">+</div>
+                                        <div class="kpi-card"><div class="kpi-t">Diaper Gross Profit</div><div class="kpi-v" style="<?php echo $grand_diaper_gross_profit_llp < 0 ? 'color:#dc2626;' : ''; ?>">₹<?php echo inr_format($grand_diaper_gross_profit_llp, 2); ?></div></div>
+                                        <div class="equation-op eq">=</div>
+                                        <div class="kpi-card"><div class="kpi-t">Combined Gross Profit</div><div class="kpi-v" style="<?php echo $grand_combined_gross_profit_llp < 0 ? 'color:#dc2626;' : ''; ?>">₹<?php echo inr_format($grand_combined_gross_profit_llp, 2); ?></div></div>
+                                    </div>
+
+                                    <div class="equation-row">
+                                        <div class="kpi-card"><div class="kpi-t">Combined Gross Profit</div><div class="kpi-v" style="<?php echo $grand_combined_gross_profit_llp < 0 ? 'color:#dc2626;' : ''; ?>">₹<?php echo inr_format($grand_combined_gross_profit_llp, 2); ?></div></div>
+                                        <div class="equation-op">&minus;</div>
+                                        <div class="kpi-card"><div class="kpi-t">Expense</div><div class="kpi-v">₹<?php echo inr_format($grand_combined_expense_llp, 2); ?></div></div>
+                                        <div class="equation-op eq">=</div>
+                                        <div class="kpi-card"><div class="kpi-t">Net Profit</div><div class="kpi-v" style="<?php echo $grand_combined_net_profit_llp < 0 ? 'color:#dc2626;' : ''; ?>">₹<?php echo inr_format($grand_combined_net_profit_llp, 2); ?></div></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
                     <!-- ══ CHANNEL BREAKDOWN (Income to Company scope only) ═ -->
                     <?php if ($scope === 'company'): ?>
