@@ -159,39 +159,10 @@ if ($hasTps) {
     $prev_revenue = (float)($prev_revenue_row['rev'] ?? 0) + (float)($prev_shop_row['rev'] ?? 0) - $prev_return_amt;
     $revenue_growth = $prev_revenue > 0 ? round((($total_revenue - $prev_revenue) / $prev_revenue) * 100, 1) : 0;
 
-    // ═══ Overall Target % — same formula as company MIS report's TP-scope
-    // "Overall Target %" KPI: target = SUM(partner_location_nodes.target_amount)
-    // across every location assigned to these TPs; achieved = their gross
-    // downstream revenue (before returns), which is exactly $gross_revenue
-    // already computed above. Scoped to just this BDM's own TPs via the same
-    // $tpIdList used everywhere else on this page.
-    $overall_target = (float)cval($db_conn,
-        "SELECT COALESCE(SUM(pln.target_amount),0) FROM territory_partner_locations tpl
-         JOIN partner_location_nodes pln ON pln.id = tpl.location_id
-         WHERE tpl.territory_partner_id IN ($tpIdList)");
-    // Target achievement counts Napkin-category products only — Lumi Baby
-    // Diaper sales/purchases don't count toward the Firka target, even though
-    // they still show in Sales/Turnover/Purchases figures elsewhere on this page.
-    $napkin_achieved_cust = (float)cval($db_conn,
-        "SELECT COALESCE(SUM(ii.total),0) FROM invoice_items ii
-         JOIN invoice i ON i.inv_id=ii.inv_id JOIN products p ON p.id=ii.pr_id
-         WHERE i.user_type='territory_partner' AND i.sub_total>0 AND i.date BETWEEN ? AND ?
-           AND i.user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'",
-        'ss', [$from, $to]);
-    $napkin_achieved_shop = (float)cval($db_conn,
-        "SELECT COALESCE(SUM(uii.total),0) FROM user_invoice_items uii
-         JOIN user_invoice ui ON ui.inv_id=uii.inv_id JOIN products p ON p.id=uii.pr_id
-         WHERE ui.from_user_type='territory_partner' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
-           AND ui.from_user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'",
-        'ss', [$from, $to]);
-    $overall_achieved = $napkin_achieved_cust + $napkin_achieved_shop;
-    $overall_target_pct = $overall_target > 0 ? min(round($overall_achieved / $overall_target * 100, 1), 999) : 0;
-
     // ═══ District Total Target — every Firka's target_amount within this
     // BDM's assigned districts, regardless of whether that Firka currently
-    // has a TP, or whether that TP is active/inactive. Unlike $overall_target
-    // above (which is scoped to only active-TP-assigned locations), this is
-    // the full district-level potential. Restricted to pll.is_tp_filter_enabled=1
+    // has a TP, or whether that TP is active/inactive. This is the full
+    // district-level potential. Restricted to pll.is_tp_filter_enabled=1
     // + pln.is_active=1 to match exactly what company's Add Territory Partner
     // location picker (get-tp-flat-nodes.php) shows/lets a TP be assigned —
     // otherwise target_amount set at a non-assignable depth (e.g. Division)
@@ -271,6 +242,35 @@ if ($hasTps) {
             else { $target_inactive_amount += $_val; }
         }
     }
+
+    // ═══ Overall Target % — target is the SAME "Active" figure as the
+    // District Total Target card above ($target_active_amount: every Firka
+    // in your districts that currently has an active TP). Kept as one
+    // number so the two cards can never show a different target for what is
+    // the same underlying scope — a mismatch used to happen here because
+    // this used to be computed bottom-up (TP → its assigned locations,
+    // matched by TP ownership) while District Total Target is computed
+    // top-down (district tree → Firka → is there an active TP), and a TP's
+    // free-text branch_district doesn't always agree with which district
+    // tree its assigned Firka actually falls under.
+    $overall_target = $target_active_amount;
+    // Target achievement counts Napkin-category products only — Lumi Baby
+    // Diaper sales/purchases don't count toward the Firka target, even though
+    // they still show in Sales/Turnover/Purchases figures elsewhere on this page.
+    $napkin_achieved_cust = (float)cval($db_conn,
+        "SELECT COALESCE(SUM(ii.total),0) FROM invoice_items ii
+         JOIN invoice i ON i.inv_id=ii.inv_id JOIN products p ON p.id=ii.pr_id
+         WHERE i.user_type='territory_partner' AND i.sub_total>0 AND i.date BETWEEN ? AND ?
+           AND i.user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'",
+        'ss', [$from, $to]);
+    $napkin_achieved_shop = (float)cval($db_conn,
+        "SELECT COALESCE(SUM(uii.total),0) FROM user_invoice_items uii
+         JOIN user_invoice ui ON ui.inv_id=uii.inv_id JOIN products p ON p.id=uii.pr_id
+         WHERE ui.from_user_type='territory_partner' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
+           AND ui.from_user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'",
+        'ss', [$from, $to]);
+    $overall_achieved = $napkin_achieved_cust + $napkin_achieved_shop;
+    $overall_target_pct = $overall_target > 0 ? min(round($overall_achieved / $overall_target * 100, 1), 999) : 0;
 
     // ═══ Products — downstream sold + returned, across all assigned TPs ═══
     // Split by channel (Customer via `invoice`, Shop via `user_invoice`) so the
@@ -614,11 +614,14 @@ if ($hasTps) {
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6">
-                            <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
+                            <div class="kpi-card" id="filledFirkasCard" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);cursor:pointer;" title="Click to see the Territory Partners in your filled Firkas">
                                 <i class="material-icons-outlined kpi-ico">check_circle</i>
                                 <div class="kpi-t">Filled Firkas</div>
                                 <div class="kpi-multi"><div><b><?php echo $firka_filled_count; ?></b></div></div>
                                 <p class="snote" style="margin:6px 0 0;">Has at least one Territory Partner assigned.</p>
+                                <button type="button" style="margin-top:8px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px;">
+                                    <i class="material-icons-outlined" style="font-size:15px;">visibility</i> View TPs
+                                </button>
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6">
@@ -897,6 +900,38 @@ if ($hasTps) {
     </div>
 </div>
 
+<!-- Filled Firkas — Territory Partners Modal -->
+<div class="modal fade" id="filledFirkasModal" tabindex="-1" aria-labelledby="filledFirkasModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                <h6 class="modal-title" id="filledFirkasModalLabel" style="font-weight:600;color:#1f2937;">
+                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#16a34a;">check_circle</i>
+                    Territory Partners in your Filled Firkas
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding:14px 20px;">
+                <ul class="nav nav-tabs" id="ffTabs" role="tablist" style="margin-bottom:12px;">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="ffActiveTabBtn" type="button" data-tab="active">Active TPs</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="ffInactiveTabBtn" type="button" data-tab="inactive">Inactive TPs</button>
+                    </li>
+                </ul>
+                <div id="ffListBody">
+                    <div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>
+                </div>
+                <div id="ffPagination" style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:12px;"></div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -984,6 +1019,144 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
                 return '<div style="font-size:12px;color:#999;">Loading&hellip;</div>';
             }
         });
+    });
+})(jQuery);
+</script>
+<script>
+(function ($) {
+    var viewBdmId = <?php echo json_encode($_GET['view_bdm_id'] ?? ''); ?>;
+    // Weekly-target month follows the dashboard's own date filter ("From"),
+    // so switching the filter to a previous month shows that month's own
+    // Active/Inactive weekly-target breakdown, not always the current month.
+    var ffMonth = <?php echo json_encode(date('Y-m', strtotime($from))); ?>;
+    var ffCache = {};
+    var ffCurrentTab = 'active';
+    var ffCurrentPage = 1;
+
+    function ffEsc(s) { return $('<div/>').text(s == null ? '' : s).html(); }
+    function ffMoney(n) { return '&#8377;' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
+
+    function ffRenderRows(data) {
+        if (!data || !data.rows || !data.rows.length) {
+            return '<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">No Territory Partners found.</div>';
+        }
+        var serialStart = ((data.page || 1) - 1) * (data.per_page || 15);
+        var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+            '<thead><tr style="border-bottom:2px solid #e9ecef;text-align:left;color:#6b7280;">' +
+            '<th style="padding:6px 8px;">S.No</th><th style="padding:6px 8px;">TP ID</th>' +
+            '<th style="padding:6px 8px;">Name</th><th style="padding:6px 8px;">Phone</th>' +
+            '<th style="padding:6px 8px;">District</th><th style="padding:6px 8px;">Firka(s)</th>' +
+            '<th style="padding:6px 8px;text-align:right;">Target (Napkin)</th>' +
+            '<th style="padding:6px 8px;">Weekly Status</th></tr></thead><tbody>';
+        $.each(data.rows, function (i, r) {
+            var w = r.weekly || {};
+            var rowId = 'ffwk-' + i;
+            var weeklyCell;
+            if (w.is_future) {
+                weeklyCell = '<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Upcoming</span>' +
+                    '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">' + ffEsc(w.month_label) + ' hasn\'t started yet.</div>';
+            } else {
+                var badge = w.on_track
+                    ? '<span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">On Track</span>'
+                    : '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Behind</span>';
+                weeklyCell = '<span class="ff-weekly-trigger" style="cursor:pointer;" data-target="' + rowId + '">' + badge + ' <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">expand_more</i></span>' +
+                    '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">' + ffEsc(w.week_label) + ' &middot; ' + ffMoney(w.paid_so_far) + ' paid (' + (w.pct_of_target || 0) + '% of target)</div>';
+            }
+            html += '<tr style="border-bottom:1px solid #f3f4f6;">' +
+                '<td style="padding:7px 8px;color:#9ca3af;">' + (serialStart + i + 1) + '</td>' +
+                '<td style="padding:7px 8px;color:#6b7280;">' + ffEsc(r.tp_id) + '</td>' +
+                '<td style="padding:7px 8px;font-weight:600;color:#1f2937;">' + ffEsc(r.name) + '</td>' +
+                '<td style="padding:7px 8px;">' + ffEsc(r.mobile) + '</td>' +
+                '<td style="padding:7px 8px;">' + ffEsc(r.district) + '</td>' +
+                '<td style="padding:7px 8px;color:#6b7280;">' + ffEsc(r.firkas) + '</td>' +
+                '<td style="padding:7px 8px;text-align:right;font-weight:600;">' + ffMoney(r.target_amount) + '</td>' +
+                '<td style="padding:7px 8px;white-space:nowrap;">' + weeklyCell + '</td>' +
+                '</tr>';
+            if (!w.is_future) {
+                html += '<tr id="' + rowId + '" class="ff-week-detail-row" style="display:none;">' +
+                    '<td colspan="8" style="padding:8px 10px 14px 30px;background:#f9fafb;">' + ffBuildWeeklyDetailHtml(w) + '</td>' +
+                    '</tr>';
+            }
+        });
+        html += '</tbody></table></div>';
+        return html;
+    }
+
+    function ffBuildWeeklyDetailHtml(w) {
+        if (!w || !w.weeks) return 'No data';
+        var html = '<div style="font-weight:600;margin-bottom:6px;color:#374151;">' + ffEsc(w.month_label) + ' &mdash; Weekly Purchases</div>' +
+            '<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:520px;">' +
+            '<tr style="color:#6b7280;"><th style="text-align:left;padding:3px 8px;">Week</th><th style="text-align:right;padding:3px 8px;">Purchased this week</th><th style="text-align:right;padding:3px 8px;">Total so far</th><th style="text-align:right;padding:3px 8px;">Required so far</th><th style="text-align:center;padding:3px 8px;">Status</th></tr>';
+        $.each(['week1', 'week2', 'week3', 'week4'], function (_, key) {
+            var wk = w.weeks[key];
+            if (!wk) return;
+            var status = !wk.has_started ? '<span style="color:#9ca3af;">&mdash;</span>'
+                : (wk.pass ? '<span style="color:#15803d;font-weight:600;">Pass</span>' : '<span style="color:#b91c1c;font-weight:600;">Fail</span>');
+            var rowStyle = wk.is_current ? ' style="background:#fffbeb;"' : '';
+            html += '<tr' + rowStyle + '><td style="padding:4px 8px;">' + ffEsc(wk.label) + '</td>' +
+                '<td style="text-align:right;padding:4px 8px;font-weight:600;">' + ffMoney(wk.amount) + '</td>' +
+                '<td style="text-align:right;padding:4px 8px;">' + ffMoney(wk.cumulative) + '</td>' +
+                '<td style="text-align:right;padding:4px 8px;color:#6b7280;">' + ffMoney(wk.required) + '</td>' +
+                '<td style="text-align:center;padding:4px 8px;">' + status + '</td></tr>';
+        });
+        html += '</table>';
+        return html;
+    }
+
+    function ffRenderPagination(data) {
+        var totalPages = Math.max(1, Math.ceil((data.total || 0) / (data.per_page || 15)));
+        if (totalPages <= 1) return '';
+        var html = '<button type="button" class="btn btn-sm btn-outline-secondary ff-page-btn" data-page="' + (data.page - 1) + '"' + (data.page <= 1 ? ' disabled' : '') + '>Prev</button>' +
+            '<span style="font-size:12.5px;color:#6b7280;">Page ' + data.page + ' of ' + totalPages + ' &nbsp;(' + data.total + ' total)</span>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary ff-page-btn" data-page="' + (data.page + 1) + '"' + (data.page >= totalPages ? ' disabled' : '') + '>Next</button>';
+        return html;
+    }
+
+    function ffLoad(tab, page) {
+        var key = tab + '-' + page;
+        $('#ffListBody').html('<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>');
+        $('#ffPagination').html('');
+        if (ffCache[key]) {
+            $('#ffListBody').html(ffRenderRows(ffCache[key]));
+            $('#ffPagination').html(ffRenderPagination(ffCache[key]));
+            return;
+        }
+        var params = { tab: tab, page: page, month: ffMonth };
+        if (viewBdmId) { params.view_bdm_id = viewBdmId; }
+        $.getJSON('get-filled-firka-tps.php', params, function (data) {
+            ffCache[key] = data;
+            $('#ffListBody').html(ffRenderRows(data));
+            $('#ffPagination').html(ffRenderPagination(data));
+        }).fail(function () {
+            $('#ffListBody').html('<div style="color:#b91c1c;font-size:13px;padding:20px 0;text-align:center;">Could not load data.</div>');
+        });
+    }
+
+    $(document).on('click', '.ff-weekly-trigger', function () {
+        $('#' + $(this).data('target')).toggle();
+    });
+
+    $('#filledFirkasCard').on('click', function () {
+        ffCurrentTab = 'active';
+        ffCurrentPage = 1;
+        $('#ffActiveTabBtn').addClass('active');
+        $('#ffInactiveTabBtn').removeClass('active');
+        $('#filledFirkasModal').modal('show');
+        ffLoad(ffCurrentTab, ffCurrentPage);
+    });
+
+    $('#ffTabs button').on('click', function () {
+        $('#ffTabs button').removeClass('active');
+        $(this).addClass('active');
+        ffCurrentTab = $(this).data('tab');
+        ffCurrentPage = 1;
+        ffLoad(ffCurrentTab, ffCurrentPage);
+    });
+
+    $(document).on('click', '.ff-page-btn', function () {
+        if ($(this).is(':disabled')) return;
+        ffCurrentPage = parseInt($(this).data('page'), 10);
+        ffLoad(ffCurrentTab, ffCurrentPage);
     });
 })(jQuery);
 </script>
