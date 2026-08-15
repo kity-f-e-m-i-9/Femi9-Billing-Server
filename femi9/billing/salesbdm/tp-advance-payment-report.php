@@ -113,6 +113,7 @@ $i = 0;
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
+    <link href="../../assets/plugins/select2/css/select2.min.css" rel="stylesheet">
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
     <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
@@ -193,7 +194,7 @@ $i = 0;
                         <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
                             <div>
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Territory Partner</label>
-                                <select name="tp_id" class="form-control form-control-sm" style="width:220px;">
+                                <select name="tp_id" id="tpSelect" class="form-control form-control-sm" style="width:220px;">
                                     <option value="0">All Territory Partners</option>
                                     <?php foreach ($tps as $t): ?>
                                         <option value="<?php echo (int)$t['id']; ?>" <?php echo $filter_tp===(int)$t['id']?'selected':''; ?>><?php echo htmlspecialchars($t['name']); ?></option>
@@ -302,5 +303,9 @@ $i = 0;
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
+<script>
+$('#tpSelect').select2({ width: '220px', placeholder: 'All Territory Partners' });
+</script>
 </body>
 </html>

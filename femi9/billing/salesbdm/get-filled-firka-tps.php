@@ -30,6 +30,7 @@ $status  = $_GET['status'] ?? 'all';
 $status  = in_array($status, ['on_track', 'behind'], true) ? $status : 'all';
 $page    = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 15;
+$search  = trim($_GET['q'] ?? '');
 
 // Weekly-target month follows the dashboard's own date filter (?month=Y-m,
 // derived there from its existing "from" date) — falls back to the current
@@ -45,12 +46,27 @@ if (empty($tpIds)) {
 $tpIdList  = implode(',', array_map('intval', $tpIds));
 $activeVal = $tab === 'active' ? 1 : 0;
 
-$tpRows = $db_conn->query("
-    SELECT id, tp_id, name, mobile, branch_district
-    FROM territory_partners
-    WHERE id IN ($tpIdList) AND is_active=$activeVal
-    ORDER BY name ASC
-")->fetch_all(MYSQLI_ASSOC);
+if ($search !== '') {
+    $stmt = $db_conn->prepare("
+        SELECT id, tp_id, name, mobile, branch_district
+        FROM territory_partners
+        WHERE id IN ($tpIdList) AND is_active=$activeVal
+          AND (name LIKE ? OR mobile LIKE ? OR tp_id LIKE ?)
+        ORDER BY name ASC
+    ");
+    $like = '%' . $search . '%';
+    $stmt->bind_param('sss', $like, $like, $like);
+    $stmt->execute();
+    $tpRows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+} else {
+    $tpRows = $db_conn->query("
+        SELECT id, tp_id, name, mobile, branch_district
+        FROM territory_partners
+        WHERE id IN ($tpIdList) AND is_active=$activeVal
+        ORDER BY name ASC
+    ")->fetch_all(MYSQLI_ASSOC);
+}
 
 // Weekly status/rank has to be computed for the WHOLE tab (not just one
 // page) before filtering by On Track/Behind and ranking — otherwise
