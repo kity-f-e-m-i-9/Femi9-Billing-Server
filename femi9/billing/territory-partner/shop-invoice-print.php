@@ -361,36 +361,36 @@ if ($totalgstamount > 0) {
         $CGST = inr_format($totalgstamount / 2, 2);
 ?>
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>SGST (<?php echo $__half_pct; ?>%)</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td id="rightlaign"><b><i>SGST (<?php echo $__half_pct; ?>%)</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>CGST (<?php echo $__half_pct; ?>%)</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td id="rightlaign"><b><i>CGST (<?php echo $__half_pct; ?>%)</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo $CGST; ?></b></td>
 </tr>
 <?php } else { ?>
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>IGST (<?php echo fmt_gst_pct($__inv_gst_pct); ?>%)</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td id="rightlaign"><b><i>IGST (<?php echo fmt_gst_pct($__inv_gst_pct); ?>%)</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($totalgstamount, 2); ?></b></td>
 </tr>
 <?php } } ?>
 
 <?php if (!empty($inv['discount']) && $inv['discount'] > 0): ?>
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>Discount</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td id="rightlaign"><b><i>Discount</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['discount'], 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <?php if (!empty($inv['roundoff']) && $inv['roundoff'] != 0): ?>
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>Round off</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td id="rightlaign"><b><i>Round off</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['roundoff'], 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>Total</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td id="rightlaign"><b><i>Total</i></b></td><td></td><td id="rightlaign"></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['total'] ?? 0, 2); ?></b></td>
 </tr>
 </table>

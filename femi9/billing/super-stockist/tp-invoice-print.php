@@ -392,12 +392,12 @@ Terms of Delivery<br/>&nbsp;
 ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>SGST</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>CGST</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
 </tr>
 <?php endif; ?>
@@ -405,14 +405,14 @@ Terms of Delivery<br/>&nbsp;
 <?php if ($courier_charges > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Total</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
 </tr>
 </table>

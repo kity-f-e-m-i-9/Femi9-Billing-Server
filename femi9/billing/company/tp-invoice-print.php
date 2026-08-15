@@ -537,14 +537,14 @@ Terms of Delivery<br/>&nbsp;
 <td></td><td id="rightlaign"><b><i>SGST (<?= $__half_pct; ?>%)</i></b></td>
 <td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
-<td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>CGST (<?= $__half_pct; ?>%)</i></b></td>
 <td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
-<td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
 </tr>
 <?php endif; ?>
@@ -554,7 +554,7 @@ Terms of Delivery<br/>&nbsp;
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
 <td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
-<td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
 </tr>
 <?php endif; ?>
@@ -563,7 +563,7 @@ Terms of Delivery<br/>&nbsp;
 <td></td><td id="rightlaign"><b><i>Total</i></b></td>
 <td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
-<td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
 </tr>
 </table>

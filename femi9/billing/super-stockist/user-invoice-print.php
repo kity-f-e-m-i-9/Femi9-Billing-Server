@@ -510,7 +510,7 @@ $CGST=inr_format($CGST, 2);
 <td></td>
 <td></td>
 <td></td>
-<td></td><td></td>
+<td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=$SGST;?></b></td>
 </tr>
 <tr id="bottombordervl">
@@ -521,7 +521,7 @@ $CGST=inr_format($CGST, 2);
 <td></td>
 <td></td>
 <td></td>
-<td></td><td></td>
+<td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=$CGST;?></b></td>
 </tr>
 <?php }else{?>
@@ -533,7 +533,7 @@ $CGST=inr_format($CGST, 2);
 <td></td>
 <td></td>
 <td></td>
-<td></td><td></td>
+<td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=inr_format($totalgstamount, 2);?></b></td>
 </tr>
 <?php }} ?>
@@ -552,7 +552,7 @@ if($discountamount>0){?>
 <td></td>
 <td></td>
 <td></td>
-<td></td><td></td>
+<td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($discountamount, 2);?></b></td>
 </tr>
 <?php }?>
@@ -563,6 +563,7 @@ if($discountamount>0){?>
 <td id="rightlaign"><b><i>Round off</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -583,6 +584,7 @@ if($discountamount>0){?>
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=inr_format($result_Invoice_Details['courier_charges'], 2);?></b></td>
 </tr>
 <?php }?>
@@ -595,7 +597,7 @@ if($discountamount>0){?>
 <td></td>
 <td></td>
 <td></td>
-<td></td><td></td>
+<td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($result_Invoice_Details['total'], 2);?></b></td>
 </tr>
 </table>
