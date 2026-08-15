@@ -289,7 +289,8 @@ Terms of Delivery<br/>
 <td>Description of Goods</td>
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
-<td id="rightlaign">Rate</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
@@ -301,20 +302,30 @@ Terms of Delivery<br/>
 	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
-	
+
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['pr_id'];
 		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
 		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
-		
+
 		$TotalAMount=$result_INVProductDetails['qty']*$result_INVProductDetails['amount'];
 		$TotalAMount23=$TotalAMount-$result_INVProductDetails['discount_amount'];
 		$TotalAMount123+=$TotalAMount23;
-		
+
 		$Totalquantity=$result_INVProductDetails['qty'];
 		$Totalquantity123+=$Totalquantity;
-		
+
+		$item_gst_pct  = (float)$result_INVProductDetails['gst_percentage'];
+		$item_gst_type = $result_ProductDetails123['gst_type'] ?: 'exclusive';
+		$rate_amount   = (float)$result_INVProductDetails['amount'];
+		if ($item_gst_type === 'inclusive' && $item_gst_pct > 0) {
+			$rate_excl = $rate_amount * 100 / (100 + $item_gst_pct);
+		} else {
+			$rate_excl = $rate_amount;
+		}
+		$rate_incl = $rate_excl + ($item_gst_pct > 0 ? $rate_excl * $item_gst_pct / 100 : 0);
+
 		$discountamount_show=inr_format($result_INVProductDetails['discount_amount'], 2);
 		$discountpercentage_show=inr_format($result_INVProductDetails['discount_percentage'], 0);
 	?>
@@ -323,7 +334,8 @@ Terms of Delivery<br/>
 <td><b><?=$result_ProductDetails123['productName'];?></b></td>
 <td id="rightlaign"><?=$result_ProductDetails123['hsn'];?></td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
-<td id="rightlaign"><?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
+<td id="rightlaign"><?php echo inr_format($rate_excl, 2);?></td>
+<td id="rightlaign"><?php echo inr_format($rate_incl, 2);?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?=$result_INVProductDetails['gst_percentage'];?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=$discountpercentage_show;?>%)</td>
@@ -332,7 +344,7 @@ Terms of Delivery<br/>
 
 	<?php } ?>
 	<tr>
-	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 	</tr>
 
 <tr id="bottombordervl">
@@ -340,6 +352,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"><b><i></i></b></td>
 <td></td>
 <td id="rightlaign"><b><?=$Totalquantity123;?> Packs</b></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>

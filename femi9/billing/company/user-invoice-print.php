@@ -412,7 +412,8 @@ Terms of Delivery<br/>
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
 <td id="rightlaign">MRP</td>
-<td id="rightlaign">Rate</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
@@ -445,6 +446,8 @@ Terms of Delivery<br/>
 		$Totalquantity123+=$Totalquantity;
 
 		$taxable_rate = $Totalquantity > 0 ? $TotalAMount23 / $Totalquantity : 0;
+		$gst_pct_item = (float)$result_INVProductDetails['gst_percentage'];
+		$taxable_rate_incl = $taxable_rate + ($gst_pct_item > 0 ? $taxable_rate * $gst_pct_item / 100 : 0);
 
 		$discountamount_show=inr_format($result_INVProductDetails['discount_amount'], 2);
 		$discountpercentage_show=inr_format($result_INVProductDetails['discount_percentage'], 0);
@@ -456,6 +459,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2);?></td>
 <td id="rightlaign"><?php echo inr_format($taxable_rate, 2);?></td>
+<td id="rightlaign"><?php echo inr_format($taxable_rate_incl, 2);?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?=$result_INVProductDetails['gst_percentage'];?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=$discountpercentage_show;?>%)</td>
@@ -464,7 +468,7 @@ Terms of Delivery<br/>
 
 	<?php } ?>
 	<tr>
-	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 	<td></td>
 	</tr>
 
@@ -473,6 +477,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"><b><i></i></b></td>
 <td></td>
 <td id="rightlaign"><b><?=$Totalquantity123;?> Packs</b></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>

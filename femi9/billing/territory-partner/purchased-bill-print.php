@@ -88,6 +88,9 @@ foreach ($invoice_items as &$item) {
     }
     $item['taxable_value'] = $taxable_value;
     $item['gst_amount']    = $gst_amount;
+    $qty_int = (int)$item['quantity'];
+    $item['taxable_rate']      = $qty_int > 0 ? $taxable_value / $qty_int : 0;
+    $item['taxable_rate_incl'] = $item['taxable_rate'] + ($gst_pct > 0 ? $item['taxable_rate'] * $gst_pct / 100 : 0);
 
     $TotalAMount123   += $taxable_value;
     $Totalquantity123 += (int)$item['quantity'];
@@ -394,7 +397,8 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
 <td id="rightlaign">MRP</td>
-<td id="rightlaign">Rate</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
@@ -404,7 +408,6 @@ Terms of Delivery<br/>&nbsp;
 <?php $invno = 0; foreach ($invoice_items as $item):
     $invno++;
     $qty           = (int)$item['quantity'];
-    $rate          = (float)$item['rate'];
     $gst_pct       = (int)$item['gst_percentage'];
     $gst_type      = $item['gst_type'] ?? 'exclusive';
     $mrp           = (float)$item['mrp'];
@@ -416,7 +419,8 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign"><?= htmlspecialchars($item['hsn']); ?></td>
 <td id="rightlaign"><?= inr_format($qty, 0); ?> Packs</td>
 <td id="rightlaign"><?= inr_format($mrp, 2); ?></td>
-<td id="rightlaign"><?= inr_format($rate, 2); ?></td>
+<td id="rightlaign"><?= inr_format($item['taxable_rate'], 2); ?></td>
+<td id="rightlaign"><?= inr_format($item['taxable_rate_incl'], 2); ?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?= $gst_pct; ?>%</td>
 <td id="rightlaign">0.00<br/>(0%)</td>
@@ -427,14 +431,14 @@ Terms of Delivery<br/>&nbsp;
 <tr>
 <td></td><td></td><td></td>
 <td id="rightlaign"><b><?= inr_format($Totalquantity123, 0); ?> Packs</b></td>
-<td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 
 <?php if ($discount_amount > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Discount</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
 </tr>
 <?php endif; ?>

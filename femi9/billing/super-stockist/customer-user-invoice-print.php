@@ -83,6 +83,7 @@ while ($row = mysqli_fetch_array($fetch_INVProductDetails)) {
     $row['taxable_value'] = $taxable_value;
     $row['gst_amount']    = $gst_amount;
     $row['taxable_rate']  = $qty > 0 ? $gross_taxable_value / $qty : 0;
+    $row['taxable_rate_incl'] = $row['taxable_rate'] + ($gst_pct > 0 ? $row['taxable_rate'] * $gst_pct / 100 : 0);
     $row['gst_pct']       = $gst_pct;
     $row['gst_type_item'] = $gst_type_item;
     $invoice_items[] = $row;
@@ -392,7 +393,8 @@ Terms of Delivery<br/>
 <td>Description of Goods</td>
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
-<td id="rightlaign">Rate</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
@@ -410,6 +412,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"><?=$result_INVProductDetails['p_hsn'];?></td>
 <td id="rightlaign"><?=$qty?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_INVProductDetails['taxable_rate'], 2);?></td>
+<td id="rightlaign"><?php echo inr_format($result_INVProductDetails['taxable_rate_incl'], 2);?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?=$result_INVProductDetails['gst_pct'];?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=$discountpercentage_show;?>%)</td>
@@ -418,7 +421,7 @@ Terms of Delivery<br/>
 
 	<?php endforeach; ?>
 	<tr>
-	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 	</tr>
 
 <tr id="bottombordervl">
@@ -428,7 +431,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"><b><?=$Totalquantity123;?> Packs</b></td>
 <td></td>
 <td></td>
-<td></td><td></td>
+<td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($TotalAMount123, 2);?></b></td>
 </tr>
 

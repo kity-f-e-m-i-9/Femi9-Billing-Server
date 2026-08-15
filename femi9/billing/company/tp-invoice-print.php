@@ -106,6 +106,7 @@ foreach ($invoice_items as &$item) {
     $item['taxable_value'] = $taxable_value;
     $item['gst_amount']    = $gst_amount;
     $item['taxable_rate']  = ((int)$item['quantity'] > 0) ? $gross_taxable_value / (int)$item['quantity'] : 0;
+    $item['taxable_rate_incl'] = $item['taxable_rate'] + ($gst_pct > 0 ? $item['taxable_rate'] * $gst_pct / 100 : 0);
 
     $TotalAMount123   += $taxable_value;
     $Totalquantity123 += (int)$item['quantity'];
@@ -464,7 +465,8 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign">Cartons</td>
 <?php endif; ?>
 <td id="rightlaign">MRP</td>
-<td id="rightlaign">Rate</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
@@ -483,6 +485,7 @@ Terms of Delivery<br/>&nbsp;
     // stored rate already has GST baked in, so it's carved out here rather
     // than printed as-is (which would silently overstate the taxable rate).
     $rate          = (float)$item['taxable_rate'];
+    $rate_incl     = (float)$item['taxable_rate_incl'];
     $item_disc_amt = (float)($item['discount_amount'] ?? 0);
     $item_disc_pct = (float)($item['discount_percentage'] ?? 0);
 ?>
@@ -497,6 +500,7 @@ Terms of Delivery<br/>&nbsp;
 <?php endif; ?>
 <td id="rightlaign"><?= inr_format($mrp, 2); ?></td>
 <td id="rightlaign"><?= inr_format($rate, 2); ?></td>
+<td id="rightlaign"><?= inr_format($rate_incl, 2); ?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?= $gst_pct; ?>%</td>
 <td id="rightlaign"><?= inr_format($item_disc_amt, 2); ?><br/>(<?= fmt_gst_pct($item_disc_pct); ?>%)</td>
@@ -511,7 +515,7 @@ Terms of Delivery<br/>&nbsp;
 <td></td>
 <td id="rightlaign"><b><?= inr_format($TotalCartons123, 0); ?> ctn</b></td>
 <?php endif; ?>
-<td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 
@@ -520,7 +524,7 @@ Terms of Delivery<br/>&nbsp;
 <td></td><td id="rightlaign"><b><i>Discount</i></b></td>
 <td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
-<td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
 </tr>
 <?php endif; ?>
