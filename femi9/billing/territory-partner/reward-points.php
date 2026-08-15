@@ -77,12 +77,15 @@ $invoiceCount   = (int)($purchaseResult['invoice_count'] ?? 0);
 // 1b. Sales Points — what this TP sold onward to a shop/customer
 // (user_invoice, from_user_type='territory_partner'), separate from Purchase
 // Points above (which is what the TP bought FROM the company). Same
-// total/100 convention as Purchase Points. Shown as its own figure and
-// deliberately NOT included in Total Points, same as the company view.
+// total/100 convention as Purchase Points. Gated by rwpoints_enable=1,
+// matching how company login gates its own sales points
+// (reward_points.php) — only invoices the company has flagged as
+// reward-eligible count. Shown as its own figure and deliberately NOT
+// included in Total Points, same as the company view.
 $salesQuery = "
     SELECT COALESCE(SUM(total) / 100, 0) AS sales_points, COUNT(*) AS sales_invoice_count
     FROM user_invoice
-    WHERE from_user_type = ? AND from_user_id = ? AND sub_total > 0 AND date BETWEEN ? AND ?
+    WHERE from_user_type = ? AND from_user_id = ? AND sub_total > 0 AND rwpoints_enable = 1 AND date BETWEEN ? AND ?
 ";
 $salesResult = executeQueryRow_tp($db_conn, $salesQuery, [$userType, $userId, $currentFromDate, $currentToDate], 'ssss');
 $salesPoints = (float)($salesResult['sales_points'] ?? 0);

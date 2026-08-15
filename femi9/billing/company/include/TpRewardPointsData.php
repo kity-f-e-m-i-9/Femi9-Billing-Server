@@ -128,14 +128,18 @@ function getTpRewardPointsData(string $current_from_date, string $current_to_dat
     // Separate from Purchase Points: this counts what the TP sold onward to a
     // shop/customer (user_invoice, from_user_type='territory_partner'), not
     // what the TP bought from the company (tp_invoices). Same total/100
-    // convention as Purchase Points. Shown as its own column and deliberately
-    // NOT included in Total Points — it's informational only, per request.
+    // convention as Purchase Points. Gated by rwpoints_enable=1, matching how
+    // company login gates its own sales points (reward_points.php) — only
+    // invoices the company has flagged as reward-eligible count. Shown as its
+    // own column and deliberately NOT included in Total Points — it's
+    // informational only, per request.
     $stmt = $pdo->prepare("
         SELECT from_user_id AS user_id,
                COALESCE(SUM(total) / 100, 0) AS sales_points
         FROM user_invoice
         WHERE from_user_type = 'territory_partner'
           AND sub_total > 0
+          AND rwpoints_enable = 1
           AND date BETWEEN :from_date AND :to_date
         GROUP BY from_user_id
     ");
