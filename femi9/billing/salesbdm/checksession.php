@@ -10,12 +10,23 @@ if (session_status() === PHP_SESSION_NONE) {
 // Include database connection
 require_once __DIR__ . '/include/db-connect.php';
 
-// Company "view a BDM's dashboard" bridge — read-only, single-page only.
-// Never touches $_SESSION (so it can't leak into a persistent salesbdm
-// login for any other page) — it just resolves $result_LoGuserDtails for
-// THIS request, and config.php (included right after) picks it up instead
-// of re-querying by $_SESSION['LOGIN_USER'].
-if (basename($_SERVER['SCRIPT_NAME']) === 'dashboard.php' && !empty($_COOKIE['femi9_company_bdm_view'])) {
+// Company "view a BDM's dashboard" bridge — read-only, allowlisted pages
+// only. Never touches $_SESSION (so it can't leak into a persistent
+// salesbdm login for any other page) — it just resolves $result_LoGuserDtails
+// for THIS request, and config.php (included right after) picks it up
+// instead of re-querying by $_SESSION['LOGIN_USER']. Includes dashboard.php's
+// own AJAX endpoints (Filled/Unassigned Firkas modals) — without them here,
+// those fetches hit the normal login check below and get redirected instead
+// of returning JSON, which surfaces as "Could not load" in the modal. Also
+// includes the "Our Team" submenu (Tree View / Our Team Report), since
+// femi_menu.php links to them from every salesbdm page including this
+// bridge view — without them here, clicking either link from a bridged
+// dashboard redirects to a logged-out page instead of showing the report.
+$_companyBridgeAllowedScripts = [
+    'dashboard.php', 'get-filled-firka-tps.php', 'get-unassigned-firkas.php',
+    'my-team.php', 'my-team-report.php',
+];
+if (in_array(basename($_SERVER['SCRIPT_NAME']), $_companyBridgeAllowedScripts, true) && !empty($_COOKIE['femi9_company_bdm_view'])) {
     $db_conn->query("CREATE TABLE IF NOT EXISTS company_bdm_view_bridge (
         token VARCHAR(64) PRIMARY KEY,
         bdm_id INT NOT NULL,

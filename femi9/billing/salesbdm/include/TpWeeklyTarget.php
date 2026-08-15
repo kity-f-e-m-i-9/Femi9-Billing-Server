@@ -1,9 +1,16 @@
 <?php
 // Read-only adaptation of the weekly cumulative-target concept already used
 // for TP bonus/deactivation decisions (see company/tp-bonus-points-calculator.php
-// — getWeekRanges()/getTpAdvancePaymentInRange()/the 25%/50%/75%/100% weekly
-// thresholds). This file only reuses that same math to show a TP's current
-// on-track/behind status for display — no bonus award or deactivation logic.
+// — getWeekRanges()/the 25%/50%/75%/100% weekly thresholds). This file only
+// reuses that same math to show a TP's current on-track/behind status for
+// display — no bonus award or deactivation logic.
+//
+// Unlike the bonus calculator (which compares the target against ALL cash
+// the TP paid via tp_advance_payments, regardless of what it was for), this
+// deliberately compares against the TP's actual NAPKIN-category downstream
+// sales only — target_amount itself is a Napkin-only figure (Lumi Baby
+// Diaper has its own separate diaper_target_amount, unused here), so mixing
+// in cash that was really paid for Diaper stock would overstate progress.
 
 function getTpWeekRangesForBdm(string $monthYear): array {
     $year    = (int)substr($monthYear, 0, 4);
@@ -34,21 +41,47 @@ function getTpWeekRangesForBdm(string $monthYear): array {
     ];
 }
 
-function getTpAdvancePaymentInRangeForBdm(mysqli $dbConn, string $tpCode, string $startDate, string $endDate): float {
-    $stmt = $dbConn->prepare("
-        SELECT COALESCE(SUM(tap.amount), 0) AS total
-        FROM tp_advance_payments tap
-        INNER JOIN territory_partners tp ON tp.id = tap.territory_partner_id
-        WHERE tp.tp_id = ?
-          AND tap.payment_date >= ?
-          AND tap.payment_date <= ?
+// Napkin-only downstream sales for one TP in a date range — same formula
+// (and same COALESCE(p.category,'') != 'diaper' match, since historic
+// Napkin products carry NULL category rather than the literal 'napkin')
+// as dashboard.php's own $overall_achieved, just scoped to a single TP and
+// date range instead of all of a BDM's TPs over the filter period.
+function getTpNapkinAchievedInRangeForBdm(mysqli $dbConn, int $tpDbId, string $startDate, string $endDate): float {
+    $custStmt = $dbConn->prepare("
+        SELECT COALESCE(SUM(ii.total), 0) AS total
+        FROM invoice_items ii
+        JOIN invoice i ON i.inv_id = ii.inv_id
+        JOIN products p ON p.id = ii.pr_id
+        WHERE i.user_type = 'territory_partner' AND i.sub_total > 0
+          AND i.date >= ? AND i.date <= ? AND i.user_id = ?
+          AND COALESCE(p.category, '') != 'diaper'
     ");
-    if (!$stmt) return 0.0;
-    $stmt->bind_param("sss", $tpCode, $startDate, $endDate);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    return (float)($row['total'] ?? 0.0);
+    $custTotal = 0.0;
+    if ($custStmt) {
+        $custStmt->bind_param('ssi', $startDate, $endDate, $tpDbId);
+        $custStmt->execute();
+        $custTotal = (float)($custStmt->get_result()->fetch_assoc()['total'] ?? 0.0);
+        $custStmt->close();
+    }
+
+    $shopStmt = $dbConn->prepare("
+        SELECT COALESCE(SUM(uii.total), 0) AS total
+        FROM user_invoice_items uii
+        JOIN user_invoice ui ON ui.inv_id = uii.inv_id
+        JOIN products p ON p.id = uii.pr_id
+        WHERE ui.from_user_type = 'territory_partner' AND ui.sub_total > 0
+          AND ui.date >= ? AND ui.date <= ? AND ui.from_user_id = ?
+          AND COALESCE(p.category, '') != 'diaper'
+    ");
+    $shopTotal = 0.0;
+    if ($shopStmt) {
+        $shopStmt->bind_param('ssi', $startDate, $endDate, $tpDbId);
+        $shopStmt->execute();
+        $shopTotal = (float)($shopStmt->get_result()->fetch_assoc()['total'] ?? 0.0);
+        $shopStmt->close();
+    }
+
+    return $custTotal + $shopTotal;
 }
 
 // Where the TP stands against a given month's weekly cumulative thresholds
@@ -62,7 +95,7 @@ function getTpAdvancePaymentInRangeForBdm(mysqli $dbConn, string $tpCode, string
 // returns ['is_future' => true] instead of a zeroed-out breakdown, so the
 // UI can say "hasn't started yet" rather than implying the TP already
 // missed a target for a period that doesn't exist yet.
-function getTpWeeklyCompletion(mysqli $dbConn, string $tpCode, float $targetAmount, ?string $monthYear = null): array {
+function getTpWeeklyCompletion(mysqli $dbConn, int $tpDbId, float $targetAmount, ?string $monthYear = null): array {
     $currentMonthYear = date('Y-m');
     $monthYear = $monthYear ?: $currentMonthYear;
     $monthLabel = date('F Y', strtotime($monthYear . '-01'));
@@ -95,7 +128,7 @@ function getTpWeeklyCompletion(mysqli $dbConn, string $tpCode, float $targetAmou
         // rather than borrowing from a date range that's still in the future.
         $rangeEnd = $today < $r['end'] ? $today : $r['end'];
         $amount = ($today >= $r['start'])
-            ? getTpAdvancePaymentInRangeForBdm($dbConn, $tpCode, $r['start'], $rangeEnd)
+            ? getTpNapkinAchievedInRangeForBdm($dbConn, $tpDbId, $r['start'], $rangeEnd)
             : 0.0;
         $cumulative += $amount;
         $required = $targetAmount * $thresholdPct[$key];

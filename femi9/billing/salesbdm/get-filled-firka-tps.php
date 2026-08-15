@@ -67,7 +67,7 @@ foreach ($tpRows as $tp) {
     $firkaNames   = array_map(fn($r) => $r['firka_name'], $locRows);
     $targetAmount = array_sum(array_map(fn($r) => (float)$r['target_amount'], $locRows));
 
-    $weekly = getTpWeeklyCompletion($db_conn, (string)$tp['tp_id'], $targetAmount, $month);
+    $weekly = getTpWeeklyCompletion($db_conn, (int)$tp['id'], $targetAmount, $month);
 
     $rows[] = [
         'tp_id'         => $tp['tp_id'],
