@@ -560,7 +560,7 @@ $i = 0;
 <script src="../../assets/js/pages/datatables.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="../../assets/js/whatsapp-invoice-share.js"></script>
+<script src="../../assets/js/whatsapp-invoice-share.js?v=2"></script>
 <script>
 // Shares a TP invoice straight to WhatsApp from this list — no detour through
 // the print page. Loads the print page in a hidden iframe via a real

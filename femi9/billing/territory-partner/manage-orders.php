@@ -327,7 +327,7 @@ $visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filte
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-    <script src="../../assets/js/whatsapp-invoice-share.js"></script>
+    <script src="../../assets/js/whatsapp-invoice-share.js?v=2"></script>
     <script>
     function openCancelOrderModal(orderId) {
         document.getElementById('cancelOrderIdField').value = orderId;
