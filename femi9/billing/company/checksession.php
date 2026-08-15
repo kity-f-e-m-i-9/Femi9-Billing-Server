@@ -28,7 +28,18 @@ $_bdmAllowedScripts = [
 // femi9_bdm_bridge cookie is path=/ and outlives the switch, so without this
 // guard it would keep silently downgrading a full company session back to
 // the BDM's own narrow TP scope on every one of these pages.
-if (!empty($_COOKIE['femi9_bdm_bridge']) && empty($_SESSION['LOGIN_USER']) && in_array(basename($_SERVER['SCRIPT_NAME']), $_bdmAllowedScripts, true)) {
+//
+// Checked via LOGIN_USER_TYPE === 'company' specifically (set only by a
+// real company login — CheckLogin.php / switch-login.php), NOT just
+// whether LOGIN_USER is non-empty: the bridge branch below sets
+// $_SESSION['LOGIN_USER'] itself as a side effect (so app-header.php can
+// read the BDM's name), so checking LOGIN_USER alone made the bridge
+// disable itself on every request after its own first one in the same
+// browser session — a single-role BDM (no company account at all) would
+// load the first bridged page fine, then get logged out / see "Failed to
+// load" on every link/AJAX call after that.
+$_hasRealCompanySession = !empty($_SESSION['LOGIN_USER']) && ($_SESSION['LOGIN_USER_TYPE'] ?? '') === 'company';
+if (!empty($_COOKIE['femi9_bdm_bridge']) && !$_hasRealCompanySession && in_array(basename($_SERVER['SCRIPT_NAME']), $_bdmAllowedScripts, true)) {
     $db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_company_bridge (
         token VARCHAR(64) PRIMARY KEY,
         bdm_id INT NOT NULL,
