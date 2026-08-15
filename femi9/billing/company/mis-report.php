@@ -384,10 +384,26 @@ $revenue_growth = $prev_rev > 0
 // GST is backed out of an inclusive-type rate so Gross Profit stays on a
 // pre-tax basis, same convention as the piece-rate section.
 //
+// sold_rate is put on the same pre-tax basis. Every source feeding the
+// `sold` union (invoice_items.total, user_invoice_items.total,
+// tp_invoice_items.amount, ot_sales.total) stores a GST-inclusive line
+// total by construction — an 'inclusive' product's entered rate already
+// included GST (total = subtotal), and an 'exclusive' product has GST
+// added on top (total = subtotal + gst_amount) — see user-invoice-action.php
+// and customer-invoice-action.php's identical branching. So sold_rate is
+// backed out via products.gst/gst_type using the exact same CASE-based
+// formula as llp_cost_rate above, keyed off the same joined `p` row —
+// without this, sold_rate stayed tax-inclusive while llp_cost_rate was
+// already pre-tax, silently overstating Gross Profit by the GST margin.
+//
 // Net Profit = Gross Profit − Expense Tracker's net expense total for the
 // same period, and is only meaningful for the "Income to Company" scope
 // (expenses are a company-wide cost, not attributable to a single TP).
 // ═══════════════════════════════════════════════════════════════════════════
+// total is GST-inclusive on every source regardless of the product's own
+// gst_type (see comment above), so the divisor is the same either way —
+// unlike llp_cost_rate's CASE, there is no exclusive-rate branch here.
+$gp_sold_rate_gst_divisor = "(1 + COALESCE(p.gst,0)/100)";
 $gp_cost_rate_subq = "COALESCE(
         (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
              * COALESCE(NULLIF(p.pieces_per_pack,0),1)
@@ -436,7 +452,7 @@ if ($scope === 'company') {
 // the SQL text below exactly.
 $gp_all_params = array_merge([$to, $to], $gp_params, $gp_return_params, [$to, $to]);
 $gross_profit = (float)cval($db_conn,
-    "SELECT COALESCE(SUM((sold.sold_rate - {$gp_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
+    "SELECT COALESCE(SUM((sold.sold_rate / {$gp_sold_rate_gst_divisor} - {$gp_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
      FROM (
          SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total)/NULLIF(SUM(s.qty),0) sold_rate
          FROM (
@@ -524,7 +540,7 @@ if ($scope === 'company' && !$is_neksomo_view) {
     $gp_diaper_all_params = array_merge([$to], $gp_params, $gp_return_params, [$to]);
 
     $grand_gross_profit_llp = (float)cval($db_conn,
-        "SELECT COALESCE(SUM((sold.sold_rate - {$gp_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
+        "SELECT COALESCE(SUM((sold.sold_rate / {$gp_sold_rate_gst_divisor} - {$gp_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
          FROM (
              SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total)/NULLIF(SUM(s.qty),0) sold_rate
              FROM (
@@ -556,7 +572,7 @@ if ($scope === 'company' && !$is_neksomo_view) {
         str_repeat('s', count($gp_all_params)), $gp_all_params);
 
     $grand_diaper_gross_profit_llp = (float)cval($db_conn,
-        "SELECT COALESCE(SUM((sold.sold_rate - {$gp_diaper_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
+        "SELECT COALESCE(SUM((sold.sold_rate / {$gp_sold_rate_gst_divisor} - {$gp_diaper_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
          FROM (
              SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total)/NULLIF(SUM(s.qty),0) sold_rate
              FROM (
