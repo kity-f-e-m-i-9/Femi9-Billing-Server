@@ -67,6 +67,9 @@ foreach ($invoice_items as &$item) {
     }
     $item['taxable_value'] = $taxable_value;
     $item['gst_amount']    = $gst_amount;
+    $qty_int = (int)$item['quantity'];
+    $item['taxable_rate']      = $qty_int > 0 ? $taxable_value / $qty_int : 0;
+    $item['taxable_rate_incl'] = $item['taxable_rate'] + ($gst_pct > 0 ? $item['taxable_rate'] * $gst_pct / 100 : 0);
 
     $TotalAMount123   += $taxable_value;
     $Totalquantity123 += (int)$item['quantity'];
@@ -116,21 +119,6 @@ while ($TAXi < $TAXdigits_1) {
     } else $TAXstr[] = null;
 }
 $TAXstr = array_reverse($TAXstr); $TAXresult = implode('', $TAXstr);
-
-// Taxable amount in words
-$TXBnumber = $TotalAMount123;
-$TXBno = floor($TXBnumber); $TXBdigits_1 = strlen($TXBno); $TXBi = 0; $TXBstr = [];
-while ($TXBi < $TXBdigits_1) {
-    $TXBdivider = ($TXBi == 2) ? 10 : 100; $TXBnum = floor($TXBno % $TXBdivider); $TXBno = floor($TXBno / $TXBdivider);
-    $TXBi += ($TXBdivider == 10) ? 1 : 2;
-    if ($TXBnum) {
-        $TXBplural = (($TXBcounter = count($TXBstr)) && $TXBnum > 9) ? 's' : null;
-        $TXBhundred = ($TXBcounter == 1 && $TXBstr[0]) ? ' and ' : null;
-        $TXBstr[] = ($TXBnum < 21) ? $words[$TXBnum]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred
-                    : $words[floor($TXBnum/10)*10]." ".$words[$TXBnum%10]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred;
-    } else $TXBstr[] = null;
-}
-$TXBstr = array_reverse($TXBstr); $TXBresult = implode('', $TXBstr);
 
 $Currency_symbol = "&#8377;";
 $Currency_Name   = "INR";
@@ -353,7 +341,8 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
 <td id="rightlaign">MRP</td>
-<td id="rightlaign">Rate</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
@@ -363,7 +352,6 @@ Terms of Delivery<br/>&nbsp;
 <?php $invno = 0; foreach ($invoice_items as $item):
     $invno++;
     $qty           = (int)$item['quantity'];
-    $rate          = (float)$item['rate'];
     $gst_pct       = (int)$item['gst_percentage'];
     $gst_type      = $item['gst_type'] ?? 'exclusive';
     $mrp           = (float)$item['mrp'];
@@ -371,11 +359,12 @@ Terms of Delivery<br/>&nbsp;
 ?>
 <tr>
 <td><?= $invno; ?></td>
-<td><b><?= htmlspecialchars($item['productName']); ?></b><?= $gst_type === 'inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
+<td><b><?= htmlspecialchars($item['productName']); ?></b></td>
 <td id="rightlaign"><?= htmlspecialchars($item['hsn']); ?></td>
 <td id="rightlaign"><?= inr_format($qty, 0); ?> Packs</td>
 <td id="rightlaign"><?= inr_format($mrp, 2); ?></td>
-<td id="rightlaign"><?= inr_format($rate, 2); ?></td>
+<td id="rightlaign"><?= inr_format($item['taxable_rate'], 2); ?></td>
+<td id="rightlaign"><?= inr_format($item['taxable_rate_incl'], 2); ?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?= $gst_pct; ?>%</td>
 <td id="rightlaign">0.00<br/>(0%)</td>
@@ -386,14 +375,14 @@ Terms of Delivery<br/>&nbsp;
 <tr>
 <td></td><td></td><td></td>
 <td id="rightlaign"><b><?= inr_format($Totalquantity123, 0); ?> Packs</b></td>
-<td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 
 <?php if ($discount_amount > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Discount</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
 </tr>
 <?php endif; ?>
@@ -403,12 +392,12 @@ Terms of Delivery<br/>&nbsp;
 ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>SGST</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>CGST</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
 </tr>
 <?php endif; ?>
@@ -416,14 +405,14 @@ Terms of Delivery<br/>&nbsp;
 <?php if ($courier_charges > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Total</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
 </tr>
 </table>
@@ -436,14 +425,6 @@ Terms of Delivery<br/>&nbsp;
 </tr>
 <tr>
 <td><b><?= $Currency_Name; ?> <?= ucwords($result); ?> Only</b></td>
-<td></td>
-</tr>
-<tr>
-<td style="padding-top:6px;font-size:13px;">Amount Taxable (in words)</td>
-<td align="right" style="font-size:13px;"><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></td>
-</tr>
-<tr>
-<td><b><?= $Currency_Name; ?> <?= ucwords($TXBresult); ?> Only</b></td>
 <td></td>
 </tr>
 </table>

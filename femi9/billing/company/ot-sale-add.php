@@ -79,7 +79,7 @@ $wallet_cats_json  = json_encode(array_map('strtolower', $wallet_categories));
 // ---------------------------------------------------------------
 // Fetch product list (once, reuse in table row)
 // ---------------------------------------------------------------
-$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
+$stmt_products = $db_conn->prepare("SELECT id, productName, category FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 $stmt_products->execute();
 $all_products = $stmt_products->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_products->close();
@@ -397,10 +397,10 @@ $stmt_states->close();
                                                     <tr>
                                                         <td><input type="checkbox" name="chk[]"></td>
                                                         <td>
-                                                            <select required name="product_id[]" class="form-control">
+                                                            <select required name="product_id[]" class="form-control" onchange="suggestInvoiceNumber(document.getElementById('catname').value)">
                                                                 <option value="" hidden>Select Product</option>
                                                                 <?php foreach ($all_products as $pr): ?>
-                                                                    <option value="<?= (int)$pr['id'] ?>">
+                                                                    <option value="<?= (int)$pr['id'] ?>" data-category="<?= $pr['category'] === 'diaper' ? 'diaper' : 'napkin' ?>">
                                                                         <?= htmlspecialchars($pr['productName'], ENT_QUOTES) ?>
                                                                     </option>
                                                                 <?php endforeach; ?>
@@ -510,6 +510,21 @@ $stmt_states->close();
     const TRACKED_INVOICE_CATS = ['WEBSITE', 'ID CONCEPT', 'WHATSAPP SALES'];
     let invoiceNumberIsDuplicate = false;
 
+    // True if ANY currently-selected product row is a diaper product — the
+    // invoice's series is diaper if even one line item is a diaper (diaper
+    // "wins" over napkin on a mixed cart). Re-checked on every row add/
+    // delete/product-change since this page (unlike the single-line-item
+    // customer/network invoice forms) has a real multi-row cart in the DOM
+    // before submit.
+    function cartHasDiaper() {
+        const selects = document.querySelectorAll('select[name="product_id[]"]');
+        for (const sel of selects) {
+            const opt = sel.options[sel.selectedIndex];
+            if (opt && opt.dataset.category === 'diaper') { return true; }
+        }
+        return false;
+    }
+
     function suggestInvoiceNumber(selectedCat) {
         const invField  = document.getElementById('inv_number');
         const warnEl    = document.getElementById('invoiceNumberWarning');
@@ -522,7 +537,8 @@ $stmt_states->close();
             return;
         }
 
-        fetch('ot-invoice-helper.php?action=next&cat=' + encodeURIComponent(selectedCat) + '&godownid=' + encodeURIComponent(godownid))
+        const category = cartHasDiaper() ? 'diaper' : 'napkin';
+        fetch('ot-invoice-helper.php?action=next&cat=' + encodeURIComponent(selectedCat) + '&godownid=' + encodeURIComponent(godownid) + '&category=' + category)
             .then(r => r.json())
             .then(data => {
                 if (data && data.number) {
@@ -632,6 +648,9 @@ $stmt_states->close();
         newRow.querySelectorAll('.item-qty, .item-rate, .item-discount').forEach(inp => {
             inp.addEventListener('input', recalculateGrandTotal);
         });
+        newRow.querySelectorAll('select[name="product_id[]"]').forEach(sel => {
+            sel.addEventListener('change', () => suggestInvoiceNumber(document.getElementById('catname').value));
+        });
         table.appendChild(newRow);
     }
 
@@ -649,6 +668,7 @@ $stmt_states->close();
             }
         }
         recalculateGrandTotal();
+        suggestInvoiceNumber(document.getElementById('catname').value);
     }
 
     // ----------------------------------------------------------------

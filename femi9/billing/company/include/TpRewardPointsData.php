@@ -125,17 +125,26 @@ function getTpRewardPointsData(string $current_from_date, string $current_to_dat
     }
 
     // ── Sales Points ───────────────────────────────────────────────────────────
-    // Separate from Purchase Points: this counts what the TP sold onward to a
-    // shop/customer (user_invoice, from_user_type='territory_partner'), not
+    // Separate from Purchase Points: this counts what the TP sold onward, not
     // what the TP bought from the company (tp_invoices). Same total/100
-    // convention as Purchase Points. Shown as its own column and deliberately
-    // NOT included in Total Points — it's informational only, per request.
+    // convention as Purchase Points. Two sources, combined to match Total
+    // Revenue's scope on the TP MIS report (customer + shop sales):
+    //  - Shop sales (user_invoice, from_user_type='territory_partner'), gated
+    //    by rwpoints_enable=1, matching how company login gates its own sales
+    //    points (reward_points.php) — only invoices the company has flagged
+    //    as reward-eligible count.
+    //  - Customer sales (invoice, user_type='territory_partner') — this table
+    //    has no rwpoints_enable column (see territory-partner/cnote_action.php),
+    //    so these are ungated, same as company login's customer sales points.
+    // Shown as its own column and deliberately NOT included in Total Points —
+    // it's informational only, per request.
     $stmt = $pdo->prepare("
         SELECT from_user_id AS user_id,
                COALESCE(SUM(total) / 100, 0) AS sales_points
         FROM user_invoice
         WHERE from_user_type = 'territory_partner'
           AND sub_total > 0
+          AND rwpoints_enable = 1
           AND date BETWEEN :from_date AND :to_date
         GROUP BY from_user_id
     ");
@@ -143,6 +152,20 @@ function getTpRewardPointsData(string $current_from_date, string $current_to_dat
     $sales_data = [];
     foreach ($stmt->fetchAll() as $row) {
         $sales_data[$row['user_id']] = (float)$row['sales_points'];
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT user_id,
+               COALESCE(SUM(total) / 100, 0) AS sales_points
+        FROM invoice
+        WHERE user_type = 'territory_partner'
+          AND sub_total > 0
+          AND date BETWEEN :from_date AND :to_date
+        GROUP BY user_id
+    ");
+    $stmt->execute([':from_date' => $current_from_date, ':to_date' => $current_to_date]);
+    foreach ($stmt->fetchAll() as $row) {
+        $sales_data[$row['user_id']] = ($sales_data[$row['user_id']] ?? 0) + (float)$row['sales_points'];
     }
 
     // ── Daily Login Points ─────────────────────────────────────────────────────

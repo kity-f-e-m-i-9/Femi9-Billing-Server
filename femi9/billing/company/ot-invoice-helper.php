@@ -15,13 +15,20 @@ $action     = $_GET['action'] ?? '';
 $cat        = trim($_GET['cat'] ?? '');
 $inv_number = trim($_GET['inv_number'] ?? '');
 $godownid   = (int)($_GET['godownid'] ?? 0);
+// 'diaper' if the cart being invoiced has any diaper line item, else 'napkin'
+// (default) — decided client-side by ot-sale-add.php's cartHasDiaper(), since
+// this endpoint has no cart access of its own. Diaper "wins" on a mixed cart.
+$category   = ($_GET['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin';
 
 if (!isset($prefixMap[$cat])) {
     echo json_encode(['error' => 'not tracked']);
     exit;
 }
 
-$prefix = $prefixMap[$cat];
+// Diaper series reuses the same channel prefix with a trailing "D" (e.g.
+// WEB -> WEBD, ID -> IDD, WA -> WAD), same convention as the network/shop
+// and customer invoice series (see InvoiceNumberSuggest.php).
+$prefix = $prefixMap[$cat] . ($category === 'diaper' ? 'D' : '');
 
 // Indian financial year (Apr–Mar), e.g. 2026-07-22 -> "26-27"
 $month = (int)date('n');

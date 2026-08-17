@@ -27,6 +27,14 @@ if(empty($Invoice_ID)) {
     die("Error: Invalid Invoice ID");
 }
 
+// Needed early for the Tax Invoice / Bill of Supply heading, as well as
+// later in the GST summary section — computed once here rather than twice.
+$select_sum_gstamount = "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id='$Invoice_ID'";
+$fetch_sum_gstamount = mysqli_query($db_conn, $select_sum_gstamount);
+$result_sum_gstamount = mysqli_fetch_array($fetch_sum_gstamount);
+$totalgstamount = $result_sum_gstamount[0];
+$invoice_heading = $totalgstamount > 0 ? 'Tax Invoice' : 'Bill of Supply';
+
 // Fetch Invoice Details
 $select_Invoice_Details = "SELECT * FROM user_invoice WHERE inv_id='$Invoice_ID'";
 $fetch_Invoice_Details = mysqli_query($db_conn, $select_Invoice_Details);
@@ -344,7 +352,7 @@ if($get_ccode == "Default" || $get_ccode == NULL) {
 
 <table id="toptl">
 <tr>
-<td>Bill of Supply</td>
+<td><?=htmlspecialchars($invoice_heading);?></td>
 </tr>
 </table>
 
@@ -527,10 +535,8 @@ while($result_INVProductDetails = mysqli_fetch_array($fetch_INVProductDetails)) 
 <?php 
 $gsttype = $result_Invoice_Details['gst_type'];
 
-$select_sum_gstamount = "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id='$Invoice_ID'";
-$fetch_sum_gstamount = mysqli_query($db_conn, $select_sum_gstamount);
-$result_sum_gstamount = mysqli_fetch_array($fetch_sum_gstamount);
-$totalgstamount = $result_sum_gstamount[0];
+// $totalgstamount already computed near the top of the file (needed early
+// for the Tax Invoice / Bill of Supply heading).
 
 if($totalgstamount > 0) {
     if($gsttype == "inner") {

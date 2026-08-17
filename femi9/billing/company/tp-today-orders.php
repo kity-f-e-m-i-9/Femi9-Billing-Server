@@ -34,7 +34,10 @@ if ($filterSubmitted) {
     $statusFilter = 'waiting';
 }
 
-$whereSql = 'WHERE 1=1';
+// SS-routed orders belong exclusively to that SS's own queue
+// (super-stockist/tp-today-orders.php) — excluded here so they never appear
+// twice or get double-approved.
+$whereSql = "WHERE o.approver_type = 'company'";
 $bindTypes = '';
 $bindValues = [];
 if ($filterSubmitted) {
@@ -186,6 +189,7 @@ if (!empty($tpDbIds)) {
         "SELECT territory_partner_id, COALESCE(SUM(balance_amount), 0) AS bal
          FROM tp_advance_payments
          WHERE territory_partner_id IN ($placeholders) AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
+           AND approver_type = 'company'
          GROUP BY territory_partner_id"
     );
     $stmtB->bind_param($types, ...$tpDbIds);
@@ -201,6 +205,7 @@ if (!empty($tpDbIds)) {
         "SELECT territory_partner_id, COUNT(*) AS cnt
          FROM tp_advance_payment_submissions
          WHERE territory_partner_id IN ($placeholders) AND status IN ('pending_review', 'accepted')
+           AND approver_type = 'company'
          GROUP BY territory_partner_id"
     );
     $stmtP->bind_param($types, ...$tpDbIds);

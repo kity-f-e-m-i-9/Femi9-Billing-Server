@@ -225,6 +225,9 @@ if($LoginPasswordCheck=="12345678")
 		                            <li><a href="manage-tp-invoices">Manage Invoice</a></li>
                             <li><a href="add-tp-advance-payment">Add TP Payment Entry</a></li>
                             <li><a href="manage-tp-advance-payments">Manage TP Payments</a></li>
+                            <li><a href="tp-today-orders">TP Purchase Orders</a></li>
+                            <li><a href="tp-po-screenshot-review">PO Screenshot Review</a></li>
+                            <li><a href="manage-tp-advance-submissions">TP Advance Submissions</a></li>
                         </ul>
                     </li>
 					 

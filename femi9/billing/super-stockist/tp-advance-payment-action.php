@@ -50,16 +50,23 @@ try {
     if (!$chk->get_result()->fetch_assoc()) throw new \Exception("Territory partner not found under your account.");
     $chk->close();
 
+    // This SS's own numeric id — approver_ss_id is always stored as this,
+    // never the varchar temp_id. A payment recorded directly by an SS is
+    // always their own pool (unlike invoices/POs, tp_advance_payments has
+    // no product/line-item link, so no GST override applies here).
+    $ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
+    $approver_type = 'ss';
+
     $balance  = $amount;
     $adjusted = 0.00;
     $status   = 'active';
 
     $s = $db_conn->prepare("INSERT INTO tp_advance_payments
-        (territory_partner_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
+        (territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
          adjusted_amount, balance_amount, status, created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("idssssssdss",
-        $tp_id, $amount, $payment_date, $payment_mode, $reference_num, $bank_name, $remarks,
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $s->bind_param("isidssssssdss",
+        $tp_id, $approver_type, $ss_account_id, $amount, $payment_date, $payment_mode, $reference_num, $bank_name, $remarks,
         $adjusted, $balance, $status, $created_by);
     if (!$s->execute()) throw new \Exception("Insert failed: " . $s->error);
     $s->close();

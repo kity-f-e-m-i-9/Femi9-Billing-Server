@@ -4,6 +4,8 @@ error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
+$ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
+
 // Only TPs onboarded by this SS
 $tp_stmt = $db_conn->prepare("SELECT id, tp_id, name, mobile FROM territory_partners WHERE is_active=1 AND onboard_ss_id=? ORDER BY name");
 $tp_stmt->bind_param("s", $Login_user_IDvl);
@@ -11,6 +13,38 @@ $tp_stmt->execute();
 $tps = $tp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $tp_stmt->close();
 
+// Arriving from tp-today-orders.php's "Invoice" button on an SS-routed PO —
+// prefill the TP and requested line items so the SS isn't re-typing what the
+// TP already ordered. Only honored when the PO is actually routed to this
+// SS and still waiting, same ownership check every other SS PO action uses.
+$po_id = (int)($_GET['po_id'] ?? 0);
+$poData = null;
+if ($po_id > 0) {
+    $poStmt = $db_conn->prepare(
+        "SELECT o.id, o.territory_partner_id, tp.name AS tp_name, tp.tp_id AS tp_code
+         FROM tp_purchase_orders o
+         JOIN territory_partners tp ON tp.id = o.territory_partner_id
+         WHERE o.id = ? AND tp.onboard_ss_id = ? AND o.approver_type = 'ss' AND o.approver_ss_id = ? AND o.status = 'waiting'"
+    );
+    $poStmt->bind_param("isi", $po_id, $Login_user_IDvl, $ss_account_id);
+    $poStmt->execute();
+    $poRow = $poStmt->get_result()->fetch_assoc();
+    $poStmt->close();
+
+    if ($poRow) {
+        $itemsStmt = $db_conn->prepare("SELECT product_id, qty, price FROM tp_purchase_order_items WHERE po_id = ?");
+        $itemsStmt->bind_param("i", $po_id);
+        $itemsStmt->execute();
+        $poItems = $itemsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $itemsStmt->close();
+
+        $poData = [
+            'po_id' => $po_id,
+            'tp_id' => (int)$poRow['territory_partner_id'],
+            'items' => $poItems,
+        ];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -153,6 +187,9 @@ $tp_stmt->close();
                     <form action="tp-invoice-action" method="post" id="invoiceForm">
                         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         <input type="hidden" name="action" value="insert-tp-invoice">
+                        <?php if ($poData): ?>
+                        <input type="hidden" name="po_id" value="<?php echo (int)$poData['po_id']; ?>">
+                        <?php endif; ?>
                         <div id="hiddenProductInputs"></div>
 
                         <div class="form-section">
@@ -354,6 +391,7 @@ $(document).ready(function() {
     var invNumberOk       = false;
     var invNumberTimer    = null;
     var rowSeq             = 0;
+    var poData = <?php echo $poData ? json_encode($poData, JSON_UNESCAPED_UNICODE) : 'null'; ?>;
 
     $('#invNumberInput').on('input', function () {
         var val = $(this).val().trim();
@@ -424,6 +462,10 @@ $(document).ready(function() {
         loadSsProducts();
     });
 
+    if (poData && poData.tp_id) {
+        $('#tpSelect').val(String(poData.tp_id)).trigger('change');
+    }
+
     function loadSsProducts() {
         $.getJSON('get-ss-tp-products.php?tp_id=' + currentTpId, function (data) {
             availableProducts = data || [];
@@ -433,7 +475,21 @@ $(document).ready(function() {
                 renumberRows();
                 return;
             }
-            addProductRow();
+            if (poData && poData.tp_id === currentTpId && poData.items && poData.items.length) {
+                // Prefill from the originating PO's requested items instead of
+                // one blank row — the SS still reviews/edits qty & rate before
+                // submitting, same as they would for any other invoice.
+                $.each(poData.items, function (_, item) {
+                    addProductRow();
+                    var $tr = $('#productBody .product-row').last();
+                    $tr.find('.row-product-select').val(String(item.product_id)).trigger('change');
+                    $tr.find('.row-qty').val(item.qty);
+                    $tr.find('.row-rate').val(parseFloat(item.price).toFixed(2));
+                    updateRowAmount($tr);
+                });
+            } else {
+                addProductRow();
+            }
         }).fail(function () {
             showAddError('Error loading products. Please refresh.');
         });

@@ -54,6 +54,7 @@ while ($row = mysqli_fetch_array($fetch_INVProductDetails)) {
     $row['taxable_value'] = $taxable_value;
     $row['gst_amount']    = $gst_amount;
     $row['taxable_rate']  = $qty > 0 ? $gross_taxable_value / $qty : 0;
+    $row['taxable_rate_incl'] = $row['taxable_rate'] + ($gst_pct > 0 ? $row['taxable_rate'] * $gst_pct / 100 : 0);
     $row['gst_pct']       = $gst_pct;
     $row['gst_type_item'] = $gst_type_item;
     $invoice_items[] = $row;
@@ -373,7 +374,8 @@ Terms of Delivery<br/>
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
 <td id="rightlaign">MRP</td>
-<td id="rightlaign">Rate</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
@@ -392,6 +394,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"><?=$qty?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_INVProductDetails['p_mrp'], 2);?></td>
 <td id="rightlaign"><?php echo inr_format($result_INVProductDetails['taxable_rate'], 2);?></td>
+<td id="rightlaign"><?php echo inr_format($result_INVProductDetails['taxable_rate_incl'], 2);?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?=$result_INVProductDetails['gst_pct'];?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=$discountpercentage_show;?>%)</td>
@@ -400,7 +403,7 @@ Terms of Delivery<br/>
 
 	<?php endforeach; ?>
 	<tr>
-	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 	<td></td>
 	</tr>
 
@@ -410,7 +413,7 @@ Terms of Delivery<br/>
 <td></td>
 <td id="rightlaign"><b><?=$Totalquantity123;?> Packs</b></td>
 <td></td>
-<td></td><td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($TotalAMount123, 2);?></b></td>
 </tr>
 
@@ -438,7 +441,7 @@ $CGST=inr_format($CGST, 2);
 <td id="rightlaign"></td>
 <td></td>
 <td></td>
-<td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=$SGST;?></b></td>
 </tr>
 <tr id="bottombordervl">
@@ -448,7 +451,7 @@ $CGST=inr_format($CGST, 2);
 <td id="rightlaign"></td>
 <td></td>
 <td></td>
-<td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=$CGST;?></b></td>
 </tr>
 <?php }else{?>
@@ -459,7 +462,7 @@ $CGST=inr_format($CGST, 2);
 <td id="rightlaign"></td>
 <td></td>
 <td></td>
-<td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=inr_format($totalgstamount, 2);?></b></td>
 </tr>
 <?php }} ?>
@@ -476,7 +479,7 @@ $CGST=inr_format($CGST, 2);
 <td id="rightlaign"></td>
 <td></td>
 <td></td>
-<td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($result_Invoice_Details['discount'], 2);?></b></td>
 </tr>
 <?php }?>
@@ -490,7 +493,7 @@ $CGST=inr_format($CGST, 2);
 <td></td>
 <td></td>
 <td></td>
-<td></td><td></td>
+<td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=inr_format($result_Invoice_Details['roundoff'], 2);?></b></td>
 </tr>
 <?php }?>
@@ -501,6 +504,7 @@ $CGST=inr_format($CGST, 2);
 <td id="rightlaign"><b><i>Courier Charges</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -517,7 +521,7 @@ $CGST=inr_format($CGST, 2);
 <td id="rightlaign"></td>
 <td></td>
 <td></td>
-<td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($result_Invoice_Details['total'], 2);?></b></td>
 </tr>
 </table>
@@ -569,6 +573,18 @@ $number = $result_Invoice_Details['total'];
   //echo $result;
  ?> 
 
+
+<table width="100%">
+<tr>
+<td width="70%">Amount Chargeable (in words)</td>
+<td align="right">E. & O.E</td>
+</tr>
+<tr>
+<td><b><?=$Currency_Name;?> <?=ucwords($result);?> Only</b></td>
+<td></td>
+</tr>
+</table>
+
 <?php
 // Taxable amount in words — same three-way (chargeable/taxable/tax) word
 // breakdown as tp-invoice-print.php.
@@ -588,14 +604,6 @@ $TXBstr = array_reverse($TXBstr); $TXBresult = implode('', $TXBstr);
 ?>
 
 <table width="100%">
-<tr>
-<td width="70%">Amount Chargeable (in words)</td>
-<td align="right">E. & O.E</td>
-</tr>
-<tr>
-<td><b><?=$Currency_Name;?> <?=ucwords($result);?> Only</b></td>
-<td></td>
-</tr>
 <tr>
 <td style="padding-top:6px;font-size:13px;">Amount Taxable (in words)</td>
 <td align="right" style="font-size:13px;"><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($TotalAMount123, 2);?></td>

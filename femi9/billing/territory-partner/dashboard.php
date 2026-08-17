@@ -2,10 +2,12 @@
 include("checksession.php");
 include("config.php");
 include("insert_wallet_referral.php");
+require_once(__DIR__ . '/../shared/TpApproverContext.php');
 
 // ── Safe defaults (used if try block below fails for any reason) ─────────────
 $locCount    = 0; $invCount    = 0; $advBalance = 0; $totalTarget = 0;
 $productsSold = 0; $paidRevenue = 0; $stockList  = [];
+$advBalanceCompany = 0; $advBalanceSs = 0; $assignedSs = null;
 
 try {
 
@@ -55,7 +57,10 @@ mysqli_stmt_close($shopInvStmt);
 
 $invCount = $custInvCount + $shopInvCount;
 
-// Advance balance
+// Advance balance — total across both approver pools; when the TP is
+// SS-assigned, also broken out per pool below so this tile can't be read as
+// "spendable against either approver" when it's really a sum of two
+// independent balances (see add-purchase-order.php for the per-approver gate).
 $balStmt = mysqli_prepare($db_conn,
     "SELECT COALESCE(SUM(balance_amount), 0) AS bal
      FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL"
@@ -64,6 +69,27 @@ mysqli_stmt_bind_param($balStmt, "i", $Login_user_IDvl);
 mysqli_stmt_execute($balStmt);
 $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
 mysqli_stmt_close($balStmt);
+
+$assignedSs = tpGetAssignedSs($db_conn, (int)$Login_user_IDvl);
+if ($assignedSs !== null) {
+    $balCoStmt = mysqli_prepare($db_conn,
+        "SELECT COALESCE(SUM(balance_amount), 0) AS bal
+         FROM tp_advance_payments WHERE territory_partner_id = ? AND approver_type='company' AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL"
+    );
+    mysqli_stmt_bind_param($balCoStmt, "i", $Login_user_IDvl);
+    mysqli_stmt_execute($balCoStmt);
+    $advBalanceCompany = (float)(mysqli_stmt_get_result($balCoStmt)->fetch_assoc()['bal'] ?? 0);
+    mysqli_stmt_close($balCoStmt);
+
+    $balSsStmt = mysqli_prepare($db_conn,
+        "SELECT COALESCE(SUM(balance_amount), 0) AS bal
+         FROM tp_advance_payments WHERE territory_partner_id = ? AND approver_type='ss' AND approver_ss_id=? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL"
+    );
+    mysqli_stmt_bind_param($balSsStmt, "ii", $Login_user_IDvl, $assignedSs['id']);
+    mysqli_stmt_execute($balSsStmt);
+    $advBalanceSs = (float)(mysqli_stmt_get_result($balSsStmt)->fetch_assoc()['bal'] ?? 0);
+    mysqli_stmt_close($balSsStmt);
+}
 
 // Total target
 $targetStmt = mysqli_prepare($db_conn,
@@ -280,6 +306,12 @@ mysqli_stmt_close($stockListStmt);
                                                             <div class="widget-stats-content flex-fill">
                                                                 <span class="widget-stats-title">Advance Balance</span>
                                                                 <span class="widget-stats-amount">₹<?php echo inr_format($advBalance, 2); ?></span>
+                                                                <?php if ($assignedSs !== null): ?>
+                                                                <div style="font-size:11px;color:#6b7280;margin-top:2px;">
+                                                                    Company: ₹<?php echo inr_format($advBalanceCompany, 2); ?> &middot;
+                                                                    <?php echo htmlspecialchars($assignedSs['name']); ?>: ₹<?php echo inr_format($advBalanceSs, 2); ?>
+                                                                </div>
+                                                                <?php endif; ?>
                                                             </div>
                                                         </div>
                                                     </div>

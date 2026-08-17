@@ -87,7 +87,7 @@ if ((int)$chk['n'] === 0) {
           user_type,user_id,gst_type,roundoff,courier_charges,buyer_gsttype)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
     );
-    $s->bind_param('sssssssssssisss',
+    $s->bind_param('sssssssssssssss',
         $inv_id, $zero, $inv_number, $customer_id, $date, $inv_year, $zero, $zero, $zero,
         $Login_user_TYPEvl, $tp_id, $gst_type, $zero, $zero, $buyer_gsttype
     );

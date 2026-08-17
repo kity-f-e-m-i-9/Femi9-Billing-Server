@@ -12,6 +12,14 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 // down there.
 $gsttype=$result_Invoice_Details['gst_type'];
 
+// Also needed early for the Tax Invoice / Bill of Supply heading below —
+// same query the GST summary section further down reuses via $totalgstamount.
+$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
+$fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
+$result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
+$totalgstamount=$result_sum_gstamount[0];
+$invoice_heading = $totalgstamount > 0 ? 'Tax Invoice' : 'Bill of Supply';
+
 // Trims a rate like 1.50 down to "1.5" or 9.00 down to "9" — CGST/SGST is
 // always exactly half the item's GST%, which is often a non-whole number
 // (e.g. 3% GST -> 1.5% + 1.5%), so this avoids both misleading rounding
@@ -283,7 +291,7 @@ while($result_currency=mysqli_fetch_array($fetch_currency))
 
 <table id="toptl">
 <tr>
-<td>Bill of Supply</td>
+<td><?=htmlspecialchars($invoice_heading);?></td>
 </tr>
 </table>
 
@@ -404,7 +412,8 @@ Terms of Delivery<br/>
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
 <td id="rightlaign">MRP</td>
-<td id="rightlaign">Rate</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
@@ -437,6 +446,8 @@ Terms of Delivery<br/>
 		$Totalquantity123+=$Totalquantity;
 
 		$taxable_rate = $Totalquantity > 0 ? $TotalAMount23 / $Totalquantity : 0;
+		$gst_pct_item = (float)$result_INVProductDetails['gst_percentage'];
+		$taxable_rate_incl = $taxable_rate + ($gst_pct_item > 0 ? $taxable_rate * $gst_pct_item / 100 : 0);
 
 		$discountamount_show=inr_format($result_INVProductDetails['discount_amount'], 2);
 		$discountpercentage_show=inr_format($result_INVProductDetails['discount_percentage'], 0);
@@ -448,6 +459,7 @@ Terms of Delivery<br/>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2);?></td>
 <td id="rightlaign"><?php echo inr_format($taxable_rate, 2);?></td>
+<td id="rightlaign"><?php echo inr_format($taxable_rate_incl, 2);?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?=$result_INVProductDetails['gst_percentage'];?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=$discountpercentage_show;?>%)</td>
@@ -456,7 +468,7 @@ Terms of Delivery<br/>
 
 	<?php } ?>
 	<tr>
-	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 	<td></td>
 	</tr>
 
@@ -470,6 +482,7 @@ Terms of Delivery<br/>
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($TotalAMount123, 2);?></b></td>
 </tr>
 
@@ -477,11 +490,8 @@ Terms of Delivery<br/>
 <!------------------------------------------------------------------>
 <!------------------------------GST--------------------------------->
 <?php
-$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
-$fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
-$result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
-$totalgstamount=$result_sum_gstamount[0];
-
+// $totalgstamount already computed near the top of the file for the
+// Tax Invoice / Bill of Supply heading — reused here.
 if($totalgstamount>0)
 {
 // Rate shown alongside the SGST/CGST/IGST label below — MAX() rather than
@@ -510,6 +520,7 @@ $__half_pct = fmt_gst_pct($__inv_gst_pct / 2);
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=$SGST;?></b></td>
 </tr>
 <tr id="bottombordervl">
@@ -517,6 +528,7 @@ $__half_pct = fmt_gst_pct($__inv_gst_pct / 2);
 <td id="rightlaign"><b><i>CGST (<?=$__half_pct;?>%)</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -530,6 +542,7 @@ $__half_pct = fmt_gst_pct($__inv_gst_pct / 2);
 <td id="rightlaign"><b><i>IGST (<?=fmt_gst_pct($__inv_gst_pct);?>%)</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -555,6 +568,7 @@ if($discountamount>0){?>
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($discountamount, 2);?></b></td>
 </tr>
 <?php }?>
@@ -565,6 +579,7 @@ if($discountamount>0){?>
 <td id="rightlaign"><b><i>Round off</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -585,6 +600,7 @@ if($discountamount>0){?>
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 <td id="rightlaign"><b><?=$Currency_symbol;?>&nbsp;<?=inr_format($result_Invoice_Details['courier_charges'], 2);?></b></td>
 </tr>
 <?php }?>
@@ -594,6 +610,7 @@ if($discountamount>0){?>
 <td id="rightlaign"><b><i>Total</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>

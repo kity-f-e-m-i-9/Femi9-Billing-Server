@@ -3,6 +3,7 @@ ob_start();
 include("checksession.php");
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
+require_once __DIR__ . '/../shared/TpApproverContext.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
     header("Location: manage-tp-invoices?error=unauthorized"); exit;
@@ -47,15 +48,25 @@ function insertTpLedger(mysqli $db, int $tp_id, int $pid, int $qty, int $before,
     $s->execute(); $s->close();
 }
 
-function getTpAdvanceBalance(mysqli $db, int $tp_id): float {
-    $s = $db->prepare("SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted'");
-    $s->bind_param("i", $tp_id); $s->execute();
+function getTpAdvanceBalance(mysqli $db, int $tp_id, ?array $approver = null): float {
+    $sql = "SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted'";
+    $types = "i";
+    $params = [$tp_id];
+    if ($approver !== null) {
+        $sql .= " AND approver_type=? AND approver_ss_id<=>?";
+        $types .= "si";
+        $params[] = $approver['type'];
+        $params[] = $approver['ss_id'];
+    }
+    $s = $db->prepare($sql);
+    $s->bind_param($types, ...$params);
+    $s->execute();
     $r = $s->get_result()->fetch_assoc(); $s->close();
     return round((float)$r['bal'], 2);
 }
 
-function deductTpAdvance(mysqli $db, int $tp_id, float $required, string $inv_num, int $tp_invoice_id = 0): void {
-    tpAdvanceDeduct($db, $tp_invoice_id, $inv_num, $tp_id, $required);
+function deductTpAdvance(mysqli $db, int $tp_id, float $required, string $inv_num, int $tp_invoice_id = 0, ?array $approver = null): void {
+    tpAdvanceDeduct($db, $tp_invoice_id, $inv_num, $tp_id, $required, 0, $approver);
 }
 
 // ── Schema migration ──────────────────────────────────────────────────────────
@@ -106,6 +117,7 @@ if ($col3 && $col3->num_rows === 0) {
 }
 
 // ── Input & validation ────────────────────────────────────────────────────────
+$po_id            = (int)($_POST['po_id'] ?? 0);
 $tp_id            = (int)($_POST['tp_id'] ?? 0);
 $inv_num          = trim(str_replace("'", "", $_POST['inv_number'] ?? ''));
 $invoice_date     = trim($_POST['invoice_date'] ?? date('Y-m-d'));
@@ -171,6 +183,21 @@ if (empty($items)) {
     header("Location: add-tp-invoice?error=noproducts"); exit;
 }
 
+// GST products stay under Company regardless of who invoices them — an SS
+// creating an invoice with even one GST line item still gets tagged
+// approver_type='company' here, same rule the historical backfill applied
+// (see db_migrations/2026_08_12_tp_invoice_approver_gst_backfill.sql).
+$pidPlaceholders = implode(',', array_fill(0, count($items), '?'));
+$pidTypes = str_repeat('i', count($items));
+$gstStmt = $db_conn->prepare("SELECT COUNT(*) AS cnt FROM products WHERE id IN ($pidPlaceholders) AND gst > 0");
+$gstStmt->bind_param($pidTypes, ...array_column($items, 'pid'));
+$gstStmt->execute();
+$hasGstItem = (int)($gstStmt->get_result()->fetch_assoc()['cnt'] ?? 0) > 0;
+$gstStmt->close();
+
+$invoiceApproverType   = $hasGstItem ? 'company' : 'ss';
+$invoiceApproverSsId   = $hasGstItem ? null : $ss_account_id;
+
 // Gross subtotal minus each line's own discount, then the invoice-level
 // "Additional Discount" field on top of that.
 $gross_subtotal   = round(array_sum(array_column($items, 'amount')), 2);
@@ -181,8 +208,13 @@ $net_amount    = round($subtotal - $discount_amount, 2);
 if ($net_amount < 0) $net_amount = 0;
 $invoice_total = round($net_amount + $courier_charges, 2);
 
+// This SS's own direct-invoice flow — always draws from this TP's
+// SS-approved balance pool (the one scoped to this exact SS), never the
+// company pool, regardless of which approver a given PO was routed to.
+$invoiceApprover = ['type' => 'ss', 'ss_id' => $ss_account_id];
+
 // Pre-validate advance balance
-$avail_balance = getTpAdvanceBalance($db_conn, $tp_id);
+$avail_balance = getTpAdvanceBalance($db_conn, $tp_id, $invoiceApprover);
 if ($avail_balance < $net_amount) {
     header("Location: add-tp-invoice?error=nobalance&need=" . urlencode(inr_format($net_amount, 2)) . "&have=" . urlencode(inr_format($avail_balance, 2))); exit;
 }
@@ -214,8 +246,8 @@ try {
     $null_src = null;
     $zero_src = 0;
     $created_by_user_type = 'super_stockiest';
-    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by,created_by_user_type,created_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("siiiisdddsss", $inv_num, $tp_id, $null_src, $zero_src, $zero_src, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type, $ss_account_id);
+    $s = $db_conn->prepare("INSERT INTO tp_invoices (invoice_number,territory_partner_id,approver_type,approver_ss_id,source_location_id,source_cp_id,source_godown_id,invoice_date,courier_charges,discount_amount,total_amount,created_by,created_by_user_type,created_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $s->bind_param("sisiiiisdddsss", $inv_num, $tp_id, $invoiceApproverType, $invoiceApproverSsId, $null_src, $zero_src, $zero_src, $invoice_date, $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type, $ss_account_id);
     $s->execute();
     $invoice_id = $db_conn->insert_id;
     $s->close();
@@ -245,7 +277,23 @@ try {
     $s_item->close();
 
     // Deduct net amount from advance
-    deductTpAdvance($db_conn, $tp_id, $net_amount, $inv_num, $invoice_id);
+    deductTpAdvance($db_conn, $tp_id, $net_amount, $inv_num, $invoice_id, $invoiceApprover);
+
+    // Mark the originating purchase order (if this invoice was raised from
+    // tp-today-orders.php's "Invoice" button) as completed and link it —
+    // mirrors company/tp-invoice-action.php's same handling. Ownership
+    // (routed to this SS) was already verified when add-tp-invoice.php
+    // prefilled from it; re-verify here too since po_id is client-submitted.
+    if ($po_id > 0) {
+        $s_po = $db_conn->prepare(
+            "UPDATE tp_purchase_orders
+             SET status='completed', tp_invoice_id=?, cancelled_at=NULL, cancelled_by=NULL, cancel_reason=NULL
+             WHERE id=? AND territory_partner_id=? AND approver_type='ss' AND approver_ss_id=? AND status IN ('waiting','cancelled')"
+        );
+        $s_po->bind_param("iiii", $invoice_id, $po_id, $tp_id, $ss_account_id);
+        $s_po->execute();
+        $s_po->close();
+    }
 
     $db_conn->commit();
     header("Location: manage-tp-invoices?success=1&inv=" . urlencode($inv_num)); exit;

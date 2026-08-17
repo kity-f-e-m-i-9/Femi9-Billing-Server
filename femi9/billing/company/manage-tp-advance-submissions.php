@@ -43,8 +43,10 @@ if ($filterSubmitted) {
 
 // Drafts (status='draft') are still-in-progress TP uploads not yet
 // submitted for review — never shown here, same as a PO's po_id IS NULL
-// screenshots never appearing on tp-today-orders.php.
-$whereSql = "WHERE sub.status != 'draft'";
+// screenshots never appearing on tp-today-orders.php. SS-routed submissions
+// belong exclusively to that SS's own queue
+// (super-stockist/manage-tp-advance-submissions.php).
+$whereSql = "WHERE sub.status != 'draft' AND sub.approver_type = 'company'";
 $bindTypes = '';
 $bindValues = [];
 if ($filterSubmitted) {

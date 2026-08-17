@@ -88,15 +88,20 @@ try {
     $balance = $amount;
     $status = 'active';
 
+    // Company-side conversion — the screenshot's parent PO is guaranteed
+    // company-routed (company/tp-today-orders.php only shows those), so this
+    // always credits the company-approved pool.
+    $approverType = 'company';
+    $approverSsId = null;
     $ins = $db_conn->prepare(
         "INSERT INTO tp_advance_payments
-            (company_id, territory_partner_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
+            (company_id, territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
              adjusted_amount, balance_amount, status, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
     );
     $ins->bind_param(
-        'iidssssssdss',
-        $companyId, $tpId, $amount, $paymentDate, $paymentMode, $referenceNum, $bankName, $remarks,
+        'iisidsssssddss',
+        $companyId, $tpId, $approverType, $approverSsId, $amount, $paymentDate, $paymentMode, $referenceNum, $bankName, $remarks,
         $adjusted, $balance, $status, $createdBy
     );
     if (!$ins->execute()) throw new \Exception('Insert failed: ' . $ins->error);

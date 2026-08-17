@@ -74,19 +74,35 @@ $purchaseResult = executeQueryRow_tp($db_conn, $purchaseQuery, [(int)$userId, $c
 $purchasePoints = (float)($purchaseResult['purchase_points'] ?? 0);
 $invoiceCount   = (int)($purchaseResult['invoice_count'] ?? 0);
 
-// 1b. Sales Points — what this TP sold onward to a shop/customer
-// (user_invoice, from_user_type='territory_partner'), separate from Purchase
-// Points above (which is what the TP bought FROM the company). Same
-// total/100 convention as Purchase Points. Shown as its own figure and
-// deliberately NOT included in Total Points, same as the company view.
-$salesQuery = "
+// 1b. Sales Points — what this TP sold onward, separate from Purchase Points
+// above (which is what the TP bought FROM the company). Same total/100
+// convention as Purchase Points. Two sources, combined to match Total
+// Revenue's scope on the TP MIS report (customer + shop sales):
+//  - Shop sales (user_invoice, from_user_type='territory_partner'), gated by
+//    rwpoints_enable=1, matching how company login gates its own sales
+//    points (reward_points.php) — only invoices the company has flagged as
+//    reward-eligible count.
+//  - Customer sales (invoice, user_type='territory_partner') — this table
+//    has no rwpoints_enable column (see cnote_action.php), so these are
+//    ungated, same as company login's customer sales points.
+// Shown as its own figure and deliberately NOT included in Total Points,
+// same as the company view.
+$shopSalesQuery = "
     SELECT COALESCE(SUM(total) / 100, 0) AS sales_points, COUNT(*) AS sales_invoice_count
     FROM user_invoice
-    WHERE from_user_type = ? AND from_user_id = ? AND sub_total > 0 AND date BETWEEN ? AND ?
+    WHERE from_user_type = ? AND from_user_id = ? AND sub_total > 0 AND rwpoints_enable = 1 AND date BETWEEN ? AND ?
 ";
-$salesResult = executeQueryRow_tp($db_conn, $salesQuery, [$userType, $userId, $currentFromDate, $currentToDate], 'ssss');
-$salesPoints = (float)($salesResult['sales_points'] ?? 0);
-$salesInvoiceCount = (int)($salesResult['sales_invoice_count'] ?? 0);
+$shopSalesResult = executeQueryRow_tp($db_conn, $shopSalesQuery, [$userType, $userId, $currentFromDate, $currentToDate], 'ssss');
+
+$custSalesQuery = "
+    SELECT COALESCE(SUM(total) / 100, 0) AS sales_points, COUNT(*) AS sales_invoice_count
+    FROM invoice
+    WHERE user_type = ? AND user_id = ? AND sub_total > 0 AND date BETWEEN ? AND ?
+";
+$custSalesResult = executeQueryRow_tp($db_conn, $custSalesQuery, [$userType, $userId, $currentFromDate, $currentToDate], 'ssss');
+
+$salesPoints = (float)($shopSalesResult['sales_points'] ?? 0) + (float)($custSalesResult['sales_points'] ?? 0);
+$salesInvoiceCount = (int)($shopSalesResult['sales_invoice_count'] ?? 0) + (int)($custSalesResult['sales_invoice_count'] ?? 0);
 
 // 2. Daily Login Points
 $dailyQuery = "

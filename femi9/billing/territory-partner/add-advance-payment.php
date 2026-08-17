@@ -1,21 +1,33 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpApproverContext.php';
 error_reporting(0);
 
 date_default_timezone_set("Asia/Kolkata");
 $title = "Advance Payment";
 
+// If this TP has an assigned SS, they choose per-submission whether Company
+// or that SS reviews it — otherwise this never renders and everything
+// behaves exactly as before. When arriving from add-purchase-order.php
+// (?approver=ss), default the radio to whatever was chosen there so the
+// two pages stay in sync.
+$assignedSs = tpGetAssignedSs($db_conn, (int)$Login_user_IDvl);
+$requestedApproverParam = $_GET['approver'] ?? null;
+$defaultApprover = tpResolveApprover($db_conn, (int)$Login_user_IDvl, $requestedApproverParam);
+
 // Available advance balance — same query used everywhere else this figure
 // is shown (add-purchase-order.php, dashboard.php, mis-report.php); the
 // three-condition filter (balance_amount > 0 AND status != 'fully_adjusted'
 // AND deleted_at IS NULL) was the subject of two prior bugfixes and must be
-// kept exactly as-is.
+// kept exactly as-is. Now also scoped to the approver pool this submission
+// will be routed to.
 $balStmt = mysqli_prepare($db_conn,
     "SELECT COALESCE(SUM(balance_amount), 0) AS bal
-     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL"
+     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
+       AND approver_type = ? AND approver_ss_id <=> ?"
 );
-mysqli_stmt_bind_param($balStmt, "i", $Login_user_IDvl);
+mysqli_stmt_bind_param($balStmt, "isi", $Login_user_IDvl, $defaultApprover['type'], $defaultApprover['ss_id']);
 mysqli_stmt_execute($balStmt);
 $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
 mysqli_stmt_close($balStmt);
@@ -181,6 +193,38 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
                         </div>
                         <?php endif; ?>
 
+                        <?php if ($assignedSs !== null && !$hasResumableDraft): ?>
+                        <div class="apo-card">
+                            <div class="apo-card-title"><i class="material-icons-outlined">alt_route</i>Submit To</div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
+                                        <input type="radio" name="approver_choice_display" value="company" <?=$defaultApprover['type'] === 'company' ? 'checked' : ''?> onchange="switchApprover('company')"> Company
+                                    </label>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
+                                        <input type="radio" name="approver_choice_display" value="ss" <?=$defaultApprover['type'] === 'ss' ? 'checked' : ''?> onchange="switchApprover('ss')"> <?=htmlspecialchars($assignedSs['name'])?> (Super Stockist)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <?php elseif ($assignedSs !== null): ?>
+                        <div class="apo-card" style="background:#f8fafc;">
+                            <div style="font-size:12.5px;color:#6b7280;">
+                                <i class="material-icons-outlined" style="font-size:15px;vertical-align:-2px;">alt_route</i>
+                                Submitting to: <strong><?=$defaultApprover['type'] === 'ss' ? htmlspecialchars($assignedSs['name']) . ' (Super Stockist)' : 'Company'?></strong>
+                                — you already have an unfinished draft for this approver; finish or clear it before switching.
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <form id="advApproverForm" method="get" style="display:none;">
+                            <input type="hidden" name="approver" id="approver_switch_input" value="<?=htmlspecialchars($defaultApprover['type'])?>">
+                            <?php if ($returnToPo): ?><input type="hidden" name="return_to" value="po"><?php endif; ?>
+                            <?php if ($prefillAmount > 0): ?><input type="hidden" name="amount" value="<?=htmlspecialchars((string)$prefillAmount)?>"><?php endif; ?>
+                        </form>
+
                         <div class="apo-balance-card">
                             <i class="material-icons-outlined">account_balance_wallet</i>
                             <div>
@@ -292,6 +336,17 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
     <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
 
     <script>
+    var currentApprover = <?=json_encode($defaultApprover['type'])?>;
+
+    // Re-submitting the page as a GET with ?approver=… is the simplest way
+    // to get a freshly-scoped balance for the newly chosen pool — same
+    // pattern as switching status_filter on the list pages elsewhere in
+    // this codebase, just applied to a radio instead of a dropdown.
+    function switchApprover(approver) {
+        document.getElementById('approver_switch_input').value = approver;
+        document.getElementById('advApproverForm').submit();
+    }
+
     var MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024;
     var MAX_SCREENSHOTS = 5;
     var returnToPo = <?=json_encode($returnToPo)?>;
@@ -498,6 +553,7 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
         formData.append('note', document.getElementById('adv_note').value.trim());
         if (currentSubmissionId) formData.append('submission_id', currentSubmissionId);
         if (returnToPo) formData.append('source', 'po');
+        formData.append('approver_type', currentApprover);
 
         fetch('upload-advance-payment-screenshot.php', { method: 'POST', body: formData })
             .then(function(r) {

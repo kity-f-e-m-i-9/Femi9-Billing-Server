@@ -127,12 +127,22 @@ if ($shop_firka_id > 0) {
 }
 if ($shop_state_norm === null) {
     $state_id = (int)($shopRow['state_id'] ?? 0);
-    $stmtState = $db_conn->prepare("SELECT st_name FROM state WHERE id=? LIMIT 1");
-    $stmtState->bind_param('i', $state_id);
-    $stmtState->execute();
-    $shopStateRow = $stmtState->get_result()->fetch_assoc();
-    $stmtState->close();
-    $shop_state_norm = tp_invoice_norm_state($shopStateRow['st_name'] ?? '');
+    // Legacy data bug: a large batch of shops (~7,300) were stamped with
+    // state_id=2, which is not a valid `state` table id (Tamilnadu is id=7
+    // there) — it's a stray partner_location_nodes id (node 2 = "Tamilnadu")
+    // written into the wrong column by an old import/bulk-assignment. Since
+    // this business operates in Tamil Nadu, treat it as Tamilnadu rather than
+    // letting the lookup silently fail and force every such shop to IGST.
+    if ($state_id === 2) {
+        $shop_state_norm = tp_invoice_norm_state('Tamilnadu');
+    } else {
+        $stmtState = $db_conn->prepare("SELECT st_name FROM state WHERE id=? LIMIT 1");
+        $stmtState->bind_param('i', $state_id);
+        $stmtState->execute();
+        $shopStateRow = $stmtState->get_result()->fetch_assoc();
+        $stmtState->close();
+        $shop_state_norm = tp_invoice_norm_state($shopStateRow['st_name'] ?? '');
+    }
 }
 
 // TP's state(s) — every firka they're assigned to, resolved up to STATE

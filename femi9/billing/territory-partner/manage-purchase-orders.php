@@ -66,11 +66,13 @@ function tpInvoiceItemLines($db_conn, int $invoiceId): array {
 // the only record. For completed ones, items/total get replaced below with
 // the actual invoice — the company may have adjusted qty/price when billing.
 $stmt = mysqli_prepare($db_conn,
-    "SELECT o.id, o.order_date, o.status, o.tp_invoice_id, o.cancel_reason,
+    "SELECT o.id, o.order_date, o.status, o.tp_invoice_id, o.cancel_reason, o.approver_type, o.approver_ss_id,
+            ss.name AS approver_ss_name,
             i.product_id, i.qty, i.price, i.amount, p.productName
      FROM tp_purchase_orders o
      LEFT JOIN tp_purchase_order_items i ON i.po_id = o.id
      LEFT JOIN products p ON p.id = i.product_id
+     LEFT JOIN super_stockiest ss ON ss.id = o.approver_ss_id
      WHERE o.territory_partner_id=? AND o.order_date BETWEEN ? AND ?"
     . ($statusFilter !== 'all' ? " AND o.status = ?" : '')
     . "\n     ORDER BY o.order_date DESC, o.id DESC, i.id ASC"
@@ -95,6 +97,7 @@ foreach ($rows as $r) {
             'status'        => $r['status'],
             'tp_invoice_id' => $r['tp_invoice_id'],
             'cancel_reason' => $r['cancel_reason'],
+            'approver_label' => $r['approver_type'] === 'ss' ? ($r['approver_ss_name'] ?? 'Super Stockist') : 'Company',
             'lines'         => [],
             'total'         => 0,
             'bill'          => null,
@@ -155,6 +158,13 @@ if ($statusFilter === 'all' || $statusFilter === 'completed') {
             'status'        => 'completed',
             'tp_invoice_id' => $inv['id'],
             'cancel_reason' => null,
+            // Direct invoices (no originating PO) are created either by
+            // Company or, for TPs assigned to an SS, by that SS directly
+            // from their own stock (super-stockist/tp-invoice-action.php) —
+            // both always draw from the company-approved pool today (see
+            // that file's own $invoiceApprover), so labeling by creator here
+            // reflects who billed it, not a routing choice the TP made.
+            'approver_label' => ($inv['created_by_user_type'] ?? '') === 'super_stockiest' ? 'Super Stockist' : 'Company',
             'lines'         => tpInvoiceItemLines($db_conn, (int)$inv['id']),
             'total'         => (float)$inv['total_amount'],
             'bill'          => tpBillInfo($db_conn, $inv),
@@ -357,6 +367,7 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                         <tr>
                                             <th>Date</th>
                                             <th>Invoice No.</th>
+                                            <th>Approver</th>
                                             <th>Products</th>
                                             <th>Total</th>
                                             <th>Status</th>
@@ -365,7 +376,7 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                     </thead>
                                     <tbody>
                                         <?php if (empty($orders)): ?>
-                                        <tr><td colspan="6">
+                                        <tr><td colspan="7">
                                             <div class="po-empty">
                                                 <i class="material-icons-outlined">inbox</i>
                                                 No purchase orders in this date range.
@@ -397,6 +408,7 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                                 <span class="text-muted">—</span>
                                                 <?php endif; ?>
                                             </td>
+                                            <td><span class="text-muted" style="font-size:12.5px;"><?=htmlspecialchars($o['approver_label'])?></span></td>
                                             <td>
                                                 <button type="button" class="po-items-trigger items-view-trigger" data-items="<?=$items_json?>" data-bill="<?=$bill_json?>">
                                                     <?=count($o['lines'])?> item<?=count($o['lines']) !== 1 ? 's' : ''?>

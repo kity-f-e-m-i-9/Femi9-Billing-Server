@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpApproverContext.php';
 error_reporting(0);
 
 if (!isset($_POST['submit_po'])) {
@@ -10,6 +11,10 @@ if (!isset($_POST['submit_po'])) {
 
 $tp_id      = (int)$Login_user_IDvl;
 $order_date = date("Y-m-d");
+
+// Never trust the client-submitted approver type on its own — re-verify the
+// TP actually has that SS assignment before honoring 'ss'.
+$approver = tpResolveApprover($db_conn, $tp_id, $_POST['approver_type'] ?? null);
 
 $pr_ids   = $_POST['pr_id']   ?? [];
 $qtys     = $_POST['qty']     ?? [];
@@ -33,6 +38,23 @@ if (empty($items)) {
     $_SESSION['errorMessage'] = 'Please add at least one product before submitting.';
     header("Location: add-purchase-order.php");
     exit;
+}
+
+// GST products stay under Company regardless of which approver the TP
+// picked — same rule applied to tp_invoices (see
+// db_migrations/2026_08_12_tp_invoice_approver_gst_backfill.sql) and
+// backfilled onto tp_purchase_orders in
+// db_migrations/2026_08_12_tp_purchase_order_gst_backfill.sql.
+$pidPlaceholders = implode(',', array_fill(0, count($items), '?'));
+$pidTypes = str_repeat('i', count($items));
+$gstStmt = $db_conn->prepare("SELECT COUNT(*) AS cnt FROM products WHERE id IN ($pidPlaceholders) AND gst > 0");
+$gstStmt->bind_param($pidTypes, ...array_column($items, 'pid'));
+$gstStmt->execute();
+$hasGstItem = (int)($gstStmt->get_result()->fetch_assoc()['cnt'] ?? 0) > 0;
+$gstStmt->close();
+
+if ($hasGstItem) {
+    $approver = ['type' => 'company', 'ss_id' => null];
 }
 
 // Delivery address — either the TP's existing registered address, or a
@@ -61,11 +83,14 @@ if ($useDefaultDelivery) {
 $grandTotal = array_sum(array_column($items, 'amount'));
 
 // Available advance balance — recomputed server-side, never trust the client total.
+// Scoped to the resolved approver's own pool — Company and SS balances are
+// independent, so this must never sum across both.
 $balStmt = mysqli_prepare($db_conn,
     "SELECT COALESCE(SUM(balance_amount), 0) AS bal
-     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL"
+     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
+       AND approver_type = ? AND approver_ss_id <=> ?"
 );
-mysqli_stmt_bind_param($balStmt, "i", $tp_id);
+mysqli_stmt_bind_param($balStmt, "isi", $tp_id, $approver['type'], $approver['ss_id']);
 mysqli_stmt_execute($balStmt);
 $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
 mysqli_stmt_close($balStmt);
@@ -75,14 +100,16 @@ mysqli_stmt_close($balStmt);
 // even though balance_amount is only decremented once an order is fulfilled.
 // Without this, a TP could submit several pending orders that each pass this
 // check individually while cumulatively over-committing the real balance.
+// Scoped to the same approver pool this new order is being routed to.
 $reservedStmt = mysqli_prepare($db_conn,
     "SELECT COALESCE(SUM(poi.total - po.excess_amount), 0) AS reserved
      FROM tp_purchase_orders po
      JOIN (SELECT po_id, SUM(amount) AS total FROM tp_purchase_order_items GROUP BY po_id) poi
        ON poi.po_id = po.id
-     WHERE po.territory_partner_id = ? AND po.status = 'waiting'"
+     WHERE po.territory_partner_id = ? AND po.status = 'waiting'
+       AND po.approver_type = ? AND po.approver_ss_id <=> ?"
 );
-mysqli_stmt_bind_param($reservedStmt, "i", $tp_id);
+mysqli_stmt_bind_param($reservedStmt, "isi", $tp_id, $approver['type'], $approver['ss_id']);
 mysqli_stmt_execute($reservedStmt);
 $reservedAmount = (float)(mysqli_stmt_get_result($reservedStmt)->fetch_assoc()['reserved'] ?? 0);
 mysqli_stmt_close($reservedStmt);
@@ -119,9 +146,10 @@ if ($excessAmount > 0) {
     $advSubStmt = mysqli_prepare($db_conn,
         "SELECT id, amount FROM tp_advance_payment_submissions
          WHERE territory_partner_id = ? AND status = 'pending_review' AND used_for_po_id IS NULL
+           AND approver_type = ? AND approver_ss_id <=> ?
          ORDER BY amount ASC"
     );
-    mysqli_stmt_bind_param($advSubStmt, "i", $tp_id);
+    mysqli_stmt_bind_param($advSubStmt, "isi", $tp_id, $approver['type'], $approver['ss_id']);
     mysqli_stmt_execute($advSubStmt);
     $eligibleSubs = mysqli_stmt_get_result($advSubStmt)->fetch_all(MYSQLI_ASSOC);
     mysqli_stmt_close($advSubStmt);
@@ -139,13 +167,13 @@ $db_conn->begin_transaction();
 try {
     $s = $db_conn->prepare(
         "INSERT INTO tp_purchase_orders
-            (territory_partner_id, order_date, status, excess_amount, use_default_delivery_address,
+            (territory_partner_id, approver_type, approver_ss_id, order_date, status, excess_amount, use_default_delivery_address,
              custom_delivery_line1, custom_delivery_line2, custom_delivery_city, custom_delivery_district,
              custom_delivery_state, custom_delivery_country, custom_delivery_pincode)
-         VALUES (?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $s->bind_param(
-        "isdisssssss", $tp_id, $order_date, $excessAmount, $useDefaultDelivery,
+        "isisdisssssss", $tp_id, $approver['type'], $approver['ss_id'], $order_date, $excessAmount, $useDefaultDelivery,
         $customDeliveryLine1, $customDeliveryLine2, $customDeliveryCity, $customDeliveryDistrict,
         $customDeliveryState, $customDeliveryCountry, $customDeliveryPincode
     );

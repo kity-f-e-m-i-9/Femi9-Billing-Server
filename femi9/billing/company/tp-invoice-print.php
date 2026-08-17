@@ -106,6 +106,7 @@ foreach ($invoice_items as &$item) {
     $item['taxable_value'] = $taxable_value;
     $item['gst_amount']    = $gst_amount;
     $item['taxable_rate']  = ((int)$item['quantity'] > 0) ? $gross_taxable_value / (int)$item['quantity'] : 0;
+    $item['taxable_rate_incl'] = $item['taxable_rate'] + ($gst_pct > 0 ? $item['taxable_rate'] * $gst_pct / 100 : 0);
 
     $TotalAMount123   += $taxable_value;
     $Totalquantity123 += (int)$item['quantity'];
@@ -196,20 +197,6 @@ if (trim($TAXresult) !== '' && $TAXpaise_words !== '') {
     $TAXresult = 'Zero';
 }
 
-// Taxable amount in words
-$TXBnumber = $TotalAMount123;
-$TXBno = floor($TXBnumber); $TXBdigits_1 = strlen($TXBno); $TXBi = 0; $TXBstr = [];
-while ($TXBi < $TXBdigits_1) {
-    $TXBdivider = ($TXBi == 2) ? 10 : 100; $TXBnum = floor($TXBno % $TXBdivider); $TXBno = floor($TXBno / $TXBdivider);
-    $TXBi += ($TXBdivider == 10) ? 1 : 2;
-    if ($TXBnum) {
-        $TXBplural = (($TXBcounter = count($TXBstr)) && $TXBnum > 9) ? 's' : null;
-        $TXBhundred = ($TXBcounter == 1 && $TXBstr[0]) ? ' and ' : null;
-        $TXBstr[] = ($TXBnum < 21) ? $words[$TXBnum]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred
-                    : $words[floor($TXBnum/10)*10]." ".$words[$TXBnum%10]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred;
-    } else $TXBstr[] = null;
-}
-$TXBstr = array_reverse($TXBstr); $TXBresult = implode('', $TXBstr);
 
 $Currency_symbol = "&#8377;";
 $Currency_Name   = "INR";
@@ -473,16 +460,17 @@ Terms of Delivery<br/>&nbsp;
 <td>Description of Goods</td>
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
-<td id="rightlaign">MRP</td>
-<td id="rightlaign">Rate</td>
-<td id="rightlaign">per</td>
-<td id="rightlaign">GST(%)</td>
-<td id="rightlaign">Disc</td>
-<td id="rightlaign">Amount</td>
 <?php if ($has_carton_data): ?>
 <td id="rightlaign">Packs/Carton</td>
 <td id="rightlaign">Cartons</td>
 <?php endif; ?>
+<td id="rightlaign">MRP</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
+<td id="rightlaign">per</td>
+<td id="rightlaign">GST(%)</td>
+<td id="rightlaign">Disc</td>
+<td id="rightlaign">Amount</td>
 </tr>
 
 <?php $invno = 0; foreach ($invoice_items as $item):
@@ -497,44 +485,47 @@ Terms of Delivery<br/>&nbsp;
     // stored rate already has GST baked in, so it's carved out here rather
     // than printed as-is (which would silently overstate the taxable rate).
     $rate          = (float)$item['taxable_rate'];
+    $rate_incl     = (float)$item['taxable_rate_incl'];
     $item_disc_amt = (float)($item['discount_amount'] ?? 0);
     $item_disc_pct = (float)($item['discount_percentage'] ?? 0);
 ?>
 <tr>
 <td><?= $invno; ?></td>
-<td><b><?= htmlspecialchars($item['productName']); ?></b><?= $gst_type === 'inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
+<td><b><?= htmlspecialchars($item['productName']); ?></b></td>
 <td id="rightlaign"><?= htmlspecialchars($item['hsn']); ?></td>
 <td id="rightlaign"><?= inr_format($qty, 0); ?> Packs</td>
-<td id="rightlaign"><?= inr_format($mrp, 2); ?></td>
-<td id="rightlaign"><?= inr_format($rate, 2); ?></td>
-<td id="rightlaign">Packs</td>
-<td id="rightlaign"><?= $gst_pct; ?>%</td>
-<td id="rightlaign"><?= inr_format($item_disc_amt, 2); ?><br/>(<?= fmt_gst_pct($item_disc_pct); ?>%)</td>
-<td id="rightlaign"><?= inr_format($taxable_value, 2); ?></td>
 <?php if ($has_carton_data): ?>
 <td id="rightlaign"><?= ($item['packs_per_carton'] !== null && $item['packs_per_carton'] !== '') ? inr_format((int)$item['packs_per_carton'], 0) : '—'; ?></td>
 <td id="rightlaign"><?= $item['carton_display']; ?></td>
 <?php endif; ?>
+<td id="rightlaign"><?= inr_format($mrp, 2); ?></td>
+<td id="rightlaign"><?= inr_format($rate, 2); ?></td>
+<td id="rightlaign"><?= inr_format($rate_incl, 2); ?></td>
+<td id="rightlaign">Packs</td>
+<td id="rightlaign"><?= $gst_pct; ?>%</td>
+<td id="rightlaign"><?= inr_format($item_disc_amt, 2); ?><br/>(<?= fmt_gst_pct($item_disc_pct); ?>%)</td>
+<td id="rightlaign"><?= inr_format($taxable_value, 2); ?></td>
 </tr>
 <?php endforeach; ?>
 
 <tr>
 <td></td><td></td><td></td>
 <td id="rightlaign"><b><?= inr_format($Totalquantity123, 0); ?> Packs</b></td>
-<td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></b></td>
 <?php if ($has_carton_data): ?>
 <td></td>
 <td id="rightlaign"><b><?= inr_format($TotalCartons123, 0); ?> ctn</b></td>
 <?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></b></td>
 </tr>
 
 <?php if ($discount_amount > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Discount</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
 </tr>
 <?php endif; ?>
 <?php if ($totalgstamount > 0):
@@ -544,32 +535,36 @@ Terms of Delivery<br/>&nbsp;
 ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>SGST (<?= $__half_pct; ?>%)</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>CGST (<?= $__half_pct; ?>%)</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
 </tr>
 <?php endif; ?>
 
 <?php if ($courier_charges > 0): ?>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
 </tr>
 <?php endif; ?>
 
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Total</i></b></td>
-<td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
+<td></td><td></td>
 <?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<td></td><td></td><td></td><td></td><td></td><td></td>
+<td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
 </tr>
 </table>
 <div style="clear:both;"></div>
@@ -583,14 +578,6 @@ Terms of Delivery<br/>&nbsp;
 <td><b><?= $Currency_Name; ?> <?= ucwords($result); ?> Only</b></td>
 <td></td>
 </tr>
-<tr>
-<td style="padding-top:6px;font-size:13px;">Amount Taxable (in words)</td>
-<td align="right" style="font-size:13px;"><?= $Currency_symbol; ?>&nbsp;<?= inr_format($TotalAMount123, 2); ?></td>
-</tr>
-<tr>
-<td><b><?= $Currency_Name; ?> <?= ucwords($TXBresult); ?> Only</b></td>
-<td></td>
-</tr>
 </table>
 
 <!---------------------HSN WISE TOTAL------------------------------>
@@ -599,7 +586,7 @@ Terms of Delivery<br/>&nbsp;
 <td align="center">HSN/SAC</td>
 <td align="right">Taxable<br/>Value</td>
 <td align="right" colspan="2">CGST</td>
-<td align="right" colspan="2">SGST/UTGST</td>
+<td align="right" colspan="2">SGST</td>
 <td align="right">Total<br/>Tax Amount</td>
 </tr>
 <tr>

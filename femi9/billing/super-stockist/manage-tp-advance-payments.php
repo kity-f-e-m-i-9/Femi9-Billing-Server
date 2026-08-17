@@ -12,6 +12,11 @@ if (empty($_SESSION['csrf_token'])) {
 
 $ss_id = $Login_user_IDvl;
 
+// This SS's own numeric id — approver_ss_id is always stored as this, never
+// the varchar temp_id used for the onboard_ss_id assignment link. See
+// tp-today-orders.php for the same pattern.
+$ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
+
 $filter_from   = $_GET['from_date'] ?? date('Y-m-01');
 $filter_to     = $_GET['to_date']   ?? date('Y-m-d');
 $filter_tp     = (int)($_GET['tp_id'] ?? 0);
@@ -20,12 +25,17 @@ $filter_status = $_GET['status'] ?? '';
 $allowed_statuses = ['active','partially_adjusted','fully_adjusted',''];
 if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = '';
 
-// Only TPs belonging to this SS, and only payments this SS itself recorded —
-// company_id is set exclusively by company's tp-advance-payment-action.php
-// (SS's own insert never sets it), so IS NULL means "created by this SS".
-$where  = ["tp.onboard_ss_id = ?", "tap.company_id IS NULL", "tap.payment_date BETWEEN ? AND ?"];
-$params = [$ss_id, $filter_from, $filter_to];
-$types  = "sss";
+// Only TPs belonging to this SS, and only payments actually approved under
+// THIS SS's own pool — company_id IS NULL used to be the signal for "not
+// company-recorded," but that stopped being reliable once a payment could
+// be created by an SS insert yet still get tagged approver_type='company'
+// (e.g. GST-related routing, or a screenshot/PO Company itself approved
+// for one of this SS's TPs) — approver_type/approver_ss_id is the real
+// ownership signal now (see add-tp-invoice.php's balance widget, which
+// already only ever draws from this same scoped pool).
+$where  = ["tp.onboard_ss_id = ?", "tap.approver_type = 'ss'", "tap.approver_ss_id = ?", "tap.payment_date BETWEEN ? AND ?"];
+$params = [$ss_id, $ss_account_id, $filter_from, $filter_to];
+$types  = "siss";
 
 if ($filter_tp > 0) {
     $where[]  = "tap.territory_partner_id = ?";

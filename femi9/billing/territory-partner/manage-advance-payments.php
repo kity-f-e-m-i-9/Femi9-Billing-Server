@@ -15,11 +15,14 @@ if (!in_array($statusFilter, $allowedStatusFilters, true)) $statusFilter = 'all'
 // Drafts (still-in-progress, unsubmitted) never show here — they live only
 // on add-advance-payment.php until the TP explicitly submits.
 $stmt = mysqli_prepare($db_conn,
-    "SELECT id, amount, payment_date, payment_mode, reference_number, note, status, rejection_reason, advance_payment_id, created_at
-     FROM tp_advance_payment_submissions
-     WHERE territory_partner_id=? AND status != 'draft' AND DATE(created_at) BETWEEN ? AND ?"
-    . ($statusFilter !== 'all' ? " AND status = ?" : '')
-    . "\n     ORDER BY created_at DESC"
+    "SELECT sub.id, sub.amount, sub.payment_date, sub.payment_mode, sub.reference_number, sub.note, sub.status,
+            sub.rejection_reason, sub.advance_payment_id, sub.created_at, sub.approver_type, sub.approver_ss_id,
+            ss.name AS approver_ss_name
+     FROM tp_advance_payment_submissions sub
+     LEFT JOIN super_stockiest ss ON ss.id = sub.approver_ss_id
+     WHERE sub.territory_partner_id=? AND sub.status != 'draft' AND DATE(sub.created_at) BETWEEN ? AND ?"
+    . ($statusFilter !== 'all' ? " AND sub.status = ?" : '')
+    . "\n     ORDER BY sub.created_at DESC"
 );
 if ($statusFilter !== 'all') {
     mysqli_stmt_bind_param($stmt, "isss", $Login_user_IDvl, $from_date, $to_date, $statusFilter);
@@ -49,6 +52,7 @@ if (!empty($submissionIds)) {
 }
 foreach ($submissions as &$sub) {
     $sub['screenshots'] = $screenshotsBySubmission[$sub['id']] ?? [];
+    $sub['approver_label'] = $sub['approver_type'] === 'ss' ? ($sub['approver_ss_name'] ?? 'Super Stockist') : 'Company';
 }
 unset($sub);
 
@@ -236,6 +240,7 @@ mysqli_stmt_close($balStmt);
                                         <tr>
                                             <th>Submitted</th>
                                             <th>Amount</th>
+                                            <th>Approver</th>
                                             <th>Mode</th>
                                             <th>Reference</th>
                                             <th>Screenshots</th>
@@ -246,7 +251,7 @@ mysqli_stmt_close($balStmt);
                                     </thead>
                                     <tbody>
                                         <?php if (empty($submissions)): ?>
-                                        <tr><td colspan="8">
+                                        <tr><td colspan="9">
                                             <div class="po-empty">
                                                 <i class="material-icons-outlined">inbox</i>
                                                 No advance payment submissions in this date range.
@@ -258,6 +263,7 @@ mysqli_stmt_close($balStmt);
                                         <tr id="sub-row-<?=(int)$sub['id']?>">
                                             <td><?=htmlspecialchars(date("d-m-Y g:i A", strtotime($sub['created_at'])))?></td>
                                             <td><strong>₹<?=number_format((float)$sub['amount'], 2)?></strong></td>
+                                            <td><span class="text-muted" style="font-size:12.5px;"><?=htmlspecialchars($sub['approver_label'])?></span></td>
                                             <td><?=htmlspecialchars($sub['payment_mode'])?></td>
                                             <td><?=htmlspecialchars($sub['reference_number'])?></td>
                                             <td><?=count($sub['screenshots'])?></td>

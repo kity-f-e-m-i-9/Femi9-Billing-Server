@@ -6,6 +6,11 @@ date_default_timezone_set("Asia/Kolkata");
 
 $Invoice_ID = base64_decode($_REQUEST['invoiceid'] ?? '');
 
+// Needed early for the Tax Invoice / Bill of Supply heading, as well as
+// later in the GST summary section — computed once here rather than twice.
+$totalgst = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(gstamount_total) FROM invoice_items WHERE inv_id='$Invoice_ID'"))[0]);
+$invoice_heading = $totalgst > 0 ? 'Tax Invoice' : 'Bill of Supply';
+
 $inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='$Invoice_ID' LIMIT 1"));
 
 // Seller: territory_partners
@@ -132,7 +137,7 @@ document.getElementById("currencySelect").addEventListener("change", function() 
 </style>
 
 <div class="maincontainar">
-<table id="toptl"><tr><td>Bill of Supply</td></tr></table>
+<table id="toptl"><tr><td><?=htmlspecialchars($invoice_heading);?></td></tr></table>
 
 <table class="second_containar">
 <tr valign="top">
@@ -228,7 +233,8 @@ while ($ri = mysqli_fetch_array($resItems)) {
 
 <?php
 $gsttype      = $inv['gst_type'] ?? 'inner';
-$totalgst     = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(gstamount_total) FROM invoice_items WHERE inv_id='$Invoice_ID'"))[0]);
+// $totalgst already computed near the top of the file (needed early for the
+// Tax Invoice / Bill of Supply heading).
 if ($totalgst > 0) {
     if ($gsttype == 'inner') {
         $half = inr_format($totalgst / 2, 2);

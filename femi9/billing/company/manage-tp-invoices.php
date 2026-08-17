@@ -35,6 +35,8 @@ if ($col && $col->num_rows === 0) {
 $filter_state_id    = (int)($_GET['state_id']    ?? 0);
 $filter_location_id = (int)($_GET['location_id'] ?? 0);
 $filter_tp_id       = (int)($_GET['tp_id']       ?? 0);
+$filter_date_from   = trim($_GET['date_from'] ?? '');
+$filter_date_to     = trim($_GET['date_to']   ?? '');
 
 // ── Filter dropdown data ───────────────────────────────────────────────────────
 // States = depth-2 nodes that are ancestors of (or equal to) any source_location used in invoices
@@ -119,6 +121,17 @@ if ($filter_tp_id > 0) {
     $where[]  = "tpi.territory_partner_id = ?";
     $params[] = $filter_tp_id;
     $types   .= 'i';
+}
+
+if ($filter_date_from !== '') {
+    $where[]  = "tpi.invoice_date >= ?";
+    $params[] = $filter_date_from;
+    $types   .= 's';
+}
+if ($filter_date_to !== '') {
+    $where[]  = "tpi.invoice_date <= ?";
+    $params[] = $filter_date_to;
+    $types   .= 's';
 }
 
 $where_sql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
@@ -345,13 +358,27 @@ $i = 0;
                                     </select>
                                 </div>
                                 <div class="col-lg-3 col-sm-6">
+                                    <label class="form-label">
+                                        <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">event</i>
+                                        Date From
+                                    </label>
+                                    <input type="date" name="date_from" class="form-control" value="<?php echo htmlspecialchars($filter_date_from); ?>">
+                                </div>
+                                <div class="col-lg-3 col-sm-6">
+                                    <label class="form-label">
+                                        <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">event</i>
+                                        Date To
+                                    </label>
+                                    <input type="date" name="date_to" class="form-control" value="<?php echo htmlspecialchars($filter_date_to); ?>">
+                                </div>
+                                <div class="col-lg-3 col-sm-6">
                                     <label class="form-label" style="visibility:hidden;">.</label>
                                     <div style="display:flex;gap:8px;align-items:center;">
                                         <button type="submit" class="btn-filter">
                                             <i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">filter_list</i>
                                             Filter
                                         </button>
-                                        <?php if ($filter_state_id || $filter_location_id || $filter_tp_id): ?>
+                                        <?php if ($filter_state_id || $filter_location_id || $filter_tp_id || $filter_date_from || $filter_date_to): ?>
                                         <a href="manage-tp-invoices" class="btn-clear">
                                             <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:3px;">close</i>
                                             Clear
@@ -397,7 +424,7 @@ $i = 0;
                             <span class="card-header-title">
                                 <i class="material-icons-outlined">receipt_long</i>
                                 All TP Invoices
-                                <?php if ($filter_state_id || $filter_location_id || $filter_tp_id): ?>
+                                <?php if ($filter_state_id || $filter_location_id || $filter_tp_id || $filter_date_from || $filter_date_to): ?>
                                 <span class="filter-active-badge">Filtered</span>
                                 <?php endif; ?>
                             </span>

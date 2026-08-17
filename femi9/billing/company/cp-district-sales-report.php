@@ -57,23 +57,34 @@ $rows = crr($db_conn,
         SELECT c.id, a.anc_id, a.anc_name FROM partner_location_nodes c JOIN divanc a ON c.parent_id = a.node_id
     )
     SELECT danc.anc_name AS district_name, divanc.anc_name AS division_name, x.source_cp_id,
+           x.territory_partner_id, tp.name AS tp_name, tp.tp_id AS tp_code,
            COUNT(DISTINCT x.tp_invoice_id) AS inv_cnt,
            COALESCE(SUM(x.qty), 0) AS total_qty,
-           COALESCE(SUM(x.amount), 0) AS total_amount
+           COALESCE(SUM(x.net_amount), 0) AS total_amount
     FROM (
-        SELECT tii.tp_invoice_id, tii.quantity AS qty, tii.amount, ti.source_cp_id,
+        -- net_amount = this line's amount, less its own line-level discount,
+        -- less its proportional share of the invoice-level discount (spread
+        -- across lines by each line's share of the invoice's gross amount) —
+        -- matches how tp-invoice-action.php derives tp_invoices.total_amount,
+        -- so this report's sales figure reconciles with manage-tp-invoices.
+        SELECT tii.tp_invoice_id, tii.quantity AS qty, tii.amount, ti.source_cp_id, ti.territory_partner_id,
+               (tii.amount - tii.discount_amount)
+               - COALESCE(ti.discount_amount, 0) * (tii.amount / NULLIF(inv_gross.gross, 0)) AS net_amount,
                (SELECT tpl.location_id FROM territory_partner_locations tpl
                 WHERE tpl.territory_partner_id = ti.territory_partner_id
                 ORDER BY tpl.assigned_at ASC, tpl.id ASC LIMIT 1) AS location_id
         FROM tp_invoices ti
         JOIN tp_invoice_items tii ON tii.tp_invoice_id = ti.id
         JOIN products p ON p.id = tii.product_id
+        JOIN (SELECT tp_invoice_id, SUM(amount) AS gross FROM tp_invoice_items GROUP BY tp_invoice_id) inv_gross
+             ON inv_gross.tp_invoice_id = ti.id
         WHERE {$company_tp_cond} AND ti.invoice_date BETWEEN ? AND ?{$gst_cond}
     ) x
     JOIN danc ON danc.node_id = x.location_id
     LEFT JOIN divanc ON divanc.node_id = x.location_id
+    JOIN territory_partners tp ON tp.id = x.territory_partner_id
     WHERE 1=1{$district_where}
-    GROUP BY danc.anc_id, danc.anc_name, divanc.anc_id, divanc.anc_name, x.source_cp_id
+    GROUP BY danc.anc_id, danc.anc_name, divanc.anc_id, divanc.anc_name, x.source_cp_id, x.territory_partner_id, tp.name, tp.tp_id
     ORDER BY danc.anc_name ASC, total_amount DESC",
     'ss', [$from, $to]);
 
@@ -148,12 +159,14 @@ if ($cp_ids) {
 $grand_qty = 0; $grand_amount = 0; $grand_inv = 0; $grand_commission = 0;
 foreach ($rows as $r) { $grand_qty += (float)$r['total_qty']; $grand_amount += (float)$r['total_amount']; $grand_inv += (int)$r['inv_cnt']; }
 
-// Group rows by district, then by division (collapsing the per-CP rows within
-// each division into one line, summing quantity/amount/commission).
+// Group rows by district, then by division, then by TP (a TP's sales can
+// still split across several source_cp_id rows within one division, so TPs
+// are collapsed to one line the same way divisions collapse per-CP rows).
 $by_district = [];
 foreach ($rows as $r) {
     $dist = $r['district_name'];
     $div_key = $r['division_name'] ?? '';
+    $tp_key = (int)$r['territory_partner_id'];
     $cid = (int)$r['source_cp_id'];
     $pct = $cid > 0 ? ($cp_effective_pct[$cid] ?? 0.0) : NO_CP_COMMISSION_PCT;
     $commission = (float)$r['total_amount'] * $pct;
@@ -161,13 +174,23 @@ foreach ($rows as $r) {
     if (!isset($by_district[$dist])) $by_district[$dist] = ['divisions' => [], 'qty' => 0, 'amount' => 0, 'inv' => 0, 'commission' => 0];
     if (!isset($by_district[$dist]['divisions'][$div_key])) {
         $by_district[$dist]['divisions'][$div_key] = [
-            'division_name' => $r['division_name'], 'inv_cnt' => 0, 'total_qty' => 0, 'total_amount' => 0, 'commission' => 0,
+            'division_name' => $r['division_name'], 'inv_cnt' => 0, 'total_qty' => 0, 'total_amount' => 0, 'commission' => 0, 'tps' => [],
         ];
     }
     $by_district[$dist]['divisions'][$div_key]['inv_cnt']      += (int)$r['inv_cnt'];
     $by_district[$dist]['divisions'][$div_key]['total_qty']    += (float)$r['total_qty'];
     $by_district[$dist]['divisions'][$div_key]['total_amount'] += (float)$r['total_amount'];
     $by_district[$dist]['divisions'][$div_key]['commission']   += $commission;
+
+    if (!isset($by_district[$dist]['divisions'][$div_key]['tps'][$tp_key])) {
+        $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key] = [
+            'tp_name' => $r['tp_name'], 'tp_code' => $r['tp_code'], 'inv_cnt' => 0, 'total_qty' => 0, 'total_amount' => 0, 'commission' => 0,
+        ];
+    }
+    $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['inv_cnt']      += (int)$r['inv_cnt'];
+    $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['total_qty']    += (float)$r['total_qty'];
+    $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['total_amount'] += (float)$r['total_amount'];
+    $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['commission']   += $commission;
 
     $by_district[$dist]['qty']        += (float)$r['total_qty'];
     $by_district[$dist]['amount']     += (float)$r['total_amount'];
@@ -177,7 +200,11 @@ foreach ($rows as $r) {
 }
 // Highest-selling district first, so the ranked share-bars read top to bottom.
 uasort($by_district, fn($a, $b) => $b['amount'] <=> $a['amount']);
-foreach ($by_district as &$d) { uasort($d['divisions'], fn($a, $b) => $b['total_amount'] <=> $a['total_amount']); }
+foreach ($by_district as &$d) {
+    uasort($d['divisions'], fn($a, $b) => $b['total_amount'] <=> $a['total_amount']);
+    foreach ($d['divisions'] as &$div) { uasort($div['tps'], fn($a, $b) => $b['total_amount'] <=> $a['total_amount']); }
+    unset($div);
+}
 unset($d);
 $max_district_amount = $by_district ? max(array_column($by_district, 'amount')) : 0;
 ?>
@@ -253,6 +280,22 @@ $max_district_amount = $by_district ? max(array_column($by_district, 'amount')) 
         .div-table .div-name .dot { width:6px; height:6px; border-radius:50%; background:#c9c7bd; flex-shrink:0; }
         .div-table td.num, .div-table th.num { text-align:right; }
         .div-table .commission-cell { color:#7b5cf0; font-weight:700; }
+        .div-table tbody tr.div-row { cursor:pointer; }
+        .div-table tbody tr.div-row td { padding-top:11px; padding-bottom:11px; }
+        .div-caret { color:#c9c7bd; font-size:17px; vertical-align:middle; margin-left:2px; transition:transform .18s; }
+        .div-row.open .div-caret { transform:rotate(180deg); color:#7b5cf0; }
+        .tp-sub-row { display:none; }
+        .div-row.open + .tp-sub-row { display:table-row; }
+        .tp-sub-row > td { padding:0 !important; border-bottom:1px solid #f3f2ec; background:#fbfaf7; }
+        .tp-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+        .tp-table th { background:transparent; font-weight:700; color:#a8a69d; padding:6px 18px 6px 46px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid #eeede6; }
+        .tp-table td { padding:7px 18px; border-bottom:1px dashed #eeede6; color:#52514e; }
+        .tp-table tr:last-child td { border-bottom:none; }
+        .tp-table td.num, .tp-table th.num { text-align:right; }
+        .tp-table .tp-name-cell { padding-left:46px; display:flex; align-items:center; gap:8px; }
+        .tp-table .tp-name-cell i { font-size:15px; color:#b3b1a8; }
+        .tp-table .tp-code { color:#a8a69d; font-size:11px; margin-left:4px; }
+        .tp-table .commission-cell { color:#9c85f0; font-weight:600; }
 
         .empty-state { text-align:center; padding:50px 20px; color:#a8a69d; }
         .empty-state i { font-size:40px; opacity:.5; display:block; margin-bottom:8px; }
@@ -360,12 +403,30 @@ $max_district_amount = $by_district ? max(array_column($by_district, 'amount')) 
                                 <thead><tr><th>Division</th><th class="num">Invoices</th><th class="num">Quantity</th><th class="num">Sales Amount &#8377;</th><th class="num">Commission &#8377;</th></tr></thead>
                                 <tbody>
                                 <?php foreach ($d['divisions'] as $div): ?>
-                                    <tr>
-                                        <td><span class="div-name"><span class="dot"></span><?php echo htmlspecialchars($div['division_name'] ?? 'Unassigned Division'); ?></span></td>
+                                    <tr class="div-row" onclick="this.classList.toggle('open')">
+                                        <td><span class="div-name"><span class="dot"></span><?php echo htmlspecialchars($div['division_name'] ?? 'Unassigned Division'); ?><i class="material-icons-outlined div-caret">expand_more</i></span></td>
                                         <td class="num"><?php echo inr_format((int)$div['inv_cnt'], 0); ?></td>
                                         <td class="num"><?php echo inr_format((float)$div['total_qty'], 0); ?></td>
                                         <td class="num">&#8377;<?php echo inr_format((float)$div['total_amount'], 2); ?></td>
                                         <td class="num commission-cell">&#8377;<?php echo inr_format((float)$div['commission'], 2); ?></td>
+                                    </tr>
+                                    <tr class="tp-sub-row">
+                                        <td colspan="5">
+                                            <table class="tp-table">
+                                                <thead><tr><th>Territory Partner</th><th class="num">Invoices</th><th class="num">Quantity</th><th class="num">Sales Amount &#8377;</th><th class="num">Commission &#8377;</th></tr></thead>
+                                                <tbody>
+                                                <?php foreach ($div['tps'] as $tp): ?>
+                                                    <tr>
+                                                        <td><span class="tp-name-cell"><i class="material-icons-outlined">person_outline</i><?php echo htmlspecialchars($tp['tp_name']); ?><span class="tp-code"><?php echo htmlspecialchars($tp['tp_code']); ?></span></span></td>
+                                                        <td class="num"><?php echo inr_format((int)$tp['inv_cnt'], 0); ?></td>
+                                                        <td class="num"><?php echo inr_format((float)$tp['total_qty'], 0); ?></td>
+                                                        <td class="num">&#8377;<?php echo inr_format((float)$tp['total_amount'], 2); ?></td>
+                                                        <td class="num commission-cell">&#8377;<?php echo inr_format((float)$tp['commission'], 2); ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                                </tbody>
+                                            </table>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                                 </tbody>

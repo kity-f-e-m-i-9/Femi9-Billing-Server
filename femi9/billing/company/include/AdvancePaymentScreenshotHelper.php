@@ -227,6 +227,12 @@ function convertAdvancePaymentSubmissionToAdvancePayment(
 
     $tpId = (int)$submission['territory_partner_id'];
 
+    // Company-side conversion — the submission is guaranteed company-routed
+    // (company/manage-tp-advance-submissions.php only shows those), so this
+    // always credits the company-approved pool.
+    $approverType = 'company';
+    $approverSsId = null;
+
     $db_conn->begin_transaction();
     try {
         $adjusted = 0.00;
@@ -235,13 +241,13 @@ function convertAdvancePaymentSubmissionToAdvancePayment(
 
         $ins = $db_conn->prepare(
             "INSERT INTO tp_advance_payments
-                (company_id, territory_partner_id, amount, payment_date, payment_mode, reference_number, remarks,
+                (company_id, territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, remarks,
                  adjusted_amount, balance_amount, status, created_by)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $ins->bind_param(
-            'iidssssddss',
-            $companyId, $tpId, $amount, $paymentDate, $paymentMode, $referenceNumber, $note,
+            'iisidssssddss',
+            $companyId, $tpId, $approverType, $approverSsId, $amount, $paymentDate, $paymentMode, $referenceNumber, $note,
             $adjusted, $balance, $status, $createdBy
         );
         if (!$ins->execute()) throw new \Exception('Insert failed: ' . $ins->error);

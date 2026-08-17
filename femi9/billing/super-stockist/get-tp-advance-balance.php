@@ -17,12 +17,17 @@ if ($chk->get_result()->num_rows === 0) {
 }
 $chk->close();
 
+// Scoped to this SS's own approver pool — a TP's Company-approved balance
+// must never be shown/spent here, since super-stockist/tp-invoice-action.php
+// only ever deducts from the approver='ss' pool for this exact SS.
+$ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
 $stmt = $db_conn->prepare("
     SELECT COALESCE(SUM(balance_amount), 0) AS balance, COUNT(*) AS cnt
     FROM tp_advance_payments
     WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
+      AND approver_type = 'ss' AND approver_ss_id = ?
 ");
-$stmt->bind_param("i", $tp_id);
+$stmt->bind_param("ii", $tp_id, $ss_account_id);
 $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
 $stmt->close();
