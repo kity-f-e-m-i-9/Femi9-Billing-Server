@@ -7,6 +7,20 @@
 // support isn't available (most desktop browsers), it falls back to
 // downloading the PDF and opening a WhatsApp chat with a text prompt asking
 // the customer's shop to attach the file that was just downloaded.
+//
+// navigator.share() is deliberately restricted to actual mobile devices
+// (see isMobileDevice() below), even on desktop browsers that technically
+// support it (notably Safari/Chrome on macOS) — on those, navigator.share()
+// hands off to the OS's own generic "Share" panel, which lists whatever
+// apps are registered as system share-targets on that machine. Telegram
+// registers a macOS share extension; WhatsApp's desktop app generally does
+// not, so that panel would show Telegram (or nothing useful) instead of
+// WhatsApp with no way for this page to control or influence that choice.
+// The wa.me fallback path is deterministic and always targets WhatsApp
+// specifically, so desktop always uses it regardless of API support.
+function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod|Mobile|Silk|Opera Mini|BlackBerry|IEMobile/i.test(navigator.userAgent);
+}
 
 function shareInvoiceToWhatsApp(opts) {
     var doc = opts.doc || document;
@@ -46,7 +60,7 @@ function shareInvoiceToWhatsApp(opts) {
         try { pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' }); }
         catch (e) { pdfFile = null; }
 
-        if (pdfFile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        if (pdfFile && isMobileDevice() && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
             if (opts.preOpenedWindow && !opts.preOpenedWindow.closed) opts.preOpenedWindow.close();
             navigator.share({ files: [pdfFile], title: fileName, text: shareText })
                 .catch(function (err) {

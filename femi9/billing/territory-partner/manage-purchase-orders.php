@@ -538,7 +538,7 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
     });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-    <script src="../../assets/js/whatsapp-invoice-share.js?v=2"></script>
+    <script src="../../assets/js/whatsapp-invoice-share.js?v=3"></script>
     <script>
     // Shares a purchased bill straight to WhatsApp from this list — no
     // detour through the print page. This click is a real user gesture, so
