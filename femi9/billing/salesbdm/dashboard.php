@@ -490,6 +490,8 @@ if ($hasTps) {
         .mis-filter { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-bottom: 14px; }
         .preset-btn { padding:4px 13px; border-radius:20px; border:1.5px solid var(--blue); color:var(--blue); background:var(--surface-1); font-size:12px; cursor:pointer; text-decoration:none; display:inline-block; }
         .preset-btn.active, .preset-btn:hover { background:var(--blue); color:#fff; border-color:var(--blue); }
+        .ff-status-btn { padding:4px 13px; border-radius:20px; border:1.5px solid #9ca3af; color:#4b5563; background:#fff; font-size:12px; cursor:pointer; }
+        .ff-status-btn.active { background:#4b5563; color:#fff; border-color:#4b5563; }
         .tp-name-cell { cursor: pointer; color: var(--blue); font-weight: 600; text-decoration: underline dotted; }
         .snote { font-size:12px; color:var(--text-muted); margin-bottom:10px; }
         .col-toggle-btn { border:1px solid var(--blue); background:#fff; color:var(--blue); font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:10px; cursor:pointer; margin-top:3px; }
@@ -923,6 +925,14 @@ if ($hasTps) {
                         <button class="nav-link" id="ffInactiveTabBtn" type="button" data-tab="inactive">Inactive TPs</button>
                     </li>
                 </ul>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+                    <div id="ffStatusFilters" style="display:flex;gap:6px;">
+                        <button type="button" class="btn btn-sm ff-status-btn active" data-status="all" style="border-radius:14px;">All</button>
+                        <button type="button" class="btn btn-sm ff-status-btn" data-status="on_track" style="border-radius:14px;">On Track</button>
+                        <button type="button" class="btn btn-sm ff-status-btn" data-status="behind" style="border-radius:14px;">Behind</button>
+                    </div>
+                    <input type="text" id="ffSearchBox" class="form-control form-control-sm" placeholder="Search TP name / phone / TP ID..." style="max-width:240px;margin-left:auto;">
+                </div>
                 <div id="ffListBody">
                     <div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>
                 </div>
@@ -947,6 +957,7 @@ if ($hasTps) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" style="padding:14px 20px;">
+                <input type="text" id="ufSearchBox" class="form-control form-control-sm" placeholder="Search District / Firka..." style="max-width:260px;margin-bottom:12px;">
                 <div id="ufListBody">
                     <div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>
                 </div>
@@ -1058,10 +1069,31 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
     var ffMonth = <?php echo json_encode(date('Y-m', strtotime($from))); ?>;
     var ffCache = {};
     var ffCurrentTab = 'active';
+    var ffCurrentStatus = 'all';
+    var ffCurrentSearch = '';
     var ffCurrentPage = 1;
+    var ffSearchTimer = null;
 
     function ffEsc(s) { return $('<div/>').text(s == null ? '' : s).html(); }
     function ffMoney(n) { return '&#8377;' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
+
+    var ffTierMeta = {
+        top:    { label: 'Top',    bg: '#dcfce7', color: '#15803d' },
+        medium: { label: 'Medium', bg: '#fef9c3', color: '#a16207' },
+        late:   { label: 'Late',   bg: '#fee2e2', color: '#b91c1c' },
+        none:   { label: 'No sale yet', bg: '#f3f4f6', color: '#6b7280' }
+    };
+
+    function ffRankCell(r, w) {
+        if (w.is_future) return '<span style="color:#9ca3af;">&mdash;</span>';
+        var tier = ffTierMeta[w.rank_tier] || ffTierMeta.none;
+        var dayLine = (w.rank_day_offset === null || w.rank_day_offset === undefined)
+            ? 'No Napkin sale this week'
+            : (w.rank_day_offset <= 0 ? 'Sold on week start day' : 'Sold ' + w.rank_day_offset + ' day(s) into the week');
+        return '<span style="font-weight:700;color:#374151;">#' + r.rank + '</span> ' +
+            '<span style="background:' + tier.bg + ';color:' + tier.color + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + tier.label + '</span>' +
+            '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">' + dayLine + '</div>';
+    }
 
     function ffRenderRows(data) {
         if (!data || !data.rows || !data.rows.length) {
@@ -1074,7 +1106,7 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
             '<th style="padding:6px 8px;">Name</th><th style="padding:6px 8px;">Phone</th>' +
             '<th style="padding:6px 8px;">District</th><th style="padding:6px 8px;">Firka(s)</th>' +
             '<th style="padding:6px 8px;text-align:right;">Target (Napkin)</th>' +
-            '<th style="padding:6px 8px;">Weekly Status</th></tr></thead><tbody>';
+            '<th style="padding:6px 8px;">Weekly Status</th><th style="padding:6px 8px;">Rank (this week)</th></tr></thead><tbody>';
         $.each(data.rows, function (i, r) {
             var w = r.weekly || {};
             var rowId = 'ffwk-' + i;
@@ -1098,10 +1130,11 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
                 '<td style="padding:7px 8px;color:#6b7280;">' + ffEsc(r.firkas) + '</td>' +
                 '<td style="padding:7px 8px;text-align:right;font-weight:600;">' + ffMoney(r.target_amount) + '</td>' +
                 '<td style="padding:7px 8px;white-space:nowrap;">' + weeklyCell + '</td>' +
+                '<td style="padding:7px 8px;white-space:nowrap;">' + ffRankCell(r, w) + '</td>' +
                 '</tr>';
             if (!w.is_future) {
                 html += '<tr id="' + rowId + '" class="ff-week-detail-row" style="display:none;">' +
-                    '<td colspan="8" style="padding:8px 10px 14px 30px;background:#f9fafb;">' + ffBuildWeeklyDetailHtml(w) + '</td>' +
+                    '<td colspan="9" style="padding:8px 10px 14px 30px;background:#f9fafb;">' + ffBuildWeeklyDetailHtml(w) + '</td>' +
                     '</tr>';
             }
         });
@@ -1139,8 +1172,8 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         return html;
     }
 
-    function ffLoad(tab, page) {
-        var key = tab + '-' + page;
+    function ffLoad(tab, page, status, search) {
+        var key = tab + '-' + status + '-' + page + '-' + search;
         $('#ffListBody').html('<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>');
         $('#ffPagination').html('');
         if (ffCache[key]) {
@@ -1148,7 +1181,7 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
             $('#ffPagination').html(ffRenderPagination(ffCache[key]));
             return;
         }
-        var params = { tab: tab, page: page, month: ffMonth };
+        var params = { tab: tab, page: page, month: ffMonth, status: status, q: search };
         if (viewBdmId) { params.view_bdm_id = viewBdmId; }
         $.getJSON('get-filled-firka-tps.php', params, function (data) {
             ffCache[key] = data;
@@ -1165,11 +1198,26 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
 
     $('#filledFirkasCard').on('click', function () {
         ffCurrentTab = 'active';
+        ffCurrentStatus = 'all';
+        ffCurrentSearch = '';
         ffCurrentPage = 1;
+        $('#ffSearchBox').val('');
         $('#ffActiveTabBtn').addClass('active');
         $('#ffInactiveTabBtn').removeClass('active');
+        $('#ffStatusFilters .ff-status-btn').removeClass('active');
+        $('#ffStatusFilters .ff-status-btn[data-status="all"]').addClass('active');
         $('#filledFirkasModal').modal('show');
-        ffLoad(ffCurrentTab, ffCurrentPage);
+        ffLoad(ffCurrentTab, ffCurrentPage, ffCurrentStatus, ffCurrentSearch);
+    });
+
+    $('#ffSearchBox').on('input', function () {
+        var val = $(this).val();
+        clearTimeout(ffSearchTimer);
+        ffSearchTimer = setTimeout(function () {
+            ffCurrentSearch = val;
+            ffCurrentPage = 1;
+            ffLoad(ffCurrentTab, ffCurrentPage, ffCurrentStatus, ffCurrentSearch);
+        }, 350);
     });
 
     $('#ffTabs button').on('click', function () {
@@ -1177,13 +1225,21 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         $(this).addClass('active');
         ffCurrentTab = $(this).data('tab');
         ffCurrentPage = 1;
-        ffLoad(ffCurrentTab, ffCurrentPage);
+        ffLoad(ffCurrentTab, ffCurrentPage, ffCurrentStatus, ffCurrentSearch);
+    });
+
+    $('#ffStatusFilters .ff-status-btn').on('click', function () {
+        $('#ffStatusFilters .ff-status-btn').removeClass('active');
+        $(this).addClass('active');
+        ffCurrentStatus = $(this).data('status');
+        ffCurrentPage = 1;
+        ffLoad(ffCurrentTab, ffCurrentPage, ffCurrentStatus, ffCurrentSearch);
     });
 
     $(document).on('click', '.ff-page-btn', function () {
         if ($(this).is(':disabled')) return;
         ffCurrentPage = parseInt($(this).data('page'), 10);
-        ffLoad(ffCurrentTab, ffCurrentPage);
+        ffLoad(ffCurrentTab, ffCurrentPage, ffCurrentStatus, ffCurrentSearch);
     });
 })(jQuery);
 </script>
@@ -1192,23 +1248,27 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
     var viewBdmId = <?php echo json_encode($_GET['view_bdm_id'] ?? ''); ?>;
     var ufCache = {};
     var ufCurrentPage = 1;
+    var ufCurrentSearch = '';
+    var ufSearchTimer = null;
 
     function ufEsc(s) { return $('<div/>').text(s == null ? '' : s).html(); }
+    function ufMoney(n) { return '&#8377;' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
 
     function ufRenderRows(data) {
         if (!data || !data.rows || !data.rows.length) {
-            return '<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">No unassigned Firkas &mdash; every Firka in your districts has a Territory Partner.</div>';
+            return '<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">No unassigned Firkas found.</div>';
         }
         var serialStart = ((data.page || 1) - 1) * (data.per_page || 15);
         var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
             '<thead><tr style="border-bottom:2px solid #e9ecef;text-align:left;color:#6b7280;">' +
             '<th style="padding:6px 8px;">S.No</th><th style="padding:6px 8px;">District</th>' +
-            '<th style="padding:6px 8px;">Firka</th></tr></thead><tbody>';
+            '<th style="padding:6px 8px;">Firka</th><th style="padding:6px 8px;text-align:right;">Target Amount</th></tr></thead><tbody>';
         $.each(data.rows, function (i, r) {
             html += '<tr style="border-bottom:1px solid #f3f4f6;">' +
                 '<td style="padding:7px 8px;color:#9ca3af;">' + (serialStart + i + 1) + '</td>' +
                 '<td style="padding:7px 8px;">' + ufEsc(r.district_name) + '</td>' +
                 '<td style="padding:7px 8px;font-weight:600;color:#1f2937;">' + ufEsc(r.firka_name) + '</td>' +
+                '<td style="padding:7px 8px;text-align:right;font-weight:600;">' + ufMoney(r.target_amount) + '</td>' +
                 '</tr>';
         });
         html += '</tbody></table></div>';
@@ -1223,18 +1283,19 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
             '<button type="button" class="btn btn-sm btn-outline-secondary uf-page-btn" data-page="' + (data.page + 1) + '"' + (data.page >= totalPages ? ' disabled' : '') + '>Next</button>';
     }
 
-    function ufLoad(page) {
+    function ufLoad(page, search) {
+        var key = page + '-' + search;
         $('#ufListBody').html('<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>');
         $('#ufPagination').html('');
-        if (ufCache[page]) {
-            $('#ufListBody').html(ufRenderRows(ufCache[page]));
-            $('#ufPagination').html(ufRenderPagination(ufCache[page]));
+        if (ufCache[key]) {
+            $('#ufListBody').html(ufRenderRows(ufCache[key]));
+            $('#ufPagination').html(ufRenderPagination(ufCache[key]));
             return;
         }
-        var params = { page: page };
+        var params = { page: page, q: search };
         if (viewBdmId) { params.view_bdm_id = viewBdmId; }
         $.getJSON('get-unassigned-firkas.php', params, function (data) {
-            ufCache[page] = data;
+            ufCache[key] = data;
             $('#ufListBody').html(ufRenderRows(data));
             $('#ufPagination').html(ufRenderPagination(data));
         }).fail(function () {
@@ -1244,14 +1305,26 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
 
     $('#unassignedFirkasCard').on('click', function () {
         ufCurrentPage = 1;
+        ufCurrentSearch = '';
+        $('#ufSearchBox').val('');
         $('#unassignedFirkasModal').modal('show');
-        ufLoad(ufCurrentPage);
+        ufLoad(ufCurrentPage, ufCurrentSearch);
+    });
+
+    $('#ufSearchBox').on('input', function () {
+        var val = $(this).val();
+        clearTimeout(ufSearchTimer);
+        ufSearchTimer = setTimeout(function () {
+            ufCurrentSearch = val;
+            ufCurrentPage = 1;
+            ufLoad(ufCurrentPage, ufCurrentSearch);
+        }, 350);
     });
 
     $(document).on('click', '.uf-page-btn', function () {
         if ($(this).is(':disabled')) return;
         ufCurrentPage = parseInt($(this).data('page'), 10);
-        ufLoad(ufCurrentPage);
+        ufLoad(ufCurrentPage, ufCurrentSearch);
     });
 })(jQuery);
 </script>

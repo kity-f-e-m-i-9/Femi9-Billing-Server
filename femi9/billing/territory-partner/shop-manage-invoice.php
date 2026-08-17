@@ -277,7 +277,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
 <script src="../../assets/js/custom.js"></script>
 <script src="../../assets/js/pages/datatables.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="../../assets/js/whatsapp-invoice-share.js"></script>
+<script src="../../assets/js/whatsapp-invoice-share.js?v=2"></script>
 <script>
 // Shares a shop invoice straight to WhatsApp from this list — no detour
 // through the print page. This click is a real user gesture, so the whole

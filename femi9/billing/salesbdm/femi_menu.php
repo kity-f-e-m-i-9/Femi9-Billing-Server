@@ -66,6 +66,10 @@ if (!empty($salesBdmID)) {
         <a href="<?php echo $_bdmBase; ?>tp-advance-payment-report"><i class="material-icons-two-tone">payments</i>TP Advance Payment Report</a>
     </li>
 
+    <li>
+        <a href="<?php echo $_bdmBase; ?>reward-points-tp"><i class="material-icons-two-tone">analytics</i>Reward Points: TPs</a>
+    </li>
+
     <?php if ($_hasReports): ?>
     <li>
         <a href=""><i class="material-icons-two-tone">groups</i>Our Team

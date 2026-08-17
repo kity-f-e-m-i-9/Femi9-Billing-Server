@@ -1,8 +1,9 @@
 <?php
 // AJAX backend for the "Filled Firkas" hover-modal on dashboard.php — lists
 // the Territory Partners (active or inactive tab) assigned within this
-// Sales BDM's own districts, with their Napkin-only target amount and
-// current weekly-target completion status.
+// Sales BDM's own districts, with their Napkin-only target amount, current
+// weekly-target completion status, and a promptness rank for the current
+// week (earliest Napkin sale this week = best rank).
 include("checksession.php");
 include("config.php");
 require_once("include/BdmTpScope.php");
@@ -25,8 +26,11 @@ if (!empty($_GET['view_bdm_id'])) {
 }
 
 $tab     = ($_GET['tab'] ?? 'active') === 'inactive' ? 'inactive' : 'active';
+$status  = $_GET['status'] ?? 'all';
+$status  = in_array($status, ['on_track', 'behind'], true) ? $status : 'all';
 $page    = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 15;
+$search  = trim($_GET['q'] ?? '');
 
 // Weekly-target month follows the dashboard's own date filter (?month=Y-m,
 // derived there from its existing "from" date) — falls back to the current
@@ -42,19 +46,33 @@ if (empty($tpIds)) {
 $tpIdList  = implode(',', array_map('intval', $tpIds));
 $activeVal = $tab === 'active' ? 1 : 0;
 
-$countRow = $db_conn->query("SELECT COUNT(*) c FROM territory_partners WHERE id IN ($tpIdList) AND is_active=$activeVal")->fetch_assoc();
-$total = (int)($countRow['c'] ?? 0);
+if ($search !== '') {
+    $stmt = $db_conn->prepare("
+        SELECT id, tp_id, name, mobile, branch_district
+        FROM territory_partners
+        WHERE id IN ($tpIdList) AND is_active=$activeVal
+          AND (name LIKE ? OR mobile LIKE ? OR tp_id LIKE ?)
+        ORDER BY name ASC
+    ");
+    $like = '%' . $search . '%';
+    $stmt->bind_param('sss', $like, $like, $like);
+    $stmt->execute();
+    $tpRows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+} else {
+    $tpRows = $db_conn->query("
+        SELECT id, tp_id, name, mobile, branch_district
+        FROM territory_partners
+        WHERE id IN ($tpIdList) AND is_active=$activeVal
+        ORDER BY name ASC
+    ")->fetch_all(MYSQLI_ASSOC);
+}
 
-$offset = ($page - 1) * $perPage;
-$tpRows = $db_conn->query("
-    SELECT id, tp_id, name, mobile, branch_district
-    FROM territory_partners
-    WHERE id IN ($tpIdList) AND is_active=$activeVal
-    ORDER BY name ASC
-    LIMIT $perPage OFFSET $offset
-")->fetch_all(MYSQLI_ASSOC);
-
-$rows = [];
+// Weekly status/rank has to be computed for the WHOLE tab (not just one
+// page) before filtering by On Track/Behind and ranking — otherwise
+// pagination would show fewer than a page's worth of matching rows, or
+// rank TPs only against whichever 15 happened to load on that page.
+$all = [];
 foreach ($tpRows as $tp) {
     $locRows = $db_conn->query("
         SELECT pln.name AS firka_name, pln.target_amount
@@ -69,7 +87,10 @@ foreach ($tpRows as $tp) {
 
     $weekly = getTpWeeklyCompletion($db_conn, (int)$tp['id'], $targetAmount, $month);
 
-    $rows[] = [
+    if ($status === 'on_track' && (!empty($weekly['is_future']) || empty($weekly['on_track']))) continue;
+    if ($status === 'behind' && (!empty($weekly['is_future']) || !empty($weekly['on_track']))) continue;
+
+    $all[] = [
         'tp_id'         => $tp['tp_id'],
         'name'          => $tp['name'],
         'mobile'        => $tp['mobile'],
@@ -79,5 +100,24 @@ foreach ($tpRows as $tp) {
         'weekly'        => $weekly,
     ];
 }
+
+// Rank by promptness this week — earliest first Napkin sale (smallest
+// rank_day_offset) wins; TPs with no sale yet this week (null offset) sort
+// last, below every TP who has sold something. Ties broken by name.
+usort($all, function ($a, $b) {
+    $ao = $a['weekly']['rank_day_offset'] ?? null;
+    $bo = $b['weekly']['rank_day_offset'] ?? null;
+    if ($ao === null && $bo === null) return strcmp($a['name'], $b['name']);
+    if ($ao === null) return 1;
+    if ($bo === null) return -1;
+    if ($ao !== $bo) return $ao <=> $bo;
+    return strcmp($a['name'], $b['name']);
+});
+foreach ($all as $i => &$row) { $row['rank'] = $i + 1; }
+unset($row);
+
+$total  = count($all);
+$offset = ($page - 1) * $perPage;
+$rows   = array_slice($all, $offset, $perPage);
 
 echo json_encode(['total' => $total, 'page' => $page, 'per_page' => $perPage, 'rows' => $rows]);

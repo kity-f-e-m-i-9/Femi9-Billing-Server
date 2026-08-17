@@ -128,7 +128,7 @@ $invoice_heading = $has_gst_product ? 'Tax Invoice' : 'Bill of Supply';
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="../../assets/js/whatsapp-invoice-share.js"></script>
+<script src="../../assets/js/whatsapp-invoice-share.js?v=2"></script>
 <?php
 $waShareOpts = "{elementId:'divToPrint', mobile:'" . htmlspecialchars($result_Customer_Details['mobile'] ?? '', ENT_QUOTES) . "', invoiceNumber:'" . htmlspecialchars($result_Invoice_Details['inv_number'] ?? '', ENT_QUOTES) . "', fileName:'Invoice_" . htmlspecialchars($result_Invoice_Details['inv_number'] ?? '', ENT_QUOTES) . "', businessName:'" . htmlspecialchars($business_name ?? '', ENT_QUOTES) . "', button:this}";
 ?>
@@ -389,7 +389,7 @@ Terms of Delivery<br/>
 ?>
 <tr>
 <td><?=$invno=$invno+1;?></td>
-<td><b><?=$result_INVProductDetails['productName'];?></b></td>
+<td><b><?=$result_INVProductDetails['productName'];?></b><?= $result_INVProductDetails['gst_type_item'] === 'inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
 <td id="rightlaign"><?=$result_INVProductDetails['p_hsn'];?></td>
 <td id="rightlaign"><?=$qty?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_INVProductDetails['p_mrp'], 2);?></td>
@@ -585,6 +585,35 @@ $number = $result_Invoice_Details['total'];
 </tr>
 </table>
 
+<?php
+// Taxable amount in words — same three-way (chargeable/taxable/tax) word
+// breakdown as tp-invoice-print.php.
+$TXBnumber = $TotalAMount123;
+$TXBno = floor($TXBnumber); $TXBdigits_1 = strlen($TXBno); $TXBi = 0; $TXBstr = [];
+while ($TXBi < $TXBdigits_1) {
+    $TXBdivider = ($TXBi == 2) ? 10 : 100; $TXBnum = floor($TXBno % $TXBdivider); $TXBno = floor($TXBno / $TXBdivider);
+    $TXBi += ($TXBdivider == 10) ? 1 : 2;
+    if ($TXBnum) {
+        $TXBplural = (($TXBcounter = count($TXBstr)) && $TXBnum > 9) ? 's' : null;
+        $TXBhundred = ($TXBcounter == 1 && $TXBstr[0]) ? ' and ' : null;
+        $TXBstr[] = ($TXBnum < 21) ? $words[$TXBnum]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred
+                    : $words[floor($TXBnum/10)*10]." ".$words[$TXBnum%10]." ".$digits[$TXBcounter].$TXBplural." ".$TXBhundred;
+    } else $TXBstr[] = null;
+}
+$TXBstr = array_reverse($TXBstr); $TXBresult = implode('', $TXBstr);
+?>
+
+<table width="100%">
+<tr>
+<td style="padding-top:6px;font-size:13px;">Amount Taxable (in words)</td>
+<td align="right" style="font-size:13px;"><?=$Currency_symbol;?>&nbsp;<?php echo inr_format($TotalAMount123, 2);?></td>
+</tr>
+<tr>
+<td><b><?=$Currency_Name;?> <?=ucwords($TXBresult);?> Only</b></td>
+<td></td>
+</tr>
+</table>
+
 <!---------------------HSN WISE TOTAL------------------------------>
 <?php if ($gsttype=="inner"): ?>
 <table width="100%" id="hsnsac">
@@ -592,7 +621,7 @@ $number = $result_Invoice_Details['total'];
 <td align="center">HSN/SAC</td>
 <td align="right">Taxable<br/>Value</td>
 <td align="right" colspan="2">CGST</td>
-<td align="right" colspan="2">SGST</td>
+<td align="right" colspan="2">SGST/UTGST</td>
 <td align="right">Total<br/>Tax Amount</td>
 </tr>
 <tr>

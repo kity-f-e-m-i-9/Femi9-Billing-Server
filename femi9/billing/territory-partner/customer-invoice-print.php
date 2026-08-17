@@ -127,7 +127,7 @@ function PrintDiv() {
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="../../assets/js/whatsapp-invoice-share.js"></script>
+<script src="../../assets/js/whatsapp-invoice-share.js?v=2"></script>
 
 <table align="right">
 <tr>
