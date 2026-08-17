@@ -86,6 +86,42 @@ if (isset($_REQUEST['add-record'])) {
     $username      = $_REQUEST['username'];
     $usertype      = $_REQUEST['usertype'];
 
+    // Diaper/napkin invoice-series guard for the three tracked OT categories
+    // (WEBSITE/ID CONCEPT/WHATSAPP SALES -> WEB/ID/WA, or WEBD/IDD/WAD when
+    // the cart has a diaper product — see ot-invoice-helper.php's suggestion
+    // logic). That suggestion only pre-fills a plain editable text input on
+    // the client, so nothing stops a stale or hand-typed number reaching
+    // here with the wrong series. Re-derive the expected prefix from the
+    // actual submitted cart (diaper wins on a mixed cart, same rule as
+    // ot-sale-add.php's cartHasDiaper()) and reject on mismatch rather than
+    // silently rewriting what the user typed.
+    $otTrackedPrefixMap = [
+        'WEBSITE'        => 'WEB',
+        'ID CONCEPT'     => 'ID',
+        'WHATSAPP SALES' => 'WA',
+    ];
+    if (isset($otTrackedPrefixMap[$catname])) {
+        $cartHasDiaper = false;
+        foreach ($product_id_ex as $pid) {
+            $pid = (int)$pid;
+            if (!$pid) continue;
+            $stmt = $db_conn->prepare("SELECT category FROM products WHERE id = ?");
+            $stmt->bind_param('i', $pid);
+            $stmt->execute();
+            $prodCat = $stmt->get_result()->fetch_assoc()['category'] ?? '';
+            $stmt->close();
+            if ($prodCat === 'diaper') { $cartHasDiaper = true; break; }
+        }
+        $expectedPrefix = $otTrackedPrefixMap[$catname] . ($cartHasDiaper ? 'D' : '');
+        if (!str_starts_with($inv_number, $expectedPrefix . '/')) {
+            $_SESSION['errorMessageOT'] = "Invoice number \"$inv_number\" doesn't match the "
+                . ($cartHasDiaper ? 'diaper' : 'napkin') . " series for $catname (expected it to start with \"$expectedPrefix/\"). "
+                . "Please re-generate the suggested invoice number.";
+            echo "<script>window.location='ot-sale-add?InvalidStock&&AlertStockError';</script>";
+            exit;
+        }
+    }
+
     $stockService = new StockService($db_conn);
     $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
