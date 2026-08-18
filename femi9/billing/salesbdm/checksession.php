@@ -22,9 +22,12 @@ require_once __DIR__ . '/include/db-connect.php';
 // femi_menu.php links to them from every salesbdm page including this
 // bridge view — without them here, clicking either link from a bridged
 // dashboard redirects to a logged-out page instead of showing the report.
+// tp-advance-payment-report.php is included too — the Filled Firkas modal's
+// "View entries" link (dashboard.php) opens it in a new tab, which carries
+// the same bridge cookie but hits this same login check independently.
 $_companyBridgeAllowedScripts = [
     'dashboard.php', 'get-filled-firka-tps.php', 'get-unassigned-firkas.php',
-    'my-team.php', 'my-team-report.php',
+    'my-team.php', 'my-team-report.php', 'tp-advance-payment-report.php',
 ];
 if (in_array(basename($_SERVER['SCRIPT_NAME']), $_companyBridgeAllowedScripts, true) && !empty($_COOKIE['femi9_company_bdm_view'])) {
     $db_conn->query("CREATE TABLE IF NOT EXISTS company_bdm_view_bridge (
