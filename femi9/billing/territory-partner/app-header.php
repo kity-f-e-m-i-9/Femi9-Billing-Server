@@ -17,6 +17,19 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                     #tp-logoTable h1 { font-size: 15px; text-transform: capitalize; padding: 0; margin: 0; color: #d97706; }
                     #tp-logoTable h2 { font-size: 13px; color: #999; padding: 0; margin: 0; }
                     #tp-logoTable h3 { font-size: 11px; color: #003333; padding: 0; margin: 0; font-weight: 400; }
+                    /* The base template pins .app-header to a fixed offset that assumes
+                       its 340px sidebar is always visible — on real mobile widths the
+                       sidebar is off-canvas, so that offset squeezes this header into a
+                       tiny box and the account logo/name overflow it. Scoped to TP pages
+                       only (this file is included on every one) rather than touching the
+                       shared main.css used by every portal. */
+                    @media (max-width: 576px) {
+                        .app-header { left: 0 !important; right: 0 !important; width: 100% !important; }
+                        #tp-logoTable h1 { font-size: 12px; }
+                        #tp-logoTable h2 { font-size: 11px; }
+                        #tp-logoTable h3 { font-size: 9px; }
+                        #tp-logoTable td:first-child > div { width: 34px !important; height: 34px !important; font-size: 15px !important; }
+                    }
                 </style>
                 <table id="tp-logoTable">
                     <tr valign="top">
@@ -36,6 +49,26 @@ $walletBalance = $_wCredits - $_wWithdrawn;
             </div>
 
             <div class="d-flex">
+                <style>
+                    .tp-account-toggle .nav-notifications-toggle img {
+                        width: 32px;
+                        height: 32px;
+                        object-fit: cover;
+                        border-radius: 50%;
+                        vertical-align: middle;
+                    }
+                    @media (max-width: 1100px) {
+                        .tp-account-toggle { display: flex !important; }
+                        .notifications-dropdown.tp-account-dropdown {
+                            position: fixed !important;
+                            top: 60px !important;
+                            right: 8px !important;
+                            left: 8px !important;
+                            width: auto !important;
+                            max-width: none !important;
+                        }
+                    }
+                </style>
                 <ul class="navbar-nav">
                     <li class="nav-item hidden-on-mobile">
                         <a class="nav-link" href="wallet-history.php" style="margin-top:12px;">
@@ -43,11 +76,11 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                         </a>
                     </li>
 
-                    <li class="nav-item hidden-on-mobile">
+                    <li class="nav-item tp-account-toggle">
                         <a class="nav-link nav-notifications-toggle" id="tpDropDown" href="#" data-bs-toggle="dropdown">
                             <img src="../../assets/images/femi-logo.png"/>
                         </a>
-                        <div class="dropdown-menu dropdown-menu-end notifications-dropdown" aria-labelledby="tpDropDown">
+                        <div class="dropdown-menu dropdown-menu-end notifications-dropdown tp-account-dropdown" aria-labelledby="tpDropDown">
                             <h6 class="dropdown-header">Territory Partner (<?php echo htmlspecialchars($Login_user_mobile); ?>)</h6>
                             <div class="notifications-dropdown-list">
                                 <?php if (count($_SESSION['LINKED_ACCOUNTS'] ?? []) > 1): ?>
@@ -62,6 +95,7 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                                 </a>
                                 <?php endforeach; ?>
                                 <?php endif; ?>
+                                <h6 class="dropdown-header">Security</h6>
                                 <a href="change-password.php">
                                     <div class="notifications-dropdown-item">
                                         <div class="notifications-dropdown-item-text">

@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 require_once("include/GodownAccess.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
@@ -212,7 +213,10 @@ foreach ($existing_items as $it) {
                         <i class="material-icons" style="vertical-align:middle;margin-right:8px;">error</i>
                         <?php if ($err === 'insufficient'): ?>Insufficient stock at the source location for one or more products.
                         <?php elseif ($err === 'noproducts'): ?>Please add at least one product.
-                        <?php elseif ($err === 'nobalance'): ?>Insufficient advance balance. <a href="add-tp-advance-payment" style="color:inherit;font-weight:700;text-decoration:underline;">Add advance payment →</a>
+                        <?php elseif ($err === 'nobalance'): ?>
+                            <?php $_errType = tpResolveProductType($inv['product_type'] ?? null); ?>
+                            Insufficient <strong><?php echo htmlspecialchars(tpProductTypeLabel($_errType)); ?></strong> advance balance. <a href="add-tp-advance-payment" style="color:inherit;font-weight:700;text-decoration:underline;">Add a <?php echo htmlspecialchars(tpProductTypeLabel($_errType)); ?> advance payment →</a>
+                        <?php elseif ($err === 'type_mismatch'): ?>One or more selected products don't match this invoice's declared type.
                         <?php else: ?>An error occurred. <?php if (!empty($_GET['msg'])): ?><small style="opacity:.75;">(<?php echo htmlspecialchars(substr($_GET['msg'],0,120)); ?>)</small><?php endif; ?>
                         <?php endif; ?>
                     </div>
@@ -224,6 +228,8 @@ foreach ($existing_items as $it) {
                             <i class="material-icons">edit</i>
                             Edit Invoice
                             <span class="inv-badge"><?php echo htmlspecialchars($inv['invoice_number']); ?></span>
+                            <?php $_invType = $inv['product_type'] ?? 'napkin'; [$_tBg, $_tFg] = tpProductTypeBadgeColors($_invType); ?>
+                            <span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;background:<?php echo $_tBg; ?>;color:<?php echo $_tFg; ?>;vertical-align:middle;"><?php echo htmlspecialchars(tpProductTypeLabel($_invType)); ?></span>
                         </h1>
                         <a href="manage-tp-invoices" class="menu-link" title="Back to Invoices">
                             <i class="material-icons">list</i>
@@ -415,6 +421,10 @@ foreach ($existing_items as $it) {
     var sourceCpId     = <?php echo $_src_cp_id; ?>;
     var sourceGodownId = <?php echo $_src_godown_id; ?>;
     var locationId     = <?php echo (int)$inv['source_location_id']; ?>;
+    // This invoice's type is fixed at creation — never editable here, only
+    // used to keep the "add more of this type" picker consistent with what's
+    // already on the invoice.
+    var invoiceProductType = <?php echo json_encode($inv['product_type'] ?? 'napkin'); ?>;
     var tpId           = <?php echo (int)$inv['territory_partner_id']; ?>;
     var oldSubtotal    = <?php echo $subtotal; ?>;
     var advanceBalance = 0;
@@ -429,7 +439,7 @@ foreach ($existing_items as $it) {
     function fetchBalance() {
         $.getJSON('get-tp-advance-balance.php?tp_id=' + tpId, function (res) {
             // Effective balance = current_balance + old_subtotal (will be restored on save)
-            var current = res.balance || 0;
+            var current = (invoiceProductType === 'diaper' ? res.balance_diaper : res.balance_napkin) || 0;
             var effective = parseFloat((current + oldSubtotal).toFixed(2));
             advanceBalance = effective;
             if (effective <= 0) {
@@ -456,10 +466,11 @@ foreach ($existing_items as $it) {
     /* ── Load products at source ── */
     function loadProducts() {
         $('#productSelect').html('<option value="">Loading…</option>').prop('disabled', true);
+        var typeParam = '&product_type=' + encodeURIComponent(invoiceProductType);
         var url = sourceCpId
-            ? 'get-tp-location-products.php?cp_id=' + sourceCpId
-            : (sourceGodownId ? 'get-godown-tp-products.php?godown_id=' + sourceGodownId
-                              : 'get-tp-location-products.php?location_id=' + locationId);
+            ? 'get-tp-location-products.php?cp_id=' + sourceCpId + typeParam
+            : (sourceGodownId ? 'get-godown-tp-products.php?godown_id=' + sourceGodownId + typeParam
+                              : 'get-tp-location-products.php?location_id=' + locationId + typeParam);
         $.getJSON(url, function (data) {
             availableProducts = data;
             var loadedPids = {};

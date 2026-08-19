@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -28,6 +29,12 @@ $to   = isset($_GET['to'])   && $_GET['to']   ? date('Y-m-d', strtotime($_GET['t
 // ═══════════════════════════════════════════════════════════════════════════
 $my_tpid_esc = mysqli_real_escape_string($db_conn, $my_tpid);
 $referrals = [];
+// total_purchase (and therefore target_pct below) is Napkin-only —
+// target_amount has no Diaper equivalent, so counting Diaper invoices here
+// would make a downline TP's "on track" reading meaningless (a TP pushing
+// only Diaper volume would falsely look like they're hitting a Napkin
+// target). tp_invoices.product_type is the invoice's own authoritative
+// type, set at creation time — no need to re-derive it from line items.
 $res = mysqli_query($db_conn, "
     SELECT m.id, m.tp_id, m.name, m.mobile, m.is_active, m.referral_percentage, m.created_at,
            COUNT(tpi.id)                        AS invoice_count,
@@ -37,6 +44,7 @@ $res = mysqli_query($db_conn, "
     LEFT JOIN tp_invoices tpi
            ON tpi.territory_partner_id = m.id
           AND tpi.invoice_date BETWEEN '" . mysqli_real_escape_string($db_conn, $from) . "' AND '" . mysqli_real_escape_string($db_conn, $to) . "'
+          AND tpi.product_type = 'napkin'
     WHERE m.referral_type = 'TP' AND m.referral_id = '$my_tpid_esc'
     GROUP BY m.id
     ORDER BY total_purchase DESC, m.name ASC
@@ -274,9 +282,9 @@ unset($rf);
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
                             <div class="kpi-card">
                                 <span class="kpi-icon-chip chip-indigo"><i class="material-icons-outlined">shopping_cart</i></span>
-                                <div class="kpi-title">Their Purchases</div>
+                                <div class="kpi-title">Their Purchases <small style="font-weight:400;">(Napkin)</small></div>
                                 <div class="kpi-value">&#x20B9;<?php echo inr_format($total_downline_purchase, 0); ?></div>
-                                <div class="kpi-sub">total stock bought</div>
+                                <div class="kpi-sub">total stock bought — Napkin only, matches their target</div>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
@@ -323,8 +331,8 @@ unset($rf);
                                                 <th>Territory Partner</th>
                                                 <th>Mobile</th>
                                                 <th>Commission Rate</th>
-                                                <th>Invoices</th>
-                                                <th>Purchases</th>
+                                                <th>Invoices <small>(Napkin)</small></th>
+                                                <th>Purchases <small>(Napkin)</small></th>
                                                 <th>Target Progress</th>
                                                 <th>Last Purchase</th>
                                                 <th>Lifetime Earned From Them</th>

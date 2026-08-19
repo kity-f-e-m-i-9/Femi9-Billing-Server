@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 $cp_id = (int) $Login_user_IDvl;
@@ -45,7 +46,7 @@ if ($filter_date_to !== '') {
 $where_sql = 'WHERE ' . implode(' AND ', $where);
 
 $sql = "
-    SELECT tpi.id, tpi.invoice_number, tpi.invoice_date, tpi.courier_charges, tpi.discount_amount, tpi.total_amount,
+    SELECT tpi.id, tpi.invoice_number, tpi.invoice_date, tpi.courier_charges, tpi.discount_amount, tpi.total_amount, tpi.product_type,
            tp.name AS tp_name, tp.tp_id AS tp_code,
            (SELECT COUNT(*) FROM tp_invoice_items tii WHERE tii.tp_invoice_id = tpi.id) AS item_count
     FROM tp_invoices tpi
@@ -192,7 +193,11 @@ $filters_active = $filter_tp_id || $filter_date_from || $filter_date_to;
                                                 <tr><td colspan="7" class="text-center text-muted">No invoices sourced from your stock yet.</td></tr>
                                             <?php else: foreach ($invoices as $inv): ?>
                                                 <tr data-search="<?php echo htmlspecialchars(strtolower($inv['invoice_number'] . ' ' . $inv['tp_name'] . ' ' . $inv['tp_code'])); ?>">
-                                                    <td><code><?php echo htmlspecialchars($inv['invoice_number']); ?></code></td>
+                                                    <td>
+                                                        <code><?php echo htmlspecialchars($inv['invoice_number']); ?></code>
+                                                        <?php $_invType = tpResolveProductType($inv['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_invType); ?>
+                                                        <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?php echo $_tBg; ?>;color:<?php echo $_tFg; ?>;"><?php echo htmlspecialchars(tpProductTypeLabel($_invType)); ?></span>
+                                                    </td>
                                                     <td><?php echo htmlspecialchars($inv['invoice_date']); ?></td>
                                                     <td><?php echo htmlspecialchars($inv['tp_name']); ?></td>
                                                     <td><?php echo htmlspecialchars($inv['tp_code']); ?></td>

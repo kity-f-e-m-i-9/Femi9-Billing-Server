@@ -1707,12 +1707,22 @@ $district_sales = array_slice(
 // user_invoice (TP reselling to SS/S/SD/D/Shop or another business) plus
 // invoice (TP selling directly to a customer, user_type='territory_partner')
 // — not from what company invoiced TO the TP (that's company's own invoice).
+// Revenue is split Napkin/Diaper by the product-category mix of each TP's
+// own item lines (uii.pr_id / ii.pr_id -> products.category), then that
+// ratio is applied to the header-level revenue (which is already net of
+// courier_charges) rather than summing item totals directly — this keeps
+// the combined figure exactly matching the pre-split total while still
+// giving an accurate split. target_amount has no Diaper equivalent (it's
+// Napkin-only), so only the Napkin side is ever compared against target;
+// Diaper is shown as a share of the TP's own total sales instead.
 $tp_perf = ($scope === 'tp') ? call_rows($db_conn,
     "SELECT tp.id tp_id, tp.name tp_name, tp.tp_id tp_code,
             COALESCE(si.cnt,0) + COALESCE(ci.cnt,0) inv_cnt,
             COALESCE(si.rev,0) + COALESCE(ci.rev,0) revenue,
             COALESCE(si.units,0) + COALESCE(ci.units,0) units,
-            COALESCE(tgt.target,0) target
+            COALESCE(tgt.target,0) target,
+            COALESCE(sic.napkin_total,0) + COALESCE(cic.napkin_total,0) napkin_item_total,
+            COALESCE(sic.diaper_total,0) + COALESCE(cic.diaper_total,0) diaper_item_total
      FROM territory_partners tp
      LEFT JOIN (
          SELECT from_user_id, COUNT(*) cnt, SUM(total-courier_charges) rev,
@@ -1727,6 +1737,24 @@ $tp_perf = ($scope === 'tp') ? call_rows($db_conn,
          GROUP BY user_id
      ) ci ON ci.user_id = tp.id
      LEFT JOIN (
+         SELECT uii.from_user_id,
+                SUM(CASE WHEN COALESCE(p.category,'') != 'diaper' THEN uii.total ELSE 0 END) napkin_total,
+                SUM(CASE WHEN p.category = 'diaper' THEN uii.total ELSE 0 END) diaper_total
+         FROM user_invoice_items uii
+         JOIN products p ON p.id = uii.pr_id
+         WHERE uii.from_user_type='territory_partner' AND uii.date BETWEEN '{$from}' AND '{$to}'
+         GROUP BY uii.from_user_id
+     ) sic ON sic.from_user_id = tp.id
+     LEFT JOIN (
+         SELECT ii.user_id,
+                SUM(CASE WHEN COALESCE(p.category,'') != 'diaper' THEN ii.total ELSE 0 END) napkin_total,
+                SUM(CASE WHEN p.category = 'diaper' THEN ii.total ELSE 0 END) diaper_total
+         FROM invoice_items ii
+         JOIN products p ON p.id = ii.pr_id
+         WHERE ii.user_type='territory_partner' AND ii.date BETWEEN '{$from}' AND '{$to}'
+         GROUP BY ii.user_id
+     ) cic ON cic.user_id = tp.id
+     LEFT JOIN (
          SELECT tpl.territory_partner_id, COALESCE(SUM(pln.target_amount),0) target
          FROM territory_partner_locations tpl
          JOIN partner_location_nodes pln ON pln.id=tpl.location_id
@@ -1735,11 +1763,27 @@ $tp_perf = ($scope === 'tp') ? call_rows($db_conn,
      WHERE tp.is_active=1
      ORDER BY revenue DESC") : [];
 
+foreach ($tp_perf as &$_tp) {
+    $_itemTotal = (float)$_tp['napkin_item_total'] + (float)$_tp['diaper_item_total'];
+    // No item-level category data for this TP in range (e.g. legacy rows) —
+    // default to treating it all as Napkin, same safe-majority default used
+    // elsewhere in the Napkin/Diaper split (see shared/TpProductType.php).
+    $_napkinShare = $_itemTotal > 0 ? ((float)$_tp['napkin_item_total'] / $_itemTotal) : 1.0;
+    $_tp['napkin_revenue'] = round((float)$_tp['revenue'] * $_napkinShare, 2);
+    $_tp['diaper_revenue'] = round((float)$_tp['revenue'] - $_tp['napkin_revenue'], 2);
+    $_tp['diaper_pct'] = (float)$_tp['revenue'] > 0 ? round($_tp['diaper_revenue'] / (float)$_tp['revenue'] * 100, 1) : 0;
+}
+unset($_tp);
+
 $max_tp_rev  = (float)($tp_perf[0]['revenue'] ?? 1) ?: 1;
 $total_target_all = array_sum(array_column($tp_perf, 'target'));
 $total_achieved_all = array_sum(array_column($tp_perf, 'revenue'));
+$total_napkin_achieved_all = array_sum(array_column($tp_perf, 'napkin_revenue'));
+$total_diaper_achieved_all = array_sum(array_column($tp_perf, 'diaper_revenue'));
 $overall_pct_all = $total_target_all > 0
-    ? min(round($total_achieved_all / $total_target_all * 100, 1), 999) : 0;
+    ? min(round($total_napkin_achieved_all / $total_target_all * 100, 1), 999) : 0;
+$overall_diaper_pct_all = $total_achieved_all > 0
+    ? round($total_diaper_achieved_all / $total_achieved_all * 100, 1) : 0;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 7. TOP SHOPS & TOP DISTRIBUTORS
@@ -1921,7 +1965,9 @@ $j_gvals   = json_encode(array_map('floatval', array_column($six_months,'total_r
 $j_plabels = json_encode(array_column($product_sales,'productName'));
 $j_pqty    = json_encode(array_map('intval', array_column($product_sales,'total_qty')));
 $j_tplabels= json_encode(array_column($tp_perf,'tp_name'));
-$j_tprevs  = json_encode(array_map(fn($r)=>round($r['revenue'],0), $tp_perf));
+// Napkin revenue (not combined) — target_amount is Napkin-only, so this is
+// the figure that's actually comparable to it (see napkin_revenue split above).
+$j_tprevs  = json_encode(array_map(fn($r)=>round($r['napkin_revenue'],0), $tp_perf));
 $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2387,8 +2433,9 @@ if ($is_neksomo_view) {
             el.style.opacity = '0';
             setTimeout(function(){ el && el.remove(); }, 300);
         }
+        document.addEventListener('DOMContentLoaded', hide);
         window.addEventListener('load', hide);
-        setTimeout(hide, 8000);
+        setTimeout(hide, 1500);
     })();
     </script>
 <div class="app align-content-stretch d-flex flex-wrap">
@@ -2567,8 +2614,8 @@ if ($is_neksomo_view) {
                     ];
                     if ($scope === 'tp') {
                         $tgt_accent = $overall_pct_all>=100 ? 'good' : ($overall_pct_all>=50 ? 'warning' : 'critical');
-                        $kpis[] = [$tgt_accent,'flag','Overall Target %',$overall_pct_all.'%',
-                         '₹'.inr_format($total_achieved_all, 0).' / ₹'.inr_format($total_target_all, 0), ''];
+                        $kpis[] = [$tgt_accent,'flag','Overall Napkin Target %',$overall_pct_all.'%',
+                         '₹'.inr_format($total_napkin_achieved_all, 0).' / ₹'.inr_format($total_target_all, 0), ''];
                     }
                     // Company scope (non-Neksomo) shows Gross Profit / Expenses / Net
                     // Profit as the dedicated Napkin/Diaper split card further down the
@@ -2899,23 +2946,24 @@ if ($is_neksomo_view) {
                                                 <div style="font-size:22px;font-weight:700;color:#1a237e">₹<?php echo inr_format($total_achieved_all, 0); ?></div>
                                             </div>
                                             <div style="background:#f5f6fa;border-radius:8px;padding:14px;text-align:center;">
-                                                <div style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Overall Achievement</div>
+                                                <div style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Overall Napkin Achievement</div>
                                                 <div style="font-size:22px;font-weight:700;color:<?php echo $overall_pct_all>=100?'#0ca30c':($overall_pct_all>=50?'#9a6b00':'#d03b3b'); ?>">
                                                     <?php echo $overall_pct_all; ?>%
                                                 </div>
-                                                <div style="font-size:12px;color:#888">Target: ₹<?php echo inr_format($total_target_all, 0); ?></div>
+                                                <div style="font-size:12px;color:#888">Napkin Target: ₹<?php echo inr_format($total_target_all, 0); ?></div>
+                                                <div style="font-size:12px;color:#888;margin-top:6px;">Diaper: ₹<?php echo inr_format($total_diaper_achieved_all, 0); ?> (<?php echo $overall_diaper_pct_all; ?>% of total sales)</div>
                                             </div>
                                         </div>
                                     </div>
                                     <div style="overflow-x:auto">
                                     <table class="mt">
-                                        <thead><tr><th>Rank</th><th>TP Name</th><th>TP Code</th><th>Invoices</th><th>Units</th><th>Revenue</th><th>Target</th><th>Achievement</th><th>Gap</th></tr></thead>
+                                        <thead><tr><th>Rank</th><th>TP Name</th><th>TP Code</th><th>Invoices</th><th>Units</th><th>Napkin Revenue</th><th>Napkin Target</th><th>Napkin Achievement</th><th>Napkin Gap</th><th>Diaper Revenue</th><th>Diaper Share</th></tr></thead>
                                         <tbody>
                                         <?php foreach ($tp_perf as $i => $tp): ?>
                                             <?php
-                                            $pct = $tp['target']>0 ? min(round($tp['revenue']/$tp['target']*100,1),999) : 0;
+                                            $pct = $tp['target']>0 ? min(round($tp['napkin_revenue']/$tp['target']*100,1),999) : 0;
                                             $bc  = $pct>=100?'#0ca30c':($pct>=50?'#fab219':'#d03b3b');
-                                            $gap = (float)$tp['target'] - (float)$tp['revenue'];
+                                            $gap = (float)$tp['target'] - (float)$tp['napkin_revenue'];
                                             $rk_class = $i==0?'rank-1':($i==1?'rank-2':($i==2?'rank-3':''));
                                             ?>
                                             <tr>
@@ -2925,8 +2973,8 @@ if ($is_neksomo_view) {
                                                 <td><?php echo inr_format((int)$tp['inv_cnt'], 0); ?></td>
                                                 <td><span class="bq"><?php echo inr_format((int)$tp['units'], 0); ?></span></td>
                                                 <td>
-                                                    <b>₹<?php echo inr_format($tp['revenue'], 2); ?></b>
-                                                    <div class="pbar mt-1"><div class="pf" style="width:<?php echo round($tp['revenue']/$max_tp_rev*100,1); ?>%;background:#2a78d6"></div></div>
+                                                    <b>₹<?php echo inr_format($tp['napkin_revenue'], 2); ?></b>
+                                                    <div class="pbar mt-1"><div class="pf" style="width:<?php echo round($tp['napkin_revenue']/$max_tp_rev*100,1); ?>%;background:#2a78d6"></div></div>
                                                 </td>
                                                 <td>₹<?php echo inr_format($tp['target'], 0); ?></td>
                                                 <td>
@@ -2938,11 +2986,14 @@ if ($is_neksomo_view) {
                                                 <td style="color:<?php echo $gap>0?'#d03b3b':'#0ca30c'; ?>">
                                                     <?php echo $gap>0?'−':'+'?>₹<?php echo inr_format(abs($gap), 0); ?>
                                                 </td>
+                                                <td><b>₹<?php echo inr_format($tp['diaper_revenue'], 2); ?></b></td>
+                                                <td><span style="font-size:13px;font-weight:700;color:#7c3aed;"><?php echo $tp['diaper_pct']; ?>%</span></td>
                                             </tr>
                                         <?php endforeach; ?>
                                         </tbody>
                                     </table>
                                     </div>
+                                    <div style="font-size:11px;color:#888;margin-top:6px;">Diaper has no separate target yet — "Diaper Share" is that revenue as a % of the TP's own total sales, not an achievement figure.</div>
                                 </div>
                             </div>
                         </div>
@@ -3470,8 +3521,8 @@ document.querySelectorAll('.tab-item').forEach(function(t) {
         data:{
             labels:labels,
             datasets:[
-                { label:'Revenue',  data:revs, backgroundColor:'#2a78d6', borderRadius:4, maxBarThickness:24 },
-                { label:'Target',   data:tgts, backgroundColor:'#c3c2b7', borderRadius:4, maxBarThickness:24 }
+                { label:'Napkin Revenue',  data:revs, backgroundColor:'#2a78d6', borderRadius:4, maxBarThickness:24 },
+                { label:'Napkin Target',   data:tgts, backgroundColor:'#c3c2b7', borderRadius:4, maxBarThickness:24 }
             ]
         },
         options:{responsive:true, maintainAspectRatio:false,

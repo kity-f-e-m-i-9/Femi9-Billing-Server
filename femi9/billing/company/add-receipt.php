@@ -1,4 +1,5 @@
 <?php
+
 /**
  * add-receipt.php
  *
@@ -46,9 +47,17 @@ $csrfToken = $_SESSION['csrf_token'];
 
 function verifyCsrf(): void
 {
-    $submitted = $_POST['csrf_token'] ?? '';
-    if (!hash_equals($_SESSION['csrf_token'], $submitted)) {
-        die('Invalid CSRF token.');
+    $submitted    = $_POST['csrf_token']    ?? '';
+    $sessionToken = $_SESSION['csrf_token'] ?? '';
+    // Session token can be empty/missing if the session expired or was reset
+    // between page load and submit (page left open a long time, or a second
+    // tab regenerated it) — hash_equals() requires strings, so guard against
+    // null/empty here rather than letting a TypeError fatal into a blank page.
+    if ($sessionToken === '' || !hash_equals($sessionToken, $submitted)) {
+        $safeInvid   = urlencode($_POST['invid']   ?? '');
+        $safeInvuser = urlencode($_POST['invuser'] ?? '');
+        header("Location: add-receipt.php?invid=$safeInvid&invuser=$safeInvuser&SessionExpired");
+        exit;
     }
 }
 
@@ -106,6 +115,23 @@ if (!$result_product_list) {
 $courier_charges       = floatval($result_product_list['courier_charges'] ?? 0);
 $invoice_total         = floatval($result_product_list['total'] ?? 0);
 $invoice_amount_only   = $invoice_total - $courier_charges;   // product-only amount
+
+// The `invoice` table (customer invoices) has no from_user_type/from_user_id/
+// to_user_type/to_user_id columns — only user_type/user_id (the seller) and
+// customer_id. Every other invoice table (user_invoice) already has the
+// from/to pair natively. Normalize here so the rest of this file can use one
+// consistent set of fields regardless of which table this invoice came from.
+if ($invtable_name === 'invoice') {
+    $receipt_from_user_type = (string)($result_product_list['user_type'] ?? '');
+    $receipt_from_user_id   = (string)($result_product_list['user_id']   ?? '');
+    $receipt_to_user_type   = 'customer';
+    $receipt_to_user_id     = (string)($result_product_list['customer_id'] ?? '');
+} else {
+    $receipt_from_user_type = (string)($result_product_list['from_user_type'] ?? '');
+    $receipt_from_user_id   = (string)($result_product_list['from_user_id']   ?? '');
+    $receipt_to_user_type   = (string)($result_product_list['to_user_type']   ?? '');
+    $receipt_to_user_id     = (string)($result_product_list['to_user_id']     ?? '');
+}
 
 // ── DELETE RECEIPT ────────────────────────────────────────────────────────────
 if (isset($_REQUEST['delreceiptact'])) {
@@ -402,10 +428,10 @@ if (isset($_POST['addreceipt'])) {
             $received_amount,     // received = paid now
             $balance_amount,      // receivable = balance after this payment
             $receipt_date,
-            $result_product_list['from_user_type'],
-            $result_product_list['from_user_id'],
-            $result_product_list['to_user_type'],
-            $result_product_list['to_user_id'],
+            $receipt_from_user_type,
+            $receipt_from_user_id,
+            $receipt_to_user_type,
+            $receipt_to_user_id,
             $receipt_method,
             $receipt_remarks,
             $db_payment_type
@@ -743,6 +769,13 @@ $temp_time = date('gis');
                     <div class="alert alert-danger">
                         <i class="material-icons">account_balance_wallet</i>
                         <div><strong>Insufficient advance balance.</strong> Please top up advance payment first.</div>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (isset($_REQUEST['SessionExpired'])): ?>
+                    <div class="alert alert-danger">
+                        <i class="material-icons">error</i>
+                        <div><strong>Your session had expired.</strong> Please re-enter the payment details and submit again.</div>
                     </div>
                     <?php endif; ?>
 

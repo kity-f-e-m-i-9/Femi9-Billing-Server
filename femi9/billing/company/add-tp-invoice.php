@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 require_once("include/GodownAccess.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -20,14 +21,20 @@ $godowns_list = $gd_result ? $gd_result->fetch_all(MYSQLI_ASSOC) : [];
 $prefill_po_id = (int)($_GET['po_id'] ?? 0);
 $prefill_tp_id = 0;
 $prefill_items = [];
+// Read-only, inherited from the PO — an invoice billed from a PO always
+// carries that PO's type; a direct/manual invoice (no po_id) gets an
+// explicit selector further down instead. Defaults to napkin only for the
+// direct-invoice case (the selector overrides it before submit).
+$prefill_product_type = 'napkin';
 if ($prefill_po_id > 0) {
-    $poStmt = $db_conn->prepare("SELECT territory_partner_id FROM tp_purchase_orders WHERE id=? AND status IN ('waiting','cancelled')");
+    $poStmt = $db_conn->prepare("SELECT territory_partner_id, product_type FROM tp_purchase_orders WHERE id=? AND status IN ('waiting','cancelled')");
     $poStmt->bind_param("i", $prefill_po_id);
     $poStmt->execute();
     $poRow = $poStmt->get_result()->fetch_assoc();
     $poStmt->close();
     if ($poRow) {
         $prefill_tp_id = (int)$poRow['territory_partner_id'];
+        $prefill_product_type = tpResolveProductType($poRow['product_type'] ?? null);
         $itStmt = $db_conn->prepare("SELECT product_id, qty FROM tp_purchase_order_items WHERE po_id=?");
         $itStmt->bind_param("i", $prefill_po_id);
         $itStmt->execute();
@@ -278,8 +285,10 @@ if ($prefill_po_id > 0) {
                         <?php elseif ($err === 'missing'): ?>Please fill in all required fields.
                         <?php elseif ($err === 'noproducts'): ?>Please add at least one product with a valid quantity.
                         <?php elseif ($err === 'nobalance'): ?>
-                            Insufficient advance balance. Required: <strong>₹<?php echo htmlspecialchars($_GET['need'] ?? ''); ?></strong>, Available: <strong>₹<?php echo htmlspecialchars($_GET['have'] ?? '0.00'); ?></strong>.
-                            <a href="add-tp-advance-payment" style="color:inherit;font-weight:700;text-decoration:underline;">Add advance payment →</a>
+                            <?php $_errType = tpResolveProductType($_GET['type'] ?? null); ?>
+                            Insufficient <strong><?php echo htmlspecialchars(tpProductTypeLabel($_errType)); ?></strong> advance balance. Required: <strong>₹<?php echo htmlspecialchars($_GET['need'] ?? ''); ?></strong>, Available: <strong>₹<?php echo htmlspecialchars($_GET['have'] ?? '0.00'); ?></strong>.
+                            <a href="add-tp-advance-payment" style="color:inherit;font-weight:700;text-decoration:underline;">Add a <?php echo htmlspecialchars(tpProductTypeLabel($_errType)); ?> advance payment →</a>
+                        <?php elseif ($err === 'type_mismatch'): ?>One or more selected products don't match this invoice's declared type. Please re-check your product selection.
                         <?php else: ?>An error occurred. Please try again.<?php if (!empty($_GET['msg'])): ?> <small style="opacity:0.75;">(<?php echo htmlspecialchars(substr($_GET['msg'],0,100)); ?>)</small><?php endif; ?>
                         <?php endif; ?>
                     </div>
@@ -344,6 +353,21 @@ if ($prefill_po_id > 0) {
                                            value="<?php echo date('Y-m-d'); ?>"
                                            max="<?php echo date('Y-m-d'); ?>" required>
                                     <div class="field-hint">Cannot be a future date</div>
+                                </div>
+
+                                <div class="col-lg-3 col-md-4">
+                                    <label class="form-label">Product Type <span class="required">*</span></label>
+                                    <?php if ($prefill_po_id > 0): ?>
+                                        <input type="text" class="form-control" value="<?php echo htmlspecialchars(tpProductTypeLabel($prefill_product_type)); ?>" disabled>
+                                        <input type="hidden" name="product_type" id="productTypeInput" value="<?php echo htmlspecialchars($prefill_product_type); ?>">
+                                        <div class="field-hint">Inherited from the purchase order</div>
+                                    <?php else: ?>
+                                        <select name="product_type" id="productTypeInput" class="form-control" required onchange="onProductTypeChange()">
+                                            <option value="napkin" selected>Napkin</option>
+                                            <option value="diaper">Lumi Diaper</option>
+                                        </select>
+                                        <div class="field-hint">Products offered below are restricted to this type</div>
+                                    <?php endif; ?>
                                 </div>
 
                             </div>
@@ -572,6 +596,7 @@ $(document).ready(function() {
     var currentCpSources  = [];
     var sourceMode        = 'cp'; // 'cp' or 'godown' — which source type is currently shown
     var advanceBalance    = 0;
+    var balanceRequestSeq = 0; // guards against an older in-flight balance request (e.g. Napkin) resolving after a newer one (Diaper) and overwriting the panel with stale data
 
     /* ── Godown list (pre-loaded from PHP) ── */
     var godownsList = <?php echo json_encode($godowns_list); ?>;
@@ -602,20 +627,25 @@ $(document).ready(function() {
 
     /* ── Balance helpers ── */
     function fetchBalance(tp_id, godown_id) {
-        var url = 'get-tp-advance-balance.php?tp_id=' + tp_id;
+        var ptype = $('#productTypeInput').val() || 'napkin';
+        var url = 'get-tp-advance-balance.php?tp_id=' + tp_id + '&product_type=' + encodeURIComponent(ptype);
         if (godown_id) url += '&godown_id=' + godown_id;
-        var note = godown_id ? 'Available advance balance for this godown.' : 'Available to deduct against new invoices.';
+        var typeLabel = ptype === 'diaper' ? 'Diaper' : 'Napkin';
+        var note = (godown_id ? 'Available ' + typeLabel + ' advance balance for this godown.' : 'Available ' + typeLabel + ' balance to deduct against new invoices.');
         $('#balancePanel').show();
         setBalancePanel('loading', '—', 'Fetching balance…', false);
+        var mySeq = ++balanceRequestSeq;
         $.getJSON(url, function (res) {
-            advanceBalance = res.balance || 0;
+            if (mySeq !== balanceRequestSeq) return; // a newer request (e.g. after switching type) has already superseded this one
+            advanceBalance = (ptype === 'diaper' ? res.balance_diaper : res.balance_napkin) || 0;
             if (advanceBalance <= 0) {
-                setBalancePanel('danger', '₹0.00', 'No advance balance' + (godown_id ? ' for this godown' : '') + '. Please add a payment before creating an invoice.', true);
+                setBalancePanel('danger', '₹0.00', 'No ' + typeLabel + ' advance balance' + (godown_id ? ' for this godown' : '') + '. Please add a payment before creating an invoice.', true);
             } else {
                 setBalancePanel('ok', '₹' + fmtAmt(advanceBalance), note, false);
             }
             updateSummary();
         }).fail(function () {
+            if (mySeq !== balanceRequestSeq) return;
             advanceBalance = 0;
             setBalancePanel('warn', '—', 'Could not load balance. Balance will be checked on submit.', false);
             updateSummary();
@@ -830,7 +860,7 @@ $(document).ready(function() {
     /* ── Load products from godown stock ── */
     function loadGodownProducts(godown_id) {
         $('#productSelect').html('<option value="">Loading…</option>').prop('disabled', true);
-        $.getJSON('get-godown-tp-products.php?godown_id=' + godown_id, function (data) {
+        $.getJSON('get-godown-tp-products.php?godown_id=' + godown_id + '&product_type=' + encodeURIComponent($('#productTypeInput').val() || 'napkin'), function (data) {
             availableProducts = data;
             var opts = '<option value="">— Select Product —</option>';
             $.each(data, function (_, p) {
@@ -853,7 +883,7 @@ $(document).ready(function() {
     /* ── Load products for CP ── */
     function loadProducts(cp_id) {
         $('#productSelect').html('<option value="">Loading…</option>').prop('disabled', true);
-        $.getJSON('get-tp-location-products.php?cp_id=' + cp_id, function (data) {
+        $.getJSON('get-tp-location-products.php?cp_id=' + cp_id + '&product_type=' + encodeURIComponent($('#productTypeInput').val() || 'napkin'), function (data) {
             availableProducts = data;
             var opts = '<option value="">— Select Product —</option>';
             $.each(data, function (_, p) {
@@ -1131,6 +1161,23 @@ $(document).ready(function() {
         renderTable();
         resetAddForm();
         $('#hiddenProductInputs').empty();
+    }
+
+    // Switching Napkin/Diaper on a direct (no-PO) invoice clears whatever was
+    // already added — the two types never mix in one invoice, same rule as
+    // the purchase order form this mirrors.
+    // Exposed on window because the <select> uses an inline onchange="" attribute,
+    // which runs in the global scope and can't see a name declared only inside
+    // this (function ($) {...})(jQuery) closure.
+    window.onProductTypeChange = function onProductTypeChange() {
+        resetProducts();
+        if (sourceMode === 'godown' && currentGodownId) {
+            loadGodownProducts(currentGodownId);
+            fetchBalance(currentTpId, currentGodownId);
+        } else if (currentCpId) {
+            loadProducts(currentCpId);
+            fetchBalance(currentTpId);
+        }
     }
 
     function resetAddForm() {

@@ -3,11 +3,13 @@ include("checksession.php");
 include("config.php");
 include("insert_wallet_referral.php");
 require_once(__DIR__ . '/../shared/TpApproverContext.php');
+require_once(__DIR__ . '/../shared/TpProductType.php');
 
 // ── Safe defaults (used if try block below fails for any reason) ─────────────
 $locCount    = 0; $invCount    = 0; $advBalance = 0; $totalTarget = 0;
 $productsSold = 0; $paidRevenue = 0; $stockList  = [];
 $advBalanceCompany = 0; $advBalanceSs = 0; $assignedSs = null;
+$advBalanceNapkin = 0; $advBalanceDiaper = 0;
 
 try {
 
@@ -69,6 +71,22 @@ mysqli_stmt_bind_param($balStmt, "i", $Login_user_IDvl);
 mysqli_stmt_execute($balStmt);
 $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
 mysqli_stmt_close($balStmt);
+
+// Same total, split by wallet (Napkin vs Diaper) — orthogonal to the
+// approver split below, both apply together.
+$balTypeStmt = mysqli_prepare($db_conn,
+    "SELECT product_type, COALESCE(SUM(balance_amount), 0) AS bal
+     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
+     GROUP BY product_type"
+);
+mysqli_stmt_bind_param($balTypeStmt, "i", $Login_user_IDvl);
+mysqli_stmt_execute($balTypeStmt);
+$balTypeRes = mysqli_stmt_get_result($balTypeStmt);
+while ($r = mysqli_fetch_assoc($balTypeRes)) {
+    if (tpResolveProductType($r['product_type']) === 'diaper') $advBalanceDiaper = (float)$r['bal'];
+    else $advBalanceNapkin = (float)$r['bal'];
+}
+mysqli_stmt_close($balTypeStmt);
 
 $assignedSs = tpGetAssignedSs($db_conn, (int)$Login_user_IDvl);
 if ($assignedSs !== null) {
@@ -238,8 +256,9 @@ mysqli_stmt_close($stockListStmt);
             el.style.opacity = '0';
             setTimeout(function(){ el && el.remove(); }, 300);
         }
+        document.addEventListener('DOMContentLoaded', hide);
         window.addEventListener('load', hide);
-        setTimeout(hide, 8000);
+        setTimeout(hide, 1500);
     })();
     </script>
     <div class="app align-content-stretch d-flex flex-wrap">
@@ -306,6 +325,10 @@ mysqli_stmt_close($stockListStmt);
                                                             <div class="widget-stats-content flex-fill">
                                                                 <span class="widget-stats-title">Advance Balance</span>
                                                                 <span class="widget-stats-amount">₹<?php echo inr_format($advBalance, 2); ?></span>
+                                                                <div style="font-size:11px;color:#6b7280;margin-top:2px;">
+                                                                    Napkin: ₹<?php echo inr_format($advBalanceNapkin, 2); ?> &middot;
+                                                                    Diaper: ₹<?php echo inr_format($advBalanceDiaper, 2); ?>
+                                                                </div>
                                                                 <?php if ($assignedSs !== null): ?>
                                                                 <div style="font-size:11px;color:#6b7280;margin-top:2px;">
                                                                     Company: ₹<?php echo inr_format($advBalanceCompany, 2); ?> &middot;

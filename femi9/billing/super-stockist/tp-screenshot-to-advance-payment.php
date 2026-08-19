@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 header('Content-Type: application/json');
@@ -55,7 +56,7 @@ if (!empty($errors)) {
 // territory_partner_id alone, since that alone doesn't prove approver
 // routing or SS ownership.
 $stmt = $db_conn->prepare(
-    "SELECT s.id, s.territory_partner_id, s.status, s.advance_payment_id
+    "SELECT s.id, s.territory_partner_id, s.status, s.advance_payment_id, po.product_type AS po_product_type
      FROM tp_purchase_order_screenshots s
      JOIN tp_purchase_orders po ON po.id = s.po_id
      JOIN territory_partners tp ON tp.id = s.territory_partner_id
@@ -78,6 +79,15 @@ if ($screenshot['advance_payment_id'] !== null) {
 
 $tpId = (int)$screenshot['territory_partner_id'];
 
+// Inherits the type from the screenshot's own PO — see the matching comment
+// in company/tp-screenshot-to-advance-payment.php. The JOIN above is INNER
+// (po_id is never NULL here), so po_product_type is always real.
+tpEnsureAdvanceWalletColumns($db_conn);
+$productTypeOverride = isset($_POST['product_type']) ? (string)$_POST['product_type'] : null;
+$productType = $productTypeOverride !== null
+    ? tpResolveProductType($productTypeOverride)
+    : tpResolveProductType($screenshot['po_product_type'] ?? null);
+
 $db_conn->begin_transaction();
 try {
     $adjusted = 0.00;
@@ -89,13 +99,13 @@ try {
     // bookkeeping concept, unrelated to SS-routed advance payments.
     $ins = $db_conn->prepare(
         "INSERT INTO tp_advance_payments
-            (territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, remarks,
+            (territory_partner_id, product_type, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, remarks,
              adjusted_amount, balance_amount, status, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
     );
     $ins->bind_param(
-        'isidssssddss',
-        $tpId, $approverType, $ss_account_id, $amount, $paymentDate, $paymentMode, $referenceNum, $remarks,
+        'issidssssddss',
+        $tpId, $productType, $approverType, $ss_account_id, $amount, $paymentDate, $paymentMode, $referenceNum, $remarks,
         $adjusted, $balance, $status, $createdBy
     );
     if (!$ins->execute()) throw new \Exception('Insert failed: ' . $ins->error);

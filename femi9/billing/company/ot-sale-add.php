@@ -222,7 +222,8 @@ $stmt_states->close();
 
                                     <form action="ot-sale-action" method="post"
                                           enctype="multipart/form-data" id="otSaleForm"
-                                          onsubmit="return confirmOtSaleSubmit();">
+                                          onsubmit="return confirmOtSaleSubmit();"
+                                          onkeydown="if (event.key === 'Enter' && event.target.tagName === 'INPUT' && event.target.type !== 'submit') { event.preventDefault(); }">
 
                                         <!-- Hidden fields -->
                                         <input type="hidden" name="tempid"      value="<?= htmlspecialchars($tempid, ENT_QUOTES) ?>">
@@ -489,7 +490,7 @@ $stmt_states->close();
             walletInp.value = 0; // reset wallet when not applicable
         }
         recalculateGrandTotal();
-        suggestInvoiceNumber(selectedCat);
+        suggestInvoiceNumber(selectedCat, true);
     }
 
     // Company/godown changed — the invoice series depends on which company
@@ -525,7 +526,7 @@ $stmt_states->close();
         return false;
     }
 
-    function suggestInvoiceNumber(selectedCat) {
+    function suggestInvoiceNumber(selectedCat, isCategoryChange) {
         const invField  = document.getElementById('inv_number');
         const warnEl    = document.getElementById('invoiceNumberWarning');
         const godownid  = document.getElementById('godownid').value;
@@ -533,7 +534,11 @@ $stmt_states->close();
         invoiceNumberIsDuplicate = false;
 
         if (!TRACKED_INVOICE_CATS.includes(selectedCat)) {
-            invField.value = ''; // free/manual entry for all other categories
+            // Free/manual entry for all other categories. Only clear the field
+            // when the category itself just changed (old number belonged to a
+            // different series) — NOT on every product-row select, which used
+            // to wipe out whatever the user had already typed.
+            if (isCategoryChange) { invField.value = ''; }
             return;
         }
 

@@ -24,7 +24,8 @@ function convertAdvancePaymentSubmissionToSsAdvancePayment(
     string $referenceNumber,
     string $note,
     int $ssAccountId,
-    string $createdBy
+    string $createdBy,
+    ?string $productTypeOverride = null
 ): array {
     $referenceNumber = trim($referenceNumber);
     if ($amount <= 0 || $amount > 99999999.99) {
@@ -48,7 +49,7 @@ function convertAdvancePaymentSubmissionToSsAdvancePayment(
     }
 
     $stmt = $db_conn->prepare(
-        "SELECT id, territory_partner_id, status, advance_payment_id FROM tp_advance_payment_submissions WHERE id = ?"
+        "SELECT id, territory_partner_id, status, advance_payment_id, product_type FROM tp_advance_payment_submissions WHERE id = ?"
     );
     $stmt->bind_param('i', $submissionId);
     $stmt->execute();
@@ -71,6 +72,11 @@ function convertAdvancePaymentSubmissionToSsAdvancePayment(
 
     $tpId = (int)$submission['territory_partner_id'];
 
+    tpEnsureAdvanceWalletColumns($db_conn);
+    $productType = $productTypeOverride !== null
+        ? tpResolveProductType($productTypeOverride)
+        : tpResolveProductType($submission['product_type'] ?? null);
+
     $db_conn->begin_transaction();
     try {
         $adjusted = 0.00;
@@ -80,13 +86,13 @@ function convertAdvancePaymentSubmissionToSsAdvancePayment(
 
         $ins = $db_conn->prepare(
             "INSERT INTO tp_advance_payments
-                (territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, remarks,
+                (territory_partner_id, product_type, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, remarks,
                  adjusted_amount, balance_amount, status, created_by)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $ins->bind_param(
-            'isidssssddss',
-            $tpId, $approverType, $ssAccountId, $amount, $paymentDate, $paymentMode, $referenceNumber, $note,
+            'issidssssddss',
+            $tpId, $productType, $approverType, $ssAccountId, $amount, $paymentDate, $paymentMode, $referenceNumber, $note,
             $adjusted, $balance, $status, $createdBy
         );
         if (!$ins->execute()) throw new \Exception('Insert failed: ' . $ins->error);

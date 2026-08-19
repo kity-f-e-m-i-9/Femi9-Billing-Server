@@ -20,6 +20,8 @@
  * territory-partner/include/AdvancePaymentScreenshotHelper.php.
  */
 
+require_once __DIR__ . '/../../shared/TpProductType.php';
+
 // Claude's raw_text is a structured one-line summary written by
 // classifyAdvancePaymentVisionResult() in upload-advance-payment-screenshot.php,
 // always prefixed "Claude vision: " — anything else stored in ocr_raw_text
@@ -177,7 +179,8 @@ function convertAdvancePaymentSubmissionToAdvancePayment(
     string $referenceNumber,
     string $note,
     int $companyId,
-    string $createdBy
+    string $createdBy,
+    ?string $productTypeOverride = null
 ): array {
     $referenceNumber = trim($referenceNumber);
     if ($amount <= 0 || $amount > 99999999.99) {
@@ -204,7 +207,7 @@ function convertAdvancePaymentSubmissionToAdvancePayment(
     }
 
     $stmt = $db_conn->prepare(
-        "SELECT id, territory_partner_id, status, advance_payment_id FROM tp_advance_payment_submissions WHERE id = ?"
+        "SELECT id, territory_partner_id, status, advance_payment_id, product_type FROM tp_advance_payment_submissions WHERE id = ?"
     );
     $stmt->bind_param('i', $submissionId);
     $stmt->execute();
@@ -233,6 +236,15 @@ function convertAdvancePaymentSubmissionToAdvancePayment(
     $approverType = 'company';
     $approverSsId = null;
 
+    // Inherits the type the TP submitted under, unless a reviewer explicitly
+    // overrides it here — the one legitimate place to correct a TP mislabel,
+    // since this is the last human checkpoint before the money becomes a
+    // real wallet balance.
+    tpEnsureAdvanceWalletColumns($db_conn);
+    $productType = $productTypeOverride !== null
+        ? tpResolveProductType($productTypeOverride)
+        : tpResolveProductType($submission['product_type'] ?? null);
+
     $db_conn->begin_transaction();
     try {
         $adjusted = 0.00;
@@ -241,13 +253,13 @@ function convertAdvancePaymentSubmissionToAdvancePayment(
 
         $ins = $db_conn->prepare(
             "INSERT INTO tp_advance_payments
-                (company_id, territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, remarks,
+                (company_id, territory_partner_id, product_type, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, remarks,
                  adjusted_amount, balance_amount, status, created_by)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $ins->bind_param(
-            'iisidssssddss',
-            $companyId, $tpId, $approverType, $approverSsId, $amount, $paymentDate, $paymentMode, $referenceNumber, $note,
+            'iissidssssddss',
+            $companyId, $tpId, $productType, $approverType, $approverSsId, $amount, $paymentDate, $paymentMode, $referenceNumber, $note,
             $adjusted, $balance, $status, $createdBy
         );
         if (!$ins->execute()) throw new \Exception('Insert failed: ' . $ins->error);

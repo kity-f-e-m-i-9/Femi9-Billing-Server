@@ -3,6 +3,7 @@ include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 require_once("include/GodownAccess.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 header('Content-Type: application/json');
@@ -51,7 +52,10 @@ if (!empty($errors)) {
 }
 
 $stmt = $db_conn->prepare(
-    "SELECT id, territory_partner_id, status, advance_payment_id FROM tp_purchase_order_screenshots WHERE id = ?"
+    "SELECT s.id, s.territory_partner_id, s.status, s.advance_payment_id, po.product_type AS po_product_type
+     FROM tp_purchase_order_screenshots s
+     LEFT JOIN tp_purchase_orders po ON po.id = s.po_id
+     WHERE s.id = ?"
 );
 $stmt->bind_param('i', $screenshotId);
 $stmt->execute();
@@ -82,6 +86,17 @@ if (!is_godown_allowed($db_conn, $companyId)) {
     respond(['success' => false, 'message' => 'You are not authorized to record payments for this company profile.'], 403);
 }
 
+// Inherits the type from the screenshot's own PO (the most reliable source
+// — this money was raised specifically to cover that order), unless a
+// reviewer explicitly overrides it or the screenshot was never linked to a
+// PO (uploaded then abandoned before submit), in which case it falls back
+// to napkin like any other untyped legacy row.
+tpEnsureAdvanceWalletColumns($db_conn);
+$productTypeOverride = isset($_POST['product_type']) ? (string)$_POST['product_type'] : null;
+$productType = $productTypeOverride !== null
+    ? tpResolveProductType($productTypeOverride)
+    : tpResolveProductType($screenshot['po_product_type'] ?? null);
+
 $db_conn->begin_transaction();
 try {
     $adjusted = 0.00;
@@ -95,13 +110,13 @@ try {
     $approverSsId = null;
     $ins = $db_conn->prepare(
         "INSERT INTO tp_advance_payments
-            (company_id, territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
+            (company_id, territory_partner_id, product_type, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
              adjusted_amount, balance_amount, status, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
     );
     $ins->bind_param(
-        'iisidsssssddss',
-        $companyId, $tpId, $approverType, $approverSsId, $amount, $paymentDate, $paymentMode, $referenceNum, $bankName, $remarks,
+        'iissidsssssddss',
+        $companyId, $tpId, $productType, $approverType, $approverSsId, $amount, $paymentDate, $paymentMode, $referenceNum, $bankName, $remarks,
         $adjusted, $balance, $status, $createdBy
     );
     if (!$ins->execute()) throw new \Exception('Insert failed: ' . $ins->error);

@@ -2,6 +2,7 @@
 ob_start();
 include("checksession.php");
 require_once("include/GodownAccess.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
@@ -20,9 +21,11 @@ $_col = $db_conn->query("SHOW COLUMNS FROM tp_advance_payments LIKE 'company_id'
 if ($_col && $_col->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_advance_payments ADD COLUMN company_id INT UNSIGNED DEFAULT NULL AFTER territory_partner_id, ADD INDEX idx_tpap_company (company_id)");
 }
+tpEnsureAdvanceWalletColumns($db_conn);
 
 $company_id     = (int)($_POST['company_id'] ?? 0);
 $tp_id          = (int)($_POST['territory_partner_id'] ?? 0);
+$productType    = tpResolveProductType($_POST['product_type'] ?? null);
 $amount         = round((float)($_POST['amount'] ?? 0), 2);
 $payment_date   = trim($_POST['payment_date'] ?? '');
 $payment_mode   = trim($_POST['payment_mode'] ?? '');
@@ -75,11 +78,11 @@ try {
     $status = 'active';
 
     $s = $db_conn->prepare("INSERT INTO tp_advance_payments
-        (company_id, territory_partner_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
+        (company_id, territory_partner_id, product_type, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
          adjusted_amount, balance_amount, status, created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("iidssssssdss",
-        $company_id, $tp_id, $amount, $payment_date, $payment_mode, $reference_num, $bank_name, $remarks,
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $s->bind_param("iisdssssssdss",
+        $company_id, $tp_id, $productType, $amount, $payment_date, $payment_mode, $reference_num, $bank_name, $remarks,
         $adjusted, $balance, $status, $created_by);
     if (!$s->execute()) throw new \Exception("Insert failed: " . $s->error);
     $s->close();

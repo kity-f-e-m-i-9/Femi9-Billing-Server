@@ -45,8 +45,10 @@ if ($companyId > 0) {
     }
 }
 
+$productTypeOverride = isset($_POST['product_type']) ? (string)$_POST['product_type'] : null;
+
 $result = convertAdvancePaymentSubmissionToAdvancePayment(
-    $db_conn, $submissionId, $amount, $paymentDate, $paymentMode, $referenceNum, $note, $companyId, $createdBy
+    $db_conn, $submissionId, $amount, $paymentDate, $paymentMode, $referenceNum, $note, $companyId, $createdBy, $productTypeOverride
 );
 
 echo json_encode($result);

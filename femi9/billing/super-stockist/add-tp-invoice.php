@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -21,7 +22,7 @@ $po_id = (int)($_GET['po_id'] ?? 0);
 $poData = null;
 if ($po_id > 0) {
     $poStmt = $db_conn->prepare(
-        "SELECT o.id, o.territory_partner_id, tp.name AS tp_name, tp.tp_id AS tp_code
+        "SELECT o.id, o.territory_partner_id, o.product_type, tp.name AS tp_name, tp.tp_id AS tp_code
          FROM tp_purchase_orders o
          JOIN territory_partners tp ON tp.id = o.territory_partner_id
          WHERE o.id = ? AND tp.onboard_ss_id = ? AND o.approver_type = 'ss' AND o.approver_ss_id = ? AND o.status = 'waiting'"
@@ -42,9 +43,11 @@ if ($po_id > 0) {
             'po_id' => $po_id,
             'tp_id' => (int)$poRow['territory_partner_id'],
             'items' => $poItems,
+            'product_type' => tpResolveProductType($poRow['product_type'] ?? null),
         ];
     }
 }
+$prefill_product_type = $poData['product_type'] ?? 'napkin';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -169,7 +172,10 @@ if ($po_id > 0) {
                         <?php elseif ($err === 'missing'): ?>Please fill in all required fields.
                         <?php elseif ($err === 'noproducts'): ?>Please add at least one product with a valid quantity.
                         <?php elseif ($err === 'nobalance'): ?>
-                            Insufficient advance balance. Required: <strong>₹<?php echo htmlspecialchars($_GET['need'] ?? ''); ?></strong>, Available: <strong>₹<?php echo htmlspecialchars($_GET['have'] ?? '0.00'); ?></strong>.
+                            <?php $_errType = tpResolveProductType($_GET['type'] ?? null); ?>
+                            Insufficient <strong><?php echo htmlspecialchars(tpProductTypeLabel($_errType)); ?></strong> advance balance. Required: <strong>₹<?php echo htmlspecialchars($_GET['need'] ?? ''); ?></strong>, Available: <strong>₹<?php echo htmlspecialchars($_GET['have'] ?? '0.00'); ?></strong>.
+                            <a href="add-tp-advance-payment" style="color:inherit;font-weight:700;text-decoration:underline;">Add a <?php echo htmlspecialchars(tpProductTypeLabel($_errType)); ?> advance payment →</a>
+                        <?php elseif ($err === 'type_mismatch'): ?>One or more selected products don't match this invoice's declared type. Please re-check your product selection.
                         <?php elseif ($err === 'duplicate'): ?>
                             Invoice number <strong><?php echo htmlspecialchars($_GET['inv'] ?? ''); ?></strong> already exists. Please enter a different invoice number.
                         <?php else: ?>An error occurred. Please try again.<?php if (!empty($_GET['msg'])): ?> <small>(<?php echo htmlspecialchars(substr($_GET['msg'],0,100)); ?>)</small><?php endif; ?>
@@ -231,6 +237,21 @@ if ($po_id > 0) {
                                            value="<?php echo (isset($_GET['error']) && $_GET['error'] === 'duplicate') ? htmlspecialchars($_GET['inv'] ?? '') : ''; ?>"
                                            placeholder="Enter invoice number">
                                     <div id="invNumberHint" style="margin-top:6px;font-size:12.5px;"></div>
+                                </div>
+
+                                <div class="col-lg-4 col-md-4">
+                                    <label class="form-label">Product Type <span class="required">*</span></label>
+                                    <?php if ($poData): ?>
+                                        <input type="text" class="form-control" value="<?php echo htmlspecialchars(tpProductTypeLabel($prefill_product_type)); ?>" disabled>
+                                        <input type="hidden" name="product_type" id="productTypeInput" value="<?php echo htmlspecialchars($prefill_product_type); ?>">
+                                        <div class="field-hint">Inherited from the purchase order</div>
+                                    <?php else: ?>
+                                        <select name="product_type" id="productTypeInput" class="form-control" required onchange="onProductTypeChange()">
+                                            <option value="napkin" selected>Napkin</option>
+                                            <option value="diaper">Lumi Diaper</option>
+                                        </select>
+                                        <div class="field-hint">Products offered below are restricted to this type</div>
+                                    <?php endif; ?>
                                 </div>
 
                             </div>
@@ -388,6 +409,7 @@ $(document).ready(function() {
     var availableProducts = [];
     var currentTpId       = null;
     var advanceBalance    = 0;
+    var balanceRequestSeq = 0; // guards against an older in-flight balance request (e.g. Napkin) resolving after a newer one (Diaper) and overwriting the panel with stale data
     var invNumberOk       = false;
     var invNumberTimer    = null;
     var rowSeq             = 0;
@@ -418,17 +440,22 @@ $(document).ready(function() {
     if ($('#invNumberInput').val().trim()) { $('#invNumberInput').trigger('input'); }
 
     function fetchBalance(tp_id) {
+        var ptype = $('#productTypeInput').val() || 'napkin';
+        var typeLabel = ptype === 'diaper' ? 'Diaper' : 'Napkin';
         $('#balancePanel').show();
         setBalancePanel('loading', '—', 'Fetching balance…', false);
+        var mySeq = ++balanceRequestSeq;
         $.getJSON('get-tp-advance-balance.php?tp_id=' + tp_id, function (res) {
-            advanceBalance = res.balance || 0;
+            if (mySeq !== balanceRequestSeq) return; // a newer request (e.g. after switching type) has already superseded this one
+            advanceBalance = (ptype === 'diaper' ? res.balance_diaper : res.balance_napkin) || 0;
             if (advanceBalance <= 0) {
-                setBalancePanel('danger', '₹0.00', 'No advance balance. Please add a payment before creating an invoice.', true);
+                setBalancePanel('danger', '₹0.00', 'No ' + typeLabel + ' advance balance. Please add a payment before creating an invoice.', true);
             } else {
-                setBalancePanel('ok', '₹' + fmtAmt(advanceBalance), 'Available to deduct against new invoices.', false);
+                setBalancePanel('ok', '₹' + fmtAmt(advanceBalance), 'Available ' + typeLabel + ' balance to deduct against new invoices.', false);
             }
             updateSummary();
         }).fail(function () {
+            if (mySeq !== balanceRequestSeq) return;
             advanceBalance = 0;
             setBalancePanel('warn', '—', 'Could not load balance. Balance will be checked on submit.', false);
             updateSummary();
@@ -466,8 +493,28 @@ $(document).ready(function() {
         $('#tpSelect').val(String(poData.tp_id)).trigger('change');
     }
 
+    // Switching Napkin/Diaper on a direct (no-PO) invoice clears whatever was
+    // already added and reloads the picker for the newly chosen type — the
+    // two types never mix in one invoice, same rule as the purchase order
+    // form this mirrors. Deliberately does NOT use resetAll() here since
+    // that also clears currentTpId (the TP itself is still selected).
+    // Exposed on window because the <select> uses an inline onchange="" attribute,
+    // which runs in the global scope and can't see a name declared only inside
+    // this (function ($) {...})(jQuery) closure.
+    window.onProductTypeChange = function onProductTypeChange() {
+        availableProducts = [];
+        rowSeq = 0;
+        $('#productBody').empty();
+        $('#hiddenProductInputs').empty();
+        updateSummary();
+        if (currentTpId) {
+            loadSsProducts();
+            fetchBalance(currentTpId);
+        }
+    }
+
     function loadSsProducts() {
-        $.getJSON('get-ss-tp-products.php?tp_id=' + currentTpId, function (data) {
+        $.getJSON('get-ss-tp-products.php?tp_id=' + currentTpId + '&product_type=' + encodeURIComponent($('#productTypeInput').val() || 'napkin'), function (data) {
             availableProducts = data || [];
             $('#productBody').empty();
             if (!availableProducts.length) {

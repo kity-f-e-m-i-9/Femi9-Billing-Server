@@ -362,7 +362,14 @@ while ($ri = mysqli_fetch_array($res_items)) {
     <tr id="itemrow_<?php echo $ri['id']; ?>">
         <th><?php echo ++$rd; ?></th>
         <td><?php echo $pr['productName']; ?></td>
-        <?php $canEditLine = $isFromDmOrder && $amount_received_fully == 0; ?>
+        <?php
+        $canEditLine  = $isFromDmOrder && $amount_received_fully == 0;
+        // Shop Price stays editable on every invoice (not just DM-assigned
+        // orders) as long as payment hasn't been fully received yet — TPs
+        // need to be able to correct the price charged to a shop regardless
+        // of how the invoice line originated.
+        $canEditPrice = $amount_received_fully == 0;
+        ?>
         <td>
             <?php if ($canEditLine) { ?>
             <input type="number" min="0" step="any" id="qty_<?php echo $ri['id']; ?>"
@@ -375,10 +382,10 @@ while ($ri = mysqli_fetch_array($res_items)) {
         </td>
         <td class="text-muted">&#8377;<?php echo inr_format($pr['mrp'] ?? 0, 2); ?></td>
         <td>
-            <?php if ($canEditLine) { ?>
+            <?php if ($canEditPrice) { ?>
             <input type="number" min="0" step="any" id="price_<?php echo $ri['id']; ?>"
                    value="<?php echo $ri['amount']; ?>"
-                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
+                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>', <?php echo (float)$ri['qty']; ?>, <?php echo (float)$ri['discount_amount']; ?>, <?php echo (float)$ri['gst_percentage']; ?>)"
                    class="form-control form-control-sm" style="width:80px;">
             <?php } else { ?>
             &#8377;<?php echo inr_format($ri['amount'], 2); ?>
@@ -422,7 +429,7 @@ while ($ri = mysqli_fetch_array($res_items)) {
 </table>
 </div></div>
 
-<?php if ($isFromDmOrder) { ?>
+<?php if ($isFromDmOrder || $amount_received_fully == 0) { ?>
 <form id="rowEditForm" method="post" action="shop-invoice-item-edit.php" style="display:none;">
     <input type="hidden" name="invid" id="rf_invid">
     <input type="hidden" name="rowid" id="rf_rowid">
@@ -437,11 +444,19 @@ while ($ri = mysqli_fetch_array($res_items)) {
 // DM-assigned order's invoice and change it — saves itself the moment you
 // leave the field, no separate Edit/Save step. Discount is rupees-only;
 // the percentage shown underneath is derived and read-only.
-function saveLineEdit(id, invid, rowid, invuser) {
-    var qty     = document.getElementById('qty_' + id).value;
+//
+// On a non-DM invoice only the Shop Price field is an actual <input> (Qty/
+// Discount/GST% stay plain text) — origQty/origDiscamt/origGstpct are the
+// line's existing values, passed in so the save still round-trips the
+// unedited fields correctly instead of finding no element and erroring.
+function saveLineEdit(id, invid, rowid, invuser, origQty, origDiscamt, origGstpct) {
+    var qtyEl     = document.getElementById('qty_' + id);
+    var discamtEl = document.getElementById('discamt_' + id);
+    var gstpctEl  = document.getElementById('gstpct_' + id);
+    var qty     = qtyEl     ? qtyEl.value     : origQty;
     var price   = document.getElementById('price_' + id).value;
-    var discamt = document.getElementById('discamt_' + id).value;
-    var gstpct  = document.getElementById('gstpct_' + id).value;
+    var discamt = discamtEl ? discamtEl.value : origDiscamt;
+    var gstpct  = gstpctEl  ? gstpctEl.value  : origGstpct;
     if (qty === '' || isNaN(qty)) { return; }
     if (price === '' || isNaN(price)) { return; }
     document.getElementById('rf_invid').value = invid;

@@ -4,6 +4,7 @@ include("checksession.php");
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
 require_once __DIR__ . '/../shared/TpApproverContext.php';
+require_once __DIR__ . '/../shared/TpProductType.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
     header("Location: manage-tp-invoices?error=unauthorized"); exit;
@@ -72,6 +73,14 @@ if (empty($new_items)) {
 }
 if (!empty($item_errors)) {
     header("Location: edit-tp-invoice?id=$enc&error=invalid_items&details=" . urlencode(implode(',', $item_errors))); exit;
+}
+
+// This invoice's type is fixed at creation — editing can add/remove/change
+// quantities, but never smuggle in a product of the other type.
+$invoiceProductType = tpResolveProductType($inv['product_type'] ?? null);
+$editCartClassification = tpProductTypeOfProducts($db_conn, array_column($new_items, 'pid'));
+if ($editCartClassification['mixed'] || ($editCartClassification['type'] !== null && $editCartClassification['type'] !== $invoiceProductType)) {
+    header("Location: edit-tp-invoice?id=$enc&error=type_mismatch"); exit;
 }
 
 $new_subtotal = round(array_sum(array_column($new_items, 'amount')), 2);
@@ -160,18 +169,18 @@ try {
     }
 
     // 2. Restore old advance payment — reverse exactly what was deducted for this invoice
-    tpAdvanceRestore($db_conn, $inv_id);
+    tpAdvanceRestore($db_conn, $inv_id, null, $invoiceProductType);
 
     // 3. Validate new advance balance (net amount after discount; courier collected separately)
     // This SS's own direct-invoice edit flow — always scoped to this TP's
     // SS-approved balance pool for this exact SS, same reasoning as
     // tp-invoice-action.php.
     $editApprover = ['type' => 'ss', 'ss_id' => (int)($result_LoGuserDtails['id'] ?? 0)];
-    $bs = $db_conn->prepare("SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted' AND approver_type=? AND approver_ss_id<=>?");
-    $bs->bind_param("isi", $tp_id, $editApprover['type'], $editApprover['ss_id']); $bs->execute();
+    $bs = $db_conn->prepare("SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted' AND approver_type=? AND approver_ss_id<=>? AND product_type=?");
+    $bs->bind_param("isis", $tp_id, $editApprover['type'], $editApprover['ss_id'], $invoiceProductType); $bs->execute();
     $avail_balance = round((float)$bs->get_result()->fetch_assoc()['bal'], 2); $bs->close();
     if ($avail_balance < $new_net) {
-        throw new \Exception("Insufficient advance balance. Available: " . inr_format($avail_balance, 2) . ", Required: " . inr_format($new_net, 2));
+        throw new \Exception("Insufficient " . tpProductTypeLabel($invoiceProductType) . " advance balance. Available: " . inr_format($avail_balance, 2) . ", Required: " . inr_format($new_net, 2));
     }
 
     // 4. Apply new stock movements
@@ -198,7 +207,7 @@ try {
     }
 
     // 5. Deduct new advance (FIFO, net amount after discount) and log for future restore
-    tpAdvanceDeduct($db_conn, $inv_id, $inv_num, $tp_id, $new_net, 0, $editApprover);
+    tpAdvanceDeduct($db_conn, $inv_id, $inv_num, $tp_id, $new_net, 0, $editApprover, $invoiceProductType);
 
     // 6. Update invoice header (discount_amount preserved/updated so total stays consistent)
     // Note: existence is already guaranteed by the FOR UPDATE lock above (within this same

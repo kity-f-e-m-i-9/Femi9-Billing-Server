@@ -78,8 +78,9 @@ echo "<script>window.location='change-password.php';</script>";
             el.style.opacity = '0';
             setTimeout(function(){ el && el.remove(); }, 300);
         }
+        document.addEventListener('DOMContentLoaded', hide);
         window.addEventListener('load', hide);
-        setTimeout(hide, 8000);
+        setTimeout(hide, 1500);
     })();
     </script> 
  

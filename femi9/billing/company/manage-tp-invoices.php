@@ -2,6 +2,7 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 require_once("include/GodownAccess.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -138,7 +139,7 @@ $where_sql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
 $sql = "
     SELECT tpi.id, tpi.invoice_number, tpi.invoice_date, tpi.total_amount,
-           tpi.rwpoints_enable,
+           tpi.rwpoints_enable, tpi.product_type,
            COALESCE(tpi.courier_charges, 0) AS courier_charges,
            tpi.created_by, tpi.created_at,
            tp.name AS tp_name, tp.tp_id AS tp_code, tp.mobile AS tp_mobile,
@@ -460,7 +461,11 @@ $i = 0;
                                     ?>
                                         <tr>
                                             <td style="color:#9ca3af;font-size:13px;"><?php echo ++$i; ?></td>
-                                            <td><code style="font-size:12px;background:#f3f4f6;padding:2px 7px;border-radius:4px;"><?php echo htmlspecialchars($inv['invoice_number']); ?></code></td>
+                                            <td>
+                                                <code style="font-size:12px;background:#f3f4f6;padding:2px 7px;border-radius:4px;"><?php echo htmlspecialchars($inv['invoice_number']); ?></code>
+                                                <?php $_invType = tpResolveProductType($inv['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_invType); ?>
+                                                <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?php echo $_tBg; ?>;color:<?php echo $_tFg; ?>;"><?php echo htmlspecialchars(tpProductTypeLabel($_invType)); ?></span>
+                                            </td>
                                             <td>
                                                 <span style="font-weight:600;font-size:13.5px;"><?php echo htmlspecialchars($inv['tp_name']); ?></span><br>
                                                 <small style="color:#9ca3af;font-size:11px;"><?php echo htmlspecialchars($inv['tp_code']); ?></small>

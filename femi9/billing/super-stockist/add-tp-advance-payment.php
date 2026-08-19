@@ -144,6 +144,16 @@ $tps = $tp_stmt->get_result()->fetch_all(MYSQLI_ASSOC); $tp_stmt->close();
                                                        placeholder="Enter amount" min="1" step="0.01" required>
                                             </div>
 
+                                            <!-- Product Type -->
+                                            <div class="col-md-6 mb-3">
+                                                <label for="product_type" class="form-label required-field">Product Type</label>
+                                                <select name="product_type" id="product_type" class="form-select" required>
+                                                    <option value="napkin">Napkin</option>
+                                                    <option value="diaper">Lumi Diaper</option>
+                                                </select>
+                                                <small class="text-muted">This payment funds only this wallet — Napkin and Diaper balances are tracked separately</small>
+                                            </div>
+
                                             <!-- Payment Mode -->
                                             <div class="col-md-6 mb-3">
                                                 <label for="payment_mode" class="form-label required-field">Payment Mode</label>
@@ -231,6 +241,7 @@ $(function () {
     }
     $('#territory_partner_id').select2({ placeholder: 'Select Territory Partner', allowClear: true, matcher: tpMatcher });
     $('#payment_mode').select2({ placeholder: 'Select Payment Mode', minimumResultsForSearch: Infinity });
+    $('#product_type').select2({ minimumResultsForSearch: Infinity });
 
     $('#territory_partner_id').on('change', function () {
         var tpId = $(this).val();
@@ -243,7 +254,8 @@ $(function () {
             } else {
                 parts.push('<strong>Monthly Target:</strong> Not set');
             }
-            parts.push('<strong>Outstanding Advance Balance:</strong> ₹' + Number(resp.balance || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
+            parts.push('<strong>Napkin Balance:</strong> ₹' + Number(resp.balance_napkin || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
+            parts.push('<strong>Diaper Balance:</strong> ₹' + Number(resp.balance_diaper || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
             $info.html(parts.join(' &middot; ')).show();
         }).fail(function () { $info.hide().empty(); });
     });

@@ -2,7 +2,9 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 require_once("include/GodownAccess.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
+tpEnsureAdvanceWalletColumns($db_conn);
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -88,6 +90,17 @@ $total_amount = array_sum(array_column($payments, 'amount'));
 $total_balance = array_sum(array_column($payments, 'balance_amount'));
 $total_adjusted = array_sum(array_column($payments, 'adjusted_amount'));
 
+// Same four totals, split by wallet — the combined figure above hides
+// which type each amount actually belongs to.
+$stats_by_type = ['napkin' => ['count' => 0, 'amount' => 0.0, 'balance' => 0.0, 'adjusted' => 0.0], 'diaper' => ['count' => 0, 'amount' => 0.0, 'balance' => 0.0, 'adjusted' => 0.0]];
+foreach ($payments as $p) {
+    $t = ($p['product_type'] ?? 'napkin') === 'diaper' ? 'diaper' : 'napkin';
+    $stats_by_type[$t]['count']++;
+    $stats_by_type[$t]['amount'] += (float)$p['amount'];
+    $stats_by_type[$t]['balance'] += (float)$p['balance_amount'];
+    $stats_by_type[$t]['adjusted'] += (float)$p['adjusted_amount'];
+}
+
 // TPs for filter dropdown (payers)
 $tps = $db_conn->query("SELECT id, tp_id, name FROM territory_partners ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 
@@ -153,6 +166,16 @@ $i = 0;
                                         <td><a href="add-tp-advance-payment" title="Add Payment"><i class="material-icons">add_circle</i></a></td>
                                     </tr></table>
                                 </h1>
+                                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+                                    <a href="review-mixed-advance-payments.php" style="display:inline-flex;align-items:center;gap:6px;background:#ede9fe;color:#6d28d9;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">
+                                        <i class="material-icons-outlined" style="font-size:17px;">fact_check</i>
+                                        Review Mixed Napkin/Diaper Payments
+                                    </a>
+                                    <a href="tp-wallet-transfer.php" style="display:inline-flex;align-items:center;gap:6px;background:#dbeafe;color:#1e40af;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">
+                                        <i class="material-icons-outlined" style="font-size:17px;">swap_horiz</i>
+                                        Transfer Between Napkin/Diaper Wallets
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -163,24 +186,36 @@ $i = 0;
                             <div class="stats-card">
                                 <h3><?php echo $total_count; ?></h3>
                                 <p>Total Payments</p>
+                                <p style="font-size:11.5px;color:#9ca3af;margin-top:4px;">
+                                    <?php echo $stats_by_type['napkin']['count']; ?> Napkin &middot; <?php echo $stats_by_type['diaper']['count']; ?> Diaper
+                                </p>
                             </div>
                         </div>
                         <div class="col-lg-3 col-md-6">
                             <div class="stats-card">
                                 <h3>₹<?php echo inr_format($total_amount, 2); ?></h3>
                                 <p>Total Amount</p>
+                                <p style="font-size:11.5px;color:#9ca3af;margin-top:4px;">
+                                    ₹<?php echo inr_format($stats_by_type['napkin']['amount'], 2); ?> Napkin &middot; ₹<?php echo inr_format($stats_by_type['diaper']['amount'], 2); ?> Diaper
+                                </p>
                             </div>
                         </div>
                         <div class="col-lg-3 col-md-6">
                             <div class="stats-card">
                                 <h3>₹<?php echo inr_format($total_balance, 2); ?></h3>
                                 <p>Total Balance</p>
+                                <p style="font-size:11.5px;color:#9ca3af;margin-top:4px;">
+                                    ₹<?php echo inr_format($stats_by_type['napkin']['balance'], 2); ?> Napkin &middot; ₹<?php echo inr_format($stats_by_type['diaper']['balance'], 2); ?> Diaper
+                                </p>
                             </div>
                         </div>
                         <div class="col-lg-3 col-md-6">
                             <div class="stats-card">
                                 <h3>₹<?php echo inr_format($total_adjusted, 2); ?></h3>
                                 <p>Adjusted Amount</p>
+                                <p style="font-size:11.5px;color:#9ca3af;margin-top:4px;">
+                                    ₹<?php echo inr_format($stats_by_type['napkin']['adjusted'], 2); ?> Napkin &middot; ₹<?php echo inr_format($stats_by_type['diaper']['adjusted'], 2); ?> Diaper
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -257,6 +292,7 @@ $i = 0;
                                                     <th>TP Name</th>
                                                     <th>TP ID</th>
                                                     <th>TP Target (₹)</th>
+                                                    <th>Type</th>
                                                     <th>Receiver Name</th>
                                                     <th>Date</th>
                                                     <th>Amount (₹)</th>
@@ -282,6 +318,10 @@ $i = 0;
                                                         <?php else: ?>
                                                             <span class="text-muted">Not set</span>
                                                         <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php $ptype = tpResolveProductType($p['product_type'] ?? null); [$ptBg, $ptFg] = tpProductTypeBadgeColors($ptype); ?>
+                                                        <span style="background:<?=$ptBg?>;color:<?=$ptFg?>;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;"><?=tpProductTypeLabel($ptype)?></span>
                                                     </td>
                                                     <td><?php echo htmlspecialchars($p['receiver_name'] ?: '—'); ?></td>
                                                     <td><?php echo htmlspecialchars($p['payment_date']); ?></td>

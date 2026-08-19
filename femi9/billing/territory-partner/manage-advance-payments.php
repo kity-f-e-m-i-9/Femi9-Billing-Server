@@ -1,7 +1,9 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
+tpEnsureAdvanceWalletColumns($db_conn);
 
 date_default_timezone_set("Asia/Kolkata");
 $today     = date("Y-m-d");
@@ -62,15 +64,22 @@ $pendingCount  = count(array_filter($submissions, fn($r) => $r['status'] === 'pe
 $acceptedCount = count(array_filter($submissions, fn($r) => $r['status'] === 'accepted'));
 $rejectedCount = count(array_filter($submissions, fn($r) => $r['status'] === 'rejected'));
 
-// Available advance balance — same query as add-advance-payment.php / add-purchase-order.php.
+// Available advance balance, split by wallet — same query as
+// add-advance-payment.php / add-purchase-order.php.
 $balStmt = mysqli_prepare($db_conn,
-    "SELECT COALESCE(SUM(balance_amount), 0) AS bal
-     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL"
+    "SELECT product_type, COALESCE(SUM(balance_amount), 0) AS bal
+     FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
+     GROUP BY product_type"
 );
 mysqli_stmt_bind_param($balStmt, "i", $Login_user_IDvl);
 mysqli_stmt_execute($balStmt);
-$advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
+$advBalanceByType = ['napkin' => 0.0, 'diaper' => 0.0];
+$balRes = mysqli_stmt_get_result($balStmt);
+while ($r = mysqli_fetch_assoc($balRes)) {
+    $advBalanceByType[tpResolveProductType($r['product_type'])] = (float)$r['bal'];
+}
 mysqli_stmt_close($balStmt);
+$advBalance = $advBalanceByType['napkin'] + $advBalanceByType['diaper'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -181,7 +190,13 @@ mysqli_stmt_close($balStmt);
                         <div class="row">
                             <div class="col-lg-3 col-sm-6">
                                 <div class="po-stat-card purple">
-                                    <div><h3 style="font-size:18px;">₹<?=number_format($advBalance, 2)?></h3><p>Available Advance Balance</p></div>
+                                    <div><h3 style="font-size:18px;">₹<?=number_format($advBalanceByType['napkin'], 2)?></h3><p>Napkin Balance</p></div>
+                                    <i class="material-icons-outlined">account_balance_wallet</i>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-sm-6">
+                                <div class="po-stat-card purple">
+                                    <div><h3 style="font-size:18px;">₹<?=number_format($advBalanceByType['diaper'], 2)?></h3><p>Diaper Balance</p></div>
                                     <i class="material-icons-outlined">account_balance_wallet</i>
                                 </div>
                             </div>

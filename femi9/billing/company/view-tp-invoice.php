@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 require_once("include/GodownAccess.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 $enc_id = $_GET['id'] ?? '';
@@ -97,6 +98,8 @@ $stmt2->close();
                                 <div class="card-body inv-block">
                                     <div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;">Invoice</div>
                                     <div style="font-size:22px;font-weight:700;color:#1a237e;"><?php echo htmlspecialchars($inv['invoice_number']); ?></div>
+                                    <?php $_invType = tpResolveProductType($inv['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_invType); ?>
+                                    <span style="display:inline-block;margin-top:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;background:<?php echo $_tBg; ?>;color:<?php echo $_tFg; ?>;"><?php echo htmlspecialchars(tpProductTypeLabel($_invType)); ?></span>
                                     <div style="font-size:13px;color:#555;margin-top:4px;"><?php echo htmlspecialchars($inv['invoice_date']); ?></div>
                                     <hr style="margin:10px 0;">
                                     <table class="inv-meta">

@@ -1,12 +1,14 @@
 <?php
 include("checksession.php");
 require_once("include/GodownAccess.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 header('Content-Type: application/json');
 error_reporting(0);
 
 $godown_id = (int)($_GET['godown_id'] ?? 0);
 if (!$godown_id || !is_godown_allowed($db_conn, $godown_id)) { echo json_encode([]); exit; }
 
+$productType = tpResolveProductType($_GET['product_type'] ?? null);
 $uid = (string)$godown_id;
 $stmt = $db_conn->prepare("
     SELECT p.id AS product_id, p.productName, s.closing_qty AS available_qty,
@@ -15,6 +17,7 @@ $stmt = $db_conn->prepare("
     JOIN products p ON p.id = s.product_id
     WHERE s.user_type = 'company' AND s.user_id = ? AND s.closing_qty > 0 AND p.deleted_at IS NULL
       AND (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
+      AND " . tpProductTypeSqlFilter($productType) . "
     ORDER BY p.productName
 ");
 $stmt->bind_param("s", $uid);

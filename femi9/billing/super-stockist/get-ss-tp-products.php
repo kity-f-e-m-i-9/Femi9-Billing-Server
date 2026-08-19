@@ -1,11 +1,13 @@
 <?php
 include("checksession.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 mysqli_report(MYSQLI_REPORT_OFF);
 header('Content-Type: application/json');
 
 $tp_id = (int)($_GET['tp_id'] ?? 0);
 $ss_id = mysqli_real_escape_string($db_conn, (string)$Login_user_IDvl);
+$productType = tpResolveProductType($_GET['product_type'] ?? null);
 
 if ($tp_id <= 0) { echo json_encode([]); exit; }
 
@@ -24,6 +26,7 @@ $sql = "SELECT s.product_id, p.productName, p.hsn,
          WHERE s.user_type = 'super_stockiest'
            AND s.user_id = '$ss_id'
            AND s.closing_qty > 0
+           AND " . tpProductTypeSqlFilter($productType) . "
          ORDER BY p.productName ASC";
 
 $res = mysqli_query($db_conn, $sql);

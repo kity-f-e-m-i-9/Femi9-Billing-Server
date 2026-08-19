@@ -1,4 +1,5 @@
 <?php include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 include("config.php");
 
@@ -7,7 +8,7 @@ if (!$po_id) { header("Location: tp-today-orders"); exit; }
 
 // PO header + TP billing/delivery details
 $stmt = $db_conn->prepare("
-    SELECT o.id, o.order_date, o.status,
+    SELECT o.id, o.order_date, o.status, o.product_type,
            o.use_default_delivery_address, o.custom_delivery_line1, o.custom_delivery_line2,
            o.custom_delivery_city, o.custom_delivery_district, o.custom_delivery_state,
            o.custom_delivery_country, o.custom_delivery_pincode,
@@ -232,7 +233,7 @@ Mobile:&nbsp;<?= htmlspecialchars($po['tp_mobile']); ?><br/>
 <td valign="top">
 <table id="second_topvl">
 <tr id="border_nbottom">
-<td>PO #<br/><b><?= htmlspecialchars($po['id']); ?></b></td>
+<td>PO #<br/><b><?= htmlspecialchars($po['id']); ?></b> <?php $_poType = tpResolveProductType($po['product_type'] ?? null); ?><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#eee;border:1px solid #ccc;"><?= htmlspecialchars(tpProductTypeLabel($_poType)); ?></span></td>
 <td>Order Date:<br/><b><?= date("d M Y", strtotime($po['order_date'])); ?></b></td>
 </tr>
 <tr id="border_nbottom" valign="top">
