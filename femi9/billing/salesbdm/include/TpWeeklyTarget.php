@@ -1,9 +1,17 @@
 <?php
 // Read-only adaptation of the weekly cumulative-target concept already used
 // for TP bonus/deactivation decisions (see company/tp-bonus-points-calculator.php
-// — getWeekRanges()/the 25%/50%/75%/100% weekly thresholds). This file only
-// reuses that same math to show a TP's current on-track/behind status for
-// display — no bonus award or deactivation logic.
+// — getWeekRanges()/the 25%/50%/75%/100% weekly thresholds); 'required' per
+// week here still uses those same cumulative markers, purely for display.
+// The actual Pass/Fail and On Track logic is stricter: each started week
+// must independently receive its OWN slice of the target (target/4, paid
+// during that specific week) — a surplus from an earlier week does not
+// carry forward to excuse a later week. The one exception is reaching the
+// full month's target (cumulative >= 100%), which passes every remaining
+// week automatically since there's nothing left owed. A later catch-up
+// never retroactively un-fails an earlier week that already missed its own
+// slice while it was current — no bonus award or deactivation logic lives
+// here, this file is display-only.
 //
 // On Track/Behind, the weekly Pass/Fail breakdown, and the promptness rank
 // are all driven by how much the TP actually PAID toward their Napkin
@@ -214,6 +222,17 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
         $tpPaidRows = $paidByTp[$tpId] ?? [];
         $tpSoldRows = $soldByTp[$tpId] ?? [];
 
+        // Each week must independently receive its OWN slice of the target
+        // (target/4) — a surplus paid in an earlier week does NOT carry
+        // forward to excuse a later week's own payment. The one exception:
+        // once the TP has paid the FULL month's target (cumulative >= 100%),
+        // every remaining week automatically passes — paying everything in
+        // Week 1 still means the whole month is done, so there's nothing
+        // left to fail. A lump sum that only partially covers past weeks
+        // does NOT retroactively fix an earlier week that already missed
+        // its own slice when its own week was current.
+        $weeklySlice = $targetAmount / 4;
+
         $weeks = [];
         $cumulative = 0.0;
         foreach ($ranges as $key => $r) {
@@ -243,24 +262,19 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
                 'sold'       => $sold,
                 'cumulative' => $cumulative,
                 'required'   => $required,
+                'weekly_slice' => $weeklySlice,
                 'is_current' => $key === $currentWeekKey,
                 'has_started'=> $hasStarted,
-                'pass'       => $cumulative >= $required,
+                'pass'       => $paid >= $weeklySlice || $cumulative >= $targetAmount,
             ];
         }
 
         $requiredSoFar = $targetAmount * $thresholdPct[$currentWeekKey];
         $paidSoFar     = $weeks[$currentWeekKey]['cumulative'];
         $pctOfTarget   = round(($paidSoFar / $targetAmount) * 100, 1);
-        // Stricter than a single check against the current week's cumulative
-        // bar: every week that has already started must have independently
-        // cleared its OWN cumulative threshold. A TP who misses an early
-        // week's pace and only catches up later with a lump sum no longer
-        // reads as "On Track" just because today's running total clears
-        // today's bar — the earlier miss still shows up here. Paying the
-        // full month's target in Week 1 still passes every later week
-        // automatically (cumulative never decreases), so front-loading
-        // payment is still rewarded exactly as before.
+        // On Track only if every week that has already started passed on
+        // its own terms above — a later catch-up (even a huge one) never
+        // retroactively un-fails an earlier week that missed its own slice.
         $onTrack = true;
         foreach ($ranges as $key => $r) {
             if (!$weeks[$key]['has_started']) break;

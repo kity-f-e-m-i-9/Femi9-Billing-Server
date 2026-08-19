@@ -1185,10 +1185,10 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
     function ffBuildWeeklyDetailHtml(w, tpDbId) {
         if (!w || !w.weeks) return 'No data';
         var html = '<div style="font-weight:600;margin-bottom:6px;color:#374151;">' + ffEsc(w.month_label) + ' &mdash; Weekly Advance Payments</div>' +
-            '<div style="font-size:11px;color:#9ca3af;margin-bottom:6px;">Pass/Fail is based on Napkin advance payments received. "Napkin sold" is shown alongside for reference only.</div>' +
+            '<div style="font-size:11px;color:#9ca3af;margin-bottom:6px;">Each week needs its own Napkin advance payment of at least its "Required this week" amount — an earlier week\'s surplus does not carry forward, unless the full month\'s target has already been paid in full. "Napkin sold" is shown alongside for reference only.</div>' +
             '<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:640px;">' +
             '<tr style="color:#6b7280;"><th style="text-align:left;padding:3px 8px;">Week</th>' +
-            '<th style="text-align:right;padding:3px 8px;">Required so far</th>' +
+            '<th style="text-align:right;padding:3px 8px;">Required this week</th>' +
             '<th style="text-align:right;padding:3px 8px;">Napkin sold this week</th>' +
             '<th style="text-align:right;padding:3px 8px;">Advance paid this week</th>' +
             '<th style="text-align:right;padding:3px 8px;">Total paid so far</th>' +
@@ -1205,7 +1205,7 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
                 ? ffMoney(wk.amount) + spilloverNote + ffWeekPaymentLink(tpDbId, wk, key === 'week1' && w.has_spillover)
                 : ffMoney(wk.amount);
             html += '<tr' + rowStyle + '><td style="padding:4px 8px;">' + ffEsc(wk.label) + '</td>' +
-                '<td style="text-align:right;padding:4px 8px;color:#6b7280;">' + ffMoney(wk.required) + '</td>' +
+                '<td style="text-align:right;padding:4px 8px;color:#6b7280;">' + ffMoney(wk.weekly_slice) + '</td>' +
                 '<td style="text-align:right;padding:4px 8px;color:#6b7280;">' + ffMoney(wk.sold) + '</td>' +
                 '<td style="text-align:right;padding:4px 8px;font-weight:600;">' + paidCell + '</td>' +
                 '<td style="text-align:right;padding:4px 8px;">' + ffMoney(wk.cumulative) + '</td>' +
