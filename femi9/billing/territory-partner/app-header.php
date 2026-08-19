@@ -30,16 +30,24 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                        than touching the shared main.css used by every portal. */
                     @media (max-width: 991px) {
                         .app-header { left: 0 !important; right: 0 !important; width: 100% !important; }
-                        .app-header .navbar { height: auto !important; min-height: 60px; padding: 8px 10px; }
+                        /* .navbar was shrink-wrapping to its content's width instead of
+                           filling .app-header — that's what left a small white box
+                           floating at the left with a transparent gap (and the account
+                           logo, a separate flex item pinned to .app-header's real right
+                           edge) instead of one full-width white bar. */
+                        .app-header .navbar {
+                            height: auto !important; min-height: 60px; padding: 8px 10px;
+                            width: 100% !important; box-sizing: border-box !important;
+                        }
                         .app-header .navbar > .container-fluid {
                             display: flex !important; flex-wrap: nowrap !important;
                             align-items: center !important; justify-content: space-between !important;
-                            gap: 6px; width: 100%;
+                            gap: 6px; width: 100%; box-sizing: border-box;
                         }
                         /* flex:1 1 auto with min-width:0 lets the browser shrink this all
                            the way to 0 (hiding the name entirely) once space is tight —
                            it needs a real floor so it always keeps some visible width. */
-                        .app-header #navbarNav { min-width: 90px; flex: 1 1 auto; overflow: hidden; }
+                        .app-header #navbarNav { min-width: 120px; flex: 1 1 auto; overflow: hidden; }
                         .app-header .d-flex { flex: 0 0 auto; }
                         #tp-logoTable td:first-child { padding-right: 4px; }
                         #tp-logoTable td:last-child { min-width: 0; padding-left: 0; }
@@ -47,13 +55,17 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                         }
                     }
-                    @media (max-width: 340px) {
-                        #tp-logoTable td:first-child > div { width: 26px !important; height: 26px !important; font-size: 12px !important; }
+                    /* Below ~400px there just isn't room for name + TP-ID + mobile +
+                       "Territory Partner" all at once without crushing every line into
+                       an illegible sliver — drop to name-only so what's left is fully
+                       readable instead of a truncated fragment of everything. */
+                    @media (max-width: 400px) {
+                        #tp-logoTable td:first-child > div { width: 30px !important; height: 30px !important; font-size: 13px !important; }
                         #tp-logoTable td { padding: 3px !important; }
-                        #tp-logoTable h1 { font-size: 10px !important; }
-                        #tp-logoTable h2, #tp-logoTable h3 { font-size: 8px !important; }
+                        #tp-logoTable h1 { font-size: 13px !important; white-space: normal !important; }
+                        #tp-logoTable h2, #tp-logoTable h3 { display: none !important; }
                     }
-                    @media (max-width: 576px) {
+                    @media (min-width: 401px) and (max-width: 576px) {
                         #tp-logoTable h1 { font-size: 12px; }
                         #tp-logoTable h2 { font-size: 11px; }
                         #tp-logoTable h3 { font-size: 9px; }
