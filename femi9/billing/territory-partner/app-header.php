@@ -80,11 +80,12 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                         .tp-account-toggle { display: flex !important; }
                         .notifications-dropdown.tp-account-dropdown {
                             position: fixed !important;
-                            top: 60px !important;
+                            top: 62px !important;
                             right: 8px !important;
-                            left: 8px !important;
-                            width: auto !important;
-                            max-width: none !important;
+                            left: auto !important;
+                            width: 220px !important;
+                            max-width: calc(100vw - 16px) !important;
+                            max-height: min(320px, calc(100vh - 80px)) !important;
                             z-index: 2000 !important;
                         }
                         /* Bootstrap's Popper-based positioning fights the forced
@@ -93,6 +94,9 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                            the only thing that controls visibility here. */
                         .notifications-dropdown.tp-account-dropdown:not(.show) { display: none !important; }
                         .notifications-dropdown.tp-account-dropdown.show { display: block !important; }
+                        .tp-account-dropdown .dropdown-header { padding: 6px 10px !important; font-size: 10px !important; }
+                        .tp-account-dropdown .notifications-dropdown-item { padding: 6px 10px !important; }
+                        .tp-account-dropdown .notifications-dropdown-item-text p { font-size: 12.5px !important; }
                     }
                     /* Bootstrap's .navbar-expand-lg switches .navbar-nav to a stacked
                        column below 992px (expecting a collapse toggler this theme never
