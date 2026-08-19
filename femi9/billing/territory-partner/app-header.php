@@ -10,8 +10,8 @@ $walletBalance = $_wCredits - $_wWithdrawn;
 <div class="app-header">
     <nav class="navbar navbar-light navbar-expand-lg">
         <div class="container-fluid">
-            <a class="hide-sidebar-toggle-button tp-mobile-menu-toggle" href="#" style="display:none;">
-                <i class="material-icons-outlined" style="font-size:26px;color:#293442;">menu</i>
+            <a class="hide-sidebar-toggle-button tp-mobile-menu-toggle" href="#">
+                <i class="material-icons-outlined">menu</i>
             </a>
             <div class="navbar-nav" id="navbarNav">
                 <style>
@@ -43,9 +43,15 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                        app-header.php already shows richer info (name, wallet, account
                        switcher), the fix is to hide the theme's own floating logo box on
                        mobile and move its hamburger toggle into this header instead. */
+                    .tp-mobile-menu-toggle {
+                        display: none;
+                        width: 38px; height: 38px; border-radius: 50%; background: #f3f4f6;
+                        align-items: center; justify-content: center; flex: 0 0 auto; margin-right: 6px;
+                    }
+                    .tp-mobile-menu-toggle .material-icons-outlined { font-size: 24px; color: #293442; }
                     @media (max-width: 1199px) {
                         .app-sidebar .logo { display: none !important; }
-                        .tp-mobile-menu-toggle { display: flex !important; align-items: center; flex: 0 0 auto; margin-right: 6px; }
+                        .tp-mobile-menu-toggle { display: flex !important; }
                     }
                     @media (max-width: 991px) {
                         .app-header { left: 0 !important; right: auto !important; width: 100% !important; box-sizing: border-box !important; }
