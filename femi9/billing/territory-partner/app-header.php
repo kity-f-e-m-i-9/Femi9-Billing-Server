@@ -77,7 +77,7 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                         /* flex:1 1 auto with min-width:0 lets the browser shrink this all
                            the way to 0 (hiding the name entirely) once space is tight —
                            it needs a real floor so it always keeps some visible width. */
-                        .app-header #navbarNav { min-width: 90px; flex: 1 1 auto; overflow: hidden; }
+                        .app-header #navbarNav { min-width: 160px; flex: 1 1 auto; overflow: hidden; }
                         .app-header .d-flex { flex: 0 0 auto; display: flex !important; align-items: center; gap: 4px; }
                         #tp-logoTable tr { vertical-align: middle !important; }
                         #tp-logoTable td:first-child { padding-right: 4px; }
@@ -88,25 +88,23 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                         /* Keep the account logo vertically centered in line with the
                            name row, not riding high/low relative to it. */
                         .app-header .tp-account-toggle { display: flex !important; align-items: center; }
-                        /* Wallet balance now stays visible on mobile too (previously
-                           hidden entirely) — shrunk down so it fits alongside the name
-                           and the account logo in the same single row. */
-                        .app-header .tp-wallet-toggle { flex: 0 0 auto; }
-                        .app-header .tp-wallet-toggle > a { margin-top: 0 !important; padding: 4px 6px !important; font-size: 12px; white-space: nowrap; display: flex; align-items: center; }
-                        .app-header .tp-wallet-toggle .material-icons-outlined { font-size: 16px !important; }
                     }
-                    /* Below ~400px there just isn't room for name + TP-ID + mobile +
-                       "Territory Partner" (plus wallet + logo) all at once without
-                       crushing every line into an illegible sliver — drop to name-only
-                       so what's left is fully readable instead of a truncated fragment
-                       of everything. */
+                    /* Per feedback: wallet balance shouldn't show on mobile at all (back
+                       to the original behavior) — just name+details and the account
+                       logo, in line with each other. Removing wallet frees up enough
+                       width that the full name/TP-ID/mobile/"Territory Partner" block no
+                       longer needs to be hidden or aggressively truncated down to a
+                       name-only sliver, the way it did when wallet was competing for the
+                       same row. */
+                    @media (max-width: 1199px) {
+                        .app-header .tp-wallet-toggle { display: none !important; }
+                    }
                     @media (max-width: 400px) {
-                        .app-header .tp-wallet-toggle > a { font-size: 10.5px !important; padding: 3px 4px !important; }
-                        .app-header .tp-wallet-toggle .material-icons-outlined { font-size: 14px !important; }
-                        #tp-logoTable td:first-child > div { width: 28px !important; height: 28px !important; font-size: 12px !important; }
+                        #tp-logoTable td:first-child > div { width: 30px !important; height: 30px !important; font-size: 13px !important; }
                         #tp-logoTable td { padding: 3px !important; vertical-align: middle !important; }
-                        #tp-logoTable h1 { font-size: 11px !important; white-space: normal !important; }
-                        #tp-logoTable h2, #tp-logoTable h3 { display: none !important; }
+                        #tp-logoTable h1 { font-size: 11px !important; }
+                        #tp-logoTable h2 { font-size: 9.5px !important; }
+                        #tp-logoTable h3 { font-size: 8px !important; }
                     }
                     @media (min-width: 401px) and (max-width: 576px) {
                         #tp-logoTable h1 { font-size: 12px; }
@@ -143,6 +141,21 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                     }
                     @media (max-width: 1100px) {
                         .tp-account-toggle { display: flex !important; }
+                        /* main.css's .nav-notifications-toggle carries 6.5px 15px of its
+                           own padding — added to the mobile hamburger toggle, avatar, name
+                           column, and wallet pill all competing for the same narrow row,
+                           that 15px each side was enough to push this logo entirely past
+                           the right edge of the screen (present in the DOM, just invisible
+                           off-viewport, not merely small/hard to see). Trimmed way down. */
+                        .tp-account-toggle .nav-notifications-toggle { padding: 2px !important; }
+                        /* Matches the "T" avatar circle's own size at each breakpoint —
+                           wallet no longer competes for room in this row, so there's
+                           space for the logo to be this size without pushing off-screen. */
+                        .tp-account-toggle .nav-notifications-toggle img { width: 44px; height: 44px; }
+                    }
+                    @media (max-width: 400px) {
+                        .tp-account-toggle .nav-notifications-toggle img { width: 45px; height: 45px; }
+                    }
                         .notifications-dropdown.tp-account-dropdown {
                             position: fixed !important;
                             top: 62px !important;
