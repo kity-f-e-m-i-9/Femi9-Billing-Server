@@ -10,6 +10,9 @@ $walletBalance = $_wCredits - $_wWithdrawn;
 <div class="app-header">
     <nav class="navbar navbar-light navbar-expand-lg">
         <div class="container-fluid">
+            <a class="hide-sidebar-toggle-button tp-mobile-menu-toggle" href="#" style="display:none;">
+                <i class="material-icons-outlined" style="font-size:26px;color:#293442;">menu</i>
+            </a>
             <div class="navbar-nav" id="navbarNav">
                 <style>
                     #tp-logoTable { border-collapse: collapse; width: 100%; }
@@ -28,6 +31,22 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                        header's fixed-height white box instead of staying in one row.
                        Scoped to TP pages only (this file is included on every one) rather
                        than touching the shared main.css used by every portal. */
+                    /* The REAL cause of the header looking broken/overlapped on mobile
+                       this whole time: main.css gives .app-sidebar .logo (the small
+                       white rounded box with the hamburger icon, from logo.php) its own
+                       position:fixed + translateX at <=1199px specifically so it floats
+                       on screen as a compact mobile top bar even while the rest of
+                       .app-sidebar slides off-canvas. This app's app-header.php renders
+                       a SECOND, separate fixed header on top of that for the same
+                       breakpoint — the two were never designed to coexist, so they
+                       landed in the same screen region and overlapped. Since
+                       app-header.php already shows richer info (name, wallet, account
+                       switcher), the fix is to hide the theme's own floating logo box on
+                       mobile and move its hamburger toggle into this header instead. */
+                    @media (max-width: 1199px) {
+                        .app-sidebar .logo { display: none !important; }
+                        .tp-mobile-menu-toggle { display: flex !important; align-items: center; flex: 0 0 auto; margin-right: 6px; }
+                    }
                     @media (max-width: 991px) {
                         .app-header { left: 0 !important; right: auto !important; width: 100% !important; box-sizing: border-box !important; }
                         /* Bootstrap's .navbar is itself display:flex, and with only one
