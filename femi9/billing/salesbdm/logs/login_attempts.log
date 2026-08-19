@@ -124,3 +124,9 @@
 [2026-08-18 03:54:34] SUCCESS | Mobile: 7845554596 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
 [2026-08-18 06:13:37] SUCCESS | Mobile: 9840463299 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
 [2026-08-18 07:20:48] SUCCESS | Mobile: 9150068051 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+[2026-08-19 09:24:00] SUCCESS | Mobile: 9042916499 | IP: ::1 | Reason: Dual account — sent to chooser | User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+[2026-08-19 10:10:00] FAILED | Mobile: 9150068051 | IP: ::1 | Reason: Invalid password | User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+[2026-08-19 10:10:23] SUCCESS | Mobile: 9150068051 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+[2026-08-19 10:14:53] SUCCESS | Mobile: 9150068051 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+[2026-08-19 11:07:05] SUCCESS | Mobile: 9150068051 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+[2026-08-19 13:21:50] SUCCESS | Mobile: 9150068051 | IP: ::1 | Reason: Login successful | User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36

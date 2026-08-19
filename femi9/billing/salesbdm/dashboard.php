@@ -927,6 +927,7 @@ if ($hasTps) {
                     <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#16a34a;">check_circle</i>
                     Territory Partners in your Filled Firkas
                 </h6>
+                <span id="ffCountBadge" style="font-size:12px;font-weight:700;color:#374151;background:#f3f4f6;padding:4px 12px;border-radius:14px;margin-left:auto;margin-right:10px;white-space:nowrap;"></span>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" style="padding:14px 20px;">
@@ -1225,6 +1226,15 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         return html;
     }
 
+    function ffStatusLabel(status) {
+        return status === 'on_track' ? 'On Track' : (status === 'behind' ? 'Behind' : 'Total');
+    }
+
+    function ffUpdateCountBadge(data, status) {
+        var count = data && typeof data.total !== 'undefined' ? data.total : 0;
+        $('#ffCountBadge').text(count + ' ' + ffStatusLabel(status));
+    }
+
     function ffLoad(tab, page, status, search) {
         var key = tab + '-' + status + '-' + page + '-' + search;
         $('#ffListBody').html('<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>');
@@ -1232,6 +1242,7 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         if (ffCache[key]) {
             $('#ffListBody').html(ffRenderRows(ffCache[key]));
             $('#ffPagination').html(ffRenderPagination(ffCache[key]));
+            ffUpdateCountBadge(ffCache[key], status);
             return;
         }
         var params = { tab: tab, page: page, month: ffMonth, status: status, q: search };
@@ -1240,8 +1251,10 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
             ffCache[key] = data;
             $('#ffListBody').html(ffRenderRows(data));
             $('#ffPagination').html(ffRenderPagination(data));
+            ffUpdateCountBadge(data, status);
         }).fail(function () {
             $('#ffListBody').html('<div style="color:#b91c1c;font-size:13px;padding:20px 0;text-align:center;">Could not load data.</div>');
+            $('#ffCountBadge').text('');
         });
     }
 
