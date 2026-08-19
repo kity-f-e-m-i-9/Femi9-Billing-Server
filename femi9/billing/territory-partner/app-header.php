@@ -29,20 +29,25 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                        Scoped to TP pages only (this file is included on every one) rather
                        than touching the shared main.css used by every portal. */
                     @media (max-width: 991px) {
-                        .app-header { left: 0 !important; right: 0 !important; width: 100% !important; }
-                        /* .navbar was shrink-wrapping to its content's width instead of
-                           filling .app-header — that's what left a small white box
-                           floating at the left with a transparent gap (and the account
-                           logo, a separate flex item pinned to .app-header's real right
-                           edge) instead of one full-width white bar. */
+                        .app-header { left: 0 !important; right: auto !important; width: 100% !important; box-sizing: border-box !important; }
+                        /* Bootstrap's .navbar is itself display:flex, and with only one
+                           child (.container-fluid) a flex parent doesn't reliably stretch
+                           that child to 100% just because the child says width:100% —
+                           that's what left a small white box (sized to its content)
+                           floating at the left with a transparent gap, and the account
+                           logo pinned separately at .app-header's real right edge, instead
+                           of one full-width white bar. Switching .navbar to a plain block
+                           removes that ambiguity entirely — .container-fluid's own flex
+                           rules below do the actual row layout. */
                         .app-header .navbar {
+                            display: block !important;
                             height: auto !important; min-height: 60px; padding: 8px 10px;
                             width: 100% !important; box-sizing: border-box !important;
                         }
                         .app-header .navbar > .container-fluid {
                             display: flex !important; flex-wrap: nowrap !important;
                             align-items: center !important; justify-content: space-between !important;
-                            gap: 6px; width: 100%; box-sizing: border-box;
+                            gap: 6px; width: 100% !important; box-sizing: border-box;
                         }
                         /* flex:1 1 auto with min-width:0 lets the browser shrink this all
                            the way to 0 (hiding the name entirely) once space is tight —
