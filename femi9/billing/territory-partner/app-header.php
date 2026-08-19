@@ -36,12 +36,22 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                             align-items: center !important; justify-content: space-between !important;
                             gap: 6px; width: 100%;
                         }
-                        .app-header #navbarNav { min-width: 0; flex: 1 1 auto; overflow: hidden; }
+                        /* flex:1 1 auto with min-width:0 lets the browser shrink this all
+                           the way to 0 (hiding the name entirely) once space is tight —
+                           it needs a real floor so it always keeps some visible width. */
+                        .app-header #navbarNav { min-width: 90px; flex: 1 1 auto; overflow: hidden; }
                         .app-header .d-flex { flex: 0 0 auto; }
-                        #tp-logoTable td:last-child { min-width: 0; }
+                        #tp-logoTable td:first-child { padding-right: 4px; }
+                        #tp-logoTable td:last-child { min-width: 0; padding-left: 0; }
                         #tp-logoTable h1, #tp-logoTable h2, #tp-logoTable h3 {
                             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                         }
+                    }
+                    @media (max-width: 340px) {
+                        #tp-logoTable td:first-child > div { width: 26px !important; height: 26px !important; font-size: 12px !important; }
+                        #tp-logoTable td { padding: 3px !important; }
+                        #tp-logoTable h1 { font-size: 10px !important; }
+                        #tp-logoTable h2, #tp-logoTable h3 { font-size: 8px !important; }
                     }
                     @media (max-width: 576px) {
                         #tp-logoTable h1 { font-size: 12px; }
@@ -70,8 +80,8 @@ $walletBalance = $_wCredits - $_wWithdrawn;
             <div class="d-flex">
                 <style>
                     .tp-account-toggle .nav-notifications-toggle img {
-                        width: 40px;
-                        height: 40px;
+                        width: 46px;
+                        height: 46px;
                         object-fit: cover;
                         border-radius: 50%;
                         vertical-align: middle;
