@@ -20,11 +20,30 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                     /* The base template pins .app-header to a fixed offset that assumes
                        its 340px sidebar is always visible — on real mobile widths the
                        sidebar is off-canvas, so that offset squeezes this header into a
-                       tiny box and the account logo/name overflow it. Scoped to TP pages
-                       only (this file is included on every one) rather than touching the
-                       shared main.css used by every portal. */
-                    @media (max-width: 576px) {
+                       tiny box and the account logo/name overflow it. It also relies on
+                       Bootstrap's .navbar-expand-lg, which switches the nav to a stacked
+                       "collapsed" layout below 992px expecting a working toggler button —
+                       this theme never wires one up, so below that width the name block
+                       and the account icon wrap onto their own line and spill outside the
+                       header's fixed-height white box instead of staying in one row.
+                       Scoped to TP pages only (this file is included on every one) rather
+                       than touching the shared main.css used by every portal. */
+                    @media (max-width: 991px) {
                         .app-header { left: 0 !important; right: 0 !important; width: 100% !important; }
+                        .app-header .navbar { height: auto !important; min-height: 60px; padding: 8px 10px; }
+                        .app-header .navbar > .container-fluid {
+                            display: flex !important; flex-wrap: nowrap !important;
+                            align-items: center !important; justify-content: space-between !important;
+                            gap: 6px; width: 100%;
+                        }
+                        .app-header #navbarNav { min-width: 0; flex: 1 1 auto; overflow: hidden; }
+                        .app-header .d-flex { flex: 0 0 auto; }
+                        #tp-logoTable td:last-child { min-width: 0; }
+                        #tp-logoTable h1, #tp-logoTable h2, #tp-logoTable h3 {
+                            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                        }
+                    }
+                    @media (max-width: 576px) {
                         #tp-logoTable h1 { font-size: 12px; }
                         #tp-logoTable h2 { font-size: 11px; }
                         #tp-logoTable h3 { font-size: 9px; }
@@ -67,6 +86,13 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                             width: auto !important;
                             max-width: none !important;
                         }
+                    }
+                    /* Bootstrap's .navbar-expand-lg switches .navbar-nav to a stacked
+                       column below 992px (expecting a collapse toggler this theme never
+                       adds) — force it back to a single row so the account icon stays
+                       inline instead of dropping onto its own line. */
+                    @media (max-width: 991px) {
+                        .app-header .navbar-nav { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
                     }
                 </style>
                 <ul class="navbar-nav">
