@@ -70,8 +70,8 @@ $walletBalance = $_wCredits - $_wWithdrawn;
             <div class="d-flex">
                 <style>
                     .tp-account-toggle .nav-notifications-toggle img {
-                        width: 32px;
-                        height: 32px;
+                        width: 40px;
+                        height: 40px;
                         object-fit: cover;
                         border-radius: 50%;
                         vertical-align: middle;
@@ -85,7 +85,14 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                             left: 8px !important;
                             width: auto !important;
                             max-width: none !important;
+                            z-index: 2000 !important;
                         }
+                        /* Bootstrap's Popper-based positioning fights the forced
+                           position:fixed above on mobile and can silently fail to open
+                           the menu at all — driven manually below instead, so .show is
+                           the only thing that controls visibility here. */
+                        .notifications-dropdown.tp-account-dropdown:not(.show) { display: none !important; }
+                        .notifications-dropdown.tp-account-dropdown.show { display: block !important; }
                     }
                     /* Bootstrap's .navbar-expand-lg switches .navbar-nav to a stacked
                        column below 992px (expecting a collapse toggler this theme never
@@ -103,7 +110,7 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                     </li>
 
                     <li class="nav-item tp-account-toggle">
-                        <a class="nav-link nav-notifications-toggle" id="tpDropDown" href="#" data-bs-toggle="dropdown">
+                        <a class="nav-link nav-notifications-toggle" id="tpDropDown" href="#">
                             <img src="../../assets/images/femi-logo.png"/>
                         </a>
                         <div class="dropdown-menu dropdown-menu-end notifications-dropdown tp-account-dropdown" aria-labelledby="tpDropDown">
@@ -145,3 +152,23 @@ $walletBalance = $_wCredits - $_wWithdrawn;
     </nav>
 </div>
 <br/>
+<script>
+(function () {
+    // Driven manually (not via data-bs-toggle) so it doesn't depend on
+    // Bootstrap's Popper positioning, which fights the position:fixed CSS
+    // this menu needs on mobile and can silently fail to open there.
+    var toggle = document.getElementById('tpDropDown');
+    var menu = toggle ? toggle.closest('.nav-item').querySelector('.tp-account-dropdown') : null;
+    if (!toggle || !menu) return;
+    toggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        menu.classList.toggle('show');
+    });
+    document.addEventListener('click', function (e) {
+        if (menu.classList.contains('show') && !menu.contains(e.target) && e.target !== toggle) {
+            menu.classList.remove('show');
+        }
+    });
+})();
+</script>
