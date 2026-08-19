@@ -127,11 +127,14 @@ $invoice_heading = $has_gst_product ? 'Tax Invoice' : 'Bill of Supply';
 
 <script type="text/javascript">
 function PrintDiv() {
-    var divToPrint = document.getElementById('divToPrint');
-    var popupWin = window.open('', '_blank', 'width=990,height=540,left=200,top=80');
-    popupWin.document.open();
-    popupWin.document.write('<html><body onload="window.print()">' + divToPrint.innerHTML + '</html>');
-    popupWin.document.close();
+    // A popup window (the old approach) gets silently blocked or opened as a
+    // tiny unstyled tab on most mobile browsers, and never picks up the
+    // page's external stylesheets — only whatever's inside #divToPrint's own
+    // <style> block — so mobile prints came out misaligned or didn't appear
+    // at all. Printing the current page directly with an @media print rule
+    // (below) that hides everything except #divToPrint works identically on
+    // desktop and mobile and needs no popup.
+    window.print();
 }
 </script>
 
@@ -220,8 +223,26 @@ document.getElementById("currencySelect").addEventListener("change", function() 
 #sealsign td{padding:3px;}
 #sealsign tr:nth-child(1){border-top:1px solid #000;}
 #sealsign tr td:nth-child(1){border-right:1px solid #000;}
+
+/* The invoice table has 11 columns and doesn't reflow — on a phone screen
+   it just gets crushed/misaligned instead. Let it scroll horizontally at
+   its natural size instead of shrinking, both on screen and when printed. */
+@media (max-width: 768px) {
+    .maincontainar { width: max-content; min-width: 100%; }
+    #divToPrintScroll { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+}
+/* Printing the page directly (window.print()) instead of a popup — hide
+   everything except the invoice itself, on any screen size. */
+@media print {
+    body * { visibility: hidden; }
+    #divToPrint, #divToPrint * { visibility: visible; }
+    #divToPrint { position: absolute; left: 0; top: 0; width: 100%; }
+    #divToPrintScroll { overflow: visible !important; }
+    .maincontainar { width: 100% !important; min-width: 0 !important; }
+}
 </style>
 
+<div id="divToPrintScroll">
 <div class="maincontainar">
 
 <table id="toptl">
@@ -562,6 +583,7 @@ $TAXresult = implode('', $TAXstr);
 </table>
 <div style="clear:both;"></div>
 </div><!--maincontainar-->
+</div><!--divToPrintScroll-->
 <div align="center">This is a Computer Generated Invoice</div>
 
 </div><!--divToPrint-->
