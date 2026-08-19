@@ -252,7 +252,21 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
         $requiredSoFar = $targetAmount * $thresholdPct[$currentWeekKey];
         $paidSoFar     = $weeks[$currentWeekKey]['cumulative'];
         $pctOfTarget   = round(($paidSoFar / $targetAmount) * 100, 1);
-        $onTrack       = $paidSoFar >= $requiredSoFar;
+        // Stricter than a single check against the current week's cumulative
+        // bar: every week that has already started must have independently
+        // cleared its OWN cumulative threshold. A TP who misses an early
+        // week's pace and only catches up later with a lump sum no longer
+        // reads as "On Track" just because today's running total clears
+        // today's bar — the earlier miss still shows up here. Paying the
+        // full month's target in Week 1 still passes every later week
+        // automatically (cumulative never decreases), so front-loading
+        // payment is still rewarded exactly as before.
+        $onTrack = true;
+        foreach ($ranges as $key => $r) {
+            if (!$weeks[$key]['has_started']) break;
+            if (!$weeks[$key]['pass']) { $onTrack = false; }
+            if ($key === $currentWeekKey) break;
+        }
 
         // Ranking input — how many days into the CURRENT week this TP made
         // their first Napkin advance payment (0 = the very first day of the
