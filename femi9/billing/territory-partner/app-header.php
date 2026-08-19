@@ -49,20 +49,24 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                            it needs a real floor so it always keeps some visible width. */
                         .app-header #navbarNav { min-width: 120px; flex: 1 1 auto; overflow: hidden; }
                         .app-header .d-flex { flex: 0 0 auto; }
+                        #tp-logoTable tr { vertical-align: middle !important; }
                         #tp-logoTable td:first-child { padding-right: 4px; }
                         #tp-logoTable td:last-child { min-width: 0; padding-left: 0; }
                         #tp-logoTable h1, #tp-logoTable h2, #tp-logoTable h3 {
                             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                         }
+                        /* Keep the account logo vertically centered in line with the
+                           name row, not riding high/low relative to it. */
+                        .app-header .tp-account-toggle { display: flex !important; align-items: center; }
                     }
                     /* Below ~400px there just isn't room for name + TP-ID + mobile +
                        "Territory Partner" all at once without crushing every line into
                        an illegible sliver — drop to name-only so what's left is fully
                        readable instead of a truncated fragment of everything. */
                     @media (max-width: 400px) {
-                        #tp-logoTable td:first-child > div { width: 30px !important; height: 30px !important; font-size: 13px !important; }
-                        #tp-logoTable td { padding: 3px !important; }
-                        #tp-logoTable h1 { font-size: 13px !important; white-space: normal !important; }
+                        #tp-logoTable td:first-child > div { width: 28px !important; height: 28px !important; font-size: 12px !important; }
+                        #tp-logoTable td { padding: 3px !important; vertical-align: middle !important; }
+                        #tp-logoTable h1 { font-size: 11px !important; white-space: normal !important; }
                         #tp-logoTable h2, #tp-logoTable h3 { display: none !important; }
                     }
                     @media (min-width: 401px) and (max-width: 576px) {
