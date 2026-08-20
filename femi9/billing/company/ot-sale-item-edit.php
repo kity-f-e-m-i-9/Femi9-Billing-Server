@@ -53,16 +53,26 @@ try {
         $stockService->otReverse($productId, $Login_user_TYPEvl, $godownid, -$delta, $tempid, $createdBy, true);
     }
 
-    $stmtProd = $db_conn->prepare("SELECT gst FROM products WHERE id = ?");
+    $stmtProd = $db_conn->prepare("SELECT gst, gst_type FROM products WHERE id = ?");
     $stmtProd->bind_param('i', $productId);
     $stmtProd->execute();
     $prod = $stmtProd->get_result()->fetch_assoc();
     $stmtProd->close();
-    $gst = (float) ($prod['gst'] ?? 0);
+    $gst              = (float) ($prod['gst'] ?? 0);
+    $product_gst_type = ($prod['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive';
 
-    $subTotal  = ($newRate * $newQty) - $newDisc;
-    $gstAmount = round($subTotal * $gst / 100, 2);
-    $total     = $subTotal + $gstAmount;
+    $subTotal = ($newRate * $newQty) - $newDisc;
+    // Product GST — inclusive-tax products already have GST baked into the
+    // entered rate, so it's carved out of subtotal (not added again into
+    // total); exclusive-tax products get GST added on top — same convention
+    // as invoice-action.php / ot-sale-action.php.
+    if ($product_gst_type === 'inclusive' && $gst > 0) {
+        $gstAmount = round($subTotal - ($subTotal * 100 / (100 + $gst)), 2);
+        $total     = $subTotal;
+    } else {
+        $gstAmount = round($subTotal * $gst / 100, 2);
+        $total     = $subTotal + $gstAmount;
+    }
 
     $stmtUpd = $db_conn->prepare(
         "UPDATE ot_sales SET qty=?, price=?, discount=?, sub_total=?, gst_amount=?, total=? WHERE id=?"
