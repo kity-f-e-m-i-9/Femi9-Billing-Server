@@ -43,7 +43,7 @@ try {
     // — already-spent money stays exactly where its real invoice history
     // (tp_invoice_advance_log) says it is.
     $stmt = $db_conn->prepare(
-        "SELECT id, amount, balance_amount FROM tp_advance_payments
+        "SELECT id, amount, balance_amount, company_id FROM tp_advance_payments
           WHERE territory_partner_id = ? AND approver_type = ? AND approver_ss_id <=> ? AND product_type = ?
             AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
           ORDER BY payment_date ASC, id ASC FOR UPDATE"
@@ -52,6 +52,14 @@ try {
     $stmt->execute();
     $sourceRows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
+
+    // The new row inherits the source pool's company profile — every row
+    // FIFO-deducted from belongs to the same TP/approver/product_type pool,
+    // so they always share one company_id. Without this, the transferred
+    // balance loses its receiver company and drops out of every
+    // company_id-scoped view (e.g. manage-tp-advance-payments.php's
+    // Receiver Name filter).
+    $sourceCompanyId = $sourceRows[0]['company_id'] ?? null;
 
     $remaining = $amount;
     foreach ($sourceRows as $row) {
@@ -74,14 +82,14 @@ try {
     $remarks = "Transferred from " . tpProductTypeLabel($fromProductType) . " to " . tpProductTypeLabel($toProductType) . " by $createdBy";
     $ins = $db_conn->prepare(
         "INSERT INTO tp_advance_payments
-            (territory_partner_id, product_type, product_type_reviewed, approver_type, approver_ss_id,
+            (territory_partner_id, product_type, product_type_reviewed, approver_type, approver_ss_id, company_id,
              amount, payment_date, payment_mode, reference_number, remarks,
              adjusted_amount, balance_amount, status, created_by)
-         VALUES (?, ?, 1, ?, ?, ?, CURDATE(), 'Wallet Transfer', ?, ?, 0.00, ?, 'active', ?)"
+         VALUES (?, ?, 1, ?, ?, ?, ?, CURDATE(), 'Wallet Transfer', ?, ?, 0.00, ?, 'active', ?)"
     );
     $ins->bind_param(
-        'issidssds',
-        $tpId, $toProductType, $toApproverType, $toApproverSsId,
+        'issiidssds',
+        $tpId, $toProductType, $toApproverType, $toApproverSsId, $sourceCompanyId,
         $amount, $reference, $remarks, $amount, $createdBy
     );
     if (!$ins->execute()) throw new \Exception('insert_failed');
