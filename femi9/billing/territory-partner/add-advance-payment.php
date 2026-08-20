@@ -136,6 +136,22 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
         .apo-card-title { font-size: 14.5px; font-weight: 700; color: #374151; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
         .apo-card-title i { font-size: 18px; color: #667eea; }
 
+        /* Same card-choice look as add-purchase-order.php's "What kind of
+           order is this?" screen — the actual radio stays functional
+           (switchProductType() still fires on change) but visually hidden,
+           with the label itself styled and highlighted as the clickable card. */
+        .apo-type-choice { display: flex; gap: 20px; flex-wrap: wrap; }
+        .apo-type-card {
+            flex: 1; min-width: 200px; background: #fff; border: 2px solid #e5e7eb; border-radius: 14px;
+            padding: 22px 18px; text-align: center; cursor: pointer; transition: all .2s; display: block;
+        }
+        .apo-type-card:hover { border-color: #a5b4fc; box-shadow: 0 4px 16px rgba(102,126,234,.12); }
+        .apo-type-card.selected { border-color: #667eea; background: #f5f6ff; box-shadow: 0 4px 16px rgba(102,126,234,.18); }
+        .apo-type-card input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+        .apo-type-card .material-icons-outlined { font-size: 34px; color: #667eea; margin-bottom: 8px; }
+        .apo-type-card .name { font-size: 16px; font-weight: 700; color: #1f2937; }
+        .apo-type-card .desc { font-size: 12px; color: #6b7280; margin-top: 3px; }
+
         .apo-info-row { display: flex; flex-wrap: wrap; gap: 14px; }
         .apo-info-chip { background: #f8fafc; border-radius: 8px; padding: 8px 14px; min-width: 160px; }
         .apo-info-chip label { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 2px; }
@@ -211,17 +227,19 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
                         <?php if (!$returnToPo && !$hasResumableDraft): ?>
                         <div class="apo-card">
                             <div class="apo-card-title"><i class="material-icons-outlined">inventory_2</i>Product Type</div>
-                            <div class="row g-2">
-                                <div class="col-md-6">
-                                    <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
-                                        <input type="radio" name="type_choice_display" value="napkin" <?=$productType === 'napkin' ? 'checked' : ''?> onchange="switchProductType('napkin')"> Napkin
-                                    </label>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
-                                        <input type="radio" name="type_choice_display" value="diaper" <?=$productType === 'diaper' ? 'checked' : ''?> onchange="switchProductType('diaper')"> Lumi Diaper
-                                    </label>
-                                </div>
+                            <div class="apo-type-choice">
+                                <label class="apo-type-card <?=$productType === 'napkin' ? 'selected' : ''?>" style="position:relative;">
+                                    <input type="radio" name="type_choice_display" value="napkin" <?=$productType === 'napkin' ? 'checked' : ''?> onchange="switchProductType('napkin')">
+                                    <i class="material-icons-outlined">inventory_2</i>
+                                    <div class="name">Napkin</div>
+                                    <div class="desc">Femi9 Sanitary Napkin products</div>
+                                </label>
+                                <label class="apo-type-card <?=$productType === 'diaper' ? 'selected' : ''?>" style="position:relative;">
+                                    <input type="radio" name="type_choice_display" value="diaper" <?=$productType === 'diaper' ? 'checked' : ''?> onchange="switchProductType('diaper')">
+                                    <i class="material-icons-outlined">inventory_2</i>
+                                    <div class="name">Lumi Diaper</div>
+                                    <div class="desc">Lumi Baby Diaper products</div>
+                                </label>
                             </div>
                             <small class="text-muted d-block mt-2">Napkin and Diaper advance balances are tracked separately — this payment funds only the selected wallet.</small>
                         </div>

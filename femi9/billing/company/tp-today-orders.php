@@ -35,6 +35,10 @@ if ($filterSubmitted) {
     $statusFilter = 'waiting';
 }
 
+// Napkin/Diaper filter — independent of status/date, applies either way.
+$typeFilter = $_GET['type_filter'] ?? '';
+if (!in_array($typeFilter, ['napkin', 'diaper'], true)) $typeFilter = '';
+
 // SS-routed orders belong exclusively to that SS's own queue
 // (super-stockist/tp-today-orders.php) — excluded here so they never appear
 // twice or get double-approved.
@@ -53,6 +57,11 @@ if ($statusFilter === 'active') {
     $whereSql .= ' AND o.status = ?';
     $bindTypes .= 's';
     $bindValues[] = $statusFilter;
+}
+if ($typeFilter !== '') {
+    $whereSql .= ' AND o.product_type = ?';
+    $bindTypes .= 's';
+    $bindValues[] = $typeFilter;
 }
 
 $stmt = $db_conn->prepare(
@@ -400,11 +409,11 @@ $companyProfiles = $db_conn->query(
                             <div class="filter-card">
                                 <form method="GET" action="">
                                     <div class="row g-2 align-items-end">
-                                        <div class="col-md-3">
+                                        <div class="col-md-2">
                                             <label class="form-label">From Date</label>
                                             <input type="date" name="from_date" class="form-control" value="<?=htmlspecialchars($from_date)?>" max="<?=date('Y-m-d')?>">
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-2">
                                             <label class="form-label">To Date</label>
                                             <input type="date" name="to_date" class="form-control" value="<?=htmlspecialchars($to_date)?>" max="<?=date('Y-m-d')?>">
                                         </div>
@@ -416,6 +425,14 @@ $companyProfiles = $db_conn->query(
                                                 <option value="completed" <?=$statusFilter === 'completed' ? 'selected' : ''?>>Completed</option>
                                                 <option value="cancelled" <?=$statusFilter === 'cancelled' ? 'selected' : ''?>>Cancelled</option>
                                                 <option value="all" <?=$statusFilter === 'all' ? 'selected' : ''?>>All (including cancelled)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Type</label>
+                                            <select name="type_filter" class="form-control">
+                                                <option value="" <?=$typeFilter === '' ? 'selected' : ''?>>Napkin + Diaper</option>
+                                                <option value="napkin" <?=$typeFilter === 'napkin' ? 'selected' : ''?>>Napkin only</option>
+                                                <option value="diaper" <?=$typeFilter === 'diaper' ? 'selected' : ''?>>Lumi Diaper only</option>
                                             </select>
                                         </div>
                                         <div class="col-md-3 d-flex gap-2">

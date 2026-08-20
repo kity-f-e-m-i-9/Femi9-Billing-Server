@@ -45,7 +45,7 @@ if (!empty($lines[0]['invoiced_inv_id'])) {
 $shop_id = (int)$lines[0]['shop_id'];
 
 $stmtShop = $db_conn->prepare(
-    "SELECT temp_id, gstin, state_id FROM shop WHERE id=? AND onboard_userID=? AND onboard_userTYPE='territory_partner' LIMIT 1"
+    "SELECT temp_id, gstin, state_id, firka_id FROM shop WHERE id=? AND onboard_userID=? AND onboard_userTYPE='territory_partner' LIMIT 1"
 );
 $stmtShop->bind_param('is', $shop_id, $tp_id);
 $stmtShop->execute();
@@ -61,21 +61,83 @@ if (!$shopRow) {
 $customer_id   = $shopRow['temp_id'];
 $buyer_GSTIN   = $shopRow['gstin'] ?? '';
 $buyer_gsttype = strlen($buyer_GSTIN) === 15 ? 'register' : 'unregister';
-$state_id      = (int)($shopRow['state_id'] ?? 0);
 
-$stmtState = $db_conn->prepare("SELECT st_name FROM state WHERE id=? LIMIT 1");
-$stmtState->bind_param('i', $state_id);
-$stmtState->execute();
-$shop_state_name = $stmtState->get_result()->fetch_assoc()['st_name'] ?? '';
-$stmtState->close();
+// Same firka-based state resolution as shop-invoice-action.php — comparing
+// free-text state names directly (old logic below, kept only as a fallback)
+// broke on spelling/spacing mismatches like "Tamil Nadu" vs "Tamilnadu" and
+// wrongly taxed intra-state invoices as inter-state (IGST instead of
+// CGST/SGST). The firka hierarchy is authoritative for where a TP/shop is
+// actually assigned.
+function oti_resolve_state_via_firka(mysqli $db, int $nodeId): ?string {
+    static $stateDepth = null;
+    if ($stateDepth === null) {
+        $r = mysqli_fetch_assoc(mysqli_query($db, "SELECT depth FROM partner_location_layers WHERE layer_name='STATE' LIMIT 1"));
+        $stateDepth = $r ? (int)$r['depth'] : 2;
+    }
+    $cur = $nodeId;
+    for ($i = 0; $i < 10 && $cur > 0; $i++) {
+        $stmt = $db->prepare("SELECT parent_id, depth, name FROM partner_location_nodes WHERE id=? LIMIT 1");
+        $stmt->bind_param('i', $cur);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$row) return null;
+        if ((int)$row['depth'] === $stateDepth) return $row['name'];
+        $cur = $row['parent_id'] !== null ? (int)$row['parent_id'] : 0;
+    }
+    return null;
+}
+function oti_norm_state(string $s): string {
+    return preg_replace('/\s+/', '', strtolower($s));
+}
 
-$stmtTP = $db_conn->prepare("SELECT branch_state FROM territory_partners WHERE id=? LIMIT 1");
-$stmtTP->bind_param('i', $tp_id);
-$stmtTP->execute();
-$tp_state = $stmtTP->get_result()->fetch_assoc()['branch_state'] ?? '';
-$stmtTP->close();
+// Shop's state — prefer its assigned firka, fall back to the state master
+// lookup (same legacy state_id=2 == "Tamilnadu" quirk as shop-invoice-action.php).
+$shop_state_norm = null;
+$shop_firka_id = (int)($shopRow['firka_id'] ?? 0);
+if ($shop_firka_id > 0) {
+    $st = oti_resolve_state_via_firka($db_conn, $shop_firka_id);
+    if ($st !== null) $shop_state_norm = oti_norm_state($st);
+}
+if ($shop_state_norm === null) {
+    $state_id = (int)($shopRow['state_id'] ?? 0);
+    if ($state_id === 2) {
+        $shop_state_norm = oti_norm_state('Tamilnadu');
+    } else {
+        $stmtState = $db_conn->prepare("SELECT st_name FROM state WHERE id=? LIMIT 1");
+        $stmtState->bind_param('i', $state_id);
+        $stmtState->execute();
+        $shopStateRow = $stmtState->get_result()->fetch_assoc();
+        $stmtState->close();
+        $shop_state_norm = oti_norm_state($shopStateRow['st_name'] ?? '');
+    }
+}
 
-$gst_type = (strtolower($shop_state_name) === strtolower($tp_state)) ? 'inner' : 'outer';
+// TP's state(s) — every firka they're assigned to, resolved up to STATE depth.
+$tp_state_norms = [];
+$stmtTPLoc = $db_conn->prepare("SELECT location_id FROM territory_partner_locations WHERE territory_partner_id=?");
+$stmtTPLoc->bind_param('i', $tp_id);
+$stmtTPLoc->execute();
+$tpLocRes = $stmtTPLoc->get_result();
+while ($locRow = $tpLocRes->fetch_assoc()) {
+    $st = oti_resolve_state_via_firka($db_conn, (int)$locRow['location_id']);
+    if ($st !== null) $tp_state_norms[oti_norm_state($st)] = true;
+}
+$stmtTPLoc->close();
+
+if (!empty($tp_state_norms)) {
+    $gst_type = ($shop_state_norm !== '' && isset($tp_state_norms[$shop_state_norm])) ? 'inner' : 'outer';
+} else {
+    // TP has no firka assignment at all (rare) — fall back to the free-text
+    // branch_state field, still normalized.
+    $stmtTP = $db_conn->prepare("SELECT branch_state FROM territory_partners WHERE id=? LIMIT 1");
+    $stmtTP->bind_param('i', $tp_id);
+    $stmtTP->execute();
+    $tpRow = $stmtTP->get_result()->fetch_assoc();
+    $stmtTP->close();
+    $norm_tp_state = oti_norm_state($tpRow['branch_state'] ?? '');
+    $gst_type = ($shop_state_norm !== '' && $shop_state_norm === $norm_tp_state) ? 'inner' : 'outer';
+}
 
 // Validate every line up front — matches shop-invoice-action.php's per-item
 // stock check. Lines without enough closing_qty are left out of the invoice
