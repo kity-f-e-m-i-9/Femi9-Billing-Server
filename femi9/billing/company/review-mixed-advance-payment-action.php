@@ -92,17 +92,31 @@ $adjustedDiaper = round($adjustedDiaper, 2);
 
 $db_conn->begin_transaction();
 try {
-    $newNapkinAmount = round($adjustedNapkin + $napkinBalanceSplit, 2);
-    $napkinStatus = tpAdvanceStatusFor($adjustedNapkin, $napkinBalanceSplit);
-    $stmt = $db_conn->prepare(
-        "UPDATE tp_advance_payments
-            SET product_type = 'napkin', product_type_reviewed = 1,
-                amount = ?, adjusted_amount = ?, balance_amount = ?, status = ?
-          WHERE id = ? AND deleted_at IS NULL"
-    );
-    $stmt->bind_param('dddsi', $newNapkinAmount, $adjustedNapkin, $napkinBalanceSplit, $napkinStatus, $advanceId);
-    $stmt->execute();
-    $stmt->close();
+    // A reviewer allocating everything to Diaper (0 adjusted + 0 balance on
+    // the Napkin side) leaves nothing for the original row to keep — updating
+    // it in place would strand a hollow ₹0/₹0 "Napkin" row that clutters
+    // every advance-payment list forever. Soft-delete it instead; the Diaper
+    // side below (guaranteed non-zero, since split_napkin + split_diaper =
+    // the original balance > 0) carries the real money forward as the new row.
+    $hasNapkinPortion = $adjustedNapkin > 0.005 || $napkinBalanceSplit > 0.005;
+    if ($hasNapkinPortion) {
+        $newNapkinAmount = round($adjustedNapkin + $napkinBalanceSplit, 2);
+        $napkinStatus = tpAdvanceStatusFor($adjustedNapkin, $napkinBalanceSplit);
+        $stmt = $db_conn->prepare(
+            "UPDATE tp_advance_payments
+                SET product_type = 'napkin', product_type_reviewed = 1,
+                    amount = ?, adjusted_amount = ?, balance_amount = ?, status = ?
+              WHERE id = ? AND deleted_at IS NULL"
+        );
+        $stmt->bind_param('dddsi', $newNapkinAmount, $adjustedNapkin, $napkinBalanceSplit, $napkinStatus, $advanceId);
+        $stmt->execute();
+        $stmt->close();
+    } else {
+        $stmt = $db_conn->prepare("UPDATE tp_advance_payments SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL");
+        $stmt->bind_param('i', $advanceId);
+        $stmt->execute();
+        $stmt->close();
+    }
 
     if ($adjustedDiaper > 0 || $diaperBalanceSplit > 0) {
         $newDiaperAmount = round($adjustedDiaper + $diaperBalanceSplit, 2);
