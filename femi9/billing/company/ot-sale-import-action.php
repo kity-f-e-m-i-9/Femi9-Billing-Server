@@ -247,7 +247,7 @@ if ($usertype === 'admin') {
 }
 
 $productById = [];
-$res = $db_conn->query("SELECT id, productName, gst, hsn FROM products WHERE id IN (" . implode(',', array_map('intval', array_unique(array_values($colToProductId)))) . ")");
+$res = $db_conn->query("SELECT id, productName, gst, gst_type, hsn FROM products WHERE id IN (" . implode(',', array_map('intval', array_unique(array_values($colToProductId)))) . ")");
 while ($row = $res->fetch_assoc()) {
     $productById[(int)$row['id']] = $row;
 }
@@ -399,6 +399,7 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
         $lines[] = [
             'product_id' => $pid,
             'gst'        => (float)$product['gst'],
+            'gst_type'   => ($product['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive',
             'hsn'        => $product['hsn'] ?? '',
             'qty'        => $qty,
             'rate'       => $rate,
@@ -550,8 +551,17 @@ try {
         foreach ($g['lines'] as $line) {
             $sub_total_rate = $line['rate'] * $line['qty'];
             $sub_total = $sub_total_rate - $line['discount'];
-            $gst_amount = number_format($sub_total * $line['gst'] / 100, 2, '.', '');
-            $total = $sub_total + (float)$gst_amount;
+            // Product GST — inclusive-tax products already have GST baked into
+            // the entered rate, so it's carved out of subtotal (not added again
+            // into total); exclusive-tax products get GST added on top — same
+            // convention as invoice-action.php / ot-sale-action.php.
+            if (($line['gst_type'] ?? 'exclusive') === 'inclusive' && $line['gst'] > 0) {
+                $gst_amount = number_format($sub_total - ($sub_total * 100 / (100 + $line['gst'])), 2, '.', '');
+                $total = $sub_total;
+            } else {
+                $gst_amount = number_format($sub_total * $line['gst'] / 100, 2, '.', '');
+                $total = $sub_total + (float)$gst_amount;
+            }
             $gst_type = ($g['state_id'] && $g['state_id'] == $admin_state_id) ? 'inner' : 'outer';
 
             $stmt = $db_conn->prepare(

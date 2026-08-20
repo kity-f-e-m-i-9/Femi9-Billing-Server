@@ -151,7 +151,7 @@ if (isset($_REQUEST['add-record'])) {
             if (!$product_id_value || $qty_value <= 0) continue;
 
             // Get product details
-            $stmt = $db_conn->prepare("SELECT gst, hsn FROM products WHERE id = ?");
+            $stmt = $db_conn->prepare("SELECT gst, gst_type, hsn FROM products WHERE id = ?");
             $stmt->bind_param('i', $product_id_value);
             $stmt->execute();
             $prod = $stmt->get_result()->fetch_assoc();
@@ -160,9 +160,20 @@ if (isset($_REQUEST['add-record'])) {
             $sub_total_rate = $rate_value * $qty_value;
             $sub_total      = $sub_total_rate - $discount_value;
             $gst            = (float)($prod['gst'] ?? 0);
-            $gst_amount     = number_format($sub_total * $gst / 100, 2, '.', '');
-            $total          = $sub_total + (float)$gst_amount;
             $hsn            = $prod['hsn'] ?? '';
+
+            // Product GST — inclusive-tax products already have GST baked into
+            // the entered rate, so it's carved out of subtotal (not added again
+            // into total); exclusive-tax products get GST added on top — same
+            // convention as invoice-action.php / tp-invoice-print.php.
+            $product_gst_type = ($prod['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive';
+            if ($product_gst_type === 'inclusive' && $gst > 0) {
+                $gst_amount = number_format($sub_total - ($sub_total * 100 / (100 + $gst)), 2, '.', '');
+                $total      = $sub_total;
+            } else {
+                $gst_amount = number_format($sub_total * $gst / 100, 2, '.', '');
+                $total      = $sub_total + (float)$gst_amount;
+            }
 
             // Create invoice header once per tempid
             $stmt = $db_conn->prepare("SELECT COUNT(*) AS n FROM ot_sales_invoice WHERE tempid = ?");
