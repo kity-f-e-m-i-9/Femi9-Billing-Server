@@ -128,7 +128,7 @@ $invoice_heading = $has_gst_product ? 'Tax Invoice' : 'Bill of Supply';
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="../../assets/js/whatsapp-invoice-share.js?v=3"></script>
+<script src="../../assets/js/whatsapp-invoice-share.js?v=5"></script>
 <?php
 $waShareOpts = "{elementId:'divToPrint', mobile:'" . htmlspecialchars($result_Customer_Details['mobile'] ?? '', ENT_QUOTES) . "', invoiceNumber:'" . htmlspecialchars($result_Invoice_Details['inv_number'] ?? '', ENT_QUOTES) . "', fileName:'Invoice_" . htmlspecialchars($result_Invoice_Details['inv_number'] ?? '', ENT_QUOTES) . "', businessName:'" . htmlspecialchars($business_name ?? '', ENT_QUOTES) . "', button:this}";
 ?>

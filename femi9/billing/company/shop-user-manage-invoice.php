@@ -330,7 +330,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
     <script src="../../assets/js/custom.js"></script>
     <script src="../../assets/js/pages/datatables.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-    <script src="../../assets/js/whatsapp-invoice-share.js?v=3"></script>
+    <script src="../../assets/js/whatsapp-invoice-share.js?v=5"></script>
     <script>
     // Shares a shop invoice straight to WhatsApp from this list — no detour
     // through the print page. This click is a real user gesture, so the

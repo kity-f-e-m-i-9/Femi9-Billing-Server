@@ -13,6 +13,18 @@ if ($col && $col->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN courier_charges DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER invoice_date");
 }
 
+// Ensure product_type column exists (migration) — mirrors the same
+// self-healing check in tp-invoice-action.php / run-napkin-diaper-migration.php.
+// Without this, the SELECT below (which reads tpi.product_type
+// unconditionally) throws an uncaught "Unknown column" fatal on any
+// environment where that migration never ran, and with error_reporting(0)
+// + display_errors off in production that fatal renders as a blank white
+// page instead of a visible error.
+$col = $db_conn->query("SHOW COLUMNS FROM tp_invoices LIKE 'product_type'");
+if ($col && $col->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN product_type ENUM('napkin','diaper') NOT NULL DEFAULT 'napkin' AFTER territory_partner_id");
+}
+
 // Ensure reward-points columns exist (migration) — mirrors user_invoice /
 // user_invoice_items so TP invoices can use the same enable/disable toggle
 // as SS/Stockist/Distributor invoices on user-manage-invoice.php.
@@ -592,7 +604,7 @@ $i = 0;
 <script src="../../assets/js/pages/datatables.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="../../assets/js/whatsapp-invoice-share.js?v=3"></script>
+<script src="../../assets/js/whatsapp-invoice-share.js?v=5"></script>
 <script>
 // Shares a TP invoice straight to WhatsApp from this list — no detour through
 // the print page. Loads the print page in a hidden iframe via a real

@@ -853,7 +853,7 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-    <script src="../../assets/js/whatsapp-invoice-share.js?v=3"></script>
+    <script src="../../assets/js/whatsapp-invoice-share.js?v=5"></script>
     
     <script>
     $(document).ready(function() {
