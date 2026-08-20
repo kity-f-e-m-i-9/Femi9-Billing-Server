@@ -175,7 +175,7 @@ if ($submissionId > 0) {
             (territory_partner_id, product_type, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, note, source, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')"
     );
-    $ins->bind_param('isisdsssss', $tp_id, $productType, $approver['type'], $approver['ss_id'], $amount, $paymentDate, $paymentMode, $referenceNumber, $note, $source);
+    $ins->bind_param('issidsssss', $tp_id, $productType, $approver['type'], $approver['ss_id'], $amount, $paymentDate, $paymentMode, $referenceNumber, $note, $source);
     $ins->execute();
     $submissionId = $db_conn->insert_id;
     $ins->close();
