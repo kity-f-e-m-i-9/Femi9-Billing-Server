@@ -2,16 +2,96 @@
 include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpApproverContext.php';
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 date_default_timezone_set("Asia/Kolkata");
 $order_date = date("Y-m-d");
 $title      = "Purchase Order";
 
-// Full company product catalog — this is a stock replenishment request to the
-// company, not limited to what the TP already holds (unlike Field Order).
+// Every PO belongs to exactly one product type, chosen upfront — the picker
+// below only offers that type's products, and purchase-order-action.php
+// re-validates every submitted line matches server-side. Not defaulted
+// silently: if ?type= is missing/invalid, a small chooser screen renders
+// instead of the order form so the TP always makes this choice explicitly.
+$requestedType = $_GET['type'] ?? null;
+$productType = null;
+if ($requestedType === 'napkin' || $requestedType === 'diaper') {
+    $productType = $requestedType;
+}
+
+if ($productType === null) {
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?php echo $title;?> : <?php echo $business_name;?></title>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
+    <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/css/main.min.css" rel="stylesheet">
+    <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        .apo-type-choice { display: flex; gap: 20px; flex-wrap: wrap; max-width: 640px; margin: 30px auto; }
+        .apo-type-card {
+            flex: 1; min-width: 240px; background: #fff; border: 2px solid #e5e7eb; border-radius: 14px;
+            padding: 28px 22px; text-align: center; text-decoration: none; color: #1f2937; transition: all .2s;
+        }
+        .apo-type-card:hover { border-color: #667eea; box-shadow: 0 4px 16px rgba(102,126,234,.18); transform: translateY(-2px); color: #1f2937; }
+        .apo-type-card .material-icons-outlined { font-size: 40px; color: #667eea; margin-bottom: 10px; }
+        .apo-type-card .name { font-size: 18px; font-weight: 700; }
+        .apo-type-card .desc { font-size: 12.5px; color: #6b7280; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="app align-content-stretch d-flex flex-wrap">
+        <div class="app-sidebar">
+            <?php include("logo.php");?>
+            <?php include("femi_menu.php");?>
+        </div>
+        <div class="app-container">
+            <?php include("app-header.php");?>
+            <div class="app-content">
+                <div class="content-wrapper">
+                    <div class="container-fluid">
+                        <div class="page-description"><h1 style="margin:0;"><?php echo $title;?></h1></div>
+                        <p style="color:#6b7280;margin-top:6px;">What kind of order is this?</p>
+                        <div class="apo-type-choice">
+                            <a href="?type=napkin" class="apo-type-card">
+                                <i class="material-icons-outlined">inventory_2</i>
+                                <div class="name">Napkin</div>
+                                <div class="desc">Femi9 Sanitary Napkin products</div>
+                            </a>
+                            <a href="?type=diaper" class="apo-type-card">
+                                <i class="material-icons-outlined">inventory_2</i>
+                                <div class="name">Lumi Diaper</div>
+                                <div class="desc">Lumi Baby Diaper products</div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+<?php
+    exit;
+}
+
+tpEnsureAdvanceWalletColumns($db_conn);
+
+// Product catalog scoped to the chosen type — this is a stock replenishment
+// request to the company, not limited to what the TP already holds (unlike
+// Field Order).
 $productList = [];
-$resProd = mysqli_query($db_conn, "SELECT id, productName, stockist_price FROM products WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
+$resProd = mysqli_query($db_conn, "SELECT id, productName, stockist_price FROM products WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) AND " . tpProductTypeSqlFilter($productType, 'products') . " ORDER BY productName ASC");
 if ($resProd) while ($p = mysqli_fetch_assoc($resProd)) $productList[] = $p;
 
 // If this TP is assigned to a Super Stockist, they get a choice of approver
@@ -23,14 +103,14 @@ $assignedSs = tpGetAssignedSs($db_conn, (int)$Login_user_IDvl);
 // per approver pool — reused as-is (same query, just filtered by approver)
 // so the existing single-pool math for TPs with no SS assignment is
 // byte-for-byte unchanged.
-function tpApoBalanceFor(mysqli $db_conn, int $tpId, array $approver): array {
+function tpApoBalanceFor(mysqli $db_conn, int $tpId, array $approver, string $productType): array {
     $balStmt = mysqli_prepare($db_conn,
         "SELECT COALESCE(SUM(balance_amount), 0) AS bal
          FROM tp_advance_payments
          WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
-           AND approver_type = ? AND approver_ss_id <=> ?"
+           AND approver_type = ? AND approver_ss_id <=> ? AND product_type = ?"
     );
-    mysqli_stmt_bind_param($balStmt, "isi", $tpId, $approver['type'], $approver['ss_id']);
+    mysqli_stmt_bind_param($balStmt, "isis", $tpId, $approver['type'], $approver['ss_id'], $productType);
     mysqli_stmt_execute($balStmt);
     $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
     mysqli_stmt_close($balStmt);
@@ -49,9 +129,9 @@ function tpApoBalanceFor(mysqli $db_conn, int $tpId, array $approver): array {
          JOIN (SELECT po_id, SUM(amount) AS total FROM tp_purchase_order_items GROUP BY po_id) poi
            ON poi.po_id = po.id
          WHERE po.territory_partner_id = ? AND po.status = 'waiting'
-           AND po.approver_type = ? AND po.approver_ss_id <=> ?"
+           AND po.approver_type = ? AND po.approver_ss_id <=> ? AND po.product_type = ?"
     );
-    mysqli_stmt_bind_param($reservedStmt, "isi", $tpId, $approver['type'], $approver['ss_id']);
+    mysqli_stmt_bind_param($reservedStmt, "isis", $tpId, $approver['type'], $approver['ss_id'], $productType);
     mysqli_stmt_execute($reservedStmt);
     $reservedAmount = (float)(mysqli_stmt_get_result($reservedStmt)->fetch_assoc()['reserved'] ?? 0);
     mysqli_stmt_close($reservedStmt);
@@ -59,10 +139,10 @@ function tpApoBalanceFor(mysqli $db_conn, int $tpId, array $approver): array {
     return [max(0, round($advBalance - $reservedAmount, 2))];
 }
 
-[$advBalanceCompany] = tpApoBalanceFor($db_conn, (int)$Login_user_IDvl, ['type' => 'company', 'ss_id' => null]);
+[$advBalanceCompany] = tpApoBalanceFor($db_conn, (int)$Login_user_IDvl, ['type' => 'company', 'ss_id' => null], $productType);
 $advBalanceSs = null;
 if ($assignedSs !== null) {
-    [$advBalanceSs] = tpApoBalanceFor($db_conn, (int)$Login_user_IDvl, ['type' => 'ss', 'ss_id' => $assignedSs['id']]);
+    [$advBalanceSs] = tpApoBalanceFor($db_conn, (int)$Login_user_IDvl, ['type' => 'ss', 'ss_id' => $assignedSs['id']], $productType);
 }
 
 // Default selection and displayed balance — Company unless the TP has an SS
@@ -93,14 +173,14 @@ if ($_usedForPoCol && $_usedForPoCol->num_rows === 0) {
 // balance was never actually enough (e.g. an old accepted ₹10,000
 // submission, whose money is already spent as part of the visible balance,
 // otherwise kept "covering" every future unrelated order indefinitely).
-function tpApoEligibleSubmissionFor(mysqli $db_conn, int $tpId, array $approver): array {
+function tpApoEligibleSubmissionFor(mysqli $db_conn, int $tpId, array $approver, string $productType): array {
     $advSubStmt = mysqli_prepare($db_conn,
         "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt
          FROM tp_advance_payment_submissions
          WHERE territory_partner_id = ? AND status = 'pending_review' AND used_for_po_id IS NULL
-           AND approver_type = ? AND approver_ss_id <=> ?"
+           AND approver_type = ? AND approver_ss_id <=> ? AND product_type = ?"
     );
-    mysqli_stmt_bind_param($advSubStmt, "isi", $tpId, $approver['type'], $approver['ss_id']);
+    mysqli_stmt_bind_param($advSubStmt, "isis", $tpId, $approver['type'], $approver['ss_id'], $productType);
     mysqli_stmt_execute($advSubStmt);
     $advSubRow = mysqli_stmt_get_result($advSubStmt)->fetch_assoc();
     mysqli_stmt_close($advSubStmt);
@@ -108,12 +188,12 @@ function tpApoEligibleSubmissionFor(mysqli $db_conn, int $tpId, array $approver)
 }
 
 [$eligibleAdvanceSubmissionTotalCompany, $hasEligibleAdvanceSubmissionCompany] =
-    tpApoEligibleSubmissionFor($db_conn, (int)$Login_user_IDvl, ['type' => 'company', 'ss_id' => null]);
+    tpApoEligibleSubmissionFor($db_conn, (int)$Login_user_IDvl, ['type' => 'company', 'ss_id' => null], $productType);
 $eligibleAdvanceSubmissionTotalSs = 0.0;
 $hasEligibleAdvanceSubmissionSs = false;
 if ($assignedSs !== null) {
     [$eligibleAdvanceSubmissionTotalSs, $hasEligibleAdvanceSubmissionSs] =
-        tpApoEligibleSubmissionFor($db_conn, (int)$Login_user_IDvl, ['type' => 'ss', 'ss_id' => $assignedSs['id']]);
+        tpApoEligibleSubmissionFor($db_conn, (int)$Login_user_IDvl, ['type' => 'ss', 'ss_id' => $assignedSs['id']], $productType);
 }
 $eligibleAdvanceSubmissionTotal = $eligibleAdvanceSubmissionTotalCompany;
 $hasEligibleAdvanceSubmission = $hasEligibleAdvanceSubmissionCompany;
@@ -273,7 +353,11 @@ $tpDeliveryAddressParts = array_filter([
                         <div class="row">
                             <div class="col d-flex align-items-center justify-content-between flex-wrap" style="gap:10px;">
                                 <div class="page-description">
-                                    <h1 style="margin:0;"><?php echo $title;?></h1>
+                                    <h1 style="margin:0;"><?php echo $title;?>
+                                        <?php [$badgeBg, $badgeFg] = tpProductTypeBadgeColors($productType); ?>
+                                        <span style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;background:<?=$badgeBg?>;color:<?=$badgeFg?>;vertical-align:middle;"><?=htmlspecialchars(tpProductTypeLabel($productType))?></span>
+                                    </h1>
+                                    <a href="add-purchase-order.php" style="font-size:12.5px;color:#6b7280;">Change order type</a>
                                 </div>
                                 <a href="manage-purchase-orders.php" class="btn-back-orders">
                                     <i class="material-icons" style="font-size:17px;">list_alt</i> My Purchase Orders
@@ -285,6 +369,7 @@ $tpDeliveryAddressParts = array_filter([
                         <form action="purchase-order-action.php" method="post" id="uploadForm" onsubmit="return validatePoLines();">
                             <input type="hidden" id="advBalanceVal" value="<?=$advBalance?>">
                             <input type="hidden" name="approver_type" id="approver_type_input" value="company">
+                            <input type="hidden" name="product_type" value="<?=htmlspecialchars($productType)?>">
 
                             <?php if ($assignedSs !== null): ?>
                             <div class="apo-card">
@@ -307,7 +392,7 @@ $tpDeliveryAddressParts = array_filter([
                             <div class="apo-balance-card">
                                 <i class="material-icons-outlined">account_balance_wallet</i>
                                 <div>
-                                    <div class="label">Available Advance Balance</div>
+                                    <div class="label">Available <?=htmlspecialchars(tpProductTypeLabel($productType))?> Advance Balance</div>
                                     <div class="value">&#8377;<span id="advBalanceDisplay"><?=inr_format($advBalance, 2)?></span></div>
                                 </div>
                             </div>
@@ -380,6 +465,13 @@ $tpDeliveryAddressParts = array_filter([
                                 </div>
                             </div>
 
+                            <div class="po-eta-banner">
+                                <div class="po-eta-banner-track">
+                                    <span><i class="material-icons-outlined">local_shipping</i> Your purchase order will reach you within 3 to 5 working days.</span>
+                                </div>
+                            </div>
+                            <?php include __DIR__ . '/include/po-eta-banner-style.php'; ?>
+
                             <?php if (empty($productList)): ?>
                             <div class="alert alert-warning">No products available to order.</div>
                             <?php else: ?>
@@ -435,14 +527,14 @@ $tpDeliveryAddressParts = array_filter([
                                 <div class="apo-summary-row">
                                     <span>Order Total: <span class="amt" id="poGrandTotal">&#8377;0.00</span></span>
                                     <span style="color:#d1d5db;">|</span>
-                                    <span>Available Advance Balance: <span class="amt">&#8377;<span id="advBalanceDisplay2"><?=inr_format($advBalance, 2)?></span></span></span>
+                                    <span>Available <?=htmlspecialchars(tpProductTypeLabel($productType))?> Advance Balance: <span class="amt">&#8377;<span id="advBalanceDisplay2"><?=inr_format($advBalance, 2)?></span></span></span>
                                 </div>
                             </div>
 
                             <div id="poExcessWarning" class="apo-excess-card" style="display:none;">
-                                <div class="apo-excess-title">Your order total exceeds your available advance balance by &#8377;<span id="poExcessAmount">0.00</span></div>
+                                <div class="apo-excess-title">Your order total exceeds your available <?=htmlspecialchars(tpProductTypeLabel($productType))?> advance balance by &#8377;<span id="poExcessAmount">0.00</span></div>
                                 <div class="apo-excess-desc">
-                                    Submit an advance payment for review to cover the difference. Your cart and delivery details will be
+                                    Submit a <?=htmlspecialchars(tpProductTypeLabel($productType))?> advance payment for review to cover the difference. Your cart and delivery details will be
                                     saved and restored automatically when you come back to finish this order.
                                 </div>
 
@@ -692,7 +784,7 @@ $tpDeliveryAddressParts = array_filter([
                     return;
                 }
                 var approver = document.getElementById('approver_type_input').value || 'company';
-                window.location.href = 'add-advance-payment.php?return_to=po&amount=' + encodeURIComponent(excess.toFixed(2)) + '&approver=' + encodeURIComponent(approver);
+                window.location.href = 'add-advance-payment.php?return_to=po&amount=' + encodeURIComponent(excess.toFixed(2)) + '&approver=' + encodeURIComponent(approver) + '&type=<?=urlencode($productType)?>';
             })
             .catch(function() {
                 alert('Could not reach the server — please try again.');
@@ -751,8 +843,8 @@ $tpDeliveryAddressParts = array_filter([
         var excess = total - advBalance;
 
         if (excess > 0.001 && !hasEligibleAdvanceSubmission) {
-            alert('Your order total exceeds your available advance balance by ₹' + excess.toFixed(2) +
-                '. Please submit an advance payment for review before submitting this order.');
+            alert('Your order total exceeds your available <?=htmlspecialchars(tpProductTypeLabel($productType))?> advance balance by ₹' + excess.toFixed(2) +
+                '. Please submit a <?=htmlspecialchars(tpProductTypeLabel($productType))?> advance payment for review before submitting this order.');
             return false;
         }
         return true;

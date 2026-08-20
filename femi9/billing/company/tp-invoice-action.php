@@ -5,6 +5,7 @@ error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
 require_once __DIR__ . '/../shared/TpInvoiceNumberService.php';
 require_once __DIR__ . '/../shared/TpApproverContext.php';
+require_once __DIR__ . '/../shared/TpProductType.php';
 require_once __DIR__ . '/include/GodownAccess.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
@@ -98,7 +99,7 @@ function insertTpLedger(mysqli $db, int $tp_id, int $pid, int $qty, int $before,
 
 // ── Helpers: advance payment ───────────────────────────────────────────────────
 
-function getTpAdvanceBalance(mysqli $db, int $tp_id, int $godown_id = 0, ?array $approver = null): float {
+function getTpAdvanceBalance(mysqli $db, int $tp_id, int $godown_id = 0, ?array $approver = null, ?string $productType = null): float {
     $sql = "SELECT COALESCE(SUM(balance_amount),0) AS bal FROM tp_advance_payments WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted'";
     $types = "i";
     $params = [$tp_id];
@@ -113,6 +114,11 @@ function getTpAdvanceBalance(mysqli $db, int $tp_id, int $godown_id = 0, ?array 
         $params[] = $approver['type'];
         $params[] = $approver['ss_id'];
     }
+    if ($productType !== null) {
+        $sql .= " AND product_type=?";
+        $types .= "s";
+        $params[] = $productType;
+    }
     $s = $db->prepare($sql);
     $s->bind_param($types, ...$params);
     $s->execute();
@@ -120,8 +126,8 @@ function getTpAdvanceBalance(mysqli $db, int $tp_id, int $godown_id = 0, ?array 
     return round((float)$r['bal'], 2);
 }
 
-function deductTpAdvance(mysqli $db, int $tp_id, float $required, string $inv_num, int $godown_id = 0, int $tp_invoice_id = 0, ?array $approver = null): void {
-    tpAdvanceDeduct($db, $tp_invoice_id, $inv_num, $tp_id, $required, $godown_id, $approver);
+function deductTpAdvance(mysqli $db, int $tp_id, float $required, string $inv_num, int $godown_id = 0, int $tp_invoice_id = 0, ?array $approver = null, ?string $productType = null): void {
+    tpAdvanceDeduct($db, $tp_invoice_id, $inv_num, $tp_id, $required, $godown_id, $approver, $productType);
 }
 
 // ── Schema migration (runs once, safe to repeat) ──────────────────────────────
@@ -152,10 +158,32 @@ if ($colDel && $colDel->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN custom_delivery_pincode VARCHAR(20) NULL AFTER custom_delivery_country");
 }
 
+// Every invoice carries the same product_type as the PO it was billed from
+// (read-only, inherited below), or an explicit choice for a direct invoice
+// with no PO — see db_migrations/2026_08_18_tp_napkin_diaper_invoice_type.sql
+$colPt = $db_conn->query("SHOW COLUMNS FROM tp_invoices LIKE 'product_type'");
+if ($colPt && $colPt->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN product_type ENUM('napkin','diaper') NOT NULL DEFAULT 'napkin' AFTER territory_partner_id");
+}
+
 // ── Input & validation ─────────────────────────────────────────────────────────
 
 $po_id            = (int)($_POST['po_id'] ?? 0);
 $tp_id            = (int)($_POST['tp_id'] ?? 0);
+
+// PO-sourced invoices inherit the PO's own type (read-only — the form's
+// hidden field already carries it, but re-resolved from the DB here rather
+// than trusted from POST); a direct invoice takes the submitted selector.
+if ($po_id > 0) {
+    $poTypeStmt = $db_conn->prepare("SELECT product_type FROM tp_purchase_orders WHERE id=? LIMIT 1");
+    $poTypeStmt->bind_param("i", $po_id);
+    $poTypeStmt->execute();
+    $poTypeRow = $poTypeStmt->get_result()->fetch_assoc();
+    $poTypeStmt->close();
+    $productType = tpResolveProductType($poTypeRow['product_type'] ?? null);
+} else {
+    $productType = tpResolveProductType($_POST['product_type'] ?? null);
+}
 $source_loc_id    = (int)($_POST['source_location_id'] ?? 0) ?: null;
 $source_cp_id     = (int)($_POST['source_cp_id'] ?? 0);
 $source_godown_id = (int)($_POST['source_godown_id'] ?? 0);
@@ -216,6 +244,15 @@ if (empty($items)) {
     header("Location: add-tp-invoice?error=noproducts"); exit;
 }
 
+// The product picker already only offers the declared type's products, but
+// that's UX only — re-classify every submitted line here since a raw POST
+// could bypass the picker (and a PO-sourced invoice's items should already
+// match its PO's type, but this catches any drift).
+$cartClassification = tpProductTypeOfProducts($db_conn, array_column($items, 'pid'));
+if ($cartClassification['mixed'] || ($cartClassification['type'] !== null && $cartClassification['type'] !== $productType)) {
+    header("Location: add-tp-invoice?error=type_mismatch"); exit;
+}
+
 // Gross subtotal minus each line's own discount — no invoice-level discount.
 $gross_subtotal       = round(array_sum(array_column($items, 'amount')), 2);
 $item_discount_total  = round(array_sum(array_column($items, 'disc_amt')), 2);
@@ -241,9 +278,9 @@ if (!$stk_row || !(int)$stk_row['stock_initialized']) {
 $invoiceApprover = ['type' => 'company', 'ss_id' => null];
 
 // Pre-validate advance balance (courier charges collected separately, not from advance)
-$avail_balance = getTpAdvanceBalance($db_conn, $tp_id, $use_godown ? $source_godown_id : 0, $invoiceApprover);
+$avail_balance = getTpAdvanceBalance($db_conn, $tp_id, $use_godown ? $source_godown_id : 0, $invoiceApprover, $productType);
 if ($avail_balance < $net_amount) {
-    header("Location: add-tp-invoice?error=nobalance&need=" . urlencode(inr_format($net_amount, 2)) . "&have=" . urlencode(inr_format($avail_balance, 2))); exit;
+    header("Location: add-tp-invoice?error=nobalance&type=" . urlencode($productType) . "&need=" . urlencode(inr_format($net_amount, 2)) . "&have=" . urlencode(inr_format($avail_balance, 2))); exit;
 }
 
 // Pre-validate stock (fast fail before transaction)
@@ -302,14 +339,14 @@ try {
     $created_by_user_type = 'company';
     $s = $db_conn->prepare(
         "INSERT INTO tp_invoices
-            (invoice_number,territory_partner_id,source_location_id,source_cp_id,source_godown_id,invoice_date,
+            (invoice_number,territory_partner_id,product_type,source_location_id,source_cp_id,source_godown_id,invoice_date,
              courier_charges,discount_amount,total_amount,created_by,created_by_user_type,
              use_default_delivery_address,custom_delivery_line1,custom_delivery_line2,custom_delivery_city,
              custom_delivery_district,custom_delivery_state,custom_delivery_country,custom_delivery_pincode)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
     );
     $s->bind_param(
-        "siiiisdddssisssssss", $inv_num, $tp_id, $source_loc_id, $source_cp_id, $source_godown_id, $invoice_date,
+        "sisiiisdddssisssssss", $inv_num, $tp_id, $productType, $source_loc_id, $source_cp_id, $source_godown_id, $invoice_date,
         $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type,
         $useDefaultDelivery, $customDeliveryLine1, $customDeliveryLine2, $customDeliveryCity,
         $customDeliveryDistrict, $customDeliveryState, $customDeliveryCountry, $customDeliveryPincode
@@ -349,7 +386,7 @@ try {
     $s_item->close();
 
     // Deduct net amount (after discount) from advance; courier is collected separately via receipt
-    deductTpAdvance($db_conn, $tp_id, $net_amount, $inv_num, $use_godown ? $source_godown_id : 0, $invoice_id, $invoiceApprover);
+    deductTpAdvance($db_conn, $tp_id, $net_amount, $inv_num, $use_godown ? $source_godown_id : 0, $invoice_id, $invoiceApprover, $productType);
 
     // Mark the originating purchase order (if this invoice was raised from
     // tp-today-orders.php's "Invoice" button) as completed and link it.

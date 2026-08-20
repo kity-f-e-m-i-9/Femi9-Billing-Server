@@ -16,6 +16,8 @@
  * @param ?array{type:'company'|'ss',ss_id:?int} $approver  Pass to scope
  *   deductions to a specific approver's balance pool (Company vs a specific
  *   SS) — omitted, this behaves exactly as before (no approver filter).
+ * @param ?string $productType  Pass 'napkin'|'diaper' to draw only from that
+ *   wallet — omitted, this behaves exactly as before (no type filter).
  * @throws Exception if balance is insufficient during processing.
  */
 function tpAdvanceDeduct(
@@ -25,7 +27,8 @@ function tpAdvanceDeduct(
     int    $tp_id,
     float  $required,
     int    $godown_id = 0,
-    ?array $approver = null
+    ?array $approver = null,
+    ?string $productType = null
 ): void {
     $sql = "SELECT id, balance_amount FROM tp_advance_payments
               WHERE territory_partner_id=? AND balance_amount>0 AND status!='fully_adjusted' AND deleted_at IS NULL";
@@ -42,6 +45,11 @@ function tpAdvanceDeduct(
         $types .= "si";
         $params[] = $approver['type'];
         $params[] = $approver['ss_id'];
+    }
+    if ($productType !== null) {
+        $sql .= " AND product_type=?";
+        $types .= "s";
+        $params[] = $productType;
     }
     $sql .= " ORDER BY payment_date ASC, id ASC FOR UPDATE";
 
@@ -98,8 +106,12 @@ function tpAdvanceDeduct(
  *   already points at the exact tp_advance_payments.id row it deducted from
  *   (via tp_advance_id), so which approver pool that row belongs to is
  *   already implicit and never needs re-filtering here.
+ * @param ?string $productType  Accepted for signature symmetry with
+ *   tpAdvanceDeduct(), but unused for the same reason as $approver above —
+ *   the wallet a log entry drew from is implicit via tp_advance_id, so
+ *   filtering restore by type would risk restoring the wrong pool's row.
  */
-function tpAdvanceRestore(mysqli $db, int $tp_invoice_id, ?array $approver = null): void
+function tpAdvanceRestore(mysqli $db, int $tp_invoice_id, ?array $approver = null, ?string $productType = null): void
 {
     $s = $db->prepare(
         "SELECT id, tp_advance_id, deducted_amount
@@ -176,9 +188,11 @@ function tpAdvanceRestore(mysqli $db, int $tp_invoice_id, ?array $approver = nul
  * @param ?array{type:'company'|'ss',ss_id:?int} $approver  Accepted for
  *   signature symmetry with tpAdvanceDeduct() — see tpAdvanceRestore()'s
  *   docblock for why it's unused here too.
+ * @param ?string $productType  Accepted for signature symmetry — see
+ *   tpAdvanceRestore()'s docblock for why it's unused here too.
  * @return float The amount actually restored (may be less than $amount).
  */
-function tpAdvanceRestorePartial(mysqli $db, int $tp_invoice_id, float $amount, ?array $approver = null): float
+function tpAdvanceRestorePartial(mysqli $db, int $tp_invoice_id, float $amount, ?array $approver = null, ?string $productType = null): float
 {
     if ($amount <= 0) return 0.0;
 

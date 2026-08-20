@@ -2,7 +2,10 @@
 include("checksession.php");
 include("config.php");
 require_once("include/BdmTpScope.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
+
+tpEnsureAdvanceWalletColumns($db_conn);
 
 $tpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID);
 $hasTps = !empty($tpIds);
@@ -40,6 +43,11 @@ if ($hasTps) {
         $params[] = $filter_status;
         $types .= "s";
     }
+    if ($filter_type !== '') {
+        $where[] = "tap.product_type = ?";
+        $params[] = $filter_type;
+        $types .= "s";
+    }
 
     $sql = "SELECT tap.*, tp.name AS tp_name, tp.tp_id AS tp_code, cg.gname AS receiver_name
             FROM tp_advance_payments tap
@@ -63,13 +71,16 @@ if ($hasTps) {
             $tpTargets[$tr['territory_partner_id']] = (int)$tr['set_count'] > 0 ? (float)$tr['total_target'] : null;
         }
 
-        // Invoiced amount per TP for the selected product Type (Napkin / Lumi
-        // Diaper), same date range as the payments filter — Napkin match uses
-        // COALESCE since existing Napkin products carry a NULL category, not
-        // the literal string 'napkin' (Diaper is the only explicitly-tagged one).
-        $typeWhere = '';
-        if ($filter_type === 'diaper') { $typeWhere = " AND p.category = 'diaper'"; }
-        elseif ($filter_type === 'napkin') { $typeWhere = " AND COALESCE(p.category,'') != 'diaper'"; }
+        // Invoiced amount per TP, always Napkin-only — target_amount (the
+        // column this gets shown next to) has no Diaper equivalent, so
+        // comparing it against a combined or Diaper-only invoiced figure
+        // would silently misreport a TP's progress toward their real
+        // (Napkin) target. This is deliberately independent of $filter_type,
+        // which only controls which advance-payment rows are listed below.
+        // Napkin match uses COALESCE since existing Napkin products carry a
+        // NULL category, not the literal string 'napkin' (Diaper is the only
+        // explicitly-tagged one).
+        $typeWhere = " AND COALESCE(p.category,'') != 'diaper'";
         $resInv = call_rows_local($db_conn, "
             SELECT ti.territory_partner_id, COALESCE(SUM(tii.amount),0) AS inv_amt
             FROM tp_invoice_items tii
@@ -238,8 +249,9 @@ $i = 0;
                                         <th>#</th>
                                         <th>TP Name</th>
                                         <th>TP ID</th>
+                                        <th>Type</th>
                                         <th>TP Target (&#8377;)</th>
-                                        <th>Invoiced<?php echo $filter_type ? ' &mdash; ' . ($filter_type === 'napkin' ? 'Napkin' : 'Lumi Diaper') : ''; ?> (&#8377;)</th>
+                                        <th>Invoiced &mdash; Napkin (&#8377;)</th>
                                         <th>Receiver Name</th>
                                         <th>Date</th>
                                         <th>Amount (&#8377;)</th>
@@ -252,12 +264,16 @@ $i = 0;
                                 </thead>
                                 <tbody>
                                 <?php if (empty($payments)): ?>
-                                    <tr><td colspan="13" class="text-muted">No advance payments in this period.</td></tr>
+                                    <tr><td colspan="14" class="text-muted">No advance payments in this period.</td></tr>
                                 <?php else: foreach ($payments as $p): ?>
                                     <tr>
                                         <td><?php echo ++$i; ?></td>
                                         <td><?php echo htmlspecialchars($p['tp_name']); ?></td>
                                         <td><code style="font-size:12px;"><?php echo htmlspecialchars($p['tp_code']); ?></code></td>
+                                        <td>
+                                            <?php $_payType = tpResolveProductType($p['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_payType); ?>
+                                            <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?php echo $_tBg; ?>;color:<?php echo $_tFg; ?>;"><?php echo htmlspecialchars(tpProductTypeLabel($_payType)); ?></span>
+                                        </td>
                                         <td>
                                             <?php $tgt = $tpTargets[$p['territory_partner_id']] ?? null; ?>
                                             <?php if ($tgt !== null && $tgt > 0): ?>

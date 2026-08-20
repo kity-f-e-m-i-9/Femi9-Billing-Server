@@ -8,6 +8,7 @@ require_once __DIR__ . '/../shared/OcrService.php';
 require_once __DIR__ . '/../shared/PaymentScreenshotParser.php';
 require_once __DIR__ . '/../shared/ClaudeVisionService.php';
 require_once __DIR__ . '/../shared/TpApproverContext.php';
+require_once __DIR__ . '/../shared/TpProductType.php';
 
 header('Content-Type: application/json');
 
@@ -60,6 +61,12 @@ $source = ($_POST['source'] ?? '') === 'po' ? 'po' : 'direct';
 // draft keeps whatever approver it was created with (a draft is never
 // re-routed mid-upload).
 $approver = tpResolveApprover($db_conn, $tp_id, $_POST['approver_type'] ?? null);
+
+// Same "never re-routed mid-upload" rule as $approver above — only used when
+// this call is creating a brand-new draft; an existing draft keeps whatever
+// type it was created with.
+tpEnsureAdvanceWalletColumns($db_conn);
+$productType = tpResolveProductType($_POST['product_type'] ?? null);
 
 $allowedModes = ['Cash', 'Bank Transfer', 'Cheque', 'UPI', 'NEFT', 'RTGS', 'IMPS', 'Demand Draft', 'Other'];
 
@@ -165,10 +172,10 @@ if ($submissionId > 0) {
 
     $ins = $db_conn->prepare(
         "INSERT INTO tp_advance_payment_submissions
-            (territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, note, source, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')"
+            (territory_partner_id, product_type, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, note, source, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')"
     );
-    $ins->bind_param('isidsssss', $tp_id, $approver['type'], $approver['ss_id'], $amount, $paymentDate, $paymentMode, $referenceNumber, $note, $source);
+    $ins->bind_param('isisdsssss', $tp_id, $productType, $approver['type'], $approver['ss_id'], $amount, $paymentDate, $paymentMode, $referenceNumber, $note, $source);
     $ins->execute();
     $submissionId = $db_conn->insert_id;
     $ins->close();

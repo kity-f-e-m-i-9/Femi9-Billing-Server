@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 date_default_timezone_set("Asia/Kolkata");
@@ -66,7 +67,7 @@ function tpInvoiceItemLines($db_conn, int $invoiceId): array {
 // the only record. For completed ones, items/total get replaced below with
 // the actual invoice — the company may have adjusted qty/price when billing.
 $stmt = mysqli_prepare($db_conn,
-    "SELECT o.id, o.order_date, o.status, o.tp_invoice_id, o.cancel_reason, o.approver_type, o.approver_ss_id,
+    "SELECT o.id, o.order_date, o.status, o.tp_invoice_id, o.cancel_reason, o.approver_type, o.approver_ss_id, o.product_type,
             ss.name AS approver_ss_name,
             i.product_id, i.qty, i.price, i.amount, p.productName
      FROM tp_purchase_orders o
@@ -98,6 +99,7 @@ foreach ($rows as $r) {
             'tp_invoice_id' => $r['tp_invoice_id'],
             'cancel_reason' => $r['cancel_reason'],
             'approver_label' => $r['approver_type'] === 'ss' ? ($r['approver_ss_name'] ?? 'Super Stockist') : 'Company',
+            'product_type'  => $r['product_type'] ?? 'napkin',
             'lines'         => [],
             'total'         => 0,
             'bill'          => null,
@@ -165,6 +167,10 @@ if ($statusFilter === 'all' || $statusFilter === 'completed') {
             // that file's own $invoiceApprover), so labeling by creator here
             // reflects who billed it, not a routing choice the TP made.
             'approver_label' => ($inv['created_by_user_type'] ?? '') === 'super_stockiest' ? 'Super Stockist' : 'Company',
+            // No originating PO to carry a type from — Phase 2 adds
+            // product_type directly to tp_invoices; until then this is left
+            // null (badge omitted) rather than guessed from line items here.
+            'product_type'  => $inv['product_type'] ?? null,
             'lines'         => tpInvoiceItemLines($db_conn, (int)$inv['id']),
             'total'         => (float)$inv['total_amount'],
             'bill'          => tpBillInfo($db_conn, $inv),
@@ -297,8 +303,19 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                         </div>
                         <br/>
 
+                        <?php
+                            $_poJustSubmitted = isset($_SESSION['successMessage']) && $_SESSION['successMessage'] === 'Purchase order submitted successfully.';
+                        ?>
                         <?php if (isset($_SESSION['successMessage'])): ?>
                         <div class="alert alert-success"><?=htmlspecialchars($_SESSION['successMessage']); unset($_SESSION['successMessage']);?></div>
+                        <?php endif; ?>
+                        <?php if ($_poJustSubmitted): ?>
+                        <div class="po-eta-banner">
+                            <div class="po-eta-banner-track">
+                                <span><i class="material-icons-outlined">local_shipping</i> Your purchase order will reach you within 3 to 5 working days.</span>
+                            </div>
+                        </div>
+                        <?php include __DIR__ . '/include/po-eta-banner-style.php'; ?>
                         <?php endif; ?>
                         <?php if (isset($_SESSION['errorMessage'])): ?>
                         <div class="alert alert-danger"><?=htmlspecialchars($_SESSION['errorMessage']); unset($_SESSION['errorMessage']);?></div>
@@ -368,6 +385,7 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                             <th>Date</th>
                                             <th>Invoice No.</th>
                                             <th>Approver</th>
+                                            <th>Type</th>
                                             <th>Products</th>
                                             <th>Total</th>
                                             <th>Status</th>
@@ -376,7 +394,7 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                     </thead>
                                     <tbody>
                                         <?php if (empty($orders)): ?>
-                                        <tr><td colspan="7">
+                                        <tr><td colspan="8">
                                             <div class="po-empty">
                                                 <i class="material-icons-outlined">inbox</i>
                                                 No purchase orders in this date range.
@@ -409,6 +427,13 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                                 <?php endif; ?>
                                             </td>
                                             <td><span class="text-muted" style="font-size:12.5px;"><?=htmlspecialchars($o['approver_label'])?></span></td>
+                                            <td>
+                                                <?php if ($o['product_type']): [$tBg, $tFg] = tpProductTypeBadgeColors($o['product_type']); ?>
+                                                <span style="font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:12px;background:<?=$tBg?>;color:<?=$tFg?>;"><?=htmlspecialchars(tpProductTypeLabel($o['product_type']))?></span>
+                                                <?php else: ?>
+                                                <span class="text-muted" style="font-size:11px;">—</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td>
                                                 <button type="button" class="po-items-trigger items-view-trigger" data-items="<?=$items_json?>" data-bill="<?=$bill_json?>">
                                                     <?=count($o['lines'])?> item<?=count($o['lines']) !== 1 ? 's' : ''?>

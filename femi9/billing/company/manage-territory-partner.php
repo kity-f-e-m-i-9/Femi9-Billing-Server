@@ -19,16 +19,21 @@ $_col = $db_conn->query("SHOW COLUMNS FROM partner_location_nodes LIKE 'target_a
 if ($_col && $_col->num_rows === 0) {
     $db_conn->query("ALTER TABLE partner_location_nodes ADD COLUMN target_amount DECIMAL(12,2) DEFAULT NULL AFTER deposit_amount");
 }
+$_delCol = $db_conn->query("SHOW COLUMNS FROM territory_partners LIKE 'deleted_at'");
+if ($_delCol && $_delCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE territory_partners ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER is_active");
+}
 
 // A Sales BDM session only sees Territory Partners inside their own assigned
 // districts (including inactive ones, since this page is also how they'd
-// reactivate one) — company staff see everyone, unfiltered.
+// reactivate one) — company staff see everyone, unfiltered. Soft-deleted TPs
+// (delete-territory-partner.php) never show here regardless of scope.
 $_isBdm = ($Login_user_TYPEvl ?? '') === 'salesbdm';
-$_bdmTpWhere = '';
+$_bdmTpWhere = 'WHERE tp.deleted_at IS NULL';
 if ($_isBdm) {
     require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
     $_bdmTpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
-    $_bdmTpWhere = 'WHERE tp.id IN (' . (empty($_bdmTpIds) ? '0' : implode(',', array_map('intval', $_bdmTpIds))) . ')';
+    $_bdmTpWhere .= ' AND tp.id IN (' . (empty($_bdmTpIds) ? '0' : implode(',', array_map('intval', $_bdmTpIds))) . ')';
 }
 
 $result = $db_conn->query("

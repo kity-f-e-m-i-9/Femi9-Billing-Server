@@ -1,7 +1,9 @@
 <?php
 include("checksession.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 header('Content-Type: application/json');
 error_reporting(0);
+tpEnsureAdvanceWalletColumns($db_conn);
 
 $tp_id = (int)($_GET['tp_id'] ?? 0);
 if (!$tp_id) { echo json_encode(['balance' => 0.00, 'count' => 0]); exit; }
@@ -22,14 +24,22 @@ $chk->close();
 // only ever deducts from the approver='ss' pool for this exact SS.
 $ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
 $stmt = $db_conn->prepare("
-    SELECT COALESCE(SUM(balance_amount), 0) AS balance, COUNT(*) AS cnt
+    SELECT product_type, COALESCE(SUM(balance_amount), 0) AS balance, COUNT(*) AS cnt
     FROM tp_advance_payments
     WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
       AND approver_type = 'ss' AND approver_ss_id = ?
+    GROUP BY product_type
 ");
 $stmt->bind_param("ii", $tp_id, $ss_account_id);
 $stmt->execute();
-$row = $stmt->get_result()->fetch_assoc();
+$byType = ['napkin' => 0.0, 'diaper' => 0.0];
+$cntByType = ['napkin' => 0, 'diaper' => 0];
+$res = $stmt->get_result();
+while ($r = $res->fetch_assoc()) {
+    $t = tpResolveProductType($r['product_type']);
+    $byType[$t] = (float)$r['balance'];
+    $cntByType[$t] = (int)$r['cnt'];
+}
 $stmt->close();
 
 // TP's monthly target = sum of target_amount across the Firka/location(s) assigned to them
@@ -45,7 +55,11 @@ $tgtRow = $stmtTgt->get_result()->fetch_assoc();
 $stmtTgt->close();
 
 echo json_encode([
-    'balance' => round((float)$row['balance'], 2),
-    'count'   => (int)$row['cnt'],
+    'balance'        => round($byType['napkin'] + $byType['diaper'], 2),
+    'count'          => $cntByType['napkin'] + $cntByType['diaper'],
+    'balance_napkin' => round($byType['napkin'], 2),
+    'balance_diaper' => round($byType['diaper'], 2),
+    'count_napkin'   => $cntByType['napkin'],
+    'count_diaper'   => $cntByType['diaper'],
     'target'  => ($tgtRow && (int)$tgtRow['set_count'] > 0) ? round((float)$tgtRow['total_target'], 2) : null,
 ]);

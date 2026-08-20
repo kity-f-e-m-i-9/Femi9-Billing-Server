@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
@@ -11,7 +12,8 @@ $ss_account_id = (int)($result_LoGuserDtails['id'] ?? 0);
 
 $stmt = $db_conn->prepare(
     "SELECT s.id, s.territory_partner_id, s.po_id, s.file_path, s.detected_amount, s.reference_number,
-            s.ocr_raw_text, s.rejection_reason, s.created_at, tp.name AS tp_name, tp.mobile AS tp_mobile
+            s.ocr_raw_text, s.rejection_reason, s.created_at, tp.name AS tp_name, tp.mobile AS tp_mobile,
+            po.product_type
      FROM tp_purchase_order_screenshots s
      JOIN tp_purchase_orders po ON po.id = s.po_id
      JOIN territory_partners tp ON tp.id = s.territory_partner_id
@@ -90,7 +92,11 @@ $stmt->close();
                                                     <?php endif; ?>
                                                 </div>
                                                 <div class="col-md-9">
-                                                    <div><b>TP:</b> <?=htmlspecialchars($r['tp_name'] ?? ('#'.$r['territory_partner_id']))?> (<?=htmlspecialchars($r['tp_mobile'] ?? '')?>)</div>
+                                                    <div><b>TP:</b> <?=htmlspecialchars($r['tp_name'] ?? ('#'.$r['territory_partner_id']))?> (<?=htmlspecialchars($r['tp_mobile'] ?? '')?>)
+                                                        <?php if ($r['product_type'] !== null): $_poType = tpResolveProductType($r['product_type']); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_poType); ?>
+                                                        <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?=$_tBg?>;color:<?=$_tFg?>;"><?=htmlspecialchars(tpProductTypeLabel($_poType))?></span>
+                                                        <?php endif; ?>
+                                                    </div>
                                                     <div><b>Uploaded:</b> <?=htmlspecialchars(date("d-m-Y g:i A", strtotime($r['created_at'])))?></div>
                                                     <div><b>Detected amount:</b> <?=$r['detected_amount'] !== null ? '₹'.number_format((float)$r['detected_amount'], 2) : '<span class="text-muted">not detected</span>'?></div>
                                                     <div><b>Detected reference number:</b> <?=$r['reference_number'] !== null && $r['reference_number'] !== '' ? htmlspecialchars($r['reference_number']) : '<span class="text-muted">not detected</span>'?></div>

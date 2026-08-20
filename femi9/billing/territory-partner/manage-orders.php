@@ -14,7 +14,7 @@ $stmt = mysqli_prepare($db_conn,
     "SELECT o.id, o.order_id, o.order_date, o.new_order, o.noorder_reason, o.marketing_tool,
             o.pr_id, o.qty, o.invoiced_inv_id, o.assigned_by_ms_id, o.voided_at, o.void_reason,
             s.name shop_name, s.latitude shop_lat, s.longitude shop_lng, s.mobile_number shop_mobile,
-            p.productName, dm.ms_name, mo.dm_lat, mo.dm_lng, ui.inv_number
+            p.productName, p.gst AS p_gst, dm.ms_name, mo.dm_lat, mo.dm_lng, ui.inv_number
      FROM tp_orders o
      LEFT JOIN shop s ON s.id=o.shop_id
      LEFT JOIN products p ON p.id=o.pr_id
@@ -54,7 +54,7 @@ foreach ($rows as $r) {
         ];
     }
     if ($r['new_order'] === 'yes') {
-        $visits[$oid]['lines'][] = ['product' => $r['productName'], 'qty' => $r['qty']];
+        $visits[$oid]['lines'][] = ['product' => $r['productName'], 'qty' => $r['qty'], 'gst' => $r['p_gst']];
     }
 }
 
@@ -250,7 +250,7 @@ $visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filte
                                                     <td>
                                                         <?php if ($v['new_order'] === 'yes'): ?>
                                                             <?php foreach ($v['lines'] as $ln): ?>
-                                                            <div class="tp-line-item"><?=htmlspecialchars($ln['product'] ?? '-')?>: <b><?=htmlspecialchars($ln['qty'])?></b></div>
+                                                            <div class="tp-line-item"><?=htmlspecialchars($ln['product'] ?? '-')?>: <b><?=htmlspecialchars($ln['qty'])?></b> <span class="text-muted" style="font-size:11px;">(GST <?=htmlspecialchars($ln['gst'] !== null ? $ln['gst'] . '%' : '-')?>)</span></div>
                                                             <?php endforeach; ?>
                                                         <?php else: ?>
                                                             <span class="text-muted">Reason: <?=htmlspecialchars($v['noorder_reason'])?></span>

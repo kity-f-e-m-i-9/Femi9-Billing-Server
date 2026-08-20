@@ -2,6 +2,7 @@
 include("checksession.php");
 include("config.php");
 require_once("include/BdmTpScope.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 $tpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID);
@@ -95,7 +96,7 @@ if ($hasTps) {
     $where_sql = 'WHERE ' . implode(' AND ', $where);
 
     $sql = "
-        SELECT po.id AS po_id, po.order_date, po.status, po.cancel_reason, po.tp_invoice_id,
+        SELECT po.id AS po_id, po.order_date, po.status, po.cancel_reason, po.tp_invoice_id, po.product_type,
                tp.name AS tp_name, tp.tp_id AS tp_code,
                ti.invoice_number,
                COALESCE(tinv.item_total, 0) AS invoice_total,
@@ -349,6 +350,7 @@ if ($hasTps) {
                                             <thead>
                                                 <tr>
                                                     <th>#</th>
+                                                    <th>Type</th>
                                                     <th>Date</th>
                                                     <th>Territory Partner</th>
                                                     <th class="text-right">Items</th>
@@ -359,7 +361,7 @@ if ($hasTps) {
                                             </thead>
                                             <tbody>
                                             <?php if (empty($orders)): ?>
-                                                <tr><td colspan="7" class="text-center text-muted">No purchase order requests in this period.</td></tr>
+                                                <tr><td colspan="8" class="text-center text-muted">No purchase order requests in this period.</td></tr>
                                             <?php else: foreach ($orders as $o):
                                                 $isCompleted = $o['status'] === 'completed' && $o['tp_invoice_id'];
                                                 $amount = $isCompleted ? (float)$o['invoice_total'] : (float)$o['po_item_total'];
@@ -371,6 +373,10 @@ if ($hasTps) {
                                             ?>
                                                 <tr data-search="<?php echo htmlspecialchars($searchKey); ?>">
                                                     <td><?php echo $o['invoice_number'] ? '<code>'.htmlspecialchars($o['invoice_number']).'</code>' : '#'.(int)$o['po_id']; ?></td>
+                                                    <td>
+                                                        <?php $_poType = tpResolveProductType($o['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_poType); ?>
+                                                        <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?php echo $_tBg; ?>;color:<?php echo $_tFg; ?>;"><?php echo htmlspecialchars(tpProductTypeLabel($_poType)); ?></span>
+                                                    </td>
                                                     <td><?php echo htmlspecialchars($o['order_date']); ?></td>
                                                     <td><?php echo htmlspecialchars($o['tp_name']); ?> <small class="text-muted">(<?php echo htmlspecialchars($o['tp_code']); ?>)</small></td>
                                                     <td class="text-right">

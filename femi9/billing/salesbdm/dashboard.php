@@ -103,7 +103,7 @@ $gross_revenue = 0.0; $total_revenue = 0.0; $total_invoices = 0; $total_units = 
 $total_returns = 0; $total_return_amt = 0.0; $total_return_qty = 0.0; $net_units = 0;
 $revenue_growth = 0; $product_sales = []; $returns_by_pid = [];
 $purchaseRows = []; $purchaseReturnByTp = []; $downstreamByTp = []; $downstreamReturnByTp = [];
-$overall_target = 0.0; $overall_achieved = 0.0; $overall_target_pct = 0;
+$overall_target = 0.0; $overall_achieved = 0.0; $overall_target_pct = 0; $overall_napkin_sold = 0.0;
 
 if ($hasTps) {
     // ═══ Overview — "TP → downstream sales" (TP selling onward to shops/customers) ═══
@@ -254,23 +254,35 @@ if ($hasTps) {
     // free-text branch_district doesn't always agree with which district
     // tree its assigned Firka actually falls under.
     $overall_target = $target_active_amount;
-    // Target achievement counts Napkin-category products only — Lumi Baby
-    // Diaper sales/purchases don't count toward the Firka target, even though
-    // they still show in Sales/Turnover/Purchases figures elsewhere on this page.
-    $napkin_achieved_cust = (float)cval($db_conn,
+    // Target % is driven by Napkin advance-wallet PAYMENTS, not downstream
+    // sales — same basis switch as the Filled Firkas weekly on-track/behind
+    // logic (see include/TpWeeklyTarget.php): a TP could sell from stock
+    // they already hold without paying anything new inside this date
+    // filter, which shouldn't count as progress against the target. The
+    // old Napkin-sales figure is still shown alongside for reference (not
+    // used for the % itself). Lumi Baby Diaper doesn't count toward the
+    // Firka target either way, even though it still shows in
+    // Sales/Turnover/Purchases figures elsewhere on this page.
+    $overall_achieved = (float)cval($db_conn,
+        "SELECT COALESCE(SUM(amount),0) FROM tp_advance_payments
+         WHERE territory_partner_id IN ($tpIdList) AND product_type='napkin' AND deleted_at IS NULL
+           AND payment_date BETWEEN ? AND ?",
+        'ss', [$from, $to]);
+    $overall_target_pct = $overall_target > 0 ? min(round($overall_achieved / $overall_target * 100, 1), 999) : 0;
+
+    $napkin_sold_cust = (float)cval($db_conn,
         "SELECT COALESCE(SUM(ii.total),0) FROM invoice_items ii
          JOIN invoice i ON i.inv_id=ii.inv_id JOIN products p ON p.id=ii.pr_id
          WHERE i.user_type='territory_partner' AND i.sub_total>0 AND i.date BETWEEN ? AND ?
            AND i.user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'",
         'ss', [$from, $to]);
-    $napkin_achieved_shop = (float)cval($db_conn,
+    $napkin_sold_shop = (float)cval($db_conn,
         "SELECT COALESCE(SUM(uii.total),0) FROM user_invoice_items uii
          JOIN user_invoice ui ON ui.inv_id=uii.inv_id JOIN products p ON p.id=uii.pr_id
          WHERE ui.from_user_type='territory_partner' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
            AND ui.from_user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'",
         'ss', [$from, $to]);
-    $overall_achieved = $napkin_achieved_cust + $napkin_achieved_shop;
-    $overall_target_pct = $overall_target > 0 ? min(round($overall_achieved / $overall_target * 100, 1), 999) : 0;
+    $overall_napkin_sold = $napkin_sold_cust + $napkin_sold_shop;
 
     // ═══ Products — downstream sold + returned, across all assigned TPs ═══
     // Split by channel (Customer via `invoice`, Shop via `user_invoice`) so the
@@ -685,11 +697,12 @@ if ($hasTps) {
                                 <i class="material-icons-outlined kpi-ico">flag</i>
                                 <div class="kpi-t">Overall Target %</div>
                                 <div class="kpi-multi">
-                                    <div><span>Achieved</span><b>&#8377;<?php echo inr_format($overall_achieved, 0); ?></b></div>
+                                    <div><span>Advance Paid</span><b>&#8377;<?php echo inr_format($overall_achieved, 0); ?></b></div>
+                                    <div><span>Napkin Sold</span><b>&#8377;<?php echo inr_format($overall_napkin_sold, 0); ?></b></div>
                                     <div><span>Target</span><b>&#8377;<?php echo inr_format($overall_target, 0); ?></b></div>
                                     <div><span>%</span><b style="color:<?php echo $tgtAccent; ?>;"><?php echo $overall_target_pct; ?>%</b></div>
                                 </div>
-                                <p class="snote" style="margin:6px 0 0;">Achieved counts Napkin products only — Lumi Baby Diaper sales don't count toward the Firka target.</p>
+                                <p class="snote" style="margin:6px 0 0;">% is based on Napkin advance payments received in this date range. "Napkin Sold" is shown alongside for reference only. Lumi Baby Diaper doesn't count toward the Firka target either way.</p>
                             </div>
                         </div>
                         <div class="col-md-5 col-sm-12">
@@ -914,6 +927,7 @@ if ($hasTps) {
                     <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#16a34a;">check_circle</i>
                     Territory Partners in your Filled Firkas
                 </h6>
+                <span id="ffCountBadge" style="font-size:12px;font-weight:700;color:#374151;background:#f3f4f6;padding:4px 12px;border-radius:14px;margin-left:auto;margin-right:10px;white-space:nowrap;"></span>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" style="padding:14px 20px;">
@@ -1085,11 +1099,11 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
     };
 
     function ffRankCell(r, w) {
-        if (w.is_future) return '<span style="color:#9ca3af;">&mdash;</span>';
+        if (w.is_future || w.no_target) return '<span style="color:#9ca3af;">&mdash;</span>';
         var tier = ffTierMeta[w.rank_tier] || ffTierMeta.none;
         var dayLine = (w.rank_day_offset === null || w.rank_day_offset === undefined)
-            ? 'No Napkin sale this week'
-            : (w.rank_day_offset <= 0 ? 'Sold on week start day' : 'Sold ' + w.rank_day_offset + ' day(s) into the week');
+            ? 'No Napkin advance payment this week'
+            : (w.rank_day_offset <= 0 ? 'Paid on week start day' : 'Paid ' + w.rank_day_offset + ' day(s) into the week');
         return '<span style="font-weight:700;color:#374151;">#' + r.rank + '</span> ' +
             '<span style="background:' + tier.bg + ';color:' + tier.color + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + tier.label + '</span>' +
             '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">' + dayLine + '</div>';
@@ -1114,12 +1128,15 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
             if (w.is_future) {
                 weeklyCell = '<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Upcoming</span>' +
                     '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">' + ffEsc(w.month_label) + ' hasn\'t started yet.</div>';
+            } else if (w.no_target) {
+                weeklyCell = '<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">No Target</span>' +
+                    '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">No Firka assigned, or assigned Firka has no target set.</div>';
             } else {
                 var badge = w.on_track
                     ? '<span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">On Track</span>'
                     : '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Behind</span>';
                 weeklyCell = '<span class="ff-weekly-trigger" style="cursor:pointer;" data-target="' + rowId + '">' + badge + ' <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">expand_more</i></span>' +
-                    '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">' + ffEsc(w.week_label) + ' &middot; ' + ffMoney(w.paid_so_far) + ' Napkin sold (' + (w.pct_of_target || 0) + '% of target)</div>';
+                    '<div style="font-size:10.5px;color:#9ca3af;margin-top:2px;">' + ffEsc(w.week_label) + ' &middot; ' + ffMoney(w.paid_so_far) + ' Napkin advance paid (' + (w.pct_of_target || 0) + '% of target)</div>';
             }
             html += '<tr style="border-bottom:1px solid #f3f4f6;">' +
                 '<td style="padding:7px 8px;color:#9ca3af;">' + (serialStart + i + 1) + '</td>' +
@@ -1132,9 +1149,9 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
                 '<td style="padding:7px 8px;white-space:nowrap;">' + weeklyCell + '</td>' +
                 '<td style="padding:7px 8px;white-space:nowrap;">' + ffRankCell(r, w) + '</td>' +
                 '</tr>';
-            if (!w.is_future) {
+            if (!w.is_future && !w.no_target) {
                 html += '<tr id="' + rowId + '" class="ff-week-detail-row" style="display:none;">' +
-                    '<td colspan="9" style="padding:8px 10px 14px 30px;background:#f9fafb;">' + ffBuildWeeklyDetailHtml(w) + '</td>' +
+                    '<td colspan="9" style="padding:8px 10px 14px 30px;background:#f9fafb;">' + ffBuildWeeklyDetailHtml(w, r.db_id) + '</td>' +
                     '</tr>';
             }
         });
@@ -1142,24 +1159,61 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         return html;
     }
 
-    function ffBuildWeeklyDetailHtml(w) {
+    // Day 29 of the month immediately before a Y-m-01 (week 1's start) —
+    // where that week's spillover range actually begins. Built from
+    // Date(year, monthIndex, 29) directly rather than subtracting a fixed
+    // day count, since the previous month's length varies (28-31 days).
+    function ffSpilloverStart(week1StartYmd) {
+        var parts = week1StartYmd.split('-').map(Number);
+        // parts[1] is the target month (1-indexed); the JS Date month index
+        // for the PREVIOUS month is (parts[1] - 1) - 1 = parts[1] - 2.
+        var d = new Date(parts[0], parts[1] - 2, 29);
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        return d.getFullYear() + '-' + mm + '-' + dd;
+    }
+
+    function ffWeekPaymentLink(tpDbId, wk, includeSpillover) {
+        if (!tpDbId) return '';
+        var fromDate = includeSpillover ? ffSpilloverStart(wk.start) : wk.start;
+        var url = 'tp-advance-payment-report.php?tp_id=' + tpDbId +
+            '&from_date=' + fromDate + '&to_date=' + wk.end + '&type=napkin';
+        return ' <a href="' + url + '" target="_blank" rel="noopener" ' +
+            'style="font-size:10.5px;color:#4f46e5;text-decoration:none;white-space:nowrap;" ' +
+            'title="View the actual advance payment entries for this week">View entries &#8599;</a>';
+    }
+
+    function ffBuildWeeklyDetailHtml(w, tpDbId) {
         if (!w || !w.weeks) return 'No data';
-        var html = '<div style="font-weight:600;margin-bottom:6px;color:#374151;">' + ffEsc(w.month_label) + ' &mdash; Weekly Purchases</div>' +
-            '<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:520px;">' +
-            '<tr style="color:#6b7280;"><th style="text-align:left;padding:3px 8px;">Week</th><th style="text-align:right;padding:3px 8px;">Napkin sold this week</th><th style="text-align:right;padding:3px 8px;">Total so far</th><th style="text-align:right;padding:3px 8px;">Required so far</th><th style="text-align:center;padding:3px 8px;">Status</th></tr>';
+        var html = '<div style="font-weight:600;margin-bottom:6px;color:#374151;">' + ffEsc(w.month_label) + ' &mdash; Weekly Advance Payments</div>' +
+            '<div style="font-size:11px;color:#9ca3af;margin-bottom:6px;">Each week needs its own Napkin advance payment of at least its "Required this week" amount — an earlier week\'s surplus does not carry forward, unless the full month\'s target has already been paid in full. "Napkin sold" is shown alongside for reference only.</div>' +
+            '<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:640px;">' +
+            '<tr style="color:#6b7280;"><th style="text-align:left;padding:3px 8px;">Week</th>' +
+            '<th style="text-align:right;padding:3px 8px;">Required this week</th>' +
+            '<th style="text-align:right;padding:3px 8px;">Napkin sold this week</th>' +
+            '<th style="text-align:right;padding:3px 8px;">Advance paid this week</th>' +
+            '<th style="text-align:right;padding:3px 8px;">Total paid so far</th>' +
+            '<th style="text-align:center;padding:3px 8px;">Status</th></tr>';
         $.each(['week1', 'week2', 'week3', 'week4'], function (_, key) {
             var wk = w.weeks[key];
             if (!wk) return;
             var status = !wk.has_started ? '<span style="color:#9ca3af;">&mdash;</span>'
                 : (wk.pass ? '<span style="color:#15803d;font-weight:600;">Pass</span>' : '<span style="color:#b91c1c;font-weight:600;">Fail</span>');
             var rowStyle = wk.is_current ? ' style="background:#fffbeb;"' : '';
+            var spilloverNote = (key === 'week1' && w.has_spillover)
+                ? '<div style="font-size:10px;color:#0ea5e9;">incl. ' + ffMoney(w.spillover_amount) + ' paid late last month</div>' : '';
+            var paidCell = wk.has_started
+                ? ffMoney(wk.amount) + spilloverNote + ffWeekPaymentLink(tpDbId, wk, key === 'week1' && w.has_spillover)
+                : ffMoney(wk.amount);
             html += '<tr' + rowStyle + '><td style="padding:4px 8px;">' + ffEsc(wk.label) + '</td>' +
-                '<td style="text-align:right;padding:4px 8px;font-weight:600;">' + ffMoney(wk.amount) + '</td>' +
+                '<td style="text-align:right;padding:4px 8px;color:#6b7280;">' + ffMoney(wk.weekly_slice) + '</td>' +
+                '<td style="text-align:right;padding:4px 8px;color:#6b7280;">' + ffMoney(wk.sold) + '</td>' +
+                '<td style="text-align:right;padding:4px 8px;font-weight:600;">' + paidCell + '</td>' +
                 '<td style="text-align:right;padding:4px 8px;">' + ffMoney(wk.cumulative) + '</td>' +
-                '<td style="text-align:right;padding:4px 8px;color:#6b7280;">' + ffMoney(wk.required) + '</td>' +
                 '<td style="text-align:center;padding:4px 8px;">' + status + '</td></tr>';
         });
-        html += '</table>';
+        html += '</table>' +
+            '<div style="font-size:10.5px;color:#9ca3af;margin-top:6px;">A payment made on day 29-31 falls outside every week of that month &mdash; it counts toward next month\'s Week 1 instead.</div>';
         return html;
     }
 
@@ -1172,6 +1226,15 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         return html;
     }
 
+    function ffStatusLabel(status) {
+        return status === 'on_track' ? 'On Track' : (status === 'behind' ? 'Behind' : 'Total');
+    }
+
+    function ffUpdateCountBadge(data, status) {
+        var count = data && typeof data.total !== 'undefined' ? data.total : 0;
+        $('#ffCountBadge').text(count + ' ' + ffStatusLabel(status));
+    }
+
     function ffLoad(tab, page, status, search) {
         var key = tab + '-' + status + '-' + page + '-' + search;
         $('#ffListBody').html('<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>');
@@ -1179,6 +1242,7 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         if (ffCache[key]) {
             $('#ffListBody').html(ffRenderRows(ffCache[key]));
             $('#ffPagination').html(ffRenderPagination(ffCache[key]));
+            ffUpdateCountBadge(ffCache[key], status);
             return;
         }
         var params = { tab: tab, page: page, month: ffMonth, status: status, q: search };
@@ -1187,8 +1251,10 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
             ffCache[key] = data;
             $('#ffListBody').html(ffRenderRows(data));
             $('#ffPagination').html(ffRenderPagination(data));
+            ffUpdateCountBadge(data, status);
         }).fail(function () {
             $('#ffListBody').html('<div style="color:#b91c1c;font-size:13px;padding:20px 0;text-align:center;">Could not load data.</div>');
+            $('#ffCountBadge').text('');
         });
     }
 

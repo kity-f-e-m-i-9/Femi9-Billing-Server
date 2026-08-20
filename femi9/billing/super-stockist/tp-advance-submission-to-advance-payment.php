@@ -49,8 +49,10 @@ if (!$owned) {
     respond(['success' => false, 'message' => 'Submission not found.'], 404);
 }
 
+$productTypeOverride = isset($_POST['product_type']) ? (string)$_POST['product_type'] : null;
+
 $result = convertAdvancePaymentSubmissionToSsAdvancePayment(
-    $db_conn, $submissionId, $amount, $paymentDate, $paymentMode, $referenceNum, $note, $ss_account_id, $createdBy
+    $db_conn, $submissionId, $amount, $paymentDate, $paymentMode, $referenceNum, $note, $ss_account_id, $createdBy, $productTypeOverride
 );
 
 echo json_encode($result);

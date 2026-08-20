@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 $advBalance = 0;
@@ -92,7 +93,7 @@ while ($result_bill = mysqli_fetch_array($fetch_bills)) {
 ?>
                                                 <tr valign="top">
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo htmlspecialchars($result_bill["invoice_number"]); ?></td>
+                                                    <td><?php echo htmlspecialchars($result_bill["invoice_number"]); ?> <?php $_invType = tpResolveProductType($result_bill['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_invType); ?><span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;background:<?php echo $_tBg; ?>;color:<?php echo $_tFg; ?>;"><?php echo htmlspecialchars(tpProductTypeLabel($_invType)); ?></span></td>
                                                     <td><?php echo date("d/M/Y", strtotime($result_bill["invoice_date"])); ?></td>
                                                     <td><?php echo inr_format($subtotal, 2); ?></td>
                                                     <td><?php echo inr_format($discount, 2); ?></td>

@@ -1,4 +1,5 @@
 <?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 include("config.php");
 
@@ -346,7 +347,7 @@ Mobile:&nbsp;<?= htmlspecialchars($d['tp_mobile']); ?><br/>
 <td valign="top">
 <table id="second_topvl">
 <tr id="border_nbottom">
-<td>Invoice #<br/><b><?= htmlspecialchars($result_Invoice_Details['invoice_number']); ?></b></td>
+<td>Invoice #<br/><b><?= htmlspecialchars($result_Invoice_Details['invoice_number']); ?></b> <?php $_invType = tpResolveProductType($result_Invoice_Details['product_type'] ?? null); ?><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#eee;border:1px solid #ccc;"><?= htmlspecialchars(tpProductTypeLabel($_invType)); ?></span></td>
 <td>Invoice Date:<br/><b><?= date("d M Y", strtotime($result_Invoice_Details['invoice_date'])); ?></b></td>
 </tr>
 <tr id="border_nbottom" valign="top">

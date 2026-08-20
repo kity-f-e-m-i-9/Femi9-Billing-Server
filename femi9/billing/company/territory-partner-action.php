@@ -87,8 +87,10 @@ if ($action === 'insert-territory-partner') {
     $branch_line1   = $branch_line1   ?: null;
     $delivery_line1 = $delivery_line1 ?: null;
 
-    // Check mobile uniqueness
-    $chk = $db_conn->prepare("SELECT id FROM territory_partners WHERE mobile = ?");
+    // Check mobile uniqueness — excludes soft-deleted TPs (deleted_at IS NOT
+    // NULL) so a re-onboarded number isn't falsely blocked by its own
+    // deleted history.
+    $chk = $db_conn->prepare("SELECT id FROM territory_partners WHERE mobile = ? AND deleted_at IS NULL");
     $chk->bind_param("s", $mobile);
     $chk->execute();
     if ($chk->get_result()->num_rows > 0) {
@@ -210,8 +212,8 @@ if ($action === 'update-territory-partner') {
     $branch_line1   = $branch_line1   ?: null;
     $delivery_line1 = $delivery_line1 ?: null;
 
-    // Check mobile uniqueness excluding self
-    $chk = $db_conn->prepare("SELECT id FROM territory_partners WHERE mobile = ? AND id != ?");
+    // Check mobile uniqueness excluding self and soft-deleted TPs
+    $chk = $db_conn->prepare("SELECT id FROM territory_partners WHERE mobile = ? AND id != ? AND deleted_at IS NULL");
     $chk->bind_param("si", $mobile, $tp_db_id);
     $chk->execute();
     if ($chk->get_result()->num_rows > 0) {

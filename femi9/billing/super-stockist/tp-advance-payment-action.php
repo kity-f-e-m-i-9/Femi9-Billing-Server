@@ -1,6 +1,7 @@
 <?php
 ob_start();
 include("checksession.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'super_stockiest') {
@@ -13,8 +14,11 @@ if (!isset($_POST['add_tp_advance_payment'])) {
     header("Location: add-tp-advance-payment"); exit;
 }
 
+tpEnsureAdvanceWalletColumns($db_conn);
+
 $ss_id        = $Login_user_IDvl;
 $tp_id        = (int)($_POST['territory_partner_id'] ?? 0);
+$productType  = tpResolveProductType($_POST['product_type'] ?? null);
 $amount       = round((float)($_POST['amount'] ?? 0), 2);
 $payment_date = trim($_POST['payment_date'] ?? '');
 $payment_mode = trim($_POST['payment_mode'] ?? '');
@@ -62,11 +66,11 @@ try {
     $status   = 'active';
 
     $s = $db_conn->prepare("INSERT INTO tp_advance_payments
-        (territory_partner_id, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
+        (territory_partner_id, product_type, approver_type, approver_ss_id, amount, payment_date, payment_mode, reference_number, bank_name, remarks,
          adjusted_amount, balance_amount, status, created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("isidssssssdss",
-        $tp_id, $approver_type, $ss_account_id, $amount, $payment_date, $payment_mode, $reference_num, $bank_name, $remarks,
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $s->bind_param("issidssssssdss",
+        $tp_id, $productType, $approver_type, $ss_account_id, $amount, $payment_date, $payment_mode, $reference_num, $bank_name, $remarks,
         $adjusted, $balance, $status, $created_by);
     if (!$s->execute()) throw new \Exception("Insert failed: " . $s->error);
     $s->close();

@@ -119,6 +119,10 @@ function getTpAdvancePaymentInRange(
     string $startDate,
     string $endDate
 ): float {
+    // Scoped to the Napkin wallet only — partner_location_nodes.target_amount
+    // (what this figure is compared against) is itself Napkin-only, so
+    // counting Diaper payments here would inflate bonus eligibility against
+    // a target that was never meant to include them.
     $stmt = $dbConn->prepare("
         SELECT COALESCE(SUM(tap.amount), 0) AS total
         FROM tp_advance_payments tap
@@ -126,6 +130,7 @@ function getTpAdvancePaymentInRange(
         WHERE tp.tp_id = ?
           AND tap.payment_date >= ?
           AND tap.payment_date <= ?
+          AND tap.product_type = 'napkin'
     ");
 
     if (!$stmt) {

@@ -72,30 +72,52 @@ if ($search !== '') {
 // page) before filtering by On Track/Behind and ranking — otherwise
 // pagination would show fewer than a page's worth of matching rows, or
 // rank TPs only against whichever 15 happened to load on that page.
-$all = [];
-foreach ($tpRows as $tp) {
-    $locRows = $db_conn->query("
-        SELECT pln.name AS firka_name, pln.target_amount
+//
+// Both the Firka/target lookup and the weekly-completion math are batched
+// across every TP in this tab in a handful of queries total — doing either
+// per TP (as this used to) meant 30-40+ round trips each for a BDM with a
+// large team, which is what made this modal slow to load.
+$visibleTpIds = array_map(fn($tp) => (int)$tp['id'], $tpRows);
+
+$firkasByTp  = [];
+$targetsByTp = [];
+if (!empty($visibleTpIds)) {
+    $visibleIdList = implode(',', $visibleTpIds);
+    $locRes = $db_conn->query("
+        SELECT tpl.territory_partner_id, pln.name AS firka_name, pln.target_amount
         FROM territory_partner_locations tpl
         JOIN partner_location_nodes pln ON pln.id = tpl.location_id
-        WHERE tpl.territory_partner_id = " . (int)$tp['id'] . "
+        WHERE tpl.territory_partner_id IN ($visibleIdList)
         ORDER BY pln.name ASC
-    ")->fetch_all(MYSQLI_ASSOC);
+    ");
+    while ($loc = $locRes->fetch_assoc()) {
+        $tpId = (int)$loc['territory_partner_id'];
+        $firkasByTp[$tpId][] = $loc['firka_name'];
+        $targetsByTp[$tpId] = ($targetsByTp[$tpId] ?? 0) + (float)$loc['target_amount'];
+    }
+}
 
-    $firkaNames   = array_map(fn($r) => $r['firka_name'], $locRows);
-    $targetAmount = array_sum(array_map(fn($r) => (float)$r['target_amount'], $locRows));
+$weeklyByTp = getTpWeeklyCompletionBatch($db_conn, $visibleTpIds, $targetsByTp, $month);
 
-    $weekly = getTpWeeklyCompletion($db_conn, (int)$tp['id'], $targetAmount, $month);
+$all = [];
+foreach ($tpRows as $tp) {
+    $tpId = (int)$tp['id'];
+    $targetAmount = $targetsByTp[$tpId] ?? 0.0;
+    $weekly = $weeklyByTp[$tpId] ?? ['is_future' => false, 'no_target' => true, 'month_label' => date('F Y', strtotime($month . '-01'))];
 
-    if ($status === 'on_track' && (!empty($weekly['is_future']) || empty($weekly['on_track']))) continue;
-    if ($status === 'behind' && (!empty($weekly['is_future']) || !empty($weekly['on_track']))) continue;
+    // A TP with no Firka assigned (or an assigned Firka with no target set)
+    // has nothing to be on-track/behind against — never counts toward
+    // either filter, only visible under "All".
+    if ($status === 'on_track' && (!empty($weekly['is_future']) || !empty($weekly['no_target']) || empty($weekly['on_track']))) continue;
+    if ($status === 'behind' && (!empty($weekly['is_future']) || !empty($weekly['no_target']) || !empty($weekly['on_track']))) continue;
 
     $all[] = [
+        'db_id'         => $tpId,
         'tp_id'         => $tp['tp_id'],
         'name'          => $tp['name'],
         'mobile'        => $tp['mobile'],
         'district'      => $tp['branch_district'],
-        'firkas'        => implode(', ', $firkaNames),
+        'firkas'        => implode(', ', $firkasByTp[$tpId] ?? []),
         'target_amount' => $targetAmount,
         'weekly'        => $weekly,
     ];

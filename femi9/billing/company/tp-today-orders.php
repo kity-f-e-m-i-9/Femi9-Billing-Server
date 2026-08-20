@@ -2,6 +2,7 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 require_once("include/GodownAccess.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) {
@@ -55,7 +56,7 @@ if ($statusFilter === 'active') {
 }
 
 $stmt = $db_conn->prepare(
-    "SELECT o.id, o.order_date, o.status, o.tp_invoice_id, o.excess_amount,
+    "SELECT o.id, o.order_date, o.status, o.tp_invoice_id, o.excess_amount, o.product_type,
             o.cancelled_at, o.cancelled_by, o.cancel_reason,
             o.use_default_delivery_address, o.custom_delivery_line1, o.custom_delivery_line2,
             o.custom_delivery_city, o.custom_delivery_district, o.custom_delivery_state,
@@ -115,6 +116,7 @@ foreach ($rows as $r) {
             'tp_name'       => $r['tp_name'],
             'tp_code'       => $r['tp_code'],
             'status'        => $r['status'],
+            'product_type'  => $r['product_type'],
             'tp_invoice_id' => $r['tp_invoice_id'],
             'excess_amount' => (float)$r['excess_amount'],
             'cancelled_at'  => $r['cancelled_at'],
@@ -493,6 +495,7 @@ $companyProfiles = $db_conn->query(
                                             <th>#</th>
                                             <th>TP ID</th>
                                             <th>TP Name</th>
+                                            <th>Type</th>
                                             <th>Invoice</th>
                                             <th>Products</th>
                                             <th>Total</th>
@@ -510,6 +513,10 @@ $companyProfiles = $db_conn->query(
                                             <td style="color:#9ca3af;font-size:13px;"><?php echo ++$i; ?></td>
                                             <td><code style="font-size:12px;background:#f3f4f6;padding:2px 7px;border-radius:4px;"><?=htmlspecialchars($o['tp_code'])?></code></td>
                                             <td><span style="font-weight:600;font-size:13.5px;color:#1f2937;"><?=htmlspecialchars($o['tp_name'])?></span></td>
+                                            <td>
+                                                <?php $_poType = tpResolveProductType($o['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_poType); ?>
+                                                <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?=$_tBg?>;color:<?=$_tFg?>;"><?=htmlspecialchars(tpProductTypeLabel($_poType))?></span>
+                                            </td>
                                             <td>
                                                 <?php if ($o['status'] === 'completed'): ?>
                                                     <?php if ($o['tp_invoice_id'] && isset($invNumbers[$o['tp_invoice_id']])): ?>

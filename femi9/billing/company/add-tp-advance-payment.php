@@ -269,6 +269,16 @@ if ($stmt_cp) { $stmt_cp->execute(); $company_profiles = $stmt_cp->get_result()-
                                                     <small class="text-muted">Enter advance payment amount</small>
                                                 </div>
 
+                                                <!-- Product Type -->
+                                                <div class="col-md-6 mb-3">
+                                                    <label for="product_type" class="form-label required-field">Product Type</label>
+                                                    <select name="product_type" id="product_type" class="form-select" required>
+                                                        <option value="napkin">Napkin</option>
+                                                        <option value="diaper">Lumi Diaper</option>
+                                                    </select>
+                                                    <small class="text-muted">This payment funds only this wallet — Napkin and Diaper balances are tracked separately</small>
+                                                </div>
+
                                                 <!-- Payment Mode -->
                                                 <div class="col-md-6 mb-3">
                                                     <label for="payment_mode" class="form-label required-field">Payment Mode</label>
@@ -374,6 +384,9 @@ if ($stmt_cp) { $stmt_cp->execute(); $company_profiles = $stmt_cp->get_result()-
             placeholder: 'Select Payment Mode',
             minimumResultsForSearch: Infinity
         });
+        $('#product_type').select2({
+            minimumResultsForSearch: Infinity
+        });
 
         $('#territory_partner_id').on('change', function () {
             var tpId = $(this).val();
@@ -386,7 +399,8 @@ if ($stmt_cp) { $stmt_cp->execute(); $company_profiles = $stmt_cp->get_result()-
                 } else {
                     parts.push('<strong>Monthly Target:</strong> Not set');
                 }
-                parts.push('<strong>Outstanding Advance Balance:</strong> ₹' + Number(resp.balance || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
+                parts.push('<strong>Napkin Balance:</strong> ₹' + Number(resp.balance_napkin || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
+                parts.push('<strong>Diaper Balance:</strong> ₹' + Number(resp.balance_diaper || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
                 $info.html(parts.join(' &middot; ')).show();
             }).fail(function () { $info.hide().empty(); });
         });

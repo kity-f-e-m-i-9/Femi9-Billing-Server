@@ -45,15 +45,15 @@ $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Invoice Report');
 
 $sheet->setCellValue('A1', 'Invoice Report');
-$sheet->mergeCells('A1:J1');
+$sheet->mergeCells('A1:K1');
 $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(15);
 
 $sheet->setCellValue('A2', 'Period: ' . date('d-M-Y', strtotime($from)) . ' to ' . date('d-M-Y', strtotime($to)));
-$sheet->mergeCells('A2:J2');
+$sheet->mergeCells('A2:K2');
 $sheet->getStyle('A2')->getFont()->setItalic(true)->setSize(10);
 
 $headerRow = 4;
-$columns = ['S.No', 'Date', 'Invoice No.', 'Type', 'Party Name', 'Mobile', 'Billed', 'Received', 'Due', 'Status'];
+$columns = ['S.No', 'Date', 'Invoice No.', 'Type', 'Party Name', 'Mobile', 'Shop Address', 'Billed', 'Received', 'Due', 'Status'];
 $colIndex = 1;
 foreach ($columns as $title) {
     xlsx_set($sheet, $colIndex, $headerRow, $title);
@@ -78,10 +78,11 @@ foreach ($rows as $inv) {
     xlsx_set($sheet, 4, $row, $inv['kind'] === 'shop' ? 'Shop' : 'Customer');
     xlsx_set($sheet, 5, $row, ucwords($inv['party']));
     xlsx_set($sheet, 6, $row, $inv['mobile']);
-    xlsx_set($sheet, 7, $row, $inv['total']);
-    xlsx_set($sheet, 8, $row, $inv['received']);
-    xlsx_set($sheet, 9, $row, $inv['due']);
-    xlsx_set($sheet, 10, $row, $statusLabels[$inv['status']] ?? $inv['status']);
+    xlsx_set($sheet, 7, $row, $inv['address'] ?? '');
+    xlsx_set($sheet, 8, $row, $inv['total']);
+    xlsx_set($sheet, 9, $row, $inv['received']);
+    xlsx_set($sheet, 10, $row, $inv['due']);
+    xlsx_set($sheet, 11, $row, $statusLabels[$inv['status']] ?? $inv['status']);
 
     $grand_total    += $inv['total'];
     $grand_received += $inv['received'];
@@ -92,19 +93,19 @@ foreach ($rows as $inv) {
 if ($row > $headerRow + 1) {
     $dataRange = Coordinate::stringFromColumnIndex(1) . ($headerRow + 1) . ':' . Coordinate::stringFromColumnIndex($lastCol) . ($row - 1);
     $sheet->getStyle($dataRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-    $sheet->getStyle('G' . ($headerRow + 1) . ':I' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+    $sheet->getStyle('H' . ($headerRow + 1) . ':J' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 }
 
 xlsx_set($sheet, 5, $row, 'GRAND TOTAL');
-xlsx_set($sheet, 7, $row, $grand_total);
-xlsx_set($sheet, 8, $row, $grand_received);
-xlsx_set($sheet, 9, $row, $grand_due);
+xlsx_set($sheet, 8, $row, $grand_total);
+xlsx_set($sheet, 9, $row, $grand_received);
+xlsx_set($sheet, 10, $row, $grand_due);
 $totalsRange = Coordinate::stringFromColumnIndex(1) . $row . ':' . Coordinate::stringFromColumnIndex($lastCol) . $row;
 $sheet->getStyle($totalsRange)->getFont()->setBold(true);
 $sheet->getStyle($totalsRange)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E6F7F5');
-$sheet->getStyle('G' . $row . ':I' . $row)->getNumberFormat()->setFormatCode('#,##0.00');
+$sheet->getStyle('H' . $row . ':J' . $row)->getNumberFormat()->setFormatCode('#,##0.00');
 
-foreach (range('A', 'J') as $letter) {
+foreach (range('A', 'K') as $letter) {
     $sheet->getColumnDimension($letter)->setAutoSize(true);
 }
 

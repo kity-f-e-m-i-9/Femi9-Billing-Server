@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(E_ALL);          // TEMP DEBUG — set back to 0 once the 500 is diagnosed
 ini_set('display_errors', '1');  // TEMP DEBUG
 date_default_timezone_set("Asia/Kolkata");
@@ -259,7 +260,7 @@ $grand_purch_qty = array_sum(array_column($product_purchases, 'total_qty')) ?: 1
 
 // Purchase invoice list with payment status (mirrors tpBillInfo() logic in manage-purchase-orders.php)
 $purchase_invoices = mis_all($db_conn,
-    "SELECT id, invoice_number, invoice_date, total_amount, courier_charges
+    "SELECT id, invoice_number, invoice_date, total_amount, courier_charges, product_type
      FROM tp_invoices WHERE territory_partner_id=? AND invoice_date BETWEEN ? AND ?
      ORDER BY invoice_date DESC, id DESC LIMIT 50",
     'iss', [$uid, $from, $to]);
@@ -337,6 +338,14 @@ $target_rows = mis_all($db_conn,
      ORDER BY pln.depth ASC, pln.name ASC",
     'i', [$uid]);
 
+// target_amount is Napkin-only (no separate Diaper target exists), so
+// 'achieved' here (combined Napkin+Diaper) is not directly comparable to
+// target on its own — every row also gets a Napkin-only 'napkin_achieved'
+// figure (product category split via products.category, same canonical
+// rule used across the Napkin/Diaper wallet split elsewhere:
+// COALESCE(category,'') != 'diaper'). The page renders both and lets the
+// viewer switch between "Napkin only" (accurate vs target) and "With
+// Diaper" (combined) via a toggle, rather than silently picking one.
 $total_target = 0;
 foreach ($target_rows as &$tr) {
     $total_target += (float)$tr['target'];
@@ -350,11 +359,27 @@ foreach ($target_rows as &$tr) {
                AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
                AND (s.state_id=? OR s.district_id=?)",
             'isssii', [$uid, $utype, $from, $to, $loc_id, $loc_id]);
+        $napkinAchieved = (float)mis_val($db_conn,
+            "SELECT COALESCE(SUM(uii.total),0) FROM user_invoice ui
+             JOIN shop s ON s.temp_id = ui.to_user_id
+             JOIN user_invoice_items uii ON uii.inv_id = ui.inv_id AND uii.from_user_id = ui.from_user_id AND uii.from_user_type = ui.from_user_type
+             JOIN products p ON p.id = uii.pr_id
+             WHERE ui.from_user_id=? AND ui.from_user_type=?
+               AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
+               AND (s.state_id=? OR s.district_id=?)
+               AND COALESCE(p.category,'') != 'diaper'",
+            'isssii', [$uid, $utype, $from, $to, $loc_id, $loc_id]);
     } else {
         $achieved = 0;
+        $napkinAchieved = 0;
     }
     $tr['achieved'] = $achieved;
+    // Clamp defensively — item-level sums can differ slightly from the
+    // header-level total (gst/discount rounding), never let Napkin exceed combined.
+    $tr['napkin_achieved'] = min($napkinAchieved, $achieved);
+    $tr['diaper_achieved'] = max(0, $achieved - $tr['napkin_achieved']);
     $tr['pct'] = $tr['target'] > 0 ? min(round($achieved / $tr['target'] * 100, 1), 999) : 0;
+    $tr['napkin_pct'] = $tr['target'] > 0 ? min(round($tr['napkin_achieved'] / $tr['target'] * 100, 1), 999) : 0;
 }
 unset($tr);
 
@@ -363,9 +388,21 @@ unset($tr);
 // district_id). It still counts toward the TP's overall target, so it's added to the
 // grand total here rather than silently dropped.
 $located_achieved   = array_sum(array_column($target_rows, 'achieved'));
+$located_napkin_achieved = array_sum(array_column($target_rows, 'napkin_achieved'));
 $unlocated_achieved = (float)($cust_row['revenue'] ?? 0);
-$total_achieved      = $located_achieved + $unlocated_achieved;
-$overall_pct    = $total_target > 0 ? min(round($total_achieved / $total_target * 100, 1), 999) : 0;
+$unlocated_napkin_row = mis_row($db_conn,
+    "SELECT COALESCE(SUM(ii.total),0) rev FROM invoice i
+     JOIN invoice_items ii ON ii.inv_id = i.inv_id AND ii.user_id = i.user_id AND ii.user_type = i.user_type
+     JOIN products p ON p.id = ii.pr_id
+     WHERE i.user_id=? AND i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?
+       AND COALESCE(p.category,'') != 'diaper'",
+    'isss', [$uid, $utype, $from, $to]);
+$unlocated_napkin_achieved = min((float)($unlocated_napkin_row['rev'] ?? 0), $unlocated_achieved);
+$total_achieved        = $located_achieved + $unlocated_achieved;
+$total_napkin_achieved = $located_napkin_achieved + $unlocated_napkin_achieved;
+$total_diaper_achieved = max(0, $total_achieved - $total_napkin_achieved);
+$overall_pct        = $total_target > 0 ? min(round($total_achieved / $total_target * 100, 1), 999) : 0;
+$overall_pct_napkin = $total_target > 0 ? min(round($total_napkin_achieved / $total_target * 100, 1), 999) : 0;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 8. ORDER STATUS
@@ -750,9 +787,13 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
                             <div class="kpi-card">
                                 <span class="kpi-icon-chip chip-green"><i class="material-icons-outlined">flag</i></span>
-                                <div class="kpi-title">Target Achieved</div>
-                                <div class="kpi-value"><?php echo $overall_pct; ?>%</div>
-                                <div class="kpi-sub">&#x20B9;<?php echo inr_format($total_achieved, 0); ?> of &#x20B9;<?php echo inr_format($total_target, 0); ?></div>
+                                <div class="kpi-title">Target Achieved <small style="font-weight:400;color:var(--ink-faint);">(Napkin)</small></div>
+                                <div class="kpi-value target-pct-display"
+                                     data-napkin-pct="<?php echo $overall_pct_napkin; ?>%"
+                                     data-combined-pct="<?php echo $overall_pct; ?>%"><?php echo $overall_pct_napkin; ?>%</div>
+                                <div class="kpi-sub target-pct-display"
+                                     data-napkin-sub="&#x20B9;<?php echo inr_format($total_napkin_achieved, 0); ?> of &#x20B9;<?php echo inr_format($total_target, 0); ?>"
+                                     data-combined-sub="&#x20B9;<?php echo inr_format($total_achieved, 0); ?> of &#x20B9;<?php echo inr_format($total_target, 0); ?>">&#x20B9;<?php echo inr_format($total_napkin_achieved, 0); ?> of &#x20B9;<?php echo inr_format($total_target, 0); ?></div>
                             </div>
                         </div>
                     </div>
@@ -1041,11 +1082,15 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                         <div class="empty-state"><i class="material-icons-outlined">receipt_long</i>No purchase invoices in this period.</div>
                                     <?php else: ?>
                                     <table class="mis-table">
-                                        <thead><tr><th>Invoice #</th><th>Date</th><th>Amount</th><th>Paid</th><th>Status</th></tr></thead>
+                                        <thead><tr><th>Invoice #</th><th>Type</th><th>Date</th><th>Amount</th><th>Paid</th><th>Status</th></tr></thead>
                                         <tbody>
                                         <?php foreach ($purchase_invoices as $pi): ?>
                                             <tr>
                                                 <td><?php echo htmlspecialchars($pi['invoice_number']); ?></td>
+                                                <td>
+                                                    <?php $_invType = tpResolveProductType($pi['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_invType); ?>
+                                                    <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?php echo $_tBg; ?>;color:<?php echo $_tFg; ?>;"><?php echo htmlspecialchars(tpProductTypeLabel($_invType)); ?></span>
+                                                </td>
                                                 <td><?php echo date('d M Y', strtotime($pi['invoice_date'])); ?></td>
                                                 <td>&#x20B9;<?php echo inr_format($pi['total_amount'], 2); ?></td>
                                                 <td>&#x20B9;<?php echo inr_format($pi['paid_amount'], 2); ?></td>
@@ -1212,64 +1257,89 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                     <div class="row mis-section">
                         <div class="col-xl-12 mb-4">
                             <div class="card">
-                                <div class="card-header">
-                                    <span class="hdr-icon chip-green"><i class="material-icons-outlined">flag</i></span>
-                                    <h5 class="card-title">Target vs Achievement — by Location</h5>
+                                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                                    <div>
+                                        <span class="hdr-icon chip-green"><i class="material-icons-outlined">flag</i></span>
+                                        <h5 class="card-title" style="display:inline;">Target vs Achievement — by Location</h5>
+                                    </div>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--ink-faint);cursor:pointer;user-select:none;">
+                                        <input type="checkbox" id="targetDiaperToggle" style="width:16px;height:16px;">
+                                        Include Diaper sales (target itself stays Napkin-only)
+                                    </label>
                                 </div>
                                 <div class="card-body">
                                     <?php if (empty($target_rows)): ?>
                                         <div class="empty-state"><i class="material-icons-outlined">flag</i>No assigned locations with targets found.</div>
                                     <?php else: ?>
+                                    <p class="section-note">
+                                        <i class="material-icons-outlined">info</i>
+                                        Your target is Napkin-only, so figures below default to Napkin sales. Flip the switch above to see Napkin+Diaper combined instead — useful to check total sales, but not a real reading of target progress.
+                                    </p>
                                     <?php if ($unlocated_achieved > 0): ?>
                                     <p class="section-note">
                                         <i class="material-icons-outlined">info</i>
-                                        Includes &#x20B9;<?php echo inr_format($unlocated_achieved, 0); ?> from customer invoices, which have no state/district on file and so can't be split by location below — it's added to the overall total only.
+                                        Includes &#x20B9;<?php echo inr_format($unlocated_achieved, 0); ?> (combined) / &#x20B9;<?php echo inr_format($unlocated_napkin_achieved, 0); ?> (Napkin) from customer invoices, which have no state/district on file and so can't be split by location below — it's added to the overall total only.
                                     </p>
                                     <?php endif; ?>
                                     <div class="row mb-3">
                                         <div class="col-md-4 mb-2">
                                             <div class="stat-tile">
-                                                <div class="stat-label">Total Target</div>
+                                                <div class="stat-label">Total Target <small>(Napkin)</small></div>
                                                 <div class="stat-value" style="color:var(--indigo);">&#x20B9;<?php echo inr_format($total_target, 0); ?></div>
                                             </div>
                                         </div>
                                         <div class="col-md-4 mb-2">
                                             <div class="stat-tile">
                                                 <div class="stat-label">Total Achieved</div>
-                                                <div class="stat-value" style="color:var(--green);">&#x20B9;<?php echo inr_format($total_achieved, 0); ?></div>
+                                                <div class="stat-value target-pct-display" style="color:var(--green);"
+                                                     data-napkin-sub="&#x20B9;<?php echo inr_format($total_napkin_achieved, 0); ?>"
+                                                     data-combined-sub="&#x20B9;<?php echo inr_format($total_achieved, 0); ?>">&#x20B9;<?php echo inr_format($total_napkin_achieved, 0); ?></div>
                                             </div>
                                         </div>
                                         <div class="col-md-4 mb-2">
                                             <div class="stat-tile">
                                                 <div class="stat-label">Achievement %</div>
-                                                <div class="stat-value" style="color:<?php echo $overall_pct >= 100 ? 'var(--green)' : ($overall_pct >= 50 ? 'var(--amber)' : 'var(--rose)'); ?>;">
-                                                    <?php echo $overall_pct; ?>%
+                                                <div class="stat-value target-pct-display"
+                                                     data-napkin-pct="<?php echo $overall_pct_napkin; ?>%"
+                                                     data-combined-pct="<?php echo $overall_pct; ?>%"
+                                                     data-napkin-color="<?php echo $overall_pct_napkin >= 100 ? 'var(--green)' : ($overall_pct_napkin >= 50 ? 'var(--amber)' : 'var(--rose)'); ?>"
+                                                     data-combined-color="<?php echo $overall_pct >= 100 ? 'var(--green)' : ($overall_pct >= 50 ? 'var(--amber)' : 'var(--rose)'); ?>"
+                                                     style="color:<?php echo $overall_pct_napkin >= 100 ? 'var(--green)' : ($overall_pct_napkin >= 50 ? 'var(--amber)' : 'var(--rose)'); ?>;">
+                                                    <?php echo $overall_pct_napkin; ?>%
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                     <div style="overflow-x:auto">
                                     <table class="mis-table">
-                                        <thead><tr><th>Location</th><th>Depth</th><th>Target</th><th>Achieved</th><th>Gap</th><th>Achievement %</th></tr></thead>
+                                        <thead><tr><th>Location</th><th>Depth</th><th>Target <small>(Napkin)</small></th><th>Achieved</th><th>Gap</th><th>Achievement %</th></tr></thead>
                                         <tbody>
                                         <?php foreach ($target_rows as $tr): ?>
                                             <?php
-                                            $gap      = (float)$tr['target'] - (float)$tr['achieved'];
-                                            $pct      = (float)$tr['pct'];
-                                            $bar_c    = $pct >= 100 ? '#2e7d32' : ($pct >= 50 ? '#f57c00' : '#c62828');
+                                            $gapNapkin   = (float)$tr['target'] - (float)$tr['napkin_achieved'];
+                                            $gapCombined = (float)$tr['target'] - (float)$tr['achieved'];
+                                            $pctNapkin   = (float)$tr['napkin_pct'];
+                                            $pctCombined = (float)$tr['pct'];
+                                            $barNapkin   = $pctNapkin >= 100 ? '#2e7d32' : ($pctNapkin >= 50 ? '#f57c00' : '#c62828');
+                                            $barCombined = $pctCombined >= 100 ? '#2e7d32' : ($pctCombined >= 50 ? '#f57c00' : '#c62828');
                                             ?>
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($tr['loc_name']); ?></b></td>
                                                 <td><span style="font-size:11px;background:#e8eaf6;padding:2px 6px;border-radius:4px;">L<?php echo $tr['depth']; ?></span></td>
                                                 <td>&#x20B9;<?php echo inr_format($tr['target'], 2); ?></td>
-                                                <td>&#x20B9;<?php echo inr_format($tr['achieved'], 2); ?></td>
-                                                <td style="color:<?php echo $gap > 0 ? '#c62828' : '#2e7d32'; ?>">
-                                                    <?php echo $gap > 0 ? '−' : '+'; ?>&#x20B9;<?php echo inr_format(abs($gap), 2); ?>
+                                                <td class="target-pct-display" data-napkin-sub="&#x20B9;<?php echo inr_format($tr['napkin_achieved'], 2); ?>" data-combined-sub="&#x20B9;<?php echo inr_format($tr['achieved'], 2); ?>">&#x20B9;<?php echo inr_format($tr['napkin_achieved'], 2); ?></td>
+                                                <td class="target-pct-display"
+                                                    data-napkin-sub="<?php echo $gapNapkin > 0 ? '−' : '+'; ?>&#x20B9;<?php echo inr_format(abs($gapNapkin), 2); ?>"
+                                                    data-combined-sub="<?php echo $gapCombined > 0 ? '−' : '+'; ?>&#x20B9;<?php echo inr_format(abs($gapCombined), 2); ?>"
+                                                    data-napkin-color="<?php echo $gapNapkin > 0 ? '#c62828' : '#2e7d32'; ?>"
+                                                    data-combined-color="<?php echo $gapCombined > 0 ? '#c62828' : '#2e7d32'; ?>"
+                                                    style="color:<?php echo $gapNapkin > 0 ? '#c62828' : '#2e7d32'; ?>">
+                                                    <?php echo $gapNapkin > 0 ? '−' : '+'; ?>&#x20B9;<?php echo inr_format(abs($gapNapkin), 2); ?>
                                                 </td>
                                                 <td>
                                                     <div class="d-flex align-items-center gap-2">
-                                                        <div class="progress-bar-mis" style="width:100px"><div class="progress-fill" style="width:<?php echo min($pct,100); ?>%;background:<?php echo $bar_c; ?>"></div></div>
-                                                        <span style="font-size:13px;font-weight:700;color:<?php echo $bar_c; ?>"><?php echo $pct; ?>%</span>
+                                                        <div class="progress-bar-mis" style="width:100px"><div class="progress-fill target-pct-bar" style="width:<?php echo min($pctNapkin,100); ?>%;background:<?php echo $barNapkin; ?>" data-napkin-width="<?php echo min($pctNapkin,100); ?>" data-combined-width="<?php echo min($pctCombined,100); ?>" data-napkin-color="<?php echo $barNapkin; ?>" data-combined-color="<?php echo $barCombined; ?>"></div></div>
+                                                        <span class="target-pct-display" style="font-size:13px;font-weight:700;color:<?php echo $barNapkin; ?>" data-napkin-sub="<?php echo $pctNapkin; ?>%" data-combined-sub="<?php echo $pctCombined; ?>%" data-napkin-color="<?php echo $barNapkin; ?>" data-combined-color="<?php echo $barCombined; ?>"><?php echo $pctNapkin; ?>%</span>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1279,7 +1349,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             <td><b>Customer Sales</b> <span style="font-size:11px;color:var(--ink-faint);">(unassigned)</span></td>
                                             <td><span style="font-size:11px;background:#f1f0fb;color:var(--ink-faint);padding:2px 6px;border-radius:4px;">—</span></td>
                                             <td style="color:var(--ink-faint);">—</td>
-                                            <td>&#x20B9;<?php echo inr_format($unlocated_achieved, 2); ?></td>
+                                            <td class="target-pct-display" data-napkin-sub="&#x20B9;<?php echo inr_format($unlocated_napkin_achieved, 2); ?>" data-combined-sub="&#x20B9;<?php echo inr_format($unlocated_achieved, 2); ?>">&#x20B9;<?php echo inr_format($unlocated_napkin_achieved, 2); ?></td>
                                             <td style="color:var(--ink-faint);">—</td>
                                             <td style="color:var(--ink-faint);">Counted in overall total only</td>
                                         </tr>
@@ -1292,6 +1362,29 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                             </div>
                         </div>
                     </div>
+                    <script>
+                    (function () {
+                        var toggle = document.getElementById('targetDiaperToggle');
+                        if (!toggle) return;
+                        toggle.addEventListener('change', function () {
+                            var includeDiaper = this.checked;
+                            document.querySelectorAll('.target-pct-display').forEach(function (el) {
+                                var text = includeDiaper
+                                    ? (el.dataset.combinedPct !== undefined ? el.dataset.combinedPct : el.dataset.combinedSub)
+                                    : (el.dataset.napkinPct !== undefined ? el.dataset.napkinPct : el.dataset.napkinSub);
+                                if (text !== undefined) el.textContent = text;
+                                var color = includeDiaper ? el.dataset.combinedColor : el.dataset.napkinColor;
+                                if (color) el.style.color = color;
+                            });
+                            document.querySelectorAll('.target-pct-bar').forEach(function (el) {
+                                var width = includeDiaper ? el.dataset.combinedWidth : el.dataset.napkinWidth;
+                                var color = includeDiaper ? el.dataset.combinedColor : el.dataset.napkinColor;
+                                if (width !== undefined) el.style.width = width + '%';
+                                if (color) el.style.background = color;
+                            });
+                        });
+                    })();
+                    </script>
 
                     <!-- ══════════════════════════════════════════════════════
                          6-MONTH GROWTH TREND

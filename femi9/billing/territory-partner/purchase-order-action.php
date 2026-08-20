@@ -2,6 +2,7 @@
 include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpApproverContext.php';
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 if (!isset($_POST['submit_po'])) {
@@ -11,6 +12,12 @@ if (!isset($_POST['submit_po'])) {
 
 $tp_id      = (int)$Login_user_IDvl;
 $order_date = date("Y-m-d");
+$productType = tpResolveProductType($_POST['product_type'] ?? null);
+
+// Must exist before the balance/reserved/eligible-submission queries below,
+// which now scope by product_type — see
+// db_migrations/2026_08_18_tp_napkin_diaper_advance_wallet.sql.
+tpEnsureAdvanceWalletColumns($db_conn);
 
 // Never trust the client-submitted approver type on its own — re-verify the
 // TP actually has that SS assignment before honoring 'ss'.
@@ -36,6 +43,16 @@ foreach ($pr_ids as $i => $rpid) {
 
 if (empty($items)) {
     $_SESSION['errorMessage'] = 'Please add at least one product before submitting.';
+    header("Location: add-purchase-order.php");
+    exit;
+}
+
+// The product picker on add-purchase-order.php already only offers the
+// declared type's products, but that's UX only — re-classify every
+// submitted line here, since a raw POST could bypass the picker entirely.
+$cartClassification = tpProductTypeOfProducts($db_conn, array_column($items, 'pid'));
+if ($cartClassification['mixed'] || ($cartClassification['type'] !== null && $cartClassification['type'] !== $productType)) {
+    $_SESSION['errorMessage'] = 'This order contains a product that doesn\'t match its declared type (' . tpProductTypeLabel($productType) . '). Please start the order again.';
     header("Location: add-purchase-order.php");
     exit;
 }
@@ -88,9 +105,9 @@ $grandTotal = array_sum(array_column($items, 'amount'));
 $balStmt = mysqli_prepare($db_conn,
     "SELECT COALESCE(SUM(balance_amount), 0) AS bal
      FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
-       AND approver_type = ? AND approver_ss_id <=> ?"
+       AND approver_type = ? AND approver_ss_id <=> ? AND product_type = ?"
 );
-mysqli_stmt_bind_param($balStmt, "isi", $tp_id, $approver['type'], $approver['ss_id']);
+mysqli_stmt_bind_param($balStmt, "isis", $tp_id, $approver['type'], $approver['ss_id'], $productType);
 mysqli_stmt_execute($balStmt);
 $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
 mysqli_stmt_close($balStmt);
@@ -107,9 +124,9 @@ $reservedStmt = mysqli_prepare($db_conn,
      JOIN (SELECT po_id, SUM(amount) AS total FROM tp_purchase_order_items GROUP BY po_id) poi
        ON poi.po_id = po.id
      WHERE po.territory_partner_id = ? AND po.status = 'waiting'
-       AND po.approver_type = ? AND po.approver_ss_id <=> ?"
+       AND po.approver_type = ? AND po.approver_ss_id <=> ? AND po.product_type = ?"
 );
-mysqli_stmt_bind_param($reservedStmt, "isi", $tp_id, $approver['type'], $approver['ss_id']);
+mysqli_stmt_bind_param($reservedStmt, "isis", $tp_id, $approver['type'], $approver['ss_id'], $productType);
 mysqli_stmt_execute($reservedStmt);
 $reservedAmount = (float)(mysqli_stmt_get_result($reservedStmt)->fetch_assoc()['reserved'] ?? 0);
 mysqli_stmt_close($reservedStmt);
@@ -125,6 +142,13 @@ $excessAmount = round(max(0, $grandTotal - $advBalance), 2);
 $_usedForPoCol = $db_conn->query("SHOW COLUMNS FROM tp_advance_payment_submissions LIKE 'used_for_po_id'");
 if ($_usedForPoCol && $_usedForPoCol->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_advance_payment_submissions ADD COLUMN used_for_po_id INT UNSIGNED NULL AFTER advance_payment_id");
+}
+
+// Self-migrating: see db_migrations/2026_08_18_tp_napkin_diaper_purchase_order_type.sql
+// for the full rationale — every PO belongs to exactly one product type.
+$_productTypeCol = $db_conn->query("SHOW COLUMNS FROM tp_purchase_orders LIKE 'product_type'");
+if ($_productTypeCol && $_productTypeCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_purchase_orders ADD COLUMN product_type ENUM('napkin','diaper') NOT NULL DEFAULT 'napkin' AFTER territory_partner_id");
 }
 
 $claimSubmissionIds = [];
@@ -146,17 +170,17 @@ if ($excessAmount > 0) {
     $advSubStmt = mysqli_prepare($db_conn,
         "SELECT id, amount FROM tp_advance_payment_submissions
          WHERE territory_partner_id = ? AND status = 'pending_review' AND used_for_po_id IS NULL
-           AND approver_type = ? AND approver_ss_id <=> ?
+           AND approver_type = ? AND approver_ss_id <=> ? AND product_type = ?
          ORDER BY amount ASC"
     );
-    mysqli_stmt_bind_param($advSubStmt, "isi", $tp_id, $approver['type'], $approver['ss_id']);
+    mysqli_stmt_bind_param($advSubStmt, "isis", $tp_id, $approver['type'], $approver['ss_id'], $productType);
     mysqli_stmt_execute($advSubStmt);
     $eligibleSubs = mysqli_stmt_get_result($advSubStmt)->fetch_all(MYSQLI_ASSOC);
     mysqli_stmt_close($advSubStmt);
 
     if (empty($eligibleSubs)) {
-        $_SESSION['errorMessage'] = 'Your order total exceeds your available advance balance by ₹' . number_format($excessAmount, 2)
-            . '. Please submit an advance payment for review before submitting this order.';
+        $_SESSION['errorMessage'] = 'Your order total exceeds your available ' . tpProductTypeLabel($productType) . ' advance balance by ₹' . number_format($excessAmount, 2)
+            . '. Please submit a ' . tpProductTypeLabel($productType) . ' advance payment for review before submitting this order.';
         header("Location: add-purchase-order.php");
         exit;
     }
@@ -167,13 +191,13 @@ $db_conn->begin_transaction();
 try {
     $s = $db_conn->prepare(
         "INSERT INTO tp_purchase_orders
-            (territory_partner_id, approver_type, approver_ss_id, order_date, status, excess_amount, use_default_delivery_address,
+            (territory_partner_id, product_type, approver_type, approver_ss_id, order_date, status, excess_amount, use_default_delivery_address,
              custom_delivery_line1, custom_delivery_line2, custom_delivery_city, custom_delivery_district,
              custom_delivery_state, custom_delivery_country, custom_delivery_pincode)
-         VALUES (?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $s->bind_param(
-        "isisdisssssss", $tp_id, $approver['type'], $approver['ss_id'], $order_date, $excessAmount, $useDefaultDelivery,
+        "issisdisssssss", $tp_id, $productType, $approver['type'], $approver['ss_id'], $order_date, $excessAmount, $useDefaultDelivery,
         $customDeliveryLine1, $customDeliveryLine2, $customDeliveryCity, $customDeliveryDistrict,
         $customDeliveryState, $customDeliveryCountry, $customDeliveryPincode
     );

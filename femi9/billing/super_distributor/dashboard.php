@@ -243,8 +243,9 @@ mysqli_query($db_conn,$update_reward_points234);
             el.style.opacity = '0';
             setTimeout(function(){ el && el.remove(); }, 300);
         }
+        document.addEventListener('DOMContentLoaded', hide);
         window.addEventListener('load', hide);
-        setTimeout(hide, 8000);
+        setTimeout(hide, 1500);
     })();
     </script>
     <div class="app align-content-stretch d-flex flex-wrap">

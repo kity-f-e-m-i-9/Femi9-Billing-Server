@@ -2,10 +2,13 @@
 include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpApproverContext.php';
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 
 date_default_timezone_set("Asia/Kolkata");
 $title = "Advance Payment";
+
+tpEnsureAdvanceWalletColumns($db_conn);
 
 // If this TP has an assigned SS, they choose per-submission whether Company
 // or that SS reviews it — otherwise this never renders and everything
@@ -16,18 +19,29 @@ $assignedSs = tpGetAssignedSs($db_conn, (int)$Login_user_IDvl);
 $requestedApproverParam = $_GET['approver'] ?? null;
 $defaultApprover = tpResolveApprover($db_conn, (int)$Login_user_IDvl, $requestedApproverParam);
 
+// When arriving from add-purchase-order.php (order total exceeds available
+// balance), this payment MUST fund that same PO's wallet — locked, not a
+// free choice, same reasoning as $defaultApprover above. Otherwise the TP
+// picks via the type selector below, reloading with ?type= like the
+// approver switcher does.
+$returnToPo = ($_GET['return_to'] ?? '') === 'po';
+$productType = tpResolveProductType($_GET['type'] ?? null);
+// Kept as its own name too since Phase 1's bounce-back-to-PO logic already
+// reads $returnToPoType — same value, just the historical name at that call site.
+$returnToPoType = $productType;
+
 // Available advance balance — same query used everywhere else this figure
 // is shown (add-purchase-order.php, dashboard.php, mis-report.php); the
 // three-condition filter (balance_amount > 0 AND status != 'fully_adjusted'
 // AND deleted_at IS NULL) was the subject of two prior bugfixes and must be
-// kept exactly as-is. Now also scoped to the approver pool this submission
-// will be routed to.
+// kept exactly as-is. Now also scoped to the approver pool AND the wallet
+// this submission will be routed to.
 $balStmt = mysqli_prepare($db_conn,
     "SELECT COALESCE(SUM(balance_amount), 0) AS bal
      FROM tp_advance_payments WHERE territory_partner_id = ? AND balance_amount > 0 AND status != 'fully_adjusted' AND deleted_at IS NULL
-       AND approver_type = ? AND approver_ss_id <=> ?"
+       AND approver_type = ? AND approver_ss_id <=> ? AND product_type = ?"
 );
-mysqli_stmt_bind_param($balStmt, "isi", $Login_user_IDvl, $defaultApprover['type'], $defaultApprover['ss_id']);
+mysqli_stmt_bind_param($balStmt, "isis", $Login_user_IDvl, $defaultApprover['type'], $defaultApprover['ss_id'], $productType);
 mysqli_stmt_execute($balStmt);
 $advBalance = (float)(mysqli_stmt_get_result($balStmt)->fetch_assoc()['bal'] ?? 0);
 mysqli_stmt_close($balStmt);
@@ -46,11 +60,11 @@ if ($_sourceCol && $_sourceCol->num_rows === 0) {
 // (po_id IS NULL) screenshot draft.
 $draftSubmission = null;
 $draftStmt = mysqli_prepare($db_conn,
-    "SELECT id, amount, payment_date, payment_mode, reference_number, note, source
+    "SELECT id, amount, payment_date, payment_mode, reference_number, note, source, product_type
      FROM tp_advance_payment_submissions
-     WHERE territory_partner_id = ? AND status = 'draft' ORDER BY id DESC LIMIT 1"
+     WHERE territory_partner_id = ? AND status = 'draft' AND product_type = ? ORDER BY id DESC LIMIT 1"
 );
-mysqli_stmt_bind_param($draftStmt, "i", $Login_user_IDvl);
+mysqli_stmt_bind_param($draftStmt, "is", $Login_user_IDvl, $productType);
 mysqli_stmt_execute($draftStmt);
 $draftSubmission = mysqli_stmt_get_result($draftStmt)->fetch_assoc() ?: null;
 mysqli_stmt_close($draftStmt);
@@ -82,8 +96,9 @@ $minDate = date("Y-m-d", strtotime("-2 days"));
 // When arriving from add-purchase-order.php (order total exceeds available
 // balance), prefill the amount with the shortfall and remember to bounce
 // the TP back to the PO page — with their cart already restored there via
-// stash-po-draft.php — once this submission is made.
-$returnToPo = ($_GET['return_to'] ?? '') === 'po';
+// stash-po-draft.php — once this submission is made. ($returnToPo and
+// $returnToPoType/$productType were already resolved above, before the
+// balance query needed them.)
 $prefillAmount = $returnToPo ? (float)($_GET['amount'] ?? 0) : 0;
 
 // Amount and UTR/reference specifically must NOT resume from a draft that
@@ -193,6 +208,33 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
                         </div>
                         <?php endif; ?>
 
+                        <?php if (!$returnToPo && !$hasResumableDraft): ?>
+                        <div class="apo-card">
+                            <div class="apo-card-title"><i class="material-icons-outlined">inventory_2</i>Product Type</div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
+                                        <input type="radio" name="type_choice_display" value="napkin" <?=$productType === 'napkin' ? 'checked' : ''?> onchange="switchProductType('napkin')"> Napkin
+                                    </label>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
+                                        <input type="radio" name="type_choice_display" value="diaper" <?=$productType === 'diaper' ? 'checked' : ''?> onchange="switchProductType('diaper')"> Lumi Diaper
+                                    </label>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-2">Napkin and Diaper advance balances are tracked separately — this payment funds only the selected wallet.</small>
+                        </div>
+                        <?php else: ?>
+                        <div class="apo-card" style="background:#f8fafc;">
+                            <div style="font-size:12.5px;color:#6b7280;">
+                                <i class="material-icons-outlined" style="font-size:15px;vertical-align:-2px;">inventory_2</i>
+                                Product type: <strong><?=$productType === 'diaper' ? 'Lumi Diaper' : 'Napkin'?></strong>
+                                <?=$returnToPo ? '— matches the order you\'re continuing.' : '— you already have an unfinished draft for this type; finish or clear it before switching.'?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <?php if ($assignedSs !== null && !$hasResumableDraft): ?>
                         <div class="apo-card">
                             <div class="apo-card-title"><i class="material-icons-outlined">alt_route</i>Submit To</div>
@@ -221,6 +263,7 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
 
                         <form id="advApproverForm" method="get" style="display:none;">
                             <input type="hidden" name="approver" id="approver_switch_input" value="<?=htmlspecialchars($defaultApprover['type'])?>">
+                            <input type="hidden" name="type" id="type_switch_input" value="<?=htmlspecialchars($productType)?>">
                             <?php if ($returnToPo): ?><input type="hidden" name="return_to" value="po"><?php endif; ?>
                             <?php if ($prefillAmount > 0): ?><input type="hidden" name="amount" value="<?=htmlspecialchars((string)$prefillAmount)?>"><?php endif; ?>
                         </form>
@@ -337,6 +380,7 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
 
     <script>
     var currentApprover = <?=json_encode($defaultApprover['type'])?>;
+    var currentProductType = <?=json_encode($productType)?>;
 
     // Re-submitting the page as a GET with ?approver=… is the simplest way
     // to get a freshly-scoped balance for the newly chosen pool — same
@@ -344,6 +388,11 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
     // this codebase, just applied to a radio instead of a dropdown.
     function switchApprover(approver) {
         document.getElementById('approver_switch_input').value = approver;
+        document.getElementById('advApproverForm').submit();
+    }
+
+    function switchProductType(type) {
+        document.getElementById('type_switch_input').value = type;
         document.getElementById('advApproverForm').submit();
     }
 
@@ -554,6 +603,7 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
         if (currentSubmissionId) formData.append('submission_id', currentSubmissionId);
         if (returnToPo) formData.append('source', 'po');
         formData.append('approver_type', currentApprover);
+        formData.append('product_type', currentProductType);
 
         fetch('upload-advance-payment-screenshot.php', { method: 'POST', body: formData })
             .then(function(r) {
@@ -627,7 +677,7 @@ $canResumeAmount = $hasResumableDraft && ($draftSubmission['source'] !== 'po' ||
                 // Sent here from the PO page (excess over balance) — the
                 // cart/delivery draft is still saved server-side, so bounce
                 // straight back instead of the normal "My Advance Payments" list.
-                window.location.href = returnToPo ? 'add-purchase-order.php' : 'manage-advance-payments.php';
+                window.location.href = returnToPo ? 'add-purchase-order.php?type=<?=urlencode($returnToPoType)?>' : 'manage-advance-payments.php';
             })
             .catch(function() {
                 alert('Could not reach the server — please try again.');
