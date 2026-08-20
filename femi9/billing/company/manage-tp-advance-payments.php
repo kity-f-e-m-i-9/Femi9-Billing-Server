@@ -26,9 +26,11 @@ $filter_to   = $_GET['to_date']   ?? date('Y-m-d');
 $filter_tp   = (int)($_GET['tp_id'] ?? 0);
 $filter_company = isset($_GET['company_id']) ? (int)$_GET['company_id'] : $default_company_id;
 $filter_status = $_GET['status'] ?? '';
+$filter_type   = $_GET['type_filter'] ?? '';
 
 $allowed_statuses = ['active','partially_adjusted','fully_adjusted',''];
 if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = '';
+if (!in_array($filter_type, ['napkin','diaper'], true)) $filter_type = '';
 
 // Build query
 $where = ["tap.deleted_at IS NULL", "tap.payment_date BETWEEN ? AND ?"];
@@ -48,6 +50,11 @@ if ($filter_company > 0) {
 if ($filter_status !== '') {
     $where[] = "tap.status = ?";
     $params[] = $filter_status;
+    $types .= "s";
+}
+if ($filter_type !== '') {
+    $where[] = "tap.product_type = ?";
+    $params[] = $filter_type;
     $types .= "s";
 }
 
@@ -234,7 +241,7 @@ $i = 0;
                                             <label class="form-label">To Date</label>
                                             <input type="date" name="to_date" class="form-control" value="<?php echo htmlspecialchars($filter_to); ?>" max="<?php echo date('Y-m-d'); ?>">
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-2">
                                             <label class="form-label">Payer Name</label>
                                             <select name="tp_id" class="form-control">
                                                 <option value="">All Payers</option>
@@ -245,7 +252,7 @@ $i = 0;
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-2">
                                             <label class="form-label">Receiver Name</label>
                                             <select name="company_id" class="form-control">
                                                 <option value="">All Receivers</option>
@@ -257,6 +264,14 @@ $i = 0;
                                             </select>
                                         </div>
                                         <div class="col-md-2">
+                                            <label class="form-label">Type</label>
+                                            <select name="type_filter" class="form-control">
+                                                <option value="">Napkin + Diaper</option>
+                                                <option value="napkin" <?php echo $filter_type==='napkin' ? 'selected' : ''; ?>>Napkin only</option>
+                                                <option value="diaper" <?php echo $filter_type==='diaper' ? 'selected' : ''; ?>>Lumi Diaper only</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
                                             <label class="form-label">Status</label>
                                             <select name="status" class="form-control">
                                                 <option value="">All Status</option>
@@ -265,7 +280,7 @@ $i = 0;
                                                 <option value="fully_adjusted" <?php echo $filter_status==='fully_adjusted' ? 'selected' : ''; ?>>Fully Adjusted</option>
                                             </select>
                                         </div>
-                                        <div class="col-md-3 d-flex gap-2">
+                                        <div class="col-md-2 d-flex gap-2">
                                             <button type="submit" class="btn btn-light font-weight-bold">
                                                 <i class="material-icons" style="vertical-align:middle;font-size:17px;">filter_list</i> Filter
                                             </button>
