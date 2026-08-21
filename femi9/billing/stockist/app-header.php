@@ -1,8 +1,45 @@
  <div class="app-header">
                 <nav class="navbar navbar-light navbar-expand-lg">
                     <div class="container-fluid">
+                        <a class="hide-sidebar-toggle-button st-mobile-menu-toggle" href="#">
+                            <i class="material-icons-outlined">menu</i>
+                        </a>
+                        <style>
+                            /* Same root cause/fix as territory-partner/app-header.php: main.css
+                               gives .app-sidebar .logo (logo.php's own floating mobile bar) a
+                               fixed position at <=1199px that overlaps this separate header —
+                               hide that and move its hamburger toggle into this header instead. */
+                            .st-mobile-menu-toggle {
+                                display: none;
+                                width: 38px; height: 38px; border-radius: 50%; background: #f3f4f6;
+                                align-items: center; justify-content: center; flex: 0 0 auto; margin-right: 6px;
+                            }
+                            .st-mobile-menu-toggle .material-icons-outlined { font-size: 24px; color: #293442; }
+                            @media (max-width: 1199px) {
+                                .app-sidebar .logo { display: none !important; }
+                                .st-mobile-menu-toggle { display: flex !important; }
+                            }
+                            @media (max-width: 991px) {
+                                .app-header { left: 0 !important; right: auto !important; width: 100% !important; box-sizing: border-box !important; }
+                                .app-header .navbar {
+                                    display: block !important;
+                                    height: auto !important; min-height: 60px; padding: 8px 10px;
+                                    width: 100% !important; box-sizing: border-box !important;
+                                }
+                                .app-header .navbar > .container-fluid {
+                                    display: flex !important; flex-wrap: nowrap !important;
+                                    align-items: center !important; justify-content: space-between !important;
+                                    gap: 6px; width: 100% !important; box-sizing: border-box;
+                                }
+                                .app-header #navbarNav { min-width: 160px; flex: 1 1 auto; overflow: hidden; }
+                                .app-header .navbar-nav { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
+                                #logoTablevl h1, #logoTablevl h2, #logoTablevl h3 {
+                                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                                }
+                            }
+                        </style>
                         <div class="navbar-nav" id="navbarNav">
-                            
+
 							<table id="logoTablevl">
 				<tr valign="top">
 				<td><img src="<?php echo $usericon_concat;?>" class="usericon"></td>
