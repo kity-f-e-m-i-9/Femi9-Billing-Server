@@ -624,7 +624,14 @@ function shareTpInvoiceDirect(btn) {
     btn.innerHTML = '&hellip;';
 
     var iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:600px;border:0;';
+    // 1200px, not 900px: the invoice markup is a fluid width:100% table with
+    // no fixed intrinsic width, so at 900px the browser genuinely reflows/
+    // compresses the columns to fit (this is not a capture-width bug fixed
+    // by scrollWidth/windowWidth in shareInvoiceToWhatsApp — those correctly
+    // measure the already-squeezed layout). 1200px matches a normal desktop
+    // viewport so the table renders with every column at its natural width,
+    // same as opening the print page directly.
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1200px;height:600px;border:0;';
     iframe.onload = function () {
         var idoc     = iframe.contentDocument;
         var printDiv = idoc && idoc.getElementById('divToPrint');
