@@ -277,8 +277,31 @@ $totalcountitems = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS
 </select>
 </div>
 <div class="col-md-6">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <label class="form-label">Invoice Date*</label>
-<input type="date" readonly name="date" value="<?php echo $result_InvoieDetails['date']; ?>" required class="form-control">
+<?php
+// A draft continued here can have an empty date column (never set on
+// first creation) — falling back to today keeps this consistent with the
+// brand-new-invoice flow below, which always defaults to today too.
+$editInvoiceDateVal = $result_InvoieDetails['date'] ?: date("Y-m-d");
+?>
+<input id="editInvoiceDate" type="date" name="date" value="<?php echo $editInvoiceDateVal; ?>" required class="form-control">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+// Same today/yesterday/day-before restriction as the brand-new-invoice
+// date field further down this page — this used to be a plain readonly
+// input instead, which left the date permanently stuck blank whenever a
+// continued draft's date column was empty, since readonly blocks the
+// native picker from ever committing a value into it.
+var editInvoiceMinDate = new Date();
+editInvoiceMinDate.setHours(0, 0, 0, 0);
+editInvoiceMinDate.setDate(editInvoiceMinDate.getDate() - 2);
+flatpickr("#editInvoiceDate", {
+    dateFormat: "Y-m-d", altFormat: "d-m-Y", altInput: true,
+    maxDate: "today", minDate: editInvoiceMinDate
+});
+</script>
+<style>.flatpickr-alt-input { margin-bottom: 10px; }</style>
 </div>
 </div>
 
@@ -752,6 +775,7 @@ while ($r = mysqli_fetch_array($res_shops)) { ?>
 // calendar icon still opens its native picker (which ignores minDate/
 // maxDate entirely) alongside flatpickr's, letting any date through.
 var invoiceMinDate = new Date();
+invoiceMinDate.setHours(0, 0, 0, 0);
 invoiceMinDate.setDate(invoiceMinDate.getDate() - 2);
 var invoiceDateOpts = {
     dateFormat: "Y-m-d", altFormat: "d-m-Y", altInput: true,
