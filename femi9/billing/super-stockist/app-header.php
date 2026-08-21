@@ -18,6 +18,17 @@
                             @media (max-width: 1199px) {
                                 .app-sidebar .logo { display: none !important; }
                                 .ss-mobile-menu-toggle { display: flex !important; }
+                                /* The theme's own scroll plugin measures the sidebar menu's
+                                   height once at page-load, while the sidebar itself is still
+                                   off-canvas — it locks in a wrong, too-short height, so items
+                                   further down a long menu (Account Manager, Security) become
+                                   unreachable. Pure-CSS native scroll here works the same on
+                                   every device (phone/tablet/laptop) at this breakpoint,
+                                   independent of that plugin's timing. */
+                                .app-sidebar .app-menu {
+                                    overflow-y: auto !important;
+                                    -webkit-overflow-scrolling: touch !important;
+                                }
                             }
                             @media (max-width: 991px) {
                                 .app-header { left: 0 !important; right: auto !important; width: 100% !important; box-sizing: border-box !important; }
@@ -74,9 +85,39 @@ $Average_available_walletAmount_ST=$Total_wallet_amount_ST-$Total_withdraw_amoun
                                     <a class="nav-link" href="wallet-history" style="margin-top:12px;"> <i class="material-icons-outlined">wallet</i>&nbsp;<b><?=inr_format($Average_available_walletAmount_ST, 2);?></b></a>
                                 </li>
 								
-                                <li class="nav-item hidden-on-mobile">
-                                    <a class="nav-link nav-notifications-toggle" id="notificationsDropDown" href="#" data-bs-toggle="dropdown"><img src="../../assets/images/femi-logo.png"/></a>
-                                    <div class="dropdown-menu dropdown-menu-end notifications-dropdown" aria-labelledby="notificationsDropDown">
+                                <li class="nav-item ss-account-toggle">
+                                    <style>
+                                        /* Account switcher (logo) stays visible on mobile even though
+                                           .hidden-on-mobile hides the rest of this nav — same treatment
+                                           as territory-partner/app-header.php's .tp-account-toggle. */
+                                        @media (max-width: 1100px) {
+                                            .ss-account-toggle { display: flex !important; }
+                                            .ss-account-toggle .nav-notifications-toggle { padding: 2px !important; }
+                                            .ss-account-toggle .nav-notifications-toggle img { width: 52px; height: 52px; object-fit: cover; border-radius: 50%; }
+                                        }
+                                        @media (max-width: 400px) {
+                                            .ss-account-toggle .nav-notifications-toggle img { width: 48px; height: 48px; }
+                                        }
+                                        @media (max-width: 991px) {
+                                            .notifications-dropdown.ss-account-dropdown {
+                                                position: fixed !important;
+                                                top: 62px !important;
+                                                right: 8px !important;
+                                                left: auto !important;
+                                                width: 220px !important;
+                                                max-width: calc(100vw - 16px) !important;
+                                                max-height: min(320px, calc(100vh - 80px)) !important;
+                                                z-index: 2000 !important;
+                                            }
+                                            /* Bootstrap's Popper-based positioning fights the forced
+                                               position:fixed above on mobile and can silently fail to
+                                               open at all — driven manually below instead. */
+                                            .notifications-dropdown.ss-account-dropdown:not(.show) { display: none !important; }
+                                            .notifications-dropdown.ss-account-dropdown.show { display: block !important; }
+                                        }
+                                    </style>
+                                    <a class="nav-link nav-notifications-toggle" id="notificationsDropDown" href="#"><img src="../../assets/images/femi-logo.png"/></a>
+                                    <div class="dropdown-menu dropdown-menu-end notifications-dropdown ss-account-dropdown" aria-labelledby="notificationsDropDown">
                                         <h6 class="dropdown-header">Super Stockist (<?php echo $log_username;?>)</h6>
                                         <div class="notifications-dropdown-list">
                                             <?php if (count($_SESSION['LINKED_ACCOUNTS'] ?? []) > 1): ?>
@@ -122,3 +163,23 @@ $Average_available_walletAmount_ST=$Total_wallet_amount_ST-$Total_withdraw_amoun
 			#linkcaption{text-decoration:none;color:#2911ea;font-weight:bold;}
 			#linkcaption:hover{color:#1b0ba1;background:#DDD;}
 			</style>
+			<script>
+			(function () {
+			    // Driven manually (not via data-bs-toggle) so it doesn't depend on
+			    // Bootstrap's Popper positioning, which fights the position:fixed CSS
+			    // this menu needs on mobile and can silently fail to open there.
+			    var toggle = document.getElementById('notificationsDropDown');
+			    var menu = toggle ? toggle.closest('.nav-item').querySelector('.ss-account-dropdown') : null;
+			    if (!toggle || !menu) return;
+			    toggle.addEventListener('click', function (e) {
+			        e.preventDefault();
+			        e.stopPropagation();
+			        menu.classList.toggle('show');
+			    });
+			    document.addEventListener('click', function (e) {
+			        if (menu.classList.contains('show') && !menu.contains(e.target) && e.target !== toggle) {
+			            menu.classList.remove('show');
+			        }
+			    });
+			})();
+			</script>
