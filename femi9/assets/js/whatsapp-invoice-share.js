@@ -64,15 +64,41 @@ function shareInvoiceToWhatsApp(opts) {
     // column, etc.) instead of capturing from the element's true origin.
     var fullWidth = Math.max(el.scrollWidth, el.offsetWidth);
 
-    var pdfOpt = {
-        margin: 5,
-        filename: fileName,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, width: fullWidth, windowWidth: fullWidth, x: 0, y: 0, scrollX: 0, scrollY: 0 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+    // html2pdf's default .from(el) flow paginates against a fixed A4 page:
+    // it slices the captured canvas into successive 297mm-tall chunks, so
+    // an invoice that overflows A4 by even a few millimetres spills a
+    // near-empty second page (just the declaration/signature footer).
+    // Since this PDF exists to be shared/read on WhatsApp, not printed on
+    // physical paper, one page whose height matches the content exactly is
+    // far more useful than a "correct size" page 1 plus a near-empty page
+    // 2 — so rather than fighting html2pdf's pagination, the PDF page
+    // format itself is sized to the content (capped at A4 height so a
+    // short invoice still gets a normal-looking A4 page, not a tiny sliver).
+    var marginMm = 5;
+    var pageWmm  = 210;
+    var pageHmm  = 297;
+    var availWmm = pageWmm - marginMm * 2;
+    var availHmm = pageHmm - marginMm * 2;
 
-    html2pdf().set(pdfOpt).from(el).outputPdf('blob').then(function (pdfBlob) {
+    // html2pdf.bundle.min.js only exposes the top-level html2pdf() global —
+    // html2canvas/jsPDF are bundled internally with no separate global —
+    // so its own worker chain (.toCanvas()/.get()) is the only supported
+    // way to reach the intermediate canvas.
+    var html2canvasOpt = { scale: 2, useCORS: true, width: fullWidth, windowWidth: fullWidth, x: 0, y: 0, scrollX: 0, scrollY: 0 };
+    var worker = html2pdf().set({ margin: marginMm, image: { type: 'jpeg', quality: 0.98 }, html2canvas: html2canvasOpt, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(el);
+
+    worker.toCanvas().get('canvas').then(function (canvas) {
+        var imgHmm = availWmm * canvas.height / canvas.width;
+        var pageFormatHmm = Math.min(imgHmm, availHmm) + marginMm * 2;
+
+        // Re-point the same worker at a page format sized to the content
+        // height (capped at standard A4) instead of a fixed 297mm A4 page —
+        // .toPdf() then places the already-captured canvas as one image
+        // filling exactly that one page, so there is nothing left over to
+        // spill onto a second page.
+        worker.opt.jsPDF.format = [pageWmm, pageFormatHmm];
+        return worker.toPdf().outputPdf('blob');
+    }).then(function (pdfBlob) {
         if (btn) { btn.disabled = false; btn.innerHTML = originalLabel; }
 
         var pdfFile;

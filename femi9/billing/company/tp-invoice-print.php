@@ -137,6 +137,12 @@ foreach ($invoice_items as &$item) {
     }
 }
 unset($item);
+// The WhatsApp share flow loads this same page in a hidden iframe (see
+// manage-tp-invoices.php's shareTpInvoiceDirect()) to rasterize #divToPrint
+// into a PDF — it's the exact same markup as the on-screen Print page, not
+// a separate render. The Packs/Carton and Cartons columns are dropped only
+// on that PDF, so the regular Print page keeps showing them unchanged.
+$show_carton_cols = $has_carton_data && !isset($_GET['whatsapp']);
 
 $courier_charges  = (float)$result_Invoice_Details['courier_charges'];
 $discount_amount  = (float)($result_Invoice_Details['discount_amount'] ?? 0);
@@ -457,7 +463,7 @@ Terms of Delivery<br/>&nbsp;
 <td>Description of Goods</td>
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
-<?php if ($has_carton_data): ?>
+<?php if ($show_carton_cols): ?>
 <td id="rightlaign">Packs/Carton</td>
 <td id="rightlaign">Cartons</td>
 <?php endif; ?>
@@ -491,7 +497,7 @@ Terms of Delivery<br/>&nbsp;
 <td><b><?= htmlspecialchars($item['productName']); ?></b></td>
 <td id="rightlaign"><?= htmlspecialchars($item['hsn']); ?></td>
 <td id="rightlaign"><?= inr_format($qty, 0); ?> Packs</td>
-<?php if ($has_carton_data): ?>
+<?php if ($show_carton_cols): ?>
 <td id="rightlaign"><?= ($item['packs_per_carton'] !== null && $item['packs_per_carton'] !== '') ? inr_format((int)$item['packs_per_carton'], 0) : '—'; ?></td>
 <td id="rightlaign"><?= $item['carton_display']; ?></td>
 <?php endif; ?>
@@ -508,7 +514,7 @@ Terms of Delivery<br/>&nbsp;
 <tr>
 <td></td><td></td><td></td>
 <td id="rightlaign"><b><?= inr_format($Totalquantity123, 0); ?> Packs</b></td>
-<?php if ($has_carton_data): ?>
+<?php if ($show_carton_cols): ?>
 <td></td>
 <td id="rightlaign"><b><?= inr_format($TotalCartons123, 0); ?> ctn</b></td>
 <?php endif; ?>
@@ -520,7 +526,7 @@ Terms of Delivery<br/>&nbsp;
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Discount</i></b></td>
 <td></td><td></td>
-<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<?php if ($show_carton_cols): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b>−<?= $Currency_symbol; ?>&nbsp;<?= inr_format($discount_amount, 2); ?></b></td>
 </tr>
@@ -533,14 +539,14 @@ Terms of Delivery<br/>&nbsp;
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>SGST (<?= $__half_pct; ?>%)</i></b></td>
 <td></td><td></td>
-<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<?php if ($show_carton_cols): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>CGST (<?= $__half_pct; ?>%)</i></b></td>
 <td></td><td></td>
-<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<?php if ($show_carton_cols): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $CGST; ?></b></td>
 </tr>
@@ -550,7 +556,7 @@ Terms of Delivery<br/>&nbsp;
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
 <td></td><td></td>
-<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<?php if ($show_carton_cols): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($courier_charges, 2); ?></b></td>
 </tr>
@@ -559,7 +565,7 @@ Terms of Delivery<br/>&nbsp;
 <tr id="bottombordervl">
 <td></td><td id="rightlaign"><b><i>Total</i></b></td>
 <td></td><td></td>
-<?php if ($has_carton_data): ?><td></td><td></td><?php endif; ?>
+<?php if ($show_carton_cols): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= inr_format($grand_total, 2); ?></b></td>
 </tr>
