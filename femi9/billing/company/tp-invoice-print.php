@@ -249,25 +249,14 @@ $Currency_Name   = "INR";
                 }
                 </script>
 
-                <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-                <script src="../../assets/js/whatsapp-invoice-share.js?v=5"></script>
-
                 <table align="right">
                 <tr>
                     <td><button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button></td>
-                    <td><button type="button" id="waShareBtn" onclick="shareInvoiceToWhatsApp({elementId:'divToPrint', mobile:'<?= htmlspecialchars($result_Invoice_Details['tp_mobile'] ?? '', ENT_QUOTES) ?>', invoiceNumber:'<?= htmlspecialchars($result_Invoice_Details['invoice_number'] ?? '', ENT_QUOTES) ?>', fileName:'TPInvoice_<?= htmlspecialchars($result_Invoice_Details['invoice_number'] ?? '', ENT_QUOTES) ?>', businessName:'<?= htmlspecialchars($business_name ?? '', ENT_QUOTES) ?>', button:this});" class="btn btn-success m-b-xs m-r-xs"><i class="material-icons" style="font-size:16px;vertical-align:middle;">share</i> Share to WhatsApp</button></td>
                     <td><button type="button" onClick="javascript:window.location='add-tp-invoice';" class="btn btn-success m-b-xs m-r-xs">+ New TP Invoice</button></td>
                     <td><button type="button" onClick="javascript:window.location='manage-tp-invoices';" class="btn btn-primary m-b-xs m-r-xs">Manage TP Invoices</button></td>
                 </tr>
                 </table>
 
-                <?php if (($_REQUEST['whatsapp_share'] ?? '') === '1'): ?>
-                <script>
-                window.addEventListener('load', function () {
-                    setTimeout(function () { document.getElementById('waShareBtn').click(); }, 300);
-                });
-                </script>
-                <?php endif; ?>
                 <br/>
                 <div style="clear:both;"></div>
 

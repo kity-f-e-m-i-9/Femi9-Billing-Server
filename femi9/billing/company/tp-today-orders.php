@@ -64,6 +64,17 @@ if ($typeFilter !== '') {
     $bindValues[] = $typeFilter;
 }
 
+// Self-migrating: see db_migrations/2026_08_18_tp_napkin_diaper_purchase_order_type.sql
+// for the full rationale. The territory-partner PO submission path
+// (purchase-order-action.php) already self-heals this column, but this
+// company-side listing queries o.product_type unconditionally too, so it
+// needs the same guard — otherwise a DB that never ran that migration
+// hits an uncaught mysqli_sql_exception here and renders a blank page.
+$_productTypeCol = $db_conn->query("SHOW COLUMNS FROM tp_purchase_orders LIKE 'product_type'");
+if ($_productTypeCol && $_productTypeCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_purchase_orders ADD COLUMN product_type ENUM('napkin','diaper') NOT NULL DEFAULT 'napkin' AFTER territory_partner_id");
+}
+
 $stmt = $db_conn->prepare(
     "SELECT o.id, o.order_date, o.status, o.tp_invoice_id, o.excess_amount, o.product_type,
             o.cancelled_at, o.cancelled_by, o.cancel_reason,

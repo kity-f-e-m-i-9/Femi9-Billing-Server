@@ -340,18 +340,13 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 <div style="display:flex;align-items:center;gap:8px;">
 <a href="user-invoice-print?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>" title="Print">
 <img src="../../assets/images/print32.png"/></a>
-<button type="button" title="Share to WhatsApp" style="background:none;border:none;padding:0;cursor:pointer;"
-	data-id="<?php echo base64_encode($result_product_list["inv_id"]);?>"
-	data-mobile="<?php echo htmlspecialchars($Cust_Mbile ?? '');?>"
-	data-invoice="<?php echo htmlspecialchars($result_product_list["inv_number"]);?>"
-	onclick="shareUserInvoiceDirect(this)"><svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.29-1.39c1.44.79 3.06 1.2 4.71 1.2h.01c5.46 0 9.9-4.45 9.9-9.9C21.91 6.45 17.5 2 12.04 2zm5.8 14.03c-.24.68-1.4 1.32-1.93 1.4-.5.08-1.13.11-1.82-.11-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.79-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.66.5.24.58.83 2 .9 2.15.07.15.12.32.02.51-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.02 1.12 1 2.06 1.31 2.35 1.46.29.15.46.13.63-.08.17-.21.72-.84.92-1.13.19-.29.38-.24.64-.14.26.1 1.65.78 1.94.92.29.15.48.22.55.34.07.13.07.72-.17 1.4z"/></svg></button>
 </div>
 <?php }else{?>
 <span class='badge badge-style-bordered badge-danger'>Incomplete</span>
 <?php }?>
 													</td>
-													
-													
+
+
 																										<td>
 													    <div class="actions-group">
 													        <a href="user-invoice-add?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$INVID_encode;?>&&action=edit&&gid=<?=$result_product_list['from_user_id'];?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
@@ -403,63 +398,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
     <script src="../../assets/js/pages/datatables.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-    <script src="../../assets/js/whatsapp-invoice-share.js?v=5"></script>
-    <script>
-    // Shares a user invoice straight to WhatsApp from this list — no detour
-    // through the print page. This click is a real user gesture, so the
-    // whole async chain below (fetch -> PDF -> alert -> WhatsApp) keeps that
-    // gesture's permission to open a window, same as the print page's own
-    // button.
-    function shareUserInvoiceDirect(btn) {
-        var id             = btn.getAttribute('data-id');
-        var mobile         = btn.getAttribute('data-mobile');
-        var invoiceNumber  = btn.getAttribute('data-invoice');
-        var originalHtml   = btn.innerHTML;
 
-        btn.disabled  = true;
-        btn.innerHTML = '&hellip;';
-
-        var iframe = document.createElement('iframe');
-        // 1200px, not 900px: the invoice markup is a fluid width:100% table with
-        // no fixed intrinsic width, so at 900px the browser genuinely reflows/
-        // compresses the columns to fit (this is not a capture-width bug fixed
-        // by scrollWidth/windowWidth in shareInvoiceToWhatsApp — those correctly
-        // measure the already-squeezed layout). 1200px matches a normal desktop
-        // viewport so the table renders with every column at its natural width,
-        // same as opening the print page directly.
-        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1200px;height:600px;border:0;';
-        iframe.onload = function () {
-            var idoc     = iframe.contentDocument;
-            var printDiv = idoc && idoc.getElementById('divToPrint');
-
-            if (!printDiv) {
-                btn.disabled  = false;
-                btn.innerHTML = originalHtml;
-                iframe.remove();
-                alert('Could not prepare the invoice. Please try again.');
-                return;
-            }
-
-            btn.disabled  = false;
-            btn.innerHTML = originalHtml;
-
-            shareInvoiceToWhatsApp({
-                elementId:     'divToPrint',
-                doc:           idoc,
-                mobile:        mobile,
-                invoiceNumber: invoiceNumber,
-                fileName:      'Invoice_' + invoiceNumber,
-                businessName:  <?php echo json_encode($business_name ?? ''); ?>,
-                button:        btn
-            });
-
-            setTimeout(function () { iframe.remove(); }, 15000);
-        };
-        iframe.src = 'user-invoice-print?invoiceid=' + encodeURIComponent(id);
-        document.body.appendChild(iframe);
-    }
-    </script>
 </body>
 
 </html>
