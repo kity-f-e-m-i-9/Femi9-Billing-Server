@@ -256,6 +256,13 @@ while($result_currency=mysqli_fetch_array($fetch_currency))
 
 .item_list{width:100%;border-top:1px solid #000;border-collapse:collapse;font-family:arial;}
 .item_list td{border-right:1px solid #000;padding:5px;font-size:14px;vertical-align:top;}
+/* Last column's own border-right sits flush against .maincontainar's outer
+   border (both are 1px solid #000 with no gap between them), so right-
+   aligned numeric content (Amount, GST%, etc.) reads as crowding/overflowing
+   the page edge, especially once the table is captured at full desktop
+   width for the WhatsApp PDF share. Drop the redundant inner border and give
+   the last column a bit of breathing room instead of a border-on-border. */
+.item_list td:last-child{border-right:0;padding-right:8px;}
 #bordervl td{border-bottom:1px solid #000;padding:5px;}
 #rightlaign{text-align:right;}
 #bottombordervl{border-top:1px solid #000;border-bottom:1px solid #000;}
