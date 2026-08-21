@@ -45,11 +45,30 @@ function shareInvoiceToWhatsApp(opts) {
     var shareText = 'Invoice' + (opts.invoiceNumber ? ' #' + opts.invoiceNumber : '') +
         (opts.businessName ? ' from ' + opts.businessName : '');
 
+    // Force html2canvas to capture the invoice at its own full content width
+    // (not the browser's current viewport width). Without this, html2canvas
+    // only rasterizes the visible viewport slice of a wide element — on a
+    // desktop-width page that slice is narrower than the full invoice table,
+    // so anything past the right edge (quantity/rate/total columns) never
+    // makes it into the canvas and comes out cropped in the PDF. Pinning
+    // width/windowWidth to the element's full scrollWidth guarantees the
+    // whole table is captured, and html2pdf then scales that full-width
+    // canvas down to fit the PDF page width.
+    //
+    // x/y/scrollX/scrollY must ALSO be pinned to 0 here. html2canvas
+    // defaults scrollX/scrollY to the live page's current scroll position
+    // when they're not given explicitly, then applies that as an offset
+    // into the (now wider) capture — so on any page that happens to be
+    // scrolled even slightly, the offset crops the LEFT edge of the
+    // invoice by that many pixels (seller/buyer details, first table
+    // column, etc.) instead of capturing from the element's true origin.
+    var fullWidth = Math.max(el.scrollWidth, el.offsetWidth);
+
     var pdfOpt = {
         margin: 5,
         filename: fileName,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, width: fullWidth, windowWidth: fullWidth, x: 0, y: 0, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
