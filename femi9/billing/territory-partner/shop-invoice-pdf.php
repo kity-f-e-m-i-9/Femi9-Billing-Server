@@ -81,6 +81,14 @@ $dompdf->render();
 
 $fileName = 'Invoice_' . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invData['inv']['inv_number'] ?? 'invoice') . '.pdf';
 
+// dompdf's stream() sends no cache-control headers of its own, so without
+// this a browser (and any CDN in front of the site) is free to cache this
+// exact URL indefinitely under default heuristics — the URL never changes
+// for a given invoice, so a stale cached copy from before a rendering fix
+// or a later invoice edit could keep being served instead of a fresh one.
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+
 // inline (not attachment) so tapping the WhatsApp link opens the PDF
 // straight in the phone's browser/PDF viewer instead of forcing a download
 // prompt first.
