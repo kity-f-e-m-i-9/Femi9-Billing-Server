@@ -20,6 +20,18 @@
  * PDF endpoint intentionally drops the Packs/Carton and Cartons columns even
  * when the live Print page shows them — same behavior the old iframe/
  * html2pdf WhatsApp flow had via the `?whatsapp=1` flag.
+ *
+ * Every font-family here is "arial,\"DejaVu Sans\"" — a fallback list, not
+ * a switch to a different typeface. Real Arial has no ₹ (Rupee sign, U+20B9)
+ * glyph at all, on any platform — that's not a dompdf limitation, browsers
+ * hit the exact same gap and silently substitute a different installed
+ * font for just that one character (standard font-fallback behavior),
+ * which is invisible on screen but means the Print page was never
+ * "pure Arial" to begin with. dompdf does the same substitution given the
+ * same fallback list, so the PDF keeps Arial's (technically Helvetica's,
+ * dompdf's built-in Arial-equivalent with matching metrics) character
+ * widths for layout/wrapping — matching the Print page — and only drops
+ * to DejaVu Sans for the handful of characters (₹) missing from it.
  */
 function render_tp_invoice_html(array $ctx, bool $show_carton_cols, bool $forPdf = false): string {
     extract($ctx, EXTR_SKIP);
@@ -36,20 +48,20 @@ function render_tp_invoice_html(array $ctx, bool $show_carton_cols, bool $forPdf
 .maincontainar{width:100%;height:auto;border:1px solid #000;}
 .maincontainar hr{border-bottom:1px solid #000;}
 
-#toptl{width:100%;padding:5px;font-family:arial;font-weight:bold;border-bottom:1px solid #000;text-align:center;font-size:22px;}
+#toptl{width:100%;padding:5px;font-family:arial,"DejaVu Sans";font-weight:bold;border-bottom:1px solid #000;text-align:center;font-size:22px;}
 
 .second_containar{width:100%;}
 
-#second_topvl{width:100%;padding:5px;font-family:arial;border-bottom:1px solid #000;border-collapse:collapse;}
+#second_topvl{width:100%;padding:5px;font-family:arial,"DejaVu Sans";border-bottom:1px solid #000;border-collapse:collapse;}
 #second_topvl td{padding:5px;}
 #border_nbottom td{border-bottom:1px solid #000;}
 
 .second_containar{width:100%;border-collapse:collapse;}
 .second_containar td:nth-child(1){border-right:1px solid #000;padding:0px;}
 
-#noneborder td{border:0px !important;font-family:arial;font-size:14px;line-height:20px;}
+#noneborder td{border:0px !important;font-family:arial,"DejaVu Sans";font-size:14px;line-height:20px;}
 
-.item_list{width:100%;border-top:1px solid #000;border-collapse:collapse;font-family:arial;}
+.item_list{width:100%;border-top:1px solid #000;border-collapse:collapse;font-family:arial,"DejaVu Sans";}
 .item_list td{border-right:1px solid #000;padding:5px;font-size:14px;vertical-align:top;}
 /* Last column's own border-right sits flush against .maincontainar's outer
    border (both are 1px solid #000 with no gap between them), so right-
@@ -61,19 +73,19 @@ function render_tp_invoice_html(array $ctx, bool $show_carton_cols, bool $forPdf
 #bordervl td{border-bottom:1px solid #000;padding:5px;}
 #rightlaign{text-align:right;}
 #bottombordervl{border-top:1px solid #000;border-bottom:1px solid #000;}
-.amount_word{font-family:arial;padding:4px;border-bottom:1px solid #000;}
-.amount_payable{font-family:arial;padding:4px;border-bottom:1px solid #000;text-align:right;}
+.amount_word{font-family:arial,"DejaVu Sans";padding:4px;border-bottom:1px solid #000;}
+.amount_payable{font-family:arial,"DejaVu Sans";padding:4px;border-bottom:1px solid #000;text-align:right;}
 
-#bottom_bank{font-family:arial;width:100%;border-bottom:1px solid #000;}
+#bottom_bank{font-family:arial,"DejaVu Sans";width:100%;border-bottom:1px solid #000;}
 #bottom_bank tr td:nth-child(1){border-right:1px solid #000;}
 #bottom_bank table td{border:0px !important;}
 
-#vlnotes{font-family:arial;width:100%;}
+#vlnotes{font-family:arial,"DejaVu Sans";width:100%;}
 #vlnotes tr td:nth-child(1){border-right:1px solid #000;width:35%;}
 #cmpname{font-size:17px;font-weight:bold;}
-.cusdetaiis{margin-left:10px;font-family:arial;font-size:14px;line-height:20px;}
-#shiippingaddress{margin-left:10px;font-family:arial;}
-#pageno{font-family:arial;padding:20px 0px 20px 0px;}
+.cusdetaiis{margin-left:10px;font-family:arial,"DejaVu Sans";font-size:14px;line-height:20px;}
+#shiippingaddress{margin-left:10px;font-family:arial,"DejaVu Sans";}
+#pageno{font-family:arial,"DejaVu Sans";padding:20px 0px 20px 0px;}
 
 #hsnsac{border-collapse:collapse;}
 #hsnsac tr td{border:1px solid #000;}

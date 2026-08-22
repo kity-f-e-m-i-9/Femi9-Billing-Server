@@ -59,10 +59,14 @@ $html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>'
 
 $options = new Options();
 $options->set('isRemoteEnabled', true);   // logo images are fetched by URL
-// DejaVu Sans (bundled with dompdf) instead of Arial — Arial has no glyph
-// for the Rupee sign (₹, the &#8377; entity used throughout the invoice),
-// which rendered as a "?" tofu box under the Arial fallback.
-$options->set('defaultFont', 'DejaVu Sans');
+// defaultFont deliberately left at dompdf's own default (Helvetica, its
+// built-in Arial-equivalent) rather than forced to DejaVu Sans — the
+// invoice CSS itself (TpInvoiceHtml.php) already lists
+// arial,"DejaVu Sans" as its font-family, so dompdf only drops to DejaVu
+// Sans for the one character (₹) missing from Arial/Helvetica, the same
+// automatic font-fallback substitution a browser does silently. Forcing
+// defaultFont here previously replaced the typeface for ALL text, not
+// just the missing glyph, making every column wider than the Print page.
 
 $dompdf = new Dompdf($options);
 $dompdf->setPaper('A4', 'portrait');
