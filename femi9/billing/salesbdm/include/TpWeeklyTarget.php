@@ -1,17 +1,14 @@
 <?php
 // Read-only adaptation of the weekly cumulative-target concept already used
 // for TP bonus/deactivation decisions (see company/tp-bonus-points-calculator.php
-// — getWeekRanges()/the 25%/50%/75%/100% weekly thresholds); 'required' per
-// week here still uses those same cumulative markers, purely for display.
-// The actual Pass/Fail and On Track logic is stricter: each started week
-// must independently receive its OWN slice of the target (target/4, paid
-// during that specific week) — a surplus from an earlier week does not
-// carry forward to excuse a later week. The one exception is reaching the
-// full month's target (cumulative >= 100%), which passes every remaining
-// week automatically since there's nothing left owed. A later catch-up
-// never retroactively un-fails an earlier week that already missed its own
-// slice while it was current — no bonus award or deactivation logic lives
-// here, this file is display-only.
+// — getWeekRanges()/the 25%/50%/75%/100% weekly thresholds) — Pass/Fail for
+// each started week is exactly that cumulative ladder: Week 1 passes once
+// the TP's running total this month reaches >=25% of target, Week 2 at
+// >=50%, Week 3 at >=75%, Week 4 at >=100%. A payment made in an earlier
+// week counts toward every later week's cumulative total too, so paying
+// the full month's target in Week 1 alone passes every remaining week
+// automatically — there's no separate per-week "own slice" requirement, no
+// bonus award or deactivation logic lives here, this file is display-only.
 //
 // On Track/Behind, the weekly Pass/Fail breakdown, and the promptness rank
 // are all driven by how much the TP actually PAID toward their Napkin
@@ -222,15 +219,10 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
         $tpPaidRows = $paidByTp[$tpId] ?? [];
         $tpSoldRows = $soldByTp[$tpId] ?? [];
 
-        // Each week must independently receive its OWN slice of the target
-        // (target/4) — a surplus paid in an earlier week does NOT carry
-        // forward to excuse a later week's own payment. The one exception:
-        // once the TP has paid the FULL month's target (cumulative >= 100%),
-        // every remaining week automatically passes — paying everything in
-        // Week 1 still means the whole month is done, so there's nothing
-        // left to fail. A lump sum that only partially covers past weeks
-        // does NOT retroactively fix an earlier week that already missed
-        // its own slice when its own week was current.
+        // Pass/fail is the cumulative 25/50/75/100% ladder — see the
+        // file-level comment above. $weeklySlice (target/4) is kept only as
+        // a display figure now (how much this specific week added), not
+        // part of the pass decision.
         $weeklySlice = $targetAmount / 4;
 
         $weeks = [];
@@ -265,16 +257,17 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
                 'weekly_slice' => $weeklySlice,
                 'is_current' => $key === $currentWeekKey,
                 'has_started'=> $hasStarted,
-                'pass'       => $paid >= $weeklySlice || $cumulative >= $targetAmount,
+                'pass'       => $cumulative >= $required,
             ];
         }
 
         $requiredSoFar = $targetAmount * $thresholdPct[$currentWeekKey];
         $paidSoFar     = $weeks[$currentWeekKey]['cumulative'];
         $pctOfTarget   = round(($paidSoFar / $targetAmount) * 100, 1);
-        // On Track only if every week that has already started passed on
-        // its own terms above — a later catch-up (even a huge one) never
-        // retroactively un-fails an earlier week that missed its own slice.
+        // On Track only if every week that has already started meets its
+        // own cumulative threshold above — since the cumulative total only
+        // grows, a week that once failed only becomes On Track again once a
+        // later payment pushes the running total past that week's own mark.
         $onTrack = true;
         foreach ($ranges as $key => $r) {
             if (!$weeks[$key]['has_started']) break;

@@ -312,14 +312,14 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <br/>
 
                                                     <label class="form-label">Taluk Filter</label>
-                                                    <select id="taluk_filter_select" class="form-control" onchange="onTalukChange(this.value)" disabled>
-                                                        <option value="">All Taluks</option>
+                                                    <select id="taluk_filter_select" class="form-control" onchange="onTalukChange(this.value)" disabled required>
+                                                        <option value="" hidden>Select Taluk</option>
                                                     </select>
                                                     <br/>
 
                                                     <label class="form-label">Firka Filter</label>
-                                                    <select id="firka_filter_select" class="form-control" onchange="onFirkaChange(this.value)" disabled>
-                                                        <option value="">Select Taluk First</option>
+                                                    <select id="firka_filter_select" class="form-control" onchange="onFirkaChange(this.value)" disabled required>
+                                                        <option value="" hidden>Select Taluk First</option>
                                                     </select>
                                                     <br/>
                                                     </div>
@@ -658,7 +658,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
 
     function onDistrictChange(districtId) {
         var talukSel       = document.getElementById('taluk_filter_select');
-        talukSel.innerHTML = '<option value="">All Taluks</option>';
+        talukSel.innerHTML = '<option value="" hidden>Select Taluk</option>';
         talukSel.disabled  = !districtId;
 
         // Clean taluk list straight from the location hierarchy for this
@@ -682,7 +682,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
 
         var firkaSel = document.getElementById('firka_filter_select');
         if (firkaSel) {
-            firkaSel.innerHTML = '<option value="">All Firkas</option>';
+            firkaSel.innerHTML = '<option value="" hidden>Select Firka</option>';
             firkaSel.disabled  = !talukId;
             var firkas = talukFirkaData[talukId] || [];
             firkas.forEach(function(f) {
