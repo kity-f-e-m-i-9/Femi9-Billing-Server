@@ -284,13 +284,18 @@ unset($pi);
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. STATE / DISTRICT-WISE SALES (shop invoices only, via partner_location_nodes)
 // ═══════════════════════════════════════════════════════════════════════════
+// shop.state_id is a `state` table id, NOT a partner_location_nodes id — the
+// two id spaces overlap numerically (state.id=7 is Tamilnadu, but
+// partner_location_nodes.id=7 is Kanchipuram), so joining state_id against
+// partner_location_nodes mislabels every row here. district_id IS a
+// partner_location_nodes id, so that join below is correct as-is.
 $state_sales = mis_all($db_conn,
-    "SELECT pln.name state_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
+    "SELECT st.st_name state_name, COUNT(*) cnt, COALESCE(SUM(ui.total),0) revenue
      FROM user_invoice ui
      JOIN shop s ON s.temp_id = ui.to_user_id
-     JOIN partner_location_nodes pln ON pln.id = s.state_id
+     JOIN state st ON st.id = s.state_id
      WHERE ui.from_user_id=? AND ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
-     GROUP BY pln.id, pln.name ORDER BY revenue DESC",
+     GROUP BY st.id, st.st_name ORDER BY revenue DESC",
     'isss', [$uid, $utype, $from, $to]);
 
 $district_sales = mis_all($db_conn,

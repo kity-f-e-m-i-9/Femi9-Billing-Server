@@ -33,7 +33,13 @@ function load_shop_invoice_data($db_conn, string $Invoice_ID, int $tp_id, string
     // Customer (shop) details
     $customer_id  = $inv['to_user_id'] ?? '';
     $shop         = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='$customer_id' LIMIT 1"));
-    $state_row    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT name FROM partner_location_nodes WHERE id='{$shop['state_id']}' LIMIT 1"));
+    // shop.state_id is a `state` table id, NOT a partner_location_nodes id —
+    // the two id spaces overlap numerically (e.g. state.id=7 is Tamilnadu,
+    // but partner_location_nodes.id=7 is Kanchipuram), so looking state_id up
+    // in partner_location_nodes silently shows the wrong state/district name
+    // on the printed invoice. shop.district_id IS a partner_location_nodes id
+    // (that one's correct as-is).
+    $state_row    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT st_name AS name FROM state WHERE id='{$shop['state_id']}' LIMIT 1"));
     $state_name   = $state_row['name'] ?? '';
     $district_row = mysqli_fetch_array(mysqli_query($db_conn, "SELECT name FROM partner_location_nodes WHERE id='{$shop['district_id']}' LIMIT 1"));
     $district_name = $district_row['name'] ?? '';
