@@ -96,6 +96,26 @@ function render_purchased_bill_html(array $ctx, bool $forPdf = false): string {
 #sealsign tr:nth-child(1){border-top:1px solid #000;}
 #sealsign tr td:nth-child(1){border-right:1px solid #000;}
 
+<?php if ($forPdf): ?>
+/* dompdf renders a fixed A4 page with no viewport to shrink into, unlike a
+   browser tab — the 11-column item table at the Print page's on-screen
+   14px/5px-padding sizing runs right up against (and on invoices with
+   SGST/CGST rows, past) the page's usable width. Two changes fix this:
+   1) @page margin shrunk from dompdf's ~0.5in default to 6mm, reclaiming
+      real horizontal room for the table itself.
+   2) Tightened font-size and cell padding on the item table specifically
+      for the PDF, so every column stays readable while giving the table
+      enough headroom that its own right border reliably lands inside the
+      outer box border instead of crowding or clipping it. */
+@page { margin: 6mm; }
+.item_list td{font-size:11px;padding:3px;}
+.item_list td:last-child{padding-right:6px;}
+#noneborder td{font-size:12px;line-height:16px;}
+.cusdetaiis{font-size:12px;line-height:16px;}
+#second_topvl td{padding:3px;font-size:12px;}
+#hsnsac{font-size:11px;}
+<?php endif; ?>
+
 <?php if (!$forPdf): ?>
 @media print {
     @page { margin: 0; size: auto; }
