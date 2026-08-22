@@ -45,7 +45,13 @@ function render_tp_invoice_html(array $ctx, bool $show_carton_cols, bool $forPdf
     ob_start();
     ?>
 <style type="text/css">
-.maincontainar{width:100%;height:auto;border:1px solid #000;}
+/* box-sizing:border-box so .maincontainar's own 1px border sits INSIDE its
+   declared 100% width instead of being added on top of it (the default
+   content-box behavior). Without this, an inner width:100% table's own
+   border-collapse right border lands a hair past where the outer div's
+   border was meant to be, rendering as a faint doubled/misaligned line at
+   the right edge — most visible where the invoice table runs long. */
+.maincontainar{width:100%;height:auto;border:1px solid #000;box-sizing:border-box;}
 .maincontainar hr{border-bottom:1px solid #000;}
 
 #toptl{width:100%;padding:5px;font-family:arial,"DejaVu Sans";font-weight:bold;border-bottom:1px solid #000;text-align:center;font-size:22px;}
