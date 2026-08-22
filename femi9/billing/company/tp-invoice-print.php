@@ -80,20 +80,42 @@ $show_carton_cols = $has_carton_data;
                 $__wa_text   = 'Invoice #' . ($result_Invoice_Details['invoice_number'] ?? '') . ' from ' . ($result_Godown['gname'] ?? '') . ': ' . $__pdf_url;
                 $__wa_url    = ($__wa_number ? 'https://wa.me/' . $__wa_number : 'https://wa.me/') . '?text=' . rawurlencode($__wa_text);
                 ?>
-                <table align="right">
-                <tr>
-                    <td><button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button></td>
-                    <td><a href="<?php echo htmlspecialchars($__wa_url, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="btn btn-success m-b-xs m-r-xs"><i class="material-icons" style="font-size:16px;vertical-align:middle;">share</i> Share to WhatsApp</a></td>
-                    <td><button type="button" onClick="javascript:window.location='add-tp-invoice';" class="btn btn-success m-b-xs m-r-xs">+ New TP Invoice</button></td>
-                    <td><button type="button" onClick="javascript:window.location='manage-tp-invoices';" class="btn btn-primary m-b-xs m-r-xs">Manage TP Invoices</button></td>
-                </tr>
-                </table>
+                <style type="text/css">
+                /* This page had no mobile-responsive CSS at all — the action
+                   buttons used a <table align="right"> that doesn't wrap, and
+                   the 11-column invoice table just got crushed/misaligned on
+                   a phone screen instead of reflowing. Same fix already
+                   applied to territory-partner/shop-invoice-print.php. */
+                @media (max-width: 768px) {
+                    #tpInvoiceActionBar { justify-content: center !important; }
+                    #tpInvoiceActionBar .btn { flex: 1 1 auto; min-width: 45%; margin: 3px !important; }
+
+                    #divToPrintScroll { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+                    #divToPrintScroll .maincontainar { width: max-content; min-width: 100%; }
+
+                    .second_containar, .second_containar tbody, .second_containar tr { display: block; width: 100%; }
+                    .second_containar td { display: block; width: 100% !important; box-sizing: border-box; }
+                    .second_containar td:nth-child(1) { border-right: 0; border-bottom: 1px solid #000; }
+
+                    #bottom_bank, #bottom_bank table, #sealsign { width: 100% !important; }
+                    table[align="right"] { width: 100%; }
+                }
+                </style>
+
+                <div id="tpInvoiceActionBar" class="d-flex flex-wrap justify-content-end">
+                    <button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button>
+                    <a href="<?php echo htmlspecialchars($__wa_url, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="btn btn-success m-b-xs m-r-xs"><i class="material-icons" style="font-size:16px;vertical-align:middle;">share</i> Share to WhatsApp</a>
+                    <button type="button" onClick="javascript:window.location='add-tp-invoice';" class="btn btn-success m-b-xs m-r-xs">+ New TP Invoice</button>
+                    <button type="button" onClick="javascript:window.location='manage-tp-invoices';" class="btn btn-primary m-b-xs m-r-xs">Manage TP Invoices</button>
+                </div>
 
                 <br/>
                 <div style="clear:both;"></div>
 
                 <div id="divToPrint"><!--Print content start-->
+                <div id="divToPrintScroll">
 <?php echo render_tp_invoice_html($invData, $show_carton_cols); ?>
+                </div>
                 </div><!--Print content end-->
 
             </div>
