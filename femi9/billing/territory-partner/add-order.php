@@ -97,6 +97,16 @@ function render_geo_filter($layers, $geoNodes, $depthToField) {
         select:disabled { opacity: 0.45; }
         #add { background:green; border:1px solid green; }
         #add:hover, #add:focus { background:#DDD; color:#000; border:1px solid #000; }
+        /* Bootstrap's plain .col splits Qty/Price/Total/Disc%/Disc(Rs.)/Add
+           into 6 equal-width slivers below ~576px — too narrow to read the
+           number being typed. Two per row (with Add on its own full-width
+           row) keeps every field wide enough to actually use on a phone —
+           same fix as territory-partner/add-purchase-order.php. */
+        @media (max-width: 576px) {
+            .row.g-2.align-items-end.mb-3 > .col { flex: 0 0 50%; max-width: 50%; }
+            .row.g-2.align-items-end.mb-3 > .col-auto { flex: 0 0 100%; max-width: 100%; margin-top: 4px; }
+            .row.g-2.align-items-end.mb-3 > .col-auto #add { width: 100%; }
+        }
     </style>
 </head>
 <body>

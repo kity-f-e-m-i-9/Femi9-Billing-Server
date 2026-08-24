@@ -128,6 +128,7 @@ $i = 0;
     <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
+    <link href="../../assets/plugins/select2/css/select2.min.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
@@ -139,6 +140,22 @@ $i = 0;
         .filter-card { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-radius:10px; padding:20px; margin-bottom:20px; }
         .filter-card .form-label { color:#fff; font-weight:500; margin-bottom:5px; }
         .filter-card .form-control, .filter-card select { background:rgba(255,255,255,0.95); border:none; border-radius:6px; }
+        /* Select2 replaces the plain <select> with its own markup, which
+           doesn't inherit the .form-control sizing above — left alone it
+           renders shorter than its siblings (Receiver Name/Type/Status),
+           throwing off the row's align-items:end alignment. Match the same
+           height/background/radius here instead of guessing at a fixed
+           top-margin nudge. */
+        .filter-card .select2-container--default .select2-selection--single {
+            background:rgba(255,255,255,0.95); border:none; border-radius:6px;
+            height:38px; display:flex; align-items:center;
+        }
+        .filter-card .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height:normal; padding-left:12px; color:#374151;
+        }
+        .filter-card .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height:36px;
+        }
         .stats-card { background:#fff; border-radius:10px; padding:18px 20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-left:4px solid #667eea; }
         .stats-card h3 { font-size:26px; font-weight:700; margin:0; color:#667eea; }
         .stats-card p { margin:4px 0 0 0; color:#6b7280; font-size:13px; font-weight:500; }
@@ -243,7 +260,7 @@ $i = 0;
                                         </div>
                                         <div class="col-md-2">
                                             <label class="form-label">Payer Name</label>
-                                            <select name="tp_id" class="form-control">
+                                            <select name="tp_id" id="tpPayerSelect" class="form-control">
                                                 <option value="">All Payers</option>
                                                 <?php foreach ($tps as $tp): ?>
                                                 <option value="<?php echo $tp['id']; ?>" <?php echo $filter_tp == $tp['id'] ? 'selected' : ''; ?>>
@@ -415,10 +432,16 @@ $i = 0;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script>
 $(document).ready(function () {
+    // Plain <select> made the ~300+ TP list impossible to find a name in
+    // without scrolling the whole thing by eye — select2 adds a type-to-
+    // filter search box on top of the same options/values, no server change.
+    $('#tpPayerSelect').select2({ placeholder: 'All Payers', allowClear: true, width: '100%' });
+
     var advPayTable = $('#datatable1').DataTable({
         dom: '<"row"<"col-sm-6"l><"col-sm-6"f>><"row"<"col-sm-12"B>><"row"<"col-sm-12"tr>><"row"<"col-sm-5"i><"col-sm-7"p>>',
         buttons: [

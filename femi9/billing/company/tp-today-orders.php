@@ -76,7 +76,7 @@ if ($_productTypeCol && $_productTypeCol->num_rows === 0) {
 }
 
 $stmt = $db_conn->prepare(
-    "SELECT o.id, o.order_date, o.status, o.tp_invoice_id, o.excess_amount, o.product_type,
+    "SELECT o.id, o.order_date, o.created_at, o.status, o.tp_invoice_id, o.excess_amount, o.product_type,
             o.cancelled_at, o.cancelled_by, o.cancel_reason,
             o.use_default_delivery_address, o.custom_delivery_line1, o.custom_delivery_line2,
             o.custom_delivery_city, o.custom_delivery_district, o.custom_delivery_state,
@@ -135,6 +135,7 @@ foreach ($rows as $r) {
             'tp_db_id'      => $r['tp_db_id'],
             'tp_name'       => $r['tp_name'],
             'tp_code'       => $r['tp_code'],
+            'created_at'    => $r['created_at'],
             'status'        => $r['status'],
             'product_type'  => $r['product_type'],
             'tp_invoice_id' => $r['tp_invoice_id'],
@@ -201,7 +202,8 @@ if (!empty($orderIds)) {
 // result set — same three-condition filter used everywhere else this figure
 // is shown (add-purchase-order.php, dashboard.php, mis-report.php).
 $tpBalances = [];
-$tpPendingSubmissions = []; // territory_partner_id => count of pending_review/accepted submissions
+$tpPendingSubmissions = []; // territory_partner_id => count of pending_review submissions only
+$tpApprovedSubmissions = []; // territory_partner_id => count of accepted (already reviewed) submissions
 $tpDbIds = array_values(array_unique(array_column($orders, 'tp_db_id')));
 if (!empty($tpDbIds)) {
     $placeholders = implode(',', array_fill(0, count($tpDbIds), '?'));
@@ -222,9 +224,15 @@ if (!empty($tpDbIds)) {
 
     // Whether the TP has a live advance-payment submission at all (any
     // status other than draft) — shown as a nudge to check for it, since
-    // there's no direct FK from an order to a specific submission.
+    // there's no direct FK from an order to a specific submission. Pending
+    // and accepted are counted separately (not combined into one bucket)
+    // so the button below can tell "still needs review" (blue, unchanged)
+    // apart from "already reviewed/approved" (orange) instead of showing
+    // the same blue for both.
     $stmtP = $db_conn->prepare(
-        "SELECT territory_partner_id, COUNT(*) AS cnt
+        "SELECT territory_partner_id,
+                SUM(status = 'pending_review') AS pending_cnt,
+                SUM(status = 'accepted') AS approved_cnt
          FROM tp_advance_payment_submissions
          WHERE territory_partner_id IN ($placeholders) AND status IN ('pending_review', 'accepted')
            AND approver_type = 'company'
@@ -233,7 +241,10 @@ if (!empty($tpDbIds)) {
     $stmtP->bind_param($types, ...$tpDbIds);
     $stmtP->execute();
     $resP = $stmtP->get_result();
-    while ($pr = $resP->fetch_assoc()) { $tpPendingSubmissions[(int)$pr['territory_partner_id']] = (int)$pr['cnt']; }
+    while ($pr = $resP->fetch_assoc()) {
+        $tpPendingSubmissions[(int)$pr['territory_partner_id']]  = (int)$pr['pending_cnt'];
+        $tpApprovedSubmissions[(int)$pr['territory_partner_id']] = (int)$pr['approved_cnt'];
+    }
     $stmtP->close();
 }
 
@@ -529,6 +540,7 @@ $companyProfiles = $db_conn->query(
                                             <th>Total</th>
                                             <th>Delivery Address</th>
                                             <th>Payment Proof</th>
+                                            <th>Order Time</th>
                                             <th>Status</th>
                                             <th>Dispatch Slip</th>
                                         </tr>
@@ -597,6 +609,14 @@ $companyProfiles = $db_conn->query(
                                                 $tpBal = $tpBalances[$o['tp_db_id']] ?? 0.0;
                                                 $coveredByBalance = min($o['total'], max(0, $o['total'] - $o['excess_amount']));
                                                 $pendingSubCount = $tpPendingSubmissions[$o['tp_db_id']] ?? 0;
+                                                $approvedSubCount = $tpApprovedSubmissions[$o['tp_db_id']] ?? 0;
+                                                if ($pendingSubCount > 0) {
+                                                    $subBtnStyle = 'background:#dbeafe;color:#1e40af;';
+                                                } elseif ($approvedSubCount > 0) {
+                                                    $subBtnStyle = 'background:#ffedd5;color:#9a3412;';
+                                                } else {
+                                                    $subBtnStyle = 'background:#f3f4f6;color:#6b7280;';
+                                                }
                                                 ?>
                                                 <div style="font-size:11px;color:#6b7280;line-height:1.6;margin-bottom:4px;">
                                                     From balance: <b style="color:#1f2937;">₹<?=number_format($coveredByBalance, 2)?></b>
@@ -632,13 +652,21 @@ $companyProfiles = $db_conn->query(
                                                 <div style="font-size:10.5px;color:#9ca3af;margin-bottom:4px;">No screenshot on file for this order.</div>
                                                 <?php endif; ?>
                                                 <a href="manage-tp-advance-submissions.php?tp_id=<?php echo (int)$o['tp_db_id']; ?>&from=po"
-                                                   style="display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;text-decoration:none;<?= $pendingSubCount > 0 ? 'background:#dbeafe;color:#1e40af;' : 'background:#f3f4f6;color:#6b7280;' ?>">
+                                                   style="display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;text-decoration:none;<?= $subBtnStyle ?>">
                                                     <?php if ($pendingSubCount > 0): ?>
                                                     <?=$pendingSubCount?> Advance Submission<?=$pendingSubCount !== 1 ? 's' : ''?> →
                                                     <?php else: ?>
                                                     View Advance Submissions →
                                                     <?php endif; ?>
                                                 </a>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td style="white-space:nowrap;font-size:12.5px;color:#4b5563;">
+                                                <?php if (!empty($o['created_at'])): ?>
+                                                <?=date('d M Y', strtotime($o['created_at']))?><br>
+                                                <span style="color:#9ca3af;"><?=date('h:i A', strtotime($o['created_at']))?></span>
+                                                <?php else: ?>
+                                                —
                                                 <?php endif; ?>
                                             </td>
                                             <td>

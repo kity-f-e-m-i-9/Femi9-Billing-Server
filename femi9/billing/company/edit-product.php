@@ -7,6 +7,15 @@ if (empty($_SESSION['csrf_token'])) {
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
 
+// Self-migrating: see db_migrations/2026_08_21_products_packs_per_cover.sql
+// for the full rationale — the per-line "count this order as a full box"
+// threshold used on the dispatch slip, separate from packs_per_carton's
+// exact carton-count math.
+$_ppcCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'packs_per_cover'");
+if ($_ppcCol && $_ppcCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN packs_per_cover INT UNSIGNED NULL AFTER packs_per_carton");
+}
+
 //fetch product details
 $select_product_list="select * from products where id='$prid' and (temp_id not like 'NKS-%' or temp_id is null)";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
@@ -107,6 +116,9 @@ $select_product_list="select * from products where id='$prid' and (temp_id not l
 
 												<label for="exampleInputEmail1" class="form-label">Packs per Carton <small class="text-muted">(optional)</small></label>
                                                 <input type="number" min="0" name="packs_per_carton" class="form-control" value="<?=$result_product_list["packs_per_carton"]?>" onkeypress="restrictnumber(event)" placeholder="e.g. 60">
+
+												<label for="exampleInputEmail1" class="form-label">Packs per Cover <small class="text-muted">(optional — dispatch slip marks an order line as a full box once its quantity passes this)</small></label>
+                                                <input type="number" min="0" name="packs_per_cover" class="form-control" value="<?=$result_product_list["packs_per_cover"] ?? ''?>" onkeypress="restrictnumber(event)" placeholder="e.g. 20">
 
 												 <label for="exampleInputEmail1" class="form-label">MRP</label>
                                                 <input value="<?php echo $result_product_list["mrp"]?>" type="number" min="0" max="999" required="" name="mrp" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictnumber(event)">

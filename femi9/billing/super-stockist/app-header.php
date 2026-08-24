@@ -25,9 +25,28 @@
                                    unreachable. Pure-CSS native scroll here works the same on
                                    every device (phone/tablet/laptop) at this breakpoint,
                                    independent of that plugin's timing. */
+                                /* main.css sets .app-sidebar to height:100vh, the
+                                   LARGEST possible mobile viewport (as if browser
+                                   chrome were fully collapsed). Whenever that chrome
+                                   is actually on screen — varies by browser/OS/scroll
+                                   position, never a fixed pixel amount — the sidebar
+                                   overflows past the real visible area. 100dvh tracks
+                                   the current visible height live; kept as a second
+                                   declaration so browsers without dvh support just
+                                   ignore it and fall back to 100vh untouched. */
+                                .app-sidebar { height: 100dvh; }
                                 .app-sidebar .app-menu {
                                     overflow-y: auto !important;
                                     -webkit-overflow-scrolling: touch !important;
+                                    /* Small fixed cushion so the last item never
+                                       sits flush against the very bottom edge — not
+                                       trying to solve OS-level gesture-bar/notch
+                                       safe areas here, that needs viewport-fit=cover
+                                       on every page's own viewport meta tag, a
+                                       separate, wider change. The 100dvh fix above
+                                       already covers the actual reported case: the
+                                       browser's own address/tool bar. */
+                                    padding-bottom: 16px !important;
                                 }
                             }
                             @media (max-width: 991px) {

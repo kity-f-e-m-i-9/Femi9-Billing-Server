@@ -286,6 +286,15 @@ $tpDeliveryAddressParts = array_filter([
 
         .apo-add-panel { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; margin-bottom: 6px; }
         .apo-add-panel .form-label { font-size: 11.5px; font-weight: 600; color: #6b7280; margin-bottom: 4px; }
+        /* Bootstrap's plain .col splits Qty/Price/Total/Disc%/Disc(Rs.)/Add
+           into 6 equal-width slivers below ~576px — too narrow to read the
+           number being typed. Two per row (with Add on its own full-width
+           row) keeps every field wide enough to actually use on a phone. */
+        @media (max-width: 576px) {
+            .apo-add-panel .row.g-2 > .col { flex: 0 0 50%; max-width: 50%; }
+            .apo-add-panel .row.g-2 > .col-auto { flex: 0 0 100%; max-width: 100%; margin-top: 4px; }
+            .apo-add-panel .row.g-2 > .col-auto #add { width: 100%; }
+        }
         #add {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: #fff;
             font-weight: 600; border-radius: 8px; transition: all .2s;

@@ -17,6 +17,12 @@ include("RemoveSpecialChar.php");
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
+// Self-migrating: see db_migrations/2026_08_21_products_packs_per_cover.sql
+$_ppcCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'packs_per_cover'");
+if ($_ppcCol && $_ppcCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN packs_per_cover INT UNSIGNED NULL AFTER packs_per_carton");
+}
+
 // CSRF Token Validation Function
 function validateCSRFToken(): bool {
     if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token'])) {
@@ -74,6 +80,8 @@ if (isset($_POST['add-product'])) {
     $pieces_per_pack = ($pieces_per_pack === '') ? null : (int) $pieces_per_pack;
     $packs_per_carton = trim($_POST['packs_per_carton'] ?? '');
     $packs_per_carton = ($packs_per_carton === '') ? null : (int) $packs_per_carton;
+    $packs_per_cover = trim($_POST['packs_per_cover'] ?? '');
+    $packs_per_cover = ($packs_per_cover === '') ? null : (int) $packs_per_cover;
     $category = ($_POST['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin';
 
     // Check if product already exists
@@ -86,14 +94,14 @@ if (isset($_POST['add-product'])) {
     if ($result['numProducts'] == 0) {
         // Insert new product
         $stmt = $db_conn->prepare(
-            "INSERT INTO products (temp_id, productName, category, pieces_per_pack, packs_per_carton, mrp, supersstock_price, super_distributor_price,
+            "INSERT INTO products (temp_id, productName, category, pieces_per_pack, packs_per_carton, packs_per_cover, mrp, supersstock_price, super_distributor_price,
             stockist_price, distributor_price, outlet_price, gst, gst_type, hsn, rwpoints, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
         );
 
         $stmt->bind_param(
-            "sssiidddddddssd",
-            $temp_id, $productName, $category, $pieces_per_pack, $packs_per_carton, $mrp, $supersstock_price, $super_distributor_price,
+            "sssiiidddddddssd",
+            $temp_id, $productName, $category, $pieces_per_pack, $packs_per_carton, $packs_per_cover, $mrp, $supersstock_price, $super_distributor_price,
             $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints
         );
         
@@ -141,19 +149,21 @@ if (isset($_POST['update-product'])) {
     $pieces_per_pack = ($pieces_per_pack === '') ? null : (int) $pieces_per_pack;
     $packs_per_carton = trim($_POST['packs_per_carton'] ?? '');
     $packs_per_carton = ($packs_per_carton === '') ? null : (int) $packs_per_carton;
+    $packs_per_cover = trim($_POST['packs_per_cover'] ?? '');
+    $packs_per_cover = ($packs_per_cover === '') ? null : (int) $packs_per_cover;
     $category = ($_POST['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin';
 
     // Update product
     $stmt = $db_conn->prepare(
-        "UPDATE products SET productName = ?, category = ?, pieces_per_pack = ?, packs_per_carton = ?, mrp = ?, supersstock_price = ?,
+        "UPDATE products SET productName = ?, category = ?, pieces_per_pack = ?, packs_per_carton = ?, packs_per_cover = ?, mrp = ?, supersstock_price = ?,
         super_distributor_price = ?, stockist_price = ?, distributor_price = ?,
         outlet_price = ?, gst = ?, gst_type = ?, hsn = ?, rwpoints = ?, updated_at = NOW()
         WHERE id = ?"
     );
 
     $stmt->bind_param(
-        "ssiidddddddssdi",
-        $productName, $category, $pieces_per_pack, $packs_per_carton, $mrp, $supersstock_price, $super_distributor_price,
+        "ssiiidddddddssdi",
+        $productName, $category, $pieces_per_pack, $packs_per_carton, $packs_per_cover, $mrp, $supersstock_price, $super_distributor_price,
         $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $update_id
     );
     

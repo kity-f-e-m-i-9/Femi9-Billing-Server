@@ -99,6 +99,12 @@ $i          = $start_from;
 <?php
 $fetch_invoices = mysqli_query($db_conn,
     "SELECT * FROM user_invoice WHERE from_user_id='$Login_user_IDvl' AND from_user_type='$Login_user_TYPEvl' AND to_user_type='$getinvuser' ORDER BY id DESC");
+// Delivery-note modals are buffered here and printed once, after </table>,
+// instead of inline inside each <tr> — a <div> nested directly between two
+// <td>s is invalid HTML that browsers silently "fix" by relocating it out
+// of the table, which was corrupting the row/column structure DataTables
+// parses on init and made it fail silently (no pagination, no search box).
+$dlModalsHtml = '';
 while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
     $CuSTID       = $result_product_list['to_user_id'];
     $result_cust  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='$CuSTID'"));
@@ -151,6 +157,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                 <?php } ?>
                                                 </td>
 
+                                                <?php ob_start(); ?>
                                                 <!-- Delivery note modal -->
                                                 <div class="modal fade" id="dlModal<?php echo $result_product_list["id"]; ?>" tabindex="-1" aria-hidden="true">
                                                 <div class="modal-dialog"><div class="modal-content">
@@ -180,6 +187,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                     </form>
                                                 </div></div>
                                                 </div>
+                                                <?php $dlModalsHtml .= ob_get_clean(); ?>
 
                                                 <!-- Customer name + Update badge -->
                                                 <td><?php echo htmlspecialchars($Cust_Name); ?><br/>M:&nbsp;<?php echo htmlspecialchars($Cust_Mbile); ?>
@@ -251,6 +259,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                         </tbody>
                                     </table>
                                 </div>
+                                <?php echo $dlModalsHtml; ?>
                                 </div>
                             </div>
                         </div>
@@ -271,5 +280,54 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script src="../../assets/js/pages/datatables.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="../../assets/js/whatsapp-invoice-share.js?v=11"></script>
+<script>
+// Shares a shop invoice straight to WhatsApp from this list — no detour
+// through the print page. This click is a real user gesture, so the whole
+// async chain below (fetch -> PDF -> alert -> WhatsApp) keeps that gesture's
+// permission to open a window, same as the print page's own button.
+function shareShopInvoiceDirect(btn) {
+    var id             = btn.getAttribute('data-id');
+    var mobile         = btn.getAttribute('data-mobile');
+    var invoiceNumber  = btn.getAttribute('data-invoice');
+    var originalHtml   = btn.innerHTML;
+
+    btn.disabled  = true;
+    btn.innerHTML = '&hellip;';
+
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:600px;border:0;';
+    iframe.onload = function () {
+        var idoc     = iframe.contentDocument;
+        var printDiv = idoc && idoc.getElementById('divToPrint');
+
+        if (!printDiv) {
+            btn.disabled  = false;
+            btn.innerHTML = originalHtml;
+            iframe.remove();
+            alert('Could not prepare the invoice. Please try again.');
+            return;
+        }
+
+        btn.disabled  = false;
+        btn.innerHTML = originalHtml;
+
+        shareInvoiceToWhatsApp({
+            elementId:     'divToPrint',
+            doc:           idoc,
+            mobile:        mobile,
+            invoiceNumber: invoiceNumber,
+            fileName:      'Invoice_' + invoiceNumber,
+            businessName:  <?php echo json_encode($business_name ?? ''); ?>,
+            button:        btn
+        });
+
+        setTimeout(function () { iframe.remove(); }, 15000);
+    };
+    iframe.src = 'shop-invoice-print.php?invoiceid=' + encodeURIComponent(id);
+    document.body.appendChild(iframe);
+}
+</script>
 </body>
 </html>

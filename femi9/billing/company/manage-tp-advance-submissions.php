@@ -2,6 +2,7 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 require_once("include/GodownAccess.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 include("config.php");
 error_reporting(0);
 
@@ -69,6 +70,7 @@ if ($filterTpId > 0) {
 $stmt = $db_conn->prepare(
     "SELECT sub.id, sub.territory_partner_id, sub.amount, sub.payment_date, sub.payment_mode, sub.reference_number, sub.note,
             sub.status, sub.rejection_reason, sub.reviewed_by, sub.reviewed_at, sub.advance_payment_id, sub.created_at,
+            sub.product_type,
             tp.name AS tp_name, tp.mobile AS tp_mobile, tp.tp_id AS tp_code
      FROM tp_advance_payment_submissions sub
      LEFT JOIN territory_partners tp ON tp.id = sub.territory_partner_id
@@ -296,6 +298,7 @@ $companyProfiles = $db_conn->query(
                                         <tr>
                                             <th>Submitted</th>
                                             <th>Territory Partner</th>
+                                            <th>Type</th>
                                             <th>Amount</th>
                                             <th>Mode</th>
                                             <th>Reference</th>
@@ -306,7 +309,7 @@ $companyProfiles = $db_conn->query(
                                     </thead>
                                     <tbody>
                                         <?php if (empty($submissions)): ?>
-                                        <tr><td colspan="8">
+                                        <tr><td colspan="9">
                                             <div class="proof-empty">
                                                 <i class="material-icons-outlined">inbox</i>
                                                 No submissions in this view.
@@ -318,6 +321,10 @@ $companyProfiles = $db_conn->query(
                                         <tr>
                                             <td><?=htmlspecialchars(date("d-m-Y g:i A", strtotime($sub['created_at'])))?></td>
                                             <td><?=htmlspecialchars($sub['tp_name'] ?? ('#'.$sub['territory_partner_id']))?><div class="text-muted" style="font-size:11.5px;"><?=htmlspecialchars($sub['tp_code'] ?? '')?></div></td>
+                                            <td>
+                                                <?php $_subType = tpResolveProductType($sub['product_type'] ?? null); [$_subBg, $_subFg] = tpProductTypeBadgeColors($_subType); ?>
+                                                <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?=$_subBg?>;color:<?=$_subFg?>;"><?=htmlspecialchars(tpProductTypeLabel($_subType))?></span>
+                                            </td>
                                             <td><strong>₹<?=number_format((float)$sub['amount'], 2)?></strong></td>
                                             <td><?=htmlspecialchars($sub['payment_mode'])?></td>
                                             <td><?=htmlspecialchars($sub['reference_number'])?></td>
@@ -418,8 +425,14 @@ $companyProfiles = $db_conn->query(
         var statusColor = sub.status === 'accepted' ? '#065f46' : (sub.status === 'rejected' ? '#991b1b' : '#92400e');
         var statusBg = sub.status === 'accepted' ? '#d1fae5' : (sub.status === 'rejected' ? '#fee2e2' : '#fef3c7');
 
+        var isDiaper = sub.product_type === 'diaper';
+        var typeLabel = isDiaper ? 'Lumi Diaper' : 'Napkin';
+        var typeBg = isDiaper ? '#ede9fe' : '#dcfce7';
+        var typeFg = isDiaper ? '#6d28d9' : '#15803d';
+
         var summary = '<div class="proof-summary">' +
             '<div class="proof-info-grid">' +
+            '<div><div class="proof-info-label">Type</div><span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:9px;background:' + typeBg + ';color:' + typeFg + ';">' + typeLabel + '</span></div>' +
             '<div><div class="proof-info-label">Amount</div><span class="proof-info-value">₹' + parseFloat(sub.amount).toFixed(2) + '</span></div>' +
             '<div><div class="proof-info-label">Reference</div><span class="proof-info-value">' + $('<div>').text(sub.reference_number).html() + '</span></div>' +
             '<div><div class="proof-info-label">Payment Mode</div><span class="proof-info-value">' + $('<div>').text(sub.payment_mode).html() + '</span></div>' +
