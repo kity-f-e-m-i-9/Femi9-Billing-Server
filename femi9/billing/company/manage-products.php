@@ -1,4 +1,15 @@
-<?php include("checksession.php");?>
+<?php include("checksession.php");
+require_once __DIR__ . '/../shared/DispatchSlipSettings.php';
+// Self-migrating: see db_migrations/2026_08_21_products_packs_per_cover.sql
+$_ppcCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'packs_per_cover'");
+if ($_ppcCol && $_ppcCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN packs_per_cover INT UNSIGNED NULL AFTER packs_per_carton");
+}
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$_overallPacksSettings = dispatchSlipGetOverallSettings($db_conn);
+?>
 require_once("include/PermissionCheck.php"); requirePermission('products');
 <!DOCTYPE html>
 <html lang="en">
@@ -68,6 +79,7 @@ require_once("include/PermissionCheck.php"); requirePermission('products');
 								<?php if(isset($_REQUEST['updatedSuccess'])){?><div class="alert alert-info">Changes saved success.</div><?php }?>
 								
 								<?php if(isset($_REQUEST['deletedDone'])){?><div class="alert alert-warning">Deleted ! one product deleted success.</div><?php }?>
+									<?php if(isset($_REQUEST['packs_per_box_saved'])){?><div class="alert alert-success">Dispatch slip box-grouping setting saved.</div><?php }?>
 								
                                     <h1>
 									<table class="headertble">
@@ -78,6 +90,15 @@ require_once("include/PermissionCheck.php"); requirePermission('products');
 									</tr>
 									</table>
 									</h1>
+
+									<form method="post" action="dispatch-slip-settings-action.php" style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;flex-wrap:wrap;">
+										<input type="hidden" name="csrf_token" value="<?=htmlspecialchars($_SESSION['csrf_token'])?>">
+										<label for="overall_packs_per_box" style="margin:0;color:#6b7280;">Dispatch slip — Overall Packs per Box (groups non-boxed lines into full boxes):</label>
+										<input type="number" min="1" name="overall_packs_per_box" id="overall_packs_per_box" value="<?=(int)$_overallPacksSettings['box']?>" class="form-control" style="width:90px;display:inline-block;">
+										<label for="overall_packs_per_cover" style="margin:0 0 0 10px;color:#6b7280;">Overall Packs per Cover (leftover above this also becomes a box):</label>
+										<input type="number" min="1" name="overall_packs_per_cover" id="overall_packs_per_cover" value="<?=(int)$_overallPacksSettings['cover']?>" class="form-control" style="width:90px;display:inline-block;">
+										<button type="submit" class="btn btn-sm btn-primary">Save</button>
+									</form>
                                 </div>
                             </div>
                         </div>
@@ -105,6 +126,7 @@ $i= $start_from;
                                                     <th>Product Name</th>
 													<th>Pieces/Pack</th>
 													<th>Packs/Carton</th>
+													<th>Packs/Cover</th>
 													<th>MRP &#8377;</th>
 													
 													<th>SS Price &#8377;</th>
@@ -135,6 +157,7 @@ $i= $start_from;
                                                     <td><?php echo $result_product_list["productName"];?></td>
 													<td><?php echo $result_product_list["pieces_per_pack"] !== null ? $result_product_list["pieces_per_pack"] : '—';?></td>
 													<td><?php echo $result_product_list["packs_per_carton"] !== null ? $result_product_list["packs_per_carton"] : '—';?></td>
+													<td><?php echo ($result_product_list["packs_per_cover"] ?? null) !== null ? $result_product_list["packs_per_cover"] : '—';?></td>
 													<td>&#8377;<?php echo $result_product_list["mrp"];?>.00</td>
 													
 							<td>&#8377;<?php echo $result_product_list["supersstock_price"];?>.00</td>
