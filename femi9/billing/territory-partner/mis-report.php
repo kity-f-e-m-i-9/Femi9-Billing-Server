@@ -127,6 +127,155 @@ $purch_growth = $prev_purch_amount > 0
 
 $net_position = $total_revenue - $total_purch_amount;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 1b. GROSS PROFIT — same formula as the company/LLP login's MIS report
+// (see company/mis-report.php §1b), adapted to TP's own real purchase
+// records instead of a synthetic LLP cost-rate table:
+//
+//   net_qty   = qty_sold − qty_returned                      (per product)
+//   sold_rate = total sale revenue / qty_sold                (per product,
+//               effective average price actually realized this period)
+//   cost_rate = total purchase cost / qty_purchased           (per product,
+//               effective average price TP actually paid the company/SS
+//               this period, from tp_invoices/tp_invoice_items — TP's own
+//               genuine purchase order, unlike LLP which has no literal
+//               purchase invoice and needs a separate rate table)
+//   Gross Profit = Σ (sold_rate − cost_rate) × net_qty         (across products)
+//
+// Both rates are GST-inclusive at the source (invoice_items.total,
+// user_invoice_items.total, tp_invoice_items.amount all store tax-inclusive
+// line totals — see customer-invoice-action.php / user-invoice-action.php),
+// so both are backed out to a pre-tax basis via products.gst before
+// subtracting, same convention as the company login — otherwise GST on the
+// sold side would inflate the margin against an already pre-tax-adjusted
+// cost, or vice versa if cost stayed inclusive.
+//
+// A product with no purchase this period (no cost_rate to compare against)
+// is excluded from Gross Profit entirely — same "unrated == excluded" rule
+// as the company login, since a product TP never bought (e.g. opening stock
+// carried over, or a free sample) can't be priced here.
+// ═══════════════════════════════════════════════════════════════════════════
+$gp_sold_rate_gst_divisor = "(1 + COALESCE(p.gst,0)/100)";
+$gross_profit = (float)mis_val($db_conn,
+    "SELECT COALESCE(SUM((sold.sold_rate / {$gp_sold_rate_gst_divisor} - cost.cost_rate) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
+     FROM (
+         SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total)/NULLIF(SUM(s.qty),0) sold_rate
+         FROM (
+             SELECT ii.pr_id, ii.qty, ii.total AS line_total
+             FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+             WHERE i.user_id=? AND i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?
+             UNION ALL
+             SELECT uii.pr_id, uii.qty, uii.total AS line_total
+             FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+             WHERE ui.from_user_id=? AND ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
+         ) s
+         GROUP BY s.pr_id
+     ) sold
+     JOIN products p ON p.id = sold.pr_id
+     JOIN (
+         SELECT tpii.product_id pr_id,
+                SUM(tpii.amount) / (1 + COALESCE(pc.gst,0)/100) / NULLIF(SUM(tpii.quantity),0) cost_rate
+         FROM tp_invoice_items tpii
+         JOIN tp_invoices tpi ON tpi.id = tpii.tp_invoice_id
+         JOIN products pc ON pc.id = tpii.product_id
+         WHERE tpi.territory_partner_id=? AND tpi.invoice_date BETWEEN ? AND ?
+         GROUP BY tpii.product_id
+     ) cost ON cost.pr_id = sold.pr_id
+     LEFT JOIN (
+         SELECT ri.prid pr_id, SUM(ri.qty) qty_returned
+         FROM user_return_stock_items ri
+         WHERE ri.to_usertype=? AND ri.to_userid=? AND ri.date BETWEEN ? AND ?
+         GROUP BY ri.prid
+     ) ret ON ret.pr_id = sold.pr_id",
+    'isssisssisssiss',
+    [$uid, $utype, $from, $to, $uid, $utype, $from, $to, $uid, $from, $to, $utype, $uid, $from, $to]);
+
+// ── Gross Profit split by paid / unpaid sales invoices ─────────────────────
+// Same per-product margin (sold_rate − cost_rate, both pre-tax) as above,
+// but attributed to the specific sales invoice each line belongs to, then
+// bucketed by that invoice's payment status (same receipt.received-vs-total
+// comparison the Order Status section below already uses). An invoice with
+// partial payment splits its margin proportionally between the two buckets
+// by amount received, rather than being force-bucketed to one side — a
+// half-paid ₹1L invoice contributes half its margin to "paid" and half to
+// "unpaid", matching how much of that revenue is actually realized in hand.
+$gp_cost_rate_map = mis_all($db_conn,
+    "SELECT tpii.product_id pr_id,
+            SUM(tpii.amount) / (1 + COALESCE(pc.gst,0)/100) / NULLIF(SUM(tpii.quantity),0) cost_rate
+     FROM tp_invoice_items tpii
+     JOIN tp_invoices tpi ON tpi.id = tpii.tp_invoice_id
+     JOIN products pc ON pc.id = tpii.product_id
+     WHERE tpi.territory_partner_id=? AND tpi.invoice_date BETWEEN ? AND ?
+     GROUP BY tpii.product_id",
+    'iss', [$uid, $from, $to]);
+$gp_cost_rate_by_pr = [];
+foreach ($gp_cost_rate_map as $r) $gp_cost_rate_by_pr[(int)$r['pr_id']] = (float)$r['cost_rate'];
+
+// Per-invoice lines (customer + shop), joined to product GST so sold_rate
+// can be put pre-tax per line — margin is computed per LINE here (not
+// per-product-average like the headline KPI above) since each line already
+// carries its own invoice_id for the paid/unpaid split; small rounding
+// differences against the headline figure are expected and immaterial.
+$gp_lines = mis_all($db_conn,
+    "SELECT ii.inv_id, ii.pr_id, ii.qty, ii.total AS line_total, COALESCE(p.gst,0) gst
+     FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id JOIN products p ON p.id=ii.pr_id
+     WHERE i.user_id=? AND i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?
+     UNION ALL
+     SELECT uii.inv_id, uii.pr_id, uii.qty, uii.total AS line_total, COALESCE(p.gst,0) gst
+     FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id JOIN products p ON p.id=uii.pr_id
+     WHERE ui.from_user_id=? AND ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?",
+    'isssisss', [$uid, $utype, $from, $to, $uid, $utype, $from, $to]);
+
+// Invoice header totals + amount received, customer and shop invoices alike
+// (mirrors the Order Status section's own $order_cust/$order_shop queries).
+$gp_inv_totals = [];
+foreach (mis_all($db_conn,
+    "SELECT i.inv_id, i.total, COALESCE(r.received,0) paid
+     FROM invoice i
+     LEFT JOIN (SELECT inv_id, SUM(received) received FROM receipt GROUP BY inv_id) r ON r.inv_id = i.inv_id
+     WHERE i.user_id=? AND i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?
+     UNION ALL
+     SELECT ui.inv_id, ui.total, COALESCE(r.received,0) paid
+     FROM user_invoice ui
+     LEFT JOIN (SELECT inv_id, SUM(received) received FROM receipt GROUP BY inv_id) r ON r.inv_id = ui.inv_id
+     WHERE ui.from_user_id=? AND ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?",
+    'isssisss', [$uid, $utype, $from, $to, $uid, $utype, $from, $to]) as $r) {
+    $t = (float)$r['total']; $p = (float)$r['paid'];
+    // Fraction of this invoice's value actually realized in hand — clamped
+    // to [0,1] since an overpayment (advance credit etc.) shouldn't push a
+    // line's margin past 100% into the paid bucket.
+    $gp_inv_totals[$r['inv_id']] = $t > 0 ? max(0, min(1, $p / $t)) : 0;
+}
+
+$gross_profit_paid = 0.0;
+$gross_profit_unpaid = 0.0;
+foreach ($gp_lines as $ln) {
+    $pr_id = (int)$ln['pr_id'];
+    if (!isset($gp_cost_rate_by_pr[$pr_id])) continue; // never purchased this period — unrated, excluded (same rule as headline KPI)
+    $cost_rate = $gp_cost_rate_by_pr[$pr_id];
+    $qty = (float)$ln['qty'];
+    if ($qty <= 0) continue;
+    $line_sold_rate = (float)$ln['line_total'] / $qty / (1 + (float)$ln['gst'] / 100);
+    // Returns aren't captured per-invoice-line in user_return_stock_items,
+    // only per-product for the period, so they can't be netted per line
+    // here — margin is computed gross per line, and the aggregate
+    // reconciliation below (against the headline $gross_profit, which IS
+    // return-netted) spreads the return adjustment across both buckets.
+    $line_margin = ($line_sold_rate - $cost_rate) * $qty;
+    $paid_frac = $gp_inv_totals[$ln['inv_id']] ?? 0;
+    $gross_profit_paid   += $line_margin * $paid_frac;
+    $gross_profit_unpaid += $line_margin * (1 - $paid_frac);
+}
+// Net out returns at the aggregate level (by product), same net_qty logic
+// as the headline KPI, applied proportionally across the paid/unpaid split
+// so the two buckets still sum to (approximately) $gross_profit above.
+$gp_paid_unpaid_sum = $gross_profit_paid + $gross_profit_unpaid;
+if (abs($gp_paid_unpaid_sum) > 0.01) {
+    $gp_return_adjustment = $gross_profit - $gp_paid_unpaid_sum;
+    $gross_profit_paid   += $gp_return_adjustment * ($gross_profit_paid / $gp_paid_unpaid_sum);
+    $gross_profit_unpaid += $gp_return_adjustment * ($gross_profit_unpaid / $gp_paid_unpaid_sum);
+}
+
 // Previous period KPI (for growth %)
 $prev_cust = mis_row($db_conn,
     "SELECT COALESCE(SUM(total),0) revenue FROM invoice
@@ -843,6 +992,55 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                 <div class="kpi-title">Net Position</div>
                                 <div class="kpi-value"><?php echo $net_position >= 0 ? '+' : '−'; ?>&#x20B9;<?php echo inr_format(abs($net_position), 0); ?></div>
                                 <div class="kpi-sub">Sales − Purchases</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ══════════════════════════════════════════════════════
+                         GROSS PROFIT
+                    ═══════════════════════════════════════════════════════ -->
+                    <div class="row mis-section">
+                        <div class="col-xl-12 mb-4">
+                            <div class="card">
+                                <div class="card-header"><span class="hdr-icon chip-green"><i class="material-icons-outlined">trending_up</i></span><h5 class="card-title">Gross Profit</h5></div>
+                                <div class="card-body">
+                                    <p class="snote" style="font-size:12px;color:var(--ink-faint);margin-top:-6px;margin-bottom:16px;">
+                                        Sold rate is your actual sale price to customers/shops this period; purchase rate is what you actually paid the company/super-stockist on your purchase invoices (<?php echo inr_format($total_purch_invoices, 0); ?> invoices, <?php echo inr_format((int)$purch_units, 0); ?> units) — both put on a pre-tax basis before comparing, same calculation used on the company/LLP login's MIS report. Products purchased once and sold from carried-over stock (never re-purchased this period) are excluded, since there's no purchase rate to compare against.
+                                    </p>
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <div class="kpi-card <?php echo $gross_profit >= 0 ? 'positive' : 'negative'; ?>">
+                                                <span class="kpi-icon-chip <?php echo $gross_profit >= 0 ? 'chip-green' : 'chip-rose'; ?>"><i class="material-icons-outlined">account_balance</i></span>
+                                                <div class="kpi-title">Total Gross Profit</div>
+                                                <div class="kpi-value">&#x20B9;<?php echo inr_format($gross_profit, 2); ?></div>
+                                                <div class="kpi-sub">Sold rate − Purchase rate, net of returns</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <div class="kpi-card positive">
+                                                <span class="kpi-icon-chip chip-green"><i class="material-icons-outlined">check_circle</i></span>
+                                                <div class="kpi-title">From Paid Invoices</div>
+                                                <div class="kpi-value">&#x20B9;<?php echo inr_format($gross_profit_paid, 2); ?></div>
+                                                <div class="kpi-sub">Realized — payment received</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <div class="kpi-card">
+                                                <span class="kpi-icon-chip chip-amber"><i class="material-icons-outlined">hourglass_empty</i></span>
+                                                <div class="kpi-title">From Unpaid / Partial Invoices</div>
+                                                <div class="kpi-value">&#x20B9;<?php echo inr_format($gross_profit_unpaid, 2); ?></div>
+                                                <div class="kpi-sub">Booked — payment pending</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="progress-bar-mis" style="width:100%;height:10px;">
+                                        <?php $gp_paid_pct = ($gross_profit_paid + $gross_profit_unpaid) != 0 ? max(0, min(100, round($gross_profit_paid / ($gross_profit_paid + $gross_profit_unpaid) * 100, 1))) : 0; ?>
+                                        <div class="progress-fill" style="width:<?php echo $gp_paid_pct; ?>%;background:var(--green);"></div>
+                                    </div>
+                                    <div class="section-note" style="margin-top:8px;">
+                                        <b><?php echo $gp_paid_pct; ?>%</b>&nbsp;of gross profit is realized (payment received) · <b><?php echo 100 - $gp_paid_pct; ?>%</b> is still booked on outstanding invoices
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
