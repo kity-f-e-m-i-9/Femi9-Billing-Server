@@ -1367,29 +1367,45 @@ if ($is_neksomo_view) {
                                 JOIN products np ON np.id = m.neksomo_product_id
                                 WHERE np.category = 'diaper'";
 
+    // Sold Value is the REAL invoiced amount for each line (ii.total /
+    // uii.total / os.total / tpii.amount), not the internal Neksomo→LLP
+    // transfer rate — that rate table only prices what the company bought
+    // from Neksomo (used for Cost/purchase_rate below), it has nothing to
+    // do with what the company actually charged its own customers/TPs, so
+    // using it for Sold Value silently substituted the wrong number (and,
+    // since that table's rate happened to differ from the real invoice
+    // rate, looked like a GST-inclusion bug). GST is still excluded from
+    // Sold Value the same way every other revenue figure in this report
+    // is: the line's own gst_percentage/gst_type, snapshotted onto the
+    // invoice row at billing time (see user-invoice-action.php /
+    // invoice-action2.php) — an 'inclusive' line has GST baked into
+    // total=subtotal already and it's backed out here; an 'exclusive'
+    // line's total is subtotal+gst and backing out the same fraction
+    // still recovers subtotal. Demo/Free/Damage rows carry no sale
+    // amount at all, so they fall through with a NULL rate and are
+    // excluded from Sold Value (same "unrated == excluded" convention
+    // used everywhere else), while still counting toward Pack Qty Sold.
     $diaper_sold = call_rows($db_conn,
         "SELECT p.id pid, p.productName,
                 COALESCE(SUM(dp.day_qty),0) total_qty,
-                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * dp.rate ELSE 0 END),0) total_value,
-                COALESCE(SUM(CASE WHEN dp.rate IS NULL THEN dp.day_qty ELSE 0 END),0) unrated_qty,
-                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * dp.rate_gst_amt ELSE 0 END),0) total_gst_value,
+                COALESCE(SUM(CASE WHEN dp.day_line_total IS NOT NULL THEN
+                    dp.day_line_total / (1 + COALESCE(p.gst,0)/100) ELSE 0 END),0) total_value,
+                COALESCE(SUM(CASE WHEN dp.day_line_total IS NULL THEN dp.day_qty ELSE 0 END),0) unrated_qty,
+                COALESCE(SUM(CASE WHEN dp.day_line_total IS NOT NULL THEN
+                    dp.day_line_total - (dp.day_line_total / (1 + COALESCE(p.gst,0)/100)) ELSE 0 END),0) total_gst_value,
                 COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * dp.purchase_rate ELSE 0 END),0) total_purchase_value,
                 COALESCE(SUM(CASE WHEN dp.purchase_rate IS NULL THEN dp.day_qty ELSE 0 END),0) unpriced_qty,
                 COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * dp.purchase_rate_gst_amt ELSE 0 END),0) total_purchase_gst_value
          FROM (
-             SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
-                    -- Taxable (pre-tax) rate — see the same-purpose comment on the
-                    -- napkin $pieces_sold query above; identical GST convention.
-                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
-                     FROM neksomo_llp_piece_rates r
-                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
-                       AND r.effective_date <= d.date
-                     ORDER BY r.effective_date DESC LIMIT 1) rate,
-                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece - r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece * r.gst_rate/100 END
-                     FROM neksomo_llp_piece_rates r
-                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
-                       AND r.effective_date <= d.date
-                     ORDER BY r.effective_date DESC LIMIT 1) rate_gst_amt,
+             SELECT d.pr_id, d.date,
+                    SUM(d.qty) day_qty,
+                    -- Real invoiced amount for the day (GST-inclusive as
+                    -- stored) — de-taxed against the company product's own
+                    -- gst% in the outer SELECT above, once `p` is joined.
+                    -- NULL when nothing sellable priced that day (only
+                    -- Demo/Free/Damage rows), which correctly excludes it
+                    -- from Sold Value while still counting toward Pack Qty.
+                    SUM(d.line_total) day_line_total,
                     (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
                      FROM neksomo_llp_piece_purchase_rates pr
                      WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
@@ -1401,29 +1417,30 @@ if ($is_neksomo_view) {
                        AND pr.effective_date <= d.date
                      ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate_gst_amt
              FROM (
-                 SELECT ii.pr_id, ii.qty, i.date
+                 SELECT ii.pr_id, ii.qty, ii.total AS line_total, i.date
                  FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
                  WHERE i.user_type=? AND i.date BETWEEN ? AND ?{$pcs_ii_cond}
                  UNION ALL
-                 SELECT uii.pr_id, uii.qty, ui.date
+                 SELECT uii.pr_id, uii.qty, uii.total AS line_total, ui.date
                  FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
                  WHERE ui.from_user_type=? AND ui.date BETWEEN ? AND ?{$pcs_uii_cond}
                  UNION ALL
-                 SELECT os.prid, os.qty, os.date
+                 SELECT os.prid, os.qty, os.total AS line_total, os.date
                  FROM ot_sales os
                  WHERE os.date BETWEEN ? AND ?{$pcs_ot_cond}
                  UNION ALL
-                 SELECT tpii.product_id, tpii.quantity, tpi.invoice_date
+                 SELECT tpii.product_id, tpii.quantity, tpii.amount AS line_total, tpi.invoice_date
                  FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
                  WHERE tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
                  UNION ALL
-                 SELECT dfd.product_id, dfd.qty, dfd.date
+                 SELECT dfd.product_id, dfd.qty, NULL AS line_total, dfd.date
                  FROM demofreedamage dfd
                  WHERE dfd.usertype=? AND dfd.category IN ('Demo','Free','Damage') AND dfd.date BETWEEN ? AND ?{$pcs_dfd_cond}
              ) d
              WHERE d.pr_id IN ({$diaper_mapped_ids_subq})
              GROUP BY d.pr_id, d.date
-         ) dp JOIN products p ON p.id = dp.pr_id
+         ) dp
+         JOIN products p ON p.id = dp.pr_id
          GROUP BY p.id, p.productName
          ORDER BY total_qty DESC",
         'sssssssssssss', [$utype, $from, $to, $utype, $from, $to, $from, $to, $from, $to, $utype, $from, $to]);
@@ -1436,25 +1453,20 @@ if ($is_neksomo_view) {
     $grand_diaper_unpriced_qty   = (int) array_sum(array_column($diaper_sold, 'unpriced_qty'));
     $grand_diaper_purchase_gst_value = (float) array_sum(array_column($diaper_sold, 'total_purchase_gst_value'));
 
+    // Return Value — same fix as Sold Value above: the REAL returned amount
+    // (user_return_stock_items.total / ot_sales_return.total), de-taxed via
+    // the company product's own gst%, not the Neksomo transfer-rate table.
     $diaper_returned = call_rows($db_conn,
         "SELECT p.id pid,
                 COALESCE(SUM(dp.day_qty),0) total_qty,
-                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * dp.rate ELSE 0 END),0) total_value,
-                COALESCE(SUM(CASE WHEN dp.rate IS NOT NULL THEN dp.day_qty * dp.rate_gst_amt ELSE 0 END),0) total_gst_value,
+                COALESCE(SUM(CASE WHEN dp.day_line_total IS NOT NULL THEN
+                    dp.day_line_total / (1 + COALESCE(p.gst,0)/100) ELSE 0 END),0) total_value,
+                COALESCE(SUM(CASE WHEN dp.day_line_total IS NOT NULL THEN
+                    dp.day_line_total - (dp.day_line_total / (1 + COALESCE(p.gst,0)/100)) ELSE 0 END),0) total_gst_value,
                 COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * dp.purchase_rate ELSE 0 END),0) total_purchase_value,
                 COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * dp.purchase_rate_gst_amt ELSE 0 END),0) total_purchase_gst_value
          FROM (
-             SELECT d.pr_id, d.date, SUM(d.qty) day_qty,
-                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
-                     FROM neksomo_llp_piece_rates r
-                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
-                       AND r.effective_date <= d.date
-                     ORDER BY r.effective_date DESC LIMIT 1) rate,
-                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece - r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece * r.gst_rate/100 END
-                     FROM neksomo_llp_piece_rates r
-                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
-                       AND r.effective_date <= d.date
-                     ORDER BY r.effective_date DESC LIMIT 1) rate_gst_amt,
+             SELECT d.pr_id, d.date, SUM(d.qty) day_qty, SUM(d.line_total) day_line_total,
                     (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
                      FROM neksomo_llp_piece_purchase_rates pr
                      WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
@@ -1466,11 +1478,11 @@ if ($is_neksomo_view) {
                        AND pr.effective_date <= d.date
                      ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate_gst_amt
              FROM (
-                 SELECT ri.prid pr_id, ri.qty, ri.date
+                 SELECT ri.prid pr_id, ri.qty, ri.total AS line_total, ri.date
                  FROM user_return_stock_items ri
                  WHERE ri.to_usertype=? AND ri.date BETWEEN ? AND ?{$pcs_uret_cond}
                  UNION ALL
-                 SELECT osr.prid pr_id, osr.qty, osr.return_date date
+                 SELECT osr.prid pr_id, osr.qty, osr.total AS line_total, osr.return_date date
                  FROM ot_sales_return osr
                  WHERE osr.return_date BETWEEN ? AND ?{$pcs_otret_cond}
              ) d
