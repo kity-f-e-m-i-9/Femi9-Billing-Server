@@ -38,6 +38,8 @@ $filter_location_id = (int)($_GET['location_id'] ?? 0);
 $filter_tp_id       = (int)($_GET['tp_id']       ?? 0);
 $filter_date_from   = trim($_GET['date_from'] ?? '');
 $filter_date_to     = trim($_GET['date_to']   ?? '');
+$filter_type        = $_GET['type_filter'] ?? '';
+if (!in_array($filter_type, ['napkin', 'diaper'], true)) $filter_type = '';
 
 // ── Filter dropdown data ───────────────────────────────────────────────────────
 // States = depth-2 nodes that are ancestors of (or equal to) any source_location used in invoices
@@ -132,6 +134,12 @@ if ($filter_date_from !== '') {
 if ($filter_date_to !== '') {
     $where[]  = "tpi.invoice_date <= ?";
     $params[] = $filter_date_to;
+    $types   .= 's';
+}
+
+if ($filter_type !== '') {
+    $where[]  = "tpi.product_type = ?";
+    $params[] = $filter_type;
     $types   .= 's';
 }
 
@@ -373,13 +381,24 @@ $i = 0;
                                     <input type="date" name="date_to" class="form-control" value="<?php echo htmlspecialchars($filter_date_to); ?>">
                                 </div>
                                 <div class="col-lg-3 col-sm-6">
+                                    <label class="form-label">
+                                        <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">category</i>
+                                        Type
+                                    </label>
+                                    <select name="type_filter" class="form-control">
+                                        <option value="">Napkin + Diaper</option>
+                                        <option value="napkin" <?php echo $filter_type === 'napkin' ? 'selected' : ''; ?>>Napkin only</option>
+                                        <option value="diaper" <?php echo $filter_type === 'diaper' ? 'selected' : ''; ?>>Lumi Diaper only</option>
+                                    </select>
+                                </div>
+                                <div class="col-lg-3 col-sm-6">
                                     <label class="form-label" style="visibility:hidden;">.</label>
                                     <div style="display:flex;gap:8px;align-items:center;">
                                         <button type="submit" class="btn-filter">
                                             <i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">filter_list</i>
                                             Filter
                                         </button>
-                                        <?php if ($filter_state_id || $filter_location_id || $filter_tp_id || $filter_date_from || $filter_date_to): ?>
+                                        <?php if ($filter_state_id || $filter_location_id || $filter_tp_id || $filter_date_from || $filter_date_to || $filter_type): ?>
                                         <a href="manage-tp-invoices" class="btn-clear">
                                             <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:3px;">close</i>
                                             Clear
@@ -449,6 +468,7 @@ $i = 0;
                                             <th>Courier</th>
                                             <th>Payment</th>
                                             <th>Created By</th>
+                                            <th>Invoiced Time</th>
                                             <th>Reward Points</th>
                                             <th>Actions</th>
                                         </tr>
@@ -517,6 +537,14 @@ $i = 0;
                                                 <?php endif; ?>
                                             </td>
                                             <td style="font-size:13px;color:#6b7280;"><?php echo htmlspecialchars($inv['created_by']); ?></td>
+                                            <td style="white-space:nowrap;font-size:12.5px;color:#4b5563;">
+                                                <?php if (!empty($inv['created_at'])): ?>
+                                                <?php echo date('d M Y', strtotime($inv['created_at'])); ?><br>
+                                                <span style="color:#9ca3af;"><?php echo date('h:i A', strtotime($inv['created_at'])); ?></span>
+                                                <?php else: ?>
+                                                —
+                                                <?php endif; ?>
+                                            </td>
                                             <td>
                                                 <form method="POST" action="update-tp-invoice-rwpermission" class="d-inline rwpoints-toggle-form" style="display:inline">
                                                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
@@ -592,7 +620,7 @@ $i = 0;
 <script src="../../assets/js/pages/datatables.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="../../assets/js/whatsapp-invoice-share.js?v=3"></script>
+<script src="../../assets/js/whatsapp-invoice-share.js?v=11"></script>
 <script>
 // Shares a TP invoice straight to WhatsApp from this list — no detour through
 // the print page. Loads the print page in a hidden iframe via a real

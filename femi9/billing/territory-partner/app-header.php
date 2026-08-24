@@ -52,6 +52,35 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                     @media (max-width: 1199px) {
                         .app-sidebar .logo { display: none !important; }
                         .tp-mobile-menu-toggle { display: flex !important; }
+                        /* main.css sets .app-sidebar to height:100vh, which on
+                           mobile is the LARGEST possible viewport — as if the
+                           browser's own address bar/bottom toolbar were fully
+                           collapsed. Whenever that browser chrome is actually
+                           on screen (varies by browser, OS version, and even
+                           scroll position — never a fixed pixel amount), the
+                           sidebar overflows past the real visible area and its
+                           last menu items land underneath the toolbar. 100dvh
+                           ("dynamic viewport height") is the modern fix built
+                           for exactly this — it tracks the CURRENT visible
+                           height live as browser chrome shows/hides, no
+                           per-device guessing needed. Kept as a second
+                           declaration (not a replacement) so browsers that
+                           don't understand dvh yet just ignore this line and
+                           fall back to main.css's own 100vh untouched. */
+                        .app-sidebar { height: 100dvh; }
+                        .app-sidebar .app-menu {
+                            overflow-y: auto !important;
+                            -webkit-overflow-scrolling: touch !important;
+                            /* Small fixed cushion so the last item never sits
+                               flush against the very bottom edge. Not trying
+                               to solve OS-level gesture-bar/notch safe areas
+                               here — that needs viewport-fit=cover on every
+                               page's own <meta name="viewport">, a separate,
+                               wider change (see the plain 100dvh fix above,
+                               which already covers the actual reported case:
+                               the browser's own address/tool bar). */
+                            padding-bottom: 16px !important;
+                        }
                     }
                     @media (max-width: 991px) {
                         .app-header { left: 0 !important; right: auto !important; width: 100% !important; box-sizing: border-box !important; }

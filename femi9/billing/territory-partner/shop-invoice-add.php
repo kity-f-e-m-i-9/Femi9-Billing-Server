@@ -288,14 +288,14 @@ $editInvoiceDateVal = $result_InvoieDetails['date'] ?: date("Y-m-d");
 <input id="editInvoiceDate" type="date" name="date" value="<?php echo $editInvoiceDateVal; ?>" required class="form-control">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-// Same today/yesterday/day-before restriction as the brand-new-invoice
+// Same today-plus-4-days-back restriction as the brand-new-invoice
 // date field further down this page — this used to be a plain readonly
 // input instead, which left the date permanently stuck blank whenever a
 // continued draft's date column was empty, since readonly blocks the
 // native picker from ever committing a value into it.
 var editInvoiceMinDate = new Date();
 editInvoiceMinDate.setHours(0, 0, 0, 0);
-editInvoiceMinDate.setDate(editInvoiceMinDate.getDate() - 2);
+editInvoiceMinDate.setDate(editInvoiceMinDate.getDate() - 4);
 flatpickr("#editInvoiceDate", {
     dateFormat: "Y-m-d", altFormat: "d-m-Y", altInput: true,
     maxDate: "today", minDate: editInvoiceMinDate
@@ -718,39 +718,8 @@ function showInvoiceDuplicate(str) {
 <div class="row g-3">
 <div class="col-md-4">
 <label class="form-label">Invoice Number *</label>
-<input type="text" id="inv_number" onkeyup="invNumberEdited(); showInvoiceDuplicate(this.value)" name="inv_number" autofocus required onkeypress="restrictSpecialChars(event)" class="form-control">
+<input type="text" id="inv_number" onkeyup="showInvoiceDuplicate(this.value)" name="inv_number" autofocus required onkeypress="restrictSpecialChars(event)" class="form-control">
 <span id="txtHintInvoice"></span>
-<script>
-// Auto-suggest next invoice number (TPSH/FY/LLP{n} napkin / TPSHD/FY/LLP{n}
-// diaper). Suggested on page load (napkin default, since no product is
-// picked yet) and re-suggested once a product is selected via showPrice()
-// below — see invNumberSuggest(). Only ever fills/overwrites while the field
-// still holds an auto-suggested value; stops touching it the moment the user
-// types anything themselves.
-var invNumberAutoFilled = false;
-function invNumberEdited() {
-    invNumberAutoFilled = false;
-}
-function invNumberSuggest(productId) {
-    var invField = document.getElementById('inv_number');
-    if (!invField) { return; }
-    if (invField.value.trim() !== '' && !invNumberAutoFilled) { return; }
-    var url = 'load_next_invoice_number_shop.php' + (productId ? '?pid=' + encodeURIComponent(productId) : '');
-    fetch(url)
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data && data.number && (invField.value.trim() === '' || invNumberAutoFilled)) {
-                invField.value = data.number;
-                invNumberAutoFilled = true;
-                if (typeof showInvoiceDuplicate === 'function') {
-                    showInvoiceDuplicate(data.number);
-                }
-            }
-        })
-        .catch(function() {});
-}
-invNumberSuggest();
-</script>
 </div>
 <div class="col-md-4">
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
@@ -769,14 +738,14 @@ while ($r = mysqli_fetch_array($res_shops)) { ?>
 <input id="bookingDate" type="date" name="date" value="<?php echo date("Y-m-d"); ?>" required class="form-control">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-// Invoice date can only be today, yesterday, or the day before — no older
+// Invoice date can only be today or up to 4 days back — no older
 // backdating allowed. altInput swaps in a flatpickr-controlled text field in
 // place of the native type="date" widget — without it, the browser's own
 // calendar icon still opens its native picker (which ignores minDate/
 // maxDate entirely) alongside flatpickr's, letting any date through.
 var invoiceMinDate = new Date();
 invoiceMinDate.setHours(0, 0, 0, 0);
-invoiceMinDate.setDate(invoiceMinDate.getDate() - 2);
+invoiceMinDate.setDate(invoiceMinDate.getDate() - 4);
 var invoiceDateOpts = {
     dateFormat: "Y-m-d", altFormat: "d-m-Y", altInput: true,
     maxDate: "today", minDate: invoiceMinDate
@@ -792,7 +761,7 @@ flatpickr("#bookingDate", invoiceDateOpts);
 <div class="product-add-grid">
 <div class="input-group-modern wide">
 <label>Product</label>
-<select required name="pr_id" style="width:100%;" onchange="showPrice(this.value); invNumberSuggest(this.value);" class="prinput">
+<select required name="pr_id" style="width:100%;" onchange="showPrice(this.value);" class="prinput">
 <option value="" hidden>Select Product</option>
 <?php
 $res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
