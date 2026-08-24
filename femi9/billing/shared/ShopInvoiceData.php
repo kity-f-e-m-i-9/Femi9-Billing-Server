@@ -66,8 +66,8 @@ function load_shop_invoice_data($db_conn, string $Invoice_ID, int $tp_id, string
     // GST computed fresh from the product master at print time (inclusive vs
     // exclusive tax treatment), the same convention as tp-invoice-print.php —
     // not trusted from the gstamount_total value frozen on the invoice item
-    // at add-time (which was always calculated as if every product were
-    // exclusive).
+    // at add-time (which may have been calculated by an older code path or
+    // while the product's gst_type was set differently).
     $select_INVProductDetails = "select uii.*, p.productName, p.hsn as p_hsn, p.mrp as p_mrp, p.gst as p_gst, p.gst_type as p_gst_type
         from user_invoice_items uii
         join products p on p.id = uii.pr_id

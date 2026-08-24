@@ -153,7 +153,7 @@ foreach ($lines as $ln) {
     $qty   = (int)$ln['qty'];
     if ($pr_id <= 0 || $qty <= 0) continue;
 
-    $stmtProd = $db_conn->prepare("SELECT productName, gst, hsn, rwpoints, outlet_price FROM products WHERE id=?");
+    $stmtProd = $db_conn->prepare("SELECT productName, gst, gst_type, hsn, rwpoints, outlet_price FROM products WHERE id=?");
     $stmtProd->bind_param('i', $pr_id);
     $stmtProd->execute();
     $prod = $stmtProd->get_result()->fetch_assoc();
@@ -229,6 +229,7 @@ try {
 
         $amount             = (float)$prod['outlet_price'];
         $gst_percentage     = $prod['gst'] ?? 0;
+        $gst_type_item      = $prod['gst_type'] ?: 'exclusive';
         $hsn                = $prod['hsn'] ?? '';
         $rwpoints_i         = (int)(($prod['rwpoints'] ?? 0) * $qty);
         $totalamount        = $amount * $qty;
@@ -244,9 +245,20 @@ try {
             $discount_percentage = $totalamount > 0 ? round($discount_amount * 100 / $totalamount, 2) : 0;
         }
 
-        $subtotal           = number_format($totalamount - $discount_amount, 2, '.', '');
-        $gstamount_total    = $subtotal * $gst_percentage / 100;
-        $total              = $subtotal + $gstamount_total;
+        $subtotal = number_format($totalamount - $discount_amount, 2, '.', '');
+
+        // Same convention as shop-invoice-action.php: inclusive-tax products
+        // already have GST baked into the entered price, so tax is carved
+        // out of subtotal (not added again into total); exclusive-tax
+        // products get GST added on top.
+        if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
+            $taxable_value   = $subtotal * 100 / (100 + $gst_percentage);
+            $gstamount_total = $subtotal - $taxable_value;
+            $total           = $subtotal;
+        } else {
+            $gstamount_total = $subtotal * $gst_percentage / 100;
+            $total           = $subtotal + $gstamount_total;
+        }
         $gstamount_singlepr = '0';
         $rwpoints_sls_i     = $rwpoints_i;
 
