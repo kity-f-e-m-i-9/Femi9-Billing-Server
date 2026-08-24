@@ -18,7 +18,7 @@ function redirectWithMessage(string $location, string $message = ''): void {
 }
 
 if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-    redirectWithMessage('llp-sale-rate.php', 'error');
+    redirectWithMessage('llp-purchase-rate.php', 'error');
 }
 
 // ── ADD (batch — one or more products sharing one effective date) ─────────
@@ -28,7 +28,7 @@ if (isset($_POST['add-record'])) {
     $raw_rates      = $_POST['rate_per_piece'] ?? [];
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $effective_date) || empty($raw_pids)) {
-        redirectWithMessage('llp-sale-rate.php', 'error');
+        redirectWithMessage('llp-purchase-rate.php', 'error');
     }
 
     // Build and dedupe rows
@@ -43,7 +43,7 @@ if (isset($_POST['add-record'])) {
     }
 
     if (empty($rows)) {
-        redirectWithMessage('llp-sale-rate.php', 'error');
+        redirectWithMessage('llp-purchase-rate.php', 'error');
     }
 
     // GST is never trusted from the client — snapshot each product's own
@@ -86,9 +86,9 @@ if (isset($_POST['add-record'])) {
     $stmt->close();
 
     if ($added === 0) {
-        redirectWithMessage('llp-sale-rate.php', 'error');
+        redirectWithMessage('llp-purchase-rate.php', 'error');
     }
-    redirectWithMessage('llp-sale-rate.php', "addesuccess&count=$added&skipped=$skipped");
+    redirectWithMessage('llp-purchase-rate.php', "addesuccess&count=$added&skipped=$skipped");
 }
 
 // ── UPDATE ───────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ if (isset($_POST['update-record'])) {
     $rate_per_piece = filter_var($_POST['rate_per_piece'] ?? 0, FILTER_VALIDATE_FLOAT);
 
     if (!$update_id || !$product_id || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $effective_date) || $rate_per_piece === false || $rate_per_piece < 0) {
-        redirectWithMessage('llp-sale-rate-manage.php', 'error');
+        redirectWithMessage('llp-purchase-rate-manage.php', 'error');
     }
 
     // Re-snapshot GST from the product's current setting whenever the rate
@@ -122,11 +122,11 @@ if (isset($_POST['update-record'])) {
     } catch (\mysqli_sql_exception $e) {
         $stmt->close();
         if ($e->getCode() === 1062) {
-            redirectWithMessage('llp-sale-rate-manage.php', 'duplicate');
+            redirectWithMessage('llp-purchase-rate-manage.php', 'duplicate');
         }
         throw $e;
     }
-    redirectWithMessage('llp-sale-rate-manage.php', 'updatedSuccess');
+    redirectWithMessage('llp-purchase-rate-manage.php', 'updatedSuccess');
 }
 
-redirectWithMessage('llp-sale-rate.php');
+redirectWithMessage('llp-purchase-rate.php');

@@ -30,7 +30,7 @@ function fmt_cost($n) {
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Manage Femi9 LLP Rates : <?php echo $business_name; ?></title>
+    <title>Manage Purchase Rates (LLP) : <?php echo $business_name; ?></title>
 
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -75,8 +75,8 @@ function fmt_cost($n) {
                                     <h1>
                                         <table class="headertble">
                                         <tr>
-                                        <td>Femi9 LLP Rates</td>
-                                        <td><a href="llp-sale-rate.php" title="Add Rate">&#10011;</a></td>
+                                        <td>Purchase Rates (LLP)</td>
+                                        <td><a href="llp-purchase-rate.php" title="Add Rate">&#10011;</a></td>
                                         </tr>
                                         </table>
                                     </h1>
@@ -109,8 +109,8 @@ function fmt_cost($n) {
                                                     <td><?php echo number_format((float)$e['gst_rate'], 2); ?>% <?php echo $e['gst_type'] === 'inclusive' ? '(Incl.)' : '(Excl.)'; ?></td>
                                                     <td>
                                                         <div class="actions-group">
-                                                            <a href="llp-sale-rate-edit.php?id=<?php echo $eid; ?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
-                                                            <a href="delete-llp-sale-rate.php?id=<?php echo $eid; ?>" class="action-link delete" title="Delete" onclick="return confirm('Delete this rate entry?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+                                                            <a href="llp-purchase-rate-edit.php?id=<?php echo $eid; ?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+                                                            <a href="delete-llp-purchase-rate.php?id=<?php echo $eid; ?>" class="action-link delete" title="Delete" onclick="return confirm('Delete this rate entry?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
                                                         </div>
                                                     </td>
                                                 </tr>

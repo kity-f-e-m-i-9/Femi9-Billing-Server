@@ -21,6 +21,14 @@ $today    = date('Y-m-d');
 $__viewerType   = get_login_usertype($db_conn);
 $is_neksomo_view = ($__viewerType === 'neksomo');
 
+// neksomo login: rate lookups stay mapping-only — only products with a
+// neksomo_product_mapping row are priced, so Neksomo's own report never
+// shows LLP-only products. admin/LLP login: the napkin Gross Profit cost
+// lookup ($gp_cost_rate_subq below) falls back to the company product's own
+// id/rate tables when there's no mapping row, so LLP-entered rates
+// (llp-purchase-rate.php, for products with no Neksomo-side counterpart) are
+// picked up too, on top of every mapped Neksomo product exactly as before.
+
 // ── Scope: company (direct, all-channel) vs a single channel's transactions ─
 $scope = $is_neksomo_view ? 'company' : ($_GET['scope'] ?? 'tp');
 if (!in_array($scope, ['company', 'tp', 'super_stockiest', 'stockiest'], true)) $scope = 'tp';
@@ -383,9 +391,18 @@ $revenue_growth = $prev_rev > 0
 //     via this same table (see DIAPER comment further down), so they're
 //     excluded from the multiplier.
 //   - femi9_llp_sale_rates for every other product, entered from the normal
-//     company login's own "Sale to Femi9 LLP" page (llp-sale-rate.php),
-//     already priced per the product's native selling unit — so this
-//     branch is never scaled.
+//     company login's own Purchase Rate (LLP) page (llp-purchase-rate.php,
+//     table name kept as-is — an internal implementation detail) as a
+//     genuine per-piece cost when the product's unit_type is 'pieces' (the
+//     page's own rate label switches to "Rate/Piece" vs "Rate/Pack" based on
+//     that), same as neksomo_llp_piece_rates above — so it needs the exact
+//     same products.pieces_per_pack scaling: a piece-type company SKU is
+//     still sold/invoiced in pack quantities (see tp_invoice_items rows for
+//     product 1/410mm — quantity=1 at rate=160 means 1 PACK), so comparing
+//     an unscaled per-piece cost against a per-pack sold_rate understated
+//     cost (and inflated Gross Profit) by a factor of pieces_per_pack.
+//     A unit_type='pack' product has pieces_per_pack NULL/0, so the
+//     COALESCE(NULLIF(...),1) multiplier is a no-op there — no regression.
 // A product with no rate in either table as of the period end is excluded
 // from Gross Profit entirely (no cost to subtract, so it can't be priced) —
 // same "unrated == excluded" convention the piece-rate section already uses.
@@ -412,17 +429,20 @@ $revenue_growth = $prev_rev > 0
 // gst_type (see comment above), so the divisor is the same either way —
 // unlike llp_cost_rate's CASE, there is no exclusive-rate branch here.
 $gp_sold_rate_gst_divisor = "(1 + COALESCE(p.gst,0)/100)";
+$gp_napkin_mapped_id = "(SELECT m.neksomo_product_id FROM neksomo_product_mapping m
+                                WHERE m.company_product_id = p.id
+                                  AND m.neksomo_product_id NOT IN (SELECT np.id FROM products np WHERE np.category = 'diaper')
+                                LIMIT 1)";
+$gp_napkin_product_match = $is_neksomo_view ? $gp_napkin_mapped_id : "COALESCE({$gp_napkin_mapped_id}, p.id)";
 $gp_cost_rate_subq = "COALESCE(
         (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
              * COALESCE(NULLIF(p.pieces_per_pack,0),1)
          FROM neksomo_llp_piece_rates r
-         WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m
-                                WHERE m.company_product_id = p.id
-                                  AND m.neksomo_product_id NOT IN (SELECT np.id FROM products np WHERE np.category = 'diaper')
-                                LIMIT 1)
+         WHERE r.product_id = {$gp_napkin_product_match}
            AND r.effective_date <= ?
          ORDER BY r.effective_date DESC LIMIT 1),
         (SELECT CASE WHEN fr.gst_type = 'inclusive' THEN fr.rate_per_piece / (1 + fr.gst_rate/100) ELSE fr.rate_per_piece END
+             * COALESCE(NULLIF(p.pieces_per_pack,0),1)
          FROM femi9_llp_sale_rates fr
          WHERE fr.product_id = p.id
            AND fr.effective_date <= ?
@@ -516,10 +536,13 @@ if ($scope === 'company') {
 // does. So a company product's category has to be read off whichever Neksomo
 // product it's mapped to via neksomo_product_mapping, same indirection the
 // $is_neksomo_view section uses at the top of this file. A company product
-// with no Neksomo mapping at all has no way to resolve a category and is
-// excluded from both buckets (and from Combined) — same "unrated == excluded"
-// convention as the rest of this report, confirmed as the intended behavior
-// rather than defaulting unmapped products to Napkin.
+// with no Neksomo mapping at all has no category to resolve (np.category is
+// NULL via the LEFT JOIN below) and is folded into the Napkin bucket —
+// confirmed as intended: every unmapped legacy product (410mm, 320mm, Trial
+// Pack, etc., priced via llp-purchase-rate.php since they have no
+// Neksomo-side counterpart to map to) is a napkin in practice, never a
+// diaper, so COALESCE(np.category,'') != 'diaper' already does the right
+// thing once unmapped rows survive the join.
 // ═══════════════════════════════════════════════════════════════════════════
 $grand_gross_profit_llp = 0.0;
 $grand_diaper_gross_profit_llp = 0.0;
@@ -527,8 +550,14 @@ $grand_combined_gross_profit_llp = 0.0;
 $grand_combined_expense_llp = 0.0;
 $grand_combined_net_profit_llp = 0.0;
 if ($scope === 'company' && !$is_neksomo_view) {
-    $gp_cat_join = "JOIN neksomo_product_mapping m ON m.company_product_id = p.id
-         JOIN products np ON np.id = m.neksomo_product_id";
+    // LEFT JOIN (not JOIN) — a company product with no Neksomo mapping still
+    // needs to survive into this result set so it can be priced via its own
+    // direct LLP purchase/sale rate ($gp_cost_rate_subq's fallback) and
+    // counted in the Napkin bucket below (COALESCE(np.category,'') != 'diaper'
+    // already treats a NULL category, i.e. unmapped, as Napkin — every
+    // unmapped legacy product is a napkin in practice, never a diaper).
+    $gp_cat_join = "LEFT JOIN neksomo_product_mapping m ON m.company_product_id = p.id
+         LEFT JOIN products np ON np.id = m.neksomo_product_id";
 
     // Diaper cost basis is NOT $gp_cost_rate_subq (that subquery is
     // deliberately napkin-only — see its comment above — and its first
@@ -539,10 +568,13 @@ if ($scope === 'company' && !$is_neksomo_view) {
     // convention, but with NO pieces_per_pack scaling — diaper is pack-based
     // even though priced through this piece-rate table, same convention the
     // Neksomo view's own diaper section already uses (mis-report.php ~1276-1280).
+    // This whole block only ever runs for the admin/LLP view (guarded above),
+    // so the direct-id fallback applies unconditionally — a neksomo login
+    // never reaches this query.
     $gp_diaper_cost_rate_subq = "
         (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
          FROM neksomo_llp_piece_purchase_rates pr
-         WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = p.id LIMIT 1)
+         WHERE pr.product_id = COALESCE((SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = p.id LIMIT 1), p.id)
            AND pr.effective_date <= ?
          ORDER BY pr.effective_date DESC LIMIT 1)";
     $gp_diaper_all_params = array_merge([$to], $gp_params, $gp_return_params, [$to]);

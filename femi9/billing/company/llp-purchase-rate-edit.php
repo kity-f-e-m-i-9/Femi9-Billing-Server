@@ -20,7 +20,7 @@ $entry = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$entry) {
-    header("Location: llp-sale-rate-manage.php");
+    header("Location: llp-purchase-rate-manage.php");
     exit;
 }
 
@@ -33,7 +33,7 @@ $products = $db_conn->query("SELECT id, productName, unit_type FROM products ORD
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Edit Rate : <?php echo $business_name; ?></title>
+    <title>Edit Purchase Rate (LLP) : <?php echo $business_name; ?></title>
 
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -66,8 +66,8 @@ $products = $db_conn->query("SELECT id, productName, unit_type FROM products ORD
                                     <h1>
                                         <table class="headertble">
                                         <tr>
-                                        <td>Edit Femi9 LLP Rate</td>
-                                        <td><a href="llp-sale-rate-manage.php" title="Manage Rates">&#9776;</a></td>
+                                        <td>Edit Purchase Rate (LLP)</td>
+                                        <td><a href="llp-purchase-rate-manage.php" title="Manage Rates">&#9776;</a></td>
                                         </tr>
                                         </table>
                                     </h1>
@@ -79,7 +79,7 @@ $products = $db_conn->query("SELECT id, productName, unit_type FROM products ORD
                                 <div class="card">
                                     <div class="card-body">
 
-<form action="llp-sale-rate-action.php" method="post">
+<form action="llp-purchase-rate-action.php" method="post">
 <input type="hidden" name="update_id" value="<?php echo (int)$entry['id']; ?>">
 <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
 

@@ -453,6 +453,8 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="Products">Add Product</a></li>
                         <li><a href="manage-products">Manage Products</a></li>
+						<li><a href="llp-purchase-rate.php">Purchase Rate (LLP) — Add Entry</a></li>
+						<li><a href="llp-purchase-rate-manage.php">Purchase Rate (LLP) — Manage Entries</a></li>
 						<li><a href="op-stock">Set Opening Stock</a></li>
 						<li>
 							<a href="#">Overall Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
@@ -829,10 +831,10 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 
 					<?php if($resultusertypeGET['report']==1){?>
 					<li>
-                        <a href="#"><i class="material-icons-two-tone">sell</i>Sale to Femi9 LLP<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <a href="#"><i class="material-icons-two-tone">sell</i>Purchase Rate (LLP)<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
-						<li><a href="llp-sale-rate.php">Add Entry</a></li>
-						<li><a href="llp-sale-rate-manage.php">Manage Entries</a></li>
+						<li><a href="llp-purchase-rate.php">Add Entry</a></li>
+						<li><a href="llp-purchase-rate-manage.php">Manage Entries</a></li>
                         </ul>
                     </li>
 					<li>

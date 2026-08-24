@@ -2,11 +2,13 @@
 require_once("include/GodownAccess.php");
 include("config.php");
 
-// Dedicated to the normal company ("users") login — a Femi9 LLP sale-rate
-// entry point for products that have no Neksomo mapping (admin retained for
-// oversight/support). Keyed directly on products.id, unlike
-// neksomo_llp_piece_rates which is keyed on the Neksomo product id and needs
-// neksomo_product_mapping to translate. See mis-report.php Gross Profit
+// Dedicated to the normal company ("users") login — a Femi9 LLP purchase-rate
+// entry point (the company's cost basis buying from Neksomo/LLP) for
+// products that have no Neksomo mapping (admin retained for oversight/
+// support). Keyed directly on products.id, unlike neksomo_llp_piece_rates
+// which is keyed on the Neksomo product id and needs neksomo_product_mapping
+// to translate. Table name (femi9_llp_sale_rates) kept as-is — an internal
+// implementation detail, not user-facing. See mis-report.php Gross Profit
 // comment for how the two rate sources are combined.
 $__usertype = get_login_usertype($db_conn);
 if (!in_array($__usertype, ['users', 'admin'], true)) {
@@ -45,7 +47,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sale to Femi9 LLP : <?php echo $business_name; ?></title>
+    <title>Purchase Rate (LLP) : <?php echo $business_name; ?></title>
 
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -105,8 +107,8 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
                                     <h1>
                                         <table class="headertble">
                                         <tr>
-                                        <td>Sale to Femi9 LLP</td>
-                                        <td><a href="llp-sale-rate-manage.php" title="Manage Entries">&#9776;</a></td>
+                                        <td>Purchase Rate (LLP)</td>
+                                        <td><a href="llp-purchase-rate-manage.php" title="Manage Entries">&#9776;</a></td>
                                         </tr>
                                         </table>
                                     </h1>
@@ -124,9 +126,9 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
                         <?php endif; ?>
                         <?php if (isset($_REQUEST['error'])): ?><div class="alert alert-danger">Something went wrong. Please try again.</div><?php endif; ?>
 
-                        <p class="text-muted" style="font-size:13px;">This rate feeds Gross Profit on the MIS Report for products not mapped into Neksomo. For Neksomo-mapped products, use the Neksomo login's own "Sale to Femi9 LLP" rate instead — this entry has no effect on those.</p>
+                        <p class="text-muted" style="font-size:13px;">This rate feeds Gross Profit on the MIS Report for products not mapped into Neksomo. For Neksomo-mapped products, use the Neksomo login's own Purchase Rate entry instead — this entry has no effect on those.</p>
 
-                        <form action="llp-sale-rate-action.php" method="post" id="rateForm">
+                        <form action="llp-purchase-rate-action.php" method="post" id="rateForm">
                         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         <input type="hidden" name="add-record" value="1">
                         <div id="hiddenRateInputs"></div>
@@ -134,10 +136,10 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
                         <div class="form-section">
                             <div class="section-header"><i class="material-icons">edit_document</i>Rate Details</div>
                             <p class="text-muted" style="font-size:13px;">
-                                This is a rate list, not a per-sale log. Enter the rate and the
-                                date it takes effect — that rate applies to every sale from that date
+                                This is a rate list, not a per-purchase log. Enter the cost and the
+                                date it takes effect — that cost applies to every purchase from that date
                                 onward, until a later effective date for the same product supersedes it.
-                                Piece-based products are rated per piece; pack-based products are rated per pack.
+                                Piece-based products are costed per piece; pack-based products are costed per pack.
                             </p>
                             <div class="row g-4 align-items-start">
                                 <div class="col-lg-4 col-md-6">

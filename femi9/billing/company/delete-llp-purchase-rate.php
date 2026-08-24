@@ -15,5 +15,5 @@ $stmt->bind_param('i', $id);
 $stmt->execute();
 $stmt->close();
 
-header("Location: llp-sale-rate-manage.php?deletedDone");
+header("Location: llp-purchase-rate-manage.php?deletedDone");
 exit;
