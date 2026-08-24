@@ -270,6 +270,14 @@ if ($scope === 'company') {
     $active_businesses = (int)cval($db_conn,
         "SELECT COUNT(DISTINCT CONCAT(to_user_type,'-',to_user_id)) FROM user_invoice WHERE from_user_type='company' AND sub_total>0 AND `date` BETWEEN ? AND ?",
         'ss', [$from, $to]);
+    // Territory Partners never appear in user_invoice (company never invoices
+    // a TP through that table) — TP stock supply is tracked separately in
+    // tp_invoices, keyed by territory_partner_id, live since 2026-06-01.
+    // Without this, active_businesses goes blind exactly when TP volume
+    // took over from the legacy Stockist/SS/Distributor channel.
+    $active_businesses += (int)cval($db_conn,
+        "SELECT COUNT(DISTINCT territory_partner_id) FROM tp_invoices WHERE total_amount>0 AND invoice_date BETWEEN ? AND ?",
+        'ss', [$from, $to]);
     $active_tps = $active_customers + $active_businesses;
 } else {
     $total_tps = (int)cval($db_conn,
