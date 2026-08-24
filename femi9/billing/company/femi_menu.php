@@ -651,6 +651,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                             </li>
 							<li><a href="ms_prorders">Product Orders Report</a></li>
 							<li><a href="ms_noorders">No Orders Report</a></li>
+							<li><a href="ms-shop-coverage-report">New Shop Coverage</a></li>
 							<li><a href="ms_expenses">Expenses Report</a></li>
                         </ul>
                     </li>
@@ -1125,6 +1126,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                             </li>
 							<li><a href="ms_prorders">Product Orders Report</a></li>
 							<li><a href="ms_noorders">No Orders Report</a></li>
+							<li><a href="ms-shop-coverage-report">New Shop Coverage</a></li>
                         </ul>
                     </li>
 					<?php }?>
