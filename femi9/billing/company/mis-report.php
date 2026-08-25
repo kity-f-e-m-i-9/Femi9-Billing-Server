@@ -563,20 +563,26 @@ if ($scope === 'company' && !$is_neksomo_view) {
     // deliberately napkin-only — see its comment above — and its first
     // branch explicitly excludes any mapping to a diaper-category Neksomo
     // product, falling through to femi9_llp_sale_rates, which has no rows
-    // for anything). Diaper cost comes from neksomo_llp_piece_purchase_rates
-    // via the same mapping, same "latest effective_date <= as-of date"
-    // convention, but with NO pieces_per_pack scaling — diaper is pack-based
-    // even though priced through this piece-rate table, same convention the
-    // Neksomo view's own diaper section already uses (mis-report.php ~1276-1280).
+    // for anything). Diaper cost comes from neksomo_llp_piece_rates — the
+    // rate Neksomo "sells" to Femi9 LLP, entered via the Neksomo login's own
+    // "Sale to Femi9 LLP" page (neksomo-llp-piece-sale.php /
+    // neksomo-llp-piece-sale-manage.php) — same as napkin's cost basis above,
+    // NOT neksomo_llp_piece_purchase_rates (that table prices what Neksomo
+    // itself buys from its manufacturer, a different, unrelated cost that
+    // has nothing to do with Femi9 LLP's purchase cost). Same mapping, same
+    // "latest effective_date <= as-of date" convention, but with NO
+    // pieces_per_pack scaling — diaper is pack-based even though priced
+    // through this piece-rate table, same convention the Neksomo view's own
+    // diaper section uses (mis-report.php, $diaper_sold/$diaper_returned).
     // This whole block only ever runs for the admin/LLP view (guarded above),
     // so the direct-id fallback applies unconditionally — a neksomo login
     // never reaches this query.
     $gp_diaper_cost_rate_subq = "
-        (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
-         FROM neksomo_llp_piece_purchase_rates pr
-         WHERE pr.product_id = COALESCE((SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = p.id LIMIT 1), p.id)
-           AND pr.effective_date <= ?
-         ORDER BY pr.effective_date DESC LIMIT 1)";
+        (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+         FROM neksomo_llp_piece_rates r
+         WHERE r.product_id = COALESCE((SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = p.id LIMIT 1), p.id)
+           AND r.effective_date <= ?
+         ORDER BY r.effective_date DESC LIMIT 1)";
     $gp_diaper_all_params = array_merge([$to], $gp_params, $gp_return_params, [$to]);
 
     $grand_gross_profit_llp = (float)cval($db_conn,
@@ -1397,11 +1403,14 @@ if ($is_neksomo_view) {
     // itself pack-based (unit_type='pack') and maps 1:1 to a pack-based
     // company SKU, unlike the napkin/piece-based figures above. So the sold
     // metric here is the pack quantity actually sold — no pieces_per_pack
-    // conversion. Rates are looked up from the SAME neksomo_llp_piece_rates /
-    // neksomo_llp_piece_purchase_rates tables napkin uses (those pages now
-    // accept both piece- and pack-based products) — for a pack-based product
-    // the stored rate_per_piece column holds a per-PACK rate instead, so
-    // day_qty * rate is already the correct value with no conversion.
+    // conversion. Cost is looked up from neksomo_llp_piece_rates — the same
+    // "Sale to Femi9 LLP" table napkin's cost basis uses (that page accepts
+    // both piece- and pack-based products) — NOT
+    // neksomo_llp_piece_purchase_rates, which prices Neksomo's own purchase
+    // from its manufacturer, a different, unrelated cost. For a pack-based
+    // product the stored rate_per_piece column holds a per-PACK rate
+    // instead, so day_qty * rate is already the correct value with no
+    // conversion.
     // ═══════════════════════════════════════════════════════════════════════
     $diaper_mapped_ids_subq = "SELECT company_product_id FROM neksomo_product_mapping m
                                 JOIN products np ON np.id = m.neksomo_product_id
@@ -1446,16 +1455,22 @@ if ($is_neksomo_view) {
                     -- Demo/Free/Damage rows), which correctly excludes it
                     -- from Sold Value while still counting toward Pack Qty.
                     SUM(d.line_total) day_line_total,
-                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
-                     FROM neksomo_llp_piece_purchase_rates pr
-                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
-                       AND pr.effective_date <= d.date
-                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate,
-                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece - pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece * pr.gst_rate/100 END
-                     FROM neksomo_llp_piece_purchase_rates pr
-                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
-                       AND pr.effective_date <= d.date
-                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate_gst_amt
+                    -- Diaper cost basis: neksomo_llp_piece_rates (Neksomo's
+                    -- Sale to Femi9 LLP rate), not
+                    -- neksomo_llp_piece_purchase_rates (Neksomo's own
+                    -- purchase from its manufacturer — a different,
+                    -- unrelated cost). Column alias kept as purchase_rate
+                    -- for the outer SELECT's existing references.
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) purchase_rate,
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece - r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece * r.gst_rate/100 END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) purchase_rate_gst_amt
              FROM (
                  SELECT ii.pr_id, ii.qty, ii.total AS line_total, i.date
                  FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
@@ -1507,16 +1522,18 @@ if ($is_neksomo_view) {
                 COALESCE(SUM(CASE WHEN dp.purchase_rate IS NOT NULL THEN dp.day_qty * dp.purchase_rate_gst_amt ELSE 0 END),0) total_purchase_gst_value
          FROM (
              SELECT d.pr_id, d.date, SUM(d.qty) day_qty, SUM(d.line_total) day_line_total,
-                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece END
-                     FROM neksomo_llp_piece_purchase_rates pr
-                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
-                       AND pr.effective_date <= d.date
-                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate,
-                    (SELECT CASE WHEN pr.gst_type = 'inclusive' THEN pr.rate_per_piece - pr.rate_per_piece / (1 + pr.gst_rate/100) ELSE pr.rate_per_piece * pr.gst_rate/100 END
-                     FROM neksomo_llp_piece_purchase_rates pr
-                     WHERE pr.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
-                       AND pr.effective_date <= d.date
-                     ORDER BY pr.effective_date DESC LIMIT 1) purchase_rate_gst_amt
+                    -- Diaper cost basis: neksomo_llp_piece_rates (Neksomo's
+                    -- Sale to Femi9 LLP rate) — see $diaper_sold above.
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) purchase_rate,
+                    (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece - r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece * r.gst_rate/100 END
+                     FROM neksomo_llp_piece_rates r
+                     WHERE r.product_id = (SELECT m.neksomo_product_id FROM neksomo_product_mapping m WHERE m.company_product_id = d.pr_id LIMIT 1)
+                       AND r.effective_date <= d.date
+                     ORDER BY r.effective_date DESC LIMIT 1) purchase_rate_gst_amt
              FROM (
                  SELECT ri.prid pr_id, ri.qty, ri.total AS line_total, ri.date
                  FROM user_return_stock_items ri
