@@ -20,7 +20,12 @@ if (!wa_po_rate_limit_check($db_conn, 'lookup-by-alt:' . $identifier, 20, 3600))
 
 $configs = wa_po_category_configs();
 $normalizedIdentifier = wa_po_normalize_phone($identifier);
-$found = null;
+// One identifier (especially a mobile number) can legitimately be
+// registered under more than one category — e.g. a stockiest and a
+// territory partner sharing the same phone number. Collect every match
+// instead of stopping at the first, so we don't silently resolve to the
+// wrong account (or a lower-priority one) while masking the rest.
+$matches = [];
 
 foreach ($configs as $category => $cfg) {
     $hasDeletedAt = in_array($category, ['distributor', 'super_distributor', 'stockiest', 'super_stockiest', 'candf'], true);
@@ -47,8 +52,8 @@ foreach ($configs as $category => $cfg) {
     mysqli_stmt_close($stmt);
 
     if ($row) {
-        $found = ['category' => $category, 'cfg' => $cfg, 'row' => $row];
-        break;
+        $matches[] = ['category' => $category, 'cfg' => $cfg, 'row' => $row];
+        continue;
     }
 
     // Normalized mobile fallback if identifier looks like a phone number.
@@ -59,32 +64,57 @@ foreach ($configs as $category => $cfg) {
         $resAll = mysqli_query($db_conn, $sqlAll);
         while ($r = $resAll->fetch_assoc()) {
             if (wa_po_normalize_phone($r['mobile']) === $normalizedIdentifier) {
-                $found = ['category' => $category, 'cfg' => $cfg, 'row' => $r];
-                break 2;
+                $matches[] = ['category' => $category, 'cfg' => $cfg, 'row' => $r];
+                break;
             }
         }
     }
 }
 
-if (!$found) {
+if (empty($matches)) {
     echo json_encode(['found' => false]);
     exit;
 }
 
+function wa_po_mask_mobile($mobile) {
+    $digits = preg_replace('/\D+/', '', (string)$mobile);
+    $last2 = substr($digits, -2);
+    return '+9198XXXX' . $last2;
+}
+
+if (count($matches) > 1) {
+    $accounts = array_map(function ($m) {
+        $row = $m['row'];
+        $isActive = ((string)$row['status'] === (string)$m['cfg']['status_active_value']);
+        return [
+            'user_id' => (int)$row['user_id'],
+            'tp_login_id' => (string)$row['login_id'],
+            'name' => (string)$row['name'],
+            'registered_number_masked' => wa_po_mask_mobile($row['mobile']),
+            'category' => $m['category'],
+            'status' => $isActive ? 'active' : 'inactive',
+        ];
+    }, $matches);
+
+    echo json_encode([
+        'found' => true,
+        'match_type' => 'multiple_accounts',
+        'accounts' => $accounts,
+    ]);
+    exit;
+}
+
+$found = $matches[0];
 $row = $found['row'];
 $isActive = ((string)$row['status'] === (string)$found['cfg']['status_active_value']);
 
-$mobile = (string)$row['mobile'];
-$digits = preg_replace('/\D+/', '', $mobile);
-$last2 = substr($digits, -2);
-$masked = '+9198XXXX' . $last2;
-
 echo json_encode([
     'found' => true,
+    'match_type' => 'exact',
     'user_id' => (int)$row['user_id'],
     'tp_login_id' => (string)$row['login_id'],
     'name' => (string)$row['name'],
-    'registered_number_masked' => $masked,
+    'registered_number_masked' => wa_po_mask_mobile($row['mobile']),
     'category' => $found['category'],
     'status' => $isActive ? 'active' : 'inactive',
 ]);
