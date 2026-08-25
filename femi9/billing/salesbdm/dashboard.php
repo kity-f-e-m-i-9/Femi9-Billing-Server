@@ -106,6 +106,7 @@ $purchaseRows = []; $purchaseReturnByTp = []; $downstreamByTp = []; $downstreamR
 $purchaseByTpCat = ['napkin' => [], 'diaper' => []]; $downstreamByTpCat = ['napkin' => [], 'diaper' => []];
 $overall_target = 0.0; $overall_achieved = 0.0; $overall_target_pct = 0; $overall_napkin_sold = 0.0;
 $overall_napkin_purchased = 0.0;
+$prevAdvanceUsed = 0.0; $prevAdvanceUsedRows = [];
 $overviewByCatDefault = ['amount'=>0,'invoices'=>0,'units'=>0,'return_amt'=>0,'return_count'=>0,'return_qty'=>0,'turnover_amt'=>0,'turnover_qty'=>0,'growth'=>0,'cust_amt'=>0,'cust_cnt'=>0,'cust_qty'=>0,'shop_amt'=>0,'shop_cnt'=>0,'shop_qty'=>0];
 $overviewByCat = ['all' => $overviewByCatDefault, 'napkin' => $overviewByCatDefault, 'diaper' => $overviewByCatDefault];
 
@@ -358,6 +359,32 @@ if ($hasTps) {
          WHERE ti.territory_partner_id IN ($tpIdList) AND ti.invoice_date BETWEEN ? AND ?
            AND COALESCE(p.category,'') != 'diaper'",
         'ss', [$from, $to]);
+
+    // ═══ Previous Month Advance (used this period) — the part of this
+    // period's Napkin Purchase that was actually FUNDED by advance money
+    // paid in an earlier period (still-unspent wallet balance carried
+    // forward), not by advance received inside this date filter. Traced via
+    // tp_invoice_advance_log, the same table TpAdvanceService.php's FIFO
+    // deduction writes to — each row already names exactly which advance
+    // payment funded how much of which invoice, so this is exact, not an
+    // estimate. This is what makes "Available Advance Payment" above go
+    // negative: that figure only nets THIS period's advance against THIS
+    // period's purchase, so spend funded by older money reads as a shortfall
+    // there even though it wasn't actually unfunded.
+    $prevAdvanceUsedRows = call_rows($db_conn,
+        "SELECT tial.deducted_amount, tap.payment_date, tap.id adv_id, tp.name tp_name, tp.tp_id tp_code,
+                ti.invoice_number, ti.invoice_date
+         FROM tp_invoice_advance_log tial
+         JOIN tp_advance_payments tap ON tap.id = tial.tp_advance_id
+         JOIN tp_invoices ti ON ti.id = tial.tp_invoice_id
+         JOIN territory_partners tp ON tp.id = ti.territory_partner_id
+         WHERE ti.territory_partner_id IN ($tpIdList)
+           AND ti.invoice_date BETWEEN ? AND ?
+           AND tap.product_type = 'napkin'
+           AND tap.payment_date < ?
+         ORDER BY tp.name, ti.invoice_date",
+        'sss', [$from, $to, $from]);
+    $prevAdvanceUsed = (float)array_sum(array_column($prevAdvanceUsedRows, 'deducted_amount'));
 
     // ═══ Products — downstream sold + returned, across all assigned TPs ═══
     // Split by channel (Customer via `invoice`, Shop via `user_invoice`) so the
@@ -812,8 +839,56 @@ if ($hasTps) {
                                     <div><span>%</span><b style="color:<?php echo $tgtAccent; ?>;"><?php echo $overall_target_pct; ?>%</b></div>
                                     <div><span>Napkin Purchase</span><b>&#8377;<?php echo inr_format($overall_napkin_purchased, 0); ?></b></div>
                                     <div><span>Available Advance Payment</span><b>&#8377;<?php echo inr_format($overall_available_advance, 0); ?></b></div>
+                                    <?php if ($prevAdvanceUsed > 0): ?>
+                                    <div>
+                                        <span>Previous Month Advance</span>
+                                        <b><a href="#" id="prevAdvanceLink" data-bs-toggle="modal" data-bs-target="#prevAdvanceModal" style="color:#8b5cf6;text-decoration:underline dotted;">&#8377;<?php echo inr_format($prevAdvanceUsed, 0); ?></a></b>
+                                    </div>
+                                    <?php endif; ?>
                                 </div>
-                                <p class="snote" style="margin:6px 0 0;">% is Advance Payment against Total Target Amount. Available Advance Payment = Advance Payment received minus Napkin Purchase already invoiced, in this date range.</p>
+                                <p class="snote" style="margin:6px 0 0;">% is Advance Payment against Total Target Amount. Available Advance Payment = Advance Payment received minus Napkin Purchase already invoiced, in this date range. Previous Month Advance = this period's purchases that were actually funded by advance paid in an earlier period (click to see who) — that's why Available Advance Payment can go negative even though nothing is unfunded.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ══ Previous Month Advance — who paid earlier, what it funded this period ══ -->
+                    <div class="modal fade" id="prevAdvanceModal" tabindex="-1" aria-labelledby="prevAdvanceModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                                    <h6 class="modal-title" id="prevAdvanceModalLabel" style="font-weight:600;color:#1f2937;">
+                                        <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#8b5cf6;">history</i>
+                                        Previous Month Advance — Used This Period
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body" style="padding:14px 20px;">
+                                    <p class="snote" style="margin:0 0 12px;">TPs who paid Napkin advance in an earlier period, and whose leftover balance funded an invoice dated <?php echo date('d M Y', strtotime($from)); ?>–<?php echo date('d M Y', strtotime($to)); ?>.</p>
+                                    <div style="overflow-x:auto;">
+                                    <table class="mt" style="min-width:640px;">
+                                        <thead><tr><th>TP</th><th>Advance Paid On</th><th style="text-align:right;">Amount Used</th><th>Invoice #</th><th>Invoice Date</th></tr></thead>
+                                        <tbody>
+                                        <?php foreach ($prevAdvanceUsedRows as $par): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($par['tp_name']); ?><div style="font-size:11px;color:#9ca3af;"><?php echo htmlspecialchars($par['tp_code']); ?></div></td>
+                                                <td><?php echo date('d M Y', strtotime($par['payment_date'])); ?></td>
+                                                <td style="text-align:right;">&#8377;<?php echo inr_format($par['deducted_amount'], 2); ?></td>
+                                                <td><?php echo htmlspecialchars($par['invoice_number']); ?></td>
+                                                <td><?php echo date('d M Y', strtotime($par['invoice_date'])); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        </tbody>
+                                        <tfoot><tr style="font-weight:700;border-top:2px solid var(--gridline);">
+                                            <td colspan="2">Total</td>
+                                            <td style="text-align:right;">&#8377;<?php echo inr_format($prevAdvanceUsed, 2); ?></td>
+                                            <td colspan="2"></td>
+                                        </tr></tfoot>
+                                    </table>
+                                    </div>
+                                </div>
+                                <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                </div>
                             </div>
                         </div>
                     </div>
