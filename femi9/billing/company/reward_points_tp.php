@@ -278,17 +278,22 @@ $(document).on('click', '.team-points-trigger', function () {
             html += '<table style="width:100%;font-size:13.5px;border-collapse:collapse;">' +
                     '<thead><tr style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #f3f4f6;">' +
                     '<th style="text-align:left;padding:8px 10px 8px 0;">Territory Partner</th>' +
+                    '<th style="text-align:center;padding:8px 10px;">%</th>' +
                     '<th style="text-align:center;padding:8px 10px;">Invoices</th>' +
                     '<th style="text-align:right;padding:8px 10px;">0% GST Amount</th>' +
                     '<th style="text-align:right;padding:8px 0;">Points Contributed</th>' +
                     '</tr></thead><tbody>';
             $.each(data.members, function (_, m) {
                 totalPoints += parseFloat(m.points) || 0;
+                var pct = parseFloat(m.referral_percentage) || 0;
                 html += '<tr style="border-bottom:1px dotted #f3f4f6;">' +
                         '<td style="padding:10px 10px 10px 0;">' +
                             '<div style="font-weight:600;color:#1f2937;">' + $('<span>').text(m.name || '–').html() + '</div>' +
                             '<div style="font-size:11px;color:#8b5cf6;font-weight:700;">' + $('<span>').text(m.tp_code || '').html() + '</div>' +
                             '<div style="font-size:11.5px;color:#9ca3af;">' + $('<span>').text(m.mobile || '').html() + '</div>' +
+                        '</td>' +
+                        '<td style="text-align:center;padding:10px;">' +
+                            '<span style="display:inline-block;white-space:nowrap;font-size:11px;font-weight:700;color:#059669;background:#d1fae5;border-radius:10px;padding:2px 9px;line-height:1.4;">' + pct + '%</span>' +
                         '</td>' +
                         '<td style="text-align:center;padding:10px;color:#374151;">' + m.invoice_count + '</td>' +
                         '<td style="text-align:right;padding:10px;color:#374151;">₹' + (parseFloat(m.amount) || 0).toFixed(2) + '</td>' +
@@ -296,7 +301,7 @@ $(document).on('click', '.team-points-trigger', function () {
                         '</tr>';
             });
             html += '</tbody><tfoot><tr>' +
-                    '<td colspan="3" style="text-align:right;padding:14px 10px 0 0;font-weight:700;color:#374151;">Total Team Points</td>' +
+                    '<td colspan="4" style="text-align:right;padding:14px 10px 0 0;font-weight:700;color:#374151;">Total Team Points</td>' +
                     '<td style="text-align:right;padding:14px 0 0;font-weight:700;color:#8b5cf6;font-size:16px;">' + totalPoints.toFixed(2) + '</td>' +
                     '</tr></tfoot></table>';
 

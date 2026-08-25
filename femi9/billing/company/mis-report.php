@@ -1903,16 +1903,34 @@ $top_distributors = array_slice($top_distributors, 0, 10);
 // ═══════════════════════════════════════════════════════════════════════════
 // 8. ORDER STATUS
 // ═══════════════════════════════════════════════════════════════════════════
+// The receipt subquery used to aggregate ALL receipts unfiltered (120k+
+// rows) on every single dashboard load, regardless of the date/user_type
+// filter above it — scoping it to only the invoices that actually match
+// the outer WHERE (same conditions, just applied to the receipt side too)
+// keeps the result identical while letting MySQL use the invoice indexes
+// instead of a full-table GROUP BY every time.
 $ord_c = call_rows($db_conn,
     "SELECT i.total, COALESCE(r.paid,0) paid
-     FROM invoice i LEFT JOIN (SELECT inv_id, SUM(received) paid FROM receipt GROUP BY inv_id) r ON r.inv_id=i.inv_id
+     FROM invoice i
+     LEFT JOIN (
+         SELECT rec.inv_id, SUM(rec.received) paid
+         FROM receipt rec
+         INNER JOIN invoice iz ON iz.inv_id = rec.inv_id AND iz.user_type=? AND iz.sub_total>0 AND iz.date BETWEEN ? AND ?{$tc_inv}
+         GROUP BY rec.inv_id
+     ) r ON r.inv_id=i.inv_id
      WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_inv}",
-    'sss', [$utype, $from, $to]);
+    'ssssss', [$utype, $from, $to, $utype, $from, $to]);
 $ord_s = call_rows($db_conn,
     "SELECT ui.total, COALESCE(r.paid,0) paid
-     FROM user_invoice ui LEFT JOIN (SELECT inv_id, SUM(received) paid FROM receipt GROUP BY inv_id) r ON r.inv_id=ui.inv_id
+     FROM user_invoice ui
+     LEFT JOIN (
+         SELECT rec.inv_id, SUM(rec.received) paid
+         FROM receipt rec
+         INNER JOIN user_invoice uiz ON uiz.inv_id = rec.inv_id AND uiz.from_user_type=? AND uiz.sub_total>0 AND uiz.date BETWEEN ? AND ?{$tc_ui}
+         GROUP BY rec.inv_id
+     ) r ON r.inv_id=ui.inv_id
      WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui}",
-    'sss', [$utype, $from, $to]);
+    'ssssss', [$utype, $from, $to, $utype, $from, $to]);
 $os_paid=$os_part=$os_unpd=0; $os_paid_a=$os_part_a=$os_unpd_a=0;
 foreach (array_merge($ord_c,$ord_s) as $o) {
     $t=(float)$o['total']; $p=(float)$o['paid'];

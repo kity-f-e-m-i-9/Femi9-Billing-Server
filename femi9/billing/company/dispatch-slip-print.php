@@ -52,75 +52,10 @@ $stmt2->close();
 
 // Overall packs-per-box / packs-per-cover for the shipment-level box
 // estimate below — company-editable (Manage Products page), not hardcoded.
-$overallSettings = dispatchSlipGetOverallSettings($db_conn);
-
-$TotalQty123     = 0;
-$TotalCartons123 = 0;
-$lineBoxesSum123 = 0; // sum of each line's own exact box count below
-$pooledQty123    = 0; // each line's leftover (or, if no packs_per_cover set, its whole qty) — pooled for the overall grouping
-foreach ($po_items as &$item) {
-    $qty = (int)$item['qty'];
-    $TotalQty123 += $qty;
-
-    $ppc = $item['packs_per_carton'];
-    $item['carton_display'] = '—';
-    if ($ppc !== null && $ppc !== '' && (int)$ppc > 0) {
-        $ppc_int  = (int)$ppc;
-        $cartons  = intdiv($qty, $ppc_int);
-        $leftover = $qty % $ppc_int;
-        $TotalCartons123 += $cartons;
-        $item['carton_display'] = $cartons . ' ctn' . ($leftover > 0 ? ' + ' . $leftover . ' pack' . ($leftover > 1 ? 's' : '') : '');
-    }
-
-    // Per-line Box column — two stages, same shape as the overall
-    // shipment-level estimate further below, just scoped to this one line:
-    //   1. Group this line's qty into full boxes of its OWN
-    //      packs_per_carton (the same number the Cartons column already
-    //      uses) — e.g. 130 at 100/box is 1 box, 30 left over.
-    //   2. That leftover is then checked against this line's OWN
-    //      packs_per_cover — if it EXCEEDS that, the leftover becomes one
-    //      more box outright (110/100/cover 25: leftover 10 <= 25, stays
-    //      "1 box + 10 packs"; 130/100/cover 25: leftover 30 > 25, becomes
-    //      "2 boxes"). Needs BOTH numbers set on the product; a line
-    //      missing either has no box math of its own and its whole qty
-    //      instead flows into the pooled overall grouping below.
-    $ppcv = $item['packs_per_cover'];
-    $item['box_display'] = '—';
-    if ($ppc !== null && $ppc !== '' && (int)$ppc > 0 && $ppcv !== null && $ppcv !== '' && (int)$ppcv > 0) {
-        $ppc_int  = (int)$ppc;
-        $ppcv_int = (int)$ppcv;
-        $lineBoxes    = intdiv($qty, $ppc_int);
-        $lineLeftover = $qty % $ppc_int;
-        if ($lineLeftover > $ppcv_int) {
-            $lineBoxes++;
-            $lineLeftover = 0;
-        }
-        $lineBoxesSum123 += $lineBoxes;
-        $pooledQty123    += $lineLeftover;
-        $item['box_display'] = ($lineBoxes > 0 ? $lineBoxes . ' box' . ($lineBoxes > 1 ? 'es' : '') : '')
-            . ($lineLeftover > 0 ? ($lineBoxes > 0 ? ' + ' : '') . $lineLeftover . ' pack' . ($lineLeftover > 1 ? 's' : '') : '');
-        if ($item['box_display'] === '') $item['box_display'] = '—';
-    } else {
-        $pooledQty123 += $qty;
-    }
-}
-unset($item);
-
-// Shipment-level box estimate: every line's own exact box count above,
-// plus two more stages applied to the pooled leftover (see
-// shared/DispatchSlipSettings.php for the full rationale):
-//   1. Group the pool into full boxes of overall_packs_per_box (floor
-//      division) — e.g. 80 pooled packs at 50/box is 1 box, 30 left over.
-//   2. Whatever's STILL left over after that grouping is checked once more
-//      against the smaller overall_packs_per_cover threshold — if it
-//      EXCEEDS that, the remainder becomes one more box outright; otherwise
-//      it just stays displayed as loose packs.
-$groupedBoxes123    = intdiv($pooledQty123, $overallSettings['box']);
-$afterGrouping123   = $pooledQty123 % $overallSettings['box'];
-$leftoverIsBox123    = $afterGrouping123 > $overallSettings['cover'];
-$TotalBoxes123 = $lineBoxesSum123 + $groupedBoxes123 + ($leftoverIsBox123 ? 1 : 0);
-$TotalBoxesDisplay123 = $TotalBoxes123 . ' box' . ($TotalBoxes123 !== 1 ? 'es' : '')
-    . (!$leftoverIsBox123 && $afterGrouping123 > 0 ? ' + ' . $afterGrouping123 . ' pack' . ($afterGrouping123 > 1 ? 's' : '') : '');
+$boxTotals = dispatchSlipComputeBoxes($db_conn, $po_items);
+$TotalQty123          = $boxTotals['TotalQty'];
+$TotalCartons123      = $boxTotals['TotalCartons'];
+$TotalBoxesDisplay123 = $boxTotals['TotalBoxesDisplay'];
 
 // Ship-to address — the PO's one-off address if the TP typed one at
 // submission time, otherwise the TP's registered default.
