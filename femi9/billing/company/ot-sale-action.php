@@ -438,15 +438,22 @@ if (isset($_REQUEST['updateRecord'])) {
                     $stockServiceUpd->otReverse($lineProductId, $Login_user_TYPEvl, $lineGodownid, -$delta, $tempid, $createdByUpd, true);
                 }
 
-                $stmtGst = $db_conn->prepare("SELECT gst FROM products WHERE id = ?");
+                $stmtGst = $db_conn->prepare("SELECT gst, gst_type FROM products WHERE id = ?");
                 $stmtGst->bind_param('i', $lineProductId);
                 $stmtGst->execute();
-                $lineGst = (float) ($stmtGst->get_result()->fetch_assoc()['gst'] ?? 0);
+                $lineProd     = $stmtGst->get_result()->fetch_assoc();
+                $lineGst      = (float) ($lineProd['gst'] ?? 0);
+                $lineGstType  = ($lineProd['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive';
                 $stmtGst->close();
 
-                $lineSubTotal  = ($newRate * $newQty) - $newDisc;
-                $lineGstAmount = round($lineSubTotal * $lineGst / 100, 2);
-                $lineTotal     = $lineSubTotal + $lineGstAmount;
+                $lineSubTotal = ($newRate * $newQty) - $newDisc;
+                if ($lineGstType === 'inclusive' && $lineGst > 0) {
+                    $lineGstAmount = round($lineSubTotal - ($lineSubTotal * 100 / (100 + $lineGst)), 2);
+                    $lineTotal     = $lineSubTotal;
+                } else {
+                    $lineGstAmount = round($lineSubTotal * $lineGst / 100, 2);
+                    $lineTotal     = $lineSubTotal + $lineGstAmount;
+                }
 
                 $stmtLineUpd = $db_conn->prepare(
                     "UPDATE ot_sales SET qty=?, price=?, discount=?, sub_total=?, gst_amount=?, total=? WHERE id=?"
