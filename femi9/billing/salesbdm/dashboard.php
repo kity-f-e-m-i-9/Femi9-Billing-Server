@@ -923,6 +923,12 @@ if ($hasTps) {
                             renderByCatCells('#purchasesCatTable .pc-amt', cat);
                             renderByCatCells('#yourSalesCatTable .ys-qty', cat);
                             renderByCatCells('#yourSalesCatTable .ys-rev', cat);
+                            // Target Amount/Achievement/Balance are Napkin-only figures
+                            // (no Diaper target concept exists) — hide them in Diaper view
+                            // instead of showing a Napkin-based % that doesn't apply.
+                            document.querySelectorAll('#purchasesCatTable .napkin-only-col').forEach(function (el) {
+                                el.style.display = (cat === 'diaper') ? 'none' : '';
+                            });
                         }
 
                         document.addEventListener('click', function (e) {
@@ -1018,7 +1024,7 @@ if ($hasTps) {
                                 <div class="card-body" style="overflow-x:auto;">
                                     <p class="snote">Hover a TP name to see their product-wise purchase &amp; return breakdown. Achievement/Balance count Napkin products only &mdash; Lumi Baby Diaper purchases don't count toward the Firka target. Qty/Value Purchased follow the Napkin/Diaper toggle above.</p>
                                     <table class="mt" id="purchasesCatTable">
-                                        <thead><tr><th>TP</th><th>District (Firka)</th><th>Qty Purchased</th><th>Value Purchased</th><th>Qty Returned to Company</th><th>Target Amount</th><th>Achievement</th><th>Balance</th></tr></thead>
+                                        <thead><tr><th>TP</th><th>District (Firka)</th><th>Qty Purchased</th><th>Value Purchased</th><th>Qty Returned to Company</th><th class="napkin-only-col">Target Amount</th><th class="napkin-only-col">Achievement</th><th class="napkin-only-col">Balance</th></tr></thead>
                                         <tbody>
                                         <?php if (empty($purchaseRows)): ?>
                                             <tr><td colspan="8" class="text-muted">No purchases in this period.</td></tr>
@@ -1039,8 +1045,8 @@ if ($hasTps) {
                                                 <td class="pc-qty" data-by-cat='<?php echo $pcQtyByCat; ?>'><?php echo inr_format($pr['qty'], 0); ?></td>
                                                 <td class="pc-amt" data-by-cat='<?php echo $pcAmtByCat; ?>'>&#8377;<?php echo inr_format($pr['amt'], 2); ?></td>
                                                 <td><?php echo inr_format($purchaseReturnByTp[$tid] ?? 0, 0); ?></td>
-                                                <td><?php echo $tp_target > 0 ? '&#8377;' . inr_format($tp_target, 0) : '—'; ?></td>
-                                                <td>
+                                                <td class="napkin-only-col"><?php echo $tp_target > 0 ? '&#8377;' . inr_format($tp_target, 0) : '—'; ?></td>
+                                                <td class="napkin-only-col">
                                                     <?php if ($tp_target > 0): ?>
                                                     <div style="display:flex;align-items:center;gap:5px;">
                                                         <div class="pbar" style="width:70px;"><div class="pf" style="width:<?php echo min($tp_pct, 100); ?>%;background:<?php echo $tp_bc; ?>;"></div></div>
@@ -1048,7 +1054,7 @@ if ($hasTps) {
                                                     </div>
                                                     <?php else: ?>—<?php endif; ?>
                                                 </td>
-                                                <td style="<?php echo $tp_target > 0 ? 'color:' . ($tp_balance > 0 ? 'var(--critical)' : 'var(--good)') . ';' : ''; ?>">
+                                                <td class="napkin-only-col" style="<?php echo $tp_target > 0 ? 'color:' . ($tp_balance > 0 ? 'var(--critical)' : 'var(--good)') . ';' : ''; ?>">
                                                     <?php echo $tp_target > 0 ? ($tp_balance > 0 ? '&minus;' : '+') . '&#8377;' . inr_format(abs($tp_balance), 0) : '—'; ?>
                                                 </td>
                                             </tr>
