@@ -72,6 +72,7 @@ foreach ($configs as $category => $cfg) {
 }
 
 if (empty($matches)) {
+    wa_po_log_event('not_found');
     echo json_encode(['found' => false]);
     exit;
 }
@@ -96,6 +97,7 @@ if (count($matches) > 1) {
         ];
     }, $matches);
 
+    wa_po_log_event('multiple_accounts (' . count($accounts) . ')');
     echo json_encode([
         'found' => true,
         'match_type' => 'multiple_accounts',
@@ -108,6 +110,7 @@ $found = $matches[0];
 $row = $found['row'];
 $isActive = ((string)$row['status'] === (string)$found['cfg']['status_active_value']);
 
+wa_po_log_event('exact (' . $found['category'] . ')');
 echo json_encode([
     'found' => true,
     'match_type' => 'exact',

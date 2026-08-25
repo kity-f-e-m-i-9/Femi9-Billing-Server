@@ -126,4 +126,5 @@ if ($curlError || $httpCode < 200 || $httpCode >= 300) {
     wa_po_fail(502, 'Failed to send OTP via WhatsApp — please try again shortly.');
 }
 
+wa_po_log_event('OTP sent (' . $cat . ' user_id ' . $userId . ')');
 echo json_encode(['otp_id' => $otpId, 'expires_in' => 300]);

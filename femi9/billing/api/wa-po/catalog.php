@@ -66,4 +66,5 @@ while ($row = $res->fetch_assoc()) {
 }
 mysqli_stmt_close($stmt);
 
+wa_po_log_event('catalog (' . $category . ', ' . count($products) . ' products' . ($q !== '' ? ", q=\"$q\"" : '') . ')');
 echo json_encode(['products' => $products]);

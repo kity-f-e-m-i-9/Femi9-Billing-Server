@@ -27,21 +27,25 @@ $row = mysqli_stmt_get_result($stmt)->fetch_assoc();
 mysqli_stmt_close($stmt);
 
 if (!$row) {
+    wa_po_log_event('invalid_otp_id');
     echo json_encode(['verified' => false, 'reason' => 'invalid_otp_id']);
     exit;
 }
 
 if ((int)$row['verified'] === 1) {
+    wa_po_log_event('already_used');
     echo json_encode(['verified' => false, 'reason' => 'already_used']);
     exit;
 }
 
 if ((int)$row['attempts_used'] >= (int)$row['max_attempts']) {
+    wa_po_log_event('locked');
     echo json_encode(['verified' => false, 'reason' => 'locked', 'message' => 'Maximum attempts reached — please contact support.']);
     exit;
 }
 
 if (strtotime($row['expires_at']) < time()) {
+    wa_po_log_event('expired');
     echo json_encode(['verified' => false, 'reason' => 'expired']);
     exit;
 }
@@ -54,6 +58,7 @@ if (!hash_equals($row['otp_code_hash'], $codeHash)) {
     mysqli_stmt_close($upd);
 
     $remaining = (int)$row['max_attempts'] - ((int)$row['attempts_used'] + 1);
+    wa_po_log_event('incorrect_code (remaining ' . max(0, $remaining) . ')');
     echo json_encode(['verified' => false, 'reason' => 'incorrect_code', 'attempts_remaining' => max(0, $remaining)]);
     exit;
 }
@@ -69,6 +74,7 @@ $userId = (int)$row['user_id'];
 
 $sessionToken = wa_po_create_session($db_conn, $waNumber, $category, $userId);
 
+wa_po_log_event('verified, session created (' . $category . ' user_id ' . $userId . ')');
 echo json_encode([
     'verified' => true,
     'session_token' => $sessionToken,

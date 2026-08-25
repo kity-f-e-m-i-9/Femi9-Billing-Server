@@ -34,6 +34,7 @@ $existing = mysqli_stmt_get_result($existingStmt)->fetch_assoc();
 mysqli_stmt_close($existingStmt);
 
 if ($existing) {
+    wa_po_log_event('idempotent replay (PO ' . $existing['id'] . ')');
     echo json_encode([
         'po_number' => wa_po_format_po_number($existing['id'], $existing['created_at']),
         'status' => 'created',
@@ -131,6 +132,7 @@ try {
 
 $createdAt = date('Y-m-d H:i:s');
 
+wa_po_log_event('PO created (id ' . $poId . ', ' . $category . ' user_id ' . $userId . ', amount ' . $computedTotal . ')');
 echo json_encode([
     'po_number' => wa_po_format_po_number($poId, $createdAt),
     'status' => 'created',

@@ -44,6 +44,7 @@ $statusMap = [
 ];
 $publicStatus = $statusMap[$row['status']] ?? 'pending';
 
+wa_po_log_event('status polled (proof ' . $proofId . ', status ' . $publicStatus . ')');
 echo json_encode([
     'proof_id' => $proofId,
     'status' => $publicStatus,

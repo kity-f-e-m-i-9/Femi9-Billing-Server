@@ -155,6 +155,7 @@ if ($classification['status'] !== 'pending_review') {
 $statusMap = ['pending_review' => 'pending', 'accepted' => 'approved', 'rejected' => 'rejected'];
 $publicStatus = $statusMap[$classification['status']] ?? 'pending';
 
+wa_po_log_event('proof submitted (id ' . $submissionId . ', ' . $category . ' user_id ' . $userId . ', status ' . $publicStatus . ')');
 echo json_encode([
     'proof_id' => 'PRF-' . $submissionId,
     'status' => $publicStatus,

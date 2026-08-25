@@ -56,6 +56,7 @@ $availableBalance = max(0, round($balance - $reserved, 2));
 $withinBalance = $totalAmount <= $availableBalance;
 $balanceAfter = $withinBalance ? round($availableBalance - $totalAmount, 2) : $availableBalance;
 
+wa_po_log_event('cart validated (' . $category . ' user_id ' . $userId . ', total ' . $totalAmount . ', within_balance=' . ($withinBalance ? 'yes' : 'no') . ')');
 echo json_encode([
     'total_amount' => $totalAmount,
     'within_balance' => $withinBalance,

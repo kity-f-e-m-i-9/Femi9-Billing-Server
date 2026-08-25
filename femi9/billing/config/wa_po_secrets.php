@@ -15,5 +15,5 @@
  * This file must stay outside direct web access — see config/.htaccess.
  */
 
-define('WA_PO_API_KEY', '828704fb0a6d4f7e60498bf7da99e50d3f032c3a40648e3a3865c1f1070f5080');
-define('WA_PO_WEBHOOK_SECRET', 'c07f39d469b283812fab46586459f226a7b0d00292ea26d2b0bf1022310edfaa');
+define('WA_PO_API_KEY', 'e34991059a058d6485da971dac2564cc190ff58605e941836d3c100a030c1677');
+define('WA_PO_WEBHOOK_SECRET', '0d05278c8bbca7978a7595b62254318ed6c9f75724b1d8383d78eb715e1e1234');

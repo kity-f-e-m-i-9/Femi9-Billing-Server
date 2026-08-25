@@ -119,11 +119,13 @@ foreach ($linked as $link) {
 }
 
 if (empty($accounts)) {
+    wa_po_log_event('not_found');
     echo json_encode(['match_type' => 'not_found', 'accounts' => []]);
     exit;
 }
 
 if (count($accounts) === 1) {
+    wa_po_log_event('exact (' . $accounts[0]['category'] . ')');
     echo json_encode(['match_type' => 'exact', 'accounts' => $accounts]);
     exit;
 }
@@ -139,6 +141,7 @@ if ($lastRow) {
     $lastUsed = (int)$lastRow['user_id'];
 }
 
+wa_po_log_event('multiple_accounts (' . count($accounts) . ')');
 echo json_encode([
     'match_type' => 'multiple_accounts',
     'accounts' => $accounts,

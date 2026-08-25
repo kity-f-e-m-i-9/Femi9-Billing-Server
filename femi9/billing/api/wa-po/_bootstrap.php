@@ -23,8 +23,82 @@ require_once __DIR__ . '/../../shared/env-loader.php';
 
 header('Content-Type: application/json');
 
+// --- Request/response logging ---------------------------------------------
+// One line per call, written to logs/wa_po_api.log, covering every endpoint
+// automatically (including PHP fatal errors and every wa_po_fail() exit) —
+// hooked at shutdown rather than scattered through each of the 13 endpoint
+// files individually. Mirrors the existing login_attempts.log line format
+// used elsewhere in this app.
+$GLOBALS['wa_po_log_endpoint'] = basename($_SERVER['SCRIPT_NAME'] ?? 'unknown');
+$GLOBALS['wa_po_log_start'] = microtime(true);
+$GLOBALS['wa_po_log_event'] = null;
+
+/**
+ * Lets an endpoint attach a short human-readable outcome/event string to the
+ * log line (e.g. "multiple_accounts (2)", "PO created", "OTP sent") —
+ * analogous to login_attempts.log's "Reason: ..." field. Purely additive;
+ * logging still happens even if no endpoint ever calls this.
+ */
+function wa_po_log_event($event) {
+    $GLOBALS['wa_po_log_event'] = (string)$event;
+}
+
+function wa_po_write_log($statusCode, $responseBody) {
+    $endpoint = $GLOBALS['wa_po_log_endpoint'] ?? 'unknown';
+    $durationMs = round((microtime(true) - ($GLOBALS['wa_po_log_start'] ?? microtime(true))) * 1000);
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '-';
+
+    // Identify the caller from whatever the request body happens to carry,
+    // without assuming a fixed shape (endpoints take different identifiers).
+    $input = $GLOBALS['input'] ?? [];
+    $identifier = $input['wa_number'] ?? $input['identifier'] ?? $input['session_token'] ?? null;
+    if ($identifier === null && isset($input['user_id'])) {
+        $identifier = 'user_id:' . $input['user_id'];
+    }
+    $identifier = $identifier ? (is_string($identifier) && strlen($identifier) > 40 ? substr($identifier, 0, 12) . '...' : $identifier) : '-';
+
+    $event = $GLOBALS['wa_po_log_event'];
+    if ($event === null) {
+        // Fall back to a short excerpt of the response so failures without
+        // an explicit wa_po_log_event() call are still informative.
+        $bodyStr = is_string($responseBody) ? $responseBody : json_encode($responseBody);
+        $event = $bodyStr !== false ? substr($bodyStr, 0, 200) : '-';
+    }
+
+    $line = sprintf(
+        "[%s] %s | Status: %d | Identifier: %s | IP: %s | Duration: %dms | Event: %s\n",
+        date('Y-m-d H:i:s'),
+        $endpoint,
+        $statusCode,
+        $identifier,
+        $ip,
+        $durationMs,
+        $event
+    );
+
+    $logDir = __DIR__ . '/logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    @file_put_contents($logDir . '/wa_po_api.log', $line, FILE_APPEND | LOCK_EX);
+}
+
+register_shutdown_function(function () {
+    $statusCode = http_response_code();
+    $statusCode = $statusCode !== false ? $statusCode : 200;
+
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        wa_po_write_log(500, 'PHP fatal: ' . $error['message'] . ' @ ' . $error['file'] . ':' . $error['line']);
+        return;
+    }
+
+    wa_po_write_log($statusCode, null);
+});
+
 function wa_po_fail($code, $msg) {
     http_response_code($code);
+    wa_po_log_event('FAIL: ' . $msg);
     echo json_encode(['error' => $msg]);
     exit;
 }

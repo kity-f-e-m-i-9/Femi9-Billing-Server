@@ -41,6 +41,7 @@ $balance = max(0, round($balance - $reserved, 2));
 
 date_default_timezone_set('Asia/Kolkata');
 
+wa_po_log_event('balance queried (' . $category . ' user_id ' . $userId . ', ' . $balance . ')');
 echo json_encode([
     'user_id' => $userId,
     'advance_balance' => $balance,

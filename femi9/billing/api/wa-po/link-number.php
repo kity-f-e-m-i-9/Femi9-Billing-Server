@@ -33,4 +33,5 @@ mysqli_stmt_bind_param($ins, 'sis', $category, $userId, $waNumber);
 mysqli_stmt_execute($ins);
 mysqli_stmt_close($ins);
 
+wa_po_log_event('number linked (' . $category . ' user_id ' . $userId . ')');
 echo json_encode(['linked' => true, 'user_id' => $userId, 'wa_number' => $waNumber, 'category' => $category]);

@@ -88,6 +88,7 @@ mysqli_stmt_bind_param($upsert, 'ssi', $waNumber, $cat, $userId);
 mysqli_stmt_execute($upsert);
 mysqli_stmt_close($upsert);
 
+wa_po_log_event('session created (' . $cat . ', user_id ' . $userId . ')');
 echo json_encode([
     'session_token' => $sessionToken,
     'user_id' => $userId,
