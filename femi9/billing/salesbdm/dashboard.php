@@ -103,7 +103,11 @@ $gross_revenue = 0.0; $total_revenue = 0.0; $total_invoices = 0; $total_units = 
 $total_returns = 0; $total_return_amt = 0.0; $total_return_qty = 0.0; $net_units = 0;
 $revenue_growth = 0; $product_sales = []; $returns_by_pid = [];
 $purchaseRows = []; $purchaseReturnByTp = []; $downstreamByTp = []; $downstreamReturnByTp = [];
+$purchaseByTpCat = ['napkin' => [], 'diaper' => []]; $downstreamByTpCat = ['napkin' => [], 'diaper' => []];
 $overall_target = 0.0; $overall_achieved = 0.0; $overall_target_pct = 0; $overall_napkin_sold = 0.0;
+$overall_napkin_purchased = 0.0;
+$overviewByCatDefault = ['amount'=>0,'invoices'=>0,'units'=>0,'return_amt'=>0,'return_count'=>0,'return_qty'=>0,'turnover_amt'=>0,'turnover_qty'=>0,'growth'=>0,'cust_amt'=>0,'cust_cnt'=>0,'cust_qty'=>0,'shop_amt'=>0,'shop_cnt'=>0,'shop_qty'=>0];
+$overviewByCat = ['all' => $overviewByCatDefault, 'napkin' => $overviewByCatDefault, 'diaper' => $overviewByCatDefault];
 
 if ($hasTps) {
     // ═══ Overview — "TP → downstream sales" (TP selling onward to shops/customers) ═══
@@ -158,6 +162,66 @@ if ($hasTps) {
         'ss', [$prev_from, $prev_to]);
     $prev_revenue = (float)($prev_revenue_row['rev'] ?? 0) + (float)($prev_shop_row['rev'] ?? 0) - $prev_return_amt;
     $revenue_growth = $prev_revenue > 0 ? round((($total_revenue - $prev_revenue) / $prev_revenue) * 100, 1) : 0;
+
+    // ═══ Napkin/Diaper split of the Sales/Returns/Total Turnover cards above —
+    // same figures, computed at the invoice-ITEM level (joined to products)
+    // instead of the whole-invoice level, so they can be filtered by
+    // category. Powers the Napkin/Diaper toggle on those 3 cards; the
+    // combined ("All") numbers already computed above are left untouched.
+    $overviewByCat = [];
+    foreach (['napkin' => "AND COALESCE(p.category,'') != 'diaper'", 'diaper' => "AND p.category = 'diaper'"] as $catKey => $catCond) {
+        $custRowC = crow($db_conn,
+            "SELECT COUNT(DISTINCT i.inv_id) cnt, COALESCE(SUM(ii.total),0) amt, COALESCE(SUM(ii.qty),0) qty
+             FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id JOIN products p ON p.id=ii.pr_id
+             WHERE i.user_type='territory_partner' AND i.sub_total>0 AND i.date BETWEEN ? AND ?
+               AND i.user_id IN ($tpIdList) $catCond",
+            'ss', [$from, $to]);
+        $shopRowC = crow($db_conn,
+            "SELECT COUNT(DISTINCT ui.inv_id) cnt, COALESCE(SUM(uii.total),0) amt, COALESCE(SUM(uii.qty),0) qty
+             FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id JOIN products p ON p.id=uii.pr_id
+             WHERE ui.from_user_type='territory_partner' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
+               AND ui.from_user_id IN ($tpIdList) $catCond",
+            'ss', [$from, $to]);
+        $invoicesC = (int)$custRowC['cnt'] + (int)$shopRowC['cnt'];
+        $unitsC    = (int)$custRowC['qty'] + (int)$shopRowC['qty'];
+        $revenueC  = (float)$custRowC['amt'] + (float)$shopRowC['amt'];
+
+        $returnRowC = crow($db_conn,
+            "SELECT COUNT(DISTINCT uri.returnid) cnt, COALESCE(SUM(uri.total),0) amt, COALESCE(SUM(uri.qty),0) qty
+             FROM user_return_stock_items uri
+             JOIN user_return_stock ur ON ur.returnid = uri.returnid
+             JOIN products p ON p.id = uri.prid
+             WHERE ur.to_usertype='territory_partner' AND ur.to_userid IN ($tpIdList) AND uri.date BETWEEN ? AND ? $catCond",
+            'ss', [$from, $to]);
+        $returnCountC = (int)$returnRowC['cnt'];
+        $returnAmtC   = (float)$returnRowC['amt'];
+        $returnQtyC   = (float)$returnRowC['qty'];
+
+        $prevCustRowC = crow($db_conn,
+            "SELECT COALESCE(SUM(ii.total),0) amt FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id JOIN products p ON p.id=ii.pr_id
+             WHERE i.user_type='territory_partner' AND i.sub_total>0 AND i.date BETWEEN ? AND ? AND i.user_id IN ($tpIdList) $catCond",
+            'ss', [$prev_from, $prev_to]);
+        $prevShopRowC = crow($db_conn,
+            "SELECT COALESCE(SUM(uii.total),0) amt FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id JOIN products p ON p.id=uii.pr_id
+             WHERE ui.from_user_type='territory_partner' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ? AND ui.from_user_id IN ($tpIdList) $catCond",
+            'ss', [$prev_from, $prev_to]);
+        $prevReturnAmtC = (float)cval($db_conn,
+            "SELECT COALESCE(SUM(uri.total),0) FROM user_return_stock_items uri
+             JOIN user_return_stock ur ON ur.returnid = uri.returnid JOIN products p ON p.id = uri.prid
+             WHERE ur.to_usertype='territory_partner' AND ur.to_userid IN ($tpIdList) AND uri.date BETWEEN ? AND ? $catCond",
+            'ss', [$prev_from, $prev_to]);
+        $prevNetC = (float)($prevCustRowC['amt'] ?? 0) + (float)($prevShopRowC['amt'] ?? 0) - $prevReturnAmtC;
+        $netC = $revenueC - $returnAmtC;
+        $growthC = $prevNetC > 0 ? round((($netC - $prevNetC) / $prevNetC) * 100, 1) : 0;
+
+        $overviewByCat[$catKey] = [
+            'amount' => $revenueC, 'invoices' => $invoicesC, 'units' => $unitsC,
+            'return_amt' => $returnAmtC, 'return_count' => $returnCountC, 'return_qty' => $returnQtyC,
+            'turnover_amt' => $netC, 'turnover_qty' => $unitsC - $returnQtyC, 'growth' => $growthC,
+            'cust_amt' => (float)$custRowC['amt'], 'cust_cnt' => (int)$custRowC['cnt'], 'cust_qty' => (int)$custRowC['qty'],
+            'shop_amt' => (float)$shopRowC['amt'], 'shop_cnt' => (int)$shopRowC['cnt'], 'shop_qty' => (int)$shopRowC['qty'],
+        ];
+    }
 
     // ═══ District Total Target — every Firka's target_amount within this
     // BDM's assigned districts, regardless of whether that Firka currently
@@ -284,26 +348,38 @@ if ($hasTps) {
         'ss', [$from, $to]);
     $overall_napkin_sold = $napkin_sold_cust + $napkin_sold_shop;
 
+    // How much Napkin these TPs bought FROM the company (tp_invoices) in the
+    // range — distinct from the advance payment (money in) and from Napkin
+    // Sold (downstream resale) above. Same Napkin-only filter, same query
+    // shape as "Purchases from Company" below ($napkinPurchaseByTp).
+    $overall_napkin_purchased = (float)cval($db_conn,
+        "SELECT COALESCE(SUM(tii.amount),0) FROM tp_invoice_items tii
+         JOIN tp_invoices ti ON ti.id=tii.tp_invoice_id JOIN products p ON p.id=tii.product_id
+         WHERE ti.territory_partner_id IN ($tpIdList) AND ti.invoice_date BETWEEN ? AND ?
+           AND COALESCE(p.category,'') != 'diaper'",
+        'ss', [$from, $to]);
+
     // ═══ Products — downstream sold + returned, across all assigned TPs ═══
     // Split by channel (Customer via `invoice`, Shop via `user_invoice`) so the
     // Products table can show a Customer/Shop breakdown per product.
     $product_sales_cust = call_rows($db_conn,
-        "SELECT p.id pid, p.productName, COALESCE(SUM(ii.qty),0) qty, COALESCE(SUM(ii.total),0) rev
+        "SELECT p.id pid, p.productName, COALESCE(p.category,'') category, COALESCE(SUM(ii.qty),0) qty, COALESCE(SUM(ii.total),0) rev
          FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id JOIN products p ON p.id=ii.pr_id
          WHERE i.user_type='territory_partner' AND i.date BETWEEN ? AND ? AND i.user_id IN ($tpIdList)
-         GROUP BY p.id, p.productName",
+         GROUP BY p.id, p.productName, p.category",
         'ss', [$from, $to]);
     $product_sales_shop = call_rows($db_conn,
-        "SELECT p.id pid, p.productName, COALESCE(SUM(uii.qty),0) qty, COALESCE(SUM(uii.total),0) rev
+        "SELECT p.id pid, p.productName, COALESCE(p.category,'') category, COALESCE(SUM(uii.qty),0) qty, COALESCE(SUM(uii.total),0) rev
          FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id JOIN products p ON p.id=uii.pr_id
          WHERE ui.from_user_type='territory_partner' AND ui.date BETWEEN ? AND ? AND ui.from_user_id IN ($tpIdList)
-         GROUP BY p.id, p.productName",
+         GROUP BY p.id, p.productName, p.category",
         'ss', [$from, $to]);
     $product_sales_map = [];
     foreach ($product_sales_cust as $r) {
         $pid = (int)$r['pid'];
         $product_sales_map[$pid]['pid'] = $pid;
         $product_sales_map[$pid]['productName'] = $r['productName'];
+        $product_sales_map[$pid]['category'] = $r['category'] === 'diaper' ? 'diaper' : 'napkin';
         $product_sales_map[$pid]['cust_qty'] = (float)$r['qty'];
         $product_sales_map[$pid]['cust_rev'] = (float)$r['rev'];
         $product_sales_map[$pid]['total_qty'] = ($product_sales_map[$pid]['total_qty'] ?? 0) + (float)$r['qty'];
@@ -313,6 +389,7 @@ if ($hasTps) {
         $pid = (int)$r['pid'];
         $product_sales_map[$pid]['pid'] = $pid;
         $product_sales_map[$pid]['productName'] = $r['productName'];
+        $product_sales_map[$pid]['category'] = $r['category'] === 'diaper' ? 'diaper' : 'napkin';
         $product_sales_map[$pid]['shop_qty'] = (float)$r['qty'];
         $product_sales_map[$pid]['shop_rev'] = (float)$r['rev'];
         $product_sales_map[$pid]['total_qty'] = ($product_sales_map[$pid]['total_qty'] ?? 0) + (float)$r['qty'];
@@ -353,6 +430,14 @@ if ($hasTps) {
     $total_return_qty = (float)array_sum(array_column($returns_by_pid, 'qty'));
     $net_units = $total_units - $total_return_qty;
 
+    $overviewByCat['all'] = [
+        'amount' => $gross_revenue, 'invoices' => $total_invoices, 'units' => $total_units,
+        'return_amt' => $total_return_amt, 'return_count' => $total_returns, 'return_qty' => $total_return_qty,
+        'turnover_amt' => $total_revenue, 'turnover_qty' => $net_units, 'growth' => $revenue_growth,
+        'cust_amt' => (float)($cust_row['rev'] ?? 0), 'cust_cnt' => (int)($cust_row['cnt'] ?? 0), 'cust_qty' => $cust_units,
+        'shop_amt' => (float)($shop_row['rev'] ?? 0), 'shop_cnt' => (int)($shop_row['cnt'] ?? 0), 'shop_qty' => $shop_units,
+    ];
+
     // ═══ "Purchases from Company" — per assigned TP ═══
     // Includes purchases billed by either Company or a Super Stockist —
     // both are "upstream of the TP" from a Sales BDM's point of view.
@@ -386,6 +471,22 @@ if ($hasTps) {
          GROUP BY ti.territory_partner_id",
         'ss', [$from, $to]);
     foreach ($napkinPurchaseRows as $r) { $napkinPurchaseByTp[(int)$r['tp_id']] = (float)$r['amt']; }
+
+    // Napkin/Diaper split of "Qty Purchased"/"Value Purchased" per TP —
+    // powers the Napkin/Diaper toggle on "Purchases from Company" below.
+    $purchaseByTpCat = ['napkin' => [], 'diaper' => []];
+    foreach (['napkin' => "AND COALESCE(p.category,'') != 'diaper'", 'diaper' => "AND p.category = 'diaper'"] as $catKey => $catCond) {
+        $pRows = call_rows($db_conn,
+            "SELECT ti.territory_partner_id tp_id, COALESCE(SUM(tii.quantity),0) qty, COALESCE(SUM(tii.amount),0) amt
+             FROM tp_invoice_items tii JOIN tp_invoices ti ON ti.id=tii.tp_invoice_id
+             JOIN products p ON p.id = tii.product_id
+             WHERE ti.territory_partner_id IN ($tpIdList) AND ti.invoice_date BETWEEN ? AND ? $catCond
+             GROUP BY ti.territory_partner_id",
+            'ss', [$from, $to]);
+        foreach ($pRows as $r) {
+            $purchaseByTpCat[$catKey][(int)$r['tp_id']] = ['qty' => (float)$r['qty'], 'amt' => (float)$r['amt']];
+        }
+    }
 
     // Per-TP Firka/location name + target amount — same join pattern as the
     // page-wide $overall_target calc, just grouped per TP instead of summed.
@@ -430,6 +531,36 @@ if ($hasTps) {
         $downstreamByTp[$tid]['qty'] = ($downstreamByTp[$tid]['qty'] ?? 0) + (float)$r['qty'];
         $downstreamByTp[$tid]['shop_rev'] = (float)$r['rev'];
         $downstreamByTp[$tid]['shop_qty'] = (float)$r['qty'];
+    }
+
+    // Napkin/Diaper split of the same per-TP downstream figures — item-level
+    // (joined to products), powers the Napkin/Diaper toggle on "Your Sales
+    // via TP" below. Row list itself never changes with the toggle, only
+    // these two numbers per row.
+    $downstreamByTpCat = ['napkin' => [], 'diaper' => []];
+    foreach (['napkin' => "AND COALESCE(p.category,'') != 'diaper'", 'diaper' => "AND p.category = 'diaper'"] as $catKey => $catCond) {
+        $dCustRows = call_rows($db_conn,
+            "SELECT i.user_id tp_id, COALESCE(SUM(ii.total),0) rev, COALESCE(SUM(ii.qty),0) qty
+             FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id JOIN products p ON p.id=ii.pr_id
+             WHERE i.user_type='territory_partner' AND i.sub_total>0 AND i.date BETWEEN ? AND ? AND i.user_id IN ($tpIdList) $catCond
+             GROUP BY i.user_id",
+            'ss', [$from, $to]);
+        $dShopRows = call_rows($db_conn,
+            "SELECT ui.from_user_id tp_id, COALESCE(SUM(uii.total),0) rev, COALESCE(SUM(uii.qty),0) qty
+             FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id JOIN products p ON p.id=uii.pr_id
+             WHERE ui.from_user_type='territory_partner' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ? AND ui.from_user_id IN ($tpIdList) $catCond
+             GROUP BY ui.from_user_id",
+            'ss', [$from, $to]);
+        foreach ($dCustRows as $r) {
+            $tid = (int)$r['tp_id'];
+            $downstreamByTpCat[$catKey][$tid]['rev'] = ($downstreamByTpCat[$catKey][$tid]['rev'] ?? 0) + (float)$r['rev'];
+            $downstreamByTpCat[$catKey][$tid]['qty'] = ($downstreamByTpCat[$catKey][$tid]['qty'] ?? 0) + (float)$r['qty'];
+        }
+        foreach ($dShopRows as $r) {
+            $tid = (int)$r['tp_id'];
+            $downstreamByTpCat[$catKey][$tid]['rev'] = ($downstreamByTpCat[$catKey][$tid]['rev'] ?? 0) + (float)$r['rev'];
+            $downstreamByTpCat[$catKey][$tid]['qty'] = ($downstreamByTpCat[$catKey][$tid]['qty'] ?? 0) + (float)$r['qty'];
+        }
     }
 
     $downstreamReturnRows = call_rows($db_conn,
@@ -651,61 +782,14 @@ if ($hasTps) {
                         </div>
                     </div>
 
-                    <!-- ══ Overview — Sales / Returns / Total Turnover (your TPs' downstream sales) ══ -->
+                    <!-- ══ Overview — District Total Target / Payment, then Sales / Returns / Total Turnover ══ -->
                     <div class="mis-section" id="sec-overview">
-                    <h3 style="font-size:16px;font-weight:700;margin:6px 0 8px;">Overview — Your TPs' Downstream Sales</h3>
-                    <div class="equation-row">
-                        <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
-                            <i class="material-icons-outlined kpi-ico">payments</i>
-                            <div class="kpi-t">Sales</div>
-                            <div class="kpi-multi">
-                                <div><span>Amount</span><b>&#8377;<?php echo inr_format($gross_revenue, 0); ?></b></div>
-                                <div><span>Invoices</span><b><?php echo inr_format($total_invoices, 0); ?></b></div>
-                                <div><span>Units</span><b><?php echo inr_format($total_units, 0); ?></b></div>
-                            </div>
-                        </div>
-                        <div class="equation-op">&minus;</div>
-                        <div class="kpi-card" style="--kpi-accent:var(--critical);--kpi-tint:var(--critical-tint);">
-                            <i class="material-icons-outlined kpi-ico">keyboard_return</i>
-                            <div class="kpi-t">Returns</div>
-                            <div class="kpi-multi">
-                                <div><span>Amount</span><b>&#8377;<?php echo inr_format($total_return_amt, 0); ?></b></div>
-                                <div><span>Returns</span><b><?php echo inr_format($total_returns, 0); ?></b></div>
-                                <div><span>Quantity</span><b><?php echo inr_format($total_return_qty, 0); ?></b></div>
-                            </div>
-                        </div>
-                        <div class="equation-op eq">=</div>
-                        <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
-                            <i class="material-icons-outlined kpi-ico">account_balance_wallet</i>
-                            <div class="kpi-t">Total Turnover</div>
-                            <div class="kpi-multi">
-                                <div><span>Amount</span><b>&#8377;<?php echo inr_format($total_revenue, 0); ?></b></div>
-                                <div><span>Quantity</span><b><?php echo inr_format($net_units, 0); ?></b></div>
-                                <div><span>vs Prev Period</span><b style="color:<?php echo $revenue_growth>=0?'var(--good)':'var(--critical)'; ?>"><?php echo ($revenue_growth>=0?'&#9650; ':'&#9660; ').abs($revenue_growth).'%'; ?></b></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ══ Overall Target % — Firka targets assigned to your TPs vs their achieved sales ══ -->
                     <?php
                         $tgtAccent = $overall_target_pct >= 100 ? 'var(--good)' : ($overall_target_pct >= 50 ? '#eab308' : 'var(--critical)');
-                        $tgtTint   = $overall_target_pct >= 100 ? 'var(--good-tint)' : ($overall_target_pct >= 50 ? '#fef9c3' : 'var(--critical-tint)');
                     ?>
+                    <?php $overall_available_advance = $overall_achieved - $overall_napkin_purchased; ?>
                     <div class="row mb-3">
-                        <div class="col-md-5 col-sm-12">
-                            <div class="kpi-card" style="--kpi-accent:<?php echo $tgtAccent; ?>;--kpi-tint:<?php echo $tgtTint; ?>;">
-                                <i class="material-icons-outlined kpi-ico">flag</i>
-                                <div class="kpi-t">Overall Target %</div>
-                                <div class="kpi-multi">
-                                    <div><span>Advance Paid</span><b>&#8377;<?php echo inr_format($overall_achieved, 0); ?></b></div>
-                                    <div><span>Napkin Sold</span><b>&#8377;<?php echo inr_format($overall_napkin_sold, 0); ?></b></div>
-                                    <div><span>Target</span><b>&#8377;<?php echo inr_format($overall_target, 0); ?></b></div>
-                                    <div><span>%</span><b style="color:<?php echo $tgtAccent; ?>;"><?php echo $overall_target_pct; ?>%</b></div>
-                                </div>
-                                <p class="snote" style="margin:6px 0 0;">% is based on Napkin advance payments received in this date range. "Napkin Sold" is shown alongside for reference only. Lumi Baby Diaper doesn't count toward the Firka target either way.</p>
-                            </div>
-                        </div>
-                        <div class="col-md-5 col-sm-12">
+                        <div class="col-md-6 col-sm-12">
                             <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
                                 <i class="material-icons-outlined kpi-ico">map</i>
                                 <div class="kpi-t">District Total Target</div>
@@ -718,7 +802,140 @@ if ($hasTps) {
                                 <p class="snote" style="margin:6px 0 0;">Includes every Firka's target in your assigned districts — even ones with no TP, or an inactive TP.</p>
                             </div>
                         </div>
+                        <div class="col-md-6 col-sm-12">
+                            <div class="kpi-card" style="--kpi-accent:#8b5cf6;--kpi-tint:#ede9fe;">
+                                <i class="material-icons-outlined kpi-ico">payments</i>
+                                <div class="kpi-t">Payment</div>
+                                <div class="kpi-multi">
+                                    <div><span>Total Target Amount</span><b>&#8377;<?php echo inr_format($overall_target, 0); ?></b></div>
+                                    <div><span>Advance Payment</span><b>&#8377;<?php echo inr_format($overall_achieved, 0); ?></b></div>
+                                    <div><span>%</span><b style="color:<?php echo $tgtAccent; ?>;"><?php echo $overall_target_pct; ?>%</b></div>
+                                    <div><span>Napkin Purchase</span><b>&#8377;<?php echo inr_format($overall_napkin_purchased, 0); ?></b></div>
+                                    <div><span>Available Advance Payment</span><b>&#8377;<?php echo inr_format($overall_available_advance, 0); ?></b></div>
+                                </div>
+                                <p class="snote" style="margin:6px 0 0;">% is Advance Payment against Total Target Amount. Available Advance Payment = Advance Payment received minus Napkin Purchase already invoiced, in this date range.</p>
+                            </div>
+                        </div>
                     </div>
+
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:6px 0 8px;">
+                        <h3 style="font-size:16px;font-weight:700;margin:0;">Overview — Your TPs' Downstream Sales</h3>
+                        <div id="overviewCatToggle" style="display:flex;gap:6px;">
+                            <button type="button" class="ov-cat-btn active" data-cat="all">All</button>
+                            <button type="button" class="ov-cat-btn" data-cat="napkin">Napkin</button>
+                            <button type="button" class="ov-cat-btn" data-cat="diaper">Diaper</button>
+                        </div>
+                    </div>
+                    <style>
+                        .ov-cat-btn { padding:5px 14px; border-radius:20px; border:1.5px solid var(--blue); color:var(--blue); background:#fff; font-size:12px; font-weight:600; cursor:pointer; }
+                        .ov-cat-btn.active { background:var(--blue); color:#fff; }
+                    </style>
+                    <div class="equation-row">
+                        <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
+                            <i class="material-icons-outlined kpi-ico">payments</i>
+                            <div class="kpi-t">Sales</div>
+                            <div class="kpi-multi">
+                                <div><span>Amount</span><b>&#8377;<span id="ovSalesAmt"><?php echo inr_format($gross_revenue, 0); ?></span></b></div>
+                                <div><span>Invoices</span><b><span id="ovSalesInv"><?php echo inr_format($total_invoices, 0); ?></span></b></div>
+                                <div><span>Units</span><b><span id="ovSalesUnits"><?php echo inr_format($total_units, 0); ?></span></b></div>
+                            </div>
+                        </div>
+                        <div class="equation-op">&minus;</div>
+                        <div class="kpi-card" style="--kpi-accent:var(--critical);--kpi-tint:var(--critical-tint);">
+                            <i class="material-icons-outlined kpi-ico">keyboard_return</i>
+                            <div class="kpi-t">Returns</div>
+                            <div class="kpi-multi">
+                                <div><span>Amount</span><b>&#8377;<span id="ovRetAmt"><?php echo inr_format($total_return_amt, 0); ?></span></b></div>
+                                <div><span>Returns</span><b><span id="ovRetCount"><?php echo inr_format($total_returns, 0); ?></span></b></div>
+                                <div><span>Quantity</span><b><span id="ovRetQty"><?php echo inr_format($total_return_qty, 0); ?></span></b></div>
+                            </div>
+                        </div>
+                        <div class="equation-op eq">=</div>
+                        <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
+                            <i class="material-icons-outlined kpi-ico">account_balance_wallet</i>
+                            <div class="kpi-t">Total Turnover</div>
+                            <div class="kpi-multi">
+                                <div><span>Amount</span><b>&#8377;<span id="ovTurnAmt"><?php echo inr_format($total_revenue, 0); ?></span></b></div>
+                                <div><span>Quantity</span><b><span id="ovTurnQty"><?php echo inr_format($net_units, 0); ?></span></b></div>
+                                <div><span>vs Prev Period</span><b id="ovGrowthWrap" style="color:<?php echo $revenue_growth>=0?'var(--good)':'var(--critical)'; ?>"><span id="ovGrowthArrow"><?php echo $revenue_growth>=0?'&#9650;':'&#9660;'; ?></span> <span id="ovGrowth"><?php echo abs($revenue_growth); ?></span>%</b></div>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                    (function () {
+                        // One global Napkin/Diaper/All category — every toggle button on this
+                        // page (Overview, Products, Purchases from Company, Your Sales via TP,
+                        // Downstream Sales Customer vs Shop) is a mirror of the same control;
+                        // clicking any of them re-renders every section together.
+                        var ovData = <?php echo json_encode($overviewByCat); ?>;
+                        function fmt(n) { return Math.round(n).toLocaleString('en-IN'); }
+
+                        function renderOverview(cat) {
+                            var d = ovData[cat];
+                            if (!d) return;
+                            document.getElementById('ovSalesAmt').textContent = fmt(d.amount);
+                            document.getElementById('ovSalesInv').textContent = fmt(d.invoices);
+                            document.getElementById('ovSalesUnits').textContent = fmt(d.units);
+                            document.getElementById('ovRetAmt').textContent = fmt(d.return_amt);
+                            document.getElementById('ovRetCount').textContent = fmt(d.return_count);
+                            document.getElementById('ovRetQty').textContent = fmt(d.return_qty);
+                            document.getElementById('ovTurnAmt').textContent = fmt(d.turnover_amt);
+                            document.getElementById('ovTurnQty').textContent = fmt(d.turnover_qty);
+                            document.getElementById('ovGrowth').textContent = Math.abs(d.growth);
+                            document.getElementById('ovGrowthArrow').innerHTML = d.growth >= 0 ? '&#9650;' : '&#9660;';
+                            document.getElementById('ovGrowthWrap').style.color = d.growth >= 0 ? 'var(--good)' : 'var(--critical)';
+
+                            var cvs = {
+                                cvsCustAmt: d.cust_amt.toFixed(2), cvsCustCnt: fmt(d.cust_cnt), cvsCustQty: fmt(d.cust_qty),
+                                cvsShopAmt: d.shop_amt.toFixed(2), cvsShopCnt: fmt(d.shop_cnt), cvsShopQty: fmt(d.shop_qty),
+                                cvsTotalAmt: d.amount.toFixed(2), cvsTotalCnt: fmt(d.invoices), cvsTotalQty: fmt(d.units)
+                            };
+                            Object.keys(cvs).forEach(function (id) {
+                                var el = document.getElementById(id);
+                                if (el) el.textContent = cvs[id];
+                            });
+                        }
+
+                        function renderProducts(cat) {
+                            document.querySelectorAll('#productsCatTable tbody tr[data-cat]').forEach(function (tr) {
+                                tr.style.display = (cat === 'all' || tr.getAttribute('data-cat') === cat) ? '' : 'none';
+                            });
+                        }
+
+                        function renderByCatCells(selector, cat) {
+                            document.querySelectorAll(selector).forEach(function (td) {
+                                var raw = td.getAttribute('data-by-cat');
+                                if (!raw) return;
+                                var d = JSON.parse(raw);
+                                var val = d[cat] || 0;
+                                var prefix = td.classList.contains('pc-amt') || td.classList.contains('ys-rev') ? '₹' : '';
+                                var decimals = (td.classList.contains('pc-amt') || td.classList.contains('ys-rev')) ? 2 : 0;
+                                var text = prefix + Number(val).toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+                                if (td.querySelector('b')) { td.querySelector('b').textContent = text; }
+                                else { td.textContent = text; }
+                            });
+                        }
+
+                        function renderAll(cat) {
+                            renderOverview(cat);
+                            renderProducts(cat);
+                            renderByCatCells('#purchasesCatTable .pc-qty', cat);
+                            renderByCatCells('#purchasesCatTable .pc-amt', cat);
+                            renderByCatCells('#yourSalesCatTable .ys-qty', cat);
+                            renderByCatCells('#yourSalesCatTable .ys-rev', cat);
+                        }
+
+                        document.addEventListener('click', function (e) {
+                            var btn = e.target.closest('.ov-cat-btn');
+                            if (!btn) return;
+                            var cat = btn.getAttribute('data-cat');
+                            document.querySelectorAll('.ov-cat-btn').forEach(function (b) {
+                                b.classList.toggle('active', b.getAttribute('data-cat') === cat);
+                            });
+                            renderAll(cat);
+                        });
+                    })();
+                    </script>
 
                     </div><!-- /#sec-overview -->
 
@@ -727,9 +944,16 @@ if ($hasTps) {
                     <div class="row mb-3">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title" style="margin:0;font-size:14px;">Products — Downstream Sales &amp; Returns</h5></div>
+                                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                                    <h5 class="card-title" style="margin:0;font-size:14px;">Products — Downstream Sales &amp; Returns</h5>
+                                    <div class="ov-cat-mirror" style="display:flex;gap:6px;">
+                                        <button type="button" class="ov-cat-btn active" data-cat="all">All</button>
+                                        <button type="button" class="ov-cat-btn" data-cat="napkin">Napkin</button>
+                                        <button type="button" class="ov-cat-btn" data-cat="diaper">Diaper</button>
+                                    </div>
+                                </div>
                                 <div class="card-body" style="overflow-x:auto;">
-                                    <table class="mt">
+                                    <table class="mt" id="productsCatTable">
                                         <thead>
                                             <tr>
                                                 <th>Product</th>
@@ -754,7 +978,7 @@ if ($hasTps) {
                                             $pid = (int)$ps['pid'];
                                             $ret = $returns_by_pid[$pid] ?? ['qty' => 0, 'amt' => 0, 'cust_qty' => 0, 'cust_amt' => 0, 'shop_qty' => 0, 'shop_amt' => 0];
                                         ?>
-                                            <tr>
+                                            <tr data-cat="<?php echo htmlspecialchars($ps['category']); ?>">
                                                 <td><?php echo htmlspecialchars($ps['productName']); ?></td>
                                                 <td class="col-cust-qty" style="display:none;"><?php echo inr_format($ps['cust_qty'] ?? 0, 0); ?></td>
                                                 <td class="col-shop-qty" style="display:none;"><?php echo inr_format($ps['shop_qty'] ?? 0, 0); ?></td>
@@ -783,10 +1007,17 @@ if ($hasTps) {
                     <div class="row mb-3">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title" style="margin:0;font-size:14px;">Purchases from Company — by TP</h5></div>
+                                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                                    <h5 class="card-title" style="margin:0;font-size:14px;">Purchases from Company — by TP</h5>
+                                    <div class="ov-cat-mirror" style="display:flex;gap:6px;">
+                                        <button type="button" class="ov-cat-btn active" data-cat="all">All</button>
+                                        <button type="button" class="ov-cat-btn" data-cat="napkin">Napkin</button>
+                                        <button type="button" class="ov-cat-btn" data-cat="diaper">Diaper</button>
+                                    </div>
+                                </div>
                                 <div class="card-body" style="overflow-x:auto;">
-                                    <p class="snote">Hover a TP name to see their product-wise purchase &amp; return breakdown. Achievement/Balance count Napkin products only &mdash; Lumi Baby Diaper purchases don't count toward the Firka target.</p>
-                                    <table class="mt">
+                                    <p class="snote">Hover a TP name to see their product-wise purchase &amp; return breakdown. Achievement/Balance count Napkin products only &mdash; Lumi Baby Diaper purchases don't count toward the Firka target. Qty/Value Purchased follow the Napkin/Diaper toggle above.</p>
+                                    <table class="mt" id="purchasesCatTable">
                                         <thead><tr><th>TP</th><th>District (Firka)</th><th>Qty Purchased</th><th>Value Purchased</th><th>Qty Returned to Company</th><th>Target Amount</th><th>Achievement</th><th>Balance</th></tr></thead>
                                         <tbody>
                                         <?php if (empty($purchaseRows)): ?>
@@ -799,12 +1030,14 @@ if ($hasTps) {
                                             $tp_pct = $tp_target > 0 ? min(round($tp_napkin_amt / $tp_target * 100, 1), 999) : 0;
                                             $tp_bc = $tp_pct >= 100 ? 'var(--good)' : ($tp_pct >= 50 ? '#eab308' : 'var(--critical)');
                                             $tp_balance = $tp_target - $tp_napkin_amt;
+                                            $pcQtyByCat = json_encode(['all' => (float)$pr['qty'], 'napkin' => $purchaseByTpCat['napkin'][$tid]['qty'] ?? 0, 'diaper' => $purchaseByTpCat['diaper'][$tid]['qty'] ?? 0]);
+                                            $pcAmtByCat = json_encode(['all' => (float)$pr['amt'], 'napkin' => $purchaseByTpCat['napkin'][$tid]['amt'] ?? 0, 'diaper' => $purchaseByTpCat['diaper'][$tid]['amt'] ?? 0]);
                                         ?>
                                             <tr>
                                                 <td><span class="tp-name-cell" data-tp-id="<?php echo $tid; ?>" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true" data-type="purchase"><?php echo htmlspecialchars($tname); ?></span></td>
                                                 <td style="font-size:12px;color:#666;"><?php echo htmlspecialchars($tpLocByTp[$tid] ?? '—'); ?></td>
-                                                <td><?php echo inr_format($pr['qty'], 0); ?></td>
-                                                <td>&#8377;<?php echo inr_format($pr['amt'], 2); ?></td>
+                                                <td class="pc-qty" data-by-cat='<?php echo $pcQtyByCat; ?>'><?php echo inr_format($pr['qty'], 0); ?></td>
+                                                <td class="pc-amt" data-by-cat='<?php echo $pcAmtByCat; ?>'>&#8377;<?php echo inr_format($pr['amt'], 2); ?></td>
                                                 <td><?php echo inr_format($purchaseReturnByTp[$tid] ?? 0, 0); ?></td>
                                                 <td><?php echo $tp_target > 0 ? '&#8377;' . inr_format($tp_target, 0) : '—'; ?></td>
                                                 <td>
@@ -833,28 +1066,35 @@ if ($hasTps) {
                     <div class="row mb-3">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title" style="margin:0;font-size:14px;">Downstream Sales — Customer vs Shop</h5></div>
+                                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                                    <h5 class="card-title" style="margin:0;font-size:14px;">Downstream Sales — Customer vs Shop</h5>
+                                    <div class="ov-cat-mirror" style="display:flex;gap:6px;">
+                                        <button type="button" class="ov-cat-btn active" data-cat="all">All</button>
+                                        <button type="button" class="ov-cat-btn" data-cat="napkin">Napkin</button>
+                                        <button type="button" class="ov-cat-btn" data-cat="diaper">Diaper</button>
+                                    </div>
+                                </div>
                                 <div class="card-body" style="overflow-x:auto;">
                                     <table class="mt">
                                         <thead><tr><th>Channel</th><th>Amount</th><th>Invoices</th><th>Units</th></tr></thead>
                                         <tbody>
                                             <tr>
                                                 <td>Customer</td>
-                                                <td>&#8377;<?php echo inr_format((float)($cust_row['rev'] ?? 0), 2); ?></td>
-                                                <td><?php echo inr_format((int)($cust_row['cnt'] ?? 0), 0); ?></td>
-                                                <td><?php echo inr_format($cust_units, 0); ?></td>
+                                                <td>&#8377;<span id="cvsCustAmt"><?php echo inr_format((float)($cust_row['rev'] ?? 0), 2); ?></span></td>
+                                                <td><span id="cvsCustCnt"><?php echo inr_format((int)($cust_row['cnt'] ?? 0), 0); ?></span></td>
+                                                <td><span id="cvsCustQty"><?php echo inr_format($cust_units, 0); ?></span></td>
                                             </tr>
                                             <tr>
                                                 <td>Shop</td>
-                                                <td>&#8377;<?php echo inr_format((float)($shop_row['rev'] ?? 0), 2); ?></td>
-                                                <td><?php echo inr_format((int)($shop_row['cnt'] ?? 0), 0); ?></td>
-                                                <td><?php echo inr_format($shop_units, 0); ?></td>
+                                                <td>&#8377;<span id="cvsShopAmt"><?php echo inr_format((float)($shop_row['rev'] ?? 0), 2); ?></span></td>
+                                                <td><span id="cvsShopCnt"><?php echo inr_format((int)($shop_row['cnt'] ?? 0), 0); ?></span></td>
+                                                <td><span id="cvsShopQty"><?php echo inr_format($shop_units, 0); ?></span></td>
                                             </tr>
                                             <tr style="font-weight:700;border-top:2px solid var(--gridline);">
                                                 <td>Total</td>
-                                                <td>&#8377;<?php echo inr_format($gross_revenue, 2); ?></td>
-                                                <td><?php echo inr_format($total_invoices, 0); ?></td>
-                                                <td><?php echo inr_format($total_units, 0); ?></td>
+                                                <td>&#8377;<span id="cvsTotalAmt"><?php echo inr_format($gross_revenue, 2); ?></span></td>
+                                                <td><span id="cvsTotalCnt"><?php echo inr_format($total_invoices, 0); ?></span></td>
+                                                <td><span id="cvsTotalQty"><?php echo inr_format($total_units, 0); ?></span></td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -867,10 +1107,17 @@ if ($hasTps) {
                     <div class="row mb-3">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header"><h5 class="card-title" style="margin:0;font-size:14px;">Your Sales via TP — Downstream</h5></div>
+                                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                                    <h5 class="card-title" style="margin:0;font-size:14px;">Your Sales via TP — Downstream</h5>
+                                    <div class="ov-cat-mirror" style="display:flex;gap:6px;">
+                                        <button type="button" class="ov-cat-btn active" data-cat="all">All</button>
+                                        <button type="button" class="ov-cat-btn" data-cat="napkin">Napkin</button>
+                                        <button type="button" class="ov-cat-btn" data-cat="diaper">Diaper</button>
+                                    </div>
+                                </div>
                                 <div class="card-body" style="overflow-x:auto;">
-                                    <p class="snote">Hover a TP name to see their product-wise downstream sales &amp; return breakdown.</p>
-                                    <table class="mt">
+                                    <p class="snote">Hover a TP name to see their product-wise downstream sales &amp; return breakdown. Total Qty/Value follow the Napkin/Diaper toggle above.</p>
+                                    <table class="mt" id="yourSalesCatTable">
                                         <thead>
                                             <tr>
                                                 <th>TP</th>
@@ -890,6 +1137,8 @@ if ($hasTps) {
                                         <?php else: foreach ($downstreamByTp as $tid => $d):
                                             $tname = $tpNameMap[$tid] ?? ('TP #' . $tid);
                                             $dret = $downstreamReturnByTp[$tid] ?? ['qty' => 0, 'amt' => 0];
+                                            $ysQtyByCat = json_encode(['all' => (float)$d['qty'], 'napkin' => $downstreamByTpCat['napkin'][$tid]['qty'] ?? 0, 'diaper' => $downstreamByTpCat['diaper'][$tid]['qty'] ?? 0]);
+                                            $ysRevByCat = json_encode(['all' => (float)$d['rev'], 'napkin' => $downstreamByTpCat['napkin'][$tid]['rev'] ?? 0, 'diaper' => $downstreamByTpCat['diaper'][$tid]['rev'] ?? 0]);
                                         ?>
                                             <tr>
                                                 <td><span class="tp-name-cell" data-tp-id="<?php echo $tid; ?>" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true" data-type="downstream"><?php echo htmlspecialchars($tname); ?></span></td>
@@ -897,8 +1146,8 @@ if ($hasTps) {
                                                 <td class="col-cust-value" style="display:none;">&#8377;<?php echo inr_format($d['cust_rev'] ?? 0, 2); ?></td>
                                                 <td><?php echo inr_format($d['shop_qty'] ?? 0, 0); ?></td>
                                                 <td class="col-shop-value" style="display:none;">&#8377;<?php echo inr_format($d['shop_rev'] ?? 0, 2); ?></td>
-                                                <td><b><?php echo inr_format($d['qty'], 0); ?></b></td>
-                                                <td><b>&#8377;<?php echo inr_format($d['rev'], 2); ?></b></td>
+                                                <td class="ys-qty" data-by-cat='<?php echo $ysQtyByCat; ?>'><b><?php echo inr_format($d['qty'], 0); ?></b></td>
+                                                <td class="ys-rev" data-by-cat='<?php echo $ysRevByCat; ?>'><b>&#8377;<?php echo inr_format($d['rev'], 2); ?></b></td>
                                                 <td><?php echo inr_format($dret['qty'] ?? 0, 0); ?></td>
                                                 <td>&#8377;<?php echo inr_format($dret['amt'] ?? 0, 2); ?></td>
                                             </tr>
