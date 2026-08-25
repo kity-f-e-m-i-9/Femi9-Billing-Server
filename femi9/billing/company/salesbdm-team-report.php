@@ -58,11 +58,15 @@ foreach ($staffRows as $r) {
     $bid = (int)$r['id'];
     $displayLevel = computeDisplayLevel($bid, (int)$r['team_level_id'], $r['level_name'], $depthToLevelName, $levelDepthById, $dualBdmIds);
     $roll = getBdmRawTargetAchieved($db_conn, $bid, $fromDate, $toDate);
-    $pct = $roll['target'] > 0 ? min(round($roll['achieved'] / $roll['target'] * 100, 1), 999) : 0;
+    // % is Advance Paid against Target — same basis as dashboard.php's own
+    // "Overall Target %"/"Payment" cards, not downstream sales (Napkin Sales
+    // is shown as its own column, informational only).
+    $pct = $roll['target'] > 0 ? min(round($roll['advance_paid'] / $roll['target'] * 100, 1), 999) : 0;
     $entry = [
         'id' => $bid, 'name' => $r['bdm_name'], 'level_name' => $displayLevel,
         'zone' => $r['zone'] ?? '', 'manager_name' => $r['manager_name'],
         'status' => $r['account_status'], 'target' => $roll['target'],
+        'advance_paid' => $roll['advance_paid'], 'napkin_purchase' => $roll['napkin_purchase'],
         'achieved' => $roll['achieved'], 'tp_count' => $roll['tp_count'], 'pct' => $pct,
         'color' => $levelColorMap[(int)$r['team_level_id']] ?? '#999999',
     ];
@@ -133,7 +137,7 @@ foreach ($staffRows as $r) {
                     </div>
 
                     <div class="card">
-                        <div class="card-header"><h5 class="card-title" style="margin:0;font-size:14px;">All Sales BDM — Target vs Achieved (Napkin only)</h5></div>
+                        <div class="card-header"><h5 class="card-title" style="margin:0;font-size:14px;">All Sales BDM — Target vs Advance Paid (Napkin only)</h5></div>
                         <div class="card-body" style="overflow-x:auto;">
                             <p class="snote">Click a name or the % to open their own dashboard (read-only).</p>
                             <table class="mt" id="teamReportTable">
@@ -146,13 +150,15 @@ foreach ($staffRows as $r) {
                                         <th>Status</th>
                                         <th>TPs</th>
                                         <th>Target (&#8377;)</th>
-                                        <th>Achieved (&#8377;)</th>
+                                        <th>Advance Paid (&#8377;)</th>
+                                        <th>Napkin Purchase (&#8377;)</th>
+                                        <th>Napkin Sales (&#8377;)</th>
                                         <th>%</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                 <?php if (empty($rows)): ?>
-                                    <tr><td colspan="9" class="text-muted">No Sales BDM found.</td></tr>
+                                    <tr><td colspan="11" class="text-muted">No Sales BDM found.</td></tr>
                                 <?php else: foreach ($rows as $r):
                                     $bc = $r['pct'] >= 100 ? 'var(--good)' : ($r['pct'] >= 50 ? '#eab308' : 'var(--critical)');
                                 ?>
@@ -165,6 +171,8 @@ foreach ($staffRows as $r) {
                                         <td><?php echo $r['status'] === 'active' ? '<span style="color:#0ca30c;font-weight:600;">Active</span>' : '<span style="color:#d03b3b;font-weight:600;">Inactive</span>'; ?></td>
                                         <td><?php echo (int)$r['tp_count']; ?></td>
                                         <td>&#8377;<?php echo inr_format($r['target'], 0); ?></td>
+                                        <td>&#8377;<?php echo inr_format($r['advance_paid'], 0); ?></td>
+                                        <td>&#8377;<?php echo inr_format($r['napkin_purchase'], 0); ?></td>
                                         <td>&#8377;<?php echo inr_format($r['achieved'], 0); ?></td>
                                         <td>
                                             <a href="<?php echo $viewUrl; ?>" style="text-decoration:none;">

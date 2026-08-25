@@ -10,7 +10,7 @@ function getBdmRawTargetAchieved($db_conn, int $bdmId, string $fromDate, string 
     require_once __DIR__ . '/BdmTpScope.php';
     $tpIds = getBdmAssignedTpIds($db_conn, $bdmId);
     if (empty($tpIds)) {
-        return ['target' => 0.0, 'achieved' => 0.0, 'tp_count' => 0];
+        return ['target' => 0.0, 'achieved' => 0.0, 'tp_count' => 0, 'advance_paid' => 0.0, 'napkin_purchase' => 0.0];
     }
     $tpIdList = implode(',', array_map('intval', $tpIds));
 
@@ -19,6 +19,19 @@ function getBdmRawTargetAchieved($db_conn, int $bdmId, string $fromDate, string 
         JOIN partner_location_nodes pln ON pln.id = tpl.location_id
         WHERE tpl.territory_partner_id IN ($tpIdList)
     ")->fetch_row()[0] ?? 0);
+
+    // Napkin advance payments received in the range — same figure as
+    // dashboard.php's own "Overall Target %" card ($overall_achieved there);
+    // this is what the % column is actually based on, not downstream sales.
+    $stmtAdvance = $db_conn->prepare("
+        SELECT COALESCE(SUM(amount),0) FROM tp_advance_payments
+        WHERE territory_partner_id IN ($tpIdList) AND product_type='napkin' AND deleted_at IS NULL
+          AND payment_date BETWEEN ? AND ?
+    ");
+    $stmtAdvance->bind_param('ss', $fromDate, $toDate);
+    $stmtAdvance->execute();
+    $advancePaid = (float)($stmtAdvance->get_result()->fetch_row()[0] ?? 0);
+    $stmtAdvance->close();
 
     $stmtCust = $db_conn->prepare("
         SELECT COALESCE(SUM(ii.total),0) FROM invoice_items ii
@@ -42,7 +55,26 @@ function getBdmRawTargetAchieved($db_conn, int $bdmId, string $fromDate, string 
     $shopAmt = (float)($stmtShop->get_result()->fetch_row()[0] ?? 0);
     $stmtShop->close();
 
-    return ['target' => $target, 'achieved' => $custAmt + $shopAmt, 'tp_count' => count($tpIds)];
+    // How much these TPs bought FROM the company (tp_invoices) in the range —
+    // distinct from 'achieved' above, which is their downstream resale to
+    // customers/shops. Same Napkin-only filter, same query shape as
+    // dashboard.php's "Purchases from Company" $napkinPurchaseByTp.
+    $stmtPurchase = $db_conn->prepare("
+        SELECT COALESCE(SUM(tii.amount),0) FROM tp_invoice_items tii
+        JOIN tp_invoices ti ON ti.id = tii.tp_invoice_id
+        JOIN products p ON p.id = tii.product_id
+        WHERE ti.territory_partner_id IN ($tpIdList) AND ti.invoice_date BETWEEN ? AND ?
+          AND COALESCE(p.category,'') != 'diaper'
+    ");
+    $stmtPurchase->bind_param('ss', $fromDate, $toDate);
+    $stmtPurchase->execute();
+    $napkinPurchase = (float)($stmtPurchase->get_result()->fetch_row()[0] ?? 0);
+    $stmtPurchase->close();
+
+    return [
+        'target' => $target, 'achieved' => $custAmt + $shopAmt, 'tp_count' => count($tpIds),
+        'napkin_purchase' => $napkinPurchase, 'advance_paid' => $advancePaid,
+    ];
 }
 
 // Per-TP breakdown for one BDM — District/Firka + own target/achieved, same
