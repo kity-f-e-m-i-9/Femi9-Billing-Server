@@ -30,9 +30,18 @@ function parseTpTargetAmountRange(string $key): ?array {
     return [(float)$minStr, $maxStr === '' ? null : (float)$maxStr];
 }
 
+// A 2% referral only counts toward Team Points if the team MEMBER was
+// registered (territory_partners.created_at) on/after this date — a member
+// added before this date never counts under the 2% rule, no matter how
+// recent their invoices are. Once a member qualifies, every month's
+// purchases from them count going forward, same as a 10% referral (which
+// has never had this cutoff at all).
+const TP_TEAM_POINTS_2PCT_START_DATE = '2026-08-01';
+
 // Per-member detail behind one referrer's Team Points total — same filters
-// (referral_type='TP', referral_percentage=10, rwpoints_enable=1, gst=0) as
-// the aggregate query in getTpRewardPointsData(), just grouped by member
+// (referral_type='TP', referral_percentage IN (10,2), rwpoints_enable=1,
+// gst=0 — see TP_TEAM_POINTS_2PCT_START_DATE for the 2% cutoff) as the
+// aggregate query in getTpRewardPointsData(), just grouped by member
 // instead of collapsed to the referrer. Powers the click-to-drill-down
 // popup on both the company and TP-facing reward points pages so a
 // referrer can see exactly which downline TP contributed how much.
@@ -51,7 +60,7 @@ function getTpTeamPointsBreakdown(int $referrer_id, string $current_from_date, s
 
     $stmt = $pdo->prepare("
         SELECT member.id AS member_id, member.tp_id AS member_tp_code, member.name AS member_name,
-               member.mobile AS member_mobile,
+               member.mobile AS member_mobile, member.referral_percentage AS member_referral_pct,
                COUNT(DISTINCT tpi.id) AS invoice_count,
                COALESCE(SUM(tii.amount), 0) AS member_amount,
                COALESCE(SUM(tii.amount) / 100, 0) AS member_points
@@ -62,29 +71,32 @@ function getTpTeamPointsBreakdown(int $referrer_id, string $current_from_date, s
         INNER JOIN products p             ON p.id = tii.product_id
         WHERE referrer.id = :referrer_id
           AND member.referral_type = 'TP'
-          AND member.referral_percentage = 10
+          AND member.referral_percentage IN (10, 2)
+          AND (member.referral_percentage = 10 OR member.created_at >= :pct2_start_date)
           AND tpi.rwpoints_enable = 1
           AND tpi.invoice_date BETWEEN :from_date AND :to_date
           AND p.gst = 0
-        GROUP BY member.id, member.tp_id, member.name, member.mobile
+        GROUP BY member.id, member.tp_id, member.name, member.mobile, member.referral_percentage
         ORDER BY member_points DESC
     ");
     $stmt->execute([
-        ':referrer_id' => $referrer_id,
-        ':from_date'   => $current_from_date,
-        ':to_date'     => $current_to_date,
+        ':referrer_id'      => $referrer_id,
+        ':from_date'        => $current_from_date,
+        ':to_date'          => $current_to_date,
+        ':pct2_start_date'  => TP_TEAM_POINTS_2PCT_START_DATE,
     ]);
 
     $members = [];
     foreach ($stmt->fetchAll() as $row) {
         $members[] = [
-            'member_id'      => (int)$row['member_id'],
-            'tp_code'        => $row['member_tp_code'],
-            'name'           => $row['member_name'],
-            'mobile'         => $row['member_mobile'],
-            'invoice_count'  => (int)$row['invoice_count'],
-            'amount'         => (float)$row['member_amount'],
-            'points'         => (float)$row['member_points'],
+            'member_id'          => (int)$row['member_id'],
+            'tp_code'            => $row['member_tp_code'],
+            'name'               => $row['member_name'],
+            'mobile'             => $row['member_mobile'],
+            'referral_percentage' => (float)$row['member_referral_pct'],
+            'invoice_count'      => (int)$row['invoice_count'],
+            'amount'             => (float)$row['member_amount'],
+            'points'             => (float)$row['member_points'],
         ];
     }
 
@@ -206,11 +218,14 @@ function getTpRewardPointsData(string $current_from_date, string $current_to_dat
     }
 
     // ── Team Points ────────────────────────────────────────────────────────────
-    // "Team" = other TPs who registered this TP as their referrer with exactly
-    // a 10% referral_percentage (one level deep only — a team member's own
-    // referrals are not included). Only 0%-GST product lines count, and only
-    // from the team member's invoices that themselves have rwpoints_enable=1
-    // (the same per-invoice toggle used for the TP's own purchase points).
+    // "Team" = other TPs who registered this TP as their referrer with either
+    // a 10% or a 2% referral_percentage (one level deep only — a team
+    // member's own referrals are not included). 10% referrals have always
+    // counted; a 2% referral only counts if the MEMBER was registered
+    // on/after TP_TEAM_POINTS_2PCT_START_DATE (see that constant's docblock).
+    // Only 0%-GST product lines count, and only from the team member's
+    // invoices that themselves have rwpoints_enable=1 (the same per-invoice
+    // toggle used for the TP's own purchase points).
     $stmt = $pdo->prepare("
         SELECT referrer.id AS referrer_id,
                COALESCE(SUM(tii.amount) / 100, 0) AS team_points
@@ -220,13 +235,18 @@ function getTpRewardPointsData(string $current_from_date, string $current_to_dat
         INNER JOIN tp_invoice_items tii   ON tii.tp_invoice_id = tpi.id
         INNER JOIN products p             ON p.id = tii.product_id
         WHERE member.referral_type = 'TP'
-          AND member.referral_percentage = 10
+          AND member.referral_percentage IN (10, 2)
+          AND (member.referral_percentage = 10 OR member.created_at >= :pct2_start_date)
           AND tpi.rwpoints_enable = 1
           AND tpi.invoice_date BETWEEN :from_date AND :to_date
           AND p.gst = 0
         GROUP BY referrer.id
     ");
-    $stmt->execute([':from_date' => $current_from_date, ':to_date' => $current_to_date]);
+    $stmt->execute([
+        ':from_date'       => $current_from_date,
+        ':to_date'         => $current_to_date,
+        ':pct2_start_date' => TP_TEAM_POINTS_2PCT_START_DATE,
+    ]);
     $team_data = [];
     foreach ($stmt->fetchAll() as $row) {
         $team_data[$row['referrer_id']] = (float)$row['team_points'];

@@ -814,7 +814,17 @@ if ($hasTps) {
                     <?php
                         $tgtAccent = $overall_target_pct >= 100 ? 'var(--good)' : ($overall_target_pct >= 50 ? '#eab308' : 'var(--critical)');
                     ?>
-                    <?php $overall_available_advance = $overall_achieved - $overall_napkin_purchased; ?>
+                    <?php
+                        // Only the part of this period's Napkin Purchase that was
+                        // actually funded by THIS period's advance counts against
+                        // it — the part already funded by an earlier period's
+                        // leftover balance ($prevAdvanceUsed) shouldn't be deducted
+                        // twice (once against that earlier period, once again
+                        // here). Without this correction, a TP whose spend was
+                        // genuinely covered read as a shortfall just because part
+                        // of the money came from an older payment.
+                        $overall_available_advance = $overall_achieved - max(0, $overall_napkin_purchased - $prevAdvanceUsed);
+                    ?>
                     <div class="row mb-3">
                         <div class="col-md-6 col-sm-12">
                             <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
@@ -838,15 +848,15 @@ if ($hasTps) {
                                     <div><span>Advance Payment</span><b>&#8377;<?php echo inr_format($overall_achieved, 0); ?></b></div>
                                     <div><span>%</span><b style="color:<?php echo $tgtAccent; ?>;"><?php echo $overall_target_pct; ?>%</b></div>
                                     <div><span>Napkin Purchase</span><b>&#8377;<?php echo inr_format($overall_napkin_purchased, 0); ?></b></div>
-                                    <div><span>Available Advance Payment</span><b>&#8377;<?php echo inr_format($overall_available_advance, 0); ?></b></div>
                                     <?php if ($prevAdvanceUsed > 0): ?>
                                     <div>
                                         <span>Previous Month Advance</span>
                                         <b><a href="#" id="prevAdvanceLink" data-bs-toggle="modal" data-bs-target="#prevAdvanceModal" style="color:#8b5cf6;text-decoration:underline dotted;">&#8377;<?php echo inr_format($prevAdvanceUsed, 0); ?></a></b>
                                     </div>
                                     <?php endif; ?>
+                                    <div><span>Available Advance Payment</span><b>&#8377;<?php echo inr_format($overall_available_advance, 0); ?></b></div>
                                 </div>
-                                <p class="snote" style="margin:6px 0 0;">% is Advance Payment against Total Target Amount. Available Advance Payment = Advance Payment received minus Napkin Purchase already invoiced, in this date range. Previous Month Advance = this period's purchases that were actually funded by advance paid in an earlier period (click to see who) — that's why Available Advance Payment can go negative even though nothing is unfunded.</p>
+                                <p class="snote" style="margin:6px 0 0;">% is Advance Payment against Total Target Amount. Previous Month Advance = this period's purchases that were actually funded by advance paid in an earlier period (click to see who). Available Advance Payment = Advance Payment received minus only the Napkin Purchase funded by THIS period's advance (Napkin Purchase minus Previous Month Advance) — spend already covered by an older payment isn't deducted twice.</p>
                             </div>
                         </div>
                     </div>

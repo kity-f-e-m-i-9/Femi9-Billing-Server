@@ -154,10 +154,13 @@ if ($tpIdString !== null) {
 }
 
 // 4b. Team Points — points earned from other TPs who registered this TP as
-// their referrer with exactly a 10% referral_percentage (one level deep
-// only). Same formula as the company-side reward_points_tp.php view: only
-// 0%-GST product lines count, and only from the team member's invoices that
+// their referrer with either a 10% or a 2% referral_percentage (one level
+// deep only). 10% referrals have always counted; a 2% referral only counts
+// if the MEMBER was registered on/after TP_TEAM_POINTS_2PCT_START_DATE.
+// Same formula as the company-side reward_points_tp.php view: only 0%-GST
+// product lines count, and only from the team member's invoices that
 // themselves have rwpoints_enable=1.
+require_once __DIR__ . '/../company/include/TpRewardPointsData.php';
 $teamPointsQuery = "
     SELECT COALESCE(SUM(tii.amount) / 100, 0) AS team_points
     FROM territory_partners member
@@ -167,12 +170,13 @@ $teamPointsQuery = "
     INNER JOIN products p             ON p.id = tii.product_id
     WHERE referrer.id = ?
       AND member.referral_type = 'TP'
-      AND member.referral_percentage = 10
+      AND member.referral_percentage IN (10, 2)
+      AND (member.referral_percentage = 10 OR member.created_at >= ?)
       AND tpi.rwpoints_enable = 1
       AND tpi.invoice_date BETWEEN ? AND ?
       AND p.gst = 0
 ";
-$teamPointsResult = executeQueryRow_tp($db_conn, $teamPointsQuery, [(int)$userId, $currentFromDate, $currentToDate], 'iss');
+$teamPointsResult = executeQueryRow_tp($db_conn, $teamPointsQuery, [(int)$userId, TP_TEAM_POINTS_2PCT_START_DATE, $currentFromDate, $currentToDate], 'isss');
 $teamPoints = (float)($teamPointsResult['team_points'] ?? 0);
 
 // 5. Grand Total
