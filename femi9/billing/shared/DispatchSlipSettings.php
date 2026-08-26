@@ -138,8 +138,18 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
             if ($lineLeftover > 0) {
                 $poolContrib[] = ['product' => $productName, 'packs' => $lineLeftover];
             }
+            // A leftover that made it past the exceed-check above (didn't
+            // exceed packs_per_cover) fits inside exactly one physical
+            // cover, so it's shown as "1 cover" rather than a loose pack
+            // count — only when this line actually HAS a cover threshold to
+            // have been checked against; without one (no packs_per_cover),
+            // the leftover is still undecided and just flows to the pool,
+            // so it stays shown as raw packs.
+            $hasCoverThreshold = $ppcv !== null && $ppcv !== '' && (int)$ppcv > 0;
             $item['box_display'] = ($lineBoxes > 0 ? $lineBoxes . ' box' . ($lineBoxes > 1 ? 'es' : '') : '')
-                . ($lineLeftover > 0 ? ($lineBoxes > 0 ? ' + ' : '') . $lineLeftover . ' pack' . ($lineLeftover > 1 ? 's' : '') : '');
+                . ($lineLeftover > 0
+                    ? ($lineBoxes > 0 ? ' + ' : '') . ($hasCoverThreshold ? '1 cover' : $lineLeftover . ' pack' . ($lineLeftover > 1 ? 's' : ''))
+                    : '');
             if ($item['box_display'] === '') $item['box_display'] = '—';
         } else {
             $pooledQty += $qty;
@@ -186,12 +196,20 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
     $groupedBoxes  = count($pooledBoxes123);
     $afterGrouping = $currentSum; // whatever never filled a full bucket — matches $pooledQty % $overallBox
     $leftoverIsBox = $afterGrouping > $overallSettings['cover'];
-    if ($leftoverIsBox && $afterGrouping > 0) {
+    // Whatever's left — whether it grew into one more box above, or stayed
+    // a "cover" below the threshold — is still a real physical package that
+    // needs its own shipping label, so it's always appended to the box list
+    // (just not counted in $TotalBoxes when it's only a cover, matching the
+    // "N boxes + 1 cover" display below).
+    if ($afterGrouping > 0) {
         $pooledBoxes123[] = ['contents' => $currentBucket];
     }
     $TotalBoxes = $lineBoxesSum + $groupedBoxes + ($leftoverIsBox ? 1 : 0);
+    // Same "fits in one physical cover" rule as the per-line display above —
+    // once pooled leftover has cleared the exceed-check (didn't exceed
+    // overall_packs_per_cover), it's exactly 1 cover, not loose packs.
     $TotalBoxesDisplay = $TotalBoxes . ' box' . ($TotalBoxes !== 1 ? 'es' : '')
-        . (!$leftoverIsBox && $afterGrouping > 0 ? ' + ' . $afterGrouping . ' pack' . ($afterGrouping > 1 ? 's' : '') : '');
+        . (!$leftoverIsBox && $afterGrouping > 0 ? ' + 1 cover' : '');
 
     return [
         'TotalQty'          => $TotalQty,
