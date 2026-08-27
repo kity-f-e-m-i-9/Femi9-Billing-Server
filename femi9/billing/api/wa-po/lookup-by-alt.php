@@ -11,7 +11,11 @@ require_once __DIR__ . '/_bootstrap.php';
 
 $identifier = trim((string)($input['identifier'] ?? ''));
 if ($identifier === '') {
-    wa_po_fail(400, 'identifier is required');
+    // Message written for the calling LLM agent, not a human — this fires
+    // when the agent invokes the tool before it actually has a real value
+    // (e.g. right after verify-user's "not found" but before asking the
+    // user for their registered mobile/login ID/GSTIN).
+    wa_po_fail(400, 'identifier is required and must not be empty — ask the user for their registered mobile number, login ID, or GSTIN before calling this tool');
 }
 
 if (!wa_po_rate_limit_check($db_conn, 'lookup-by-alt:' . $identifier, 20, 3600)) {
