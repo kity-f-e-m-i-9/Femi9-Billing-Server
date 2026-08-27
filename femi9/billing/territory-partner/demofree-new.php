@@ -25,11 +25,12 @@ $advBalance = 0;
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="../../assets/plugins/select2/css/select2.min.css" rel="stylesheet">
     <style>
+        * { box-sizing: border-box; }
         .df-header {
             display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
             margin-bottom: 4px;
         }
-        .df-header-left { display: flex; align-items: center; gap: 12px; }
+        .df-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
         .df-header-icon {
             width: 42px; height: 42px; border-radius: 10px; flex-shrink: 0;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -37,18 +38,20 @@ $advBalance = 0;
             box-shadow: 0 4px 10px rgba(102,126,234,.3);
         }
         .df-header-icon .material-icons { color: #fff; font-size: 22px; }
+        .df-header-text { min-width: 0; }
         .df-header h1 { margin: 0; font-size: 21px; font-weight: 700; color: #1f2937; line-height: 1.2; }
-        .df-header-sub { margin: 2px 0 0; font-size: 12.5px; color: #9ca3af; }
+        .df-header-sub { margin: 2px 0 0; font-size: 12.5px; color: #9ca3af; overflow-wrap: break-word; }
         .df-manage-link {
             display: inline-flex; align-items: center; gap: 6px;
             background: #fff; color: #667eea; border: 1px solid #e5e7eb;
             padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13.5px;
-            text-decoration: none; transition: all .2s;
+            text-decoration: none; transition: all .2s; white-space: nowrap;
         }
         .df-manage-link:hover { background: #f8fafc; color: #667eea; border-color: #667eea; transform: translateY(-1px); }
         .df-manage-link .material-icons { font-size: 18px; }
 
         .card { border: none; border-radius: 14px; box-shadow: 0 2px 12px rgba(15,23,42,.06); }
+        .card-body { padding: 24px; }
 
         .df-panel {
             background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 12px;
@@ -67,42 +70,39 @@ $advBalance = 0;
         .df-row > div { flex: 1; min-width: 220px; }
         .df-row:last-child { margin-bottom: 0; }
 
-        .df-items-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .df-items-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
         .df-items-head .df-panel-title { margin-bottom: 0; }
         .df-items-actions { display: flex; gap: 8px; }
         .df-items-actions .btn {
-            display: inline-flex; align-items: center; gap: 4px; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
         }
         #add-row-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: #fff; }
         #add-row-btn:hover, #add-row-btn:focus { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,.35); color: #fff; }
-        #del-row-btn { background: #fff; border: 1px solid #fca5a5; color: #dc2626; }
-        #del-row-btn:hover, #del-row-btn:focus { background: #fef2f2; color: #dc2626; }
         .df-items-actions .material-icons { font-size: 17px; }
-
-        .df-table-wrap { border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; }
-        .dataTable-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        #dataTable { width: 100%; margin: 0; border-collapse: collapse; }
-        .df-col-labels {
-            display: flex; background: #f8fafc; border-bottom: 2px solid #f1f5f9;
-            color: #94a3b8; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
-            padding: 10px 12px;
-        }
-        .df-col-labels span:first-child { width: 40px; flex-shrink: 0; }
-        .df-col-labels span:nth-child(2) { flex: 1; }
-        .df-col-labels span:last-child { min-width: 100px; }
-        #dataTable tr { transition: background .15s; }
-        #dataTable tr:hover td { background: #fafbff; }
-        #dataTable td { padding: 10px 12px; vertical-align: middle; border-bottom: 1px solid #f1f5f9; background: #fff; }
-        #dataTable tr:last-child td { border-bottom: none; }
-        #dataTable td:first-child { width: 40px; text-align: center; }
-        #dataTable td:last-child { min-width: 100px; }
-        #dataTable input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #667eea; }
-        #dataTable .form-control { border-radius: 8px; border: 1px solid #e2e8f0; }
         .df-row-count {
             font-size: 11.5px; font-weight: 600; color: #9ca3af; background: #f1f5f9;
             padding: 3px 9px; border-radius: 20px; margin-left: 8px;
         }
-        .select2-container { min-width: 180px; }
+
+        /* Product rows: CSS grid on desktop/tablet, stacked cards on phones -- no horizontal scrolling either way. */
+        .df-items-list { display: flex; flex-direction: column; gap: 10px; }
+        .df-item-row {
+            display: grid; grid-template-columns: 1fr 110px 44px; gap: 10px; align-items: start;
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; transition: border-color .15s, box-shadow .15s;
+        }
+        .df-item-row:hover { border-color: #d6dbe6; box-shadow: 0 2px 8px rgba(15,23,42,.05); }
+        .df-item-row .df-field-label { display: none; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; margin-bottom: 4px; }
+        .df-item-row .select2-container { width: 100% !important; }
+        .row-remove-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+            background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px;
+            width: 44px; height: 38px; padding: 0; cursor: pointer; transition: background .15s, transform .1s;
+        }
+        .row-remove-btn:hover { background: #fecaca; }
+        .row-remove-btn:active { transform: scale(.95); }
+        .row-remove-btn i { font-size: 19px; }
+        .df-empty-hint { text-align: center; color: #9ca3af; font-size: 13px; padding: 18px 0; }
+
         .select2-container .select2-selection--single { border-radius: 8px !important; border: 1px solid #e2e8f0 !important; height: 38px !important; }
         .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 36px !important; }
         .select2-container--default .select2-selection--single .select2-selection__arrow { height: 36px !important; }
@@ -111,12 +111,33 @@ $advBalance = 0;
         #df-submit-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: #fff;
             font-weight: 600; border-radius: 8px; padding: 10px 24px; display: inline-flex; align-items: center; gap: 6px;
+            width: 100%; justify-content: center;
         }
         #df-submit-btn:hover, #df-submit-btn:focus { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,.35); color: #fff; }
+        #df-submit-btn[disabled] { opacity: .65; pointer-events: none; transform: none; box-shadow: none; }
 
-        @media (max-width: 576px) {
-            #dataTable, .df-col-labels { min-width: 480px; }
-            .df-items-actions .btn span.label { display: none; }
+        @media (min-width: 480px) {
+            #df-submit-btn { width: auto; }
+        }
+
+        /* Below ~560px, drop the grid and stack each row's fields as a labeled mini-card -- no scrollbar needed.
+           Product spans the full width on its own line; Qty and Remove share the line below it so Remove
+           stays a normal-sized button instead of stretching into a tall bar. */
+        @media (max-width: 560px) {
+            .card-body { padding: 16px; }
+            .df-panel { padding: 14px; }
+            .df-header h1 { font-size: 18px; }
+            .df-manage-link span { display: none; }
+            .df-items-head { margin-bottom: 14px; }
+            .df-items-actions, .df-items-actions .btn { width: 100%; }
+            .df-item-row {
+                grid-template-columns: 1fr 44px; grid-template-areas: "product product" "qty remove";
+                row-gap: 8px; align-items: end;
+            }
+            .df-item-row .df-product-cell { grid-area: product; }
+            .df-item-row .df-qty-cell { grid-area: qty; }
+            .df-item-row .row-remove-btn { grid-area: remove; }
+            .df-item-row .df-field-label { display: block; }
         }
     </style>
 </head>
@@ -136,13 +157,13 @@ $advBalance = 0;
                             <div class="page-description df-header">
                                 <div class="df-header-left">
                                     <div class="df-header-icon"><i class="material-icons">redeem</i></div>
-                                    <div>
+                                    <div class="df-header-text">
                                         <h1>Add Demo/Free/Damage</h1>
                                         <p class="df-header-sub">Record products given as demo, free samples, or written off as damaged</p>
                                     </div>
                                 </div>
                                 <a href="demofree-manage.php" class="df-manage-link" title="Manage Demo/Free/Damage">
-                                    <i class="material-icons">list_alt</i> Manage Entries
+                                    <i class="material-icons">list_alt</i> <span>Manage Entries</span>
                                 </a>
                             </div>
                         </div>
@@ -208,67 +229,24 @@ $tempid = "" . $randum_number . "DFD/" . $temp_date . "/" . $temp_time . "";
     </div>
 </div>
 
-<script>
-function reinitProductSelects() {
-    // select2 wraps each select in extra markup, so strip it back to the
-    // plain <select> before cloning a row and only re-wrap once the clone
-    // is in place -- otherwise the clone duplicates the widget, not the field.
-    $('select[name="product_id[]"]').each(function() {
-        if ($(this).hasClass('select2-hidden-accessible')) { $(this).select2('destroy'); }
-    });
-    $('select[name="product_id[]"]').select2({ width: '100%', placeholder: 'Select Product' });
-}
-
-function addRow(tableID) {
-    var table = document.getElementById(tableID);
-    $('select[name="product_id[]"]').each(function() {
-        if ($(this).hasClass('select2-hidden-accessible')) { $(this).select2('destroy'); }
-    });
-    var rowCount = table.rows.length;
-    if (rowCount < 100) {
-        var row = table.insertRow(rowCount);
-        var colCount = table.rows[0].cells.length;
-        for (var i = 0; i < colCount; i++) {
-            var newcell = row.insertCell(i);
-            newcell.innerHTML = table.rows[0].cells[i].innerHTML;
-        }
-    } else {
-        alert("Maximum 100 rows allowed.");
-    }
-    $('select[name="product_id[]"]').select2({ width: '100%', placeholder: 'Select Product' });
-}
-function deleteRow(tableID) {
-    var table = document.getElementById(tableID);
-    var rowCount = table.rows.length;
-    for (var i = 0; i < rowCount; i++) {
-        var row = table.rows[i];
-        var chkbox = row.cells[0].childNodes[0];
-        if (null != chkbox && true == chkbox.checked) {
-            if (rowCount <= 1) { alert("Cannot Remove all Fields."); break; }
-            table.deleteRow(i); rowCount--; i--;
-        }
-    }
-}
-</script>
-
 <div class="df-panel">
     <div class="df-items-head">
-        <div class="df-panel-title"><i class="material-icons-outlined">inventory_2</i> Products</div>
+        <div class="df-panel-title">
+            <i class="material-icons-outlined">inventory_2</i> Products
+            <span class="df-row-count" id="rowCount">1 item</span>
+        </div>
         <div class="df-items-actions">
-            <button type="button" id="add-row-btn" class="btn" onclick="addRow('dataTable')"><i class="material-icons">add</i><span class="label">Add Row</span></button>
-            <button type="button" id="del-row-btn" class="btn" onclick="deleteRow('dataTable')"><i class="material-icons">delete_outline</i><span class="label">Remove</span></button>
+            <button type="button" id="add-row-btn" class="btn" onclick="addRow()"><i class="material-icons">add</i><span class="label">Add Row</span></button>
         </div>
     </div>
 
-    <div class="df-table-wrap">
-    <div class="dataTable-scroll">
-    <div class="df-col-labels"><span></span><span>Product</span><span>Qty</span></div>
-    <table id="dataTable" border="0">
-        <tr>
-            <td><input type="checkbox" name="chk[]"/></td>
-            <td>
-                <select required name="product_id[]" class="form-control">
-                    <option value="" hidden>Select Product</option>
+    <div class="df-items-list" id="itemsList"></div>
+    <template id="itemRowTemplate">
+        <div class="df-item-row">
+            <div class="df-product-cell">
+                <div class="df-field-label">Product</div>
+                <select required name="product_id[]" class="form-control product-select">
+                    <option value="" hidden selected>Select Product</option>
                     <?php
                     $tp_id_esc = (int)$Login_user_IDvl;
                     $fetch_product_list = $db_conn->prepare(
@@ -287,12 +265,14 @@ function deleteRow(tableID) {
                     <?php }
                     $fetch_product_list->close(); ?>
                 </select>
-            </td>
-            <td><input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control" required/></td>
-        </tr>
-    </table>
-    </div>
-    </div>
+            </div>
+            <div class="df-qty-cell">
+                <div class="df-field-label">Qty</div>
+                <input type="number" placeholder="Qty" min="1" step="1" name="qty[]" class="form-control" required/>
+            </div>
+            <button type="button" class="row-remove-btn" onclick="removeRow(this)" title="Remove this product"><i class="material-icons">delete</i></button>
+        </div>
+    </template>
 </div>
 
 <div class="df-submit-row">
@@ -319,7 +299,55 @@ function deleteRow(tableID) {
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 flatpickr("#bookingDate", { dateFormat: "Y-m-d", maxDate: "today" });
-$(document).ready(function() { reinitProductSelects(); });
+
+var MAX_ROWS = 100;
+
+function updateRowCount() {
+    var n = document.querySelectorAll('#itemsList .df-item-row').length;
+    document.getElementById('rowCount').textContent = n + (n === 1 ? ' item' : ' items');
+    document.getElementById('add-row-btn').disabled = (n >= MAX_ROWS);
+}
+
+function addRow() {
+    var list = document.getElementById('itemsList');
+    if (list.children.length >= MAX_ROWS) {
+        alert('Maximum ' + MAX_ROWS + ' rows allowed.');
+        return;
+    }
+    var tpl = document.getElementById('itemRowTemplate');
+    var frag = tpl.content.cloneNode(true);
+    var row = frag.querySelector('.df-item-row');
+    list.appendChild(row);
+    $(row).find('.product-select').select2({ width: '100%', placeholder: 'Select Product', dropdownAutoWidth: true });
+    updateRowCount();
+    return row;
+}
+
+function removeRow(btn) {
+    var list = document.getElementById('itemsList');
+    if (list.children.length <= 1) { alert('At least one product row is required.'); return; }
+    var row = btn.closest('.df-item-row');
+    var $select = $(row).find('.product-select');
+    if ($select.hasClass('select2-hidden-accessible')) { $select.select2('destroy'); }
+    row.parentNode.removeChild(row);
+    updateRowCount();
+}
+
+$(document).ready(function() {
+    addRow(); // seed the first, always-present row
+});
+
+document.querySelector('form').addEventListener('submit', function() {
+    var btn = document.getElementById('df-submit-btn');
+    // Defer disabling: the browser has already captured this button's name/value
+    // for the submit by the time this handler runs, but disabling it synchronously
+    // here (before that capture settles in some browsers) could drop add-record
+    // from the POST, which demofree_action.php requires to process the save.
+    setTimeout(function() {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="material-icons">hourglass_top</i> Submitting…';
+    }, 0);
+});
 </script>
 </body>
 </html>
