@@ -111,6 +111,13 @@ $select_product_list="select * from products where id='$prid' and (temp_id not l
                                                     <option value="diaper" <?php echo $_prodCategory==='diaper'?'selected':''; ?>>Lumi Baby Diaper</option>
                                                 </select>
 
+												<?php $_prodIsActive = empty($result_product_list["deleted_at"]); ?>
+												<label for="exampleInputEmail1" class="form-label">Status <small class="text-muted">(Inactive products stop showing up wherever a product is picked for a new order/invoice — existing records keep showing it fine)</small></label>
+                                                <select name="status" class="form-control" required>
+                                                    <option value="active" <?php echo $_prodIsActive?'selected':''; ?>>Active</option>
+                                                    <option value="inactive" <?php echo !$_prodIsActive?'selected':''; ?>>Inactive</option>
+                                                </select>
+
 												<label for="exampleInputEmail1" class="form-label">Pieces per Pack <small class="text-muted">(optional)</small></label>
                                                 <input type="number" min="0" name="pieces_per_pack" class="form-control" value="<?=$result_product_list["pieces_per_pack"]?>" onkeypress="restrictnumber(event)" placeholder="e.g. 12">
 

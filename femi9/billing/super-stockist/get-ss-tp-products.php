@@ -26,6 +26,7 @@ $sql = "SELECT s.product_id, p.productName, p.hsn,
          WHERE s.user_type = 'super_stockiest'
            AND s.user_id = '$ss_id'
            AND s.closing_qty > 0
+           AND p.deleted_at IS NULL
            AND " . tpProductTypeSqlFilter($productType) . "
          ORDER BY p.productName ASC";
 

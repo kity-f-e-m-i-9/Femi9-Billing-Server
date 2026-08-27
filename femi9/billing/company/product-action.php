@@ -152,19 +152,25 @@ if (isset($_POST['update-product'])) {
     $packs_per_cover = trim($_POST['packs_per_cover'] ?? '');
     $packs_per_cover = ($packs_per_cover === '') ? null : (int) $packs_per_cover;
     $category = ($_POST['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin';
+    // Inactive reuses the same deleted_at column the Neksomo product toggle
+    // already uses as its active/inactive flag — NULL = active, set = inactive.
+    // Never touches historical records (invoices/POs/dispatch slips look
+    // products up by id directly, unfiltered), only new-order pickers.
+    $isInactive = ($_POST['status'] ?? 'active') === 'inactive';
 
     // Update product
     $stmt = $db_conn->prepare(
         "UPDATE products SET productName = ?, category = ?, pieces_per_pack = ?, packs_per_carton = ?, packs_per_cover = ?, mrp = ?, supersstock_price = ?,
         super_distributor_price = ?, stockist_price = ?, distributor_price = ?,
-        outlet_price = ?, gst = ?, gst_type = ?, hsn = ?, rwpoints = ?, updated_at = NOW()
+        outlet_price = ?, gst = ?, gst_type = ?, hsn = ?, rwpoints = ?, deleted_at = ?, updated_at = NOW()
         WHERE id = ?"
     );
 
+    $deletedAtValue = $isInactive ? date('Y-m-d H:i:s') : null;
     $stmt->bind_param(
-        "ssiiidddddddssdi",
+        "ssiiidddddddssdsi",
         $productName, $category, $pieces_per_pack, $packs_per_carton, $packs_per_cover, $mrp, $supersstock_price, $super_distributor_price,
-        $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $update_id
+        $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $deletedAtValue, $update_id
     );
     
     if ($stmt->execute()) {

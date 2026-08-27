@@ -7,7 +7,11 @@ error_reporting(0);
 
 tpEnsureAdvanceWalletColumns($db_conn);
 
-$tpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID);
+// Advance payment HISTORY needs to stay visible even for a TP who has since
+// gone inactive — the record of what they paid/owe doesn't disappear just
+// because they're no longer active, so this report deliberately includes
+// inactive TPs unlike the active-only default used elsewhere in this file.
+$tpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
 $hasTps = !empty($tpIds);
 $tpIdList = $hasTps ? implode(',', array_map('intval', $tpIds)) : '0';
 
@@ -28,7 +32,7 @@ $tps = [];
 $total_count = 0; $total_amount = 0; $total_balance = 0; $total_adjusted = 0;
 
 if ($hasTps) {
-    $tps = call_rows_local($db_conn, "SELECT id, tp_id, name FROM territory_partners WHERE id IN ($tpIdList) ORDER BY name ASC", '', []);
+    $tps = call_rows_local($db_conn, "SELECT id, tp_id, name, is_active FROM territory_partners WHERE id IN ($tpIdList) ORDER BY name ASC", '', []);
 
     $where = ["tap.deleted_at IS NULL", "tap.payment_date BETWEEN ? AND ?", "tap.territory_partner_id IN ($tpIdList)"];
     $params = [$filter_from, $filter_to];
@@ -208,7 +212,7 @@ $i = 0;
                                 <select name="tp_id" id="tpSelect" class="form-control form-control-sm" style="width:220px;">
                                     <option value="0">All Territory Partners</option>
                                     <?php foreach ($tps as $t): ?>
-                                        <option value="<?php echo (int)$t['id']; ?>" <?php echo $filter_tp===(int)$t['id']?'selected':''; ?>><?php echo htmlspecialchars($t['name']); ?></option>
+                                        <option value="<?php echo (int)$t['id']; ?>" <?php echo $filter_tp===(int)$t['id']?'selected':''; ?>><?php echo htmlspecialchars($t['name']); ?><?php echo ((int)$t['is_active'] === 0) ? ' (Inactive)' : ''; ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>

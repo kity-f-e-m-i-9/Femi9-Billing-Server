@@ -44,7 +44,7 @@ $stmtProd = mysqli_prepare($db_conn,
     "SELECT p.id, p.productName
      FROM products p
      INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = ? AND tps.closing_qty > 0
-     WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
+     WHERE p.deleted_at IS NULL AND (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
      ORDER BY p.productName ASC"
 );
 mysqli_stmt_bind_param($stmtProd, "i", $Login_user_IDvl);

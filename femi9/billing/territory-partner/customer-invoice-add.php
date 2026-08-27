@@ -291,7 +291,7 @@ flatpickr("#editInvoiceDate", {
 <select required name="pr_id" style="width:100%;" class="prinput" autofocus onchange="showPrice(this.value)">
 <option value="" hidden>Select Product</option>
 <?php
-$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
+$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE p.deleted_at IS NULL AND (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) {
 ?>
 <option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
@@ -637,7 +637,7 @@ flatpickr("#bookingDate", invoiceDateOpts);
 <select required name="pr_id" style="width:100%;" onchange="showPrice(this.value)" class="prinput">
 <option value="" hidden>Select Product</option>
 <?php
-$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
+$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE p.deleted_at IS NULL AND (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) {
 ?>
 <option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
