@@ -250,7 +250,8 @@ Terms of Delivery<br/>
 <td id="rightlaign">HSN/SAC</td>
 <td id="rightlaign">Quantity</td>
 <td id="rightlaign">MRP</td>
-<td id="rightlaign">Rate</td>
+<td id="rightlaign">Rate (Excl. Tax)</td>
+<td id="rightlaign">Rate (Incl. Tax)</td>
 <td id="rightlaign">per</td>
 <td id="rightlaign">GST(%)</td>
 <td id="rightlaign">Disc</td>
@@ -258,6 +259,7 @@ Terms of Delivery<br/>
 </tr>
 
 <?php
+	$TotalAMount123 = 0; $Totalquantity123 = 0; $__gst_running = 0;
 	$select_INVProductDetails="select * from internal_transfer where tempid='$tempid' order by id desc";
 	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
@@ -269,23 +271,56 @@ Terms of Delivery<br/>
 		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
-		// Show the taxable (pre-GST) value in the Amount column so that
-		// Amount + SGST + CGST reconciles with Total. For an exclusive
-		// product taxable_value == qty*price-discount (no change); for an
-		// inclusive product it is that gross figure with GST carved out,
-		// matching the gst_amount/total already stored on the row.
-		$TotalAMount=(float)$result_INVProductDetails['taxable_value'];
+		// GST presentation mirrors the company-login TP invoice print
+		// (shared/TpInvoiceData.php): the Amount column and the two Rate
+		// columns are all on a pre-GST (taxable) basis, then SGST/CGST are
+		// added back below so the line reconciles with Total. For an
+		// 'inclusive' product the entered rate/amount already contains GST
+		// and it is carved out here; for 'exclusive' the figures are
+		// unchanged. Uses the taxable_value/gst_amount already stored on the
+		// row when present, else derives them the same way.
+		$__qty        = (int)$result_INVProductDetails['qty'];
+		$__price      = (float)$result_INVProductDetails['price'];
+		$__gst_pct    = (float)$result_INVProductDetails['gst'];
+		$__gst_type   = (($result_INVProductDetails['gst_type'] ?? 'exclusive') === 'inclusive') ? 'inclusive' : 'exclusive';
+		$__disc       = (float)$result_INVProductDetails['discount'];
+		$__gross_amt  = $__qty * $__price;                 // pre-discount, as entered
+		$__net_amt    = $__gross_amt - $__disc;            // billed for this line
+
+		if ($__gst_type === 'inclusive' && $__gst_pct > 0) {
+			$__gross_taxable = $__gross_amt * 100 / (100 + $__gst_pct);
+			$TotalAMount     = isset($result_INVProductDetails['taxable_value']) && $result_INVProductDetails['taxable_value'] !== null
+			                    ? (float)$result_INVProductDetails['taxable_value']
+			                    : $__net_amt * 100 / (100 + $__gst_pct);
+		} else {
+			$__gross_taxable = $__gross_amt;
+			$TotalAMount     = isset($result_INVProductDetails['taxable_value']) && $result_INVProductDetails['taxable_value'] !== null
+			                    ? (float)$result_INVProductDetails['taxable_value']
+			                    : $__net_amt;
+		}
+		$__rate_excl = $__qty > 0 ? $__gross_taxable / $__qty : 0;
+		$__rate_incl = $__rate_excl + ($__gst_pct > 0 ? $__rate_excl * $__gst_pct / 100 : 0);
+
+		// GST for this line, on the discounted (billed) taxable value —
+		// derived here so old rows with an inconsistent stored gst_amount
+		// still print a GST total that matches the lines above.
+		if ($__gst_type === 'inclusive' && $__gst_pct > 0) {
+			$__gst_line = $__net_amt - ($__net_amt * 100 / (100 + $__gst_pct));
+		} else {
+			$__gst_line = $TotalAMount * $__gst_pct / 100;
+		}
+		$__gst_running += $__gst_line;
 
 		$TotalAMount23=$TotalAMount;
 		$TotalAMount123+=$TotalAMount23;
-		
+
 		$Totalquantity=$result_INVProductDetails['qty'];
 		$Totalquantity123+=$Totalquantity;
-		
+
 		$discountamount_show=$result_INVProductDetails['discount'];
-		
-		$Actual_total_amount=$result_INVProductDetails['qty']*$result_INVProductDetails['price'];
-		$discountPercentage = ($discountamount_show/$Actual_total_amount)*100;
+
+		$Actual_total_amount=$__gross_amt;
+		$discountPercentage = $Actual_total_amount > 0 ? ($discountamount_show/$Actual_total_amount)*100 : 0;
 	?>
 <tr>
 <td><?=$intr=$intr+1;?></td>
@@ -293,7 +328,8 @@ Terms of Delivery<br/>
 <td id="rightlaign"><?=$result_ProductDetails123['hsn'];?></td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2);?></td>
-<td id="rightlaign"><?php echo inr_format($result_INVProductDetails['price'], 2);?></td>
+<td id="rightlaign"><?php echo inr_format($__rate_excl, 2);?></td>
+<td id="rightlaign"><?php echo inr_format($__rate_incl, 2);?></td>
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?=$result_INVProductDetails['gst'];?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=inr_format($discountPercentage, 2);?>%)</td>
@@ -302,7 +338,7 @@ Terms of Delivery<br/>
 
 	<?php } ?>
 	<tr>
-	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+	<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
 	</tr>
 
 <tr id="bottombordervl">
@@ -315,6 +351,7 @@ Terms of Delivery<br/>
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 <td id="rightlaign"><b>&#8377; <?php echo inr_format($TotalAMount123, 2);?></b></td>
 </tr>
 
@@ -322,14 +359,11 @@ Terms of Delivery<br/>
 <!------------------------------------------------------------------>
 <!------------------------------GST--------------------------------->
 <?php
-// Sums gst_amount across every product line for this tempid — previously
-// this only read $result_Invoice_Details, a single mysqli_fetch_array() row
-// (the first product added), silently understating the printed GST total
-// for any transfer with more than one product line.
-$select_SUm_gstamount = "select sum(gst_amount) from internal_transfer where tempid='$tempid'";
-$fetch_SUm_gstamount = mysqli_query($db_conn, $select_SUm_gstamount);
-$result_SUm_gstamount = mysqli_fetch_array($fetch_SUm_gstamount);
-$totalgstamount = $result_SUm_gstamount[0] !== NULL ? (float)$result_SUm_gstamount[0] : 0;
+// GST total = sum of the per-line GST computed in the item loop above
+// (respecting each line's gst_type), so it always reconciles with the
+// printed lines. Previously this ran a separate SUM(gst_amount) query,
+// which drifted from the displayed figures for pre-fix rows.
+$totalgstamount = (float)$__gst_running;
 
 if($totalgstamount>0)
 {
@@ -349,6 +383,7 @@ $CGST=inr_format($CGST, 2);
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 <td id="rightlaign"><b>&#8377; <?=$SGST;?></b></td>
 </tr>
 <tr id="bottombordervl">
@@ -356,6 +391,7 @@ $CGST=inr_format($CGST, 2);
 <td id="rightlaign"><b><i>CGST</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -380,6 +416,7 @@ $CGST=inr_format($CGST, 2);
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 <td id="rightlaign"><b>&#8377; <?=inr_format($result_Invoice['courier_charges'], 2);?></b></td>
 </tr>
 <?php }else{ $Courier_Charges="0";}  ?>
@@ -398,14 +435,12 @@ $CGST=inr_format($CGST, 2);
 </tr>
 <?php } */ ?>
 
-<?php 
-//TOTAL SALES AMOUNT
-$select_SUm_slsamount="select sum(total) from internal_transfer where tempid='$tempid'";
-$fetch_SUm_slsamount=mysqli_query($db_conn,$select_SUm_slsamount);
-$result_SUm_slsamount=mysqli_fetch_array($fetch_SUm_slsamount);
-if($result_SUm_slsamount[0]!=NULL){ $TotalSLS_amount=$result_SUm_slsamount[0];}else{$TotalSLS_amount="0";}
-
-$Total_amount_show=$TotalSLS_amount+$Courier_Charges;
+<?php
+// Grand Total = taxable subtotal + GST + courier. Built from the same
+// pre-tax figures shown above (not SUM(internal_transfer.total)), so it
+// reconciles with the printed lines even for rows written before the
+// inclusive-GST fix, where the stored `total` may be inconsistent.
+$Total_amount_show = $TotalAMount123 + $totalgstamount + (float)$Courier_Charges;
 ?>
 
 <tr id="bottombordervl">
@@ -413,6 +448,7 @@ $Total_amount_show=$TotalSLS_amount+$Courier_Charges;
 <td id="rightlaign"><b><i>Total</i></b></td>
 <td></td>
 <td id="rightlaign"></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
