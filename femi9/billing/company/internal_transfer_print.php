@@ -269,9 +269,13 @@ Terms of Delivery<br/>
 		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
-		$TotalAMount=$result_INVProductDetails['qty']*$result_INVProductDetails['price'];
-		$TotalAMount=$TotalAMount-$result_INVProductDetails['discount'];
-		
+		// Show the taxable (pre-GST) value in the Amount column so that
+		// Amount + SGST + CGST reconciles with Total. For an exclusive
+		// product taxable_value == qty*price-discount (no change); for an
+		// inclusive product it is that gross figure with GST carved out,
+		// matching the gst_amount/total already stored on the row.
+		$TotalAMount=(float)$result_INVProductDetails['taxable_value'];
+
 		$TotalAMount23=$TotalAMount;
 		$TotalAMount123+=$TotalAMount23;
 		
@@ -488,8 +492,9 @@ while($resulthsn=mysqli_fetch_array($fetchhsn)){
 	
 	$hsncode=$resulthsn['hsn'];
 
-//sum hsn taxable Amount
-$selecthsnTaxamount="select sum(total) from internal_transfer where tempid='$tempid' and hsn='$hsncode'";
+//sum hsn taxable Amount (taxable_value = pre-GST; total would include GST for
+//exclusive lines and, for inclusive lines, equals the gross so is overstated)
+$selecthsnTaxamount="select sum(taxable_value) from internal_transfer where tempid='$tempid' and hsn='$hsncode'";
 $fetchhsnTaxamount=mysqli_query($db_conn,$selecthsnTaxamount);
 $resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
 ?>
@@ -499,7 +504,7 @@ $resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
 </tr>
 <?php }
 
-$selecthsnTaxamount12="select sum(total) from internal_transfer where tempid='$tempid'";
+$selecthsnTaxamount12="select sum(taxable_value) from internal_transfer where tempid='$tempid'";
 $fetchhsnTaxamount12=mysqli_query($db_conn,$selecthsnTaxamount12);
 $resulthsnTaxamount12=mysqli_fetch_array($fetchhsnTaxamount12);
 ?>

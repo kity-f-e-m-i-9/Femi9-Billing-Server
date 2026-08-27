@@ -78,9 +78,20 @@ $hsn=$resultproducts['hsn'];
 	$invoiceqty=$result_invoicedtails['qty'];
 	$pr_mrp=$result_invoicedtails['amount'];
 	
+	// Respect the product's own price-tax setting (same convention as
+	// user-invoice-action.php / internal_transfer_action.php). An 'inclusive'
+	// product's invoiced rate already has GST baked in, so the tax is carved
+	// OUT of subtotal and total collapses to subtotal; adding GST on top again
+	// would inflate the credit note and any advance-payment credit from it.
+	$product_gst_type=(($resultproducts['gst_type'] ?? 'exclusive')==='inclusive') ? 'inclusive' : 'exclusive';
 	$subtotal=$pr_mrp*$returnqty;
-	$gstamount_total=$subtotal*$gst_percentage/100;
-	$total=$subtotal+$gstamount_total;
+	if($product_gst_type==='inclusive' && $gst_percentage>0){
+		$gstamount_total=$subtotal-($subtotal*100/(100+$gst_percentage));
+		$total=$subtotal;
+	}else{
+		$gstamount_total=$subtotal*$gst_percentage/100;
+		$total=$subtotal+$gstamount_total;
+	}
 	
 	if($returnqty<=$invoiceqty)
 	{

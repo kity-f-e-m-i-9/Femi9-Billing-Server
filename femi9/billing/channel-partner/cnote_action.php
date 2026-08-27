@@ -72,7 +72,7 @@ if (isset($_REQUEST['add-return'])) {
     $gst_type        = $inv['gst_type'];
 
     // Product details
-    $stmt = $db_conn->prepare("SELECT gst, hsn, rwpoints FROM products WHERE id=? LIMIT 1");
+    $stmt = $db_conn->prepare("SELECT gst, gst_type, hsn, rwpoints FROM products WHERE id=? LIMIT 1");
     $stmt->bind_param('s', $prid);
     $stmt->execute();
     $product = $stmt->get_result()->fetch_assoc();
@@ -88,9 +88,21 @@ if (isset($_REQUEST['add-return'])) {
     $stmt->close();
     if (!$inv_item) { header("Location: cnote_new.php?error=product_not_in_invoice_items"); exit; }
 
+    // Respect the product's own price-tax setting (same convention as
+    // user-invoice-action.php / internal_transfer_action.php). An 'inclusive'
+    // product's invoiced rate already has GST baked in, so the tax is carved
+    // OUT of subtotal and total collapses to subtotal; adding GST on top again
+    // would inflate the credit note and any advance-payment credit from it.
+    $product_gst_type = (($product['gst_type'] ?? 'exclusive') === 'inclusive') ? 'inclusive' : 'exclusive';
+    $gst_pct    = (float)$product['gst'];
     $subtotal   = (float)$inv_item['amount'] * $returnqty;
-    $gst_amt    = ($subtotal * (float)$product['gst']) / 100;
-    $total      = $subtotal + $gst_amt;
+    if ($product_gst_type === 'inclusive' && $gst_pct > 0) {
+        $gst_amt = $subtotal - ($subtotal * 100 / (100 + $gst_pct));
+        $total   = $subtotal;
+    } else {
+        $gst_amt = ($subtotal * $gst_pct) / 100;
+        $total   = $subtotal + $gst_amt;
+    }
     $rwpoints   = (float)$product['rwpoints'] * $returnqty;
     $return_date = date('Y-m-d');
 
