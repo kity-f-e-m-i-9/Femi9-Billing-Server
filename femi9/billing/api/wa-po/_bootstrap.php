@@ -163,7 +163,7 @@ if (!$db_conn) {
     wa_po_fail(500, 'Database connection failed');
 }
 
-// --- 1. Bearer token check ------------------------------------------------
+// --- 1. API key check -------------------------------------------------------
 $headers = function_exists('getallheaders') ? getallheaders() : [];
 // getallheaders() header casing can vary by SAPI; normalize to a
 // case-insensitive lookup so "authorization" vs "Authorization" both work.
@@ -172,8 +172,15 @@ foreach ($headers as $k => $v) {
     $normalizedHeaders[strtolower($k)] = $v;
 }
 
-$authHeader = $normalizedHeaders['authorization'] ?? '';
-if (!preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m) || !hash_equals(WA_PO_API_KEY, $m[1])) {
+// Read the key from X-Api-Key rather than Authorization: Bearer. The
+// caller is n8n's HTTP Request tool nodes, and n8n treats "Authorization"
+// as a reserved header tied to its own node-level Authentication setting —
+// a manually-added "Authorization" Header Parameter gets silently dropped
+// from the actual outgoing request (confirmed via wa_po_auth_debug.log:
+// X-Signature arrived fine, Authorization never did). X-Api-Key is a
+// plain, non-reserved header name n8n sends as configured.
+$apiKeyHeader = $normalizedHeaders['x-api-key'] ?? '';
+if (!hash_equals(WA_PO_API_KEY, $apiKeyHeader)) {
     wa_po_log_auth_debug('Invalid or missing API key', $normalizedHeaders, file_get_contents('php://input'));
     wa_po_fail(401, 'Invalid or missing API key');
 }
