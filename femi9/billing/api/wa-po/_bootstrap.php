@@ -178,9 +178,24 @@ if (!preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m) || !hash_equals(WA_PO_API
     wa_po_fail(401, 'Invalid or missing API key');
 }
 
-// --- 2. HMAC signature check on raw body ----------------------------------
+// --- 2. HMAC signature check (static, NOT over the raw body) --------------
+// Originally this hashed the raw request body, but the caller here is an
+// n8n AI Agent's tool nodes — each of the 13 tool nodes is invoked directly
+// by the LLM with its own dynamically-decided arguments, so there is no
+// single upstream step in the graph that can see (and sign) each call's
+// exact outgoing body before it's sent. That makes a body-bound signature
+// impractical to produce from n8n's agent-tool architecture.
+//
+// Instead X-Signature is now a fixed value — HMAC-SHA256(WA_PO_API_KEY,
+// WA_PO_WEBHOOK_SECRET) — the same string on every call, computed once and
+// pasted as a static header value into each tool node (same way the
+// Authorization header is a static pasted value). This keeps two
+// independent secrets required to call in (defense-in-depth / key
+// rotation isolation) without needing per-call signing. It intentionally
+// gives up replay/tamper protection on the body itself, which isn't
+// enforceable from this caller anyway.
 $rawBody = file_get_contents('php://input');
-$expectedSig = hash_hmac('sha256', $rawBody, WA_PO_WEBHOOK_SECRET);
+$expectedSig = hash_hmac('sha256', WA_PO_API_KEY, WA_PO_WEBHOOK_SECRET);
 $givenSig = $normalizedHeaders['x-signature'] ?? '';
 if ($givenSig === '' || !hash_equals($expectedSig, $givenSig)) {
     wa_po_log_auth_debug('Signature mismatch', $normalizedHeaders, $rawBody);
