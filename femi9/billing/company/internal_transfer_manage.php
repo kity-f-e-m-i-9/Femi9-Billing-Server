@@ -94,19 +94,24 @@ $sucMessage = $_SESSION['sucMessage'];
 									</h1>
 									<br/>
 									
-									<?php 
+									<?php
 									if($_REQUEST['frdate']==NULL && $_REQUEST['todate']==NULL)
 									{
 										$se_fromDate=date("Y-m-d");
 										$se_toDate=date("Y-m-d");
-										
+
 									}else{
 										$se_fromDate=$_REQUEST['frdate'];
 										$se_toDate=$_REQUEST['todate'];
 									}
-									
+
+									// Bill type filter: 'all' (default), 'napkin', or 'diaper'. Products
+									// carry category='diaper' for diaper SKUs; napkin SKUs are either
+									// category='napkin' or NULL (the older napkin catalog predates this
+									// column — see mis-report.php's identical "not diaper" convention).
+									$se_billType = in_array($_REQUEST['billtype'] ?? '', ['napkin','diaper'], true) ? $_REQUEST['billtype'] : 'all';
 									?>
-									
+
 <form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
 <div class="overviewcontainar">
 <div id="searchleftcont">
@@ -116,6 +121,14 @@ $sucMessage = $_SESSION['sucMessage'];
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
 <input type="date" required="" name="todate" value="<?=$se_toDate;?>" class="form-control">
+</div>
+<div id="searchleftcont">
+<label class="form-label">Bill Type</label>
+<select name="billtype" class="form-control">
+<option value="all" <?= $se_billType==='all' ? 'selected' : ''; ?>>All</option>
+<option value="napkin" <?= $se_billType==='napkin' ? 'selected' : ''; ?>>Napkin</option>
+<option value="diaper" <?= $se_billType==='diaper' ? 'selected' : ''; ?>>Diaper</option>
+</select>
 </div>
 
 <div id="searchbuttoncont">
@@ -128,7 +141,7 @@ $sucMessage = $_SESSION['sucMessage'];
 							</div>
 							<div style="clear:both;"></div>
 							<br/>
-							</form>	
+							</form>
 							
                                 </div>
                             </div>
@@ -157,7 +170,9 @@ $i= $start_from;
 													<th>Send To</th>
 													<th>Invoice Date</th>
                                                     <th>Invoice Number</th>
-				<?php $select_prdetails_header="select * from `products` order by `id` asc";
+				<?php
+				$__billTypeCond = $se_billType==='diaper' ? "where category='diaper'" : ($se_billType==='napkin' ? "where category IS NULL OR category='napkin'" : '');
+				$select_prdetails_header="select * from `products` {$__billTypeCond} order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
 				<th><?=$result_prdetails_header['productName'];?></th>
@@ -170,8 +185,17 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php 
-									$select_product_list12="select distinct`tempid` from `internal_transfer` where date between '$se_fromDate' and '$se_toDate'";
+										<?php
+									// When a Bill Type is selected, only list transfers that carry at
+									// least one line item in that category — a transfer with only
+									// napkin lines has nothing to show and disappears when "Diaper"
+									// is selected, same convention as the header product columns above.
+									$__billTypeJoinCond = $se_billType==='diaper'
+										? "AND p.category='diaper'"
+										: ($se_billType==='napkin' ? "AND (p.category IS NULL OR p.category='napkin')" : '');
+									$select_product_list12="select distinct it.`tempid` from `internal_transfer` it
+										join products p on p.id = it.product_id
+										where it.date between '$se_fromDate' and '$se_toDate' {$__billTypeJoinCond}";
 										$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
 										while($ResultRecords12=mysqli_fetch_array($fetch_product_list12))
 										{
@@ -218,7 +242,7 @@ $i= $start_from;
                     <td><?php echo $result_INVOICE["inv_number"];?></td>
 					
 					<!------------------------PRODUCT WISE SALES QTY------------------------------->
-				<?php $select_prdetails_header="select * from `products` order by `id` asc";
+				<?php $select_prdetails_header="select * from `products` {$__billTypeCond} order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){
 					
