@@ -174,6 +174,14 @@ $i = 0;
                                     <?php foreach ($partners as $tp):
                                         $enc_id = base64_encode($tp['id']);
                                         $initials = strtoupper(substr($tp['name'], 0, 1));
+                                        $loc_data = [];
+                                        if (!empty($tp['location_details'])) {
+                                            foreach (explode('~~', $tp['location_details']) as $_d) {
+                                                $_parts = explode('||', $_d, 4);
+                                                $loc_data[] = ['layer' => $_parts[0] ?: '—', 'name' => $_parts[1] ?? $_d, 'parent' => $_parts[2] ?? '', 'grandparent' => $_parts[3] ?? ''];
+                                            }
+                                        }
+                                        $loc_json = htmlspecialchars(json_encode($loc_data, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
                                     ?>
                                         <tr>
                                             <td style="color:#9ca3af;font-size:13px;"><?php echo ++$i; ?></td>
@@ -195,9 +203,12 @@ $i = 0;
                                             <td style="font-size:13.5px;"><?php echo htmlspecialchars($tp['mobile']); ?></td>
                                             <td>
                                                 <?php if ($tp['location_count'] > 0): ?>
-                                                    <span style="background:#667eea;color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;">
+                                                    <button type="button" class="loc-view-trigger"
+                                                            style="border:none;cursor:pointer;background:#667eea;color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;"
+                                                            data-partner="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>"
+                                                            data-locs="<?php echo $loc_json; ?>">
                                                         <?php echo (int)$tp['location_count']; ?> location<?php echo $tp['location_count'] > 1 ? 's' : ''; ?>
-                                                    </span>
+                                                    </button>
                                                 <?php else: ?>
                                                     <span style="color:#d1d5db;font-size:12px;">—</span>
                                                 <?php endif; ?>
@@ -218,6 +229,26 @@ $i = 0;
                     </div>
 
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Location View Modal -->
+<div class="modal fade" id="locViewModal" tabindex="-1" aria-labelledby="locViewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-md">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                <h6 class="modal-title" id="locViewModalLabel" style="font-weight:600;color:#1f2937;">
+                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#667eea;">location_on</i>
+                    Assigned Locations
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="locViewModalBody" style="padding:16px 20px;">
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -265,6 +296,42 @@ $(document).on('click', '.toggle-status-btn', function () {
             $badge.removeClass('badge-active').addClass('badge-inactive').text('Inactive');
         }
     }, 'json').fail(function () { alert('Request failed. Please try again.'); });
+});
+
+$(document).on('click', '.loc-view-trigger', function () {
+    var partner = $(this).data('partner');
+    var locs    = $(this).data('locs');
+    $('#locViewModalLabel').html(
+        '<i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#667eea;">location_on</i>' +
+        $('<span>').text(partner).html()
+    );
+    var grouped = {};
+    var order   = [];
+    $.each(locs, function (_, loc) {
+        var layer = loc.layer || '—';
+        if (!grouped[layer]) { grouped[layer] = []; order.push(layer); }
+        grouped[layer].push({ name: loc.name, parent: loc.parent || '', grandparent: loc.grandparent || '' });
+    });
+    var html = '';
+    $.each(order, function (_, layer) {
+        html += '<div style="margin-bottom:14px;">';
+        html += '<div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid #f3f4f6;padding-bottom:5px;margin-bottom:7px;">' + $('<div>').text(layer).html() + '</div>';
+        $.each(grouped[layer], function (_, item) {
+            html += '<div style="padding:5px 0 5px 8px;font-size:13.5px;color:#1f2937;border-bottom:1px dotted #f3f4f6;display:flex;align-items:center;gap:7px;">' +
+                    '<i class="material-icons-outlined" style="font-size:15px;color:#a5b4fc;">location_on</i>' +
+                    '<div><span>' + $('<div>').text(item.name).html() + '</span>' +
+                    (item.grandparent || item.parent
+                        ? '<span style="font-size:11px;color:#9ca3af;margin-left:6px;">' +
+                          (item.grandparent ? $('<div>').text(item.grandparent).html() + ' › ' : '') +
+                          (item.parent ? $('<div>').text(item.parent).html() : '') +
+                          '</span>'
+                        : '') +
+                    '</div></div>';
+        });
+        html += '</div>';
+    });
+    $('#locViewModalBody').html(html);
+    $('#locViewModal').modal('show');
 });
 </script>
 </body>
