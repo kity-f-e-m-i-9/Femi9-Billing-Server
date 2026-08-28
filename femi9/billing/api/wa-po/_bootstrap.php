@@ -103,6 +103,54 @@ function wa_po_fail($code, $msg) {
     exit;
 }
 
+/**
+ * Writes a one-off diagnostic line to logs/wa_po_auth_debug.log capturing
+ * exactly what the caller sent for the two auth checks (headers present,
+ * a masked/truncated view of the Authorization value, and the raw body),
+ * so an "Invalid or missing API key" / "Signature mismatch" failure in
+ * wa_po_api.log can be cross-referenced against what was actually received
+ * — without ever writing the real secrets or full token to disk.
+ *
+ * Kept separate from wa_po_api.log (which stays a compact one-liner) since
+ * this is verbose and only needed while chasing an auth failure.
+ */
+function wa_po_log_auth_debug($reason, array $normalizedHeaders, $rawBody) {
+    $mask = function ($v, $keep = 6) {
+        if (!is_string($v) || $v === '') return '(empty)';
+        $len = strlen($v);
+        return $len <= $keep ? str_repeat('*', $len) : substr($v, 0, $keep) . '...(' . $len . ' chars)';
+    };
+
+    $authHeader = $normalizedHeaders['authorization'] ?? null;
+    $sigHeader = $normalizedHeaders['x-signature'] ?? null;
+
+    $entry = [
+        'time' => date('Y-m-d H:i:s'),
+        'endpoint' => $GLOBALS['wa_po_log_endpoint'] ?? 'unknown',
+        'ip' => $_SERVER['REMOTE_ADDR'] ?? '-',
+        'reason' => $reason,
+        'method' => $_SERVER['REQUEST_METHOD'] ?? '-',
+        'headers_received' => array_keys($normalizedHeaders),
+        'authorization_present' => $authHeader !== null,
+        'authorization_masked' => $authHeader !== null ? $mask($authHeader) : null,
+        'x_signature_present' => $sigHeader !== null,
+        'x_signature_masked' => $sigHeader !== null ? $mask($sigHeader, 8) : null,
+        'content_type' => $normalizedHeaders['content-type'] ?? null,
+        'body_length' => is_string($rawBody) ? strlen($rawBody) : 0,
+        'body_preview' => is_string($rawBody) ? substr($rawBody, 0, 500) : null,
+    ];
+
+    $logDir = __DIR__ . '/logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    @file_put_contents(
+        $logDir . '/wa_po_auth_debug.log',
+        json_encode($entry, JSON_UNESCAPED_SLASHES) . "\n",
+        FILE_APPEND | LOCK_EX
+    );
+}
+
 // --- DB connection -------------------------------------------------------
 $db_conn = mysqli_connect(
     $_ENV['DB_HOST'] ?? 'localhost',
@@ -115,7 +163,7 @@ if (!$db_conn) {
     wa_po_fail(500, 'Database connection failed');
 }
 
-// --- 1. Bearer token check ------------------------------------------------
+// --- 1. API key check -------------------------------------------------------
 $headers = function_exists('getallheaders') ? getallheaders() : [];
 // getallheaders() header casing can vary by SAPI; normalize to a
 // case-insensitive lookup so "authorization" vs "Authorization" both work.
@@ -124,16 +172,40 @@ foreach ($headers as $k => $v) {
     $normalizedHeaders[strtolower($k)] = $v;
 }
 
-$authHeader = $normalizedHeaders['authorization'] ?? '';
-if (!preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m) || !hash_equals(WA_PO_API_KEY, $m[1])) {
+// Read the key from X-Api-Key rather than Authorization: Bearer. The
+// caller is n8n's HTTP Request tool nodes, and n8n treats "Authorization"
+// as a reserved header tied to its own node-level Authentication setting —
+// a manually-added "Authorization" Header Parameter gets silently dropped
+// from the actual outgoing request (confirmed via wa_po_auth_debug.log:
+// X-Signature arrived fine, Authorization never did). X-Api-Key is a
+// plain, non-reserved header name n8n sends as configured.
+$apiKeyHeader = $normalizedHeaders['x-api-key'] ?? '';
+if (!hash_equals(WA_PO_API_KEY, $apiKeyHeader)) {
+    wa_po_log_auth_debug('Invalid or missing API key', $normalizedHeaders, file_get_contents('php://input'));
     wa_po_fail(401, 'Invalid or missing API key');
 }
 
-// --- 2. HMAC signature check on raw body ----------------------------------
+// --- 2. HMAC signature check (static, NOT over the raw body) --------------
+// Originally this hashed the raw request body, but the caller here is an
+// n8n AI Agent's tool nodes — each of the 13 tool nodes is invoked directly
+// by the LLM with its own dynamically-decided arguments, so there is no
+// single upstream step in the graph that can see (and sign) each call's
+// exact outgoing body before it's sent. That makes a body-bound signature
+// impractical to produce from n8n's agent-tool architecture.
+//
+// Instead X-Signature is now a fixed value — HMAC-SHA256(WA_PO_API_KEY,
+// WA_PO_WEBHOOK_SECRET) — the same string on every call, computed once and
+// pasted as a static header value into each tool node (same way the
+// Authorization header is a static pasted value). This keeps two
+// independent secrets required to call in (defense-in-depth / key
+// rotation isolation) without needing per-call signing. It intentionally
+// gives up replay/tamper protection on the body itself, which isn't
+// enforceable from this caller anyway.
 $rawBody = file_get_contents('php://input');
-$expectedSig = hash_hmac('sha256', $rawBody, WA_PO_WEBHOOK_SECRET);
+$expectedSig = hash_hmac('sha256', WA_PO_API_KEY, WA_PO_WEBHOOK_SECRET);
 $givenSig = $normalizedHeaders['x-signature'] ?? '';
 if ($givenSig === '' || !hash_equals($expectedSig, $givenSig)) {
+    wa_po_log_auth_debug('Signature mismatch', $normalizedHeaders, $rawBody);
     wa_po_fail(401, 'Signature mismatch');
 }
 

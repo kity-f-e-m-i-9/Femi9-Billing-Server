@@ -15,10 +15,21 @@ Base URL suggestion: `https://femi9.in/api/wa-po/v1`
 
 All requests must carry:
 ```
-Authorization: Bearer <API_KEY>
-X-Signature: <HMAC-SHA256 of raw body, using WEBHOOK_SECRET>
+X-Api-Key: <API_KEY>
+X-Signature: <HMAC-SHA256(API_KEY, WEBHOOK_SECRET) — a static value, same on every call>
 Content-Type: application/json
 ```
+
+> **Deviation from the original design (2026-08-27):** this section originally specified
+> `Authorization: Bearer <API_KEY>` and `X-Signature` as an HMAC over each request's raw body.
+> The actual caller turned out to be an n8n AI Agent whose tool nodes are invoked directly by the
+> LLM — there's no shared upstream node in that graph to sign each call's exact body, and n8n's
+> HTTP Request node also silently drops a manually-added `Authorization` Header Parameter (it
+> reserves that name for its own node-level Authentication setting). So: the key moved to the
+> plain header `X-Api-Key`, and `X-Signature` became a static precomputed value —
+> `HMAC-SHA256(API_KEY, WEBHOOK_SECRET)` — pasted the same into every tool node instead of
+> computed per-request. See `femi9/billing/config/wa_po_secrets.php` for the current value and
+> `femi9/billing/api/wa-po/_bootstrap.php` for the implementation.
 
 ### 1.1 Verify user / genuineness + category
 
@@ -456,6 +467,11 @@ whichever matches how the rest of femi9billing.com is structured:
 Called as `POST /api/wa-po/verify-user.php`, etc.
 
 **`_bootstrap.php`** – shared auth/signature check, included at the top of every endpoint file:
+> **This sample predates the 2026-08-27 auth deviation noted above** — it still shows the
+> original `Authorization: Bearer` + per-body-HMAC design. The actual, current implementation
+> lives in `femi9/billing/api/wa-po/_bootstrap.php` (X-Api-Key + static X-Signature) — treat that
+> file as authoritative, not this snippet.
+
 ```php
 <?php
 // _bootstrap.php
