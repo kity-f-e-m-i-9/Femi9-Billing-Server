@@ -95,6 +95,35 @@ switch ($preset) {
 $from = isset($_GET['from']) && $_GET['from'] ? date('Y-m-d', strtotime($_GET['from'])) : $df;
 $to   = isset($_GET['to'])   && $_GET['to']   ? date('Y-m-d', strtotime($_GET['to']))   : $dt;
 
+// ── TP coverage card — Total / Active / Inactive / New, plus each group's
+// own Target Amount (sum of their assigned Firkas' target_amount). $tpIds
+// above is active-only (getBdmAssignedTpIds default), so this re-fetches
+// including inactive ones specifically for this card — every other query
+// on this page intentionally stays active-only and is untouched.
+$tp_total_count = 0; $tp_active_count = 0; $tp_inactive_count = 0; $tp_new_count = 0;
+$tp_target_active = 0.0; $tp_target_inactive = 0.0;
+$tpIdsAll = getBdmAssignedTpIds($db_conn, $effectiveBdmId, true);
+if (!empty($tpIdsAll)) {
+    $tpIdListAll = implode(',', array_map('intval', $tpIdsAll));
+    $tp_total_count = count($tpIdsAll);
+    $_tpStatusRows = call_rows($db_conn,
+        "SELECT tp.id, tp.is_active, tp.created_at,
+                COALESCE(SUM(pln.target_amount), 0) AS target
+         FROM territory_partners tp
+         LEFT JOIN territory_partner_locations tpl ON tpl.territory_partner_id = tp.id
+         LEFT JOIN partner_location_nodes pln ON pln.id = tpl.location_id
+         WHERE tp.id IN ($tpIdListAll)
+         GROUP BY tp.id");
+    foreach ($_tpStatusRows as $_tr) {
+        $_active = (int)$_tr['is_active'] === 1;
+        if ($_active) { $tp_active_count++; $tp_target_active += (float)$_tr['target']; }
+        else { $tp_inactive_count++; $tp_target_inactive += (float)$_tr['target']; }
+        if (!empty($_tr['created_at']) && $_tr['created_at'] >= $from . ' 00:00:00' && $_tr['created_at'] <= $to . ' 23:59:59') {
+            $tp_new_count++;
+        }
+    }
+}
+
 $days_diff = (strtotime($to) - strtotime($from)) / 86400;
 $prev_from = date('Y-m-d', strtotime($from) - ($days_diff + 1) * 86400);
 $prev_to   = date('Y-m-d', strtotime($from) - 86400);
@@ -334,6 +363,40 @@ if ($hasTps) {
            AND payment_date BETWEEN ? AND ?",
         'ss', [$from, $to]);
     $overall_target_pct = $overall_target > 0 ? min(round($overall_achieved / $overall_target * 100, 1), 999) : 0;
+
+    // ═══ Advance Payment, split into calendar-day bands: Week 1-4 are
+    // always exactly 1-7 / 8-14 / 15-21 / 22-28 — never stretched to a
+    // month's actual last day — same convention already established in
+    // include/TpWeeklyTarget.php. Day 29-31 never belongs to any week of
+    // its OWN month there; it's its own band 5 here for the same reason
+    // (shown separately in the modal, not folded into Week 4, so the
+    // total still reconciles with $overall_achieved above without
+    // silently misattributing those days to a week they're not part of).
+    $advanceByWeekBand = [1 => 0.0, 2 => 0.0, 3 => 0.0, 4 => 0.0, 5 => 0.0];
+    $advanceByWeekBandCount = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
+    $_weekBandRows = call_rows($db_conn,
+        "SELECT
+            CASE
+                WHEN DAY(payment_date) BETWEEN 1 AND 7  THEN 1
+                WHEN DAY(payment_date) BETWEEN 8 AND 14 THEN 2
+                WHEN DAY(payment_date) BETWEEN 15 AND 21 THEN 3
+                WHEN DAY(payment_date) BETWEEN 22 AND 28 THEN 4
+                ELSE 5
+            END AS week_band,
+            COALESCE(SUM(amount),0) AS amt,
+            COUNT(*) AS cnt
+         FROM tp_advance_payments
+         WHERE territory_partner_id IN ($tpIdList) AND product_type='napkin' AND deleted_at IS NULL
+           AND payment_date BETWEEN ? AND ?
+         GROUP BY week_band",
+        'ss', [$from, $to]);
+    foreach ($_weekBandRows as $_wb) {
+        $wk = (int)$_wb['week_band'];
+        if (isset($advanceByWeekBand[$wk])) {
+            $advanceByWeekBand[$wk] = (float)$_wb['amt'];
+            $advanceByWeekBandCount[$wk] = (int)$_wb['cnt'];
+        }
+    }
 
     $napkin_sold_cust = (float)cval($db_conn,
         "SELECT COALESCE(SUM(ii.total),0) FROM invoice_items ii
@@ -809,6 +872,48 @@ if ($hasTps) {
                         </div>
                     </div>
 
+                    <!-- ══ TP coverage — Total / Active / Inactive / New, each with its own Target Amount ══ -->
+                    <div class="row mb-3">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
+                                <i class="material-icons-outlined kpi-ico">groups</i>
+                                <div class="kpi-t">Total TPs</div>
+                                <div class="kpi-multi">
+                                    <div><b><?php echo $tp_total_count; ?></b></div>
+                                    <div><span>Target Amount</span><b>&#8377;<?php echo inr_format($tp_target_active + $tp_target_inactive, 0); ?></b></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
+                                <i class="material-icons-outlined kpi-ico">check_circle</i>
+                                <div class="kpi-t">Active TPs</div>
+                                <div class="kpi-multi">
+                                    <div><b><?php echo $tp_active_count; ?></b></div>
+                                    <div><span>Target Amount</span><b>&#8377;<?php echo inr_format($tp_target_active, 0); ?></b></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:var(--critical);--kpi-tint:var(--critical-tint);">
+                                <i class="material-icons-outlined kpi-ico">cancel</i>
+                                <div class="kpi-t">Inactive TPs</div>
+                                <div class="kpi-multi">
+                                    <div><b><?php echo $tp_inactive_count; ?></b></div>
+                                    <div><span>Target Amount</span><b>&#8377;<?php echo inr_format($tp_target_inactive, 0); ?></b></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="kpi-card" style="--kpi-accent:#8b5cf6;--kpi-tint:#ede9fe;">
+                                <i class="material-icons-outlined kpi-ico">person_add</i>
+                                <div class="kpi-t">New TPs</div>
+                                <div class="kpi-multi"><div><b><?php echo $tp_new_count; ?></b></div></div>
+                                <p class="snote" style="margin:6px 0 0;">Onboarded between <?php echo date('d M', strtotime($from)); ?>–<?php echo date('d M Y', strtotime($to)); ?>.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- ══ Overview — District Total Target / Payment, then Sales / Returns / Total Turnover ══ -->
                     <div class="mis-section" id="sec-overview">
                     <?php
@@ -845,7 +950,7 @@ if ($hasTps) {
                                 <div class="kpi-t">Payment</div>
                                 <div class="kpi-multi">
                                     <div><span>Total Target Amount</span><b>&#8377;<?php echo inr_format($overall_target, 0); ?></b></div>
-                                    <div><span>Advance Payment</span><b>&#8377;<?php echo inr_format($overall_achieved, 0); ?></b></div>
+                                    <div><span>Advance Payment</span><b><a href="#" id="advanceByWeekLink" data-bs-toggle="modal" data-bs-target="#advanceByWeekModal" style="color:#8b5cf6;text-decoration:underline dotted;">&#8377;<?php echo inr_format($overall_achieved, 0); ?></a></b></div>
                                     <div><span>%</span><b style="color:<?php echo $tgtAccent; ?>;"><?php echo $overall_target_pct; ?>%</b></div>
                                     <div><span>Napkin Purchase</span><b>&#8377;<?php echo inr_format($overall_napkin_purchased, 0); ?></b></div>
                                     <?php if ($prevAdvanceUsed > 0): ?>
@@ -903,6 +1008,54 @@ if ($hasTps) {
                         </div>
                     </div>
 
+                    <!-- ══ Advance Payment — by calendar-day band (1-7 / 8-14 / 15-21 / 22-end) ══ -->
+                    <div class="modal fade" id="advanceByWeekModal" tabindex="-1" aria-labelledby="advanceByWeekModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                                    <h6 class="modal-title" id="advanceByWeekModalLabel" style="font-weight:600;color:#1f2937;">
+                                        <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#8b5cf6;">calendar_view_week</i>
+                                        Advance Payment — by Week
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body" style="padding:14px 20px;">
+                                    <p class="snote" style="margin:0 0 12px;">Napkin advance payments dated <?php echo date('d M Y', strtotime($from)); ?>–<?php echo date('d M Y', strtotime($to)); ?>, split by the day-of-month it was paid on.</p>
+                                    <table class="mt">
+                                        <thead><tr><th>Days</th><th style="text-align:right;">Payments</th><th style="text-align:right;">Amount</th></tr></thead>
+                                        <tbody>
+                                        <?php
+                                            $_weekLabels = [1 => 'Week 1 (Day 1–7)', 2 => 'Week 2 (Day 8–14)', 3 => 'Week 3 (Day 15–21)', 4 => 'Week 4 (Day 22–28)'];
+                                            foreach ($_weekLabels as $_wk => $_label):
+                                        ?>
+                                            <tr>
+                                                <td><?php echo $_label; ?></td>
+                                                <td style="text-align:right;"><?php echo (int)$advanceByWeekBandCount[$_wk]; ?></td>
+                                                <td style="text-align:right;">&#8377;<?php echo inr_format($advanceByWeekBand[$_wk], 2); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        <?php if ($advanceByWeekBandCount[5] > 0): ?>
+                                            <tr>
+                                                <td>Day 29–31 <span class="snote" style="display:block;font-size:11px;">(belongs to next month's Week 1, not this month's Week 4)</span></td>
+                                                <td style="text-align:right;"><?php echo (int)$advanceByWeekBandCount[5]; ?></td>
+                                                <td style="text-align:right;">&#8377;<?php echo inr_format($advanceByWeekBand[5], 2); ?></td>
+                                            </tr>
+                                        <?php endif; ?>
+                                        </tbody>
+                                        <tfoot><tr style="font-weight:700;border-top:2px solid var(--gridline);">
+                                            <td>Total</td>
+                                            <td style="text-align:right;"><?php echo array_sum($advanceByWeekBandCount); ?></td>
+                                            <td style="text-align:right;">&#8377;<?php echo inr_format($overall_achieved, 2); ?></td>
+                                        </tr></tfoot>
+                                    </table>
+                                </div>
+                                <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:6px 0 8px;">
                         <h3 style="font-size:16px;font-weight:700;margin:0;">Overview — Your TPs' Downstream Sales</h3>
                         <div id="overviewCatToggle" style="display:flex;gap:6px;">
@@ -914,6 +1067,11 @@ if ($hasTps) {
                     <style>
                         .ov-cat-btn { padding:5px 14px; border-radius:20px; border:1.5px solid var(--blue); color:var(--blue); background:#fff; font-size:12px; font-weight:600; cursor:pointer; }
                         .ov-cat-btn.active { background:var(--blue); color:#fff; }
+                        .mis-pagination { display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-top:10px; flex-wrap:wrap; }
+                        .mis-pagination button { padding:4px 11px; border-radius:6px; border:1px solid var(--gridline,#e5e7eb); background:#fff; color:#374151; font-size:12.5px; font-weight:600; cursor:pointer; }
+                        .mis-pagination button.active { background:var(--blue); border-color:var(--blue); color:#fff; }
+                        .mis-pagination button:disabled { opacity:.4; cursor:default; }
+                        .mis-pagination .mis-pg-info { font-size:12px; color:#6b7280; margin-right:6px; }
                     </style>
                     <div class="equation-row">
                         <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
@@ -1146,6 +1304,51 @@ if ($hasTps) {
                                         <?php endforeach; endif; ?>
                                         </tbody>
                                     </table>
+                                    <div id="purchasesPagination" class="mis-pagination"></div>
+                                    <script>
+                                    (function () {
+                                        // Client-side only — the category toggle (All/Napkin/Diaper)
+                                        // changes each row's own qty/amt cells, never how many TP
+                                        // rows exist, so a fixed page size here never fights it.
+                                        var pageSize = 10;
+                                        var table = document.getElementById('purchasesCatTable');
+                                        var tbody = table.querySelector('tbody');
+                                        var allRows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+                                        // A single "No purchases in this period." placeholder row
+                                        // (colspan) never needs pagination.
+                                        if (allRows.length <= pageSize || (allRows.length === 1 && allRows[0].children.length === 1)) return;
+
+                                        var pager = document.getElementById('purchasesPagination');
+                                        var totalPages = Math.ceil(allRows.length / pageSize);
+                                        var currentPage = 1;
+
+                                        function render() {
+                                            allRows.forEach(function (row, i) {
+                                                var onPage = Math.floor(i / pageSize) + 1;
+                                                row.style.display = (onPage === currentPage) ? '' : 'none';
+                                            });
+                                            var start = (currentPage - 1) * pageSize + 1;
+                                            var end = Math.min(currentPage * pageSize, allRows.length);
+                                            var html = '<span class="mis-pg-info">' + start + '–' + end + ' of ' + allRows.length + '</span>';
+                                            html += '<button type="button" data-pg="prev"' + (currentPage === 1 ? ' disabled' : '') + '>Prev</button>';
+                                            for (var p = 1; p <= totalPages; p++) {
+                                                html += '<button type="button" data-pg="' + p + '" class="' + (p === currentPage ? 'active' : '') + '">' + p + '</button>';
+                                            }
+                                            html += '<button type="button" data-pg="next"' + (currentPage === totalPages ? ' disabled' : '') + '>Next</button>';
+                                            pager.innerHTML = html;
+                                        }
+                                        pager.addEventListener('click', function (e) {
+                                            var btn = e.target.closest('button[data-pg]');
+                                            if (!btn) return;
+                                            var pg = btn.getAttribute('data-pg');
+                                            if (pg === 'prev') currentPage = Math.max(1, currentPage - 1);
+                                            else if (pg === 'next') currentPage = Math.min(totalPages, currentPage + 1);
+                                            else currentPage = parseInt(pg, 10);
+                                            render();
+                                        });
+                                        render();
+                                    })();
+                                    </script>
                                 </div>
                             </div>
                         </div>

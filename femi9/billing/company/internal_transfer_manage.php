@@ -240,11 +240,11 @@ $i= $start_from;
 				<td><?=$ResultRecords["username"];?><br/><?=ucwords($ResultRecords["usertype"]);?></td>
 													
 													<td>
-<a href="internal_transfer_details?tempid=<?=$tempid;?>"><img src="../../assets/images/details-32.png"/></a>
+<a href="internal_transfer_details?tempid=<?=$tempid;?>" target="_blank"><img src="../../assets/images/details-32.png"/></a>
 													</td>
 													
 													<td>
-<a href="internal_transfer_print?tempid=<?=$tempid;?>" title="Print">
+<a href="internal_transfer_print?tempid=<?=$tempid;?>" title="Print" target="_blank">
 <img src="../../assets/images/print32.png"/></a>
 													</td>
 													

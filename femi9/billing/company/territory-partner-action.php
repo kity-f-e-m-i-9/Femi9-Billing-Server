@@ -18,6 +18,13 @@ $_tp_cols = [
     'branch_line2'     => "VARCHAR(255) DEFAULT NULL AFTER branch_line1",
     'branch_city'      => "VARCHAR(100) DEFAULT NULL AFTER branch_line2",
     'branch_district'  => "VARCHAR(100) DEFAULT NULL AFTER branch_city",
+    // Sales-territory district, auto-tracked from the picked Firka
+    // location(s) — NOT the same thing as branch_district above (a real
+    // postal Billing Address field someone types by hand and can
+    // legitimately name a different place). Only this column drives Sales
+    // BDM territory matching — see resolveAssignedDistrictFromLocations()
+    // below and salesbdm/include/BdmTpScope.php's getBdmAssignedTpIds().
+    'assigned_district'=> "VARCHAR(100) DEFAULT NULL AFTER branch_district",
     'branch_state'     => "VARCHAR(100) DEFAULT NULL AFTER branch_district",
     'branch_country'   => "VARCHAR(100) DEFAULT NULL AFTER branch_state",
     'branch_pincode'   => "VARCHAR(20)  DEFAULT NULL AFTER branch_country",
@@ -43,6 +50,7 @@ $_isBdm = ($Login_user_TYPEvl ?? '') === 'salesbdm';
 if ($_isBdm) {
     require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
 }
+require_once __DIR__ . '/../shared/PartnerLocationDistrict.php';
 
 $action = $_POST['action'] ?? '';
 
@@ -79,6 +87,9 @@ if ($action === 'insert-territory-partner') {
     if ($_isBdm) {
         $location_ids = array_values(array_filter($location_ids, fn($lid) => isLocationInBdmDistricts($db_conn, (int)$salesBdmID, $lid)));
     }
+    // Sales-territory district — auto-tracked from the picked Firka, kept
+    // completely separate from branch_district (Billing Address) above.
+    $assigned_district = resolveAssignedDistrictFromLocations($db_conn, $location_ids);
 
     if (!$name || !$company_name || !$mobile || !$branch_line1 || !$delivery_line1) {
         header("Location: add-territory-partner?error=1");
@@ -129,14 +140,14 @@ if ($action === 'insert-territory-partner') {
         $stmt = $db_conn->prepare("
             INSERT INTO territory_partners
                 (tp_id, name, company_name, referral_id, referral_type, referral_percentage, mobile, email, gstin,
-                 branch_line1, branch_line2, branch_city, branch_district, branch_state, branch_country, branch_pincode,
+                 branch_line1, branch_line2, branch_city, branch_district, assigned_district, branch_state, branch_country, branch_pincode,
                  delivery_line1, delivery_line2, delivery_city, delivery_district, delivery_state, delivery_country, delivery_pincode,
                  photo, is_active, password, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->bind_param("sssssdssssssssssssssssssiss",
+        $stmt->bind_param("sssssdsssssssssssssssssssiss",
             $tp_id, $name, $company_name, $referral_id, $referral_type, $referral_percentage, $mobile, $email, $gstin,
-            $branch_line1, $branch_line2, $branch_city, $branch_district, $branch_state, $branch_country, $branch_pincode,
+            $branch_line1, $branch_line2, $branch_city, $branch_district, $assigned_district, $branch_state, $branch_country, $branch_pincode,
             $delivery_line1, $delivery_line2, $delivery_city, $delivery_district, $delivery_state, $delivery_country, $delivery_pincode,
             $photo, $is_active, $password_hash, $created_by
         );
@@ -204,6 +215,7 @@ if ($action === 'update-territory-partner') {
         if (!in_array($tp_db_id, $_myTpIds, true)) { header("Location: manage-territory-partner"); exit; }
         $location_ids = array_values(array_filter($location_ids, fn($lid) => isLocationInBdmDistricts($db_conn, (int)$salesBdmID, $lid)));
     }
+    $assigned_district = resolveAssignedDistrictFromLocations($db_conn, $location_ids);
 
     if (!$tp_db_id || !$name || !$company_name || !$mobile || !$branch_line1 || !$delivery_line1) {
         header("Location: manage-territory-partner?error=1");
@@ -250,14 +262,14 @@ if ($action === 'update-territory-partner') {
             $stmt = $db_conn->prepare("
                 UPDATE territory_partners
                 SET name=?, company_name=?, referral_id=?, referral_type=?, referral_percentage=?, mobile=?, email=?, gstin=?,
-                    branch_line1=?, branch_line2=?, branch_city=?, branch_district=?, branch_state=?, branch_country=?, branch_pincode=?,
+                    branch_line1=?, branch_line2=?, branch_city=?, branch_district=?, assigned_district=?, branch_state=?, branch_country=?, branch_pincode=?,
                     delivery_line1=?, delivery_line2=?, delivery_city=?, delivery_district=?, delivery_state=?, delivery_country=?, delivery_pincode=?,
                     photo=?, is_active=?, updated_by=?
                 WHERE id=?
             ");
-            $stmt->bind_param("ssssdssssssssssssssssssisi",
+            $stmt->bind_param("ssssdsssssssssssssssssssisi",
                 $name, $company_name, $referral_id, $referral_type, $referral_percentage, $mobile, $email, $gstin,
-                $branch_line1, $branch_line2, $branch_city, $branch_district, $branch_state, $branch_country, $branch_pincode,
+                $branch_line1, $branch_line2, $branch_city, $branch_district, $assigned_district, $branch_state, $branch_country, $branch_pincode,
                 $delivery_line1, $delivery_line2, $delivery_city, $delivery_district, $delivery_state, $delivery_country, $delivery_pincode,
                 $photo_update, $is_active, $created_by, $tp_db_id
             );
@@ -265,14 +277,14 @@ if ($action === 'update-territory-partner') {
             $stmt = $db_conn->prepare("
                 UPDATE territory_partners
                 SET name=?, company_name=?, referral_id=?, referral_type=?, referral_percentage=?, mobile=?, email=?, gstin=?,
-                    branch_line1=?, branch_line2=?, branch_city=?, branch_district=?, branch_state=?, branch_country=?, branch_pincode=?,
+                    branch_line1=?, branch_line2=?, branch_city=?, branch_district=?, assigned_district=?, branch_state=?, branch_country=?, branch_pincode=?,
                     delivery_line1=?, delivery_line2=?, delivery_city=?, delivery_district=?, delivery_state=?, delivery_country=?, delivery_pincode=?,
                     is_active=?, updated_by=?
                 WHERE id=?
             ");
-            $stmt->bind_param("ssssdsssssssssssssssssisi",
+            $stmt->bind_param("ssssdssssssssssssssssssisi",
                 $name, $company_name, $referral_id, $referral_type, $referral_percentage, $mobile, $email, $gstin,
-                $branch_line1, $branch_line2, $branch_city, $branch_district, $branch_state, $branch_country, $branch_pincode,
+                $branch_line1, $branch_line2, $branch_city, $branch_district, $assigned_district, $branch_state, $branch_country, $branch_pincode,
                 $delivery_line1, $delivery_line2, $delivery_city, $delivery_district, $delivery_state, $delivery_country, $delivery_pincode,
                 $is_active, $created_by, $tp_db_id
             );

@@ -82,10 +82,28 @@ function getBdmAssignedTpIds($db_conn, int $bdmId, bool $includeInactive = false
     $types = str_repeat('s', count($districtNames));
     $normalized = array_map(fn($n) => mb_strtolower(trim($n)), $districtNames);
 
+    // Self-migrating: see db_migrations/2026_08_28_tp_assigned_district.sql.
+    // assigned_district is a SEPARATE concept from branch_district/
+    // delivery_district (which are real postal-address fields someone can
+    // legitimately fill with a totally different place — e.g. a TP's GST-
+    // registered office address vs. the sales territory they cover).
+    // assigned_district instead auto-tracks the district of whichever Firka
+    // the TP is actually picked for in territory_partner_locations (see
+    // territory-partner-action.php's resolveAssignedDistrictFromLocations()
+    // call) — that's the only thing this BDM-territory match should ever be
+    // based on. Falls back to branch_district only for a TP whose
+    // assigned_district hasn't been backfilled/set yet, so this doesn't
+    // silently drop every existing TP from every BDM's list the moment this
+    // column is introduced.
+    $_col = $db_conn->query("SHOW COLUMNS FROM territory_partners LIKE 'assigned_district'");
+    if ($_col && $_col->num_rows === 0) {
+        $db_conn->query("ALTER TABLE territory_partners ADD COLUMN assigned_district VARCHAR(100) DEFAULT NULL AFTER branch_district");
+    }
+
     $activeClause = $includeInactive ? '' : 'is_active = 1 AND ';
     $stmt = $db_conn->prepare("
         SELECT id FROM territory_partners
-        WHERE {$activeClause}LOWER(TRIM(branch_district)) IN ($placeholders)
+        WHERE {$activeClause}LOWER(TRIM(COALESCE(NULLIF(assigned_district,''), branch_district))) IN ($placeholders)
     ");
     $stmt->bind_param($types, ...$normalized);
     $stmt->execute();

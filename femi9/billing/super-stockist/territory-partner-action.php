@@ -15,6 +15,7 @@ $_tp_cols = [
     'branch_line2'     => "VARCHAR(255) DEFAULT NULL AFTER branch_line1",
     'branch_city'      => "VARCHAR(100) DEFAULT NULL AFTER branch_line2",
     'branch_district'  => "VARCHAR(100) DEFAULT NULL AFTER branch_city",
+    'assigned_district'=> "VARCHAR(100) DEFAULT NULL AFTER branch_district",
     'branch_state'     => "VARCHAR(100) DEFAULT NULL AFTER branch_district",
     'branch_country'   => "VARCHAR(100) DEFAULT NULL AFTER branch_state",
     'branch_pincode'   => "VARCHAR(20)  DEFAULT NULL AFTER branch_country",
@@ -33,6 +34,8 @@ foreach ($_tp_cols as $_col => $_def) {
         $db_conn->query("ALTER TABLE territory_partners ADD COLUMN `$_col` $_def");
     }
 }
+
+require_once __DIR__ . '/../shared/PartnerLocationDistrict.php';
 
 $action = $_POST['action'] ?? '';
 
@@ -64,6 +67,7 @@ if ($action === 'insert-territory-partner') {
     $created_by        = $_SESSION['LOGIN_USER'] ?? '';
     $location_ids      = array_filter(array_map('intval', $_POST['location_ids'] ?? []));
     $onboard_ss_id     = $Login_user_IDvl;
+    $assigned_district = resolveAssignedDistrictFromLocations($db_conn, $location_ids);
 
     if (!$name || !$company_name || !$mobile || !$branch_line1 || !$delivery_line1) {
         header("Location: add-territory-partner?error=1");
@@ -111,14 +115,14 @@ if ($action === 'insert-territory-partner') {
         $stmt = $db_conn->prepare("
             INSERT INTO territory_partners
                 (tp_id, name, company_name, mobile, email, gstin,
-                 branch_line1, branch_line2, branch_city, branch_district, branch_state, branch_country, branch_pincode,
+                 branch_line1, branch_line2, branch_city, branch_district, assigned_district, branch_state, branch_country, branch_pincode,
                  delivery_line1, delivery_line2, delivery_city, delivery_district, delivery_state, delivery_country, delivery_pincode,
                  photo, is_active, password, created_by, onboard_ss_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->bind_param("sssssssssssssssssssssiss",
+        $stmt->bind_param("ssssssssssssssssssssssisss",
             $tp_id, $name, $company_name, $mobile, $email, $gstin,
-            $branch_line1, $branch_line2, $branch_city, $branch_district, $branch_state, $branch_country, $branch_pincode,
+            $branch_line1, $branch_line2, $branch_city, $branch_district, $assigned_district, $branch_state, $branch_country, $branch_pincode,
             $delivery_line1, $delivery_line2, $delivery_city, $delivery_district, $delivery_state, $delivery_country, $delivery_pincode,
             $photo, $is_active, $password_hash, $created_by, $onboard_ss_id
         );
@@ -175,6 +179,7 @@ if ($action === 'update-territory-partner') {
     $delivery_pincode  = trim($_POST['tp_delivery_pincode']?? '') ?: null;
     $is_active         = (int)($_POST['tp_active'] ?? 1);
     $location_ids      = array_filter(array_map('intval', $_POST['location_ids'] ?? []));
+    $assigned_district = resolveAssignedDistrictFromLocations($db_conn, $location_ids);
 
     if (!$tp_db_id || !$name || !$company_name || !$mobile || !$branch_line1 || !$delivery_line1) {
         header("Location: manage-territory-partner?error=1");
@@ -232,14 +237,14 @@ if ($action === 'update-territory-partner') {
             $stmt = $db_conn->prepare("
                 UPDATE territory_partners
                 SET name=?, company_name=?, mobile=?, email=?, gstin=?,
-                    branch_line1=?, branch_line2=?, branch_city=?, branch_district=?, branch_state=?, branch_country=?, branch_pincode=?,
+                    branch_line1=?, branch_line2=?, branch_city=?, branch_district=?, assigned_district=?, branch_state=?, branch_country=?, branch_pincode=?,
                     delivery_line1=?, delivery_line2=?, delivery_city=?, delivery_district=?, delivery_state=?, delivery_country=?, delivery_pincode=?,
                     photo=?, is_active=?
                 WHERE id=? AND onboard_ss_id=?
             ");
             $stmt->bind_param("sssssssssssssssssssssiis",
                 $name, $company_name, $mobile, $email, $gstin,
-                $branch_line1, $branch_line2, $branch_city, $branch_district, $branch_state, $branch_country, $branch_pincode,
+                $branch_line1, $branch_line2, $branch_city, $branch_district, $assigned_district, $branch_state, $branch_country, $branch_pincode,
                 $delivery_line1, $delivery_line2, $delivery_city, $delivery_district, $delivery_state, $delivery_country, $delivery_pincode,
                 $photo_update, $is_active, $tp_db_id, $Login_user_IDvl
             );
@@ -247,14 +252,14 @@ if ($action === 'update-territory-partner') {
             $stmt = $db_conn->prepare("
                 UPDATE territory_partners
                 SET name=?, company_name=?, mobile=?, email=?, gstin=?,
-                    branch_line1=?, branch_line2=?, branch_city=?, branch_district=?, branch_state=?, branch_country=?, branch_pincode=?,
+                    branch_line1=?, branch_line2=?, branch_city=?, branch_district=?, assigned_district=?, branch_state=?, branch_country=?, branch_pincode=?,
                     delivery_line1=?, delivery_line2=?, delivery_city=?, delivery_district=?, delivery_state=?, delivery_country=?, delivery_pincode=?,
                     is_active=?
                 WHERE id=? AND onboard_ss_id=?
             ");
             $stmt->bind_param("ssssssssssssssssssssiis",
                 $name, $company_name, $mobile, $email, $gstin,
-                $branch_line1, $branch_line2, $branch_city, $branch_district, $branch_state, $branch_country, $branch_pincode,
+                $branch_line1, $branch_line2, $branch_city, $branch_district, $assigned_district, $branch_state, $branch_country, $branch_pincode,
                 $delivery_line1, $delivery_line2, $delivery_city, $delivery_district, $delivery_state, $delivery_country, $delivery_pincode,
                 $is_active, $tp_db_id, $Login_user_IDvl
             );
