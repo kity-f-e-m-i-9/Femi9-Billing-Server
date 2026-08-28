@@ -3,6 +3,15 @@ error_reporting(0);
 include("config.php");
 $tempid=$_REQUEST['tempid'];
 
+// Carries the Manage Internal Stock Transfer list's active date/bill-type
+// filter through to the "Manage Invoice" button below, so returning from
+// Print doesn't reset the list back to today's date.
+$__manageQS = http_build_query(array_filter([
+    'frdate'   => $_GET['frdate'] ?? '',
+    'todate'   => $_GET['todate'] ?? '',
+    'billtype' => $_GET['billtype'] ?? '',
+]));
+
 $select_Invoice="select * from internal_transfer_invoice where tempid='$tempid'";
 $fetch_Invoice=mysqli_query($db_conn,$select_Invoice);
 $result_Invoice=mysqli_fetch_array($fetch_Invoice);
@@ -71,7 +80,7 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 			<tr>
 			<td><button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button></td>
 			<td><button type="button" onClick="javascript:window.location='internal_transfer';" class="btn btn-success m-b-xs m-r-xs">+ New Invoice</button></td>
-			<td><button type="button" onClick="javascript:window.location='internal_transfer_manage';" class="btn btn-primary m-b-xs m-r-xs">Manage Invoice</button></td>
+			<td><button type="button" onClick="javascript:window.location='internal_transfer_manage<?= $__manageQS ? '?' . $__manageQS : ''; ?>';" class="btn btn-primary m-b-xs m-r-xs">Manage Invoice</button></td>
 			</tr>
 			</table>
 

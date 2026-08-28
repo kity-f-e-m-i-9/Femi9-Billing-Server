@@ -268,7 +268,7 @@ $i= $start_from;
 													</td>
 													
 													<td>
-<a href="internal_transfer_print?tempid=<?=$tempid;?>" title="Print" target="_blank">
+<a href="internal_transfer_print?tempid=<?=$tempid;?>&frdate=<?=urlencode($se_fromDate);?>&todate=<?=urlencode($se_toDate);?>&billtype=<?=urlencode($se_billType);?>" title="Print" target="_blank">
 <img src="../../assets/images/print32.png"/></a>
 													</td>
 													
