@@ -42,58 +42,19 @@ $utype = $Login_user_TYPEvl;
 // against `receipt` for amount actually collected. This mirrors the same
 // paid/partial/unpaid classification used on shop-manage-invoice.php and
 // add-receipt.php so the numbers here always agree with those pages.
-$shop_rows = mysqli_query($db_conn, "
-    SELECT s.id, s.temp_id, s.useridtext, s.name, s.mobile_number, s.country_code,
-           sc.catlable,
-           COUNT(ui.id)                                   AS inv_count,
-           COALESCE(SUM(CASE WHEN ui.sub_total>0 THEN ui.total ELSE 0 END),0) AS total_billed,
-           COALESCE(SUM(r.received),0)                    AS total_received
-    FROM shop s
-    LEFT JOIN shop_category sc ON sc.id = s.shop_cat
-    LEFT JOIN user_invoice ui
-           ON ui.to_user_id = s.temp_id AND ui.to_user_type = 'shop'
-          AND ui.from_user_id = '$uid' AND ui.from_user_type = '$utype'
-          AND ui.sub_total > 0 AND ui.date BETWEEN '$from' AND '$to'
-    LEFT JOIN (
-        SELECT inv_id, SUM(received) received FROM receipt GROUP BY inv_id
-    ) r ON r.inv_id = ui.inv_id
-    WHERE s.onboard_userID = '$uid' AND s.onboard_userTYPE = '$utype'
-    GROUP BY s.id, s.temp_id, s.useridtext, s.name, s.mobile_number, s.country_code, sc.catlable
-    ORDER BY total_billed DESC, s.name ASC
-");
+require_once __DIR__ . '/include/shop-report-data.php';
+$report           = tp_shop_report_fetch($db_conn, $uid, $utype, $from, $to, $statusFilter, $searchTerm);
+$shops             = $report['rows'];
+$grand_billed      = $report['grand_billed'];
+$grand_received    = $report['grand_received'];
+$grand_due         = $report['grand_due'];
+$grand_invoices    = $report['grand_invoices'];
+$shops_with_sales  = $report['shops_with_sales'];
 
-$shops = [];
-$grand_billed = 0; $grand_received = 0; $grand_invoices = 0;
-while ($row = mysqli_fetch_assoc($shop_rows)) {
-    $billed   = (float)$row['total_billed'];
-    $received = (float)$row['total_received'];
-    $due      = max(0, $billed - $received);
-
-    if ($billed <= 0) {
-        $status = 'no_invoices';
-    } elseif ($received <= 0) {
-        $status = 'not_paid';
-    } elseif (($received + 0.01) >= $billed) {
-        $status = 'fully_paid';
-    } else {
-        $status = 'partially_paid';
-    }
-
-    if ($statusFilter !== 'all' && $status !== $statusFilter) continue;
-    if ($searchTerm !== '' && stripos($row['name'] . ' ' . $row['mobile_number'] . ' ' . $row['useridtext'], $searchTerm) === false) continue;
-
-    $row['billed']   = $billed;
-    $row['received'] = $received;
-    $row['due']      = $due;
-    $row['status']   = $status;
-    $shops[] = $row;
-
-    $grand_billed    += $billed;
-    $grand_received  += $received;
-    $grand_invoices  += (int)$row['inv_count'];
-}
-$grand_due = max(0, $grand_billed - $grand_received);
-$shops_with_sales = count(array_filter($shops, fn($s) => $s['billed'] > 0));
+$exportQuery = http_build_query([
+    'from' => $from, 'to' => $to,
+    'status_filter' => $statusFilter, 'q' => $searchTerm,
+]);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -293,6 +254,9 @@ $shops_with_sales = count(array_filter($shops, fn($s) => $s['billed'] > 0));
                                 <div class="card-header">
                                     <span class="hdr-icon chip-indigo"><i class="material-icons-outlined">storefront</i></span>
                                     <h5 class="card-title">Shop-wise Sales &amp; Payment Summary</h5>
+                                    <a href="shop-report-export.php?<?php echo $exportQuery; ?>" class="view-btn" style="margin-left:auto;background:var(--green-soft);color:var(--green);">
+                                        <i class="material-icons-outlined">file_download</i> Export Excel
+                                    </a>
                                 </div>
                                 <div class="card-body" style="overflow-x:auto">
                                     <?php if (empty($shops)): ?>

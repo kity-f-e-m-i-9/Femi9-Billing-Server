@@ -14,6 +14,7 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
         $stmt = $db_conn->prepare(
             "SELECT ui.inv_id, ui.inv_number, ui.date, ui.sub_total, ui.total,
                     s.name AS party_name, s.mobile_number AS party_mobile, s.country_code, s.address AS party_address,
+                    s.gstin AS party_gstin,
                     COALESCE(r.received,0) AS received
              FROM user_invoice ui
              LEFT JOIN shop s ON s.temp_id = ui.to_user_id
@@ -33,6 +34,7 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
                 'party'    => $r['party_name'] ?: 'Shop',
                 'mobile'   => trim(($r['country_code'] ?? '') . ' ' . ($r['party_mobile'] ?? '')),
                 'address'  => $r['party_address'] ?? '',
+                'gstin'    => $r['party_gstin'] ?? '',
                 'total'    => (float)$r['total'],
                 'received' => (float)$r['received'],
             ];
@@ -43,7 +45,7 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
     if ($typeFilter === 'all' || $typeFilter === 'customer') {
         $stmt = $db_conn->prepare(
             "SELECT i.inv_id, i.inv_number, i.date, i.sub_total, i.total,
-                    c.name AS party_name, c.mobile AS party_mobile,
+                    c.name AS party_name, c.mobile AS party_mobile, c.gstin AS party_gstin,
                     COALESCE(r.received,0) AS received
              FROM invoice i
              LEFT JOIN customers c ON c.id = i.customer_id
@@ -63,6 +65,7 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
                 'party'    => $r['party_name'] ?: 'Walking Customer',
                 'mobile'   => $r['party_mobile'] ?? '',
                 'address'  => '',
+                'gstin'    => $r['party_gstin'] ?? '',
                 'total'    => (float)$r['total'],
                 'received' => (float)$r['received'],
             ];
