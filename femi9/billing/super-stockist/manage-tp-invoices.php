@@ -51,9 +51,11 @@ $sql = "
     SELECT tpi.id, tpi.invoice_number, tpi.invoice_date, tpi.total_amount, tpi.product_type,
            COALESCE(tpi.courier_charges, 0) AS courier_charges,
            tpi.created_by, tpi.created_at,
-           tp.name AS tp_name, tp.tp_id AS tp_code
+           tp.name AS tp_name, tp.tp_id AS tp_code,
+           po.id AS po_id
     FROM tp_invoices tpi
     JOIN territory_partners tp ON tp.id = tpi.territory_partner_id
+    LEFT JOIN tp_purchase_orders po ON po.tp_invoice_id = tpi.id
     $where_sql
     ORDER BY tpi.created_at DESC
 ";
@@ -114,6 +116,7 @@ $i = 0;
         .action-btn.edit   { color:#d97706; } .action-btn.edit:hover   { background:#fef3c7; }
         .action-btn.print  { color:#0369a1; } .action-btn.print:hover  { background:#e0f2fe; }
         .action-btn.delete { color:#dc2626; } .action-btn.delete:hover { background:#fee2e2; }
+        .action-btn.ship   { color:#92400e; } .action-btn.ship:hover   { background:#fef3c7; }
         .courier-chip { display:inline-block; background:#fef3c7; color:#92400e; border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600; }
         .filter-card { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-radius:10px; padding:18px 20px; margin-bottom:20px; }
         .filter-card .form-label { color:#fff; font-weight:500; margin-bottom:4px; font-size:12.5px; }
@@ -250,6 +253,11 @@ $i = 0;
                                                 <a href="tp-invoice-print?id=<?php echo $enc; ?>" class="action-btn print" title="Print" target="_blank">
                                                     <i class="material-icons-outlined" style="font-size:19px;">print</i>
                                                 </a>
+                                                <?php if (!empty($inv['po_id'])): ?>
+                                                <a href="shipping-label-print.php?po_id=<?php echo (int)$inv['po_id']; ?>" target="_blank" class="action-btn ship" title="Shipping Labels">
+                                                    <i class="material-icons-outlined" style="font-size:19px;">label</i>
+                                                </a>
+                                                <?php endif; ?>
                                                 <form method="POST" action="delete-tp-invoice" class="d-inline">
                                                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                                                     <input type="hidden" name="invoice_enc" value="<?php echo $enc; ?>">

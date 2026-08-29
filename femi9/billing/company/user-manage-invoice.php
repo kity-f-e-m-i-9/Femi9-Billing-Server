@@ -340,6 +340,11 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 <div style="display:flex;align-items:center;gap:8px;">
 <a href="user-invoice-print?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>" title="Print">
 <img src="../../assets/images/print32.png"/></a>
+<?php if ($getinvuser === 'super_stockiest'): ?>
+<a href="invoice-shipping-label-print.php?invuser=super_stockiest&invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>" title="Shipping Labels" style="display:inline-flex;">
+<i class="material-icons-outlined" style="font-size:20px;color:#92400e;">label</i>
+</a>
+<?php endif; ?>
 </div>
 <?php }else{?>
 <span class='badge badge-style-bordered badge-danger'>Incomplete</span>
