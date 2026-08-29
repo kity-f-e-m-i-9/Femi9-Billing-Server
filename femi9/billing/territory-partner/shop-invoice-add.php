@@ -427,14 +427,15 @@ while ($ri = mysqli_fetch_array($res_items)) {
         </td>
         <td>&#8377;<?php echo inr_format($ri['subtotal'], 2); ?></td>
         <td>
-            <?php if ($canEditLine) { ?>
-            <input type="number" min="0" step="any" id="gstpct_<?php echo $ri['id']; ?>"
-                   value="<?php echo $ri['gst_percentage']; ?>" placeholder="GST %"
-                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
-                   class="form-control form-control-sm" style="width:70px;">
-            <?php } else { ?>
-            <?php echo inr_format((float)$ri['gstamount_total'], 2); ?>(<?php echo $ri['gst_percentage']; ?>%)
-            <?php } ?>
+            <?php // GST % is derived from the product master (gst_type/gst%), not a
+                  // TP-entered value, so it's shown read-only here regardless of
+                  // whether the rest of the line is editable. ?>
+            <input type="number" id="gstpct_<?php echo $ri['id']; ?>"
+                   value="<?php echo $ri['gst_percentage']; ?>" readonly disabled
+                   class="form-control form-control-sm" style="width:70px;background:#f3f4f6;">
+            <div style="font-size:11px;color:#6b7280;">
+                &#8377;<?php echo inr_format((float)$ri['gstamount_total'], 2); ?>
+            </div>
         </td>
         <td align="right"><?php echo inr_format($TotalAMount, 2); ?></td>
         <?php if ($amount_received_fully == 0) { ?>
@@ -463,15 +464,18 @@ while ($ri = mysqli_fetch_array($res_items)) {
     <input type="hidden" name="gst_percentage" id="rf_gstpct">
 </form>
 <script>
-// Click straight into Qty / Shop Price / Discount(Rs.) / GST% on a
-// DM-assigned order's invoice and change it — saves itself the moment you
-// leave the field, no separate Edit/Save step. Discount is rupees-only;
-// the percentage shown underneath is derived and read-only.
+// Click straight into Qty / Shop Price / Discount(Rs.) on a DM-assigned
+// order's invoice and change it — saves itself the moment you leave the
+// field, no separate Edit/Save step. Discount is rupees-only; the percentage
+// shown underneath is derived and read-only. GST% is always read-only (it's
+// derived from the product master's gst_type/gst%, not TP-entered) — its
+// input is disabled but a disabled input's .value still reads out fine, so
+// the existing rate round-trips on every save without needing a JS branch.
 //
-// On a non-DM invoice only the Shop Price field is an actual <input> (Qty/
-// Discount/GST% stay plain text) — origQty/origDiscamt/origGstpct are the
-// line's existing values, passed in so the save still round-trips the
-// unedited fields correctly instead of finding no element and erroring.
+// On a non-DM invoice only the Shop Price field is an actual editable
+// <input> (Qty/Discount stay plain text) — origQty/origDiscamt/origGstpct
+// are the line's existing values, passed in so the save still round-trips
+// the unedited fields correctly instead of finding no element and erroring.
 function saveLineEdit(id, invid, rowid, invuser, origQty, origDiscamt, origGstpct) {
     var qtyEl     = document.getElementById('qty_' + id);
     var discamtEl = document.getElementById('discamt_' + id);

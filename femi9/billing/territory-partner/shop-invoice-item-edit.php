@@ -71,19 +71,17 @@ $amount    = isset($_POST['amount']) && is_numeric($_POST['amount']) && (float)$
     : $oldAmount;
 $hsn    = $oldRow['hsn'] ?? '';
 
-// GST% is a TP-entered override for this line (posted value), not re-derived
-// from the product master — the DM-order default is often 0% and the TP
-// needs to be able to set the real rate here. gst_type (inclusive/exclusive)
-// still comes from the product master — same convention as
+// GST% and gst_type are always re-derived from the product master here —
+// the field is read-only on the UI (shop-invoice-add.php), so the posted
+// value is not trusted even if a client sends one. Same convention as
 // shop-invoice-action.php / shop-invoice-action2.php.
-$gst_percentage = (float)($_POST['gst_percentage'] ?? 0);
-
-$stmtProd = $db_conn->prepare("SELECT gst_type FROM products WHERE id=?");
+$stmtProd = $db_conn->prepare("SELECT gst, gst_type FROM products WHERE id=?");
 $stmtProd->bind_param('i', $pr_id);
 $stmtProd->execute();
 $prod = $stmtProd->get_result()->fetch_assoc();
 $stmtProd->close();
-$gst_type_item = $prod['gst_type'] ?? 'exclusive';
+$gst_percentage = (float)($prod['gst'] ?? 0);
+$gst_type_item  = $prod['gst_type'] ?? 'exclusive';
 
 $totalamount = $amount * $qty;
 
