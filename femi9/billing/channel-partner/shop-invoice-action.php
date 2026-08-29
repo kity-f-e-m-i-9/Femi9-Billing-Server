@@ -27,8 +27,9 @@ $amount = (float)($_REQUEST['amount'] ?? 0);
 $qty    = (int)($_REQUEST['qty']    ?? 0);
 
 // Product details
-$prod = mysqli_fetch_array(mysqli_query($db_conn, "SELECT gst,hsn,rwpoints FROM products WHERE id='$pr_id'"));
+$prod = mysqli_fetch_array(mysqli_query($db_conn, "SELECT gst,gst_type,hsn,rwpoints FROM products WHERE id='$pr_id'"));
 $gst_percentage  = $prod['gst']      ?? 0;
+$gst_type_item   = $prod['gst_type'] ?: 'exclusive';
 $hsn             = $prod['hsn']      ?? '';
 $rwpoints        = ($prod['rwpoints'] ?? 0) * $qty;
 
@@ -42,9 +43,20 @@ if (($_REQUEST['discount_percentage'] ?? 0) > 0) {
     $discount_percentage = $totalamount > 0 ? inr_format($discount_amount * 100 / $totalamount, 2) : 0;
 }
 
-$subtotal        = number_format($totalamount - $discount_amount, 2, '.', '');
-$gstamount_total = $subtotal * $gst_percentage / 100;
-$total           = $subtotal + $gstamount_total;
+$subtotal = number_format($totalamount - $discount_amount, 2, '.', '');
+
+// Same convention as territory-partner/shop-invoice-action.php: inclusive-tax
+// products already have GST baked into the entered price, so tax is carved
+// out of subtotal (not added again into total); exclusive-tax products get
+// GST added on top.
+if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
+    $taxable_value   = $subtotal * 100 / (100 + $gst_percentage);
+    $gstamount_total = $subtotal - $taxable_value;
+    $total           = $subtotal;
+} else {
+    $gstamount_total = $subtotal * $gst_percentage / 100;
+    $total           = $subtotal + $gstamount_total;
+}
 $gstamount_singlepr = '0';
 
 // Customer/GST type

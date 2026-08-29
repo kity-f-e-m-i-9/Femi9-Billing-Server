@@ -73,8 +73,17 @@ $hsn    = $oldRow['hsn'] ?? '';
 
 // GST% is a TP-entered override for this line (posted value), not re-derived
 // from the product master — the DM-order default is often 0% and the TP
-// needs to be able to set the real rate here.
+// needs to be able to set the real rate here. gst_type (inclusive/exclusive)
+// still comes from the product master — same convention as
+// shop-invoice-action.php / shop-invoice-action2.php.
 $gst_percentage = (float)($_POST['gst_percentage'] ?? 0);
+
+$stmtProd = $db_conn->prepare("SELECT gst_type FROM products WHERE id=?");
+$stmtProd->bind_param('i', $pr_id);
+$stmtProd->execute();
+$prod = $stmtProd->get_result()->fetch_assoc();
+$stmtProd->close();
+$gst_type_item = $prod['gst_type'] ?? 'exclusive';
 
 $totalamount = $amount * $qty;
 
@@ -84,9 +93,19 @@ $totalamount = $amount * $qty;
 $discount_amount     = (float)($_POST['discount_amount'] ?? 0);
 $discount_percentage = $totalamount > 0 ? round($discount_amount * 100 / $totalamount, 2) : 0;
 
-$subtotal        = (float)number_format($totalamount - $discount_amount, 2, '.', '');
-$gstamount_total = $subtotal * $gst_percentage / 100;
-$total           = $subtotal + $gstamount_total;
+$subtotal = (float)number_format($totalamount - $discount_amount, 2, '.', '');
+
+// Same convention as shop-invoice-action.php: inclusive-tax products already
+// have GST baked into the entered price, so tax is carved out of subtotal
+// (not added again into total); exclusive-tax products get GST added on top.
+if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
+    $taxable_value   = $subtotal * 100 / (100 + $gst_percentage);
+    $gstamount_total = $subtotal - $taxable_value;
+    $total           = $subtotal;
+} else {
+    $gstamount_total = $subtotal * $gst_percentage / 100;
+    $total           = $subtotal + $gstamount_total;
+}
 
 $stmtUpd = $db_conn->prepare(
     "UPDATE user_invoice_items
