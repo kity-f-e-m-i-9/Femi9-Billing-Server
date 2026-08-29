@@ -167,7 +167,8 @@ $sql = "
            COALESCE(cp_src.name, gd.gname, pln.name) AS source_location,
            COALESCE(cp_src.name, cp_old.name) AS cp_name,
            COALESCE(cp_src.cp_id, cp_old.cp_id) AS cp_code,
-           COALESCE(rcpt.collected, 0) AS courier_collected
+           COALESCE(rcpt.collected, 0) AS courier_collected,
+           po.id AS po_id
     FROM tp_invoices tpi
     JOIN territory_partners tp             ON tp.id  = tpi.territory_partner_id
     LEFT JOIN partner_location_nodes pln   ON pln.id = tpi.source_location_id
@@ -175,6 +176,7 @@ $sql = "
     LEFT JOIN channel_partners cp_old      ON cp_old.id = cpl.channel_partner_id
     LEFT JOIN channel_partners cp_src      ON cp_src.id = tpi.source_cp_id
     LEFT JOIN company_godown gd            ON gd.id = tpi.source_godown_id AND (" . godown_finance_filter_sql($db_conn, 'gd') . ")
+    LEFT JOIN tp_purchase_orders po        ON po.tp_invoice_id = tpi.id
     LEFT JOIN (
         SELECT tp_invoice_id, SUM(amount) AS collected
         FROM tp_invoice_receipts
@@ -265,6 +267,7 @@ $i = 0;
         .pay-badge.na            { background:#f3f4f6; color:#9ca3af; cursor:default; }
         .action-btn.receipt { color:#059669; } .action-btn.receipt:hover { background:#d1fae5; }
         .action-btn.cn      { color:#7c3aed; } .action-btn.cn:hover      { background:#ede9fe; }
+        .action-btn.ship    { color:#92400e; } .action-btn.ship:hover    { background:#fef3c7; }
         .btn-rwpoints-toggle { border:none; background:none; padding:0; cursor:pointer; }
 
         .filter-card { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-radius:10px; padding:18px 20px; margin-bottom:20px; }
@@ -584,6 +587,11 @@ $i = 0;
                                                 <a href="tp-invoice-print?id=<?php echo $enc; ?>" class="action-btn print" title="Print Invoice">
                                                     <i class="material-icons-outlined" style="font-size:19px;">print</i>
                                                 </a>
+                                                <?php if (!empty($inv['po_id'])): ?>
+                                                <a href="shipping-label-print.php?po_id=<?php echo (int)$inv['po_id']; ?>" target="_blank" class="action-btn ship" title="Shipping Labels">
+                                                    <i class="material-icons-outlined" style="font-size:19px;">label</i>
+                                                </a>
+                                                <?php endif; ?>
                                                 <?php
                                                 // wa.me click-to-chat link straight from the list — same Method-1
                                                 // pattern (wa.me + no-login signed PDF) as the Print page's own
