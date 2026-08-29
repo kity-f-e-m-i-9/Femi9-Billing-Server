@@ -1306,11 +1306,12 @@ if ($hasTps) {
                                 <div class="card-body" style="overflow-x:auto;">
                                     <p class="snote">Hover a TP name to see their product-wise purchase &amp; return breakdown. Achievement/Balance count Napkin products only &mdash; Lumi Baby Diaper purchases don't count toward the Firka target. Qty/Value Purchased follow the Napkin/Diaper toggle above.</p>
                                     <table class="mt" id="purchasesCatTable">
-                                        <thead><tr><th>TP</th><th>District (Firka)</th><th>Qty Purchased</th><th>Value Purchased</th><th>Qty Returned to Company</th><th class="napkin-only-col">Target Amount</th><th class="napkin-only-col">Achievement</th><th class="napkin-only-col">Balance</th></tr></thead>
+                                        <thead><tr><th>S.No</th><th>TP</th><th>District (Firka)</th><th>Qty Purchased</th><th>Value Purchased</th><th>Qty Returned to Company</th><th class="napkin-only-col">Target Amount</th><th class="napkin-only-col">Achievement</th><th class="napkin-only-col">Balance</th></tr></thead>
                                         <tbody>
                                         <?php if (empty($purchaseRows)): ?>
-                                            <tr><td colspan="8" class="text-muted">No purchases in this period.</td></tr>
-                                        <?php else: foreach ($purchaseRows as $pr):
+                                            <tr><td colspan="9" class="text-muted">No purchases in this period.</td></tr>
+                                        <?php else: $__pcSno = 0; foreach ($purchaseRows as $pr):
+                                            $__pcSno++;
                                             $tid = (int)$pr['tp_id'];
                                             $tname = $tpNameMap[$tid] ?? ('TP #' . $tid);
                                             $tp_target = $tpTargetByTp[$tid] ?? 0;
@@ -1322,6 +1323,7 @@ if ($hasTps) {
                                             $pcAmtByCat = json_encode(['all' => (float)$pr['amt'], 'napkin' => $purchaseByTpCat['napkin'][$tid]['amt'] ?? 0, 'diaper' => $purchaseByTpCat['diaper'][$tid]['amt'] ?? 0]);
                                         ?>
                                             <tr>
+                                                <td><?php echo $__pcSno; ?></td>
                                                 <td><span class="tp-name-cell" data-tp-id="<?php echo $tid; ?>" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true" data-type="purchase"><?php echo htmlspecialchars($tname); ?></span></td>
                                                 <td style="font-size:12px;color:#666;"><?php echo htmlspecialchars($tpLocByTp[$tid] ?? '—'); ?></td>
                                                 <td class="pc-qty" data-by-cat='<?php echo $pcQtyByCat; ?>'><?php echo inr_format($pr['qty'], 0); ?></td>
