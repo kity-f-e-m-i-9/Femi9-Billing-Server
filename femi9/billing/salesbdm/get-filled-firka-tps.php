@@ -48,7 +48,7 @@ $activeVal = $tab === 'active' ? 1 : 0;
 
 if ($search !== '') {
     $stmt = $db_conn->prepare("
-        SELECT id, tp_id, name, mobile, branch_district
+        SELECT id, tp_id, name, mobile, COALESCE(NULLIF(assigned_district,''), branch_district) AS branch_district
         FROM territory_partners
         WHERE id IN ($tpIdList) AND is_active=$activeVal
           AND (name LIKE ? OR mobile LIKE ? OR tp_id LIKE ?)
@@ -61,7 +61,7 @@ if ($search !== '') {
     $stmt->close();
 } else {
     $tpRows = $db_conn->query("
-        SELECT id, tp_id, name, mobile, branch_district
+        SELECT id, tp_id, name, mobile, COALESCE(NULLIF(assigned_district,''), branch_district) AS branch_district
         FROM territory_partners
         WHERE id IN ($tpIdList) AND is_active=$activeVal
         ORDER BY name ASC

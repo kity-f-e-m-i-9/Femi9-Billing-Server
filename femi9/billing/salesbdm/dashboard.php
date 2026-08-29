@@ -95,25 +95,64 @@ switch ($preset) {
 $from = isset($_GET['from']) && $_GET['from'] ? date('Y-m-d', strtotime($_GET['from'])) : $df;
 $to   = isset($_GET['to'])   && $_GET['to']   ? date('Y-m-d', strtotime($_GET['to']))   : $dt;
 
+// ── This BDM's own district tree (every node under their assigned
+// district(s), at any depth) — used below to scope the TP coverage card's
+// Target Amount to only the Firkas that actually fall inside this BDM's own
+// districts. A TP can carry Firkas in more than one district (e.g. a TP
+// based near a district border covering a neighboring district's Firka
+// too); that Firka's target belongs to whichever BDM's district it's
+// actually in, never to this BDM just because they "own" the TP overall —
+// same rule the District Total Target / Active Firkas cards already follow.
+// Without this scoping, "Active TPs" Target Amount used to double-attribute
+// a stray cross-district Firka to this BDM even though "Active Firkas"
+// (Firka-centric, already district-scoped) correctly excluded it — the two
+// cards would then disagree by exactly that Firka's target_amount.
+$_districtDepthRowEarly = crow($db_conn, "SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'district%' ORDER BY depth ASC LIMIT 1");
+$_districtDepth = (int)($_districtDepthRowEarly['depth'] ?? 0);
+$_districtNames = getBdmAssignedDistrictNames($db_conn, $effectiveBdmId);
+$_districtTreeSql = '';
+$_dtTypes = ''; $_dtParams = [];
+if ($_districtDepth && !empty($_districtNames)) {
+    $_dn = array_map(fn($n) => mb_strtolower(trim($n)), $_districtNames);
+    $_ph = implode(',', array_fill(0, count($_dn), '?'));
+    $_dtTypes = 'i' . str_repeat('s', count($_dn));
+    $_dtParams = array_merge([$_districtDepth], $_dn);
+    $_districtTreeSql = "WITH RECURSIVE district_tree AS (
+                SELECT id FROM partner_location_nodes WHERE depth = ? AND LOWER(TRIM(name)) IN ($_ph)
+                UNION ALL
+                SELECT n.id FROM partner_location_nodes n JOIN district_tree dt ON n.parent_id = dt.id
+             ) ";
+}
+
 // ── TP coverage card — Total / Active / Inactive / New, plus each group's
-// own Target Amount (sum of their assigned Firkas' target_amount). $tpIds
-// above is active-only (getBdmAssignedTpIds default), so this re-fetches
-// including inactive ones specifically for this card — every other query
-// on this page intentionally stays active-only and is untouched.
+// own Target Amount (sum of their assigned Firkas' target_amount, but only
+// the Firkas that fall inside this BDM's own district tree — see above).
+// $tpIds above is active-only (getBdmAssignedTpIds default), so this
+// re-fetches including inactive ones specifically for this card — every
+// other query on this page intentionally stays active-only and is untouched.
 $tp_total_count = 0; $tp_active_count = 0; $tp_inactive_count = 0; $tp_new_count = 0;
 $tp_target_active = 0.0; $tp_target_inactive = 0.0;
 $tpIdsAll = getBdmAssignedTpIds($db_conn, $effectiveBdmId, true);
 if (!empty($tpIdsAll)) {
     $tpIdListAll = implode(',', array_map('intval', $tpIdsAll));
-    $tp_total_count = count($tpIdsAll);
-    $_tpStatusRows = call_rows($db_conn,
-        "SELECT tp.id, tp.is_active, tp.created_at,
-                COALESCE(SUM(pln.target_amount), 0) AS target
-         FROM territory_partners tp
-         LEFT JOIN territory_partner_locations tpl ON tpl.territory_partner_id = tp.id
-         LEFT JOIN partner_location_nodes pln ON pln.id = tpl.location_id
-         WHERE tp.id IN ($tpIdListAll)
-         GROUP BY tp.id");
+    if ($_districtTreeSql) {
+        $_tpStatusRows = call_rows($db_conn,
+            $_districtTreeSql .
+            "SELECT tp.id, tp.is_active, tp.created_at,
+                    COALESCE(SUM(CASE WHEN pln.id IN (SELECT id FROM district_tree) THEN pln.target_amount END), 0) AS target
+             FROM territory_partners tp
+             LEFT JOIN territory_partner_locations tpl ON tpl.territory_partner_id = tp.id
+             LEFT JOIN partner_location_nodes pln ON pln.id = tpl.location_id
+             WHERE tp.id IN ($tpIdListAll) AND tp.deleted_at IS NULL
+             GROUP BY tp.id",
+            $_dtTypes, $_dtParams);
+    } else {
+        $_tpStatusRows = call_rows($db_conn,
+            "SELECT tp.id, tp.is_active, tp.created_at, 0 AS target
+             FROM territory_partners tp
+             WHERE tp.id IN ($tpIdListAll) AND tp.deleted_at IS NULL");
+    }
+    $tp_total_count = count($_tpStatusRows);
     foreach ($_tpStatusRows as $_tr) {
         $_active = (int)$_tr['is_active'] === 1;
         if ($_active) { $tp_active_count++; $tp_target_active += (float)$_tr['target']; }

@@ -86,7 +86,7 @@ function getBdmTpBreakdown($db_conn, int $bdmId, string $fromDate, string $toDat
     if (empty($tpIds)) return [];
     $tpIdList = implode(',', array_map('intval', $tpIds));
 
-    $tps = $db_conn->query("SELECT id, name, tp_id, branch_district FROM territory_partners WHERE id IN ($tpIdList) ORDER BY name ASC")->fetch_all(MYSQLI_ASSOC);
+    $tps = $db_conn->query("SELECT id, name, tp_id, COALESCE(NULLIF(assigned_district,''), branch_district) AS branch_district FROM territory_partners WHERE id IN ($tpIdList) ORDER BY name ASC")->fetch_all(MYSQLI_ASSOC);
 
     $targetByTp = [];
     $tgtRes = $db_conn->query("
