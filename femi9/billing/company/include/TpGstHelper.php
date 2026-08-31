@@ -29,11 +29,14 @@
  * since guessing which characters to drop risks fabricating a wrong GSTIN;
  * only the source data (territory_partners.gstin) can fix those.
  */
+if (!function_exists('tp_gstin_is_valid')) {
 function tp_gstin_is_valid($gstin) {
     $g = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string)$gstin));
     return (bool) preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/', $g);
 }
+}
 
+if (!function_exists('tp_state_is_intra')) {
 function tp_state_is_intra($tp_state, $godown_state) {
     $norm = function ($s) { return preg_replace('/[^a-z]/', '', strtolower((string)$s)); };
     $a = $norm($tp_state);
@@ -42,7 +45,9 @@ function tp_state_is_intra($tp_state, $godown_state) {
     if ($a === $b) return true;
     return levenshtein($a, $b) <= 2;
 }
+}
 
+if (!function_exists('tp_line_taxable_and_gst')) {
 function tp_line_taxable_and_gst($line_total, $gst_pct, $product_gst_type) {
     $gst_pct = (int)$gst_pct;
     if (($product_gst_type ?: 'exclusive') === 'inclusive' && $gst_pct > 0) {
@@ -54,9 +59,11 @@ function tp_line_taxable_and_gst($line_total, $gst_pct, $product_gst_type) {
     }
     return [$taxable, $gst];
 }
+}
 
 // $godown_where_sql: raw SQL boolean fragment on tpi.source_godown_id, e.g. "tpi.source_godown_id = '5'"
 // or "tpi.source_godown_id IN (SELECT id FROM company_godown WHERE ...)".
+if (!function_exists('tp_sales_gst_lines')) {
 function tp_sales_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
     $sql = "
         SELECT tpi.id AS tp_invoice_id, tpi.invoice_number, tpi.invoice_date,
@@ -84,12 +91,14 @@ function tp_sales_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
     }
     return $lines;
 }
+}
 
 // Same shape as tp_sales_gst_lines but for finalised TP sales returns (credit notes).
 // tp-cnote-action.php stores these in the shared user_return_stock(_items) tables
 // tagged from_usertype='territory_partner', joined back to tp_invoices via invnumber
 // to recover the source godown / TP (to_userid is stored as the literal string
 // 'company', not a godown id, so it can't be used for godown scoping).
+if (!function_exists('tp_credit_gst_lines')) {
 function tp_credit_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
     $sql = "
         SELECT urs.returnid, urs.invnumber AS invoice_number, tpi.invoice_date AS invoice_date, ursi.date AS return_date,
@@ -120,10 +129,12 @@ function tp_credit_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) 
     }
     return $lines;
 }
+}
 
 // Collapses per-line rows (multiple products per invoice/return) into one row per
 // invoice/return, summing taxable_value/gst_amount and keeping the first line's
 // other fields (invoice_number, tp_name, etc. are the same across all lines of one doc).
+if (!function_exists('tp_group_lines')) {
 function tp_group_lines($lines, $key_field) {
     $out = [];
     foreach ($lines as $l) {
@@ -138,8 +149,10 @@ function tp_group_lines($lines, $key_field) {
     }
     return array_values($out);
 }
+}
 
 // Buckets taxable value into reg_intra / unreg_intra / reg_inter / unreg_inter.
+if (!function_exists('tp_gst_bucket_totals')) {
 function tp_gst_bucket_totals(array $lines) {
     $t = ['reg_intra' => 0.0, 'unreg_intra' => 0.0, 'reg_inter' => 0.0, 'unreg_inter' => 0.0];
     foreach ($lines as $l) {
@@ -147,4 +160,5 @@ function tp_gst_bucket_totals(array $lines) {
         else                 { $t[$l['is_registered'] ? 'reg_inter' : 'unreg_inter'] += $l['taxable_value']; }
     }
     return $t;
+}
 }
