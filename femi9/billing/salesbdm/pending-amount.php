@@ -1,8 +1,9 @@
 <?php
 // "Pending Amount" — every Territory Partner assigned to this Sales BDM,
 // with Target Amount, how much Napkin advance they've paid, the Balance
-// (Target − Advance Paid) still pending, and Total Invoice Amount — same
-// Target/Advance/Invoice logic as dashboard.php's own "Advance from
+// (unspent Napkin advance wallet money still sitting with the TP, i.e.
+// SUM(balance_amount) — not Target minus Paid), and Total Invoice Amount —
+// same Target/Advance/Invoice logic as dashboard.php's own "Advance from
 // Company — by TP" section (district-tree scoped Target, Napkin-only
 // Advance/Invoice), just as its own dedicated page with a From/To filter.
 include("checksession.php");
@@ -90,9 +91,15 @@ if ($hasTps) {
         $tpBase = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
+        // Balance = unspent advance wallet money still sitting with the TP
+        // (SUM(balance_amount) — active/partially_adjusted rows contribute
+        // their remaining amount, fully_adjusted rows contribute 0), not a
+        // Target-vs-Paid comparison — that's what "pending" actually means
+        // here per explicit correction from the user.
         $paidByTp = [];
+        $balanceByTp = [];
         $stmtP = $db_conn->prepare("
-            SELECT territory_partner_id, COALESCE(SUM(amount),0) AS paid
+            SELECT territory_partner_id, COALESCE(SUM(amount),0) AS paid, COALESCE(SUM(balance_amount),0) AS bal
             FROM tp_advance_payments
             WHERE territory_partner_id IN ($tpIdList) AND product_type = 'napkin' AND deleted_at IS NULL
               AND payment_date BETWEEN ? AND ?
@@ -102,6 +109,7 @@ if ($hasTps) {
         $stmtP->execute();
         foreach ($stmtP->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
             $paidByTp[(int)$r['territory_partner_id']] = (float)$r['paid'];
+            $balanceByTp[(int)$r['territory_partner_id']] = (float)$r['bal'];
         }
         $stmtP->close();
 
@@ -129,7 +137,7 @@ if ($hasTps) {
             if ($filter_district !== '' && $district !== $filter_district) continue;
             $rows[] = [
                 'tp_id' => $r['tp_id'], 'name' => $r['name'], 'district' => $district,
-                'target' => $target, 'advance_paid' => $paid, 'balance' => $target - $paid,
+                'target' => $target, 'advance_paid' => $paid, 'balance' => $balanceByTp[$tid] ?? 0.0,
                 'invoice_amount' => $invoiceByTp[$tid] ?? 0.0,
             ];
         }
@@ -298,7 +306,7 @@ $total_invoice = array_sum(array_column($rows, 'invoice_amount'));
                                             <td><?php echo $r['target'] > 0 ? '₹' . inr_format($r['target'], 2) : '–'; ?></td>
                                             <td>₹<?php echo inr_format($r['advance_paid'], 2); ?></td>
                                             <td style="color:<?php echo $bal > 0 ? '#dc2626' : '#16a34a'; ?>;font-weight:600;">
-                                                <?php echo $bal > 0 ? '−' : '+'; ?>₹<?php echo inr_format(abs($bal), 2); ?>
+                                                ₹<?php echo inr_format($bal, 2); ?>
                                             </td>
                                             <td>₹<?php echo inr_format($r['invoice_amount'], 2); ?></td>
                                         </tr>
@@ -310,7 +318,7 @@ $total_invoice = array_sum(array_column($rows, 'invoice_amount'));
                                             <td>₹<?php echo inr_format($total_target, 2); ?></td>
                                             <td>₹<?php echo inr_format($total_advance, 2); ?></td>
                                             <td style="color:<?php echo $total_balance > 0 ? '#dc2626' : '#16a34a'; ?>;">
-                                                <?php echo $total_balance > 0 ? '−' : '+'; ?>₹<?php echo inr_format(abs($total_balance), 2); ?>
+                                                ₹<?php echo inr_format($total_balance, 2); ?>
                                             </td>
                                             <td>₹<?php echo inr_format($total_invoice, 2); ?></td>
                                         </tr>
