@@ -222,6 +222,56 @@ if (!empty($tpIds) && $_districtTreeSql) {
 $advanceDistrictOptions = $_districtNames ?? [];
 sort($advanceDistrictOptions);
 
+// Fully Paid Active TPs — how many of the Active TPs card's own TPs have
+// paid their Napkin advance up to (or past) their own Target Amount this
+// period, and what fraction of the card's overall Target Amount that
+// represents (Fully Paid TPs' advance total ÷ Active TPs Target Amount).
+$tp_fp_count = 0;
+$tp_fp_amount = 0.0;
+foreach ($advanceTpRows as $_ar) {
+    if ($_ar['pct'] >= 100) { $tp_fp_count++; $tp_fp_amount += $_ar['advance_paid']; }
+}
+$tp_fp_pct = $tp_target_active > 0 ? round($tp_fp_amount / $tp_target_active * 100, 1) : 0;
+
+// ═══ "New TPs" modal — every TP (active or inactive) onboarded within this
+// page's From/To filter, with their Firka(s) and district-tree-scoped
+// Target Amount — same base rows as $_tpStatusRows above (which is where
+// $tp_new_count itself comes from), just with name/Firka detail added for
+// the modal.
+$newTpRows = [];
+if (!empty($_tpStatusRows) && $_districtTreeSql) {
+    $_newTpIds = [];
+    foreach ($_tpStatusRows as $_tr) {
+        if (!empty($_tr['created_at']) && $_tr['created_at'] >= $from . ' 00:00:00' && $_tr['created_at'] <= $to . ' 23:59:59') {
+            $_newTpIds[] = (int)$_tr['id'];
+        }
+    }
+    if (!empty($_newTpIds)) {
+        $_newIdList = implode(',', $_newTpIds);
+        $_newStmt = $db_conn->prepare(
+            $_districtTreeSql .
+            "SELECT tp.id, tp.tp_id, tp.name, tp.created_at,
+                    COALESCE(SUM(CASE WHEN pln.id IN (SELECT id FROM district_tree) THEN pln.target_amount END), 0) AS target,
+                    GROUP_CONCAT(DISTINCT CASE WHEN pln.id IN (SELECT id FROM district_tree) THEN pln.name END ORDER BY pln.name SEPARATOR ', ') AS firka_names
+             FROM territory_partners tp
+             LEFT JOIN territory_partner_locations tpl ON tpl.territory_partner_id = tp.id
+             LEFT JOIN partner_location_nodes pln ON pln.id = tpl.location_id
+             WHERE tp.id IN ($_newIdList) AND tp.deleted_at IS NULL
+             GROUP BY tp.id
+             ORDER BY tp.created_at ASC"
+        );
+        $_newStmt->bind_param($_dtTypes, ...$_dtParams);
+        $_newStmt->execute();
+        foreach ($_newStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $_r) {
+            $newTpRows[] = [
+                'id' => (int)$_r['id'], 'tp_id' => $_r['tp_id'], 'name' => $_r['name'],
+                'created_at' => $_r['created_at'], 'target' => (float)$_r['target'],
+                'firka_names' => $_r['firka_names'] ?: '—',
+            ];
+        }
+    }
+}
+
 $days_diff = (strtotime($to) - strtotime($from)) / 86400;
 $prev_from = date('Y-m-d', strtotime($from) - ($days_diff + 1) * 86400);
 $prev_to   = date('Y-m-d', strtotime($from) - 86400);
@@ -966,7 +1016,7 @@ if ($hasTps) {
 
                     <!-- ══ TP coverage — Total / Active / Inactive / New, each with its own Target Amount ══ -->
                     <div class="row mb-3">
-                        <div class="col-md-3 col-sm-6">
+                        <div class="col-md-2 col-sm-6">
                             <div class="kpi-card" style="--kpi-accent:var(--blue);--kpi-tint:var(--blue-tint);">
                                 <i class="material-icons-outlined kpi-ico">groups</i>
                                 <div class="kpi-t">Total TPs</div>
@@ -976,13 +1026,20 @@ if ($hasTps) {
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3 col-sm-6">
+                        <div class="col-md-4 col-sm-6">
                             <div class="kpi-card" id="activeTpsCard" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
                                 <i class="material-icons-outlined kpi-ico">check_circle</i>
                                 <div class="kpi-t">Active TPs</div>
                                 <div class="kpi-multi">
                                     <div><b><?php echo $tp_active_count; ?></b></div>
                                     <div><span>Target Amount</span><b>&#8377;<?php echo inr_format($tp_target_active, 0); ?></b></div>
+                                </div>
+                                <div style="margin-top:8px;padding-top:8px;border-top:1px solid #f1f0ec;font-size:12px;">
+                                    <span style="color:#6b7280;">Fully Paid</span>
+                                    <b style="color:var(--good);"><?php echo $tp_fp_count; ?> TP<?php echo $tp_fp_count !== 1 ? 's' : ''; ?></b>
+                                    &mdash;
+                                    <b>&#8377;<?php echo inr_format($tp_fp_amount, 0); ?></b> / &#8377;<?php echo inr_format($tp_target_active, 0); ?>
+                                    <b style="color:var(--good);">(<?php echo $tp_fp_pct; ?>%)</b>
                                 </div>
                                 <div style="display:flex;gap:6px;margin-top:8px;">
                                     <button type="button" id="activeTpsViewBtn" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
@@ -1005,11 +1062,47 @@ if ($hasTps) {
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6">
-                            <div class="kpi-card" style="--kpi-accent:#8b5cf6;--kpi-tint:#ede9fe;">
+                            <div class="kpi-card" id="newTpsCard" style="--kpi-accent:#8b5cf6;--kpi-tint:#ede9fe;<?php echo $tp_new_count > 0 ? 'cursor:pointer;' : ''; ?>" title="<?php echo $tp_new_count > 0 ? 'Click to see who was onboarded' : ''; ?>">
                                 <i class="material-icons-outlined kpi-ico">person_add</i>
                                 <div class="kpi-t">New TPs</div>
                                 <div class="kpi-multi"><div><b><?php echo $tp_new_count; ?></b></div></div>
                                 <p class="snote" style="margin:6px 0 0;">Onboarded between <?php echo date('d M', strtotime($from)); ?>–<?php echo date('d M Y', strtotime($to)); ?>.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New TPs Modal -->
+                    <div class="modal fade" id="newTpsModal" tabindex="-1" aria-labelledby="newTpsModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                                    <h6 class="modal-title" id="newTpsModalLabel" style="font-weight:600;color:#1f2937;">
+                                        <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#8b5cf6;">person_add</i>
+                                        New Territory Partners
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body" style="padding:14px 20px;overflow-x:auto;">
+                                    <table class="mt">
+                                        <thead><tr><th>S.No</th><th>Date</th><th>Name</th><th>Target Amount</th><th>Firka</th></tr></thead>
+                                        <tbody>
+                                        <?php if (empty($newTpRows)): ?>
+                                            <tr><td colspan="5" class="text-muted">No new Territory Partners in this period.</td></tr>
+                                        <?php else: $__ntSno = 0; foreach ($newTpRows as $__nt): $__ntSno++; ?>
+                                            <tr>
+                                                <td><?php echo $__ntSno; ?></td>
+                                                <td style="white-space:nowrap;"><?php echo date('d M Y', strtotime($__nt['created_at'])); ?></td>
+                                                <td><span style="font-weight:600;"><?php echo htmlspecialchars($__nt['name']); ?></span><br><small style="color:#9ca3af;"><?php echo htmlspecialchars($__nt['tp_id']); ?></small></td>
+                                                <td><?php echo $__nt['target'] > 0 ? '&#8377;' . inr_format($__nt['target'], 0) : '—'; ?></td>
+                                                <td style="font-size:12px;color:#666;"><?php echo htmlspecialchars($__nt['firka_names']); ?></td>
+                                            </tr>
+                                        <?php endforeach; endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2167,6 +2260,11 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         $('#atRangeNote').text('Advance Paid reflects the dashboard\'s current date filter: ' + rangeLabel + '.');
         $('#activeTpsModal').modal('show');
         atLoad(atCurrentPage, atCurrentSearch);
+    });
+
+    $('#newTpsCard').on('click', function () {
+        if (<?php echo (int)$tp_new_count; ?> <= 0) return;
+        $('#newTpsModal').modal('show');
     });
 
     $('#atSearchBox').on('input', function () {

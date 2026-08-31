@@ -70,6 +70,10 @@ if (!empty($salesBdmID)) {
         <a href="<?php echo $_bdmBase; ?>reward-points-tp"><i class="material-icons-two-tone">analytics</i>Reward Points: TPs</a>
     </li>
 
+    <li>
+        <a href="<?php echo $_bdmBase; ?>pending-amount"><i class="material-icons-two-tone">account_balance_wallet</i>Pending Amount</a>
+    </li>
+
     <?php if ($_hasReports): ?>
     <li>
         <a href=""><i class="material-icons-two-tone">groups</i>Our Team
