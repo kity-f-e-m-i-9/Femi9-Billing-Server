@@ -10,12 +10,29 @@
  * Neither tp_invoices/tp_invoice_items nor the TP branch of user_return_stock
  * store gst_type/buyer_gsttype/GST amount at write time (tp-cnote-action.php
  * inserts them blank/zero), so both are (re)computed here from products.gst /
- * products.gst_type, territory_partners.gstin (register if 15-char GSTIN) and a
+ * products.gst_type, territory_partners.gstin (register if it matches the GSTIN
+ * pattern, see tp_gstin_is_valid()) and a
  * fuzzy compare of territory_partners.branch_state against the source godown's
  * state (intra vs inter). The fuzzy compare tolerates minor typos (e.g. "Tamill
  * nadu") via Levenshtein distance, but can't recover a state from a misentered
  * district name (e.g. "Pudukkottai") — those fall through as inter-state.
  */
+
+/**
+ * True if $gstin is a real GSTIN once pure punctuation noise (stray spaces, a
+ * leading colon, etc.) is stripped. A plain length check
+ * (strlen(trim($gstin)) == 15) was tried first but both rejects valid GSTINs
+ * with stray punctuation (e.g. "33CPTPB3477E 1ZU", ":29CDTPB7949H1ZT") and
+ * would accept any 15-char junk string — this validates the actual GSTIN
+ * pattern instead. Non-punctuation noise (a prepended "TN" state code, a
+ * dropped/extra character) is NOT recoverable — those still correctly fail,
+ * since guessing which characters to drop risks fabricating a wrong GSTIN;
+ * only the source data (territory_partners.gstin) can fix those.
+ */
+function tp_gstin_is_valid($gstin) {
+    $g = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string)$gstin));
+    return (bool) preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/', $g);
+}
 
 function tp_state_is_intra($tp_state, $godown_state) {
     $norm = function ($s) { return preg_replace('/[^a-z]/', '', strtolower((string)$s)); };
@@ -62,7 +79,7 @@ function tp_sales_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
         $row['taxable_value'] = $taxable;
         $row['gst_amount']    = $gst;
         $row['is_intra']      = tp_state_is_intra($row['tp_state'], $row['godown_state']);
-        $row['is_registered'] = strlen(trim((string)$row['tp_gstin'])) == 15;
+        $row['is_registered'] = tp_gstin_is_valid($row['tp_gstin']);
         $lines[] = $row;
     }
     return $lines;
@@ -98,7 +115,7 @@ function tp_credit_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) 
         $row['taxable_value'] = $taxable;
         $row['gst_amount']    = $gst;
         $row['is_intra']      = tp_state_is_intra($row['tp_state'], $row['godown_state']);
-        $row['is_registered'] = strlen(trim((string)$row['tp_gstin'])) == 15;
+        $row['is_registered'] = tp_gstin_is_valid($row['tp_gstin']);
         $lines[] = $row;
     }
     return $lines;

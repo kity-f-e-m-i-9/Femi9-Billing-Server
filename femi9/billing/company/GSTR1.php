@@ -600,7 +600,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 									$q = "select tpii.quantity, tpii.amount, p.gst as gst_percentage, p.gst_type as product_gst_type, tp.gstin as tp_gstin from tp_invoices tpi join tp_invoice_items tpii on tpii.tp_invoice_id=tpi.id join products p on p.id=tpii.product_id join territory_partners tp on tp.id=tpi.territory_partner_id where p.hsn='$hsn_code' and p.gst>0 and tpi.invoice_date between '$from_date' and '$to_date' and tpi.source_godown_id='$get_godown_id'";
 									$res = mysqli_query($db_conn,$q);
 									while ($tr = mysqli_fetch_assoc($res)) {
-										$tp_is_reg = strlen(trim((string)$tr['tp_gstin'])) == 15;
+										$tp_is_reg = tp_gstin_is_valid($tr['tp_gstin']);
 										if (($bg === 'register') !== $tp_is_reg) continue;
 										[$tp_taxable, ] = tp_line_taxable_and_gst((float)$tr['amount'], $tr['gst_percentage'], $tr['product_gst_type']);
 										$qty += (float)$tr['quantity'];
