@@ -97,6 +97,12 @@ try {
                         </div>
                     </div>
 
+                    <?php if (!empty($_companyBridgeView)): ?>
+                        <div class="alert alert-info" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
+                            <span><i class="material-icons-outlined" style="vertical-align:middle;font-size:17px;">visibility</i> Viewing <b><?php echo htmlspecialchars($result_LoGuserDtails['bdm_name'] ?? ''); ?>'s</b> Reward Points (read-only).</span>
+                        </div>
+                    <?php endif; ?>
+
                     <?php if (empty($tpIds)): ?>
                         <div class="alert alert-info">No Territory Partners are assigned to your districts yet.</div>
                     <?php else: ?>

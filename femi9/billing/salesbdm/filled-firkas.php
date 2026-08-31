@@ -252,10 +252,8 @@ $dashboardUrl = 'dashboard.php' . ($viewBdmIdRaw !== '' ? '?view_bdm_id=' . urle
             var status = !wk.has_started ? '<span style="color:#9ca3af;">&mdash;</span>'
                 : (wk.pass ? '<span style="color:#15803d;font-weight:600;">Pass</span>' : '<span style="color:#b91c1c;font-weight:600;">Fail</span>');
             var rowStyle = wk.is_current ? ' style="background:#fffbeb;"' : '';
-            var spilloverNote = (key === 'week1' && w.has_spillover)
-                ? '<div style="font-size:10px;color:#0ea5e9;">incl. ' + ffMoney(w.spillover_amount) + ' paid late last month</div>' : '';
             var paidCell = wk.has_started
-                ? ffMoney(wk.amount) + spilloverNote + ffWeekPaymentLink(tpDbId, wk, key === 'week1' && w.has_spillover)
+                ? ffMoney(wk.amount) + ffWeekPaymentLink(tpDbId, wk, false)
                 : ffMoney(wk.amount);
             html += '<tr' + rowStyle + '><td style="padding:4px 8px;">' + ffEsc(wk.label) + '</td>' +
                 '<td style="text-align:right;padding:4px 8px;color:#6b7280;">' + ffMoney(wk.weekly_slice) + '</td>' +
@@ -264,8 +262,7 @@ $dashboardUrl = 'dashboard.php' . ($viewBdmIdRaw !== '' ? '?view_bdm_id=' . urle
                 '<td style="text-align:right;padding:4px 8px;">' + ffMoney(wk.cumulative) + '</td>' +
                 '<td style="text-align:center;padding:4px 8px;">' + status + '</td></tr>';
         });
-        html += '</table>' +
-            '<div style="font-size:10.5px;color:#9ca3af;margin-top:6px;">A payment made on day 29-31 falls outside every week of that month &mdash; it counts toward next month\'s Week 1 instead.</div>';
+        html += '</table>';
         return html;
     }
 
