@@ -3,6 +3,7 @@ include("checksession.php");
 include("config.php");
 require_once("include/BdmTpScope.php");
 require_once("include/TeamSubtree.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -162,6 +163,64 @@ if (!empty($tpIdsAll)) {
         }
     }
 }
+
+// ═══ "Advance from Company — by TP" — every Active TP (including ones who
+// paid ₹0 this period, unlike "Purchases from Company" below which only
+// lists TPs who actually bought something), with their own Target Amount
+// (district-tree scoped, same rule as the Active TPs card above),
+// Napkin-only advance paid within this page's From/To filter, and an
+// Achievement % = Advance Paid ÷ Target (NOT the downstream-sales-based
+// Achievement used by "Purchases from Company" — this one is advance-vs-target).
+tpEnsureAdvanceWalletColumns($db_conn);
+$advanceTpRows = [];
+if (!empty($tpIds) && $_districtTreeSql) {
+    $_advStmt = $db_conn->prepare(
+        $_districtTreeSql .
+        "SELECT tp.id, tp.tp_id, tp.name,
+                COALESCE(NULLIF(tp.assigned_district,''), tp.branch_district) AS district,
+                COALESCE(SUM(CASE WHEN pln.id IN (SELECT id FROM district_tree) THEN pln.target_amount END), 0) AS target
+         FROM territory_partners tp
+         LEFT JOIN territory_partner_locations tpl ON tpl.territory_partner_id = tp.id
+         LEFT JOIN partner_location_nodes pln ON pln.id = tpl.location_id
+         WHERE tp.id IN ($tpIdList) AND tp.deleted_at IS NULL
+         GROUP BY tp.id
+         ORDER BY tp.name ASC"
+    );
+    $_advStmt->bind_param($_dtTypes, ...$_dtParams);
+    $_advStmt->execute();
+    $_advTpBase = $_advStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $_advStmt->close();
+
+    $_advPaidByTp = [];
+    if ($hasTps) {
+        $_advPaidStmt = $db_conn->prepare("
+            SELECT territory_partner_id, COALESCE(SUM(amount),0) AS paid
+            FROM tp_advance_payments
+            WHERE territory_partner_id IN ($tpIdList) AND product_type = 'napkin' AND deleted_at IS NULL
+              AND payment_date BETWEEN ? AND ?
+            GROUP BY territory_partner_id
+        ");
+        $_advPaidStmt->bind_param('ss', $from, $to);
+        $_advPaidStmt->execute();
+        foreach ($_advPaidStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $_r) {
+            $_advPaidByTp[(int)$_r['territory_partner_id']] = (float)$_r['paid'];
+        }
+        $_advPaidStmt->close();
+    }
+
+    foreach ($_advTpBase as $_r) {
+        $tid = (int)$_r['id'];
+        $target = (float)$_r['target'];
+        $paid = $_advPaidByTp[$tid] ?? 0.0;
+        $advanceTpRows[] = [
+            'id' => $tid, 'tp_id' => $_r['tp_id'], 'name' => $_r['name'],
+            'district' => $_r['district'] ?: '—', 'target' => $target, 'advance_paid' => $paid,
+            'pct' => $target > 0 ? min(round($paid / $target * 100, 1), 999) : 0,
+        ];
+    }
+}
+$advanceDistrictOptions = $_districtNames ?? [];
+sort($advanceDistrictOptions);
 
 $days_diff = (strtotime($to) - strtotime($from)) / 86400;
 $prev_from = date('Y-m-d', strtotime($from) - ($days_diff + 1) * 86400);
@@ -403,24 +462,20 @@ if ($hasTps) {
         'ss', [$from, $to]);
     $overall_target_pct = $overall_target > 0 ? min(round($overall_achieved / $overall_target * 100, 1), 999) : 0;
 
-    // ═══ Advance Payment, split into calendar-day bands: Week 1-4 are
-    // always exactly 1-7 / 8-14 / 15-21 / 22-28 — never stretched to a
-    // month's actual last day — same convention already established in
-    // include/TpWeeklyTarget.php. Day 29-31 never belongs to any week of
-    // its OWN month there; it's its own band 5 here for the same reason
-    // (shown separately in the modal, not folded into Week 4, so the
-    // total still reconciles with $overall_achieved above without
-    // silently misattributing those days to a week they're not part of).
-    $advanceByWeekBand = [1 => 0.0, 2 => 0.0, 3 => 0.0, 4 => 0.0, 5 => 0.0];
-    $advanceByWeekBandCount = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
+    // ═══ Advance Payment, split into calendar-day bands: Week 1-3 are
+    // always exactly 1-7 / 8-14 / 15-21; Week 4 runs from day 22 through the
+    // month's actual last day (28/29/30/31) — same convention as
+    // include/TpWeeklyTarget.php. Every day of the month now belongs to
+    // some week, so there's no separate "day 29-31" band anymore.
+    $advanceByWeekBand = [1 => 0.0, 2 => 0.0, 3 => 0.0, 4 => 0.0];
+    $advanceByWeekBandCount = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
     $_weekBandRows = call_rows($db_conn,
         "SELECT
             CASE
                 WHEN DAY(payment_date) BETWEEN 1 AND 7  THEN 1
                 WHEN DAY(payment_date) BETWEEN 8 AND 14 THEN 2
                 WHEN DAY(payment_date) BETWEEN 15 AND 21 THEN 3
-                WHEN DAY(payment_date) BETWEEN 22 AND 28 THEN 4
-                ELSE 5
+                ELSE 4
             END AS week_band,
             COALESCE(SUM(amount),0) AS amt,
             COUNT(*) AS cnt
@@ -867,6 +922,7 @@ if ($hasTps) {
                     <nav class="section-nav" id="sectionNav">
                         <a href="#sec-overview">Overview</a>
                         <a href="#sec-products">Products</a>
+                        <a href="#sec-advance">Advance from Company</a>
                         <a href="#sec-purchases">Purchases from Company</a>
                         <a href="#sec-yoursales">Your Sales via TP</a>
                     </nav>
@@ -888,14 +944,11 @@ if ($hasTps) {
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6">
-                            <div class="kpi-card" id="filledFirkasCard" data-href="filled-firkas.php?month=<?php echo urlencode(date('Y-m', strtotime($from))); ?><?php echo $viewingOther && !empty($_GET['view_bdm_id']) ? '&view_bdm_id=' . urlencode($_GET['view_bdm_id']) : ''; ?>" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);cursor:pointer;" title="Click to see the Territory Partners in your filled Firkas">
+                            <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
                                 <i class="material-icons-outlined kpi-ico">check_circle</i>
                                 <div class="kpi-t">Filled Firkas</div>
                                 <div class="kpi-multi"><div><b><?php echo $firka_filled_count; ?></b></div></div>
                                 <p class="snote" style="margin:6px 0 0;">Has at least one Territory Partner assigned.</p>
-                                <button type="button" style="margin-top:8px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px;">
-                                    <i class="material-icons-outlined" style="font-size:15px;">visibility</i> View TPs
-                                </button>
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6">
@@ -924,12 +977,20 @@ if ($hasTps) {
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6">
-                            <div class="kpi-card" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
+                            <div class="kpi-card" id="activeTpsCard" style="--kpi-accent:var(--good);--kpi-tint:var(--good-tint);">
                                 <i class="material-icons-outlined kpi-ico">check_circle</i>
                                 <div class="kpi-t">Active TPs</div>
                                 <div class="kpi-multi">
                                     <div><b><?php echo $tp_active_count; ?></b></div>
                                     <div><span>Target Amount</span><b>&#8377;<?php echo inr_format($tp_target_active, 0); ?></b></div>
+                                </div>
+                                <div style="display:flex;gap:6px;margin-top:8px;">
+                                    <button type="button" id="activeTpsViewBtn" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                                        <i class="material-icons-outlined" style="font-size:12px;">visibility</i> Monthly
+                                    </button>
+                                    <button type="button" id="filledFirkasWeeklyBtn" data-href="filled-firkas.php?month=<?php echo urlencode(date('Y-m', strtotime($from))); ?><?php echo $viewingOther && !empty($_GET['view_bdm_id']) ? '&view_bdm_id=' . urlencode($_GET['view_bdm_id']) : ''; ?>" title="Click to see the Territory Partners in your filled Firkas" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                                        <i class="material-icons-outlined" style="font-size:12px;">visibility</i> Weekly
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1000,7 +1061,23 @@ if ($hasTps) {
                                     <?php endif; ?>
                                     <div><span>Available Advance Payment</span><b>&#8377;<?php echo inr_format($overall_available_advance, 0); ?></b></div>
                                 </div>
-                                <p class="snote" style="margin:6px 0 0;">% is Advance Payment against Total Target Amount. Previous Month Advance = this period's purchases that were actually funded by advance paid in an earlier period (click to see who). Available Advance Payment = Advance Payment received minus only the Napkin Purchase funded by THIS period's advance (Napkin Purchase minus Previous Month Advance) — spend already covered by an older payment isn't deducted twice.</p>
+                                <p class="snote" id="paymentNoteText" style="margin:6px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">% is Advance Payment against Total Target Amount. Previous Month Advance = this period's purchases that were actually funded by advance paid in an earlier period (click to see who). Available Advance Payment = Advance Payment received minus only the Napkin Purchase funded by THIS period's advance (Napkin Purchase minus Previous Month Advance) — spend already covered by an older payment isn't deducted twice.</p>
+                                <button type="button" id="paymentNoteToggle" style="border:none;background:none;color:var(--blue);font-size:11px;font-weight:600;cursor:pointer;padding:2px 0;margin-top:2px;">more</button>
+                                <script>
+                                document.getElementById('paymentNoteToggle').addEventListener('click', function () {
+                                    var p = document.getElementById('paymentNoteText');
+                                    var isClamped = p.style.webkitLineClamp === '2';
+                                    if (isClamped) {
+                                        p.style.webkitLineClamp = 'unset';
+                                        p.style.overflow = 'visible';
+                                        this.textContent = 'less';
+                                    } else {
+                                        p.style.webkitLineClamp = '2';
+                                        p.style.overflow = 'hidden';
+                                        this.textContent = 'more';
+                                    }
+                                });
+                                </script>
                             </div>
                         </div>
                     </div>
@@ -1064,7 +1141,8 @@ if ($hasTps) {
                                         <thead><tr><th>Days</th><th style="text-align:right;">Payments</th><th style="text-align:right;">Amount</th></tr></thead>
                                         <tbody>
                                         <?php
-                                            $_weekLabels = [1 => 'Week 1 (Day 1–7)', 2 => 'Week 2 (Day 8–14)', 3 => 'Week 3 (Day 15–21)', 4 => 'Week 4 (Day 22–28)'];
+                                            $_weekLastDay = (int)date('t', strtotime($from));
+                                            $_weekLabels = [1 => 'Week 1 (Day 1–7)', 2 => 'Week 2 (Day 8–14)', 3 => 'Week 3 (Day 15–21)', 4 => 'Week 4 (Day 22–' . $_weekLastDay . ')'];
                                             foreach ($_weekLabels as $_wk => $_label):
                                         ?>
                                             <tr>
@@ -1073,13 +1151,6 @@ if ($hasTps) {
                                                 <td style="text-align:right;">&#8377;<?php echo inr_format($advanceByWeekBand[$_wk], 2); ?></td>
                                             </tr>
                                         <?php endforeach; ?>
-                                        <?php if ($advanceByWeekBandCount[5] > 0): ?>
-                                            <tr>
-                                                <td>Day 29–31 <span class="snote" style="display:block;font-size:11px;">(belongs to next month's Week 1, not this month's Week 4)</span></td>
-                                                <td style="text-align:right;"><?php echo (int)$advanceByWeekBandCount[5]; ?></td>
-                                                <td style="text-align:right;">&#8377;<?php echo inr_format($advanceByWeekBand[5], 2); ?></td>
-                                            </tr>
-                                        <?php endif; ?>
                                         </tbody>
                                         <tfoot><tr style="font-weight:700;border-top:2px solid var(--gridline);">
                                             <td>Total</td>
@@ -1179,9 +1250,15 @@ if ($hasTps) {
                         }
 
                         function renderProducts(cat) {
-                            document.querySelectorAll('#productsCatTable tbody tr[data-cat]').forEach(function (tr) {
-                                tr.style.display = (cat === 'all' || tr.getAttribute('data-cat') === cat) ? '' : 'none';
-                            });
+                            window.productsCurrentCat = cat;
+                            if (window.productsRender) {
+                                window.productsCurrentPage = 1;
+                                window.productsRender();
+                            } else {
+                                document.querySelectorAll('#productsCatTable tbody tr[data-cat]').forEach(function (tr) {
+                                    tr.style.display = (cat === 'all' || tr.getAttribute('data-cat') === cat) ? '' : 'none';
+                                });
+                            }
                         }
 
                         function renderByCatCells(selector, cat) {
@@ -1284,11 +1361,216 @@ if ($hasTps) {
                                         <?php endforeach; endif; ?>
                                         </tbody>
                                     </table>
+                                    <div id="productsPagination" class="mis-pagination"></div>
+                                    <script>
+                                    (function () {
+                                        // Shows only 5 products at a time — the rest via pagination.
+                                        // Composes with the All/Napkin/Diaper toggle above (renderProducts()
+                                        // in the Overview section's script defers to window.productsRender
+                                        // once this has run), so filtering by category re-paginates against
+                                        // just the matching rows, not the full unfiltered set.
+                                        var pageSize = 5;
+                                        var table = document.getElementById('productsCatTable');
+                                        var tbody = table.querySelector('tbody');
+                                        var allRows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-cat]'));
+                                        var pager = document.getElementById('productsPagination');
+                                        if (!allRows.length || !pager) return;
+
+                                        window.productsCurrentPage = window.productsCurrentPage || 1;
+                                        if (typeof window.productsCurrentCat === 'undefined') window.productsCurrentCat = 'all';
+
+                                        function visibleRows() {
+                                            var cat = window.productsCurrentCat || 'all';
+                                            return allRows.filter(function (row) {
+                                                return cat === 'all' || row.getAttribute('data-cat') === cat;
+                                            });
+                                        }
+
+                                        window.productsRender = function () {
+                                            var rows = visibleRows();
+                                            var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+                                            if (window.productsCurrentPage > totalPages) window.productsCurrentPage = totalPages;
+                                            allRows.forEach(function (row) { row.style.display = 'none'; });
+                                            var start = (window.productsCurrentPage - 1) * pageSize;
+                                            rows.slice(start, start + pageSize).forEach(function (row) { row.style.display = ''; });
+
+                                            if (rows.length <= pageSize) { pager.innerHTML = ''; return; }
+                                            var s = start + 1, e = Math.min(start + pageSize, rows.length);
+                                            var html = '<span class="mis-pg-info">' + s + '–' + e + ' of ' + rows.length + '</span>';
+                                            html += '<button type="button" data-pg="prev"' + (window.productsCurrentPage === 1 ? ' disabled' : '') + '>Prev</button>';
+                                            for (var p = 1; p <= totalPages; p++) {
+                                                html += '<button type="button" data-pg="' + p + '" class="' + (p === window.productsCurrentPage ? 'active' : '') + '">' + p + '</button>';
+                                            }
+                                            html += '<button type="button" data-pg="next"' + (window.productsCurrentPage === totalPages ? ' disabled' : '') + '>Next</button>';
+                                            pager.innerHTML = html;
+                                        };
+
+                                        pager.addEventListener('click', function (e) {
+                                            var btn = e.target.closest('button[data-pg]');
+                                            if (!btn) return;
+                                            var pg = btn.getAttribute('data-pg');
+                                            var totalPages = Math.max(1, Math.ceil(visibleRows().length / pageSize));
+                                            if (pg === 'prev') window.productsCurrentPage = Math.max(1, window.productsCurrentPage - 1);
+                                            else if (pg === 'next') window.productsCurrentPage = Math.min(totalPages, window.productsCurrentPage + 1);
+                                            else window.productsCurrentPage = parseInt(pg, 10);
+                                            window.productsRender();
+                                        });
+
+                                        window.productsRender();
+                                    })();
+                                    </script>
                                 </div>
                             </div>
                         </div>
                     </div>
                     </div><!-- /#sec-products -->
+
+                    <div class="mis-section" id="sec-advance">
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                                    <h5 class="card-title" style="margin:0;font-size:14px;">Advance from Company — by TP</h5>
+                                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                                        <div id="advStatusFilter" style="display:flex;gap:5px;">
+                                            <button type="button" class="adv-status-btn active" data-status="all" style="border:1px solid #e5e7eb;background:#4f46e5;color:#fff;border-radius:14px;padding:3px 11px;font-size:11px;font-weight:600;">All</button>
+                                            <button type="button" class="adv-status-btn" data-status="fp" style="border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:14px;padding:3px 11px;font-size:11px;font-weight:600;" title="Fully Paid">FP</button>
+                                            <button type="button" class="adv-status-btn" data-status="pp" style="border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:14px;padding:3px 11px;font-size:11px;font-weight:600;" title="Partially Paid">PP</button>
+                                            <button type="button" class="adv-status-btn" data-status="np" style="border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:14px;padding:3px 11px;font-size:11px;font-weight:600;" title="Not Paid">NP</button>
+                                        </div>
+                                        <div style="display:flex;align-items:center;gap:8px;">
+                                            <label style="font-size:12px;color:#6b7280;margin:0;">District</label>
+                                            <select id="advDistrictSelect" class="form-control form-control-sm" style="width:auto;font-size:12px;">
+                                                <option value="">All Districts</option>
+                                                <?php foreach ($advanceDistrictOptions as $_adn): ?>
+                                                    <option value="<?php echo htmlspecialchars($_adn); ?>"><?php echo htmlspecialchars($_adn); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto;">
+                                    <p class="snote">Every active Territory Partner in your districts — including ones who haven't paid any advance this period. Achievement here is Advance Paid &divide; Target Amount (not downstream sales).</p>
+                                    <table class="mt" id="advanceTable">
+                                        <thead><tr><th>S.No</th><th>TP</th><th>District</th><th>Target Amount</th><th>Advance Paid</th><th>Achievement</th></tr></thead>
+                                        <tbody id="advanceTbody"></tbody>
+                                        <tfoot><tr id="advanceTotalRow" style="border-top:2px solid #e9ecef;font-weight:700;">
+                                            <td colspan="4" style="text-align:right;">Total (filtered)</td>
+                                            <td id="advanceTotalPaid"></td>
+                                            <td></td>
+                                        </tr></tfoot>
+                                    </table>
+                                    <div id="advancePagination" class="mis-pagination"></div>
+                                    <script>
+                                    (function () {
+                                        var allRows = <?php echo json_encode($advanceTpRows); ?>;
+                                        var pageSize = 10;
+                                        var currentPage = 1;
+                                        var currentDistrict = '';
+                                        var currentStatus = 'all';
+
+                                        var escDiv = document.createElement('div');
+                                        function esc(s) { escDiv.textContent = (s == null ? '' : s); return escDiv.innerHTML; }
+                                        function money(n) { return '&#8377;' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
+
+                                        // Fully Paid: Achievement >= 100%. Not Paid: nothing paid at all
+                                        // (or no target to measure against). Partially Paid: everything
+                                        // in between — paid something, but hasn't reached 100% yet.
+                                        function rowStatus(r) {
+                                            if (r.advance_paid <= 0) return 'np';
+                                            if (r.pct >= 100) return 'fp';
+                                            return 'pp';
+                                        }
+
+                                        function filteredRows() {
+                                            return allRows.filter(function (r) {
+                                                if (currentDistrict && r.district !== currentDistrict) return false;
+                                                if (currentStatus !== 'all' && rowStatus(r) !== currentStatus) return false;
+                                                return true;
+                                            });
+                                        }
+
+                                        function render() {
+                                            var rows = filteredRows();
+                                            var tbody = document.getElementById('advanceTbody');
+                                            if (!rows.length) {
+                                                tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No Territory Partners found.</td></tr>';
+                                                document.getElementById('advancePagination').innerHTML = '';
+                                                document.getElementById('advanceTotalPaid').innerHTML = money(0);
+                                                return;
+                                            }
+                                            var totalPages = Math.ceil(rows.length / pageSize);
+                                            if (currentPage > totalPages) currentPage = totalPages;
+                                            var start = (currentPage - 1) * pageSize;
+                                            var pageRows = rows.slice(start, start + pageSize);
+                                            var html = '';
+                                            pageRows.forEach(function (r, i) {
+                                                var bc = r.pct >= 100 ? 'var(--good)' : (r.pct >= 50 ? '#eab308' : 'var(--critical)');
+                                                html += '<tr>' +
+                                                    '<td>' + (start + i + 1) + '</td>' +
+                                                    '<td><span style="font-weight:600;">' + esc(r.name) + '</span><br><small style="color:#9ca3af;">' + esc(r.tp_id) + '</small></td>' +
+                                                    '<td style="font-size:12px;color:#666;">' + esc(r.district) + '</td>' +
+                                                    '<td>' + money(r.target) + '</td>' +
+                                                    '<td>' + money(r.advance_paid) + '</td>' +
+                                                    '<td><div style="display:flex;align-items:center;gap:5px;"><div class="pbar" style="width:70px;"><div class="pf" style="width:' + Math.min(r.pct, 100) + '%;background:' + bc + ';"></div></div><span style="font-size:12.5px;font-weight:700;color:' + bc + ';">' + r.pct + '%</span></div></td>' +
+                                                    '</tr>';
+                                            });
+                                            tbody.innerHTML = html;
+
+                                            var totalPaid = rows.reduce(function (sum, r) { return sum + (r.advance_paid || 0); }, 0);
+                                            document.getElementById('advanceTotalPaid').innerHTML = money(totalPaid);
+
+                                            var pager = document.getElementById('advancePagination');
+                                            var pHtml = '<span class="mis-pg-info">' + (start + 1) + '–' + Math.min(start + pageSize, rows.length) + ' of ' + rows.length + '</span>';
+                                            pHtml += '<button type="button" data-pg="prev"' + (currentPage === 1 ? ' disabled' : '') + '>Prev</button>';
+                                            for (var p = 1; p <= totalPages; p++) {
+                                                pHtml += '<button type="button" data-pg="' + p + '" class="' + (p === currentPage ? 'active' : '') + '">' + p + '</button>';
+                                            }
+                                            pHtml += '<button type="button" data-pg="next"' + (currentPage === totalPages ? ' disabled' : '') + '>Next</button>';
+                                            pager.innerHTML = pHtml;
+                                        }
+
+                                        document.getElementById('advancePagination').addEventListener('click', function (e) {
+                                            var btn = e.target.closest('button[data-pg]');
+                                            if (!btn) return;
+                                            var pg = btn.getAttribute('data-pg');
+                                            var totalPages = Math.ceil(filteredRows().length / pageSize);
+                                            if (pg === 'prev') currentPage = Math.max(1, currentPage - 1);
+                                            else if (pg === 'next') currentPage = Math.min(totalPages, currentPage + 1);
+                                            else currentPage = parseInt(pg, 10);
+                                            render();
+                                        });
+
+                                        document.getElementById('advDistrictSelect').addEventListener('change', function () {
+                                            currentDistrict = this.value;
+                                            currentPage = 1;
+                                            render();
+                                        });
+
+                                        document.getElementById('advStatusFilter').addEventListener('click', function (e) {
+                                            var btn = e.target.closest('.adv-status-btn');
+                                            if (!btn) return;
+                                            document.querySelectorAll('.adv-status-btn').forEach(function (b) {
+                                                b.classList.remove('active');
+                                                b.style.background = '#fff';
+                                                b.style.color = '#374151';
+                                            });
+                                            btn.classList.add('active');
+                                            btn.style.background = '#4f46e5';
+                                            btn.style.color = '#fff';
+                                            currentStatus = btn.getAttribute('data-status');
+                                            currentPage = 1;
+                                            render();
+                                        });
+
+                                        render();
+                                    })();
+                                    </script>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div><!-- /#sec-advance -->
 
                     <!-- ══ Purchases from Company (per TP, hover for product breakdown) ══ -->
                     <div class="mis-section" id="sec-purchases">
@@ -1351,7 +1633,7 @@ if ($hasTps) {
                                         // Client-side only — the category toggle (All/Napkin/Diaper)
                                         // changes each row's own qty/amt cells, never how many TP
                                         // rows exist, so a fixed page size here never fights it.
-                                        var pageSize = 10;
+                                        var pageSize = 5;
                                         var table = document.getElementById('purchasesCatTable');
                                         var tbody = table.querySelector('tbody');
                                         var allRows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
@@ -1455,6 +1737,7 @@ if ($hasTps) {
                                     <table class="mt" id="yourSalesCatTable">
                                         <thead>
                                             <tr>
+                                                <th>S.No</th>
                                                 <th>TP</th>
                                                 <th>Customer Qty<br><button type="button" class="col-toggle-btn" data-target="col-cust-value">Value</button></th>
                                                 <th class="col-cust-value" style="display:none;">Customer Value</th>
@@ -1468,14 +1751,16 @@ if ($hasTps) {
                                         </thead>
                                         <tbody>
                                         <?php if (empty($downstreamByTp)): ?>
-                                            <tr><td colspan="9" class="text-muted">No downstream sales in this period.</td></tr>
-                                        <?php else: foreach ($downstreamByTp as $tid => $d):
+                                            <tr><td colspan="10" class="text-muted">No downstream sales in this period.</td></tr>
+                                        <?php else: $__ysSno = 0; foreach ($downstreamByTp as $tid => $d):
+                                            $__ysSno++;
                                             $tname = $tpNameMap[$tid] ?? ('TP #' . $tid);
                                             $dret = $downstreamReturnByTp[$tid] ?? ['qty' => 0, 'amt' => 0];
                                             $ysQtyByCat = json_encode(['all' => (float)$d['qty'], 'napkin' => $downstreamByTpCat['napkin'][$tid]['qty'] ?? 0, 'diaper' => $downstreamByTpCat['diaper'][$tid]['qty'] ?? 0]);
                                             $ysRevByCat = json_encode(['all' => (float)$d['rev'], 'napkin' => $downstreamByTpCat['napkin'][$tid]['rev'] ?? 0, 'diaper' => $downstreamByTpCat['diaper'][$tid]['rev'] ?? 0]);
                                         ?>
                                             <tr>
+                                                <td><?php echo $__ysSno; ?></td>
                                                 <td><span class="tp-name-cell" data-tp-id="<?php echo $tid; ?>" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true" data-type="downstream"><?php echo htmlspecialchars($tname); ?></span></td>
                                                 <td><?php echo inr_format($d['cust_qty'] ?? 0, 0); ?></td>
                                                 <td class="col-cust-value" style="display:none;">&#8377;<?php echo inr_format($d['cust_rev'] ?? 0, 2); ?></td>
@@ -1489,6 +1774,46 @@ if ($hasTps) {
                                         <?php endforeach; endif; ?>
                                         </tbody>
                                     </table>
+                                    <div id="yourSalesPagination" class="mis-pagination"></div>
+                                    <script>
+                                    (function () {
+                                        var pageSize = 5;
+                                        var table = document.getElementById('yourSalesCatTable');
+                                        var tbody = table.querySelector('tbody');
+                                        var allRows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+                                        if (allRows.length <= pageSize || (allRows.length === 1 && allRows[0].children.length === 1)) return;
+
+                                        var pager = document.getElementById('yourSalesPagination');
+                                        var totalPages = Math.ceil(allRows.length / pageSize);
+                                        var currentPage = 1;
+
+                                        function render() {
+                                            allRows.forEach(function (row, i) {
+                                                var onPage = Math.floor(i / pageSize) + 1;
+                                                row.style.display = (onPage === currentPage) ? '' : 'none';
+                                            });
+                                            var start = (currentPage - 1) * pageSize + 1;
+                                            var end = Math.min(currentPage * pageSize, allRows.length);
+                                            var html = '<span class="mis-pg-info">' + start + '–' + end + ' of ' + allRows.length + '</span>';
+                                            html += '<button type="button" data-pg="prev"' + (currentPage === 1 ? ' disabled' : '') + '>Prev</button>';
+                                            for (var p = 1; p <= totalPages; p++) {
+                                                html += '<button type="button" data-pg="' + p + '" class="' + (p === currentPage ? 'active' : '') + '">' + p + '</button>';
+                                            }
+                                            html += '<button type="button" data-pg="next"' + (currentPage === totalPages ? ' disabled' : '') + '>Next</button>';
+                                            pager.innerHTML = html;
+                                        }
+                                        pager.addEventListener('click', function (e) {
+                                            var btn = e.target.closest('button[data-pg]');
+                                            if (!btn) return;
+                                            var pg = btn.getAttribute('data-pg');
+                                            if (pg === 'prev') currentPage = Math.max(1, currentPage - 1);
+                                            else if (pg === 'next') currentPage = Math.min(totalPages, currentPage + 1);
+                                            else currentPage = parseInt(pg, 10);
+                                            render();
+                                        });
+                                        render();
+                                    })();
+                                    </script>
                                 </div>
                             </div>
                         </div>
@@ -1519,6 +1844,33 @@ if ($hasTps) {
                     <div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>
                 </div>
                 <div id="ufPagination" style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:12px;"></div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active TPs Modal -->
+<div class="modal fade" id="activeTpsModal" tabindex="-1" aria-labelledby="activeTpsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-xl">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e9ecef;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <h6 class="modal-title" id="activeTpsModalLabel" style="font-weight:600;color:#1f2937;margin:0;">
+                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#16a34a;">check_circle</i>
+                    Active Territory Partners
+                </h6>
+                <span id="atHeaderTotal" style="margin-left:auto;font-size:12.5px;font-weight:700;color:#16a34a;background:#e6f9e6;padding:4px 12px;border-radius:20px;white-space:nowrap;"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding:14px 20px;">
+                <p class="snote" id="atRangeNote" style="margin:0 0 10px;"></p>
+                <input type="text" id="atSearchBox" class="form-control form-control-sm" placeholder="Search TP name / ID / phone..." style="max-width:260px;margin-bottom:12px;">
+                <div id="atListBody">
+                    <div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>
+                </div>
+                <div id="atPagination" style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:12px;"></div>
             </div>
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
@@ -1702,8 +2054,135 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
         ufLoad(ufCurrentPage, ufCurrentSearch);
     });
 
-    $('#filledFirkasCard').on('click', function () {
+    $('#filledFirkasWeeklyBtn').on('click', function () {
         window.location.href = $(this).data('href');
+    });
+
+    // ── Active TPs modal ──────────────────────────────────────────────────
+    var atFromDate = <?php echo json_encode($from); ?>;
+    var atToDate   = <?php echo json_encode($to); ?>;
+    var atCache = {};
+    var atCurrentPage = 1;
+    var atCurrentSearch = '';
+    var atSearchTimer = null;
+
+    function atEsc(s) { return $('<div/>').text(s == null ? '' : s).html(); }
+    function atMoney(n) { return '&#8377;' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
+
+    function atRenderRows(data) {
+        if (data && data.error) {
+            return '<div style="color:#b91c1c;font-size:13px;padding:20px 0;text-align:center;">Could not load data: ' + atEsc(data.error) + '</div>';
+        }
+        if (!data || !data.rows || !data.rows.length) {
+            return '<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">No active Territory Partners found.</div>';
+        }
+        var serialStart = ((data.page || 1) - 1) * (data.per_page || 15);
+        var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+            '<thead><tr style="border-bottom:2px solid #e9ecef;text-align:left;color:#6b7280;">' +
+            '<th style="padding:6px 8px;">S.No</th><th style="padding:6px 8px;">TP ID</th><th style="padding:6px 8px;">Name</th>' +
+            '<th style="padding:6px 8px;">District</th><th style="padding:6px 8px;">Firkas</th>' +
+            '<th style="padding:6px 8px;text-align:right;">Target Amount</th>' +
+            '<th style="padding:6px 8px;text-align:right;">Advance Paid (period)</th>' +
+            '</tr></thead><tbody>';
+        $.each(data.rows, function (i, r) {
+            var firkaBadge = r.firka_count > 0
+                ? '<span class="firka-badge" tabindex="0" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-content="' + atEsc(r.firka_names || '') + '" style="cursor:pointer;background:#ede9fe;color:#5b21b6;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap;">' + r.firka_count + ' Firka' + (r.firka_count > 1 ? 's' : '') + '</span>'
+                : '<span style="color:#d1d5db;font-size:12px;">—</span>';
+            html += '<tr style="border-bottom:1px solid #f3f4f6;">' +
+                '<td style="padding:6px 8px;color:#9ca3af;">' + (serialStart + i + 1) + '</td>' +
+                '<td style="padding:6px 8px;"><code style="font-size:11.5px;background:#f3f4f6;padding:2px 6px;border-radius:4px;">' + atEsc(r.tp_id) + '</code></td>' +
+                '<td style="padding:6px 8px;font-weight:600;">' + atEsc(r.name) + '</td>' +
+                '<td style="padding:6px 8px;color:#6b7280;">' + atEsc(r.district || '—') + '</td>' +
+                '<td style="padding:6px 8px;">' + firkaBadge + '</td>' +
+                '<td style="padding:6px 8px;text-align:right;">' + atMoney(r.target) + '</td>' +
+                '<td style="padding:6px 8px;text-align:right;color:var(--good);font-weight:600;">' + atMoney(r.advance_paid) + '</td>' +
+                '</tr>';
+        });
+        html += '</tbody>';
+        if (typeof data.total_advance_paid !== 'undefined') {
+            html += '<tfoot><tr style="border-top:2px solid #e9ecef;font-weight:700;">' +
+                '<td colspan="6" style="padding:8px;text-align:right;">Total Monthly Advance (all ' + data.total + ' TPs)</td>' +
+                '<td style="padding:8px;text-align:right;color:var(--good);">' + atMoney(data.total_advance_paid) + '</td>' +
+                '</tr></tfoot>';
+        }
+        html += '</table></div>';
+        return html;
+    }
+
+    function atRenderPagination(data) {
+        var totalPages = Math.ceil((data.total || 0) / (data.per_page || 15));
+        if (totalPages <= 1) return '';
+        var page = data.page || 1;
+        var html = '<span style="font-size:12px;color:#6b7280;">Page ' + page + ' of ' + totalPages + '</span>';
+        html += '<button type="button" class="at-page-btn" data-page="' + (page - 1) + '" ' + (page <= 1 ? 'disabled' : '') + ' style="border:1px solid #e5e7eb;background:#fff;border-radius:6px;padding:3px 10px;font-size:12px;">Prev</button>';
+        html += '<button type="button" class="at-page-btn" data-page="' + (page + 1) + '" ' + (page >= totalPages ? 'disabled' : '') + ' style="border:1px solid #e5e7eb;background:#fff;border-radius:6px;padding:3px 10px;font-size:12px;">Next</button>';
+        return html;
+    }
+
+    function atInitPopovers() {
+        $('#atListBody .firka-badge').each(function () {
+            var $el = $(this);
+            var inst = bootstrap.Popover.getInstance($el[0]);
+            if (inst) { inst.dispose(); }
+            $el.popover({ trigger: 'focus', placement: 'top', container: 'body' });
+        });
+    }
+
+    function atUpdateHeaderTotal(data) {
+        if (!data || data.error || typeof data.total_advance_paid === 'undefined') {
+            $('#atHeaderTotal').text('');
+            return;
+        }
+        $('#atHeaderTotal').html('Total Monthly Advance (all ' + data.total + ' TPs): ' + atMoney(data.total_advance_paid));
+    }
+
+    function atLoad(page, search) {
+        var key = page + '|' + search + '|' + atFromDate + '|' + atToDate;
+        if (atCache[key]) {
+            $('#atListBody').html(atRenderRows(atCache[key]));
+            $('#atPagination').html(atRenderPagination(atCache[key]));
+            atUpdateHeaderTotal(atCache[key]);
+            atInitPopovers();
+            return;
+        }
+        var params = { page: page, q: search, from: atFromDate, to: atToDate };
+        if (viewBdmId) { params.view_bdm_id = viewBdmId; }
+        $.getJSON('get-active-tps.php', params, function (data) {
+            if (!data || !data.error) { atCache[key] = data; }
+            $('#atListBody').html(atRenderRows(data));
+            $('#atPagination').html(atRenderPagination(data));
+            atUpdateHeaderTotal(data);
+            atInitPopovers();
+        }).fail(function () {
+            $('#atListBody').html('<div style="color:#b91c1c;font-size:13px;padding:20px 0;text-align:center;">Could not load data.</div>');
+        });
+    }
+
+    $('#activeTpsViewBtn').on('click', function (e) {
+        e.stopPropagation();
+        atCurrentPage = 1;
+        atCurrentSearch = '';
+        $('#atSearchBox').val('');
+        var rangeLabel = atFromDate === atToDate ? atFromDate : (atFromDate + ' to ' + atToDate);
+        $('#atRangeNote').text('Advance Paid reflects the dashboard\'s current date filter: ' + rangeLabel + '.');
+        $('#activeTpsModal').modal('show');
+        atLoad(atCurrentPage, atCurrentSearch);
+    });
+
+    $('#atSearchBox').on('input', function () {
+        var val = $(this).val();
+        clearTimeout(atSearchTimer);
+        atSearchTimer = setTimeout(function () {
+            atCurrentSearch = val;
+            atCurrentPage = 1;
+            atLoad(atCurrentPage, atCurrentSearch);
+        }, 350);
+    });
+
+    $(document).on('click', '.at-page-btn', function () {
+        if ($(this).is(':disabled')) return;
+        atCurrentPage = parseInt($(this).data('page'), 10);
+        atLoad(atCurrentPage, atCurrentSearch);
     });
 })(jQuery);
 </script>

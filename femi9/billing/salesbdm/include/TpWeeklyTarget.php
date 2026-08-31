@@ -18,13 +18,10 @@
 // already hold without paying anything new that week, which shouldn't read
 // as "on track").
 //
-// Weeks are always exactly 7-day blocks — Week 1 (1-7), Week 2 (8-14),
-// Week 3 (15-21), Week 4 (22-28) — never stretched to a month's actual last
-// day. A payment made on day 29/30/31 falls outside every week of its own
-// calendar month, so it doesn't count toward that month's target at all;
-// it "spills over" and counts toward the FOLLOWING month's Week 1 instead
-// (see $spilloverAmount below) — paying a few days early for next month is
-// treated as promptly as paying on day 1.
+// Weeks 1-3 are always exactly 7-day blocks — Week 1 (1-7), Week 2 (8-14),
+// Week 3 (15-21). Week 4 runs from day 22 all the way to the month's actual
+// last day (28/29/30/31, whatever that month has) — every day of the month
+// belongs to some week, so there's no "spillover" into the next month.
 //
 // Everything here is batched across a whole set of TPs at once (a handful
 // of queries total, not per TP) — the Filled Firkas modal calls this for an
@@ -34,6 +31,7 @@
 function getTpWeekRangesForBdm(string $monthYear): array {
     $year  = (int)substr($monthYear, 0, 4);
     $month = (int)substr($monthYear, 5, 2);
+    $lastDay = (int)date('t', mktime(0, 0, 0, $month, 1, $year));
 
     return [
         'week1' => [
@@ -53,8 +51,8 @@ function getTpWeekRangesForBdm(string $monthYear): array {
         ],
         'week4' => [
             'start' => sprintf('%04d-%02d-22', $year, $month),
-            'end'   => sprintf('%04d-%02d-28', $year, $month),
-            'label' => 'Week 4 (Day 22-28)',
+            'end'   => sprintf('%04d-%02d-%02d', $year, $month, $lastDay),
+            'label' => 'Week 4 (Day 22-' . $lastDay . ')',
         ],
     ];
 }
@@ -73,7 +71,7 @@ function getTpWeekRangesForBdm(string $monthYear): array {
 //   otherwise the full breakdown: paid_so_far/required_so_far/pct_of_target/
 //     on_track/weeks (week1-4 each with label/start/end/amount/sold/
 //     cumulative/required/is_current/has_started/pass)/first_payment_date/
-//     rank_day_offset/rank_tier/has_spillover/spillover_amount
+//     rank_day_offset/rank_tier
 function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targetAmountsByTp, ?string $monthYear = null): array {
     $tpDbIds = array_values(array_unique(array_map('intval', $tpDbIds)));
     $result = [];
@@ -90,30 +88,20 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
         return $result;
     }
 
-    // Weeks only ever cover day 1-28 — cap "today" there so a payment made
-    // on day 29-31 is never picked up as part of THIS month's own weeks
-    // (it's handled separately as spillover into next month, below).
-    $monthEndForWeeks = date('Y-m-28', strtotime($monthYear . '-01'));
+    // Week 4 now runs through the month's actual last day, so "today" is
+    // capped there instead of at a fixed day 28 — every day of the month
+    // belongs to some week, nothing spills into the next month anymore.
+    $ranges = getTpWeekRangesForBdm($monthYear);
+    $monthEndForWeeks = $ranges['week4']['end'];
     $today = ($monthYear === $currentMonthYear) ? date('Y-m-d') : $monthEndForWeeks;
     if ($today > $monthEndForWeeks) $today = $monthEndForWeeks;
 
-    $ranges       = getTpWeekRangesForBdm($monthYear);
     $thresholdPct = ['week1' => 0.25, 'week2' => 0.50, 'week3' => 0.75, 'week4' => 1.00];
 
     $currentWeekKey = 'week4';
     foreach ($ranges as $key => $r) {
         if ($today >= $r['start'] && $today <= $r['end']) { $currentWeekKey = $key; break; }
     }
-
-    // Day 29-31 of the PREVIOUS month never belonged to any of that month's
-    // own weeks — that money counts toward THIS month instead, credited to
-    // Week 1 as if paid right at the start (paying a few days early for the
-    // new month is at least as prompt as paying on day 1).
-    $prevMonthYear    = date('Y-m', strtotime($monthYear . '-01 -1 month'));
-    $prevMonthLastDay = (int)date('t', strtotime($prevMonthYear . '-01'));
-    $hasSpilloverRange = $prevMonthLastDay > 28;
-    $spilloverStart = $hasSpilloverRange ? date('Y-m-29', strtotime($prevMonthYear . '-01')) : null;
-    $spilloverEnd   = $hasSpilloverRange ? date('Y-m-' . $prevMonthLastDay, strtotime($prevMonthYear . '-01')) : null;
 
     $idList = implode(',', $tpDbIds);
     $overallStart = $ranges['week1']['start'];
@@ -139,26 +127,7 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
         $stmt->close();
     }
 
-    // Batch 2 — spillover (prev month day 29-31), one query for every TP.
-    $spilloverByTp = [];
-    if ($hasSpilloverRange) {
-        $stmt = $dbConn->prepare("
-            SELECT territory_partner_id, COALESCE(SUM(amount), 0) AS total
-            FROM tp_advance_payments
-            WHERE territory_partner_id IN ($idList) AND product_type = 'napkin' AND deleted_at IS NULL
-              AND payment_date >= ? AND payment_date <= ?
-            GROUP BY territory_partner_id
-        ");
-        $stmt->bind_param('ss', $spilloverStart, $spilloverEnd);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        while ($row = $res->fetch_assoc()) {
-            $spilloverByTp[(int)$row['territory_partner_id']] = (float)$row['total'];
-        }
-        $stmt->close();
-    }
-
-    // Batch 3 — Napkin sold (customer + shop channels), grouped by TP+date
+    // Batch 2 — Napkin sold (customer + shop channels), grouped by TP+date
     // so weekly bucketing happens in PHP, same as the paid-amount batch.
     // Informational only ("Napkin sold this week"), never feeds pass/fail.
     $soldByTp = [];
@@ -214,8 +183,6 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
             continue;
         }
 
-        $spilloverAmount = $spilloverByTp[$tpId] ?? 0.0;
-        $hasSpillover = $spilloverAmount > 0;
         $tpPaidRows = $paidByTp[$tpId] ?? [];
         $tpSoldRows = $soldByTp[$tpId] ?? [];
 
@@ -241,8 +208,6 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
                     if ($row['date'] >= $r['start'] && $row['date'] <= $rangeEnd) $sold += $row['amount'];
                 }
             }
-
-            if ($key === 'week1') $paid += $spilloverAmount;
 
             $cumulative += $paid;
             $required = $targetAmount * $thresholdPct[$key];
@@ -278,10 +243,7 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
         // Ranking input — how many days into the CURRENT week this TP made
         // their first Napkin advance payment (0 = the very first day of the
         // week). Null means no payment yet this week — ranked last, below
-        // every TP who has paid something, regardless of amount. A
-        // spillover payment (made at the tail end of last month, counted
-        // into this month's Week 1) ranks as promptly as possible — day
-        // offset 0 — since it arrived before the week even started.
+        // every TP who has paid something, regardless of amount.
         $currentWeekRange = $ranges[$currentWeekKey];
         $firstPaymentDate = null;
         foreach ($tpPaidRows as $row) {
@@ -289,13 +251,9 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
                 if ($firstPaymentDate === null || $row['date'] < $firstPaymentDate) $firstPaymentDate = $row['date'];
             }
         }
-        if ($currentWeekKey === 'week1' && $hasSpillover) {
-            $rankDayOffset = 0;
-        } else {
-            $rankDayOffset = $firstPaymentDate !== null
-                ? (int)((strtotime($firstPaymentDate) - strtotime($currentWeekRange['start'])) / 86400)
-                : null;
-        }
+        $rankDayOffset = $firstPaymentDate !== null
+            ? (int)((strtotime($firstPaymentDate) - strtotime($currentWeekRange['start'])) / 86400)
+            : null;
         $rankTier = $rankDayOffset === null ? 'none' : ($rankDayOffset <= 1 ? 'top' : ($rankDayOffset <= 3 ? 'medium' : 'late'));
 
         $result[$tpId] = [
@@ -311,8 +269,6 @@ function getTpWeeklyCompletionBatch(mysqli $dbConn, array $tpDbIds, array $targe
             'first_payment_date' => $firstPaymentDate,
             'rank_day_offset'    => $rankDayOffset,
             'rank_tier'          => $rankTier,
-            'has_spillover'      => $hasSpillover,
-            'spillover_amount'   => $spilloverAmount,
         ];
     }
 

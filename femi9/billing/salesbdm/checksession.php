@@ -25,9 +25,21 @@ require_once __DIR__ . '/include/db-connect.php';
 // tp-advance-payment-report.php is included too — the Filled Firkas modal's
 // "View entries" link (dashboard.php) opens it in a new tab, which carries
 // the same bridge cookie but hits this same login check independently.
+// filled-firkas.php, tp-purchase-order.php, and reward-points-tp.php are
+// the rest of the sidebar's own read-only, no-POST-write pages — every one
+// of them was reachable from a bridged dashboard's sidebar/cards already,
+// they just weren't allowlisted, so clicking through from a bridged session
+// silently bounced to a logged-out page. filled-firkas.php already had its
+// own $_companyBridgeView handling written (dashboard.php's "View TPs"
+// button links here) but was missing from this list, so it never actually
+// worked. change-password.php and logout.php are deliberately left off —
+// this bridge is read-only, and a company user browsing a BDM's dashboard
+// should never be able to touch that BDM's own login credentials.
 $_companyBridgeAllowedScripts = [
     'dashboard.php', 'get-filled-firka-tps.php', 'get-unassigned-firkas.php',
+    'get-active-tps.php',
     'my-team.php', 'my-team-report.php', 'tp-advance-payment-report.php',
+    'filled-firkas.php', 'tp-purchase-order.php', 'reward-points-tp.php',
 ];
 if (in_array(basename($_SERVER['SCRIPT_NAME']), $_companyBridgeAllowedScripts, true) && !empty($_COOKIE['femi9_company_bdm_view'])) {
     $db_conn->query("CREATE TABLE IF NOT EXISTS company_bdm_view_bridge (
