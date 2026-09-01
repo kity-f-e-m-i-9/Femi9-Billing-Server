@@ -3,7 +3,7 @@
 								//1 (ss, st, dt, shop) — sum from *_items so the GST embedded in an
 								// 'inclusive'-priced product's total can be stripped out via
 								// gstamount_total, same fix as territory-partner/gstr1.php.
-							   $select_sum_total_intra_register="select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='register' and gst_type='inner' and date between '$from_date' and '$to_date'";
+							   $select_sum_total_intra_register="select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='register' and (gst_type='inner' or gst_type not in ('inner','outer')) and date between '$from_date' and '$to_date'";
 							   $fetch_sum_total_intra_register=mysqli_query($db_conn,$select_sum_total_intra_register);
 							   $result_sum_total_intra_register=mysqli_fetch_array($fetch_sum_total_intra_register);
 
@@ -12,7 +12,7 @@
 							   }else{$total_intra_register="0";}
 
 							   //2 (customer)
-							   $select_sum_total_intra_register2="select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='register' and gst_type='inner' and date between '$from_date' and '$to_date'";
+							   $select_sum_total_intra_register2="select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='register' and (gst_type='inner' or gst_type not in ('inner','outer')) and date between '$from_date' and '$to_date'";
 							   $fetch_sum_total_intra_register2=mysqli_query($db_conn,$select_sum_total_intra_register2);
 							   $result_sum_total_intra_register2=mysqli_fetch_array($fetch_sum_total_intra_register2);
 
@@ -23,7 +23,7 @@
 
 							   //intra-state unregistered person (tamilnadu)
 							   //3 (ss, st, dt, shop)
-							   $select_sum_total_intra_unregister="select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='unregister' and gst_type='inner' and date between '$from_date' and '$to_date'";
+							   $select_sum_total_intra_unregister="select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='unregister' and (gst_type='inner' or gst_type not in ('inner','outer')) and date between '$from_date' and '$to_date'";
 							   $fetch_sum_total_intra_unregister=mysqli_query($db_conn,$select_sum_total_intra_unregister);
 							   $result_sum_total_intra_unregister=mysqli_fetch_array($fetch_sum_total_intra_unregister);
 
@@ -32,7 +32,7 @@
 							   }else{$total_intra_unregister="0";}
 
 							   //4 (customer)
-							   $select_sum_total_intra_unregister2="select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='unregister' and gst_type='inner' and date between '$from_date' and '$to_date'";
+							   $select_sum_total_intra_unregister2="select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='unregister' and (gst_type='inner' or gst_type not in ('inner','outer')) and date between '$from_date' and '$to_date'";
 							   $fetch_sum_total_intra_unregister2=mysqli_query($db_conn,$select_sum_total_intra_unregister2);
 							   $result_sum_total_intra_unregister2=mysqli_fetch_array($fetch_sum_total_intra_unregister2);
 
@@ -43,7 +43,7 @@
 
 //OT sales intra sales (Tamilnadu)
 //5 (OT sales) - register
-$select_sum_total_intra_OTSLS="select sum(total-gst_amount) from ot_sales where buyer_gsttype='register' and date between '$from_date' and '$to_date' and godownid='$get_godown_id' and gst_type='inner'";
+$select_sum_total_intra_OTSLS="select sum(total-gst_amount) from ot_sales where buyer_gsttype='register' and date between '$from_date' and '$to_date' and godownid='$get_godown_id' and (gst_type='inner' or gst_type not in ('inner','outer'))";
 							   $fetch_sum_total_intra_OTSLS=mysqli_query($db_conn,$select_sum_total_intra_OTSLS);
 							   $result_sum_total_intra_OTSLS=mysqli_fetch_array($fetch_sum_total_intra_OTSLS);
 
@@ -52,7 +52,7 @@ $select_sum_total_intra_OTSLS="select sum(total-gst_amount) from ot_sales where 
 							   }else{$total_reg_OTSLS_intra="0";}
 
 							   //6 (OT sales) - unregister
-$select_sum_total_intra_OTSLSUN="select sum(total-gst_amount) from ot_sales where buyer_gsttype='unregister' and date between '$from_date' and '$to_date' and godownid='$get_godown_id' and gst_type='inner'";
+$select_sum_total_intra_OTSLSUN="select sum(total-gst_amount) from ot_sales where buyer_gsttype='unregister' and date between '$from_date' and '$to_date' and godownid='$get_godown_id' and (gst_type='inner' or gst_type not in ('inner','outer'))";
 							   $fetch_sum_total_intra_OTSLSUN=mysqli_query($db_conn,$select_sum_total_intra_OTSLSUN);
 							   $result_sum_total_intra_OTSLSUN=mysqli_fetch_array($fetch_sum_total_intra_OTSLSUN);
 
@@ -82,15 +82,15 @@ $select_sum_total_intra_OTSLSUN="select sum(total-gst_amount) from ot_sales wher
 	// ---- Nil-rated-only totals (gst_percentage/gst = 0), intra-state ----
 	// The "Total Sales" figures above mix nil-rated and taxable-rate lines together;
 	// the Nil Rated Supplies filing table needs only the gst_percentage=0 portion.
-	$nil_intra_register = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='register' and gst_type='inner' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
-	$nil_intra_register += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='register' and gst_type='inner' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
-	$nil_intra_register += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gst_amount) from ot_sales where buyer_gsttype='register' and gst_type='inner' and gst=0 and date between '$from_date' and '$to_date' and godownid='$get_godown_id'"))[0] ?? 0);
+	$nil_intra_register = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='register' and (gst_type='inner' or gst_type not in ('inner','outer')) and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_intra_register += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='register' and (gst_type='inner' or gst_type not in ('inner','outer')) and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_intra_register += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gst_amount) from ot_sales where buyer_gsttype='register' and (gst_type='inner' or gst_type not in ('inner','outer')) and gst=0 and date between '$from_date' and '$to_date' and godownid='$get_godown_id'"))[0] ?? 0);
 	$nil_intra_register += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gst_amount) from internal_transfer where date between '$from_date' and '$to_date' and send_from='$get_godown_id' and gst=0"))[0] ?? 0);
 	$nil_intra_register += tp_gst_bucket_totals(array_filter($tp_sls_lines, fn($l) => $l['gst_percentage'] == 0))['reg_intra'] ?? 0;
 
-	$nil_intra_unregister = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='unregister' and gst_type='inner' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
-	$nil_intra_unregister += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='unregister' and gst_type='inner' and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
-	$nil_intra_unregister += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gst_amount) from ot_sales where buyer_gsttype='unregister' and gst_type='inner' and gst=0 and date between '$from_date' and '$to_date' and godownid='$get_godown_id'"))[0] ?? 0);
+	$nil_intra_unregister = (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='unregister' and (gst_type='inner' or gst_type not in ('inner','outer')) and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_intra_unregister += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gstamount_total) from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='unregister' and (gst_type='inner' or gst_type not in ('inner','outer')) and gst_percentage=0 and date between '$from_date' and '$to_date'"))[0] ?? 0);
+	$nil_intra_unregister += (float)(mysqli_fetch_array(mysqli_query($db_conn, "select sum(total-gst_amount) from ot_sales where buyer_gsttype='unregister' and (gst_type='inner' or gst_type not in ('inner','outer')) and gst=0 and date between '$from_date' and '$to_date' and godownid='$get_godown_id'"))[0] ?? 0);
 	$nil_intra_unregister += tp_gst_bucket_totals(array_filter($tp_sls_lines, fn($l) => $l['gst_percentage'] == 0))['unreg_intra'] ?? 0;
 
 
