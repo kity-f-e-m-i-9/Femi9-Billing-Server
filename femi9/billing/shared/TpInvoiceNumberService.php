@@ -49,8 +49,15 @@ function tpInvoiceNextNumber(mysqli $db, string $source, string $invoiceDate, in
     // account) tags its number so different accounts' numbers never collide.
     $like_pattern = $source === 'CO' ? "TP/$current_fy/%" : "TP/$source_esc/$current_fy/%";
 
-    // Sync with actual max for this source+FY to guard against an out-of-sync sequence
-    $max_res = $db->query("SELECT MAX(CAST(SUBSTRING_INDEX(invoice_number, '/', -1) AS UNSIGNED)) AS max_val FROM tp_invoices WHERE invoice_number LIKE '$like_pattern'");
+    // Sync with actual max for this source+FY to guard against an out-of-sync sequence.
+    // Scoped to created_by_user_type='company' when source is 'CO' — a Super
+    // Stockist manually types their own invoice_number (see
+    // super-stockist/tp-invoice-action.php) and, in practice, often types it
+    // in this same plain "TP/{fy}/{seq}" shape without an SS tag. Without
+    // this scope, that manually-typed text would match this LIKE pattern
+    // and inflate/skew Company's own auto-generated sequence.
+    $companyScope = $source === 'CO' ? " AND created_by_user_type='company'" : '';
+    $max_res = $db->query("SELECT MAX(CAST(SUBSTRING_INDEX(invoice_number, '/', -1) AS UNSIGNED)) AS max_val FROM tp_invoices WHERE invoice_number LIKE '$like_pattern'$companyScope");
     $actual_max = (int)(($max_res->fetch_assoc())['max_val'] ?? 0);
 
     $seq_val  = ($seq_row && $seq_row['fy'] === $current_fy) ? (int)$seq_row['last_val'] : 0;
