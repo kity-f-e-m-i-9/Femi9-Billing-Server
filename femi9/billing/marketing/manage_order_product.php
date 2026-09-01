@@ -327,6 +327,50 @@ if (!empty($orderIdsInRange)) {
     }
 }
 
+// ── New Shop stats — shops added in this same date range (same "New Shop"
+// definition as company/ms-team-shop-view.php: ms_shop.created_at within
+// range), and how many of those brand-new shops already got an order that
+// was actually invoiced by a TP, with that invoice value. Answers "of the
+// shops I onboarded this period, how many turned into real business yet".
+$newShopIds = [];
+$resNewShops = $db_conn->query(
+    "SELECT id FROM ms_shop WHERE ms_id IN ($msIdListSql) AND DATE(created_at) BETWEEN '$from_date' AND '$to_date'"
+);
+while ($nsr = mysqli_fetch_assoc($resNewShops)) { $newShopIds[(int)$nsr['id']] = true; }
+$newShopCount = count($newShopIds);
+
+// Stage 1: New Shop → Get Order — how many of these new shops placed at
+// least one Get Order at all yet (regardless of invoice status), and the
+// estimated value of those orders (same qty*price*(1-disc) estimate the
+// Get Order Value card above uses, via $orderValueMap).
+$newShopGetOrderShopIds = [];
+$newShopGetOrderValue = 0.0;
+foreach ($orderIdsInRange as $oid) {
+    $sid = (int)($orderMeta[$oid]['shop_id'] ?? 0);
+    if (!isset($newShopIds[$sid])) { continue; }
+    $newShopGetOrderShopIds[$sid] = true;
+    $newShopGetOrderValue += $orderValueMap[$oid] ?? 0;
+}
+$newShopGetOrderCount = count($newShopGetOrderShopIds);
+
+// Stage 2: Converted New Shop Get Order — of those, how many actually got
+// invoiced by a TP, and the real invoiced value (not the estimate above).
+$newShopInvoicedShopIds = [];
+$newShopInvoiceIds = [];
+foreach ($orderIdsInRange as $oid) {
+    $sid = (int)($orderMeta[$oid]['shop_id'] ?? 0);
+    if (!isset($newShopIds[$sid])) { continue; }
+    $invId = $tpOrderMeta[$oid]['invoiced_inv_id'] ?? null;
+    if (empty($invId)) { continue; }
+    $newShopInvoicedShopIds[$sid] = true;
+    $newShopInvoiceIds[$invId] = true;
+}
+$newShopInvoicedCount = count($newShopInvoicedShopIds);
+$newShopInvoicedValue = 0.0;
+foreach (array_keys($newShopInvoiceIds) as $iid) {
+    $newShopInvoicedValue += ($invTotals ?? [])[$iid] ?? 0;
+}
+
 // "Total Orders" (view=all) — Assigned TP name + a simplified TP Invoice
 // Status badge (Completed / Invoice Pending / Not Invoiced Yet), same as
 // company/ms_prorders.php's view=all. The existing $tpOrderMeta-driven
@@ -581,6 +625,40 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
                     <br/>Monthly Target: &#8377;<?php echo inr_format($monthlyTarget, 2); ?>
                 </div>
             <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="kpi-card" style="--kpi-accent:#8b5cf6;">
+            <i class="material-icons-outlined kpi-ico">storefront</i>
+            <div class="kpi-t">New Shop</div>
+            <div class="kpi-v"><?php echo (int)$newShopCount; ?></div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="kpi-card" style="--kpi-accent:#8b5cf6;">
+            <i class="material-icons-outlined kpi-ico">shopping_cart</i>
+            <div class="kpi-t">New Shop &rarr; Get Order</div>
+            <div class="kpi-v"><?php echo (int)$newShopGetOrderCount; ?></div>
+            <div class="kpi-sub">Estimated &#8377;<?php echo inr_format($newShopGetOrderValue, 2); ?></div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="kpi-card" style="--kpi-accent:#8b5cf6;">
+            <i class="material-icons-outlined kpi-ico">receipt_long</i>
+            <div class="kpi-t">Converted New Shop Get Order</div>
+            <div class="kpi-v"><?php echo (int)$newShopInvoicedCount; ?></div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="kpi-card" style="--kpi-accent:#8b5cf6;">
+            <i class="material-icons-outlined kpi-ico">compare_arrows</i>
+            <div class="kpi-t">New Shop Order Amount</div>
+            <div class="kpi-v" style="font-size:16px;">&#8377;<?php echo inr_format($newShopGetOrderValue, 0); ?> <span style="font-size:13px;color:#9ca3af;">/ &#8377;<?php echo inr_format($newShopInvoicedValue, 0); ?></span></div>
+            <div class="kpi-sub">Get Order amount / Invoiced amount</div>
         </div>
     </div>
 </div>
