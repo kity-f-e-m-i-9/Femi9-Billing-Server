@@ -44,16 +44,21 @@ $_wr_tgt = (float)(mysqli_fetch_array(mysqli_query($db_conn,
 if ($_wr_tgt <= 0) return;  // No target configured
 
 // 3. TP's actual purchases last month from tp_invoices
+// Target achievement is napkin-only — diaper invoices don't count.
 $_wr_purchase = (float)(mysqli_fetch_array(mysqli_query($db_conn,
     "SELECT COALESCE(SUM(total_amount),0) FROM tp_invoices
      WHERE territory_partner_id='$_wr_tpEsc'
-       AND invoice_date BETWEEN '$_wr_from_esc' AND '$_wr_to_esc'"))[0] ?? 0);
+       AND invoice_date BETWEEN '$_wr_from_esc' AND '$_wr_to_esc'
+       AND product_type='napkin'"))[0] ?? 0);
 
-// Deduct returns
+// Deduct returns (inherit product_type from the originating tp_invoices
+// row via invoice number, so diaper returns stay excluded too)
 $_wr_returns = (float)(mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COALESCE(SUM(total),0) FROM user_return_stock
-     WHERE from_usertype='territory_partner' AND from_userid='$_wr_tpEsc'
-       AND date BETWEEN '$_wr_from_esc' AND '$_wr_to_esc'"))[0] ?? 0);
+    "SELECT COALESCE(SUM(urs.total),0) FROM user_return_stock urs
+     JOIN tp_invoices ti ON ti.invoice_number = urs.invnumber COLLATE utf8mb4_unicode_ci
+     WHERE urs.from_usertype='territory_partner' AND urs.from_userid='$_wr_tpEsc'
+       AND urs.date BETWEEN '$_wr_from_esc' AND '$_wr_to_esc'
+       AND ti.product_type='napkin'"))[0] ?? 0);
 
 $_wr_net = $_wr_purchase - $_wr_returns;
 

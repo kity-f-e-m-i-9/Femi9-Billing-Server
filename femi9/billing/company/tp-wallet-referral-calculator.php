@@ -157,15 +157,21 @@ function getAllTerritoryPartnersForReferral(mysqli $dbConn): array
 
 function getTpNetPurchase(mysqli $dbConn, string $internalId, string $from, string $to): array
 {
+    // Target achievement is napkin-only — diaper invoices don't count.
     $stmt = $dbConn->prepare("SELECT COALESCE(SUM(total_amount),0) AS total FROM tp_invoices
-        WHERE territory_partner_id = ? AND invoice_date BETWEEN ? AND ?");
+        WHERE territory_partner_id = ? AND invoice_date BETWEEN ? AND ? AND product_type = 'napkin'");
     $stmt->bind_param("sss", $internalId, $from, $to);
     $stmt->execute();
     $purchase = (float)($stmt->get_result()->fetch_assoc()['total'] ?? 0);
     $stmt->close();
 
-    $stmt = $dbConn->prepare("SELECT COALESCE(SUM(total),0) AS total FROM user_return_stock
-        WHERE from_usertype = 'territory_partner' AND from_userid = ? AND date BETWEEN ? AND ?");
+    // Returns don't carry product_type directly — inherit it from the
+    // originating tp_invoices row via invoice number, so diaper returns
+    // stay excluded too.
+    $stmt = $dbConn->prepare("SELECT COALESCE(SUM(urs.total),0) AS total FROM user_return_stock urs
+        JOIN tp_invoices ti ON ti.invoice_number = urs.invnumber COLLATE utf8mb4_unicode_ci
+        WHERE urs.from_usertype = 'territory_partner' AND urs.from_userid = ? AND urs.date BETWEEN ? AND ?
+        AND ti.product_type = 'napkin'");
     $stmt->bind_param("sss", $internalId, $from, $to);
     $stmt->execute();
     $returns = (float)($stmt->get_result()->fetch_assoc()['total'] ?? 0);
