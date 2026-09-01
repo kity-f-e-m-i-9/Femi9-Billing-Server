@@ -26,6 +26,39 @@ $date        = date("Y-m-d", strtotime($_REQUEST['date'] ?? date("Y-m-d")));
 $inv_year    = date("Y", strtotime($date));
 $tp_id       = (int)$Login_user_IDvl;
 
+// A shop with an un-invoiced field order ("Get Order" visit) must be
+// invoiced from that order (order-to-invoice.php via manage-orders.php),
+// not started fresh here — otherwise the field order is silently orphaned
+// and never shows as fulfilled. Only blocks the very first item on a brand
+// new invoice (inv_id not yet in user_invoice); adding more items to an
+// invoice already in progress is unaffected.
+$stmtChkNew = $db_conn->prepare("SELECT COUNT(*) AS n FROM user_invoice WHERE inv_id=?");
+$stmtChkNew->bind_param('s', $inv_id);
+$stmtChkNew->execute();
+$isBrandNewInvoice = ((int)($stmtChkNew->get_result()->fetch_assoc()['n'] ?? 0)) === 0;
+$stmtChkNew->close();
+
+if ($isBrandNewInvoice && $customer_id !== '') {
+    // tp_orders.shop_id is shop.id (the PK), but $customer_id here is
+    // shop.temp_id (what invoices key shops by) — resolve PK first.
+    $stmtPending = $db_conn->prepare(
+        "SELECT 1 FROM tp_orders o
+         INNER JOIN shop s ON s.id = o.shop_id
+         WHERE o.tp_id=? AND s.temp_id=? AND o.new_order='yes' AND o.voided_at IS NULL
+           AND (o.invoiced_inv_id IS NULL OR o.invoiced_inv_id='')
+         LIMIT 1"
+    );
+    $stmtPending->bind_param('is', $tp_id, $customer_id);
+    $stmtPending->execute();
+    $hasPendingOrder = (bool)$stmtPending->get_result()->fetch_assoc();
+    $stmtPending->close();
+    if ($hasPendingOrder) {
+        $_SESSION['errorMessage'] = "This shop has a pending field order. Please invoice it from Manage Orders instead of adding a new invoice directly.";
+        echo "<script>window.location='shop-invoice-add.php?invuser=$invuser';</script>";
+        exit;
+    }
+}
+
 // Check invoice number duplicate (set by AJAX in form)
 if (($_REQUEST['invoice_number_accept'] ?? '1') == '0') {
     $_SESSION['errorMessage'] = "Invoice Number already exists!";

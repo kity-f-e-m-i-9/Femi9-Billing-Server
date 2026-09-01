@@ -727,14 +727,29 @@ function showInvoiceDuplicate(str) {
 </div>
 <div class="col-md-4">
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
+<?php
+// Shops with an un-invoiced field order ("Get Order" visit) must be
+// invoiced from that order via Manage Orders, not started fresh here — see
+// the matching server-side block in shop-invoice-action.php. Excluded from
+// this dropdown (rather than just disabled) so a TP can't submit one anyway
+// via a stale/edited option.
+$pendingOrderShops = [];
+$res_pending_shops = mysqli_query($db_conn, "SELECT DISTINCT shop_id FROM tp_orders WHERE tp_id='$Login_user_IDvl' AND new_order='yes' AND voided_at IS NULL AND (invoiced_inv_id IS NULL OR invoiced_inv_id='')");
+while ($rp2 = mysqli_fetch_array($res_pending_shops)) { $pendingOrderShops[$rp2['shop_id']] = true; }
+?>
 <select required name="customer_id" class="form-control" autofocus>
 <option value="" hidden>Select</option>
 <?php
 $res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userTYPE='$Login_user_TYPEvl' AND onboard_userID='$Login_user_IDvl' ORDER BY name ASC");
-while ($r = mysqli_fetch_array($res_shops)) { ?>
+while ($r = mysqli_fetch_array($res_shops)) {
+    if (isset($pendingOrderShops[$r['id']])) { continue; }
+?>
 <option value="<?php echo $r['temp_id']; ?>"><?php echo ucwords($r['name']); ?>, <?php echo $r['mobile_number']; ?>, <?php echo ucwords($r['address']); ?></option>
 <?php } ?>
 </select>
+<?php if (!empty($pendingOrderShops)) { ?>
+<small class="text-muted">Shops with a pending field order aren't listed — invoice them from <a href="manage-orders.php">Manage Orders</a> instead.</small>
+<?php } ?>
 </div>
 <div class="col-md-4">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
