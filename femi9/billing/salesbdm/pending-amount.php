@@ -1,11 +1,19 @@
 <?php
 // "Pending Amount" — every Territory Partner assigned to this Sales BDM,
-// with Target Amount, how much Napkin advance they've paid, the Balance
-// (unspent Napkin advance wallet money still sitting with the TP, i.e.
-// SUM(balance_amount) — not Target minus Paid), and Total Invoice Amount —
-// same Target/Advance/Invoice logic as dashboard.php's own "Advance from
-// Company — by TP" section (district-tree scoped Target, Napkin-only
-// Advance/Invoice), just as its own dedicated page with a From/To filter.
+// with Target Amount, how much Company-approved Napkin advance they've
+// paid, the Balance (unspent Company-approved Napkin advance wallet money
+// still sitting with the TP, i.e. SUM(balance_amount) — not Target minus
+// Paid), and Total Invoice Amount — same Target/Advance/Invoice logic as
+// dashboard.php's own "Advance from Company — by TP" section (district-tree
+// scoped Target, Napkin-only Advance/Invoice), just as its own dedicated
+// page with a From/To filter.
+//
+// Advance/Balance are scoped to approver_type='company' — a TP can also
+// route Napkin advance through a Super Stockist approver instead (a
+// separate wallet), which isn't money owed to/by the company. That slice
+// gets its own SS Advance/SS Balance columns so it's visible without being
+// mixed into the Company figures — per explicit correction from the user
+// after a TP's SS-routed advance was inflating this page's main balance.
 include("checksession.php");
 include("config.php");
 require_once("include/BdmTpScope.php");
@@ -96,12 +104,19 @@ if ($hasTps) {
         // their remaining amount, fully_adjusted rows contribute 0), not a
         // Target-vs-Paid comparison — that's what "pending" actually means
         // here per explicit correction from the user.
+        //
+        // Scoped to approver_type='company' — a TP can also route Napkin
+        // advance through a Super Stockist approver (separate wallet, same
+        // product_type), which isn't Company-owed money and was inflating
+        // this page's Advance/Balance columns. That SS-approved slice gets
+        // its own separate SS Advance/SS Balance columns instead, per
+        // explicit user correction.
         $paidByTp = [];
         $balanceByTp = [];
         $stmtP = $db_conn->prepare("
             SELECT territory_partner_id, COALESCE(SUM(amount),0) AS paid, COALESCE(SUM(balance_amount),0) AS bal
             FROM tp_advance_payments
-            WHERE territory_partner_id IN ($tpIdList) AND product_type = 'napkin' AND deleted_at IS NULL
+            WHERE territory_partner_id IN ($tpIdList) AND product_type = 'napkin' AND approver_type = 'company' AND deleted_at IS NULL
               AND payment_date BETWEEN ? AND ?
             GROUP BY territory_partner_id
         ");
@@ -112,6 +127,23 @@ if ($hasTps) {
             $balanceByTp[(int)$r['territory_partner_id']] = (float)$r['bal'];
         }
         $stmtP->close();
+
+        $ssPaidByTp = [];
+        $ssBalanceByTp = [];
+        $stmtSP = $db_conn->prepare("
+            SELECT territory_partner_id, COALESCE(SUM(amount),0) AS paid, COALESCE(SUM(balance_amount),0) AS bal
+            FROM tp_advance_payments
+            WHERE territory_partner_id IN ($tpIdList) AND product_type = 'napkin' AND approver_type = 'ss' AND deleted_at IS NULL
+              AND payment_date BETWEEN ? AND ?
+            GROUP BY territory_partner_id
+        ");
+        $stmtSP->bind_param('ss', $current_from_date, $current_to_date);
+        $stmtSP->execute();
+        foreach ($stmtSP->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+            $ssPaidByTp[(int)$r['territory_partner_id']] = (float)$r['paid'];
+            $ssBalanceByTp[(int)$r['territory_partner_id']] = (float)$r['bal'];
+        }
+        $stmtSP->close();
 
         $invoiceByTp = [];
         $stmtI = $db_conn->prepare("
@@ -138,6 +170,7 @@ if ($hasTps) {
             $rows[] = [
                 'tp_id' => $r['tp_id'], 'name' => $r['name'], 'district' => $district,
                 'target' => $target, 'advance_paid' => $paid, 'balance' => $balanceByTp[$tid] ?? 0.0,
+                'ss_advance_paid' => $ssPaidByTp[$tid] ?? 0.0, 'ss_balance' => $ssBalanceByTp[$tid] ?? 0.0,
                 'invoice_amount' => $invoiceByTp[$tid] ?? 0.0,
             ];
         }
@@ -147,6 +180,8 @@ if ($hasTps) {
 $total_target = array_sum(array_column($rows, 'target'));
 $total_advance = array_sum(array_column($rows, 'advance_paid'));
 $total_balance = array_sum(array_column($rows, 'balance'));
+$total_ss_advance = array_sum(array_column($rows, 'ss_advance_paid'));
+$total_ss_balance = array_sum(array_column($rows, 'ss_balance'));
 $total_invoice = array_sum(array_column($rows, 'invoice_amount'));
 ?>
 <!DOCTYPE html>
@@ -293,11 +328,13 @@ $total_invoice = array_sum(array_column($rows, 'invoice_amount'));
                                             <th>Target Amount</th>
                                             <th>Advance Amount</th>
                                             <th>Balance Amount</th>
+                                            <th>SS Advance Amount</th>
+                                            <th>SS Balance Amount</th>
                                             <th>Total Invoice Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php $sr = 1; foreach ($rows as $r): $bal = $r['balance']; ?>
+                                        <?php $sr = 1; foreach ($rows as $r): $bal = $r['balance']; $ssBal = $r['ss_balance']; ?>
                                         <tr>
                                             <td><?php echo $sr++; ?></td>
                                             <td><?php echo htmlspecialchars($r['tp_id'], ENT_QUOTES, 'UTF-8'); ?></td>
@@ -308,6 +345,8 @@ $total_invoice = array_sum(array_column($rows, 'invoice_amount'));
                                             <td style="color:<?php echo $bal > 0 ? '#dc2626' : '#16a34a'; ?>;font-weight:600;">
                                                 ₹<?php echo inr_format($bal, 2); ?>
                                             </td>
+                                            <td style="color:#6b7280;">₹<?php echo inr_format($r['ss_advance_paid'], 2); ?></td>
+                                            <td style="color:#6b7280;">₹<?php echo inr_format($ssBal, 2); ?></td>
                                             <td>₹<?php echo inr_format($r['invoice_amount'], 2); ?></td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -320,6 +359,8 @@ $total_invoice = array_sum(array_column($rows, 'invoice_amount'));
                                             <td style="color:<?php echo $total_balance > 0 ? '#dc2626' : '#16a34a'; ?>;">
                                                 ₹<?php echo inr_format($total_balance, 2); ?>
                                             </td>
+                                            <td style="color:#6b7280;">₹<?php echo inr_format($total_ss_advance, 2); ?></td>
+                                            <td style="color:#6b7280;">₹<?php echo inr_format($total_ss_balance, 2); ?></td>
                                             <td>₹<?php echo inr_format($total_invoice, 2); ?></td>
                                         </tr>
                                     </tfoot>

@@ -471,11 +471,16 @@ $recentSources = $db_conn->query("
     // "pkt"). Print doesn't need the on-screen table-column alignment, so
     // here it's safe to size each one to its own value.
     function sizeForPrint(scope) {
+        // +2 / +1 buffer — 1ch is the width of the "0" glyph, but the print
+        // font is bold Times New Roman at 24px, where real characters
+        // (letters, parens) render noticeably wider than that. Sizing to
+        // the exact character count with no buffer was clipping the tail
+        // of the value inside the input (e.g. "M(24)" showing as "M(").
         scope.querySelectorAll('.lbl-product-row input[type=text]').forEach(function (el) {
-            el.style.width = (el.value || el.placeholder || '').length + 'ch';
+            el.style.width = ((el.value || el.placeholder || '').length + 2) + 'ch';
         });
         scope.querySelectorAll('.lbl-product-row input[type=number]').forEach(function (el) {
-            el.style.width = String(el.value || el.placeholder || '0').length + 'ch';
+            el.style.width = (String(el.value || el.placeholder || '0').length + 1) + 'ch';
         });
     }
     window.addEventListener('beforeprint', function () { sizeForPrint(document); });

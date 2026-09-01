@@ -69,7 +69,13 @@ $changeTypeLabels = [
                     <div class="row">
                         <div class="col">
                             <div class="page-description">
-                                <h1><table class="headertble"><tr><td>Invoice History</td></tr></table></h1>
+                                <h1>
+                                    <table class="headertble" style="width:100%">
+                                        <tr>
+                                            <td><a href="shop-manage-invoice.php" title="Back to Manage Invoice" style="color:inherit;text-decoration:none;"><i class="material-icons" style="vertical-align:middle;">arrow_back</i></a> Invoice History</td>
+                                        </tr>
+                                    </table>
+                                </h1>
                             </div>
                         </div>
                     </div>
@@ -77,7 +83,8 @@ $changeTypeLabels = [
                         <div class="col">
                             <div class="card">
                                 <div class="card-body">
-                                    <table class="table table-bordered">
+                                    <div class="table-responsive">
+                                    <table class="table table-bordered" style="min-width:640px;">
                                         <thead>
                                             <tr>
                                                 <th>Date/Time</th>
@@ -105,6 +112,7 @@ $changeTypeLabels = [
                                         <?php endforeach; endif; ?>
                                         </tbody>
                                     </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
