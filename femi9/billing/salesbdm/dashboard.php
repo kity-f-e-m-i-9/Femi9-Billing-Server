@@ -222,16 +222,31 @@ if (!empty($tpIds) && $_districtTreeSql) {
 $advanceDistrictOptions = $_districtNames ?? [];
 sort($advanceDistrictOptions);
 
-// Fully Paid Active TPs — how many of the Active TPs card's own TPs have
-// paid their Napkin advance up to (or past) their own Target Amount this
-// period, and what fraction of the card's overall Target Amount that
-// represents (Fully Paid TPs' advance total ÷ Active TPs Target Amount).
+// Fully Paid Active TPs card — 3 independent percentages, per explicit
+// user request:
+//   1. tp_fp_count_pct — headcount: how many of the Active TPs are Fully
+//      Paid (pct >= 100), as a % of all Active TPs.
+//   2. tp_raw_amount_pct — every Active TP's raw advance paid (uncapped,
+//      overpayment included) summed and compared to the total Active
+//      Target — can exceed 100% if enough TPs overpaid.
+//   3. tp_capped_amount_pct — same sum, but each TP's own contribution is
+//      capped at their own target (min(advance_paid, target)) before
+//      summing, so one TP's overpayment can't read as covering part of a
+//      DIFFERENT TP's target. Never exceeds 100%.
 $tp_fp_count = 0;
-$tp_fp_amount = 0.0;
+$tp_raw_amount = 0.0;
+$tp_capped_amount = 0.0;
 foreach ($advanceTpRows as $_ar) {
-    if ($_ar['pct'] >= 100) { $tp_fp_count++; $tp_fp_amount += $_ar['advance_paid']; }
+    if ($_ar['pct'] >= 100) { $tp_fp_count++; }
+    $tp_raw_amount += $_ar['advance_paid'];
+    $tp_capped_amount += min($_ar['advance_paid'], $_ar['target']);
 }
-$tp_fp_pct = $tp_target_active > 0 ? round($tp_fp_amount / $tp_target_active * 100, 1) : 0;
+$tp_fp_count_pct = $tp_active_count > 0 ? round($tp_fp_count / $tp_active_count * 100, 1) : 0;
+$tp_raw_amount_pct = $tp_target_active > 0 ? round($tp_raw_amount / $tp_target_active * 100, 1) : 0;
+$tp_capped_amount_pct = $tp_target_active > 0 ? round($tp_capped_amount / $tp_target_active * 100, 1) : 0;
+// Kept for any other code still referencing the old names.
+$tp_fp_amount = $tp_capped_amount;
+$tp_fp_pct = $tp_capped_amount_pct;
 
 // ═══ "New TPs" modal — every TP (active or inactive) onboarded within this
 // page's From/To filter, with their Firka(s) and district-tree-scoped
@@ -1035,11 +1050,21 @@ if ($hasTps) {
                                     <div><span>Target Amount</span><b>&#8377;<?php echo inr_format($tp_target_active, 0); ?></b></div>
                                 </div>
                                 <div style="margin-top:8px;padding-top:8px;border-top:1px solid #f1f0ec;font-size:12px;">
-                                    <span style="color:#6b7280;">Fully Paid</span>
-                                    <b style="color:var(--good);"><?php echo $tp_fp_count; ?> TP<?php echo $tp_fp_count !== 1 ? 's' : ''; ?></b>
-                                    &mdash;
-                                    <b>&#8377;<?php echo inr_format($tp_fp_amount, 0); ?></b> / &#8377;<?php echo inr_format($tp_target_active, 0); ?>
-                                    <b style="color:var(--good);">(<?php echo $tp_fp_pct; ?>%)</b>
+                                    <div>
+                                        <span style="color:#6b7280;">Fully Paid (TPs)</span>
+                                        <b style="color:var(--good);"><?php echo $tp_fp_count; ?> / <?php echo $tp_active_count; ?></b>
+                                        <b style="color:var(--good);">(<?php echo $tp_fp_count_pct; ?>%)</b>
+                                    </div>
+                                    <div style="margin-top:3px;">
+                                        <span style="color:#6b7280;">Advance Paid / Target</span>
+                                        <b>&#8377;<?php echo inr_format($tp_raw_amount, 0); ?></b> / &#8377;<?php echo inr_format($tp_target_active, 0); ?>
+                                        <b style="color:var(--good);">(<?php echo $tp_raw_amount_pct; ?>%)</b>
+                                    </div>
+                                    <div style="margin-top:3px;">
+                                        <span style="color:#6b7280;">Advance Paid (capped) / Target</span>
+                                        <b>&#8377;<?php echo inr_format($tp_capped_amount, 0); ?></b> / &#8377;<?php echo inr_format($tp_target_active, 0); ?>
+                                        <b style="color:var(--good);">(<?php echo $tp_capped_amount_pct; ?>%)</b>
+                                    </div>
                                 </div>
                                 <div style="display:flex;gap:6px;margin-top:8px;">
                                     <button type="button" id="activeTpsViewBtn" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
