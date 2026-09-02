@@ -101,9 +101,28 @@ function render_shop_invoice_html(array $ctx, bool $forPdf = false): string {
 .item_list td{font-size:11px;padding:3px;}
 .item_list td:last-child{padding-right:6px;}
 #noneborder td{font-size:12px;line-height:16px;}
-.cusdetaiis{font-size:12px;line-height:16px;}
+.cusdetaiis{font-size:12px;line-height:16px;margin:6px 0;}
 #second_topvl td{padding:3px;font-size:12px;}
 #hsnsac{font-size:11px;}
+#hsnsac td{padding:2px 4px;}
+#sealsign td{padding:2px;font-size:12px;}
+#toptl{font-size:17px;padding:3px;}
+.amount_word,.amount_payable{padding:2px;font-size:12px;}
+/* The details table on the right (Invoice #/Delivery Note/Reference No./
+   etc.) hardcodes height="50" per row in the markup — sized for a browser
+   tab with room to spare, not a fixed A4 page. Each row's actual content
+   is one short line plus a label, so this alone was costing ~180px of
+   otherwise-empty vertical space, the single biggest reason a normal
+   4-line-item invoice spilled onto a second PDF page. CSS height overrides
+   the HTML attribute's (lower-specificity) height. */
+#second_topvl td[height]{height:24px !important;}
+#shiippingaddress{margin:4px 0;font-size:12px;}
+hr{margin:3px 0;}
+/* Several sections below the item table are separate <table width="100%">
+   blocks stacked one after another — a browser's UA stylesheet gives every
+   <table> a small default top/bottom margin, which adds up across 5-6 of
+   them into real page space with nothing rendered in it. */
+#divToPrintScroll table{margin:0;}
 <?php endif; ?>
 <?php if (!$forPdf): ?>
 

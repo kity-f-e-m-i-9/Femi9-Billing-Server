@@ -40,7 +40,7 @@ $_companyBridgeAllowedScripts = [
     'get-active-tps.php',
     'my-team.php', 'my-team-report.php', 'tp-advance-payment-report.php',
     'filled-firkas.php', 'tp-purchase-order.php', 'reward-points-tp.php',
-    'pending-amount.php',
+    'pending-amount.php', 'tp-invoices.php', 'tp-invoice-print.php',
 ];
 if (in_array(basename($_SERVER['SCRIPT_NAME']), $_companyBridgeAllowedScripts, true) && !empty($_COOKIE['femi9_company_bdm_view'])) {
     $db_conn->query("CREATE TABLE IF NOT EXISTS company_bdm_view_bridge (
