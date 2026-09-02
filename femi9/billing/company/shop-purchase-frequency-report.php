@@ -32,7 +32,10 @@ date_default_timezone_set("Asia/Kolkata");
 set_time_limit(300);
 ini_set('memory_limit', '512M');
 
-$today   = new DateTimeImmutable('today');
+// Report "as of" date — capped at end of June 2026 rather than the real
+// current date, so all coverage / "days since last" / overdue math is
+// computed against this cutoff instead of today.
+$today   = new DateTimeImmutable('2026-06-30');
 $todayS  = $today->format('Y-m-d');
 
 /* ------------------------------------------------------------------ *
@@ -115,6 +118,7 @@ $sql = "
       AND ui.voided_at IS NULL
       AND ui.date IS NOT NULL
       AND ui.date > '2000-01-01'
+      AND ui.date < '" . $today->modify('+1 day')->format('Y-m-d') . "'
 ";
 $res = mysqli_query($db_conn, $sql);
 
