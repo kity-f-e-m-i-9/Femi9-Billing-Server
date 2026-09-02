@@ -146,11 +146,14 @@ hr{margin:3px 0;}
     #currencySelectWrap select { width: 100% !important; max-width: 260px; }
 
     /* Seller/customer details vs. invoice meta panel is a rigid 50/50
-       table row — on a phone this crushed both halves unreadably. Stack
-       them full-width instead. */
-    .second_containar, .second_containar tbody, .second_containar tr { display: block; width: 100%; }
-    .second_containar td { display: block; width: 100% !important; box-sizing: border-box; }
-    .second_containar td:nth-child(1) { border-right: 0; border-bottom: 1px solid #000; }
+       table row — left at its natural desktop width (same as the item
+       table above) instead of being stacked full-width, so the on-screen
+       mobile view matches what Print actually produces; the same
+       #divToPrintScroll horizontal scroll already in place for the item
+       table covers this too. Previously stacked here, but that read as
+       one field falling below another instead of the two-column layout
+       everyone expects, per explicit user correction. */
+    .second_containar { min-width: 600px; }
 
     /* Bank details / seal & signature blocks used align="right" tables
        sized to desktop content, causing them to overflow the viewport. */
