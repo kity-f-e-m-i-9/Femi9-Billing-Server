@@ -1010,6 +1010,40 @@ function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt, 
     foreach ($tp as $r) { $map[$r['g']]['lbl']=$map[$r['g']]['lbl']??$r['lbl']; $map[$r['g']]['t']=(float)$r['rev']; $map[$r['g']]['tc']=(int)$r['cnt']; }
     foreach ($ot as $r) { $map[$r['g']]['lbl']=$map[$r['g']]['lbl']??$r['lbl']; $map[$r['g']]['o']=(float)$r['rev']; $map[$r['g']]['oc']=(int)$r['cnt']; }
     foreach ($otret as $r) { $map[$r['g']]['o']=($map[$r['g']]['o']??0)-(float)$r['rev']; }
+    // Net non-OT returns (user_return_stock, company-bound) into the same
+    // bucket + series they were originally sold under — same reconciliation
+    // Channel Breakdown / Daily Trend chart apply (see $ch_returns / $dret),
+    // and the same reason: without this every period bucket here was net of
+    // only OT's own returns, so the table's grand total sat between the top
+    // KPI's gross Sales and net Total Turnover, matching neither.
+    if ($scope === 'company') {
+        $ret = call_rows($db,
+            "SELECT DATE_FORMAT(`date`,'$gfmt') g, DATE_FORMAT(MIN(`date`),'$lfmt') lbl, from_usertype ch, COALESCE(SUM(total),0) amount FROM (
+                SELECT returnid, `date`, from_usertype, MAX(total) total FROM user_return_stock
+                WHERE to_usertype='company' AND `date` BETWEEN ? AND ?
+                GROUP BY returnid, `date`, from_usertype
+             ) x GROUP BY g, from_usertype",
+            'ss', [$from, $to]);
+        foreach ($ret as $r) {
+            // Same from_usertype -> series mapping as the Daily Trend chart's
+            // $dret loop: 'customer' nets against 'c', 'territory_partner'
+            // against 't', everything else (shop/super_stockiest/stockiest/
+            // distributor/super_distributor) against 's' — $shop above is
+            // already every non-customer, non-TP company-issued sale summed
+            // with no to_user_type split, so it already carries all of those
+            // channels folded in under one series.
+            $series = match ($r['ch']) {
+                'customer' => 'c',
+                'territory_partner' => 't',
+                default => 's',
+            };
+            // A bucket that only has a return (no sale) has no 'lbl' yet —
+            // set it here too so cmp_period_table() shows the pretty label
+            // instead of falling back to the raw group key.
+            $map[$r['g']]['lbl'] = $map[$r['g']]['lbl'] ?? $r['lbl'];
+            $map[$r['g']][$series] = ($map[$r['g']][$series] ?? 0) - (float)$r['amount'];
+        }
+    }
     ksort($map); return $map;
 }
 $daily_p   = company_period($db_conn,$utype,$from,$to,$tc_inv,$tc_ui,'%Y-%m-%d','%d %b',$tpinv_source_sql,$tc_tpi,$scope);
