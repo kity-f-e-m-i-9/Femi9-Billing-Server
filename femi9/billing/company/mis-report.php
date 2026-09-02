@@ -459,16 +459,29 @@ if ($scope === 'company') {
     $gp_params[] = $to;
 }
 // See memory "neksomo-sold-by-company-calc".
-// tpii.amount is the line's PRE-discount gross (qty*rate) — tp_invoices.total_amount
-// (used by every other revenue figure on this report, e.g. the top Sales/Total
-// Turnover KPI and Channel Breakdown) is net of each line's discount_amount, so
-// summing tpii.amount alone overstates TP revenue by the invoice's total discount.
-// Subtracting tpii.discount_amount here reconciles this union back to that same
-// header total (see e.g. TP/26-27/573: items summed 940400, discount 56424,
-// header total_amount 883976 — matching only once discount is subtracted).
+// tpii.amount is the line's PRE-discount gross (qty*rate); reconciling it back
+// to tp_invoices.total_amount (used by every other revenue figure on this
+// report, e.g. the top Sales/Total Turnover KPI and Channel Breakdown) needs
+// BOTH discount mechanisms TP invoices support:
+//  - tpii.discount_amount: a per-line discount (see e.g. TP/26-27/573: items
+//    summed 940400, line discounts totalled 56424, header total_amount
+//    883976 — matching only once each line's own discount is subtracted).
+//  - tpi.discount_amount: an invoice-wide discount some invoices carry
+//    instead/on top (only super-stockist's tp-invoice-action.php and the
+//    edit-tp-invoice-action.php pages still write this — the current
+//    company-side create flow always stores 0 here per its own comment, but
+//    older/edited rows can still have one — e.g. TP/26-27/091: items summed
+//    43757, zero line discounts, but header discount_amount 19826, header
+//    total_amount 23931 = 43757-19826). Since it isn't itemized per line,
+//    it's allocated pro-rata by each line's share of the invoice's gross
+//    subtotal (SUM(tpii.amount) for that tp_invoice_id) — the only
+//    consistent split when the real per-line breakdown wasn't captured.
+$gp_tp_net_line_amt = "(tpii.amount - COALESCE(tpii.discount_amount,0)
+             - COALESCE(tpi.discount_amount,0) * tpii.amount
+               / NULLIF((SELECT SUM(tpii2.amount) FROM tp_invoice_items tpii2 WHERE tpii2.tp_invoice_id = tpi.id), 0))";
 $gp_tp_union = '';
 if ($tpinv_source_sql) {
-    $gp_tp_union = "UNION ALL SELECT tpii.product_id pr_id, tpii.quantity qty, (tpii.amount - COALESCE(tpii.discount_amount,0)) total
+    $gp_tp_union = "UNION ALL SELECT tpii.product_id pr_id, tpii.quantity qty, {$gp_tp_net_line_amt} total
          FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
          WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}";
     $gp_params[] = $from;
@@ -988,11 +1001,12 @@ if ($scope === 'company') {
 // land in invoice / user_invoice / tp_invoices, all three must be summed.
 $ps_tp_union = '';
 if ($tpinv_source_sql) {
-    // tpii.amount is pre-discount; net it against tpii.discount_amount so this
-    // reconciles to tp_invoices.total_amount, same as the Gross Profit union
-    // above ($gp_tp_union) — see that comment for the reconciliation example.
+    // Net against both the per-line and (pro-rated) invoice-level discount so
+    // this reconciles to tp_invoices.total_amount, same as the Gross Profit
+    // union above ($gp_tp_union / $gp_tp_net_line_amt) — see that comment for
+    // the reconciliation examples.
     $ps_tp_union = "UNION ALL
-         SELECT tpii.product_id, tpii.quantity, (tpii.amount - COALESCE(tpii.discount_amount,0))
+         SELECT tpii.product_id, tpii.quantity, {$gp_tp_net_line_amt}
          FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
          WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}";
     $ps_params[] = $from;
@@ -1558,10 +1572,10 @@ if ($is_neksomo_view) {
                  FROM ot_sales os
                  WHERE os.date BETWEEN ? AND ?{$pcs_ot_cond}
                  UNION ALL
-                 -- tpii.amount is pre-discount; net it against discount_amount so
-                 -- Sold Value reconciles to tp_invoices.total_amount, same fix as
-                 -- the Gross Profit / Product-wise Sales unions above.
-                 SELECT tpii.product_id, tpii.quantity, (tpii.amount - COALESCE(tpii.discount_amount,0)) AS line_total, tpi.invoice_date
+                 -- Net against both discount mechanisms so Sold Value
+                 -- reconciles to tp_invoices.total_amount, same fix as the
+                 -- Gross Profit / Product-wise Sales unions above.
+                 SELECT tpii.product_id, tpii.quantity, {$gp_tp_net_line_amt} AS line_total, tpi.invoice_date
                  FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
                  WHERE tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
                  UNION ALL
