@@ -2781,9 +2781,17 @@ if ($is_neksomo_view) {
                          Flow panel's data is fetched lazily (only on first
                          click) from dashboard-total-flow-data.php and cached
                          in JS afterwards; it never runs on normal page load. -->
-                    <div class="tf-toggle" id="dashViewToggle">
-                        <button type="button" class="tf-toggle-btn active" id="btnDashMain" data-view="main">Main</button>
-                        <button type="button" class="tf-toggle-btn" id="btnDashTotalFlow" data-view="totalflow">Total Flow</button>
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+                        <div class="tf-toggle" id="dashViewToggle" style="margin-bottom:0;">
+                            <button type="button" class="tf-toggle-btn active" id="btnDashMain" data-view="main">Main</button>
+                            <button type="button" class="tf-toggle-btn" id="btnDashTotalFlow" data-view="totalflow">Total Flow</button>
+                        </div>
+                        <?php if ($scope === 'company' && !$is_neksomo_view): ?>
+                        <a href="mis-report-export-xlsx.php?scope=<?php echo urlencode($scope); ?>&from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?><?php echo $filter_tp > 0 ? '&tp_id='.(int)$filter_tp : ''; ?>"
+                           class="btn btn-success btn-sm" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+                            <i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">download</i> Export to Excel
+                        </a>
+                        <?php endif; ?>
                     </div>
 
                     <div id="mainPanel">
@@ -2867,15 +2875,6 @@ if ($is_neksomo_view) {
                         <a href="#sec-growth">Growth</a>
                         <a href="#sec-returns">Returns</a>
                     </nav>
-
-                    <?php if ($scope === 'company' && !$is_neksomo_view): ?>
-                    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-                        <a href="mis-report-export-xlsx.php?scope=<?php echo urlencode($scope); ?>&from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?><?php echo $filter_tp > 0 ? '&tp_id='.(int)$filter_tp : ''; ?>"
-                           class="btn btn-success btn-sm" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
-                            <i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">download</i> Export to Excel
-                        </a>
-                    </div>
-                    <?php endif; ?>
 
                     <!-- ══ KPI CARDS ════════════════════════════════════════ -->
                     <?php
