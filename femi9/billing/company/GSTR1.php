@@ -354,6 +354,9 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							 
 						   <div style="clear:both;"></div>
 						   <br/>
+
+						   <h1 style="margin-top:20px;">GSTR-1 Filing Summary</h1>
+						   <p style="color:#666;margin-top:-8px;">Standard GST portal table layout &mdash; Table 4 (B2B), Table 7 (B2C), Table 8 (Nil/Exempt/Non-GST), Table 12 (HSN Summary), Table 13 (Documents Issued).</p>
 						   
 						    <?php
 							//Intra
@@ -386,7 +389,8 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   
 						   <div style="clear:both;"></div>
 						   <br/>
-						   
+
+						   <h3>Table 8 — Nil Rated, Exempted &amp; Non-GST Outward Supplies</h3>
 						   <table id="gsttablevl">
 						   <tr>
 						   <th>Description</th>
@@ -438,6 +442,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   
 						   <!-------------HSN wise Total Qty---------->
 						   <br/>
+						   <h3>Table 12 — HSN-wise Summary of Outward Supplies</h3>
 						    <table id="gsttablevl" style="height:auto;">
 							<tr>
 							<th>HSN</th>
@@ -553,7 +558,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 							<!-------------HSN-wise B2B / B2C split (rated supplies only)---------->
 							<br/>
-							<h3>Rated (Taxable) Supplies — B2B vs B2C, HSN-wise</h3>
+							<h3>Table 4 &amp; 7 — Rated (Taxable) Supplies, B2B vs B2C, HSN-wise</h3>
 							<table id="gsttablevl" style="height:auto;">
 							<tr>
 							<th>HSN</th>
@@ -634,7 +639,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 							<!-------------B2B Buyer-Wise Summary (total value, click to expand per-buyer detail)---------->
 							<br/>
-							<h3>B2B Buyer-Wise Summary</h3>
+							<h3>Table 4 — B2B Invoices, Buyer-Wise Summary</h3>
 							<?php
 							// One row per individual registered (B2B) buyer — SS/ST/DT/Shop/Customer
 							// each keyed by temp_id/id, TP keyed by territory_partner_id — across all
@@ -791,9 +796,77 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							</div>
 
 
+							<!-------------Table 7 - B2C (Others): unregistered-buyer supplies with tax split---------->
+							<br/>
+							<h3>Table 7 — B2C (Others), Tax Summary</h3>
+							<?php
+							// Same CGST/SGST/IGST derivation as the B2B table above (gst_type='inner'
+							// -> intra -> split evenly into CGST+SGST; otherwise inter -> IGST), but
+							// aggregated only (no per-buyer listing — B2C buyers are typically
+							// walk-in/anonymous, consistent with the existing B2B table's own note).
+							// Net of B2C credit notes (rsi.buyer_gsttype='unregister' or blank/NULL,
+							// same fallback used in gst_details_credit.php).
+							$b2c_taxable = 0; $b2c_cgst = 0; $b2c_sgst = 0; $b2c_igst = 0;
+
+							$b2c_add = function($is_intra, $taxable, $gst_amt) use (&$b2c_taxable, &$b2c_cgst, &$b2c_sgst, &$b2c_igst) {
+								$b2c_taxable += $taxable;
+								if ($is_intra) { $b2c_cgst += $gst_amt / 2; $b2c_sgst += $gst_amt / 2; }
+								else { $b2c_igst += $gst_amt; }
+							};
+
+							$q = "select gst_type, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='unregister' and date between '$from_date' and '$to_date' group by gst_type";
+							$res = mysqli_query($db_conn, $q);
+							while ($r = mysqli_fetch_assoc($res)) { $b2c_add($r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), (float)$r['taxable'], (float)$r['gst_amt']); }
+
+							$q = "select gst_type, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='unregister' and date between '$from_date' and '$to_date' group by gst_type";
+							$res = mysqli_query($db_conn, $q);
+							while ($r = mysqli_fetch_assoc($res)) { $b2c_add($r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), (float)$r['taxable'], (float)$r['gst_amt']); }
+
+							$q = "select gst_type, sum(total-gst_amount) as taxable, sum(gst_amount) as gst_amt from ot_sales where godownid='$get_godown_id' and buyer_gsttype='unregister' and date between '$from_date' and '$to_date' group by gst_type";
+							$res = mysqli_query($db_conn, $q);
+							while ($r = mysqli_fetch_assoc($res)) { $b2c_add($r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), (float)$r['taxable'], (float)$r['gst_amt']); }
+
+							foreach ($tp_sls_lines ?? [] as $l) {
+								if ($l['is_registered']) continue;
+								$b2c_add($l['is_intra'], $l['taxable_value'], $l['gst_amount']);
+							}
+
+							// Net out B2C credit notes (returns) — blank/NULL buyer_gsttype defaults to
+							// unregister here too, matching gst_details_credit.php's own convention.
+							$q = "select gst_type, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and (buyer_gsttype='unregister' or buyer_gsttype not in ('register','unregister')) and date between '$from_date' and '$to_date' group by gst_type";
+							$res = mysqli_query($db_conn, $q);
+							while ($r = mysqli_fetch_assoc($res)) { $b2c_add($r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), -(float)$r['taxable'], -(float)$r['gst_amt']); }
+
+							$q = "select gst_type, sum(total) as taxable from ot_sales_return where godownid='$get_godown_id' and buyer_gsttype='unregister' and return_date between '$from_date' and '$to_date' group by gst_type";
+							$res = mysqli_query($db_conn, $q);
+							while ($r = mysqli_fetch_assoc($res)) { $b2c_add($r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), -(float)$r['taxable'], 0); }
+
+							foreach ($tp_credit_lines ?? [] as $l) {
+								if ($l['is_registered']) continue;
+								$b2c_add($l['is_intra'], -$l['taxable_value'], -$l['gst_amount']);
+							}
+							?>
+							<table id="gsttablevl" style="height:auto;">
+							<tr>
+							<th>Description</th>
+							<th>Taxable Value</th>
+							<th>CGST</th>
+							<th>SGST</th>
+							<th>IGST</th>
+							</tr>
+							<tr>
+							<td style="text-align:left;"><b>Total B2C (Others) Supplies</b></td>
+							<td style="text-align:left;"><b><?=inr_format($b2c_taxable, 2);?></b></td>
+							<td style="text-align:left;"><b><?=inr_format($b2c_cgst, 2);?></b></td>
+							<td style="text-align:left;"><b><?=inr_format($b2c_sgst, 2);?></b></td>
+							<td style="text-align:left;"><b><?=inr_format($b2c_igst, 2);?></b></td>
+							</tr>
+							</table>
+
+
 							<!-------------Documents Issued During the Tax Period---------->
 							<br/>
-							<h3>Documents Issued During the Tax Period</h3>
+							<h3>Table 13 — Documents Issued During the Tax Period</h3>
 							<table id="gsttablevl" style="height:auto;">
 							<tr>
 							<th>Channel</th>
