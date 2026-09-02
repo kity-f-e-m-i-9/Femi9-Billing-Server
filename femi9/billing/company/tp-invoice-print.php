@@ -92,9 +92,14 @@ $show_carton_cols = $has_carton_data;
                     #divToPrintScroll { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
                     #divToPrintScroll .maincontainar { width: max-content; min-width: 100%; }
 
-                    .second_containar, .second_containar tbody, .second_containar tr { display: block; width: 100%; }
-                    .second_containar td { display: block; width: 100% !important; box-sizing: border-box; }
-                    .second_containar td:nth-child(1) { border-right: 0; border-bottom: 1px solid #000; }
+                    /* Left at its natural desktop width instead of being
+                       stacked full-width, so the on-screen mobile view
+                       matches what Print actually produces — the same
+                       #divToPrintScroll horizontal scroll above covers this
+                       too. Per explicit user correction: stacking read as
+                       one field falling below another instead of the
+                       two-column layout everyone expects. */
+                    .second_containar { min-width: 600px; }
 
                     #bottom_bank, #bottom_bank table, #sealsign { width: 100% !important; }
                     table[align="right"] { width: 100%; }

@@ -74,6 +74,10 @@ if (!empty($salesBdmID)) {
         <a href="<?php echo $_bdmBase; ?>pending-amount"><i class="material-icons-two-tone">account_balance_wallet</i>Pending Amount</a>
     </li>
 
+    <li>
+        <a href="<?php echo $_bdmBase; ?>tp-invoices"><i class="material-icons-two-tone">receipt_long</i>TP Invoices</a>
+    </li>
+
     <?php if ($_hasReports): ?>
     <li>
         <a href=""><i class="material-icons-two-tone">groups</i>Our Team

@@ -74,8 +74,36 @@ $options->set('isRemoteEnabled', true);   // logo images are fetched by URL
 // defaultFont here previously replaced the typeface for ALL text, not
 // just the missing glyph, making every column wider than the Print page.
 
+// Dynamic page height so the invoice always renders as ONE continuous page
+// regardless of how many products it has, instead of a fixed A4 height that
+// a long product list would spill past into a second page. dompdf has no
+// browser-style "shrink to fit" — the standard way to get a one-page PDF
+// for variable-length content is to size the page itself to the content
+// (like a receipt-printer roll), not to fight a fixed page size. Width
+// stays A4's own width so the invoice still reads like a normal document,
+// only the height is custom.
+//
+// Estimated in mm at the PDF's own tightened font/padding sizes
+// (see ShopInvoiceHtml.php's $forPdf styles): a generous per-item allowance
+// covers a product name that wraps to 2 lines. $baseMm covers every part of
+// the layout that DOESN'T grow with item count (seller/buyer/meta blocks,
+// the item table's own header + subtotal/GST/discount/total rows, amount-
+// in-words, HSN summary header+total, declaration+bank details, seal/
+// signature, footer line, @page margins). Never goes below A4's own height
+// so a short invoice still looks like a normal page, not a stub.
+$__itemCount = count($invData['invoice_items'] ?? []);
+$__hsnCount  = count($invData['hsn_totals'] ?? []);
+$__baseMm      = 210;
+$__perItemMm   = 7;
+$__perHsnRowMm = 5; // beyond the first HSN row, which $__baseMm already covers
+$__estimatedMm = $__baseMm + ($__itemCount * $__perItemMm) + (max(0, $__hsnCount - 1) * $__perHsnRowMm);
+$__pageHeightMm = max(297, $__estimatedMm); // never shorter than a real A4 page
+$__mmToPt = 72 / 25.4;
+$__pageWidthPt  = 210 * $__mmToPt;
+$__pageHeightPt = $__pageHeightMm * $__mmToPt;
+
 $dompdf = new Dompdf($options);
-$dompdf->setPaper('A4', 'portrait');
+$dompdf->setPaper([0, 0, $__pageWidthPt, $__pageHeightPt]);
 $dompdf->loadHtml($html);
 $dompdf->render();
 

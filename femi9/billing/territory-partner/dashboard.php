@@ -172,11 +172,18 @@ mysqli_stmt_close($shopRevStmt);
 $paidRevenue = $custRevenue + $shopRevenue;
 
 // All stock products sorted by qty sold from TP-created invoices
+// return_qty = units the shop/customer sent back to THIS TP (user_return_stock_items,
+// to_usertype='territory_partner') — subtracted from the gross sold_qty below so
+// "Sales Unit" reads as the actual net units still out with a customer, not the raw
+// invoice-line total. Without this split, closing_qty (which DOES rise back up on a
+// return) didn't reconcile against what the table showed for units sold — per
+// explicit user request: Sales Unit / Return Unit / Total Unit, shown separately.
 $stockListStmt = mysqli_prepare($db_conn,
     "SELECT
          p.productName,
          tps.closing_qty,
-         COALESCE(cust_sales.sold_qty, 0) + COALESCE(shop_sales.sold_qty, 0) AS sold_qty
+         COALESCE(cust_sales.sold_qty, 0) + COALESCE(shop_sales.sold_qty, 0) AS sold_qty,
+         COALESCE(returns.return_qty, 0) AS return_qty
      FROM territory_partner_stock tps
      JOIN products p ON p.id = tps.product_id
      LEFT JOIN (
@@ -193,10 +200,16 @@ $stockListStmt = mysqli_prepare($db_conn,
          WHERE ui.from_user_id = ? AND ui.from_user_type = 'territory_partner'
          GROUP BY uii.pr_id
      ) AS shop_sales ON shop_sales.pr_id = tps.product_id
+     LEFT JOIN (
+         SELECT ursi.prid, SUM(ursi.qty) AS return_qty
+         FROM user_return_stock_items ursi
+         WHERE ursi.to_userid = ? AND ursi.to_usertype = 'territory_partner'
+         GROUP BY ursi.prid
+     ) AS returns ON returns.prid = tps.product_id
      WHERE tps.territory_partner_id = ?
      ORDER BY sold_qty DESC"
 );
-mysqli_stmt_bind_param($stockListStmt, "ssi", $Login_user_IDvl, $Login_user_IDvl, $Login_user_IDvl);
+mysqli_stmt_bind_param($stockListStmt, "sssi", $Login_user_IDvl, $Login_user_IDvl, $Login_user_IDvl, $Login_user_IDvl);
 mysqli_stmt_execute($stockListStmt);
 $stockListResult = mysqli_stmt_get_result($stockListStmt);
 $stockList = [];
@@ -424,7 +437,9 @@ mysqli_stmt_close($stockListStmt);
                                                     <tr>
                                                         <th>#</th>
                                                         <th>Product Name</th>
-                                                        <th class="text-center">Qty Sold</th>
+                                                        <th class="text-center">Sales Unit</th>
+                                                        <th class="text-center">Return Unit</th>
+                                                        <th class="text-center">Total Unit</th>
                                                         <th class="text-center">Closing Stock</th>
                                                         <th class="text-center">Sales Rank</th>
                                                     </tr>
@@ -436,6 +451,11 @@ mysqli_stmt_close($stockListStmt);
                                                 foreach ($stockList as $item):
                                                     $pct = $maxSold > 0 ? round(($item['sold_qty'] / $maxSold) * 100) : 0;
                                                     $badgeClass = $rank === 1 ? 'badge-warning' : ($rank === 2 ? 'badge-secondary' : ($rank === 3 ? 'badge-danger' : 'badge-light'));
+                                                    // Sales Unit = gross qty invoiced out; Return Unit = qty the shop/customer
+                                                    // sent back; Total Unit = net still out with them (what actually left
+                                                    // stock permanently) — this is what closing_qty's math reconciles against.
+                                                    $returnQty = (int)$item['return_qty'];
+                                                    $netSold   = (int)$item['sold_qty'] - $returnQty;
                                                 ?>
                                                     <tr>
                                                         <td><?php echo $rank; ?></td>
@@ -443,6 +463,20 @@ mysqli_stmt_close($stockListStmt);
                                                         <td class="text-center">
                                                             <span class="badge <?php echo $badgeClass; ?> badge-style-light" style="font-size:13px;padding:4px 10px;">
                                                                 <?php echo inr_format((int)$item['sold_qty'], 0); ?> units
+                                                            </span>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <?php if ($returnQty > 0): ?>
+                                                            <span class="badge badge-danger badge-style-light" style="font-size:13px;padding:4px 10px;">
+                                                                <?php echo inr_format($returnQty, 0); ?> units
+                                                            </span>
+                                                            <?php else: ?>
+                                                            <span class="text-muted">0</span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <span class="badge badge-success badge-style-light" style="font-size:13px;padding:4px 10px;">
+                                                                <?php echo inr_format($netSold, 0); ?> units
                                                             </span>
                                                         </td>
                                                         <td class="text-center"><?php echo inr_format((int)$item['closing_qty'], 0); ?></td>
