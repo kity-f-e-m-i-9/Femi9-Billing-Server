@@ -459,9 +459,16 @@ if ($scope === 'company') {
     $gp_params[] = $to;
 }
 // See memory "neksomo-sold-by-company-calc".
+// tpii.amount is the line's PRE-discount gross (qty*rate) — tp_invoices.total_amount
+// (used by every other revenue figure on this report, e.g. the top Sales/Total
+// Turnover KPI and Channel Breakdown) is net of each line's discount_amount, so
+// summing tpii.amount alone overstates TP revenue by the invoice's total discount.
+// Subtracting tpii.discount_amount here reconciles this union back to that same
+// header total (see e.g. TP/26-27/573: items summed 940400, discount 56424,
+// header total_amount 883976 — matching only once discount is subtracted).
 $gp_tp_union = '';
 if ($tpinv_source_sql) {
-    $gp_tp_union = "UNION ALL SELECT tpii.product_id pr_id, tpii.quantity qty, tpii.amount total
+    $gp_tp_union = "UNION ALL SELECT tpii.product_id pr_id, tpii.quantity qty, (tpii.amount - COALESCE(tpii.discount_amount,0)) total
          FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
          WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}";
     $gp_params[] = $from;
@@ -917,8 +924,11 @@ if ($scope === 'company') {
 // land in invoice / user_invoice / tp_invoices, all three must be summed.
 $ps_tp_union = '';
 if ($tpinv_source_sql) {
+    // tpii.amount is pre-discount; net it against tpii.discount_amount so this
+    // reconciles to tp_invoices.total_amount, same as the Gross Profit union
+    // above ($gp_tp_union) — see that comment for the reconciliation example.
     $ps_tp_union = "UNION ALL
-         SELECT tpii.product_id, tpii.quantity, tpii.amount
+         SELECT tpii.product_id, tpii.quantity, (tpii.amount - COALESCE(tpii.discount_amount,0))
          FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
          WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}";
     $ps_params[] = $from;
@@ -1484,7 +1494,10 @@ if ($is_neksomo_view) {
                  FROM ot_sales os
                  WHERE os.date BETWEEN ? AND ?{$pcs_ot_cond}
                  UNION ALL
-                 SELECT tpii.product_id, tpii.quantity, tpii.amount AS line_total, tpi.invoice_date
+                 -- tpii.amount is pre-discount; net it against discount_amount so
+                 -- Sold Value reconciles to tp_invoices.total_amount, same fix as
+                 -- the Gross Profit / Product-wise Sales unions above.
+                 SELECT tpii.product_id, tpii.quantity, (tpii.amount - COALESCE(tpii.discount_amount,0)) AS line_total, tpi.invoice_date
                  FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
                  WHERE tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
                  UNION ALL
