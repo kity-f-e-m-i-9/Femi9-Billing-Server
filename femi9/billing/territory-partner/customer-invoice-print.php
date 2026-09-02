@@ -61,18 +61,18 @@ function PrintDiv() {
 
 <?php
 // wa.me click-to-chat link carrying a link to the invoice's own PDF (see
-// customer-invoice-pdf.php) — opens the TP's own WhatsApp with the
-// customer's number and a prefilled message already selected; the TP just
-// taps Send. No file attach step, no PDF library in the browser, works on
-// every device including desktop, and doesn't depend on the Web Share API
-// (which requires HTTPS and isn't reachable at all on this deployment's
-// mobile browsers). The TP still has to tap Send themselves — WhatsApp
-// doesn't allow a webpage to submit a chat message on the user's behalf.
-$__wa_digits = preg_replace('/\D/', '', $buyer['mobile'] ?? '');
-$__wa_number = strlen($__wa_digits) === 10 ? '91' . $__wa_digits : $__wa_digits;
+// customer-invoice-pdf.php) — opens WhatsApp's own contact/chat picker with
+// a prefilled message already selected, so the TP picks who to send it to
+// (no fixed number — the customer's on-file mobile number may not even be
+// on WhatsApp, or the TP may want to send it to someone else entirely).
+// No file attach step, no PDF library in the browser, works on every
+// device including desktop, and doesn't depend on the Web Share API (which
+// requires HTTPS and isn't reachable at all on this deployment's mobile
+// browsers). The TP still has to tap Send themselves — WhatsApp doesn't
+// allow a webpage to submit a chat message on the user's behalf.
 $__pdf_url   = invoice_share_url('/femi9/billing/territory-partner/customer-invoice-pdf.php', 'customer', $_REQUEST['invoiceid'] ?? '');
 $__wa_text   = 'Invoice #' . ($inv['inv_number'] ?? '') . ' from ' . $seller_display_name . ': ' . $__pdf_url;
-$__wa_url    = ($__wa_number ? 'https://wa.me/' . $__wa_number : 'https://wa.me/') . '?text=' . rawurlencode($__wa_text);
+$__wa_url    = 'https://wa.me/?text=' . rawurlencode($__wa_text);
 ?>
 <div id="invoiceActionBar" class="d-flex flex-wrap justify-content-end">
 <button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button>

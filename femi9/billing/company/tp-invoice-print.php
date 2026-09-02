@@ -70,15 +70,14 @@ $show_carton_cols = $has_carton_data;
 
                 <?php
                 // wa.me click-to-chat link carrying a link to the invoice's own PDF
-                // (see tp-invoice-pdf.php) — opens the company user's own WhatsApp
-                // with the TP's number and a prefilled message already selected;
-                // they just tap Send. Same Method-1 pattern as the shop-invoice
-                // print page (see territory-partner/shop-invoice-print.php).
-                $__wa_digits = preg_replace('/\D/', '', $result_Invoice_Details['tp_mobile'] ?? '');
-                $__wa_number = strlen($__wa_digits) === 10 ? '91' . $__wa_digits : $__wa_digits;
+                // (see tp-invoice-pdf.php) — opens WhatsApp's own contact/chat
+                // picker with a prefilled message already selected, so the company
+                // user picks who to send it to (no fixed number). Same pattern as
+                // the shop-invoice print page (see
+                // territory-partner/shop-invoice-print.php).
                 $__pdf_url   = invoice_share_url('/femi9/billing/company/tp-invoice-pdf.php', 'tp', $enc_id);
                 $__wa_text   = 'Invoice #' . ($result_Invoice_Details['invoice_number'] ?? '') . ' from ' . ($result_Godown['gname'] ?? '') . ': ' . $__pdf_url;
-                $__wa_url    = ($__wa_number ? 'https://wa.me/' . $__wa_number : 'https://wa.me/') . '?text=' . rawurlencode($__wa_text);
+                $__wa_url    = 'https://wa.me/?text=' . rawurlencode($__wa_text);
                 ?>
                 <style type="text/css">
                 /* This page had no mobile-responsive CSS at all — the action

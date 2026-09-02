@@ -593,14 +593,14 @@ $i = 0;
                                                 </a>
                                                 <?php endif; ?>
                                                 <?php
-                                                // wa.me click-to-chat link straight from the list — same Method-1
-                                                // pattern (wa.me + no-login signed PDF) as the Print page's own
-                                                // "Share to WhatsApp" button (tp-invoice-print.php / tp-invoice-pdf.php).
-                                                $__wa_digits = preg_replace('/\D/', '', $inv['tp_mobile'] ?? '');
-                                                $__wa_number = strlen($__wa_digits) === 10 ? '91' . $__wa_digits : $__wa_digits;
+                                                // wa.me click-to-chat link straight from the list — opens
+                                                // WhatsApp's own contact/chat picker with a prefilled message
+                                                // already selected (no fixed number), same pattern as the
+                                                // Print page's own "Share to WhatsApp" button
+                                                // (tp-invoice-print.php / tp-invoice-pdf.php).
                                                 $__pdf_url   = invoice_share_url('/femi9/billing/company/tp-invoice-pdf.php', 'tp', $enc);
                                                 $__wa_text   = 'Invoice #' . $inv['invoice_number'] . ': ' . $__pdf_url;
-                                                $__wa_url    = ($__wa_number ? 'https://wa.me/' . $__wa_number : 'https://wa.me/') . '?text=' . rawurlencode($__wa_text);
+                                                $__wa_url    = 'https://wa.me/?text=' . rawurlencode($__wa_text);
                                                 ?>
                                                 <a href="<?php echo htmlspecialchars($__wa_url, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="action-btn print" title="Share to WhatsApp">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.29-1.39c1.44.79 3.06 1.2 4.71 1.2h.01c5.46 0 9.9-4.45 9.9-9.9C21.91 6.45 17.5 2 12.04 2zm5.8 14.03c-.24.68-1.4 1.32-1.93 1.4-.5.08-1.13.11-1.82-.11-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.79-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.66.5.24.58.83 2 .9 2.15.07.15.12.32.02.51-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.02 1.12 1 2.06 1.31 2.35 1.46.29.15.46.13.63-.08.17-.21.72-.84.92-1.13.19-.29.38-.24.64-.14.26.1 1.65.78 1.94.92.29.15.48.22.55.34.07.13.07.72-.17 1.4z"/></svg>
