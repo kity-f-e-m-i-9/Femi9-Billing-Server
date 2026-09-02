@@ -718,6 +718,33 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								b2b_buyer_add($b2b_buyers, 'tp_'.$l['tp_invoice_id'], $l['tp_name'], 'Territory Partner', $l['tp_gstin'], $l['invoice_number'], $l['taxable_value'], $l['is_intra'], $l['gst_amount']);
 							}
 
+							// Internal transfers (company godown -> company godown, e.g. Neksomo ->
+							// Health Care -> LLP). Each company_godown has its own distinct GSTIN, so
+							// a transfer between them is a real B2B outward supply, not a same-entity
+							// internal movement — the receiving godown is the "buyer" here. This is
+							// the dominant (often only) transaction type for finance_only godowns
+							// like Health Care/Neksomo, which otherwise have no external B2B buyers
+							// and would show an empty Table 4 despite real GST-relevant activity.
+							// (No internal-transfer credit-note/return concept exists in this system —
+							// same as the "Total Internal Transfer Sales" row above, which has no
+							// credit-note counterpart either — so no return-netting step is needed.)
+							$q = "
+								SELECT it.send_to, cg.gname AS bname, cg.gstin AS bgstin, cg.state AS to_state, it_from.state AS from_state,
+									   COALESCE(iti.inv_number, it.tempid) AS inv_number, it.gst_type,
+									   SUM(it.total - it.gst_amount) AS taxable, SUM(it.gst_amount) AS gst_amt
+								FROM internal_transfer it
+								LEFT JOIN internal_transfer_invoice iti ON iti.tempid = it.tempid
+								JOIN company_godown cg ON cg.id = it.send_to
+								JOIN company_godown it_from ON it_from.id = it.send_from
+								WHERE it.send_from='$get_godown_id' AND it.date BETWEEN '$from_date' AND '$to_date'
+								GROUP BY it.send_to, cg.gname, cg.gstin, cg.state, it_from.state, COALESCE(iti.inv_number, it.tempid), it.gst_type
+							";
+							$res = mysqli_query($db_conn, $q);
+							while ($r = mysqli_fetch_assoc($res)) {
+								$is_intra = strtolower(trim($r['to_state'])) == strtolower(trim($r['from_state']));
+								b2b_buyer_add($b2b_buyers, 'godown_'.$r['send_to'], $r['bname'], 'Internal Transfer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt']);
+							}
+
 							// Net out each buyer's own registered-person credit notes (returns), matched by
 							// buyer identity where the return table carries it directly.
 							$q = "
