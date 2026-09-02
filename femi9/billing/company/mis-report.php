@@ -1841,11 +1841,27 @@ $state_anc_cte = "WITH RECURSIVE anc AS (
     UNION ALL
     SELECT c.id, a.anc_id, a.anc_name FROM partner_location_nodes c JOIN anc a ON c.parent_id=a.node_id
 )";
+// user_invoice.to_user_id can point at any of five different business-entity
+// tables depending on to_user_type — shop, super_stockiest, stockiest,
+// distributor, super_distributor — each with its own state_id/district_id
+// pair (same shape as shop's). Joining ONLY `shop` (as this query used to)
+// silently drops every non-Shop row entirely — no location, no fallback —
+// which was a real data-loss bug, not just an unresolvable-location gap: a
+// company-issued Super Stockist invoice has a perfectly good state_id/
+// district_id on the super_stockiest row, it just never got looked up. Union
+// across all five entity tables, keyed by the matching to_user_type, so
+// every row that legitimately carries a location gets one.
 $state_sales_shop = call_rows($db_conn,
     "{$state_anc_cte}
      SELECT COALESCE(a1.anc_name, a2.anc_name) state_name, COUNT(*) cnt, COALESCE(SUM(ui.total-ui.courier_charges),0) revenue
      FROM user_invoice ui
-     JOIN shop s ON s.temp_id=ui.to_user_id
+     JOIN (
+         SELECT temp_id, district_id, state_id, 'shop' ch FROM shop
+         UNION ALL SELECT temp_id, district_id, state_id, 'super_stockiest' FROM super_stockiest
+         UNION ALL SELECT temp_id, district_id, state_id, 'stockiest' FROM stockiest
+         UNION ALL SELECT temp_id, district_id, state_id, 'distributor' FROM distributor
+         UNION ALL SELECT temp_id, district_id, state_id, 'super_distributor' FROM super_distributor
+     ) s ON s.temp_id=ui.to_user_id AND s.ch=ui.to_user_type
      LEFT JOIN anc a1 ON a1.node_id=s.district_id
      LEFT JOIN anc a2 ON a2.node_id=s.state_id
      WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
@@ -1858,7 +1874,7 @@ if ($tpinv_source_sql) {
         "{$state_anc_cte}
          SELECT a.anc_name state_name, COUNT(*) cnt, COALESCE(SUM(x.total_amount),0) revenue
          FROM (
-             SELECT ti.total_amount,
+             SELECT (ti.total_amount-ti.courier_charges) total_amount,
                     (SELECT tpl.location_id FROM territory_partner_locations tpl
                      WHERE tpl.territory_partner_id=ti.territory_partner_id
                      ORDER BY tpl.assigned_at ASC, tpl.id ASC LIMIT 1) AS location_id
@@ -1886,11 +1902,21 @@ $dist_anc_cte = "WITH RECURSIVE danc AS (
     UNION ALL
     SELECT c.id, a.anc_id, a.anc_name FROM partner_location_nodes c JOIN danc a ON c.parent_id=a.node_id
 )";
+// Same fix as state_sales_shop above (see its comment) — union across all
+// five business-entity tables user_invoice.to_user_id can point at, keyed by
+// to_user_type, instead of joining only `shop` and silently dropping every
+// Super Stockist / Stockist / Distributor / Super Distributor row.
 $district_sales_shop = call_rows($db_conn,
     "{$dist_anc_cte}
      SELECT danc.anc_name district_name, COUNT(*) cnt, COALESCE(SUM(ui.total-ui.courier_charges),0) revenue
      FROM user_invoice ui
-     JOIN shop s ON s.temp_id=ui.to_user_id
+     JOIN (
+         SELECT temp_id, district_id, 'shop' ch FROM shop
+         UNION ALL SELECT temp_id, district_id, 'super_stockiest' FROM super_stockiest
+         UNION ALL SELECT temp_id, district_id, 'stockiest' FROM stockiest
+         UNION ALL SELECT temp_id, district_id, 'distributor' FROM distributor
+         UNION ALL SELECT temp_id, district_id, 'super_distributor' FROM super_distributor
+     ) s ON s.temp_id=ui.to_user_id AND s.ch=ui.to_user_type
      JOIN danc ON danc.node_id=s.district_id
      WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_ui_plain}
      GROUP BY danc.anc_id, danc.anc_name",
@@ -1901,7 +1927,7 @@ if ($tpinv_source_sql) {
         "{$dist_anc_cte}
          SELECT danc.anc_name district_name, COUNT(*) cnt, COALESCE(SUM(x.total_amount),0) revenue
          FROM (
-             SELECT ti.total_amount,
+             SELECT (ti.total_amount-ti.courier_charges) total_amount,
                     (SELECT tpl.location_id FROM territory_partner_locations tpl
                      WHERE tpl.territory_partner_id=ti.territory_partner_id
                      ORDER BY tpl.assigned_at ASC, tpl.id ASC LIMIT 1) AS location_id
