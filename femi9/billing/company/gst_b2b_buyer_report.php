@@ -31,24 +31,21 @@ $grand_gst = $grand_cgst + $grand_sgst + $grand_igst;
 if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     ob_start();
     $csv_rows = [];
-    $csv_rows[] = ['#', 'Buyer', 'Type', 'GSTIN', 'Invoices', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total'];
+    $csv_rows[] = ['#', 'Buyer', 'Type', 'GSTIN', 'Invoice Number(s)', 'Taxable Value', 'GST Amount', 'Total'];
     $sn = 0;
     foreach ($b2b_buyers as $b) {
         $sn++;
+        $gst_amt = $b['cgst'] + $b['sgst'] + $b['igst'];
         $csv_rows[] = [
-            $sn, $b['name'] ?: '—', $b['type'], $b['gstin'] ?: '—', count($b['invoices']),
+            $sn, $b['name'] ?: '—', $b['type'], $b['gstin'] ?: '—', implode(', ', array_keys($b['invoices'])),
             number_format($b['taxable'], 2, '.', ''),
-            number_format($b['cgst'], 2, '.', ''),
-            number_format($b['sgst'], 2, '.', ''),
-            number_format($b['igst'], 2, '.', ''),
-            number_format($b['taxable'] + $b['cgst'] + $b['sgst'] + $b['igst'], 2, '.', ''),
+            number_format($gst_amt, 2, '.', ''),
+            number_format($b['taxable'] + $gst_amt, 2, '.', ''),
         ];
     }
     $csv_rows[] = ['', '', '', '', 'Grand Total',
         number_format($grand_taxable, 2, '.', ''),
-        number_format($grand_cgst, 2, '.', ''),
-        number_format($grand_sgst, 2, '.', ''),
-        number_format($grand_igst, 2, '.', ''),
+        number_format($grand_gst, 2, '.', ''),
         number_format($grand_taxable + $grand_gst, 2, '.', ''),
     ];
 
@@ -133,39 +130,34 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <th>Buyer</th>
                                         <th>Type</th>
                                         <th>GSTIN</th>
-                                        <th>Invoices</th>
+                                        <th>Invoice Number(s)</th>
                                         <th>Taxable Value</th>
-                                        <th>CGST</th>
-                                        <th>SGST</th>
-                                        <th>IGST</th>
+                                        <th>GST Amount</th>
                                         <th>Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($b2b_buyers)) { ?>
-                                    <tr><td colspan="10" style="text-align:center; padding:20px;">No B2B buyers in this period.</td></tr>
-                                    <?php } else { $sn = 0; foreach ($b2b_buyers as $b): $sn++; ?>
+                                    <tr><td colspan="8" style="text-align:center; padding:20px;">No B2B buyers in this period.</td></tr>
+                                    <?php } else { $sn = 0; foreach ($b2b_buyers as $b): $sn++; $gst_amt = $b['cgst'] + $b['sgst'] + $b['igst']; ?>
                                     <tr>
                                         <td><?= $sn ?></td>
                                         <td><?= htmlspecialchars($b['name'] ?: '—') ?></td>
                                         <td><?= htmlspecialchars($b['type']) ?></td>
                                         <td><?= htmlspecialchars($b['gstin'] ?: '—') ?></td>
-                                        <td><?= count($b['invoices']) ?></td>
+                                        <td><?= htmlspecialchars(implode(', ', array_keys($b['invoices']))) ?></td>
                                         <td align="right"><?= inr_format($b['taxable'], 2) ?></td>
-                                        <td align="right"><?= inr_format($b['cgst'], 2) ?></td>
-                                        <td align="right"><?= inr_format($b['sgst'], 2) ?></td>
-                                        <td align="right"><?= inr_format($b['igst'], 2) ?></td>
-                                        <td align="right"><b><?= inr_format($b['taxable'] + $b['cgst'] + $b['sgst'] + $b['igst'], 2) ?></b></td>
+                                        <td align="right"><?= inr_format($gst_amt, 2) ?></td>
+                                        <td align="right"><b><?= inr_format($b['taxable'] + $gst_amt, 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; } ?>
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="5" align="right"><b>Grand Total</b></td>
+                                        <td colspan="4" align="right"><b>Grand Total</b></td>
+                                        <td></td>
                                         <td align="right"><b><?= inr_format($grand_taxable, 2) ?></b></td>
-                                        <td align="right"><b><?= inr_format($grand_cgst, 2) ?></b></td>
-                                        <td align="right"><b><?= inr_format($grand_sgst, 2) ?></b></td>
-                                        <td align="right"><b><?= inr_format($grand_igst, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($grand_gst, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($grand_taxable + $grand_gst, 2) ?></b></td>
                                     </tr>
                                 </tfoot>
