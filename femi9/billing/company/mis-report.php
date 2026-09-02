@@ -916,6 +916,41 @@ foreach ($ds as $r) $dm[$r['d']]['s'] = (float)$r['rev'];
 foreach ($dt as $r) $dm[$r['d']]['t'] = (float)$r['rev'];
 foreach ($do as $r) $dm[$r['d']]['o'] = ($dm[$r['d']]['o'] ?? 0) + (float)$r['rev'];
 foreach ($dor as $r) $dm[$r['d']]['o'] = ($dm[$r['d']]['o'] ?? 0) - (float)$r['rev'];
+
+// Net non-OT returns (user_return_stock, company-bound) into their day +
+// channel, same reconciliation Channel Breakdown applies (see $ch_returns
+// above) — without this the trend was net of only OT's own returns, so its
+// summed total sat between the top KPI's gross Sales and net Total Turnover,
+// matching neither. Company scope only, same gating as Channel Breakdown /
+// the OT netting above ($returns_row's to_usertype=$utype check already
+// covers every scope for the top KPI card, but this chart only carries
+// per-day 'c'/'s'/'t' series that line up with a channel for company scope).
+if ($scope === 'company') {
+    $dret = call_rows($db_conn,
+        "SELECT `date` d, from_usertype ch, COALESCE(SUM(total),0) amount FROM (
+            SELECT returnid, `date`, from_usertype, MAX(total) total FROM user_return_stock
+            WHERE to_usertype='company' AND `date` BETWEEN ? AND ?
+            GROUP BY returnid, `date`, from_usertype
+         ) x GROUP BY `date`, from_usertype",
+        'ss', [$from, $to]);
+    foreach ($dret as $r) {
+        // Unlike Channel Breakdown (which splits $ch_b by to_user_type into
+        // one row per business channel), this chart's "Shop" series ($ds) is
+        // `user_invoice WHERE from_user_type='company'` summed with NO
+        // to_user_type split — so it already includes Super Stockist,
+        // Stockist, Distributor and Super Distributor revenue folded in
+        // under that one line (confirmed: $ds's August total, 30,51,625,
+        // equals Shop's 8,954 + Super Stockist's 30,42,671 combined). Every
+        // from_usertype value other than 'customer'/'territory_partner'
+        // therefore nets against that same 's' series, not just 'shop'.
+        $series = match ($r['ch']) {
+            'customer' => 'c',
+            'territory_partner' => 't',
+            default => 's',
+        };
+        $dm[$r['d']][$series] = ($dm[$r['d']][$series] ?? 0) - (float)$r['amount'];
+    }
+}
 $chart_labels = $chart_cust = $chart_shop = $chart_tp = $chart_ot = [];
 $ptr = strtotime($from); $end = strtotime($to);
 while ($ptr <= $end) {
