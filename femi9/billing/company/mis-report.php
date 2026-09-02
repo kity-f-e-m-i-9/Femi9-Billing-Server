@@ -2140,6 +2140,22 @@ if ($tpinv_source_sql) {
          WHERE {$tpinv_source_sql} AND invoice_date>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_tpi}
          GROUP BY invoice_date";
 }
+// Non-OT returns (user_return_stock, company-bound) — same gap fixed in
+// Channel Breakdown / Daily Trend / Period Breakdown: without this, only
+// OT's own returns were netted here, so each month's total_rev sat between
+// the top KPI's gross Sales and net Total Turnover for that same month.
+// Deduped by returnid (same convention as the Overview KPI's $returns_row),
+// summed as a negative amount so it falls out of SUM(rev) below like the OT
+// return branch already does.
+$sm_ret_union = '';
+if ($scope === 'company') {
+    $sm_ret_union = "UNION ALL
+         SELECT `date` d, -SUM(total) rev, 0 cnt FROM (
+             SELECT returnid, `date`, MAX(total) total FROM user_return_stock
+             WHERE to_usertype='company' AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH)
+             GROUP BY returnid, `date`
+         ) x GROUP BY `date`";
+}
 $sm_ot_union = '';
 if ($scope === 'company') {
     $sm_ot_union = "UNION ALL
@@ -2163,6 +2179,7 @@ $six_months = call_rows($db_conn,
          WHERE from_user_type=? AND sub_total>0 AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH){$tc_ui}
          GROUP BY `date`
          {$sm_tp_union}
+         {$sm_ret_union}
          {$sm_ot_union}
      ) z GROUP BY DATE_FORMAT(d,'%Y-%m') ORDER BY mon",
     'ss', [$utype, $utype]);
