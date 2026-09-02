@@ -2806,15 +2806,6 @@ if ($is_neksomo_view) {
                                     <option value="stockiest" <?php echo $scope==='stockiest'?'selected':''; ?>>Stockist</option>
                                 </select>
                             </div>
-                            <?php if ($scope === 'company' && !$is_neksomo_view): ?>
-                            <div>
-                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">&nbsp;</label>
-                                <a href="mis-report-export-xlsx.php?scope=<?php echo urlencode($scope); ?>&from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?><?php echo $filter_tp > 0 ? '&tp_id='.(int)$filter_tp : ''; ?>"
-                                   class="btn btn-success btn-sm" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
-                                    <i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">download</i> Export to Excel
-                                </a>
-                            </div>
-                            <?php endif; ?>
                             <div id="tpSubFilter" style="<?php echo $scope!=='tp' ? 'display:none;' : ''; ?>">
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Territory Partner</label>
                                 <select name="tp_id" class="form-control form-control-sm" style="width:200px;" onchange="this.form.submit()">
@@ -2876,6 +2867,15 @@ if ($is_neksomo_view) {
                         <a href="#sec-growth">Growth</a>
                         <a href="#sec-returns">Returns</a>
                     </nav>
+
+                    <?php if ($scope === 'company' && !$is_neksomo_view): ?>
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                        <a href="mis-report-export-xlsx.php?scope=<?php echo urlencode($scope); ?>&from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?><?php echo $filter_tp > 0 ? '&tp_id='.(int)$filter_tp : ''; ?>"
+                           class="btn btn-success btn-sm" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+                            <i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">download</i> Export to Excel
+                        </a>
+                    </div>
+                    <?php endif; ?>
 
                     <!-- ══ KPI CARDS ════════════════════════════════════════ -->
                     <?php
