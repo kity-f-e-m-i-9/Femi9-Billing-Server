@@ -869,7 +869,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<h3>Table 13 — Documents Issued During the Tax Period</h3>
 							<table id="gsttablevl" style="height:auto;">
 							<tr>
-							<th>Channel</th>
+							<th>Document Series</th>
 							<th>Series From</th>
 							<th>Series To</th>
 							<th>Total Issued</th>
@@ -879,12 +879,28 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<?php
 							// This system has no invoice-cancellation/void concept (no status column
 							// on any invoice table), so Cancelled is always 0 and Net = Total.
-							$doc_channels = [
-								['label' => 'Network Sale (SS/ST/DT/Shop)', 'table' => 'user_invoice', 'num_col' => 'inv_number', 'date_col' => 'date', 'where' => "from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id'"],
-								['label' => 'Customer Sale', 'table' => 'invoice', 'num_col' => 'inv_number', 'date_col' => 'date', 'where' => "user_type='$Login_user_TYPEvl' and user_id='$get_godown_id'"],
-								['label' => 'OT Sale', 'table' => 'ot_sales_invoice i join ot_sales s on s.tempid=i.tempid', 'num_col' => 'i.inv_number', 'date_col' => 's.date', 'where' => "s.godownid='$get_godown_id'", 'distinct' => 'i.tempid'],
-								['label' => 'Territory Partner', 'table' => 'tp_invoices', 'num_col' => 'invoice_number', 'date_col' => 'invoice_date', 'where' => "source_godown_id='$get_godown_id'"],
+							//
+							// "Network Sale" is split into one row per actual invoice series
+							// (to_user_type — SS/S/SD/D/Shop each number their own sequence), rather
+							// than one merged row — a single merged Series From/To across different
+							// series' invoice numbers would be meaningless (e.g. "S/26-27/LLP1" to
+							// "SS/26-27/LLP90" is not a real range). Customer Sale, OT Sale and TP
+							// each use one consistent numbering pattern already, so stay single rows.
+							$network_series = [
+								'super_stockiest'   => 'Super Stockist Sale',
+								'stockiest'         => 'Stockist Sale',
+								'super_distributor' => 'Super Distributor Sale',
+								'distributor'       => 'Distributor Sale',
+								'shop'              => 'Shop Sale',
 							];
+							$doc_channels = [];
+							foreach ($network_series as $to_user_type => $series_label) {
+								$doc_channels[] = ['label' => $series_label, 'table' => 'user_invoice', 'num_col' => 'inv_number', 'date_col' => 'date', 'where' => "from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and to_user_type='$to_user_type'"];
+							}
+							$doc_channels[] = ['label' => 'Customer Sale', 'table' => 'invoice', 'num_col' => 'inv_number', 'date_col' => 'date', 'where' => "user_type='$Login_user_TYPEvl' and user_id='$get_godown_id'"];
+							$doc_channels[] = ['label' => 'OT Sale', 'table' => 'ot_sales_invoice i join ot_sales s on s.tempid=i.tempid', 'num_col' => 'i.inv_number', 'date_col' => 's.date', 'where' => "s.godownid='$get_godown_id'", 'distinct' => 'i.tempid'];
+							$doc_channels[] = ['label' => 'Territory Partner', 'table' => 'tp_invoices', 'num_col' => 'invoice_number', 'date_col' => 'invoice_date', 'where' => "source_godown_id='$get_godown_id'"];
+							$doc_grand_total = 0;
 							foreach ($doc_channels as $dc) {
 								$distinct = $dc['distinct'] ?? $dc['num_col'];
 								$dq = "select {$dc['num_col']} as num from {$dc['table']} where {$dc['where']} and {$dc['date_col']} between '$from_date' and '$to_date' order by {$dc['date_col']} asc, {$dc['num_col']} asc";
@@ -893,6 +909,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								while ($drow = mysqli_fetch_assoc($dres)) { $nums[] = $drow['num']; }
 								$count = count($nums);
 								if ($count == 0) continue;
+								$doc_grand_total += $count;
 								?>
 							<tr>
 							<td style="text-align:left;"><?=htmlspecialchars($dc['label']);?></td>
@@ -903,6 +920,12 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<td style="text-align:left;"><?=$count;?></td>
 							</tr>
 							<?php }?>
+							<tr>
+							<td colspan="3" style="text-align:right;"><b>Total</b></td>
+							<td><b><?=$doc_grand_total;?></b></td>
+							<td><b>0</b></td>
+							<td><b><?=$doc_grand_total;?></b></td>
+							</tr>
 							</table>
 
 							<!-------------------------------------------------->
