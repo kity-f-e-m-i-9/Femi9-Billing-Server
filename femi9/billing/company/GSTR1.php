@@ -656,7 +656,8 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								else { $buyers[$key]['igst'] += $gst_amount; }
 							}
 
-							// Network sales (SS/ST/DT/Shop)
+							// Network sales (SS/ST/DT/Shop). gst_percentage>0 only — Table 4 is B2B
+							// *rated* (taxable) supplies; nil-rated lines belong in Table 8, not here.
 							$q = "
 								SELECT uii.to_user_type, uii.to_user_id, ui.inv_number, uii.gst_type,
 									   SUM(uii.total-uii.gstamount_total) AS taxable, SUM(uii.gstamount_total) AS gst_amt,
@@ -669,7 +670,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								LEFT JOIN distributor     dt ON uii.to_user_type='distributor'     AND dt.temp_id=uii.to_user_id
 								LEFT JOIN shop            sh ON uii.to_user_type='shop'            AND sh.temp_id=uii.to_user_id
 								WHERE uii.from_user_type='$Login_user_TYPEvl' AND uii.from_user_id='$get_godown_id'
-								  AND uii.buyer_gsttype='register' AND uii.date BETWEEN '$from_date' AND '$to_date'
+								  AND uii.buyer_gsttype='register' AND uii.gst_percentage>0 AND uii.date BETWEEN '$from_date' AND '$to_date'
 								GROUP BY uii.to_user_type, uii.to_user_id, ui.inv_number, uii.gst_type, ss.name, st.name, dt.name, sh.name, ss.gstin, st.gstin, dt.gstin, sh.gstin
 							";
 							$res = mysqli_query($db_conn, $q);
@@ -677,7 +678,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								b2b_buyer_add($b2b_buyers, $r['to_user_type'].'_'.$r['to_user_id'], $r['bname'], ucfirst(str_replace('_',' ',$r['to_user_type'])), $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
 							}
 
-							// Customer sales
+							// Customer sales. gst_percentage>0 only — see note above.
 							$q = "
 								SELECT ii.customer_id, i.inv_number, ii.gst_type,
 									   SUM(ii.total-ii.gstamount_total) AS taxable, SUM(ii.gstamount_total) AS gst_amt,
@@ -686,7 +687,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								LEFT JOIN invoice i ON i.inv_id = ii.inv_id
 								LEFT JOIN customers c ON c.id = ii.customer_id
 								WHERE ii.user_type='$Login_user_TYPEvl' AND ii.user_id='$get_godown_id'
-								  AND ii.buyer_gsttype='register' AND ii.date BETWEEN '$from_date' AND '$to_date'
+								  AND ii.buyer_gsttype='register' AND ii.gst_percentage>0 AND ii.date BETWEEN '$from_date' AND '$to_date'
 								GROUP BY ii.customer_id, i.inv_number, ii.gst_type, c.name, c.gstin
 							";
 							$res = mysqli_query($db_conn, $q);
@@ -694,13 +695,13 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								b2b_buyer_add($b2b_buyers, 'customer_'.$r['customer_id'], $r['bname'], 'Customer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
 							}
 
-							// OT sales
+							// OT sales. gst>0 only — see note above.
 							$q = "
 								SELECT s.tempid, i.inv_number, s.gst_type, s.customer_name AS bname, s.gst_number AS bgstin,
 									   SUM(s.total-s.gst_amount) AS taxable, SUM(s.gst_amount) AS gst_amt
 								FROM ot_sales s
 								LEFT JOIN ot_sales_invoice i ON i.tempid = s.tempid
-								WHERE s.godownid='$get_godown_id' AND s.buyer_gsttype='register' AND s.date BETWEEN '$from_date' AND '$to_date'
+								WHERE s.godownid='$get_godown_id' AND s.buyer_gsttype='register' AND s.gst>0 AND s.date BETWEEN '$from_date' AND '$to_date'
 								GROUP BY s.tempid, i.inv_number, s.gst_type, s.customer_name, s.gst_number
 							";
 							$res = mysqli_query($db_conn, $q);
@@ -714,7 +715,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							// split internally — so only one of the two must be used here, not both.)
 							require_once __DIR__ . '/include/TpGstHelper.php';
 							foreach ($tp_sls_lines ?? [] as $l) {
-								if (!$l['is_registered']) continue;
+								if (!$l['is_registered'] || (float)$l['gst_percentage'] <= 0) continue;
 								b2b_buyer_add($b2b_buyers, 'tp_'.$l['tp_invoice_id'], $l['tp_name'], 'Territory Partner', $l['tp_gstin'], $l['invoice_number'], $l['taxable_value'], $l['is_intra'], $l['gst_amount']);
 							}
 
@@ -736,7 +737,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								LEFT JOIN internal_transfer_invoice iti ON iti.tempid = it.tempid
 								JOIN company_godown cg ON cg.id = it.send_to
 								JOIN company_godown it_from ON it_from.id = it.send_from
-								WHERE it.send_from='$get_godown_id' AND it.date BETWEEN '$from_date' AND '$to_date'
+								WHERE it.send_from='$get_godown_id' AND it.gst>0 AND it.date BETWEEN '$from_date' AND '$to_date'
 								GROUP BY it.send_to, cg.gname, cg.gstin, cg.state, it_from.state, COALESCE(iti.inv_number, it.tempid), it.gst_type
 							";
 							$res = mysqli_query($db_conn, $q);
@@ -746,14 +747,15 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							}
 
 							// Net out each buyer's own registered-person credit notes (returns), matched by
-							// buyer identity where the return table carries it directly.
+							// buyer identity where the return table carries it directly. gst_percentage>0
+							// only, matching the rated-only taxable base being netted against.
 							$q = "
 								SELECT rsi.from_usertype, rsi.from_userid, rsi.gst_type,
 									   SUM(rsi.total-rsi.gstamount_total) AS taxable, SUM(rsi.gstamount_total) AS gst_amt
 								FROM user_return_stock_items rsi
 								WHERE rsi.to_usertype='$Login_user_TYPEvl' AND rsi.to_userid='$get_godown_id'
 								  AND rsi.buyer_gsttype='register' AND rsi.from_usertype != 'customer'
-								  AND rsi.date BETWEEN '$from_date' AND '$to_date'
+								  AND rsi.gst_percentage>0 AND rsi.date BETWEEN '$from_date' AND '$to_date'
 								GROUP BY rsi.from_usertype, rsi.from_userid, rsi.gst_type
 							";
 							$res = mysqli_query($db_conn, $q);
