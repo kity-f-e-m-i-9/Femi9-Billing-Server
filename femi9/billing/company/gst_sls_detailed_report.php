@@ -131,13 +131,20 @@ foreach ($rows3 as $row) { $total3 += $row['taxable_value']; $total_gst3 += $row
 $overall_total = $total1 + $total2 + $total3;
 $overall_gst   = $total_gst1 + $total_gst2 + $total_gst3;
 
-// Split the GST amount into CGST+SGST (intra-state) or IGST (inter-state) —
-// this page is filtered to a single gst_type for its whole result set, so one
-// split serves both the per-row and grand-total columns.
-$is_intra_page = ($gst_type != 'outer');
-function split_gst($gst_amount, $is_intra) {
-    if ($is_intra) { $half = $gst_amount / 2; return [$half, $half, 0]; }
-    return [0, 0, $gst_amount];
+// Effective GST% for a row = gst_amount / taxable_value * 100. An invoice can
+// mix line items taxed at different rates (nil + rated, or multiple rated
+// products), so this is the blended rate for the invoice, not necessarily a
+// single product's rate — shown as "Mixed" whenever a row's blended rate
+// doesn't round to one of the standard GST slabs, so mixed-rate invoices
+// aren't misread as a single flat rate.
+$gst_slabs = [0, 5, 12, 18, 28];
+function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
+    if ((float)$taxable_value == 0.0) return $gst_amount == 0 ? '0%' : 'Mixed';
+    $rate = round(($gst_amount / $taxable_value) * 100, 1);
+    foreach ($gst_slabs as $slab) {
+        if (abs($rate - $slab) <= 0.3) return $slab . '%';
+    }
+    return $rate . '% (Mixed)';
 }
 ?>
 <!DOCTYPE html>
@@ -209,19 +216,16 @@ function split_gst($gst_amount, $is_intra) {
                                         <th>Invoice Number</th>
                                         <th>Invoice Date</th>
                                         <th>GST Type</th>
+                                        <th>GST %</th>
                                         <th>Taxable Value</th>
-                                        <th>CGST</th>
-                                        <th>SGST</th>
-                                        <th>IGST</th>
+                                        <th>GST Amount</th>
                                         <th>Total Sales Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php $sn = 0; ?>
 
-                                    <?php foreach ($rows1 as $row): $sn++;
-                                        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $is_intra_page);
-                                    ?>
+                                    <?php foreach ($rows1 as $row): $sn++; ?>
                                     <tr>
                                         <td><?= $sn ?></td>
                                         <td><?= htmlspecialchars($customer_type_labels[$row['customer_usertype']] ?? ucfirst(str_replace('_', ' ', $row['customer_usertype']))) ?></td>
@@ -231,17 +235,14 @@ function split_gst($gst_amount, $is_intra) {
                                         <td><?= htmlspecialchars($row['inv_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['date'])) ?></td>
                                         <td><?= htmlspecialchars($row_gst_type_label) ?></td>
+                                        <td align="center"><?= gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs) ?></td>
                                         <td align="right"><?= inr_format($row['total_sls_amount'], 2) ?></td>
-                                        <td align="right"><?= inr_format($cgst, 2) ?></td>
-                                        <td align="right"><?= inr_format($sgst, 2) ?></td>
-                                        <td align="right"><?= inr_format($igst, 2) ?></td>
+                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
                                         <td align="right"><b><?= inr_format($row['total_sls_amount'] + $row['gst_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
-                                    <?php foreach ($rows2 as $row): $sn++;
-                                        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $is_intra_page);
-                                    ?>
+                                    <?php foreach ($rows2 as $row): $sn++; ?>
                                     <tr>
                                         <td><?= $sn ?></td>
                                         <td>Customer</td>
@@ -251,17 +252,14 @@ function split_gst($gst_amount, $is_intra) {
                                         <td><?= htmlspecialchars($row['inv_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['date'])) ?></td>
                                         <td><?= htmlspecialchars($row_gst_type_label) ?></td>
+                                        <td align="center"><?= gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs) ?></td>
                                         <td align="right"><?= inr_format($row['total_sls_amount'], 2) ?></td>
-                                        <td align="right"><?= inr_format($cgst, 2) ?></td>
-                                        <td align="right"><?= inr_format($sgst, 2) ?></td>
-                                        <td align="right"><?= inr_format($igst, 2) ?></td>
+                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
                                         <td align="right"><b><?= inr_format($row['total_sls_amount'] + $row['gst_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
-                                    <?php foreach ($rows3 as $row): $sn++;
-                                        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $is_intra_page);
-                                    ?>
+                                    <?php foreach ($rows3 as $row): $sn++; ?>
                                     <tr>
                                         <td><?= $sn ?></td>
                                         <td>Territory Partner</td>
@@ -271,28 +269,24 @@ function split_gst($gst_amount, $is_intra) {
                                         <td><?= htmlspecialchars($row['invoice_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['invoice_date'])) ?></td>
                                         <td><?= htmlspecialchars($row_gst_type_label) ?></td>
+                                        <td align="center"><?= gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs) ?></td>
                                         <td align="right"><?= inr_format($row['taxable_value'], 2) ?></td>
-                                        <td align="right"><?= inr_format($cgst, 2) ?></td>
-                                        <td align="right"><?= inr_format($sgst, 2) ?></td>
-                                        <td align="right"><?= inr_format($igst, 2) ?></td>
+                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
                                         <td align="right"><b><?= inr_format($row['taxable_value'] + $row['gst_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
                                     <?php if ($sn === 0): ?>
                                     <tr>
-                                        <td colspan="13" style="text-align:center; padding:20px;">No records found.</td>
+                                        <td colspan="12" style="text-align:center; padding:20px;">No records found.</td>
                                     </tr>
                                     <?php endif; ?>
                                 </tbody>
                                 <tfoot>
-                                    <?php [$grand_cgst, $grand_sgst, $grand_igst] = split_gst($overall_gst, $is_intra_page); ?>
                                     <tr>
-                                        <td colspan="8" align="right"><b>Grand Total</b></td>
+                                        <td colspan="9" align="right"><b>Grand Total</b></td>
                                         <td align="right"><b><?= inr_format($overall_total, 2) ?></b></td>
-                                        <td align="right"><b><?= inr_format($grand_cgst, 2) ?></b></td>
-                                        <td align="right"><b><?= inr_format($grand_sgst, 2) ?></b></td>
-                                        <td align="right"><b><?= inr_format($grand_igst, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($overall_gst, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($overall_total + $overall_gst, 2) ?></b></td>
                                     </tr>
                                 </tfoot>
