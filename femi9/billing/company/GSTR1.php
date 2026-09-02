@@ -113,14 +113,12 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
                                <select required name="godown_id" class="form-control">
 							   <?php if($get_godown_id==NULL){?>
 							   <option value="" hidden="">Select</option>
-							   <?php }else{?>
-							   <option value="<?=$get_godown_id;?>" hidden=""><?=$result_Godown_details['gname'];?></option>
 							   <?php }?>
 							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+						  <option value="<?=$result_Godown['id'];?>" <?=($get_godown_id==$result_Godown['id'])?'selected':'';?>><?=$result_Godown['gname'];?></option>
 							   <?php }?>
 							   </select>
 							   </div>
