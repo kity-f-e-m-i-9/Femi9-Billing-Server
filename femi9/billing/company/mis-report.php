@@ -2835,6 +2835,12 @@ if ($is_neksomo_view) {
                                 <a href="?preset=week<?php echo $tp_qs; ?>"   class="preset-btn <?php echo $preset=='week'  ?'active':''; ?>">This Week</a>
                                 <a href="?preset=month<?php echo $tp_qs; ?>"  class="preset-btn <?php echo $preset=='month' ?'active':''; ?>">This Month</a>
                                 <a href="?preset=year<?php echo $tp_qs; ?>"   class="preset-btn <?php echo $preset=='year'  ?'active':''; ?>">This Year</a>
+                                <?php if ($scope === 'company' && !$is_neksomo_view): ?>
+                                <a href="mis-report-export-xlsx.php?scope=<?php echo urlencode($scope); ?>&from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?><?php echo $filter_tp > 0 ? '&tp_id='.(int)$filter_tp : ''; ?>"
+                                   class="btn btn-success btn-sm" style="display:inline-flex;align-items:center;gap:6px;">
+                                    <i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">download</i> Export to Excel
+                                </a>
+                                <?php endif; ?>
                             </div>
                         </form>
                         <?php
