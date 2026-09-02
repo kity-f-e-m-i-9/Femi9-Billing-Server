@@ -683,6 +683,24 @@ if ($scope === 'company' && !$is_neksomo_view) {
 
     $gp_srt_sold_params = $gp_params;
     $gp_srt_ret_params  = $gp_return_params;
+    // Single-column (pr_id only) versions of the sold/return OT+TP unions,
+    // just for the $pop population subquery below — $gp_ot_sold_union /
+    // $gp_tp_union / $gp_srt_ot_ret_union select 3 columns each (pr_id, qty,
+    // amount), which can't UNION with a 1-column SELECT pr_id.
+    $gp_srt_pop_ot_sold_union = $scope === 'company'
+        ? "UNION ALL SELECT os.prid pr_id FROM ot_sales os WHERE os.date BETWEEN ? AND ?" : '';
+    $gp_srt_pop_tp_union = $tpinv_source_sql
+        ? "UNION ALL SELECT tpii.product_id pr_id
+             FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
+             WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}" : '';
+    $gp_srt_pop_ot_ret_union = $scope === 'company'
+        ? "UNION ALL SELECT osr.prid pr_id FROM ot_sales_return osr WHERE osr.return_date BETWEEN ? AND ?" : '';
+    // Driving table is now the UNION of every pr_id that sold OR was returned
+    // this period ($pop), not just $sold — the previous version drove off
+    // $sold alone and LEFT JOINed $ret onto it, which silently dropped any
+    // return for a product with zero sales in the period (e.g. a product
+    // returned this month but last sold in an earlier one). $pop guarantees
+    // every returned pr_id survives into the SUM even with no matching sale.
     $gp_srt_sql = "
         SELECT
             COALESCE(SUM(CASE WHEN COALESCE(np.category,'') != 'diaper' THEN sold.amt_sold ELSE 0 END),0) napkin_sold_amt,
@@ -694,6 +712,25 @@ if ($scope === 'company' && !$is_neksomo_view) {
             COALESCE(SUM(CASE WHEN np.category = 'diaper' THEN ret.amt_returned ELSE 0 END),0) diaper_return_amt,
             COALESCE(SUM(CASE WHEN np.category = 'diaper' THEN ret.qty_returned ELSE 0 END),0) diaper_return_qty
         FROM (
+            SELECT s.pr_id FROM (
+                SELECT ii.pr_id FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+                WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
+                UNION ALL
+                SELECT uii.pr_id FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+                WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii}
+                {$gp_srt_pop_ot_sold_union}
+                {$gp_srt_pop_tp_union}
+            ) s
+            UNION
+            SELECT r.pr_id FROM (
+                SELECT ri.prid pr_id FROM user_return_stock_items ri
+                WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                {$gp_srt_pop_ot_ret_union}
+            ) r
+        ) pop
+        JOIN products p ON p.id = pop.pr_id
+        {$gp_cat_join}
+        LEFT JOIN (
             SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total) amt_sold
             FROM (
                 SELECT ii.pr_id, ii.qty, ii.total AS line_total
@@ -707,9 +744,7 @@ if ($scope === 'company' && !$is_neksomo_view) {
                 {$gp_tp_union}
             ) s
             GROUP BY s.pr_id
-        ) sold
-        JOIN products p ON p.id = sold.pr_id
-        {$gp_cat_join}
+        ) sold ON sold.pr_id = pop.pr_id
         LEFT JOIN (
             SELECT r.pr_id, SUM(r.qty) qty_returned, SUM(r.amt) amt_returned
             FROM (
@@ -719,8 +754,11 @@ if ($scope === 'company' && !$is_neksomo_view) {
                 {$gp_srt_ot_ret_union}
             ) r
             GROUP BY r.pr_id
-        ) ret ON ret.pr_id = sold.pr_id";
-    $gp_srt_params = array_merge($gp_srt_sold_params, $gp_srt_ret_params);
+        ) ret ON ret.pr_id = pop.pr_id";
+    // pop's params: sold-union params once, then return-union params once.
+    // Then sold subquery repeats its own params, then ret subquery repeats
+    // its own params — matching the SQL text's placeholder order exactly.
+    $gp_srt_params = array_merge($gp_srt_sold_params, $gp_srt_ret_params, $gp_srt_sold_params, $gp_srt_ret_params);
     $gp_srt_row = crow($db_conn, $gp_srt_sql, str_repeat('s', count($gp_srt_params)), $gp_srt_params);
 
     $grand_napkin_sold_amt_llp    = (float)($gp_srt_row['napkin_sold_amt'] ?? 0);
@@ -796,6 +834,32 @@ if ($scope === 'company') {
         'rev' => (float)($ot_row['rev'] ?? 0) - (float)($ot_returns_row['amount'] ?? 0),
     ];
     $channel_labels['ot'] = 'OT Channel';
+
+    // Net every non-OT channel against its own returns — user_return_stock
+    // rows with to_usertype='company' are goods coming back to the company
+    // from whichever channel originally bought them (from_usertype), so this
+    // reconciles Channel Breakdown's per-row revenue to the same net-of-return
+    // basis the top Sales/Total Turnover KPI already uses ($returns_row above).
+    // Without this, every row here was shown gross (pre-return) while the KPI
+    // card was net, so the two disagreed by the full company-bound return
+    // total ($returns_row — see the Overview KPI section).
+    $ch_returns = call_rows($db_conn,
+        "SELECT from_usertype ch, COALESCE(SUM(total),0) amount FROM (
+            SELECT returnid, from_usertype, MAX(total) total FROM user_return_stock
+            WHERE to_usertype='company' AND `date` BETWEEN ? AND ?
+            GROUP BY returnid, from_usertype
+         ) x GROUP BY from_usertype",
+        'ss', [$from, $to]);
+    foreach ($ch_returns as $r) {
+        // from_usertype='customer' is a direct customer return against a
+        // company-issued invoice — the same population $ch_a groups under
+        // invoice.user_type='company' (channel key 'company', labelled
+        // "Customer (Direct)"). Every other from_usertype value already
+        // matches a channel_labels key verbatim.
+        $key = $r['ch'] === 'customer' ? 'company' : $r['ch'];
+        if (!isset($channel_breakdown[$key])) continue; // no sale row for this channel to net against
+        $channel_breakdown[$key]['rev'] -= (float)$r['amount'];
+    }
 }
 $channel_total_rev = array_sum(array_column($channel_breakdown, 'rev')) ?: 1;
 
