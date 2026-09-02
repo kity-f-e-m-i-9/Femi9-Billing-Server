@@ -139,6 +139,69 @@ function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
     }
     return $rate . '% (Mixed)';
 }
+
+// ✅ Excel (CSV) export — same three row sets as the on-screen table, same
+// columns, so the download always matches what's currently displayed.
+if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
+    ob_start();
+    $sn = 0;
+    $csv_rows = [];
+    $csv_rows[] = ['#', 'Customer Type', 'Customer Name', 'Customer Mobile', 'GSTIN', 'Invoice Number', 'Invoice Date', 'GST %', 'Taxable Value', 'GST Amount', 'Total Sales Amount'];
+
+    foreach ($rows1 as $row) {
+        $sn++;
+        $csv_rows[] = [
+            $sn,
+            $customer_type_labels[$row['customer_usertype']] ?? ucfirst(str_replace('_', ' ', $row['customer_usertype'])),
+            $row['cust_name'], $row['cust_mobile'], $row['cust_gstin'], $row['inv_number'],
+            date("d/m/Y", strtotime($row['date'])),
+            gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs),
+            number_format($row['total_sls_amount'], 2, '.', ''),
+            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($row['total_sls_amount'] + $row['gst_amount'], 2, '.', ''),
+        ];
+    }
+    foreach ($rows2 as $row) {
+        $sn++;
+        $csv_rows[] = [
+            $sn, 'Customer', $row['cust_name'], $row['cust_mobile'], $row['cust_gstin'], $row['inv_number'],
+            date("d/m/Y", strtotime($row['date'])),
+            gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs),
+            number_format($row['total_sls_amount'], 2, '.', ''),
+            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($row['total_sls_amount'] + $row['gst_amount'], 2, '.', ''),
+        ];
+    }
+    foreach ($rows3 as $row) {
+        $sn++;
+        $csv_rows[] = [
+            $sn, 'Territory Partner', $row['tp_name'], $row['tp_mobile'], $row['tp_gstin'], $row['invoice_number'],
+            date("d/m/Y", strtotime($row['invoice_date'])),
+            gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs),
+            number_format($row['taxable_value'], 2, '.', ''),
+            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($row['taxable_value'] + $row['gst_amount'], 2, '.', ''),
+        ];
+    }
+    $csv_rows[] = ['', '', '', '', '', '', '', 'Grand Total',
+        number_format($overall_total, 2, '.', ''),
+        number_format($overall_gst, 2, '.', ''),
+        number_format($overall_total + $overall_gst, 2, '.', ''),
+    ];
+
+    $csv_content = '';
+    foreach ($csv_rows as $csv_row) {
+        $csv_content .= implode(',', array_map(function ($v) {
+            return '"' . str_replace('"', '""', $v) . '"';
+        }, $csv_row)) . "\n";
+    }
+
+    ob_end_clean();
+    header("Content-type: text/csv");
+    header("Content-Disposition: attachment; filename=GST_Sales_Detailed_Report.csv");
+    echo $csv_content;
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -190,6 +253,9 @@ function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
                                                 <h1>GSTR1 &gt; Detailed Sales Report</h1>
                                                 <h4>(SS, ST, DT, SHP, CUS, TP)</h4>
                                                 <h5><?= htmlspecialchars($lable_header) ?></h5>
+                                            </td>
+                                            <td align="right" valign="top">
+                                                <a href="?data1=<?= urlencode($gst_type) ?>&amp;data2=<?= urlencode($buyer_gsttype) ?>&amp;frd=<?= urlencode($from_date) ?>&amp;tod=<?= urlencode($to_date) ?>&amp;gid=<?= urlencode($get_godown_id) ?>&amp;export=csv" title="Export to Excel"><img src="../../assets/images/excel-3-32.png"></a>
                                             </td>
                                         </tr>
                                     </table>
