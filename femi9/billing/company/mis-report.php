@@ -2265,8 +2265,14 @@ $j_tptgts  = json_encode(array_map(fn($r)=>round($r['target'],0), $tp_perf));
 // entity-scoped Pieces Sold report, then exits before the full report below
 // (which aggregates all company entities together with no per-entity filter)
 // ever renders. See $is_neksomo_view comment near the top of this file.
+//
+// MIS_REPORT_SUPPRESS_HTML: defined by mis-report-export-neksomo-xlsx.php
+// before including this file, so it can pull every $grand_* variable this
+// branch computes without also emitting (and then exit()ing out from under)
+// the full HTML page below — every calculation above this point still runs
+// unconditionally either way.
 // ═══════════════════════════════════════════════════════════════════════════
-if ($is_neksomo_view) {
+if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -2333,6 +2339,13 @@ if ($is_neksomo_view) {
                             </div>
                             <div>
                                 <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                            </div>
+                            <div style="margin-left:auto;">
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">&nbsp;</label>
+                                <a href="mis-report-export-neksomo-xlsx.php?from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?>"
+                                   class="btn btn-success btn-sm" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+                                    <i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">download</i> Export to Excel
+                                </a>
                             </div>
                         </form>
                     </div>
