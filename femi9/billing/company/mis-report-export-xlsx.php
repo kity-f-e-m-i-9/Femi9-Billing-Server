@@ -246,6 +246,82 @@ if ($scope === 'company') {
     $channel_category_breakdown['ot'] = channel_category_split($db_conn, 'ot', $utype, $from, $to, $filter_tp, $tc_ii, $tc_uii, $tc_tpi, $gp_tp_net_line_amt);
 }
 
+// 0b) Product-wise Sale/Return, split by Napkin/Diaper — every channel
+// (invoice, user_invoice, tp_invoice_items, ot_sales/ot_sales_return)
+// combined into one UNION, grouped by product this time instead of by
+// channel. Same product population + category-mapping rule as everywhere
+// else in this export (unmapped product -> Napkin). Quantity only (no ₹),
+// since this table is specifically for the Quantity sheet.
+function product_category_split(mysqli $db, string $scope, string $utype, string $from, string $to, int $filter_tp, string $tc_ii, string $tc_uii, string $tc_tpi, string $tpinv_source_sql): array {
+    $ot_sold_union = $scope === 'company'
+        ? "UNION ALL SELECT os.prid pr_id, os.qty FROM ot_sales os WHERE os.date BETWEEN ? AND ?" : '';
+    $ot_ret_union = $scope === 'company'
+        ? "UNION ALL SELECT osr.prid pr_id, osr.qty FROM ot_sales_return osr WHERE osr.return_date BETWEEN ? AND ?" : '';
+    $tp_sold_union = $tpinv_source_sql
+        ? "UNION ALL SELECT tpii.product_id pr_id, tpii.quantity qty
+             FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
+             WHERE {$tpinv_source_sql} AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}" : '';
+
+    $sold_sql = "SELECT p.id pid, p.productName, COALESCE(np.category,'') != 'diaper' is_napkin,
+                COALESCE(SUM(s.qty),0) sold_qty
+         FROM (
+             SELECT ii.pr_id, ii.qty FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+             WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}
+             UNION ALL
+             SELECT uii.pr_id, uii.qty FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+             WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii}
+             {$ot_sold_union}
+             {$tp_sold_union}
+         ) s
+         JOIN products p ON p.id = s.pr_id
+         LEFT JOIN neksomo_product_mapping m ON m.company_product_id = p.id
+         LEFT JOIN products np ON np.id = m.neksomo_product_id
+         GROUP BY p.id, p.productName, is_napkin";
+    $sold_params = [$utype, $from, $to, $utype, $from, $to];
+    if ($scope === 'company') { $sold_params[] = $from; $sold_params[] = $to; }
+    if ($tpinv_source_sql) { $sold_params[] = $from; $sold_params[] = $to; }
+
+    $ret_sql = "SELECT p.id pid, p.productName, COALESCE(np.category,'') != 'diaper' is_napkin,
+                COALESCE(SUM(r.qty),0) ret_qty
+         FROM (
+             SELECT ri.prid pr_id, ri.qty FROM user_return_stock_items ri
+             WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+             {$ot_ret_union}
+         ) r
+         JOIN products p ON p.id = r.pr_id
+         LEFT JOIN neksomo_product_mapping m ON m.company_product_id = p.id
+         LEFT JOIN products np ON np.id = m.neksomo_product_id
+         GROUP BY p.id, p.productName, is_napkin";
+    $ret_params = [$utype, $from, $to];
+    if ($scope === 'company') { $ret_params[] = $from; $ret_params[] = $to; }
+
+    $sold_rows = call_rows($db, $sold_sql, str_repeat('s', count($sold_params)), $sold_params);
+    $ret_rows = call_rows($db, $ret_sql, str_repeat('s', count($ret_params)), $ret_params);
+
+    $out = [];
+    foreach ($sold_rows as $r) {
+        $pid = (int)$r['pid'];
+        if (!isset($out[$pid])) $out[$pid] = ['name' => $r['productName'], 'napkin' => ['sold_qty'=>0.0,'ret_qty'=>0.0], 'diaper' => ['sold_qty'=>0.0,'ret_qty'=>0.0]];
+        $key = ((int)$r['is_napkin'] === 1) ? 'napkin' : 'diaper';
+        $out[$pid][$key]['sold_qty'] = (float)$r['sold_qty'];
+    }
+    foreach ($ret_rows as $r) {
+        $pid = (int)$r['pid'];
+        if (!isset($out[$pid])) $out[$pid] = ['name' => $r['productName'], 'napkin' => ['sold_qty'=>0.0,'ret_qty'=>0.0], 'diaper' => ['sold_qty'=>0.0,'ret_qty'=>0.0]];
+        $key = ((int)$r['is_napkin'] === 1) ? 'napkin' : 'diaper';
+        $out[$pid][$key]['ret_qty'] = (float)$r['ret_qty'];
+    }
+    // Sort by total (napkin+diaper) sold qty, descending — same convention
+    // as the on-screen Product-wise Sales table.
+    uasort($out, fn($a, $b) =>
+        ($b['napkin']['sold_qty'] + $b['diaper']['sold_qty']) <=> ($a['napkin']['sold_qty'] + $a['diaper']['sold_qty'])
+    );
+    return $out;
+}
+$product_category_breakdown = ($scope === 'company')
+    ? product_category_split($db_conn, $scope, $utype, $from, $to, $filter_tp, $tc_ii, $tc_uii, $tc_tpi, $tpinv_source_sql)
+    : [];
+
 // 1) OT channel split by sub-channel (Amazon, Flipkart, Website, etc.)
 $ot_by_subchannel = [];
 if ($scope === 'company') {
@@ -385,7 +461,7 @@ function render_sheet(
     float $grand_combined_return_amt_llp, float $grand_combined_return_qty_llp,
     float $grand_combined_turnover_amt_llp, float $grand_combined_turnover_qty_llp,
     array $channel_labels, array $channel_breakdown, float $channel_total_rev,
-    array $ot_by_subchannel, array $channel_category_breakdown,
+    array $ot_by_subchannel, array $channel_category_breakdown, array $product_category_breakdown,
     array $llp_napkin_gp, array $llp_diaper_gp, array $llp_combined_gp,
     // $_reportNapkinOnlyNetProfit intentionally unused inside — it's the
     // report's own $net_profit (Napkin gross profit − Expense, see
@@ -639,6 +715,38 @@ function render_sheet(
     }
     $row++;
 
+    // Product-wise Sale / Return, split by Napkin / Diaper — Quantity sheet
+    // only, since this table has no ₹ dimension. Same product population +
+    // category-mapping rule as everywhere else (unmapped -> Napkin).
+    if ($isQty) {
+        xset($sheet, 1, $row, 'Product');
+        xset($sheet, 2, $row, 'Napkin Sale'); xset($sheet, 3, $row, 'Napkin Return');
+        xset($sheet, 4, $row, 'Diaper Sale'); xset($sheet, 5, $row, 'Diaper Return');
+        headerRow($sheet, $row, 5); $row++;
+        $i = 0;
+        foreach ($product_category_breakdown as $pid => $prod) {
+            $napSale = $prod['napkin']['sold_qty'];
+            $napRet  = $prod['napkin']['ret_qty'];
+            $diaSale = $prod['diaper']['sold_qty'];
+            $diaRet  = $prod['diaper']['ret_qty'];
+            if ($napSale == 0 && $napRet == 0 && $diaSale == 0 && $diaRet == 0) continue;
+            xset($sheet, 1, $row, $prod['name']);
+            xset($sheet, 2, $row, $napSale); qtyFmt($sheet, 'B'.$row);
+            xset($sheet, 3, $row, $napRet);  qtyFmt($sheet, 'C'.$row);
+            xset($sheet, 4, $row, $diaSale); qtyFmt($sheet, 'D'.$row);
+            xset($sheet, 5, $row, $diaRet);  qtyFmt($sheet, 'E'.$row);
+            dataRow($sheet, $row, 5, $i % 2 === 1);
+            $i++; $row++;
+        }
+        if ($i === 0) {
+            xset($sheet, 1, $row, 'No sales this period');
+            $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->getColor()->setRGB(CLR_MUTED);
+            dataRow($sheet, $row, 5, false, false);
+            $row++;
+        }
+        $row++;
+    }
+
     if (!$isQty) {
         xset($sheet, 1, $row, 'Metric'); xset($sheet, 2, $row, 'Amount');
         headerRow($sheet, $row, 2); $row++;
@@ -694,7 +802,7 @@ render_sheet(
     $grand_combined_return_amt_llp, $grand_combined_return_qty_llp,
     $grand_combined_turnover_amt_llp, $grand_combined_turnover_qty_llp,
     $channel_labels, $channel_breakdown, $channel_total_rev,
-    $ot_by_subchannel, $channel_category_breakdown,
+    $ot_by_subchannel, $channel_category_breakdown, $product_category_breakdown,
     $llp_napkin_gp, $llp_diaper_gp, $llp_combined_gp,
     $total_expenses, $net_profit
 );
@@ -716,7 +824,7 @@ render_sheet(
     $grand_combined_return_amt_llp, $grand_combined_return_qty_llp,
     $grand_combined_turnover_amt_llp, $grand_combined_turnover_qty_llp,
     $channel_labels, $channel_breakdown, $channel_total_rev,
-    $ot_by_subchannel, $channel_category_breakdown,
+    $ot_by_subchannel, $channel_category_breakdown, $product_category_breakdown,
     $llp_napkin_gp, $llp_diaper_gp, $llp_combined_gp,
     $total_expenses, $net_profit
 );

@@ -174,9 +174,10 @@ function render_sheet(
     float $grand_diaper_gross_profit,
     float $grand_combined_gross_profit, float $grand_combined_expense, float $grand_combined_net_profit,
     float $grand_combined_net_gst,
-    array $profit_shares
+    array $profit_shares,
+    array $pieces_sold, array $diaper_sold
 ): void {
-    $COLS = 3;
+    $COLS = 5; // widest table (product-wise, Quantity sheet) uses 5 columns
     $fmt = fn(Worksheet $s, string $cell) => $isQty ? qtyFmt($s, $cell) : moneyFmt($s, $cell);
     $unitWord = $isQty ? 'Qty' : 'Amount';
 
@@ -351,12 +352,62 @@ function render_sheet(
             $row++;
         }
         $row++;
+
+        // Product-wise Sale / Return — Napkin (pack qty, from $pieces_sold)
+        // and Diaper (pack qty, from $diaper_sold) side by side, keyed by
+        // product name — the two arrays cover different product sets
+        // (Napkin-mapped vs Diaper-mapped), so this merges them into one
+        // row per product name rather than assuming they line up by index.
+        $prodRows = [];
+        foreach ($pieces_sold as $r) {
+            $name = $r['productName'];
+            if (!isset($prodRows[$name])) $prodRows[$name] = ['nap_sale'=>0,'nap_ret'=>0,'dia_sale'=>0,'dia_ret'=>0];
+            $prodRows[$name]['nap_sale'] = (int)$r['total_qty'];
+            $prodRows[$name]['nap_ret']  = (int)($r['return_qty'] ?? 0);
+        }
+        foreach ($diaper_sold as $r) {
+            $name = $r['productName'];
+            if (!isset($prodRows[$name])) $prodRows[$name] = ['nap_sale'=>0,'nap_ret'=>0,'dia_sale'=>0,'dia_ret'=>0];
+            $prodRows[$name]['dia_sale'] = (int)$r['total_qty'];
+            $prodRows[$name]['dia_ret']  = (int)($r['return_qty'] ?? 0);
+        }
+        // Sort by total (napkin+diaper) sale qty, descending.
+        uasort($prodRows, fn($a, $b) => ($b['nap_sale']+$b['dia_sale']) <=> ($a['nap_sale']+$a['dia_sale']));
+
+        xset($sheet, 1, $row, 'Product');
+        xset($sheet, 2, $row, 'Napkin Sale (Pack Qty)'); xset($sheet, 3, $row, 'Napkin Return (Pack Qty)');
+        xset($sheet, 4, $row, 'Diaper Sale (Pack Qty)'); xset($sheet, 5, $row, 'Diaper Return (Pack Qty)');
+        headerRow($sheet, $row, 5); $row++;
+        $i = 0;
+        foreach ($prodRows as $name => $r) {
+            if ($r['nap_sale'] == 0 && $r['nap_ret'] == 0 && $r['dia_sale'] == 0 && $r['dia_ret'] == 0) continue;
+            xset($sheet, 1, $row, $name);
+            xset($sheet, 2, $row, $r['nap_sale']); qtyFmt($sheet, 'B'.$row);
+            xset($sheet, 3, $row, $r['nap_ret']);  qtyFmt($sheet, 'C'.$row);
+            xset($sheet, 4, $row, $r['dia_sale']); qtyFmt($sheet, 'D'.$row);
+            xset($sheet, 5, $row, $r['dia_ret']);  qtyFmt($sheet, 'E'.$row);
+            dataRow($sheet, $row, 5, $i % 2 === 1);
+            $i++; $row++;
+        }
+        if ($i === 0) {
+            xset($sheet, 1, $row, 'No sales this period');
+            $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->getColor()->setRGB(CLR_MUTED);
+            dataRow($sheet, $row, 5, false, false);
+            $row++;
+        }
+        $row++;
+        xset($sheet, 1, $row, 'Note: Napkin figures here are Pack Qty (see the NAPKIN block above for the Pieces conversion). Diaper is already pack-based with no piece conversion.');
+        $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
+        $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
+        $row += 2;
     }
 
     // ── Column widths & cosmetics ────────────────────────────────────────────
     $sheet->getColumnDimension('A')->setWidth(46);
     $sheet->getColumnDimension('B')->setWidth(22);
     $sheet->getColumnDimension('C')->setWidth(22);
+    $sheet->getColumnDimension('D')->setWidth(22);
+    $sheet->getColumnDimension('E')->setWidth(22);
     $sheet->freezePane('A5');
     $sheet->getSheetView()->setZoomScale(100);
     $sheet->setShowGridlines(false);
@@ -378,7 +429,8 @@ render_sheet(
     $grand_diaper_gross_profit,
     $grand_combined_gross_profit, $grand_combined_expense, $grand_combined_net_profit,
     $grand_combined_net_gst,
-    $profit_shares
+    $profit_shares,
+    $pieces_sold, $diaper_sold
 );
 
 // ── Sheet 2: Quantity view ───────────────────────────────────────────────────
@@ -397,7 +449,8 @@ render_sheet(
     $grand_diaper_gross_profit,
     $grand_combined_gross_profit, $grand_combined_expense, $grand_combined_net_profit,
     $grand_combined_net_gst,
-    $profit_shares
+    $profit_shares,
+    $pieces_sold, $diaper_sold
 );
 
 $spreadsheet->setActiveSheetIndex(0);
