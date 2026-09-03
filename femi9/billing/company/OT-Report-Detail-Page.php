@@ -24,6 +24,7 @@ ob_start();
 require_once("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('report');
 require_once("config.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 
 // Set UTF-8 charset for proper character handling
 if (!mysqli_set_charset($db_conn, 'utf8mb4')) {
@@ -35,7 +36,7 @@ mysqli_query($db_conn, "SET collation_server = 'utf8mb4_general_ci'");
 // Clear filters if requested
 if (isset($_GET['clear_filters']) || isset($_POST['clear_all'])) {
     ob_clean();
-    unset($_SESSION['ot_report_from_date'], $_SESSION['ot_report_to_date']);
+    unset($_SESSION['ot_report_from_date'], $_SESSION['ot_report_to_date'], $_SESSION['ot_report_type_filter']);
     header("Location: " . $_SERVER['PHP_SELF'], true, 303);
     exit;
 }
@@ -67,6 +68,20 @@ if (isset($_SESSION['ot_report_from_date'])) {
 }
 if (isset($_SESSION['ot_report_to_date'])) {
     $to_date = $_SESSION['ot_report_to_date'];
+}
+
+// Napkin / Diaper filter — restricts which product columns show (and count
+// toward the totals), same Napkin-vs-Diaper split used everywhere else in
+// this app (see shared/TpProductType.php). '' means both.
+$filter_type = '';
+if (isset($_POST['type_filter']) && in_array($_POST['type_filter'], ['napkin', 'diaper'], true)) {
+    $filter_type = $_POST['type_filter'];
+    $_SESSION['ot_report_type_filter'] = $filter_type;
+} elseif (isset($_POST['filter_dates']) || isset($_POST['clear_all'])) {
+    // Filter form was submitted with no type selected — Both was explicitly chosen.
+    unset($_SESSION['ot_report_type_filter']);
+} elseif (isset($_SESSION['ot_report_type_filter'])) {
+    $filter_type = $_SESSION['ot_report_type_filter'];
 }
 
 // Validate dates and ensure from_date <= to_date
@@ -699,6 +714,7 @@ $page_title = htmlspecialchars($Report_LABEL . ' : ' . ($business_name ?? 'Busin
                                                     <form method="post" action="export_ot_channel_sales_xlsx.php" target="_blank" class="d-inline">
                                                         <input type="hidden" name="frdate" value="<?= htmlspecialchars($from_date, ENT_QUOTES, 'UTF-8'); ?>">
                                                         <input type="hidden" name="todate" value="<?= htmlspecialchars($to_date, ENT_QUOTES, 'UTF-8'); ?>">
+                                                        <input type="hidden" name="type_filter" value="<?= htmlspecialchars($filter_type, ENT_QUOTES, 'UTF-8'); ?>">
                                                         <button type="submit" class="btn btn-success btn-sm">
                                                             <i class="material-icons">download</i> Export to Excel
                                                         </button>
@@ -732,7 +748,15 @@ $page_title = htmlspecialchars($Report_LABEL . ' : ' . ($business_name ?? 'Busin
                                                     <label class="form-label">To Date <span class="text-danger">*</span></label>
                                                     <input type="date" name="todate" value="<?= htmlspecialchars($to_date, ENT_QUOTES, 'UTF-8'); ?>" class="form-control" required max="<?= date('Y-m-d'); ?>">
                                                 </div>
-                                                <div class="col-md-6 col-sm-12 mb-3">
+                                                <div class="col-md-3 col-sm-6 mb-3">
+                                                    <label class="form-label">Type</label>
+                                                    <select name="type_filter" class="form-control">
+                                                        <option value="">Napkin + Diaper</option>
+                                                        <option value="napkin" <?= $filter_type === 'napkin' ? 'selected' : ''; ?>>Napkin only</option>
+                                                        <option value="diaper" <?= $filter_type === 'diaper' ? 'selected' : ''; ?>>Lumi Diaper only</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3 col-sm-6 mb-3">
                                                     <div class="d-flex gap-2 flex-wrap">
                                                         <button type="submit" name="filter_dates" class="btn btn-primary">
                                                             <i class="material-icons">search</i> Apply Filter
@@ -779,9 +803,10 @@ $page_title = htmlspecialchars($Report_LABEL . ' : ' . ($business_name ?? 'Busin
 
                                     <div class="card-body">
 <?php
-// Fetch all products
+// Fetch all products (optionally narrowed to just Napkin or just Diaper)
 $products = [];
-$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
+$__typeWhere = $filter_type !== '' ? ' AND ' . tpProductTypeSqlFilter($filter_type, 'products') : '';
+$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL)$__typeWhere ORDER BY id ASC");
 if (!$stmt_products) {
     die("Product query preparation failed: " . htmlspecialchars($db_conn->error, ENT_QUOTES, 'UTF-8'));
 }
@@ -874,7 +899,17 @@ if (empty($products)) {
     while ($sale = $result_sales->fetch_assoc()) {
         $cat = $sale['cat'];
         $prid = (int)$sale['prid'];
-        
+
+        // $stmt_sales itself is never scoped by $filter_type (it aggregates
+        // by product id, before we know which type that id is), so every row
+        // reaches here regardless of the Type filter. Total Sales/Amount
+        // must still only reflect the filtered type's products — $products
+        // above is already type-scoped, so skip anything not in it. Without
+        // this, the per-product columns respected the filter but the Total
+        // Sales (Qty)/Total Amount (₹) columns silently kept summing both
+        // types together.
+        if ($filter_type !== '' && !isset($products[$prid])) continue;
+
         // Initialize channel if not exists
         if (!isset($channels[$cat])) {
             $channels[$cat] = [
