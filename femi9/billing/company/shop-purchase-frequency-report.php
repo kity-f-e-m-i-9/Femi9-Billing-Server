@@ -74,26 +74,33 @@ function shop_dedupe_key($name, $mobile, $tempId) {
     return 'id:' . $tempId;
 }
 
-$mres = mysqli_query($db_conn, "SELECT temp_id, name, mobile_number, shop_cat, address FROM shop");
+// District master: depth-3 nodes give the district name for shop.district_id.
+$districtMap = [];
+$dres = mysqli_query($db_conn, "SELECT id, name FROM partner_location_nodes WHERE depth = 3");
+while ($d = mysqli_fetch_assoc($dres)) $districtMap[(int)$d['id']] = $d['name'];
+
+$mres = mysqli_query($db_conn, "SELECT temp_id, name, mobile_number, shop_cat, address, district_id FROM shop");
 $keyByTempId   = [];   // temp_id => dedupe key
 $masterByKey   = [];   // dedupe key => display details (first non-empty wins)
 while ($m = mysqli_fetch_assoc($mres)) {
     $k = shop_dedupe_key($m['name'], $m['mobile_number'], $m['temp_id']);
     $keyByTempId[$m['temp_id']] = $k;
+    $district = $districtMap[(int)$m['district_id']] ?? '';
     if (!isset($masterByKey[$k])) {
         $masterByKey[$k] = [
-            'name'   => trim($m['name']) ?: '(unnamed shop)',
-            'mobile' => $m['mobile_number'],
-            'cat'    => $catMap[(int)$m['shop_cat']] ?? '',
-            'area'   => trim((string)$m['address']),
+            'name'     => trim($m['name']) ?: '(unnamed shop)',
+            'mobile'   => $m['mobile_number'],
+            'cat'      => $catMap[(int)$m['shop_cat']] ?? '',
+            'area'     => trim((string)$m['address']),
+            'district' => $district,
         ];
     } else {
         // Backfill any field the first record left blank.
-        foreach (['cat', 'area'] as $f) {
-            if ($masterByKey[$k][$f] === '' && trim((string)($f === 'cat'
-                    ? ($catMap[(int)$m['shop_cat']] ?? '') : $m['address'])) !== '') {
-                $masterByKey[$k][$f] = $f === 'cat'
-                    ? ($catMap[(int)$m['shop_cat']] ?? '') : trim((string)$m['address']);
+        foreach (['cat', 'area', 'district'] as $f) {
+            if ($masterByKey[$k][$f] === '') {
+                $candidate = $f === 'cat' ? ($catMap[(int)$m['shop_cat']] ?? '')
+                    : ($f === 'district' ? $district : trim((string)$m['address']));
+                if (trim((string)$candidate) !== '') $masterByKey[$k][$f] = $candidate;
             }
         }
     }
@@ -226,11 +233,12 @@ $overdueCount = 0;
 $overdueValue = 0.0;
 
 foreach ($shops as $key => &$s) {
-    $m = $masterByKey[$key] ?? ['name' => '(shop not in master)', 'mobile' => '', 'cat' => '', 'area' => ''];
-    $s['name']   = $m['name'];
-    $s['mobile'] = $m['mobile'];
-    $s['cat']    = $m['cat'];
-    $s['area']   = $m['area'];
+    $m = $masterByKey[$key] ?? ['name' => '(shop not in master)', 'mobile' => '', 'cat' => '', 'area' => '', 'district' => ''];
+    $s['name']     = $m['name'];
+    $s['mobile']   = $m['mobile'];
+    $s['cat']      = $m['cat'];
+    $s['area']     = $m['area'];
+    $s['district'] = $m['district'];
     $s['days_since_last'] = (int)$s['last']->diff($today)->days;
     $s['band']   = freq_band($s['avg_gap'], $s['count']);
     // Overdue: gone longer than 1.5x its own average gap without re-ordering.
@@ -321,6 +329,7 @@ $briefRows = function ($list) {
     return array_map(fn($s) => [
         'shop'            => $s['name'],
         'area'            => $s['area'],
+        'district'        => $s['district'],
         'purchases'       => $s['count'],
         'total_qty'       => round($s['qty']),
         'total_value'     => round($s['value']),
@@ -428,6 +437,7 @@ $fmtName = fn($s) => $s['name'] . ($s['area'] !== '' ? ' — ' . mb_strimwidth($
 $listCols = [
     ['head' => '#',            'key' => '_sno', 'fmt' => fn($s) => ''],
     ['head' => 'Shop',         'fmt' => $fmtName],
+    ['head' => 'District',     'fmt' => fn($s) => $s['district'] !== '' ? $s['district'] : '-'],
     ['head' => 'Cat',          'fmt' => fn($s) => $s['cat']],
     ['head' => 'Buys',         'num' => true, 'fmt' => fn($s) => nfmt($s['count'])],
     ['head' => 'Avg gap (d)',  'num' => true, 'fmt' => fn($s) => $s['avg_gap'] !== null ? nfmt($s['avg_gap'], 1) : '-'],
