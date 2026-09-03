@@ -66,6 +66,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 // ── Palette (matches the report's own KPI card colors) ──────────────────────
@@ -81,16 +82,27 @@ const CLR_WHITE      = 'FFFFFF';
 const CLR_TEXT       = '212529';
 const CLR_MUTED      = '6C757D';
 
-/** Write to a cell using 1-based column index (A=1, B=2, …) */
+/** Write to a cell using 1-based column index (A=1, B=2, …). String values
+ * are written as explicit TYPE_STRING2, not TYPE_STRING (Excel's normal
+ * default) — several row labels in this file legitimately start with
+ * "= " or "(+) "/"(−) " (e.g. "= Net Profit"), and setCellValue()'s
+ * auto-detection reads a leading "=" as a formula, producing #NAME? in the
+ * cell instead of the label text. TYPE_STRING2 skips formula detection
+ * entirely, so this is safe for every string this file ever writes. */
 function xset(Worksheet $sheet, int $col, int $row, $value): void {
-    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col) . $row, $value);
+    $cell = Coordinate::stringFromColumnIndex($col) . $row;
+    if (is_string($value)) {
+        $sheet->setCellValueExplicit($cell, $value, DataType::TYPE_STRING2);
+    } else {
+        $sheet->setCellValue($cell, $value);
+    }
 }
 function xrange(Worksheet $sheet, int $c1, int $r1, int $c2, int $r2): string {
     return Coordinate::stringFromColumnIndex($c1) . $r1 . ':' . Coordinate::stringFromColumnIndex($c2) . $r2;
 }
 /** Merge + style a full-width title/section banner row spanning $cols columns. */
 function banner(Worksheet $sheet, int $row, int $cols, string $text, string $bg, int $size = 13, string $fg = CLR_WHITE, int $height = 26): void {
-    $sheet->setCellValue('A' . $row, $text);
+    $sheet->setCellValueExplicit('A' . $row, $text, DataType::TYPE_STRING2);
     $sheet->mergeCells(xrange($sheet, 1, $row, $cols, $row));
     $style = $sheet->getStyle('A' . $row);
     $style->getFont()->setBold(true)->setSize($size)->getColor()->setRGB($fg);
@@ -473,7 +485,7 @@ function render_sheet(
             }
         }
         $row++;
-        $sheet->setCellValue('A'.$row, 'Note: per-channel figures above are re-derived from ' . strtolower($bannerLabel) . ' line items only, so they are not netted against courier charges the way a whole-channel header total is. OT sub-channels (Amazon, Flipkart, Website, etc.) have no per-category split of their own — shown combined, once, under Napkin.');
+        xset($sheet, 1, $row, 'Note: per-channel figures above are re-derived from ' . strtolower($bannerLabel) . ' line items only, so they are not netted against courier charges the way a whole-channel header total is. OT sub-channels (Amazon, Flipkart, Website, etc.) have no per-category split of their own — shown combined, once, under Napkin.');
         $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
         $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
         $row += 2;
@@ -501,7 +513,7 @@ function render_sheet(
                 $row++;
             }
             $row++;
-            $sheet->setCellValue('A'.$row, 'GST is a pass-through tax collected on behalf of the government, not company revenue — Gross Profit above is always computed on the pre-tax (ex-GST) sold value and cost. "Sold Value (incl. GST)" is shown only for reference.');
+            xset($sheet, 1, $row, 'GST is a pass-through tax collected on behalf of the government, not company revenue — Gross Profit above is always computed on the pre-tax (ex-GST) sold value and cost. "Sold Value (incl. GST)" is shown only for reference.');
             $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
             $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
             $row += 2;
@@ -543,7 +555,7 @@ function render_sheet(
         $row++;
     }
     $row++;
-    $sheet->setCellValue('A'.$row, 'Note: only products mapped to a Neksomo product (Napkin/Diaper Product Mapping) are classified into the NAPKIN/DIAPER blocks above — an unmapped product has no category and is folded into Napkin, though it still counts in the Combined figures here.');
+    xset($sheet, 1, $row, 'Note: only products mapped to a Neksomo product (Napkin/Diaper Product Mapping) are classified into the NAPKIN/DIAPER blocks above — an unmapped product has no category and is folded into Napkin, though it still counts in the Combined figures here.');
     $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
     $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
     $row += 2;
