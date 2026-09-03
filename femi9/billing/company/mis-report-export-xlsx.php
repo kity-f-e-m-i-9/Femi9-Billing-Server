@@ -375,9 +375,15 @@ function render_sheet(
     array $channel_labels, array $channel_breakdown, float $channel_total_rev,
     array $ot_by_subchannel, array $channel_category_breakdown,
     array $llp_napkin_gp, array $llp_diaper_gp, array $llp_combined_gp,
-    float $total_expenses, ?float $net_profit
+    // $_reportNapkinOnlyNetProfit intentionally unused inside — it's the
+    // report's own $net_profit (Napkin gross profit − Expense, see
+    // mis-report.php), which is NOT the Combined Net Profit this sheet
+    // shows; that's re-derived fresh from $llp_combined_gp below instead.
+    // Kept as a parameter (rather than dropped from both call sites) so its
+    // scope is documented here rather than silently discarded upstream.
+    float $total_expenses, ?float $_reportNapkinOnlyNetProfit
 ): void {
-    $COLS = 6; // widest table below uses 6 columns
+    $COLS = 5; // widest table below uses 5 columns
     $fmt = fn(Worksheet $s, string $cell) => $isQty ? qtyFmt($s, $cell) : moneyFmt($s, $cell);
     $unitWord = $isQty ? 'Qty' : 'Amount';
 
@@ -387,168 +393,178 @@ function render_sheet(
     banner($sheet, $row, $COLS, $periodLabel . '   |   ' . $scopeLabel, CLR_SUB_BG, 11, CLR_TEXT, 22);
     $row += 2;
 
-    // ── 1. Overall Sales / Return / Turnover ────────────────────────────────
-    banner($sheet, $row, $COLS, '1. OVERALL SALES / RETURN / TURNOVER', CLR_SECTION_BG); $row++;
+    /**
+     * Renders one category's full self-contained block: Sales/Return/
+     * Turnover, Channel Breakdown (with OT further split into its own
+     * sub-channels), and — amount sheet only — Gross Profit with the full
+     * calculation. $catKey is 'napkin' or 'diaper', used to pull the right
+     * side out of $channel_category_breakdown's per-channel rows.
+     */
+    $renderCategoryBlock = function (
+        string $bannerLabel, string $catKey, string $catBg,
+        float $sold_amt, float $sold_qty, float $ret_amt, float $ret_qty, float $turn_amt, float $turn_qty,
+        array $gp
+    ) use ($sheet, $isQty, $fmt, $unitWord, $COLS, $channel_labels, $channel_breakdown, $ot_by_subchannel, $channel_category_breakdown, $total_expenses, &$row) {
+        banner($sheet, $row, $COLS, $bannerLabel, $catBg, 14, CLR_WHITE, 28); $row++;
+        $row++;
+
+        // Sales / Return / Turnover
+        xset($sheet, 1, $row, 'Metric'); xset($sheet, 2, $row, $unitWord);
+        headerRow($sheet, $row, 2); $row++;
+        $srtRows = [
+            ['Sales (gross, pre-return)', $isQty ? $sold_qty : $sold_amt],
+            ['Returns', $isQty ? $ret_qty : $ret_amt],
+            ['Total Turnover (Sales − Returns)', $isQty ? $turn_qty : $turn_amt],
+        ];
+        foreach ($srtRows as $i => [$label, $val]) {
+            xset($sheet, 1, $row, $label); xset($sheet, 2, $row, $val);
+            $fmt($sheet, 'B' . $row);
+            dataRow($sheet, $row, 2, $i % 2 === 1);
+            $row++;
+        }
+        $row++;
+
+        // Channel Breakdown for this category — re-derived from each
+        // channel's own line items (see channel_category_split()'s own
+        // comment), so not netted against courier the way a header total is.
+        xset($sheet, 1, $row, 'Channel'); xset($sheet, 2, $row, 'Invoices');
+        xset($sheet, 3, $row, $unitWord); xset($sheet, 4, $row, 'Share of ' . $bannerLabel);
+        headerRow($sheet, $row, 4); $row++;
+        $i = 0;
+        $catTotal = ($isQty ? $turn_qty : $turn_amt) ?: 1;
+        foreach ($channel_labels as $key => $label) {
+            if ($key === 'ot') continue;
+            $r = $channel_breakdown[$key] ?? ['cnt' => 0, 'rev' => 0.0];
+            $cat = $channel_category_breakdown[$key][$catKey] ?? ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0];
+            $val = $isQty ? ($cat['sold_qty'] - $cat['ret_qty']) : ($cat['sold_amt'] - $cat['ret_amt']);
+            xset($sheet, 1, $row, $label);
+            xset($sheet, 2, $row, (int)$r['cnt']);
+            xset($sheet, 3, $row, $val); $fmt($sheet, 'C'.$row);
+            $pct = $catTotal != 0 ? round($val / $catTotal * 100, 1) : 0;
+            xset($sheet, 4, $row, $pct); pctFmt($sheet, 'D'.$row);
+            dataRow($sheet, $row, 4, $i % 2 === 1);
+            $i++; $row++;
+        }
+        $ot_row = $channel_breakdown['ot'] ?? ['cnt' => 0, 'rev' => 0.0];
+        $ot_cat = $channel_category_breakdown['ot'][$catKey] ?? ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0];
+        $ot_val = $isQty ? ($ot_cat['sold_qty'] - $ot_cat['ret_qty']) : ($ot_cat['sold_amt'] - $ot_cat['ret_amt']);
+        xset($sheet, 1, $row, 'OT Channel (combined)');
+        xset($sheet, 2, $row, (int)$ot_row['cnt']);
+        xset($sheet, 3, $row, $ot_val); $fmt($sheet, 'C'.$row);
+        $pct = $catTotal != 0 ? round($ot_val / $catTotal * 100, 1) : 0;
+        xset($sheet, 4, $row, $pct); pctFmt($sheet, 'D'.$row);
+        $sheet->getStyle('A'.$row)->getFont()->setBold(true)->setItalic(true);
+        dataRow($sheet, $row, 4, $i % 2 === 1);
+        $row++;
+        // OT sub-channels have no category split of their own (see note
+        // below) — shown once, combined, under Napkin only, to avoid
+        // implying a real split that doesn't exist.
+        if ($catKey === 'napkin') {
+            foreach ($ot_by_subchannel as $sub) {
+                $net_amt = $sub['sold_amt'] - $sub['ret_amt'];
+                $net_qty = $sub['sold_qty'] - $sub['ret_qty'];
+                xset($sheet, 1, $row, '   ↳ ' . $sub['name'] . ' (all categories)');
+                xset($sheet, 2, $row, $sub['cnt']);
+                xset($sheet, 3, $row, $isQty ? $net_qty : $net_amt); $fmt($sheet, 'C'.$row);
+                xset($sheet, 4, $row, '—');
+                $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->getColor()->setRGB(CLR_MUTED);
+                dataRow($sheet, $row, 4, false, false);
+                $row++;
+            }
+        }
+        $row++;
+        $sheet->setCellValue('A'.$row, 'Note: per-channel figures above are re-derived from ' . strtolower($bannerLabel) . ' line items only, so they are not netted against courier charges the way a whole-channel header total is. OT sub-channels (Amazon, Flipkart, Website, etc.) have no per-category split of their own — shown combined, once, under Napkin.');
+        $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
+        $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
+        $row += 2;
+
+        // Gross Profit with full calculation — amount sheet only
+        if (!$isQty) {
+            xset($sheet, 1, $row, 'Component'); xset($sheet, 2, $row, $bannerLabel);
+            headerRow($sheet, $row, 2); $row++;
+            $gpRows = [
+                ['Net Qty Sold (sold − returned)', $gp['net_qty'], 'qty'],
+                ['Sold Value (ex-GST)', $gp['sold_value'], 'money'],
+                ['(+) Output GST (collected on sales)', $gp['output_gst'], 'money'],
+                ['Sold Value (incl. GST)', $gp['sold_value'] + $gp['output_gst'], 'money'],
+                ['(−) Cost of Goods (ex-GST)', $gp['cost_value'], 'money'],
+                ['= Gross Profit (ex-GST)', $gp['gross_profit'], 'money_bold'],
+            ];
+            foreach ($gpRows as $i => [$label, $val, $type]) {
+                xset($sheet, 1, $row, $label); xset($sheet, 2, $row, $val);
+                if ($type === 'qty') qtyFmt($sheet, 'B'.$row); else moneyFmt($sheet, 'B'.$row);
+                if ($type === 'money_bold') {
+                    $sheet->getStyle(xrange($sheet,1,$row,2,$row))->getFont()->setBold(true);
+                    $sheet->getStyle(xrange($sheet,1,$row,2,$row))->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F3E5F5');
+                }
+                dataRow($sheet, $row, 2, $i % 2 === 1 && $type !== 'money_bold');
+                $row++;
+            }
+            $row++;
+            $sheet->setCellValue('A'.$row, 'GST is a pass-through tax collected on behalf of the government, not company revenue — Gross Profit above is always computed on the pre-tax (ex-GST) sold value and cost. "Sold Value (incl. GST)" is shown only for reference.');
+            $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
+            $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
+            $row += 2;
+        }
+    };
+
+    // ── NAPKIN — full block ──────────────────────────────────────────────────
+    $renderCategoryBlock(
+        'NAPKIN', 'napkin', CLR_SECTION_BG,
+        $grand_napkin_sold_amt_llp, $grand_napkin_sold_qty_llp,
+        $grand_napkin_return_amt_llp, $grand_napkin_return_qty_llp,
+        $grand_napkin_turnover_amt_llp, $grand_napkin_turnover_qty_llp,
+        $llp_napkin_gp
+    );
+
+    // ── DIAPER — full block ──────────────────────────────────────────────────
+    $renderCategoryBlock(
+        'DIAPER', 'diaper', CLR_GP_BG,
+        $grand_diaper_sold_amt_llp, $grand_diaper_sold_qty_llp,
+        $grand_diaper_return_amt_llp, $grand_diaper_return_qty_llp,
+        $grand_diaper_turnover_amt_llp, $grand_diaper_turnover_qty_llp,
+        $llp_diaper_gp
+    );
+
+    // ── COMBINED — Overall Sales/Return/Turnover + Net Profit only ──────────
+    banner($sheet, $row, $COLS, 'COMBINED (NAPKIN + DIAPER)', CLR_TOTAL_BG, 14, CLR_WHITE, 28); $row++;
+    $row++;
     xset($sheet, 1, $row, 'Metric'); xset($sheet, 2, $row, $unitWord);
     headerRow($sheet, $row, 2); $row++;
-    $overallRows = [
-        ['Sales (gross, pre-return)',  $isQty ? $total_units : $gross_revenue],
-        ['Returns',                    $isQty ? $total_return_qty : $total_return_amt],
+    $combinedRows = [
+        ['Sales (gross, pre-return)', $isQty ? $total_units : $gross_revenue],
+        ['Returns', $isQty ? $total_return_qty : $total_return_amt],
         ['Total Turnover (Sales − Returns)', $isQty ? $net_units : $total_revenue],
     ];
-    foreach ($overallRows as $i => [$label, $val]) {
+    foreach ($combinedRows as $i => [$label, $val]) {
         xset($sheet, 1, $row, $label); xset($sheet, 2, $row, $val);
         $fmt($sheet, 'B' . $row);
         dataRow($sheet, $row, 2, $i % 2 === 1);
         $row++;
     }
     $row++;
-
-    // ── 2. Sales / Return / Turnover — Napkin / Diaper split ────────────────
-    banner($sheet, $row, $COLS, '2. SALES / RETURN / TURNOVER — NAPKIN / DIAPER SPLIT', CLR_SECTION_BG); $row++;
-    xset($sheet, 1, $row, 'Category'); xset($sheet, 2, $row, 'Sales'); xset($sheet, 3, $row, 'Returns'); xset($sheet, 4, $row, 'Total Turnover');
-    headerRow($sheet, $row, 4); $row++;
-    $splitRows = [
-        ['Napkin',   $isQty ? $grand_napkin_sold_qty_llp   : $grand_napkin_sold_amt_llp,   $isQty ? $grand_napkin_return_qty_llp   : $grand_napkin_return_amt_llp,   $isQty ? $grand_napkin_turnover_qty_llp   : $grand_napkin_turnover_amt_llp],
-        ['Diaper',   $isQty ? $grand_diaper_sold_qty_llp   : $grand_diaper_sold_amt_llp,   $isQty ? $grand_diaper_return_qty_llp   : $grand_diaper_return_amt_llp,   $isQty ? $grand_diaper_turnover_qty_llp   : $grand_diaper_turnover_amt_llp],
-    ];
-    foreach ($splitRows as $i => [$label, $sold, $ret, $turn]) {
-        xset($sheet, 1, $row, $label); xset($sheet, 2, $row, $sold); xset($sheet, 3, $row, $ret); xset($sheet, 4, $row, $turn);
-        $fmt($sheet, 'B'.$row); $fmt($sheet, 'C'.$row); $fmt($sheet, 'D'.$row);
-        dataRow($sheet, $row, 4, $i % 2 === 1);
-        $row++;
-    }
-    xset($sheet, 1, $row, 'Combined'); xset($sheet, 2, $row, $isQty ? $grand_combined_sold_qty_llp : $grand_combined_sold_amt_llp);
-    xset($sheet, 3, $row, $isQty ? $grand_combined_return_qty_llp : $grand_combined_return_amt_llp);
-    xset($sheet, 4, $row, $isQty ? $grand_combined_turnover_qty_llp : $grand_combined_turnover_amt_llp);
-    $fmt($sheet, 'B'.$row); $fmt($sheet, 'C'.$row); $fmt($sheet, 'D'.$row);
-    totalRow($sheet, $row, 4, CLR_TOTAL_BG);
-    $row += 2;
-    $sheet->setCellValue('A'.$row, 'Note: only products mapped to a Neksomo product (Napkin/Diaper Product Mapping) are classified here — an unmapped product has no category and is folded into Napkin, though it still counts in the Overall figures above.');
-    $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
-    $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
-    $row += 2;
-
-    // ── 3. Channel Breakdown, split by Napkin / Diaper ──────────────────────
-    // Header total (Card 1 style, courier-netted) shown alongside a
-    // Napkin/Diaper/Combined line-item split per channel — see
-    // channel_category_split()'s own comment for why the per-category
-    // figures don't net courier the same way the whole-channel row does.
-    banner($sheet, $row, $COLS, '3. CHANNEL BREAKDOWN — NAPKIN / DIAPER SPLIT', CLR_SECTION_BG); $row++;
-    xset($sheet, 1, $row, 'Channel'); xset($sheet, 2, $row, 'Invoices');
-    xset($sheet, 3, $row, 'Napkin ' . $unitWord); xset($sheet, 4, $row, 'Diaper ' . $unitWord);
-    xset($sheet, 5, $row, 'Combined ' . $unitWord); xset($sheet, 6, $row, $isQty ? 'Total ' . $unitWord . ' (Header)' : 'Share');
-    headerRow($sheet, $row, 6); $row++;
-    $i = 0;
-    $chKey = fn(array $cat, string $field) => $isQty
-        ? ($cat['sold_qty'] ?? 0) - ($cat['ret_qty'] ?? 0)
-        : ($cat['sold_amt'] ?? 0) - ($cat['ret_amt'] ?? 0);
-    foreach ($channel_labels as $key => $label) {
-        if ($key === 'ot') continue; // OT is split into sub-channels below instead of one row
-        $r = $channel_breakdown[$key] ?? ['cnt' => 0, 'rev' => 0.0];
-        $cat = $channel_category_breakdown[$key] ?? ['napkin' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0], 'diaper' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0]];
-        $napkin = $chKey($cat['napkin'], 'x');
-        $diaper = $chKey($cat['diaper'], 'x');
-        xset($sheet, 1, $row, $label);
-        xset($sheet, 2, $row, (int)$r['cnt']);
-        xset($sheet, 3, $row, $napkin); $fmt($sheet, 'C'.$row);
-        xset($sheet, 4, $row, $diaper); $fmt($sheet, 'D'.$row);
-        xset($sheet, 5, $row, $napkin + $diaper); $fmt($sheet, 'E'.$row);
-        if ($isQty) {
-            xset($sheet, 6, $row, '—');
-        } else {
-            $val = (float)$r['rev'];
-            $pct = $channel_total_rev > 0 ? round($val / $channel_total_rev * 100, 1) : 0;
-            xset($sheet, 6, $row, $pct); pctFmt($sheet, 'F'.$row);
-        }
-        dataRow($sheet, $row, 6, $i % 2 === 1);
-        $i++; $row++;
-    }
-    // OT Channel — combined row (Napkin/Diaper split), then its own sub-channels
-    $ot_row = $channel_breakdown['ot'] ?? ['cnt' => 0, 'rev' => 0.0];
-    $ot_cat = $channel_category_breakdown['ot'] ?? ['napkin' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0], 'diaper' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0]];
-    $ot_napkin = $chKey($ot_cat['napkin'], 'x');
-    $ot_diaper = $chKey($ot_cat['diaper'], 'x');
-    xset($sheet, 1, $row, 'OT Channel (combined)');
-    xset($sheet, 2, $row, (int)$ot_row['cnt']);
-    xset($sheet, 3, $row, $ot_napkin); $fmt($sheet, 'C'.$row);
-    xset($sheet, 4, $row, $ot_diaper); $fmt($sheet, 'D'.$row);
-    xset($sheet, 5, $row, $ot_napkin + $ot_diaper); $fmt($sheet, 'E'.$row);
-    if (!$isQty) {
-        $pct = $channel_total_rev > 0 ? round((float)$ot_row['rev'] / $channel_total_rev * 100, 1) : 0;
-        xset($sheet, 6, $row, $pct); pctFmt($sheet, 'F'.$row);
-    } else {
-        xset($sheet, 6, $row, '—');
-    }
-    $sheet->getStyle('A'.$row)->getFont()->setBold(true)->setItalic(true);
-    dataRow($sheet, $row, 6, $i % 2 === 1);
-    $row++;
-    // OT sub-channels (Amazon, Flipkart, Website, ...) — combined only, this
-    // level of drill-down has no Napkin/Diaper split of its own (ot_sales has
-    // no per-line product category resolved beyond what's already folded into
-    // the combined OT row above).
-    foreach ($ot_by_subchannel as $sub) {
-        $net_amt = $sub['sold_amt'] - $sub['ret_amt'];
-        $net_qty = $sub['sold_qty'] - $sub['ret_qty'];
-        xset($sheet, 1, $row, '   ↳ ' . $sub['name']);
-        xset($sheet, 2, $row, $sub['cnt']);
-        xset($sheet, 5, $row, $isQty ? $net_qty : $net_amt);
-        $fmt($sheet, 'E'.$row);
-        if (!$isQty) {
-            $pct = $channel_total_rev > 0 ? round($net_amt / $channel_total_rev * 100, 1) : 0;
-            xset($sheet, 6, $row, $pct); pctFmt($sheet, 'F'.$row);
-        } else {
-            xset($sheet, 6, $row, '—');
-        }
-        $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->getColor()->setRGB(CLR_MUTED);
-        dataRow($sheet, $row, 6, false, false);
-        $row++;
-    }
-    $row += 2;
-    $sheet->setCellValue('A'.$row, 'Note: Napkin/Diaper columns are re-derived from each channel\'s own line items (same category-mapping rule as Section 2), so they are not netted against courier charges the way the header-based Invoices/Share columns are — a channel with non-zero courier charges will show a small difference between "Combined" and the header total for that reason.');
+    $sheet->setCellValue('A'.$row, 'Note: only products mapped to a Neksomo product (Napkin/Diaper Product Mapping) are classified into the NAPKIN/DIAPER blocks above — an unmapped product has no category and is folded into Napkin, though it still counts in the Combined figures here.');
     $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
     $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
     $row += 2;
 
     if (!$isQty) {
-        // ── 4. Gross Profit — Napkin / Diaper, with full calculation ───────────
-        banner($sheet, $row, $COLS, '4. GROSS PROFIT — NAPKIN / DIAPER, WITH CALCULATION', CLR_SECTION_BG); $row++;
-        xset($sheet, 1, $row, 'Component'); xset($sheet, 2, $row, 'Napkin'); xset($sheet, 3, $row, 'Diaper'); xset($sheet, 4, $row, 'Combined');
-        headerRow($sheet, $row, 4); $row++;
-
-        $gpRows = [
-            ['Net Qty Sold (sold − returned)', $llp_napkin_gp['net_qty'], $llp_diaper_gp['net_qty'], $llp_combined_gp['net_qty'], 'qty'],
-            ['Sold Value (ex-GST)',            $llp_napkin_gp['sold_value'], $llp_diaper_gp['sold_value'], $llp_combined_gp['sold_value'], 'money'],
-            ['(+) Output GST (collected on sales)', $llp_napkin_gp['output_gst'], $llp_diaper_gp['output_gst'], $llp_combined_gp['output_gst'], 'money'],
-            ['Sold Value (incl. GST)',          $llp_napkin_gp['sold_value']+$llp_napkin_gp['output_gst'], $llp_diaper_gp['sold_value']+$llp_diaper_gp['output_gst'], $llp_combined_gp['sold_value']+$llp_combined_gp['output_gst'], 'money'],
-            ['(−) Cost of Goods (ex-GST)',      $llp_napkin_gp['cost_value'], $llp_diaper_gp['cost_value'], $llp_combined_gp['cost_value'], 'money'],
-            ['= Gross Profit (ex-GST)',         $llp_napkin_gp['gross_profit'], $llp_diaper_gp['gross_profit'], $llp_combined_gp['gross_profit'], 'money_bold'],
-        ];
-        foreach ($gpRows as $i => [$label, $nap, $dia, $comb, $type]) {
-            xset($sheet, 1, $row, $label); xset($sheet, 2, $row, $nap); xset($sheet, 3, $row, $dia); xset($sheet, 4, $row, $comb);
-            if ($type === 'qty') { qtyFmt($sheet,'B'.$row); qtyFmt($sheet,'C'.$row); qtyFmt($sheet,'D'.$row); }
-            else { moneyFmt($sheet,'B'.$row); moneyFmt($sheet,'C'.$row); moneyFmt($sheet,'D'.$row); }
-            if ($type === 'money_bold') {
-                $sheet->getStyle(xrange($sheet,1,$row,4,$row))->getFont()->setBold(true);
-                $sheet->getStyle(xrange($sheet,1,$row,4,$row))->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F3E5F5');
-            }
-            dataRow($sheet, $row, 4, $i % 2 === 1 && $type !== 'money_bold');
-            $row++;
-        }
-        $row++;
-        $sheet->setCellValue('A'.$row, 'GST is a pass-through tax collected on behalf of the government, not company revenue — Gross Profit above is always computed on the pre-tax (ex-GST) sold value and cost, per the report\'s own convention. "Sold Value (incl. GST)" is shown only for reference / reconciliation to invoice totals.');
-        $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
-        $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
-        $row += 2;
-
-        // ── 5. Combined Gross Profit, Expense, Net Profit ───────────────────────
-        banner($sheet, $row, $COLS, '5. COMBINED GROSS PROFIT / EXPENSE / NET PROFIT', CLR_SECTION_BG); $row++;
         xset($sheet, 1, $row, 'Metric'); xset($sheet, 2, $row, 'Amount');
         headerRow($sheet, $row, 2); $row++;
+        // Net Profit here is deliberately re-derived from $llp_combined_gp
+        // (Napkin + Diaper), NOT the report's own $net_profit variable —
+        // that variable is $gross_profit - $total_expenses, and
+        // $gross_profit is the Napkin-only figure (see mis-report.php's own
+        // "1b-2. GROSS PROFIT split by Napkin / Diaper" comment) — reusing
+        // it here would silently drop Diaper's gross profit from Net Profit
+        // whenever Diaper had any.
+        $combined_net_profit = $llp_combined_gp['gross_profit'] - $total_expenses;
         $npRows = [
-            ['Combined Gross Profit', $llp_combined_gp['gross_profit'], false],
+            ['Napkin Gross Profit', $llp_napkin_gp['gross_profit'], false],
+            ['(+) Diaper Gross Profit', $llp_diaper_gp['gross_profit'], false],
+            ['= Combined Gross Profit', $llp_combined_gp['gross_profit'], false],
             ['(−) Expense (Expense Tracker, this period)', $total_expenses, false],
-            ['= Net Profit', $net_profit ?? ($llp_combined_gp['gross_profit'] - $total_expenses), true],
+            ['= Net Profit', $combined_net_profit, true],
         ];
         foreach ($npRows as $i => [$label, $val, $bold]) {
             xset($sheet, 1, $row, $label); xset($sheet, 2, $row, $val); moneyFmt($sheet, 'B'.$row);
@@ -562,10 +578,9 @@ function render_sheet(
     // ── Column widths & cosmetics ────────────────────────────────────────────
     $sheet->getColumnDimension('A')->setWidth(42);
     $sheet->getColumnDimension('B')->setWidth(20);
-    $sheet->getColumnDimension('C')->setWidth(20);
+    $sheet->getColumnDimension('C')->setWidth(18);
     $sheet->getColumnDimension('D')->setWidth(18);
     $sheet->getColumnDimension('E')->setWidth(16);
-    $sheet->getColumnDimension('F')->setWidth(16);
     $sheet->freezePane('A5');
     $sheet->getSheetView()->setZoomScale(100);
     $sheet->setShowGridlines(false);
