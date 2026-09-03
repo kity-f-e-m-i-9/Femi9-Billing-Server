@@ -9,9 +9,10 @@
  * duplicated query logic to drift out of sync over time.
  *
  * Sheet 1: Amount view — Sales/Return/Turnover (overall + Napkin/Diaper
- *   split), Channel Breakdown (OT split into its own sub-channels), and
- *   Gross Profit with a full calculation breakdown (Sold Value, Cost of
- *   Goods, GST backed out, Output/Input/Net GST) for Napkin, Diaper, and
+ *   split), Channel Breakdown split by Napkin/Diaper per channel (OT
+ *   further split into its own sub-channels — Amazon, Flipkart, Website,
+ *   etc.), and Gross Profit with a full calculation breakdown (Sold Value,
+ *   Cost of Goods, GST backed out, Output GST) for Napkin, Diaper, and
  *   Combined, plus Expense and Net Profit.
  * Sheet 2: Quantity view — same structure, in units instead of ₹.
  */
@@ -136,10 +137,102 @@ function pctFmt(Worksheet $sheet, string $cell): void {
 }
 
 // ── Re-derive the extra data this export needs that the on-screen report ────
-// doesn't already expose as a variable: OT sales split by its own sub-channel
-// (cat), and a fresh Sold/Cost/GST breakdown for Napkin & Diaper Gross Profit
-// (the on-screen LLP cards only ever show the single final GP number — see
-// $gross_profit / $grand_diaper_gross_profit_llp above).
+// doesn't already expose as a variable: a per-channel Napkin/Diaper sold+
+// returned split (Channel Breakdown itself carries no category dimension —
+// it's built from invoice/tp_invoice HEADER totals, not line items), OT
+// sales split by its own sub-channel (cat), and a fresh Sold/Cost/GST
+// breakdown for Napkin & Diaper Gross Profit (the on-screen LLP cards only
+// ever show the single final GP number — see $gross_profit /
+// $grand_diaper_gross_profit_llp above).
+
+// 0) Channel Breakdown split by Napkin / Diaper — line-item basis (same
+// product population + category-mapping rule as the existing Sales/Return/
+// Turnover Napkin/Diaper split above: an unmapped product has no category
+// and is folded into Napkin). Each channel is queried from the exact same
+// source table + filter mis-report.php's own Channel Breakdown uses for
+// that channel (invoice for Customer, user_invoice grouped by to_user_type
+// for Shop/SS/Stockist/Distributor/SD, tp_invoice_items for Territory
+// Partner, ot_sales/ot_sales_return for OT) — courier is not part of any
+// line item, so unlike the whole-channel row, these per-category figures
+// are not netted against it (same convention the Napkin/Diaper Sales/
+// Return/Turnover section above already has, for the same reason).
+function channel_category_split(mysqli $db, string $source, string $utype, string $from, string $to, int $filter_tp, string $tc_ii, string $tc_uii, string $tc_tpi, string $gp_tp_net_line_amt, ?string $to_user_type = null): array {
+    $cat_join = "LEFT JOIN neksomo_product_mapping m ON m.company_product_id = p.id
+                 LEFT JOIN products np ON np.id = m.neksomo_product_id";
+    switch ($source) {
+        case 'invoice':
+            $sold_sql = "SELECT ii.pr_id, ii.qty, ii.total amt FROM invoice_items ii JOIN invoice i ON i.inv_id=ii.inv_id
+                         WHERE i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?{$tc_ii}";
+            $sold_types = 'sss'; $sold_params = [$utype, $from, $to];
+            $ret_sql = "SELECT ri.prid pr_id, ri.qty, ri.total amt FROM user_return_stock_items ri
+                        WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                        AND ri.from_usertype='customer'";
+            $ret_types = 'sss'; $ret_params = [$utype, $from, $to];
+            break;
+        case 'user_invoice':
+            $sold_sql = "SELECT uii.pr_id, uii.qty, uii.total amt FROM user_invoice_items uii JOIN user_invoice ui ON ui.inv_id=uii.inv_id
+                         WHERE ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?{$tc_uii} AND ui.to_user_type=?";
+            $sold_types = 'ssss'; $sold_params = [$utype, $from, $to, $to_user_type];
+            $ret_sql = "SELECT ri.prid pr_id, ri.qty, ri.total amt FROM user_return_stock_items ri
+                        WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                        AND ri.from_usertype=?";
+            $ret_types = 'ssss'; $ret_params = [$utype, $from, $to, $to_user_type];
+            break;
+        case 'tp':
+            $sold_sql = "SELECT tpii.product_id pr_id, tpii.quantity qty, {$gp_tp_net_line_amt} amt
+                         FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
+                         WHERE (tpi.created_by_user_type != 'super_stockiest') AND tpi.invoice_date BETWEEN ? AND ?{$tc_tpi}";
+            $sold_types = 'ss'; $sold_params = [$from, $to];
+            $ret_sql = "SELECT ri.prid pr_id, ri.qty, ri.total amt FROM user_return_stock_items ri
+                        WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                        AND ri.from_usertype='territory_partner'";
+            $ret_types = 'sss'; $ret_params = [$utype, $from, $to];
+            break;
+        case 'ot':
+            $sold_sql = "SELECT os.prid pr_id, os.qty, os.total amt FROM ot_sales os WHERE os.date BETWEEN ? AND ?";
+            $sold_types = 'ss'; $sold_params = [$from, $to];
+            $ret_sql = "SELECT osr.prid pr_id, osr.qty, osr.total amt FROM ot_sales_return osr WHERE osr.return_date BETWEEN ? AND ?";
+            $ret_types = 'ss'; $ret_params = [$from, $to];
+            break;
+        default:
+            return ['napkin' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0], 'diaper' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0]];
+    }
+    // Sold and returns are two independently-summed passes (not the same
+    // pop-driven-union pattern the main report's return-netting fixes use)
+    // — acceptable here since this export section is presentational detail,
+    // not a reconciliation target itself, and each pass already sums every
+    // row for its own side correctly (no per-product join to miss a row).
+    $sold_by_cat = call_rows($db, "SELECT COALESCE(np.category,'') != 'diaper' is_napkin,
+            COALESCE(SUM(sold.amt),0) sold_amt, COALESCE(SUM(sold.qty),0) sold_qty
+        FROM ({$sold_sql}) sold JOIN products p ON p.id = sold.pr_id {$cat_join} GROUP BY is_napkin",
+        $sold_types, $sold_params);
+    $ret_by_cat = call_rows($db, "SELECT COALESCE(np.category,'') != 'diaper' is_napkin,
+            COALESCE(SUM(ret.amt),0) ret_amt, COALESCE(SUM(ret.qty),0) ret_qty
+        FROM ({$ret_sql}) ret JOIN products p ON p.id = ret.pr_id {$cat_join} GROUP BY is_napkin",
+        $ret_types, $ret_params);
+    $out = ['napkin' => ['sold_amt'=>0.0,'sold_qty'=>0.0,'ret_amt'=>0.0,'ret_qty'=>0.0], 'diaper' => ['sold_amt'=>0.0,'sold_qty'=>0.0,'ret_amt'=>0.0,'ret_qty'=>0.0]];
+    foreach ($sold_by_cat as $r) {
+        $key = ((int)$r['is_napkin'] === 1) ? 'napkin' : 'diaper';
+        $out[$key]['sold_amt'] = (float)$r['sold_amt'];
+        $out[$key]['sold_qty'] = (float)$r['sold_qty'];
+    }
+    foreach ($ret_by_cat as $r) {
+        $key = ((int)$r['is_napkin'] === 1) ? 'napkin' : 'diaper';
+        $out[$key]['ret_amt'] = (float)$r['ret_amt'];
+        $out[$key]['ret_qty'] = (float)$r['ret_qty'];
+    }
+    return $out;
+}
+
+$channel_category_breakdown = [];
+if ($scope === 'company') {
+    $channel_category_breakdown['company'] = channel_category_split($db_conn, 'invoice', $utype, $from, $to, $filter_tp, $tc_ii, $tc_uii, $tc_tpi, $gp_tp_net_line_amt);
+    foreach (['super_stockiest', 'stockiest', 'super_distributor', 'distributor', 'shop'] as $tut) {
+        $channel_category_breakdown[$tut] = channel_category_split($db_conn, 'user_invoice', $utype, $from, $to, $filter_tp, $tc_ii, $tc_uii, $tc_tpi, $gp_tp_net_line_amt, $tut);
+    }
+    $channel_category_breakdown['territory_partner'] = channel_category_split($db_conn, 'tp', $utype, $from, $to, $filter_tp, $tc_ii, $tc_uii, $tc_tpi, $gp_tp_net_line_amt);
+    $channel_category_breakdown['ot'] = channel_category_split($db_conn, 'ot', $utype, $from, $to, $filter_tp, $tc_ii, $tc_uii, $tc_tpi, $gp_tp_net_line_amt);
+}
 
 // 1) OT channel split by sub-channel (Amazon, Flipkart, Website, etc.)
 $ot_by_subchannel = [];
@@ -280,7 +373,7 @@ function render_sheet(
     float $grand_combined_return_amt_llp, float $grand_combined_return_qty_llp,
     float $grand_combined_turnover_amt_llp, float $grand_combined_turnover_qty_llp,
     array $channel_labels, array $channel_breakdown, float $channel_total_rev,
-    array $ot_by_subchannel,
+    array $ot_by_subchannel, array $channel_category_breakdown,
     array $llp_napkin_gp, array $llp_diaper_gp, array $llp_combined_gp,
     float $total_expenses, ?float $net_profit
 ): void {
@@ -336,60 +429,86 @@ function render_sheet(
     $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
     $row += 2;
 
-    // ── 3. Channel Breakdown ─────────────────────────────────────────────────
-    banner($sheet, $row, $COLS, '3. CHANNEL BREAKDOWN', CLR_SECTION_BG); $row++;
-    xset($sheet, 1, $row, 'Channel'); xset($sheet, 2, $row, 'Invoices'); xset($sheet, 3, $row, $unitWord); xset($sheet, 4, $row, 'Share');
-    headerRow($sheet, $row, 4); $row++;
+    // ── 3. Channel Breakdown, split by Napkin / Diaper ──────────────────────
+    // Header total (Card 1 style, courier-netted) shown alongside a
+    // Napkin/Diaper/Combined line-item split per channel — see
+    // channel_category_split()'s own comment for why the per-category
+    // figures don't net courier the same way the whole-channel row does.
+    banner($sheet, $row, $COLS, '3. CHANNEL BREAKDOWN — NAPKIN / DIAPER SPLIT', CLR_SECTION_BG); $row++;
+    xset($sheet, 1, $row, 'Channel'); xset($sheet, 2, $row, 'Invoices');
+    xset($sheet, 3, $row, 'Napkin ' . $unitWord); xset($sheet, 4, $row, 'Diaper ' . $unitWord);
+    xset($sheet, 5, $row, 'Combined ' . $unitWord); xset($sheet, 6, $row, $isQty ? 'Total ' . $unitWord . ' (Header)' : 'Share');
+    headerRow($sheet, $row, 6); $row++;
     $i = 0;
-    $grand_channel_val = 0.0;
+    $chKey = fn(array $cat, string $field) => $isQty
+        ? ($cat['sold_qty'] ?? 0) - ($cat['ret_qty'] ?? 0)
+        : ($cat['sold_amt'] ?? 0) - ($cat['ret_amt'] ?? 0);
     foreach ($channel_labels as $key => $label) {
         if ($key === 'ot') continue; // OT is split into sub-channels below instead of one row
         $r = $channel_breakdown[$key] ?? ['cnt' => 0, 'rev' => 0.0];
-        $val = $isQty ? null : (float)$r['rev']; // channel_breakdown has no qty dimension on the report itself
+        $cat = $channel_category_breakdown[$key] ?? ['napkin' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0], 'diaper' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0]];
+        $napkin = $chKey($cat['napkin'], 'x');
+        $diaper = $chKey($cat['diaper'], 'x');
         xset($sheet, 1, $row, $label);
         xset($sheet, 2, $row, (int)$r['cnt']);
+        xset($sheet, 3, $row, $napkin); $fmt($sheet, 'C'.$row);
+        xset($sheet, 4, $row, $diaper); $fmt($sheet, 'D'.$row);
+        xset($sheet, 5, $row, $napkin + $diaper); $fmt($sheet, 'E'.$row);
         if ($isQty) {
-            xset($sheet, 3, $row, '—');
+            xset($sheet, 6, $row, '—');
         } else {
-            xset($sheet, 3, $row, $val);
-            moneyFmt($sheet, 'C'.$row);
+            $val = (float)$r['rev'];
             $pct = $channel_total_rev > 0 ? round($val / $channel_total_rev * 100, 1) : 0;
-            xset($sheet, 4, $row, $pct); pctFmt($sheet, 'D'.$row);
+            xset($sheet, 6, $row, $pct); pctFmt($sheet, 'F'.$row);
         }
-        dataRow($sheet, $row, 4, $i % 2 === 1);
+        dataRow($sheet, $row, 6, $i % 2 === 1);
         $i++; $row++;
     }
-    // OT Channel — split into its own sub-channels (Amazon, Flipkart, Website, ...)
+    // OT Channel — combined row (Napkin/Diaper split), then its own sub-channels
     $ot_row = $channel_breakdown['ot'] ?? ['cnt' => 0, 'rev' => 0.0];
+    $ot_cat = $channel_category_breakdown['ot'] ?? ['napkin' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0], 'diaper' => ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0]];
+    $ot_napkin = $chKey($ot_cat['napkin'], 'x');
+    $ot_diaper = $chKey($ot_cat['diaper'], 'x');
     xset($sheet, 1, $row, 'OT Channel (combined)');
     xset($sheet, 2, $row, (int)$ot_row['cnt']);
+    xset($sheet, 3, $row, $ot_napkin); $fmt($sheet, 'C'.$row);
+    xset($sheet, 4, $row, $ot_diaper); $fmt($sheet, 'D'.$row);
+    xset($sheet, 5, $row, $ot_napkin + $ot_diaper); $fmt($sheet, 'E'.$row);
     if (!$isQty) {
-        xset($sheet, 3, $row, (float)$ot_row['rev']); moneyFmt($sheet, 'C'.$row);
         $pct = $channel_total_rev > 0 ? round((float)$ot_row['rev'] / $channel_total_rev * 100, 1) : 0;
-        xset($sheet, 4, $row, $pct); pctFmt($sheet, 'D'.$row);
+        xset($sheet, 6, $row, $pct); pctFmt($sheet, 'F'.$row);
     } else {
-        xset($sheet, 3, $row, array_sum(array_column($ot_by_subchannel, 'sold_qty')) - array_sum(array_column($ot_by_subchannel, 'ret_qty')));
-        qtyFmt($sheet, 'C'.$row);
+        xset($sheet, 6, $row, '—');
     }
     $sheet->getStyle('A'.$row)->getFont()->setBold(true)->setItalic(true);
-    dataRow($sheet, $row, 4, $i % 2 === 1);
+    dataRow($sheet, $row, 6, $i % 2 === 1);
     $row++;
+    // OT sub-channels (Amazon, Flipkart, Website, ...) — combined only, this
+    // level of drill-down has no Napkin/Diaper split of its own (ot_sales has
+    // no per-line product category resolved beyond what's already folded into
+    // the combined OT row above).
     foreach ($ot_by_subchannel as $sub) {
         $net_amt = $sub['sold_amt'] - $sub['ret_amt'];
         $net_qty = $sub['sold_qty'] - $sub['ret_qty'];
         xset($sheet, 1, $row, '   ↳ ' . $sub['name']);
         xset($sheet, 2, $row, $sub['cnt']);
-        xset($sheet, 3, $row, $isQty ? $net_qty : $net_amt);
-        $fmt($sheet, 'C'.$row);
+        xset($sheet, 5, $row, $isQty ? $net_qty : $net_amt);
+        $fmt($sheet, 'E'.$row);
         if (!$isQty) {
             $pct = $channel_total_rev > 0 ? round($net_amt / $channel_total_rev * 100, 1) : 0;
-            xset($sheet, 4, $row, $pct); pctFmt($sheet, 'D'.$row);
+            xset($sheet, 6, $row, $pct); pctFmt($sheet, 'F'.$row);
+        } else {
+            xset($sheet, 6, $row, '—');
         }
         $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->getColor()->setRGB(CLR_MUTED);
-        dataRow($sheet, $row, 4, false, false);
+        dataRow($sheet, $row, 6, false, false);
         $row++;
     }
-    $row++;
+    $row += 2;
+    $sheet->setCellValue('A'.$row, 'Note: Napkin/Diaper columns are re-derived from each channel\'s own line items (same category-mapping rule as Section 2), so they are not netted against courier charges the way the header-based Invoices/Share columns are — a channel with non-zero courier charges will show a small difference between "Combined" and the header total for that reason.');
+    $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
+    $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
+    $row += 2;
 
     if (!$isQty) {
         // ── 4. Gross Profit — Napkin / Diaper, with full calculation ───────────
@@ -469,7 +588,7 @@ render_sheet(
     $grand_combined_return_amt_llp, $grand_combined_return_qty_llp,
     $grand_combined_turnover_amt_llp, $grand_combined_turnover_qty_llp,
     $channel_labels, $channel_breakdown, $channel_total_rev,
-    $ot_by_subchannel,
+    $ot_by_subchannel, $channel_category_breakdown,
     $llp_napkin_gp, $llp_diaper_gp, $llp_combined_gp,
     $total_expenses, $net_profit
 );
@@ -491,7 +610,7 @@ render_sheet(
     $grand_combined_return_amt_llp, $grand_combined_return_qty_llp,
     $grand_combined_turnover_amt_llp, $grand_combined_turnover_qty_llp,
     $channel_labels, $channel_breakdown, $channel_total_rev,
-    $ot_by_subchannel,
+    $ot_by_subchannel, $channel_category_breakdown,
     $llp_napkin_gp, $llp_diaper_gp, $llp_combined_gp,
     $total_expenses, $net_profit
 );
