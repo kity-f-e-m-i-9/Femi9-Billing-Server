@@ -490,6 +490,45 @@ function render_sheet(
         $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
         $row += 2;
 
+        // Returns by Channel — which channel the returns in this category's
+        // Returns figure (above) actually came from. Same source/scope as
+        // the Channel Breakdown table just above (channel_category_split()),
+        // just reading ret_amt/ret_qty instead of netting them against sold.
+        xset($sheet, 1, $row, 'Channel'); xset($sheet, 2, $row, 'Return ' . $unitWord); xset($sheet, 3, $row, 'Share of ' . $bannerLabel . ' Returns');
+        headerRow($sheet, $row, 3); $row++;
+        $i = 0;
+        $catRetTotal = ($isQty ? $ret_qty : $ret_amt) ?: 1;
+        foreach ($channel_labels as $key => $label) {
+            if ($key === 'ot') continue;
+            $cat = $channel_category_breakdown[$key][$catKey] ?? ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0];
+            $val = $isQty ? $cat['ret_qty'] : $cat['ret_amt'];
+            if ($val == 0) continue; // skip channels with zero returns this period, for a shorter table
+            xset($sheet, 1, $row, $label);
+            xset($sheet, 2, $row, $val); $fmt($sheet, 'B'.$row);
+            $pct = $catRetTotal != 0 ? round($val / $catRetTotal * 100, 1) : 0;
+            xset($sheet, 3, $row, $pct); pctFmt($sheet, 'C'.$row);
+            dataRow($sheet, $row, 3, $i % 2 === 1);
+            $i++; $row++;
+        }
+        $ot_cat = $channel_category_breakdown['ot'][$catKey] ?? ['sold_amt'=>0,'sold_qty'=>0,'ret_amt'=>0,'ret_qty'=>0];
+        $ot_ret_val = $isQty ? $ot_cat['ret_qty'] : $ot_cat['ret_amt'];
+        if ($ot_ret_val != 0) {
+            xset($sheet, 1, $row, 'OT Channel');
+            xset($sheet, 2, $row, $ot_ret_val); $fmt($sheet, 'B'.$row);
+            $pct = $catRetTotal != 0 ? round($ot_ret_val / $catRetTotal * 100, 1) : 0;
+            xset($sheet, 3, $row, $pct); pctFmt($sheet, 'C'.$row);
+            $sheet->getStyle('A'.$row)->getFont()->setItalic(true);
+            dataRow($sheet, $row, 3, $i % 2 === 1);
+            $i++; $row++;
+        }
+        if ($i === 0) {
+            xset($sheet, 1, $row, 'No returns this period');
+            $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->getColor()->setRGB(CLR_MUTED);
+            dataRow($sheet, $row, 3, false, false);
+            $row++;
+        }
+        $row++;
+
         // Gross Profit with full calculation — amount sheet only
         if (!$isQty) {
             xset($sheet, 1, $row, 'Component'); xset($sheet, 2, $row, $bannerLabel);
@@ -559,6 +598,46 @@ function render_sheet(
     $sheet->mergeCells(xrange($sheet, 1, $row, $COLS, $row));
     $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(CLR_MUTED);
     $row += 2;
+
+    // Combined Returns by Channel — Napkin + Diaper returns summed per
+    // channel, so it's clear which channel returned how much overall (each
+    // category block above already shows this split for its own category).
+    xset($sheet, 1, $row, 'Channel'); xset($sheet, 2, $row, 'Return ' . $unitWord); xset($sheet, 3, $row, 'Share of Total Returns');
+    headerRow($sheet, $row, 3); $row++;
+    $i = 0;
+    $combRetTotal = ($isQty ? $total_return_qty : $total_return_amt) ?: 1;
+    foreach ($channel_labels as $key => $label) {
+        if ($key === 'ot') continue;
+        $nap = $channel_category_breakdown[$key]['napkin'] ?? ['ret_amt'=>0,'ret_qty'=>0];
+        $dia = $channel_category_breakdown[$key]['diaper'] ?? ['ret_amt'=>0,'ret_qty'=>0];
+        $val = $isQty ? ($nap['ret_qty'] + $dia['ret_qty']) : ($nap['ret_amt'] + $dia['ret_amt']);
+        if ($val == 0) continue;
+        xset($sheet, 1, $row, $label);
+        xset($sheet, 2, $row, $val); $fmt($sheet, 'B'.$row);
+        $pct = $combRetTotal != 0 ? round($val / $combRetTotal * 100, 1) : 0;
+        xset($sheet, 3, $row, $pct); pctFmt($sheet, 'C'.$row);
+        dataRow($sheet, $row, 3, $i % 2 === 1);
+        $i++; $row++;
+    }
+    $otNap = $channel_category_breakdown['ot']['napkin'] ?? ['ret_amt'=>0,'ret_qty'=>0];
+    $otDia = $channel_category_breakdown['ot']['diaper'] ?? ['ret_amt'=>0,'ret_qty'=>0];
+    $otVal = $isQty ? ($otNap['ret_qty'] + $otDia['ret_qty']) : ($otNap['ret_amt'] + $otDia['ret_amt']);
+    if ($otVal != 0) {
+        xset($sheet, 1, $row, 'OT Channel');
+        xset($sheet, 2, $row, $otVal); $fmt($sheet, 'B'.$row);
+        $pct = $combRetTotal != 0 ? round($otVal / $combRetTotal * 100, 1) : 0;
+        xset($sheet, 3, $row, $pct); pctFmt($sheet, 'C'.$row);
+        $sheet->getStyle('A'.$row)->getFont()->setItalic(true);
+        dataRow($sheet, $row, 3, $i % 2 === 1);
+        $i++; $row++;
+    }
+    if ($i === 0) {
+        xset($sheet, 1, $row, 'No returns this period');
+        $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->getColor()->setRGB(CLR_MUTED);
+        dataRow($sheet, $row, 3, false, false);
+        $row++;
+    }
+    $row++;
 
     if (!$isQty) {
         xset($sheet, 1, $row, 'Metric'); xset($sheet, 2, $row, 'Amount');
