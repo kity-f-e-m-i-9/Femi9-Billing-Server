@@ -74,18 +74,125 @@ function shop_dedupe_key($name, $mobile, $tempId) {
     return 'id:' . $tempId;
 }
 
-// District master: depth-3 nodes give the district name for shop.district_id.
-$districtMap = [];
-$dres = mysqli_query($db_conn, "SELECT id, name FROM partner_location_nodes WHERE depth = 3");
-while ($d = mysqli_fetch_assoc($dres)) $districtMap[(int)$d['id']] = $d['name'];
+/* ------------------------------------------------------------------ *
+ * District resolution.
+ *
+ * shop.district_id is NOT a clean foreign key — it's a free-form varchar
+ * that in practice holds four different kinds of value:
+ *   a) a numeric id into the legacy `district` table (the large majority)
+ *   b) a numeric id that doesn't exist in that table (garbage / stale)
+ *   c) the district name typed as free text, in varying case/spelling
+ *   d) blank
+ * (Note: `district` here is the small legacy lookup table keyed by
+ * dist_name — NOT partner_location_nodes, which is a different id space
+ * used by the firka hierarchy and does not line up with shop.district_id.)
+ *
+ * Resolution order per shop:
+ *   1. shop.district_id as a numeric id into `district`.
+ *   2. shop.district_id as free text, normalised and alias-matched
+ *      against `district.dist_name`.
+ *   3. Whoever onboarded the shop (shop.onboard_userID/TYPE):
+ *      - a territory_partner: their assigned_district, else
+ *        branch_district, else the district of their assigned firkas
+ *        (territory_partner_locations) — a TP only ever maps to one
+ *        district in this data, so no ambiguity to resolve.
+ *      - a stockiest: their district_id, resolved via `district` too.
+ *   4. Otherwise left blank ('-' in the report).
+ * ------------------------------------------------------------------ */
+$districtById = [];   // legacy district.id => dist_name
+$districtByNorm = [];  // normalised dist_name => dist_name
+function norm_district_text($s) {
+    $s = trim((string)$s);
+    $s = preg_replace('/\s+district\s*$/i', '', $s);
+    $s = preg_replace('/\s+/', ' ', $s);
+    return mb_strtolower(trim($s));
+}
+$dres = mysqli_query($db_conn, "SELECT id, dist_name FROM district");
+while ($d = mysqli_fetch_assoc($dres)) {
+    $districtById[(int)$d['id']] = $d['dist_name'];
+    $districtByNorm[norm_district_text($d['dist_name'])] = $d['dist_name'];
+}
+// Common alternate spellings seen in the free-text district_id values.
+$districtAliases = [
+    'trichy' => 'tiruchirappalli', 'tiruchirapalli' => 'tiruchirappalli', 'tiruchi' => 'tiruchirappalli',
+    'chengalapattu' => 'chengalpattu', 'chengulpattu' => 'chengalpattu',
+    'tuticorin' => 'thoothukkudi', 'thoothukudi' => 'thoothukkudi',
+    'thiruvallur' => 'thiruvallur', 'tiruvallur' => 'thiruvallur',
+    'thiruvarur' => 'thiruvarur', 'tiruvarur' => 'thiruvarur',
+    'kanyakumari' => 'kanniyakumari',
+    'villupuram' => 'viluppuram',
+    'kallakurichi' => 'kallakkurichi',
+    'நாகபட்டினம்' => 'nagapattinam',
+];
+function resolve_district_text($raw, $districtById, $districtByNorm, $districtAliases) {
+    $raw = trim((string)$raw);
+    if ($raw === '') return '';
+    if (ctype_digit($raw)) return $districtById[(int)$raw] ?? '';
+    $n = norm_district_text($raw);
+    if (isset($districtByNorm[$n])) return $districtByNorm[$n];
+    if (isset($districtAliases[$n]) && isset($districtByNorm[$districtAliases[$n]])) {
+        return $districtByNorm[$districtAliases[$n]];
+    }
+    return '';
+}
 
-$mres = mysqli_query($db_conn, "SELECT temp_id, name, mobile_number, shop_cat, address, district_id FROM shop");
+// Territory partners: onboard_userID (numeric) => resolved district name.
+$tpDistrict = [];
+$tres = mysqli_query($db_conn, "SELECT id, assigned_district, branch_district FROM territory_partners");
+while ($t = mysqli_fetch_assoc($tres)) {
+    $d = resolve_district_text($t['assigned_district'], $districtById, $districtByNorm, $districtAliases);
+    if ($d === '') $d = resolve_district_text($t['branch_district'], $districtById, $districtByNorm, $districtAliases);
+    if ($d !== '') $tpDistrict[(int)$t['id']] = $d;
+}
+// Fill in any TP still missing a district from their assigned firkas
+// (territory_partner_locations -> partner_location_nodes district ancestor).
+$missingTpIds = [];
+$tres2 = mysqli_query($db_conn, "SELECT id FROM territory_partners");
+while ($t = mysqli_fetch_assoc($tres2)) if (!isset($tpDistrict[(int)$t['id']])) $missingTpIds[] = (int)$t['id'];
+if ($missingTpIds) {
+    $fdres = mysqli_query($db_conn, "
+        SELECT tpl.territory_partner_id AS tp_id, d.name AS district_name
+        FROM territory_partner_locations tpl
+        JOIN partner_location_nodes f  ON f.id  = tpl.location_id AND f.depth = 6
+        JOIN partner_location_nodes t  ON t.id  = f.parent_id
+        JOIN partner_location_nodes dv ON dv.id = t.parent_id
+        JOIN partner_location_nodes d  ON d.id  = dv.parent_id
+    ");
+    while ($row = mysqli_fetch_assoc($fdres)) {
+        $tid = (int)$row['tp_id'];
+        if (!isset($tpDistrict[$tid])) $tpDistrict[$tid] = $row['district_name'];
+    }
+}
+
+// Stockists: temp_id => resolved district name.
+$stockistDistrict = [];
+$sres = mysqli_query($db_conn, "SELECT temp_id, district_id FROM stockiest");
+while ($st = mysqli_fetch_assoc($sres)) {
+    $d = resolve_district_text($st['district_id'], $districtById, $districtByNorm, $districtAliases);
+    if ($d !== '') $stockistDistrict[$st['temp_id']] = $d;
+}
+
+function resolve_shop_district($rawDistrictId, $onboardType, $onboardId,
+        $districtById, $districtByNorm, $districtAliases, $tpDistrict, $stockistDistrict) {
+    $d = resolve_district_text($rawDistrictId, $districtById, $districtByNorm, $districtAliases);
+    if ($d !== '') return $d;
+    if ($onboardType === 'territory_partner' && isset($tpDistrict[(int)$onboardId])) {
+        return $tpDistrict[(int)$onboardId];
+    }
+    if ($onboardType === 'stockiest' && isset($stockistDistrict[$onboardId])) {
+        return $stockistDistrict[$onboardId];
+    }
+    return '';
+}
+
+$mres = mysqli_query($db_conn, "SELECT temp_id, name, mobile_number, shop_cat, address, district_id, onboard_userTYPE, onboard_userID FROM shop");
 $keyByTempId   = [];   // temp_id => dedupe key
 $masterByKey   = [];   // dedupe key => display details (first non-empty wins)
 while ($m = mysqli_fetch_assoc($mres)) {
     $k = shop_dedupe_key($m['name'], $m['mobile_number'], $m['temp_id']);
     $keyByTempId[$m['temp_id']] = $k;
-    $district = $districtMap[(int)$m['district_id']] ?? '';
+    $district = resolve_shop_district($m['district_id'], $m['onboard_userTYPE'], $m['onboard_userID'],
+        $districtById, $districtByNorm, $districtAliases, $tpDistrict, $stockistDistrict);
     if (!isset($masterByKey[$k])) {
         $masterByKey[$k] = [
             'name'     => trim($m['name']) ?: '(unnamed shop)',
