@@ -1,13 +1,11 @@
-<?php 
+<?php
 include("checksession.php"); require_once("include/GodownAccess.php");
-include("config.php"); 
+include("config.php");
 error_reporting(0);
 
-$from_date     = mysqli_real_escape_string($db_conn, $_REQUEST['frd']); 
+$from_date     = mysqli_real_escape_string($db_conn, $_REQUEST['frd']);
 $to_date       = mysqli_real_escape_string($db_conn, $_REQUEST['tod']);
 $get_godown_id = mysqli_real_escape_string($db_conn, $_REQUEST['gid']);
-$gst_type      = mysqli_real_escape_string($db_conn, $_REQUEST['data1']); 
-$buyer_gsttype = mysqli_real_escape_string($db_conn, $_REQUEST['data2']); 
 
 if (!is_godown_allowed($db_conn, (int)$get_godown_id)) {
     header("Location: overall-stock?unauthorized"); exit;
@@ -17,17 +15,10 @@ $select_Godown_details = "SELECT * FROM company_godown WHERE id='$get_godown_id'
 $fetch_Godown_details  = mysqli_query($db_conn, $select_Godown_details);
 $result_Godown_details = mysqli_fetch_array($fetch_Godown_details);
 
-if ($gst_type == "inner" && $buyer_gsttype == "register")
-    $lable_header = "Intra-state (Registered person)";
-elseif ($gst_type == "inner" && $buyer_gsttype == "unregister")
-    $lable_header = "Intra-state (Unregistered person)";
-elseif ($gst_type == "outer" && $buyer_gsttype == "register")
-    $lable_header = "Inter-state (Registered person)";
-else
-    $lable_header = "Inter-state (Unregistered person)";
-
-// ✅ Single JOIN query — was 4 queries per row (distinct tempids × 4)
-// Joins internal_transfer + internal_transfer_invoice + company_godown (send_to) in one shot
+// ✅ Single JOIN query — was 4 queries per row (distinct tempids × 4).
+// total-gst_amount strips the GST out for the taxable-value column, same
+// convention used everywhere else on GSTR1 (internal_transfer.taxable_value
+// is unreliable/unpopulated, see gst_details.php).
 $select_Report = "
     SELECT
         it.tempid,
@@ -36,7 +27,8 @@ $select_Report = "
         MAX(iti.inv_number)   AS inv_number,
         MAX(cg.gname)         AS gname,
         MAX(cg.gstin)         AS company_gstin,
-        SUM(it.total)         AS total_sls_amount
+        SUM(it.total)         AS total_sls_amount,
+        SUM(it.gst_amount)    AS gst_amount
     FROM internal_transfer it
     LEFT JOIN internal_transfer_invoice iti ON iti.tempid = it.tempid
     LEFT JOIN company_godown cg ON cg.id = (
@@ -50,10 +42,61 @@ $select_Report = "
 $fetch_Report = mysqli_query($db_conn, $select_Report);
 
 $rows = [];
-$overall_total = 0;
+$overall_total = 0; $overall_gst = 0;
 while ($row = mysqli_fetch_assoc($fetch_Report)) {
-    $overall_total += $row['total_sls_amount'];
+    $row['taxable_value'] = $row['total_sls_amount'] - $row['gst_amount'];
+    $overall_total += $row['taxable_value'];
+    $overall_gst   += $row['gst_amount'];
     $rows[] = $row;
+}
+
+// Effective GST% for a row = gst_amount / taxable_value * 100 — same helper
+// convention as gst_sls_detailed_report.php.
+$gst_slabs = [0, 5, 12, 18, 28];
+function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
+    if ((float)$taxable_value == 0.0) return $gst_amount == 0 ? '0%' : 'Mixed';
+    $rate = round(($gst_amount / $taxable_value) * 100, 1);
+    foreach ($gst_slabs as $slab) {
+        if (abs($rate - $slab) <= 0.3) return $slab . '%';
+    }
+    return $rate . '% (Mixed)';
+}
+
+// ✅ Excel (CSV) export — same rows/columns as the on-screen table.
+if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
+    ob_start();
+    $csv_rows = [];
+    $csv_rows[] = ['#', 'Company Name', 'GSTIN', 'Invoice Number', 'Invoice Date', 'GST %', 'Taxable Value', 'GST Amount', 'Total Sales Amount'];
+    $sn = 0;
+    foreach ($rows as $row) {
+        $sn++;
+        $csv_rows[] = [
+            $sn, $row['gname'], $row['company_gstin'], $row['inv_number'],
+            date("d/m/Y", strtotime($row['transfer_date'])),
+            gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs),
+            number_format($row['taxable_value'], 2, '.', ''),
+            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($row['total_sls_amount'], 2, '.', ''),
+        ];
+    }
+    $csv_rows[] = ['', '', '', '', '', 'Grand Total',
+        number_format($overall_total, 2, '.', ''),
+        number_format($overall_gst, 2, '.', ''),
+        number_format($overall_total + $overall_gst, 2, '.', ''),
+    ];
+
+    $csv_content = '';
+    foreach ($csv_rows as $csv_row) {
+        $csv_content .= implode(',', array_map(function ($v) {
+            return '"' . str_replace('"', '""', $v) . '"';
+        }, $csv_row)) . "\n";
+    }
+
+    ob_end_clean();
+    header("Content-type: text/csv");
+    header("Content-Disposition: attachment; filename=GST_Internal_Transfer_Detailed_Report.csv");
+    echo $csv_content;
+    exit;
 }
 ?>
 <!DOCTYPE html>
@@ -105,6 +148,9 @@ while ($row = mysqli_fetch_assoc($fetch_Report)) {
                                             <td>
                                                 <h1>GSTR1 &gt; Detailed Internal Transfer Report</h1>
                                             </td>
+                                            <td align="right" valign="top">
+                                                <a href="?frd=<?= urlencode($from_date) ?>&amp;tod=<?= urlencode($to_date) ?>&amp;gid=<?= urlencode($get_godown_id) ?>&amp;export=csv" title="Export to Excel"><img src="../../assets/images/excel-3-32.png"></a>
+                                            </td>
                                         </tr>
                                     </table>
                                 </div>
@@ -120,13 +166,16 @@ while ($row = mysqli_fetch_assoc($fetch_Report)) {
                                         <th>GSTIN</th>
                                         <th>Invoice Number</th>
                                         <th>Invoice Date</th>
+                                        <th>GST %</th>
+                                        <th>Taxable Value</th>
+                                        <th>GST Amount</th>
                                         <th>Total Sales Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($rows)): ?>
                                     <tr>
-                                        <td colspan="6" style="text-align:center; padding:20px;">No records found.</td>
+                                        <td colspan="9" style="text-align:center; padding:20px;">No records found.</td>
                                     </tr>
                                     <?php else: ?>
                                     <?php $sn = 0; foreach ($rows as $row): $sn++; ?>
@@ -136,6 +185,9 @@ while ($row = mysqli_fetch_assoc($fetch_Report)) {
                                         <td><?= htmlspecialchars($row['company_gstin']) ?></td>
                                         <td><?= htmlspecialchars($row['inv_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['transfer_date'])) ?></td>
+                                        <td align="center"><?= gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs) ?></td>
+                                        <td align="right"><?= inr_format($row['taxable_value'], 2) ?></td>
+                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
                                         <td align="right"><b><?= inr_format($row['total_sls_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -143,8 +195,10 @@ while ($row = mysqli_fetch_assoc($fetch_Report)) {
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="5" align="right"><b>Grand Total</b></td>
+                                        <td colspan="6" align="right"><b>Grand Total</b></td>
                                         <td align="right"><b><?= inr_format($overall_total, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($overall_gst, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($overall_total + $overall_gst, 2) ?></b></td>
                                     </tr>
                                 </tfoot>
                             </table>
