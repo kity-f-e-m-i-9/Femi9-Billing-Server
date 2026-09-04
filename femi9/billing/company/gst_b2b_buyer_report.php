@@ -26,24 +26,37 @@ foreach ($b2b_buyers as $b) {
 }
 $grand_gst = $grand_cgst + $grand_sgst + $grand_igst;
 
+// Effective GST% for a row = gst_amount / taxable_value * 100 — same helper
+// convention as gst_sls_detailed_report.php.
+$gst_slabs = [0, 5, 12, 18, 28];
+function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
+    if ((float)$taxable_value == 0.0) return $gst_amount == 0 ? '0%' : 'Mixed';
+    $rate = round(($gst_amount / $taxable_value) * 100, 1);
+    foreach ($gst_slabs as $slab) {
+        if (abs($rate - $slab) <= 0.3) return $slab . '%';
+    }
+    return $rate . '% (Mixed)';
+}
+
 // ✅ Excel (CSV) export — same rows/columns as the on-screen table, same
 // pattern as gst_sls_detailed_report.php's export.
 if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     ob_start();
     $csv_rows = [];
-    $csv_rows[] = ['#', 'Buyer', 'Type', 'GSTIN', 'Invoice Number(s)', 'Taxable Value', 'GST Amount', 'Total'];
+    $csv_rows[] = ['#', 'Buyer', 'Type', 'GSTIN', 'Invoice Number(s)', 'GST %', 'Taxable Value', 'GST Amount', 'Total'];
     $sn = 0;
     foreach ($b2b_buyers as $b) {
         $sn++;
         $gst_amt = $b['cgst'] + $b['sgst'] + $b['igst'];
         $csv_rows[] = [
             $sn, $b['name'] ?: '—', $b['type'], $b['gstin'] ?: '—', implode(', ', array_keys($b['invoices'])),
+            gst_percentage_label($b['taxable'], $gst_amt, $gst_slabs),
             number_format($b['taxable'], 2, '.', ''),
             number_format($gst_amt, 2, '.', ''),
             number_format($b['taxable'] + $gst_amt, 2, '.', ''),
         ];
     }
-    $csv_rows[] = ['', '', '', '', 'Grand Total',
+    $csv_rows[] = ['', '', '', '', 'Grand Total', '',
         number_format($grand_taxable, 2, '.', ''),
         number_format($grand_gst, 2, '.', ''),
         number_format($grand_taxable + $grand_gst, 2, '.', ''),
@@ -131,6 +144,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <th>Type</th>
                                         <th>GSTIN</th>
                                         <th>Invoice Number(s)</th>
+                                        <th>GST %</th>
                                         <th>Taxable Value</th>
                                         <th>GST Amount</th>
                                         <th>Total</th>
@@ -138,7 +152,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                 </thead>
                                 <tbody>
                                     <?php if (empty($b2b_buyers)) { ?>
-                                    <tr><td colspan="8" style="text-align:center; padding:20px;">No B2B buyers in this period.</td></tr>
+                                    <tr><td colspan="9" style="text-align:center; padding:20px;">No B2B buyers in this period.</td></tr>
                                     <?php } else { $sn = 0; foreach ($b2b_buyers as $b): $sn++; $gst_amt = $b['cgst'] + $b['sgst'] + $b['igst']; ?>
                                     <tr>
                                         <td><?= $sn ?></td>
@@ -146,6 +160,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <td><?= htmlspecialchars($b['type']) ?></td>
                                         <td><?= htmlspecialchars($b['gstin'] ?: '—') ?></td>
                                         <td><?= htmlspecialchars(implode(', ', array_keys($b['invoices']))) ?></td>
+                                        <td align="center"><?= gst_percentage_label($b['taxable'], $gst_amt, $gst_slabs) ?></td>
                                         <td align="right"><?= inr_format($b['taxable'], 2) ?></td>
                                         <td align="right"><?= inr_format($gst_amt, 2) ?></td>
                                         <td align="right"><b><?= inr_format($b['taxable'] + $gst_amt, 2) ?></b></td>
@@ -154,7 +169,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="4" align="right"><b>Grand Total</b></td>
+                                        <td colspan="5" align="right"><b>Grand Total</b></td>
                                         <td></td>
                                         <td align="right"><b><?= inr_format($grand_taxable, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($grand_gst, 2) ?></b></td>
