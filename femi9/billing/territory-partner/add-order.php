@@ -38,13 +38,19 @@ mysqli_stmt_close($stmt);
 include("geo_layers.php");
 
 // ── Products — only what this TP actually has stock for, same list
-// shop-invoice-add.php uses, so anything ordered here can really be invoiced. ──
+// shop-invoice-add.php uses, so anything ordered here can really be invoiced.
+// Deliberately NOT filtered by p.deleted_at (company's "inactive" flag) —
+// that flag only stops an inactive product from being ORDERED as fresh
+// stock (see add-purchase-order.php, which does filter by it); a TP who
+// already has closing_qty > 0 on hand must still be able to bill it out to
+// their own customers even after the company marks it inactive. Confirmed
+// 2026-09-05 after a TP with in-hand Lumi NB3 stock couldn't invoice it. ──
 $productList = [];
 $stmtProd = mysqli_prepare($db_conn,
     "SELECT p.id, p.productName
      FROM products p
      INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = ? AND tps.closing_qty > 0
-     WHERE p.deleted_at IS NULL AND (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
+     WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
      ORDER BY p.productName ASC"
 );
 mysqli_stmt_bind_param($stmtProd, "i", $Login_user_IDvl);
