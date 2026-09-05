@@ -2,14 +2,37 @@
 // femi9/billing/includes/tests/EspoMetricsTest.php
 // Manual run: php EspoMetricsTest.php
 // Uses an in-memory-style fixture: connects to any reachable MySQL server
-// (the app's own local DB is fine) and creates throwaway tables shaped like
-// EspoCRM's schema, to test aggregation math without needing real EspoCRM
-// credentials.
+// (reusing the app's own DB credentials/host is fine) but creates its
+// `lead`/`opportunity`/`call` fixture tables inside a dedicated, disposable
+// `espo_metrics_test` schema — never inside the app's production database —
+// to test aggregation math without needing real EspoCRM credentials.
 
 require_once __DIR__ . '/../EspoMetrics.php';
-require_once __DIR__ . '/../../company/include/db-connect.php'; // reuses $db_conn as the test fixture DB
+require_once __DIR__ . '/../../company/include/db-connect.php'; // reuses $db_conn's credentials/host only — fixtures live in their own throwaway schema, never the app's production database
 
 $conn = $db_conn;
+
+// ========== ISOLATION: fixture tables live in their own throwaway schema ==========
+// NEVER create the `lead`/`opportunity`/`call` fixture tables in the app's real
+// database — those names could collide with real production tables one day,
+// and a killed-mid-run test process could leave stray tables behind. Instead,
+// create (and always eventually drop) a dedicated schema for this test run.
+const ESPO_METRICS_TEST_SCHEMA = 'espo_metrics_test';
+
+// Safety: drop any stale copy from a previous killed/aborted run first.
+$conn->query("DROP DATABASE IF EXISTS `" . ESPO_METRICS_TEST_SCHEMA . "`");
+
+if (!$conn->query("CREATE DATABASE IF NOT EXISTS `" . ESPO_METRICS_TEST_SCHEMA . "`")) {
+    fwrite(STDERR, "FATAL: could not CREATE DATABASE `" . ESPO_METRICS_TEST_SCHEMA . "` — " .
+        "the DB user in db-connect.php's config likely lacks CREATE privilege in this environment. " .
+        "Refusing to fall back to creating fixture tables in the main schema. MySQL error: " . $conn->error . "\n");
+    exit(1);
+}
+
+if (!$conn->select_db(ESPO_METRICS_TEST_SCHEMA)) {
+    fwrite(STDERR, "FATAL: could not switch to schema `" . ESPO_METRICS_TEST_SCHEMA . "` — " . $conn->error . "\n");
+    exit(1);
+}
 
 // Test counter
 $passCount = 0;
@@ -44,11 +67,8 @@ function assertArrayContains($array, $key, $value, $label) {
 }
 
 // ========== SETUP: Create fixture tables with real EspoCRM table names ==========
-
-// Clean up any existing fixture tables
-$conn->query("DROP TABLE IF EXISTS `lead`");
-$conn->query("DROP TABLE IF EXISTS `opportunity`");
-$conn->query("DROP TABLE IF EXISTS `call`");
+// (inside the isolated espo_metrics_test schema selected above — the schema
+// was just freshly created, so no pre-existing tables to clean up here)
 
 // Create lead table
 $conn->query("CREATE TABLE `lead` (
@@ -270,9 +290,9 @@ assertEqual(espoCallsPerConversionRatio(10, 5), 2.0, 'calls-per-conversion compu
 echo "\n";
 
 // ========== CLEANUP ==========
-$conn->query("DROP TABLE IF EXISTS `lead`");
-$conn->query("DROP TABLE IF EXISTS `opportunity`");
-$conn->query("DROP TABLE IF EXISTS `call`");
+// Drop the whole throwaway schema (not just the tables) so nothing survives
+// a killed-mid-run process except this one disposable database.
+$conn->query("DROP DATABASE IF EXISTS `" . ESPO_METRICS_TEST_SCHEMA . "`");
 
 // ========== SUMMARY ==========
 echo "=== TEST SUMMARY ===\n";

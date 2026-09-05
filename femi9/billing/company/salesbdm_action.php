@@ -32,7 +32,11 @@ if(isset($_REQUEST['add-salesbdm']))
 
 	$espo_user_id = $_POST['espo_user_id'] ?? null;
 	$espo_user_id = ($espo_user_id === '' || $espo_user_id === null) ? null : $espo_user_id;
-	$espo_user_id = $espo_user_id !== null ? str_replace("'","&#39;",$espo_user_id) : null;
+	// Strict allowlist rather than escaping: this value round-trips into a
+	// second (remote) EspoCRM database via espoUserFilterClause(), so make the
+	// column structurally incapable of holding anything hostile regardless of
+	// how it's later interpolated.
+	$espo_user_id = preg_match('/^[A-Za-z0-9]{1,24}$/', (string)$espo_user_id) ? $espo_user_id : null;
 
 	// Every Sales BDM gets the same default password on creation ("salesbdm@123")
 	// rather than a random one — matches how Marketing Staff onboarding works.
@@ -152,7 +156,11 @@ if(isset($_REQUEST['update-salesbdm']))
 
 	$espo_user_id = $_POST['espo_user_id'] ?? null;
 	$espo_user_id = ($espo_user_id === '' || $espo_user_id === null) ? null : $espo_user_id;
-	$espo_user_id = $espo_user_id !== null ? str_replace("'","&#39;",$espo_user_id) : null;
+	// Strict allowlist rather than escaping: this value round-trips into a
+	// second (remote) EspoCRM database via espoUserFilterClause(), so make the
+	// column structurally incapable of holding anything hostile regardless of
+	// how it's later interpolated.
+	$espo_user_id = preg_match('/^[A-Za-z0-9]{1,24}$/', (string)$espo_user_id) ? $espo_user_id : null;
 
 	$_chkTL = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'team_level_id'");
 	if ($_chkTL && $_chkTL->num_rows === 0) {

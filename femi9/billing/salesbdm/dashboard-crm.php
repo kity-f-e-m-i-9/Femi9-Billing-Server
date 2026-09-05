@@ -91,7 +91,34 @@ if (!$notLinked) {
                                 <div class="col-md-3"><div class="card p-3"><h6>Avg. Sales Cycle (days)</h6><h3><?php echo htmlspecialchars($avgCycle); ?></h3></div></div>
                                 <div class="col-md-3"><div class="card p-3"><h6>Calls Held</h6><h3><?php echo htmlspecialchars($calls['held'] ?? 0); ?></h3></div></div>
                             </div>
-                            <p class="mt-3">Calls per conversion: <strong><?php echo htmlspecialchars($callsPerConv); ?></strong></p>
+
+                            <div class="row mt-3">
+                                <div class="col-md-3"><div class="card p-3"><h6>Calls per Conversion</h6><h3><?php echo htmlspecialchars($callsPerConv); ?></h3></div></div>
+                            </div>
+
+                            <h5 class="mt-4">Conversion Trend (Monthly)</h5>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr><th>Period</th><th>Leads Created</th><th>Leads Converted</th><th>Lead Conv. Rate (%)</th><th>Opps Created</th><th>Opps Won</th><th>Opp Conv. Rate (%)</th></tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($trend)): ?>
+                                        <tr><td colspan="7" class="text-muted">No trend data for this period.</td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($trend as $period): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($period['period']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['leads_created']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['leads_converted']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['lead_conversion_rate']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['opps_created']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['opps_won']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['opp_conversion_rate']); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
                         <?php endif; ?>
 
                     </div>

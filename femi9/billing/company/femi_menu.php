@@ -800,7 +800,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         </ul>
                     </li>
 					<?php }?>
-					<?php if($resultusertypeGET['dash']==1){?>
+					<?php if($resultusertypeGET['ms']==1){?>
 					<li>
                         <a href="dashboard-crm"><i class="material-icons-two-tone">insights</i>CRM Dashboard</a>
                     </li>

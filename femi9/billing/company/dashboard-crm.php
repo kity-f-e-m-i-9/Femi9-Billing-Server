@@ -30,6 +30,7 @@ if (!$crmUnavailable) {
         $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN espo_user_id VARCHAR(24) NULL DEFAULT NULL AFTER monthly_target_amount");
     }
     $bdms = $db_conn->query("SELECT id, bdm_name, espo_user_id FROM sales_bdm_staff ORDER BY bdm_name");
+    // NOTE: N+1 query pattern — each linked BDM issues ~8 remote queries. Fine for small teams; batch via GROUP BY ... IN (...) if linked BDM count grows past ~10.
     while ($bdm = $bdms->fetch_assoc()) {
         if (empty($bdm['espo_user_id'])) {
             $repRows[] = ['bdm_name' => $bdm['bdm_name'], 'linked' => false];
@@ -118,6 +119,34 @@ if (!$crmUnavailable) {
                                 <div class="col-md-3"><div class="card p-3"><h6>Avg. Sales Cycle (days)</h6><h3><?php echo htmlspecialchars($teamAvgCycle); ?></h3></div></div>
                                 <div class="col-md-3"><div class="card p-3"><h6>Calls Held</h6><h3><?php echo htmlspecialchars($teamCalls['held']); ?></h3></div></div>
                             </div>
+
+                            <div class="row mt-3">
+                                <div class="col-md-3"><div class="card p-3"><h6>Calls per Conversion</h6><h3><?php echo htmlspecialchars($teamCallsPerConv); ?></h3></div></div>
+                            </div>
+
+                            <h5 class="mt-4">Conversion Trend (Monthly)</h5>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr><th>Period</th><th>Leads Created</th><th>Leads Converted</th><th>Lead Conv. Rate (%)</th><th>Opps Created</th><th>Opps Won</th><th>Opp Conv. Rate (%)</th></tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($teamTrend)): ?>
+                                        <tr><td colspan="7" class="text-muted">No trend data for this period.</td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($teamTrend as $period): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($period['period']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['leads_created']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['leads_converted']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['lead_conversion_rate']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['opps_created']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['opps_won']); ?></td>
+                                                <td><?php echo htmlspecialchars($period['opp_conversion_rate']); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
 
                             <h5 class="mt-4">Person-wise Breakdown</h5>
                             <table class="table table-bordered">
