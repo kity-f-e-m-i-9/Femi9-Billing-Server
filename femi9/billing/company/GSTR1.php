@@ -113,14 +113,12 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
                                <select required name="godown_id" class="form-control">
 							   <?php if($get_godown_id==NULL){?>
 							   <option value="" hidden="">Select</option>
-							   <?php }else{?>
-							   <option value="<?=$get_godown_id;?>" hidden=""><?=$result_Godown_details['gname'];?></option>
 							   <?php }?>
 							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+						  <option value="<?=$result_Godown['id'];?>" <?=($get_godown_id==$result_Godown['id'])?'selected':'';?>><?=$result_Godown['gname'];?></option>
 							   <?php }?>
 							   </select>
 							   </div>
@@ -641,106 +639,9 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<br/>
 							<h3>Table 4 — B2B Invoices, Buyer-Wise Summary</h3>
 							<?php
-							// One row per individual registered (B2B) buyer — SS/ST/DT/Shop/Customer
-							// each keyed by temp_id/id, TP keyed by territory_partner_id — across all
-							// channels, net of that buyer's own credit notes. B2C (unregistered) buyers
-							// are covered in aggregate by the B2B/B2C tables above, not listed individually
-							// here since they're typically walk-in/anonymous.
-							$b2b_buyers = []; // key => ['name','type','gstin','invoices'=>set,'taxable'=>,'cgst'=>,'sgst'=>,'igst'=>]
-
-							function b2b_buyer_add(&$buyers, $key, $name, $type, $gstin, $inv, $taxable, $is_intra, $gst_amount) {
-								if (!isset($buyers[$key])) {
-									$buyers[$key] = ['name' => $name, 'type' => $type, 'gstin' => $gstin, 'invoices' => [], 'taxable' => 0, 'cgst' => 0, 'sgst' => 0, 'igst' => 0];
-								}
-								$buyers[$key]['invoices'][$inv] = true;
-								$buyers[$key]['taxable'] += $taxable;
-								if ($is_intra) { $buyers[$key]['cgst'] += $gst_amount / 2; $buyers[$key]['sgst'] += $gst_amount / 2; }
-								else { $buyers[$key]['igst'] += $gst_amount; }
-							}
-
-							// Network sales (SS/ST/DT/Shop)
-							$q = "
-								SELECT uii.to_user_type, uii.to_user_id, ui.inv_number, uii.gst_type,
-									   SUM(uii.total-uii.gstamount_total) AS taxable, SUM(uii.gstamount_total) AS gst_amt,
-									   COALESCE(ss.name,st.name,dt.name,sh.name) AS bname,
-									   COALESCE(ss.gstin,st.gstin,dt.gstin,sh.gstin) AS bgstin
-								FROM user_invoice_items uii
-								LEFT JOIN user_invoice ui ON ui.inv_id = uii.inv_id
-								LEFT JOIN super_stockiest ss ON uii.to_user_type='super_stockiest' AND ss.temp_id=uii.to_user_id
-								LEFT JOIN stockiest       st ON uii.to_user_type='stockiest'       AND st.temp_id=uii.to_user_id
-								LEFT JOIN distributor     dt ON uii.to_user_type='distributor'     AND dt.temp_id=uii.to_user_id
-								LEFT JOIN shop            sh ON uii.to_user_type='shop'            AND sh.temp_id=uii.to_user_id
-								WHERE uii.from_user_type='$Login_user_TYPEvl' AND uii.from_user_id='$get_godown_id'
-								  AND uii.buyer_gsttype='register' AND uii.date BETWEEN '$from_date' AND '$to_date'
-								GROUP BY uii.to_user_type, uii.to_user_id, ui.inv_number, uii.gst_type, ss.name, st.name, dt.name, sh.name, ss.gstin, st.gstin, dt.gstin, sh.gstin
-							";
-							$res = mysqli_query($db_conn, $q);
-							while ($r = mysqli_fetch_assoc($res)) {
-								b2b_buyer_add($b2b_buyers, $r['to_user_type'].'_'.$r['to_user_id'], $r['bname'], ucfirst(str_replace('_',' ',$r['to_user_type'])), $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
-							}
-
-							// Customer sales
-							$q = "
-								SELECT ii.customer_id, i.inv_number, ii.gst_type,
-									   SUM(ii.total-ii.gstamount_total) AS taxable, SUM(ii.gstamount_total) AS gst_amt,
-									   c.name AS bname, c.gstin AS bgstin
-								FROM invoice_items ii
-								LEFT JOIN invoice i ON i.inv_id = ii.inv_id
-								LEFT JOIN customers c ON c.id = ii.customer_id
-								WHERE ii.user_type='$Login_user_TYPEvl' AND ii.user_id='$get_godown_id'
-								  AND ii.buyer_gsttype='register' AND ii.date BETWEEN '$from_date' AND '$to_date'
-								GROUP BY ii.customer_id, i.inv_number, ii.gst_type, c.name, c.gstin
-							";
-							$res = mysqli_query($db_conn, $q);
-							while ($r = mysqli_fetch_assoc($res)) {
-								b2b_buyer_add($b2b_buyers, 'customer_'.$r['customer_id'], $r['bname'], 'Customer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
-							}
-
-							// OT sales
-							$q = "
-								SELECT s.tempid, i.inv_number, s.gst_type, s.customer_name AS bname, s.gst_number AS bgstin,
-									   SUM(s.total-s.gst_amount) AS taxable, SUM(s.gst_amount) AS gst_amt
-								FROM ot_sales s
-								LEFT JOIN ot_sales_invoice i ON i.tempid = s.tempid
-								WHERE s.godownid='$get_godown_id' AND s.buyer_gsttype='register' AND s.date BETWEEN '$from_date' AND '$to_date'
-								GROUP BY s.tempid, i.inv_number, s.gst_type, s.customer_name, s.gst_number
-							";
-							$res = mysqli_query($db_conn, $q);
-							while ($r = mysqli_fetch_assoc($res)) {
-								b2b_buyer_add($b2b_buyers, 'ot_'.$r['bgstin'].'_'.$r['bname'], $r['bname'], 'OT Sale', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
-							}
-
-							// TP invoices — reuse the already-computed per-line list from gst_details.php.
-							// ($tp_sls_lines and $tp_sls_lines_inter are both the SAME full unfiltered
-							// line set for this godown — tp_gst_bucket_totals() does the intra/inter
-							// split internally — so only one of the two must be used here, not both.)
 							require_once __DIR__ . '/include/TpGstHelper.php';
-							foreach ($tp_sls_lines ?? [] as $l) {
-								if (!$l['is_registered']) continue;
-								b2b_buyer_add($b2b_buyers, 'tp_'.$l['tp_invoice_id'], $l['tp_name'], 'Territory Partner', $l['tp_gstin'], $l['invoice_number'], $l['taxable_value'], $l['is_intra'], $l['gst_amount']);
-							}
-
-							// Net out each buyer's own registered-person credit notes (returns), matched by
-							// buyer identity where the return table carries it directly.
-							$q = "
-								SELECT rsi.from_usertype, rsi.from_userid, rsi.gst_type,
-									   SUM(rsi.total-rsi.gstamount_total) AS taxable, SUM(rsi.gstamount_total) AS gst_amt
-								FROM user_return_stock_items rsi
-								WHERE rsi.to_usertype='$Login_user_TYPEvl' AND rsi.to_userid='$get_godown_id'
-								  AND rsi.buyer_gsttype='register' AND rsi.from_usertype != 'customer'
-								  AND rsi.date BETWEEN '$from_date' AND '$to_date'
-								GROUP BY rsi.from_usertype, rsi.from_userid, rsi.gst_type
-							";
-							$res = mysqli_query($db_conn, $q);
-							while ($r = mysqli_fetch_assoc($res)) {
-								$key = $r['from_usertype'].'_'.$r['from_userid'];
-								if (!isset($b2b_buyers[$key])) continue;
-								$b2b_buyers[$key]['taxable'] -= (float)$r['taxable'];
-								if ($r['gst_type']=='inner') { $b2b_buyers[$key]['cgst'] -= (float)$r['gst_amt']/2; $b2b_buyers[$key]['sgst'] -= (float)$r['gst_amt']/2; }
-								else { $b2b_buyers[$key]['igst'] -= (float)$r['gst_amt']; }
-							}
-
-							usort($b2b_buyers, fn($a, $b) => strcmp($a['name'] ?? '', $b['name'] ?? ''));
+							require_once __DIR__ . '/include/B2bBuyerHelper.php';
+							$b2b_buyers = compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_date, $to_date, $tp_sls_lines ?? []);
 							$b2b_grand_taxable = 0; $b2b_grand_cgst = 0; $b2b_grand_sgst = 0; $b2b_grand_igst = 0; $b2b_buyer_count = count($b2b_buyers);
 							foreach ($b2b_buyers as $b) {
 								$b2b_grand_taxable += $b['taxable']; $b2b_grand_cgst += $b['cgst']; $b2b_grand_sgst += $b['sgst']; $b2b_grand_igst += $b['igst'];
@@ -755,8 +656,8 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<th>SGST</th>
 							<th>IGST</th>
 							</tr>
-							<tr id="b2bSummaryRow" onclick="document.getElementById('b2bDetailWrap').style.display = document.getElementById('b2bDetailWrap').style.display === 'none' ? '' : 'none';" style="cursor:pointer;">
-							<td style="text-align:left;"><a href="javascript:void(0);"><b>Total B2B Supplies (click to view buyer-wise detail)</b></a></td>
+							<tr>
+							<td style="text-align:left;"><a href="gst_b2b_buyer_report?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><b>Total B2B Supplies (view buyer-wise detail)</b></a></td>
 							<td style="text-align:left;"><?=$b2b_buyer_count;?></td>
 							<td style="text-align:left;"><b><?=inr_format($b2b_grand_taxable, 2);?></b></td>
 							<td style="text-align:left;"><b><?=inr_format($b2b_grand_cgst, 2);?></b></td>
@@ -764,36 +665,6 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<td style="text-align:left;"><b><?=inr_format($b2b_grand_igst, 2);?></b></td>
 							</tr>
 							</table>
-
-							<div id="b2bDetailWrap" style="display:none;">
-							<table id="gsttablevl" style="height:auto;">
-							<tr>
-							<th>Buyer</th>
-							<th>Type</th>
-							<th>GSTIN</th>
-							<th>Invoices</th>
-							<th>Taxable Value</th>
-							<th>CGST</th>
-							<th>SGST</th>
-							<th>IGST</th>
-							</tr>
-							<?php if (empty($b2b_buyers)) { ?>
-							<tr><td colspan="8" style="text-align:center;">No B2B buyers in this period.</td></tr>
-							<?php } else {
-							foreach ($b2b_buyers as $b) { ?>
-							<tr>
-							<td style="text-align:left;"><?=htmlspecialchars($b['name'] ?: '—');?></td>
-							<td style="text-align:left;"><?=htmlspecialchars($b['type']);?></td>
-							<td style="text-align:left;"><?=htmlspecialchars($b['gstin'] ?: '—');?></td>
-							<td style="text-align:left;"><?=count($b['invoices']);?></td>
-							<td style="text-align:left;"><?=inr_format($b['taxable'], 2);?></td>
-							<td style="text-align:left;"><?=inr_format($b['cgst'], 2);?></td>
-							<td style="text-align:left;"><?=inr_format($b['sgst'], 2);?></td>
-							<td style="text-align:left;"><?=inr_format($b['igst'], 2);?></td>
-							</tr>
-							<?php } } ?>
-							</table>
-							</div>
 
 
 							<!-------------Table 7 - B2C (Others): unregistered-buyer supplies with tax split---------->
@@ -870,39 +741,57 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<table id="gsttablevl" style="height:auto;">
 							<tr>
 							<th>Channel</th>
+							<th>Document Series</th>
 							<th>Series From</th>
 							<th>Series To</th>
 							<th>Total Issued</th>
-							<th>Cancelled</th>
-							<th>Net Issued</th>
 							</tr>
 							<?php
-							// This system has no invoice-cancellation/void concept (no status column
-							// on any invoice table), so Cancelled is always 0 and Net = Total.
+							// Split by the invoice number's own leading series code (its run of
+							// letters — "C" vs "CD", "IN" vs "WEB" vs "LWAA", "S" vs "SS" vs "SH",
+							// etc.), not by channel/buyer-type — a channel can carry more than one
+							// series (e.g. Customer Sale mixes "C..." and "CD..." numbers; OT Sale
+							// mixes "IN-...", "WEB/..." and bare "LWAA..." numbers with no
+							// separator at all), and a merged Series From/To across two different
+							// series would be meaningless.
+							function doc_series_code($inv_number) {
+								$inv_number = trim($inv_number);
+								if (preg_match('/^([A-Za-z]+)/', $inv_number, $m)) return strtoupper($m[1]);
+								return 'OTHER';
+							}
 							$doc_channels = [
 								['label' => 'Network Sale (SS/ST/DT/Shop)', 'table' => 'user_invoice', 'num_col' => 'inv_number', 'date_col' => 'date', 'where' => "from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id'"],
 								['label' => 'Customer Sale', 'table' => 'invoice', 'num_col' => 'inv_number', 'date_col' => 'date', 'where' => "user_type='$Login_user_TYPEvl' and user_id='$get_godown_id'"],
 								['label' => 'OT Sale', 'table' => 'ot_sales_invoice i join ot_sales s on s.tempid=i.tempid', 'num_col' => 'i.inv_number', 'date_col' => 's.date', 'where' => "s.godownid='$get_godown_id'", 'distinct' => 'i.tempid'],
 								['label' => 'Territory Partner', 'table' => 'tp_invoices', 'num_col' => 'invoice_number', 'date_col' => 'invoice_date', 'where' => "source_godown_id='$get_godown_id'"],
 							];
+							$doc_grand_total = 0;
 							foreach ($doc_channels as $dc) {
-								$distinct = $dc['distinct'] ?? $dc['num_col'];
 								$dq = "select {$dc['num_col']} as num from {$dc['table']} where {$dc['where']} and {$dc['date_col']} between '$from_date' and '$to_date' order by {$dc['date_col']} asc, {$dc['num_col']} asc";
 								$dres = mysqli_query($db_conn, $dq);
-								$nums = [];
-								while ($drow = mysqli_fetch_assoc($dres)) { $nums[] = $drow['num']; }
-								$count = count($nums);
-								if ($count == 0) continue;
-								?>
+								$series_groups = []; // series code => [invoice numbers in date/number order]
+								while ($drow = mysqli_fetch_assoc($dres)) {
+									$series_groups[doc_series_code($drow['num'])][] = $drow['num'];
+								}
+								ksort($series_groups);
+								foreach ($series_groups as $series_code => $nums) {
+									$count = count($nums);
+									if ($count == 0) continue;
+									$doc_grand_total += $count;
+									?>
 							<tr>
 							<td style="text-align:left;"><?=htmlspecialchars($dc['label']);?></td>
+							<td style="text-align:left;"><?=htmlspecialchars($series_code);?></td>
 							<td style="text-align:left;"><?=htmlspecialchars($nums[0]);?></td>
 							<td style="text-align:left;"><?=htmlspecialchars($nums[$count-1]);?></td>
 							<td style="text-align:left;"><?=$count;?></td>
-							<td style="text-align:left;">0</td>
-							<td style="text-align:left;"><?=$count;?></td>
 							</tr>
-							<?php }?>
+							<?php }
+							}?>
+							<tr>
+							<td colspan="4" style="text-align:right;"><b>Total</b></td>
+							<td><b><?=$doc_grand_total;?></b></td>
+							</tr>
 							</table>
 
 							<!-------------------------------------------------->

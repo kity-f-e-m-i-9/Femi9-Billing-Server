@@ -26,6 +26,17 @@ elseif ($gst_type == "outer" && $buyer_gsttype == "register")
 else
     $lable_header = "Inter-state (Unregistered person)";
 
+// Friendly labels for raw DB enum values shown in the Customer Type column
+// (the page-level GST Type/state is already shown once in $lable_header
+// above, so it isn't repeated as a per-row column here).
+$customer_type_labels = [
+    'super_stockiest' => 'Super Stockist',
+    'stockiest'        => 'Stockist',
+    'distributor'      => 'Distributor',
+    'shop'             => 'Shop',
+    'customer'         => 'Customer',
+];
+
 // ✅ BLOCK 1: SS/ST/DT/SHOP invoices — aggregated from items (not the parent
 // invoice) so embedded GST on an 'inclusive'-priced product can be stripped
 // via gstamount_total; see gst_details.php for the same fix.
@@ -34,6 +45,7 @@ $select_Report = "
         ui.inv_number,
         uii.date,
         SUM(uii.total - uii.gstamount_total) AS total_sls_amount,
+        SUM(uii.gstamount_total) AS gst_amount,
         uii.to_user_type AS customer_usertype,
         COALESCE(ss.name,   st.name,   dt.name,   sh.name)            AS cust_name,
         COALESCE(ss.mobile_number, st.mobile_number, dt.mobile_number, sh.mobile_number) AS cust_mobile,
@@ -57,9 +69,10 @@ $select_Report = "
 ";
 $fetch_Report = mysqli_query($db_conn, $select_Report);
 $rows1 = [];
-$total1 = 0;
+$total1 = 0; $total_gst1 = 0;
 while ($row = mysqli_fetch_assoc($fetch_Report)) {
     $total1 += $row['total_sls_amount'];
+    $total_gst1 += $row['gst_amount'];
     $rows1[] = $row;
 }
 
@@ -69,6 +82,7 @@ $select_Report2 = "
         i.inv_number,
         ii.date,
         SUM(ii.total - ii.gstamount_total) AS total_sls_amount,
+        SUM(ii.gstamount_total) AS gst_amount,
         'customer' AS customer_usertype,
         c.name   AS cust_name,
         c.mobile AS cust_mobile,
@@ -86,9 +100,10 @@ $select_Report2 = "
 ";
 $fetch_Report2 = mysqli_query($db_conn, $select_Report2);
 $rows2 = [];
-$total2 = 0;
+$total2 = 0; $total_gst2 = 0;
 while ($row = mysqli_fetch_assoc($fetch_Report2)) {
     $total2 += $row['total_sls_amount'];
+    $total_gst2 += $row['gst_amount'];
     $rows2[] = $row;
 }
 
@@ -103,10 +118,90 @@ $tp_lines = array_filter($tp_lines, function ($l) use ($want_intra, $want_regist
     return $l['is_intra'] === $want_intra && $l['is_registered'] === $want_register;
 });
 $rows3 = tp_group_lines($tp_lines, 'tp_invoice_id');
-$total3 = 0;
-foreach ($rows3 as $row) { $total3 += $row['taxable_value']; }
+$total3 = 0; $total_gst3 = 0;
+foreach ($rows3 as $row) { $total3 += $row['taxable_value']; $total_gst3 += $row['gst_amount']; }
 
 $overall_total = $total1 + $total2 + $total3;
+$overall_gst   = $total_gst1 + $total_gst2 + $total_gst3;
+
+// Effective GST% for a row = gst_amount / taxable_value * 100. An invoice can
+// mix line items taxed at different rates (nil + rated, or multiple rated
+// products), so this is the blended rate for the invoice, not necessarily a
+// single product's rate — shown as "Mixed" whenever a row's blended rate
+// doesn't round to one of the standard GST slabs, so mixed-rate invoices
+// aren't misread as a single flat rate.
+$gst_slabs = [0, 5, 12, 18, 28];
+function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
+    if ((float)$taxable_value == 0.0) return $gst_amount == 0 ? '0%' : 'Mixed';
+    $rate = round(($gst_amount / $taxable_value) * 100, 1);
+    foreach ($gst_slabs as $slab) {
+        if (abs($rate - $slab) <= 0.3) return $slab . '%';
+    }
+    return $rate . '% (Mixed)';
+}
+
+// ✅ Excel (CSV) export — same three row sets as the on-screen table, same
+// columns, so the download always matches what's currently displayed.
+if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
+    ob_start();
+    $sn = 0;
+    $csv_rows = [];
+    $csv_rows[] = ['#', 'Customer Type', 'Customer Name', 'Customer Mobile', 'GSTIN', 'Invoice Number', 'Invoice Date', 'GST %', 'Taxable Value', 'GST Amount', 'Total Sales Amount'];
+
+    foreach ($rows1 as $row) {
+        $sn++;
+        $csv_rows[] = [
+            $sn,
+            $customer_type_labels[$row['customer_usertype']] ?? ucfirst(str_replace('_', ' ', $row['customer_usertype'])),
+            $row['cust_name'], $row['cust_mobile'], $row['cust_gstin'], $row['inv_number'],
+            date("d/m/Y", strtotime($row['date'])),
+            gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs),
+            number_format($row['total_sls_amount'], 2, '.', ''),
+            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($row['total_sls_amount'] + $row['gst_amount'], 2, '.', ''),
+        ];
+    }
+    foreach ($rows2 as $row) {
+        $sn++;
+        $csv_rows[] = [
+            $sn, 'Customer', $row['cust_name'], $row['cust_mobile'], $row['cust_gstin'], $row['inv_number'],
+            date("d/m/Y", strtotime($row['date'])),
+            gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs),
+            number_format($row['total_sls_amount'], 2, '.', ''),
+            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($row['total_sls_amount'] + $row['gst_amount'], 2, '.', ''),
+        ];
+    }
+    foreach ($rows3 as $row) {
+        $sn++;
+        $csv_rows[] = [
+            $sn, 'Territory Partner', $row['tp_name'], $row['tp_mobile'], $row['tp_gstin'], $row['invoice_number'],
+            date("d/m/Y", strtotime($row['invoice_date'])),
+            gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs),
+            number_format($row['taxable_value'], 2, '.', ''),
+            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($row['taxable_value'] + $row['gst_amount'], 2, '.', ''),
+        ];
+    }
+    $csv_rows[] = ['', '', '', '', '', '', '', 'Grand Total',
+        number_format($overall_total, 2, '.', ''),
+        number_format($overall_gst, 2, '.', ''),
+        number_format($overall_total + $overall_gst, 2, '.', ''),
+    ];
+
+    $csv_content = '';
+    foreach ($csv_rows as $csv_row) {
+        $csv_content .= implode(',', array_map(function ($v) {
+            return '"' . str_replace('"', '""', $v) . '"';
+        }, $csv_row)) . "\n";
+    }
+
+    ob_end_clean();
+    header("Content-type: text/csv");
+    header("Content-Disposition: attachment; filename=GST_Sales_Detailed_Report.csv");
+    echo $csv_content;
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -159,6 +254,9 @@ $overall_total = $total1 + $total2 + $total3;
                                                 <h4>(SS, ST, DT, SHP, CUS, TP)</h4>
                                                 <h5><?= htmlspecialchars($lable_header) ?></h5>
                                             </td>
+                                            <td align="right" valign="top">
+                                                <a href="?data1=<?= urlencode($gst_type) ?>&amp;data2=<?= urlencode($buyer_gsttype) ?>&amp;frd=<?= urlencode($from_date) ?>&amp;tod=<?= urlencode($to_date) ?>&amp;gid=<?= urlencode($get_godown_id) ?>&amp;export=csv" title="Export to Excel"><img src="../../assets/images/excel-3-32.png"></a>
+                                            </td>
                                         </tr>
                                     </table>
                                 </div>
@@ -176,6 +274,9 @@ $overall_total = $total1 + $total2 + $total3;
                                         <th>GSTIN</th>
                                         <th>Invoice Number</th>
                                         <th>Invoice Date</th>
+                                        <th>GST %</th>
+                                        <th>Taxable Value</th>
+                                        <th>GST Amount</th>
                                         <th>Total Sales Amount</th>
                                     </tr>
                                 </thead>
@@ -185,13 +286,16 @@ $overall_total = $total1 + $total2 + $total3;
                                     <?php foreach ($rows1 as $row): $sn++; ?>
                                     <tr>
                                         <td><?= $sn ?></td>
-                                        <td><?= htmlspecialchars($row['customer_usertype']) ?></td>
+                                        <td><?= htmlspecialchars($customer_type_labels[$row['customer_usertype']] ?? ucfirst(str_replace('_', ' ', $row['customer_usertype']))) ?></td>
                                         <td><?= htmlspecialchars($row['cust_name']) ?></td>
                                         <td><?= htmlspecialchars($row['cust_mobile']) ?></td>
                                         <td><?= htmlspecialchars($row['cust_gstin']) ?></td>
                                         <td><?= htmlspecialchars($row['inv_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['date'])) ?></td>
-                                        <td align="right"><b><?= inr_format($row['total_sls_amount'], 2) ?></b></td>
+                                        <td align="center"><?= gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs) ?></td>
+                                        <td align="right"><?= inr_format($row['total_sls_amount'], 2) ?></td>
+                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
+                                        <td align="right"><b><?= inr_format($row['total_sls_amount'] + $row['gst_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
@@ -204,7 +308,10 @@ $overall_total = $total1 + $total2 + $total3;
                                         <td><?= htmlspecialchars($row['cust_gstin']) ?></td>
                                         <td><?= htmlspecialchars($row['inv_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['date'])) ?></td>
-                                        <td align="right"><b><?= inr_format($row['total_sls_amount'], 2) ?></b></td>
+                                        <td align="center"><?= gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs) ?></td>
+                                        <td align="right"><?= inr_format($row['total_sls_amount'], 2) ?></td>
+                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
+                                        <td align="right"><b><?= inr_format($row['total_sls_amount'] + $row['gst_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
@@ -217,20 +324,25 @@ $overall_total = $total1 + $total2 + $total3;
                                         <td><?= htmlspecialchars($row['tp_gstin']) ?></td>
                                         <td><?= htmlspecialchars($row['invoice_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['invoice_date'])) ?></td>
-                                        <td align="right"><b><?= inr_format($row['taxable_value'], 2) ?></b></td>
+                                        <td align="center"><?= gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs) ?></td>
+                                        <td align="right"><?= inr_format($row['taxable_value'], 2) ?></td>
+                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
+                                        <td align="right"><b><?= inr_format($row['taxable_value'] + $row['gst_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
                                     <?php if ($sn === 0): ?>
                                     <tr>
-                                        <td colspan="8" style="text-align:center; padding:20px;">No records found.</td>
+                                        <td colspan="11" style="text-align:center; padding:20px;">No records found.</td>
                                     </tr>
                                     <?php endif; ?>
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="7" align="right"><b>Grand Total</b></td>
+                                        <td colspan="8" align="right"><b>Grand Total</b></td>
                                         <td align="right"><b><?= inr_format($overall_total, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($overall_gst, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($overall_total + $overall_gst, 2) ?></b></td>
                                     </tr>
                                 </tfoot>
                             </table>
