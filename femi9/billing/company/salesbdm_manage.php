@@ -146,6 +146,10 @@ $i= $start_from;
 										if ($_chkTgt && $_chkTgt->num_rows === 0) {
 											$db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
 										}
+										$_chkEspo = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'espo_user_id'");
+										if ($_chkEspo && $_chkEspo->num_rows === 0) {
+											$db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN espo_user_id VARCHAR(24) NULL DEFAULT NULL AFTER monthly_target_amount");
+										}
 										$db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_team_levels (
 											id INT AUTO_INCREMENT PRIMARY KEY,
 											level_rank INT NOT NULL,
