@@ -21,30 +21,46 @@ $today = date('Y-m-d');
 $from  = isset($_GET['from']) && $_GET['from'] ? date('Y-m-d', strtotime($_GET['from'])) : date('Y-m-01');
 $to    = isset($_GET['to'])   && $_GET['to']   ? date('Y-m-d', strtotime($_GET['to']))   : date('Y-m-t');
 $filter_district_id = (int)($_GET['district_id'] ?? 0);
-$gst_filter = $_GET['gst_filter'] ?? 'all'; // all | gst | non_gst
+$cat_filter = $_GET['category'] ?? 'all'; // all | napkin | diaper
 
-$gst_cond = '';
-if ($gst_filter === 'gst')     $gst_cond = " AND p.gst > 0";
-elseif ($gst_filter === 'non_gst') $gst_cond = " AND p.gst = 0";
-
-// Company -> TP sales only (matches TP itself never issues a tp_invoice; the
-// issuer is whoever created it — company here, not a super-stockist billing
-// their own TP), same condition mis-report.php's MIS scoping settled on.
-$company_tp_cond = "ti.created_by_user_type != 'super_stockiest'";
+$cat_cond = '';
+if ($cat_filter === 'napkin' || $cat_filter === 'diaper') $cat_cond = " AND tap.product_type = '{$cat_filter}'";
 
 // District filter dropdown (depth=3 nodes)
 $all_districts = crr($db_conn, "SELECT id, name FROM partner_location_nodes WHERE depth = 3 ORDER BY name ASC");
 
 $district_where = $filter_district_id > 0 ? " AND danc.anc_id = {$filter_district_id}" : "";
 
-// District -> Division breakdown of company-to-TP sales, from tp_invoice_items
-// joined to products (for GST filter) and up through the TP's own assigned
-// location (territory_partner_locations -> partner_location_nodes), walked to
-// its depth-3 (district) and depth-4 (division) ancestors — same recursive-CTE
-// pattern as company/mis-report.php's State/District section, since tp_invoices
-// carry no location of their own. source_cp_id is carried through per-row so
-// each division's sales can be attributed back to the Channel Partner that
-// sourced them, for the commission calculation below.
+// District -> Division breakdown of company-to-TP ADVANCE PAYMENTS (not
+// sales — tp_advance_payments carries no location or CP of its own, so the
+// same TP-location walk-up used previously for tp_invoices is reused here:
+// territory_partner_locations -> partner_location_nodes, up to depth-3
+// (district) and depth-4 (division) ancestors, same recursive-CTE pattern as
+// company/mis-report.php's State/District section.
+//
+// CP attribution: tp_advance_payments has no source_cp_id column at all (a
+// CP is only ever chosen per tp_invoice, at sale time — never at payment
+// time), so a direct-column join is impossible here. Per product decision,
+// a division is instead attributed to whichever Channel Partner has that
+// division (a depth-4 node) directly assigned in channel_partner_locations
+// — i.e. "TP's firka [division] maps to CP's division". Every division in
+// this dataset maps to at most one CP (verified: 0 divisions shared across
+// CPs), so this LEFT JOIN is unambiguous; a division with no CP assigned
+// simply carries a NULL channel_partner_id, same as an unsourced sale did
+// under the old source_cp_id scheme.
+//
+// Multi-firka TPs: a TP can hold several assigned locations/firkas at once
+// (territory_partner_locations is one-to-many, up to a dozen rows for some
+// TPs), sometimes spanning more than one division — but a tp_advance_payments
+// row is one lump sum with no location of its own, so there's no way to know
+// which firka a given payment actually funded. Per product decision, each
+// payment's amount is split EVENLY across all of that TP's assigned firkas
+// (1/N per firka), each firka then resolving to its own district/division/CP
+// as usual — rather than collapsing the whole TP to a single picked location
+// (which silently dropped its other firkas from this report) or duplicating
+// the full amount into every firka (which would inflate district/division
+// and grand totals). ROUND(...,2) below can leave a few-paisa rounding
+// residue across a payment's N firka-shares; immaterial at these amounts.
 $rows = crr($db_conn,
     "WITH RECURSIVE danc AS (
         SELECT id AS node_id, id AS anc_id, name AS anc_name FROM partner_location_nodes WHERE depth = 3
@@ -56,83 +72,98 @@ $rows = crr($db_conn,
         UNION ALL
         SELECT c.id, a.anc_id, a.anc_name FROM partner_location_nodes c JOIN divanc a ON c.parent_id = a.node_id
     )
-    SELECT danc.anc_name AS district_name, divanc.anc_name AS division_name, x.source_cp_id,
+    SELECT danc.anc_name AS district_name, divanc.anc_name AS division_name, cpl.channel_partner_id,
            x.territory_partner_id, tp.name AS tp_name, tp.tp_id AS tp_code,
-           COUNT(DISTINCT x.tp_invoice_id) AS inv_cnt,
-           COALESCE(SUM(x.qty), 0) AS total_qty,
-           COALESCE(SUM(x.net_amount), 0) AS total_amount
+           COUNT(DISTINCT x.payment_id) AS inv_cnt,
+           SUM(x.product_type = 'napkin') AS napkin_cnt,
+           SUM(x.product_type = 'diaper') AS diaper_cnt,
+           COALESCE(SUM(x.share_amount), 0) AS total_amount,
+           COALESCE(SUM(CASE WHEN x.product_type = 'napkin' THEN x.share_amount ELSE 0 END), 0) AS napkin_amount,
+           COALESCE(SUM(CASE WHEN x.product_type = 'diaper' THEN x.share_amount ELSE 0 END), 0) AS diaper_amount,
+           COALESCE(SUM(x.share_adjusted), 0) AS total_adjusted,
+           COALESCE(SUM(x.share_balance), 0) AS total_balance
     FROM (
-        -- net_amount = this line's amount, less its own line-level discount,
-        -- less its proportional share of the invoice-level discount (spread
-        -- across lines by each line's share of the invoice's gross amount) —
-        -- matches how tp-invoice-action.php derives tp_invoices.total_amount,
-        -- so this report's sales figure reconciles with manage-tp-invoices.
-        SELECT tii.tp_invoice_id, tii.quantity AS qty, tii.amount, ti.source_cp_id, ti.territory_partner_id,
-               (tii.amount - tii.discount_amount)
-               - COALESCE(ti.discount_amount, 0) * (tii.amount / NULLIF(inv_gross.gross, 0)) AS net_amount,
-               (SELECT tpl.location_id FROM territory_partner_locations tpl
-                WHERE tpl.territory_partner_id = ti.territory_partner_id
-                ORDER BY tpl.assigned_at ASC, tpl.id ASC LIMIT 1) AS location_id
-        FROM tp_invoices ti
-        JOIN tp_invoice_items tii ON tii.tp_invoice_id = ti.id
-        JOIN products p ON p.id = tii.product_id
-        JOIN (SELECT tp_invoice_id, SUM(amount) AS gross FROM tp_invoice_items GROUP BY tp_invoice_id) inv_gross
-             ON inv_gross.tp_invoice_id = ti.id
-        WHERE {$company_tp_cond} AND ti.invoice_date BETWEEN ? AND ?{$gst_cond}
+        SELECT tap.id AS payment_id, tap.territory_partner_id, tap.product_type,
+               tpl.location_id,
+               ROUND(tap.amount / firka_cnt.n, 2)           AS share_amount,
+               ROUND(tap.adjusted_amount / firka_cnt.n, 2)  AS share_adjusted,
+               ROUND(tap.balance_amount / firka_cnt.n, 2)   AS share_balance
+        FROM tp_advance_payments tap
+        JOIN territory_partner_locations tpl ON tpl.territory_partner_id = tap.territory_partner_id
+        JOIN (SELECT territory_partner_id, COUNT(*) AS n FROM territory_partner_locations GROUP BY territory_partner_id) firka_cnt
+             ON firka_cnt.territory_partner_id = tap.territory_partner_id
+        WHERE tap.deleted_at IS NULL AND tap.payment_date BETWEEN ? AND ?{$cat_cond}
     ) x
     JOIN danc ON danc.node_id = x.location_id
     LEFT JOIN divanc ON divanc.node_id = x.location_id
+    LEFT JOIN channel_partner_locations cpl ON cpl.location_id = divanc.anc_id
     JOIN territory_partners tp ON tp.id = x.territory_partner_id
     WHERE 1=1{$district_where}
-    GROUP BY danc.anc_id, danc.anc_name, divanc.anc_id, divanc.anc_name, x.source_cp_id, x.territory_partner_id, tp.name, tp.tp_id
+    GROUP BY danc.anc_id, danc.anc_name, divanc.anc_id, divanc.anc_name, cpl.channel_partner_id, x.territory_partner_id, tp.name, tp.tp_id
     ORDER BY danc.anc_name ASC, total_amount DESC",
     'ss', [$from, $to]);
 
 // ── CP commission rate lookup ────────────────────────────────────────────────
 // Same rule as cp-wallet-commission-calculator.php's evaluateCpCommission():
-// a CP's commission is whichever is higher — 6% of the CP's net sourced sales
-// (tp_invoices.source_cp_id, net of accepted TP returns) across the WHOLE
-// period, or 2% of the CP's total location deposit. That decision is made
-// once per CP (deposit isn't tied to any one division), then re-expressed as
-// a single effective %, which is applied to each division's own slice of that
-// CP's sales — so a deposit-floor CP still contributes a division-level
-// commission figure using "the same commission concept", just computed as an
-// effective rate instead of a directly-split rupee amount.
+// a CP's commission is whichever is higher — 6% of the CP's net advance
+// payments across the WHOLE period, or 2% of the CP's total location
+// deposit. That decision is made once per CP (deposit isn't tied to any one
+// division), then re-expressed as a single effective %, which is applied to
+// each division's own slice of that CP's advance-payment amount — so a
+// deposit-floor CP still contributes a division-level commission figure
+// using "the same commission concept", just computed as an effective rate
+// instead of a directly-split rupee amount.
 //
-// Most tp_invoices carry no source_cp_id (sourced directly from a company
-// godown, not a CP) — those still get a commission figure here, using the
-// same sales-based leg of the formula (6% of sales) with no CP to hold a
-// deposit floor against, since there's no real CP for the deposit-floor half
-// of the rule to apply to.
+// A CP's net advance payments = the sum of tp_advance_payments.amount across
+// every TP whose resolved division (see main query above) is assigned to
+// that CP in channel_partner_locations — the division-attribution scheme
+// replacing the old direct source_cp_id column (advance payments carry no
+// CP of their own). Divisions with no CP assigned fall to the flat leg below.
+//
+// Divisions with no CP assigned still get a commission figure here, using
+// the same advance-based leg of the formula (6% of advance amount) with no
+// CP to hold a deposit floor against, since there's no real CP for the
+// deposit-floor half of the rule to apply to.
 const NO_CP_COMMISSION_PCT = 0.06;
-$cp_ids = array_values(array_unique(array_filter(array_column($rows, 'source_cp_id'), fn($v) => (int)$v > 0)));
-$cp_effective_pct = []; // source_cp_id => effective commission %
+$cp_ids = array_values(array_unique(array_filter(array_column($rows, 'channel_partner_id'), fn($v) => (int)$v > 0)));
+$cp_effective_pct = []; // channel_partner_id => effective commission %
 
 if ($cp_ids) {
     $ph = implode(',', array_fill(0, count($cp_ids), '?'));
     $types = str_repeat('i', count($cp_ids));
 
-    $cp_sales_gross = crr($db_conn,
-        "SELECT source_cp_id, COALESCE(SUM(total_amount),0) AS gross
-         FROM tp_invoices
-         WHERE source_cp_id IN ({$ph}) AND invoice_date BETWEEN ? AND ?
-         GROUP BY source_cp_id",
+    // Net advance amount per CP: every division assigned to that CP,
+    // summed across ALL its TPs' advance payments for the period — not
+    // just the TPs/divisions present in $rows (which may be narrowed by
+    // the district filter), so the commission % reflects the CP's whole
+    // book, same as the old sales-based version did. A TP's own assigned
+    // location is a leaf (village/panchayat, depth 5-6), never the depth-4
+    // division node itself, so this needs the same depth-4-ancestor walk
+    // the main query above uses — a direct location_id match would never
+    // hit, since a CP's location_id IS the depth-4 node.
+    // Same even-split-per-firka logic as the main query above: a TP with
+    // multiple locations under this CP's divisions must not have its full
+    // advance amount counted once per matching location (that would multiply
+    // it by however many of its firkas happen to fall under this one CP).
+    $cp_advance_gross = crr($db_conn,
+        "WITH RECURSIVE divanc AS (
+            SELECT id AS node_id, id AS anc_id FROM partner_location_nodes WHERE depth = 4
+            UNION ALL
+            SELECT c.id, a.anc_id FROM partner_location_nodes c JOIN divanc a ON c.parent_id = a.node_id
+        )
+        SELECT cpl.channel_partner_id, COALESCE(SUM(ROUND(tap.amount / firka_cnt.n, 2)),0) AS gross
+         FROM channel_partner_locations cpl
+         JOIN divanc ON divanc.anc_id = cpl.location_id
+         JOIN territory_partner_locations tpl ON tpl.location_id = divanc.node_id
+         JOIN tp_advance_payments tap ON tap.territory_partner_id = tpl.territory_partner_id
+         JOIN (SELECT territory_partner_id, COUNT(*) AS n FROM territory_partner_locations GROUP BY territory_partner_id) firka_cnt
+              ON firka_cnt.territory_partner_id = tap.territory_partner_id
+         WHERE cpl.channel_partner_id IN ({$ph})
+           AND tap.deleted_at IS NULL AND tap.payment_date BETWEEN ? AND ?
+         GROUP BY cpl.channel_partner_id",
         $types . 'ss', array_merge($cp_ids, [$from, $to]));
     $cp_gross = [];
-    foreach ($cp_sales_gross as $r) $cp_gross[(int)$r['source_cp_id']] = (float)$r['gross'];
-
-    $cp_sales_returns = crr($db_conn,
-        "SELECT tpi.source_cp_id, COALESCE(SUM(urs.total),0) AS returns
-         FROM user_return_stock urs
-         JOIN tp_invoices tpi ON tpi.invoice_number = urs.invnumber COLLATE utf8mb4_unicode_ci
-         WHERE tpi.source_cp_id IN ({$ph})
-           AND urs.from_usertype = 'territory_partner'
-           AND urs.date BETWEEN ? AND ?
-           AND urs.status = 'accept'
-         GROUP BY tpi.source_cp_id",
-        $types . 'ss', array_merge($cp_ids, [$from, $to]));
-    $cp_returns = [];
-    foreach ($cp_sales_returns as $r) $cp_returns[(int)$r['source_cp_id']] = (float)$r['returns'];
+    foreach ($cp_advance_gross as $r) $cp_gross[(int)$r['channel_partner_id']] = (float)$r['gross'];
 
     $cp_deposits = crr($db_conn,
         "SELECT cpl.channel_partner_id, COALESCE(SUM(n.deposit_amount),0) AS deposit
@@ -145,57 +176,78 @@ if ($cp_ids) {
     foreach ($cp_deposits as $r) $cp_deposit[(int)$r['channel_partner_id']] = (float)$r['deposit'];
 
     foreach ($cp_ids as $cid) {
-        $net_sales = max(0, ($cp_gross[$cid] ?? 0) - ($cp_returns[$cid] ?? 0));
+        $net_sales = max(0, $cp_gross[$cid] ?? 0);
         $from_sales   = round($net_sales * 0.06, 2);
         $from_deposit = round(($cp_deposit[$cid] ?? 0) * 0.02, 2);
         $commission   = max($from_sales, $from_deposit);
-        // Re-expressed as a % of net sales so it can multiply cleanly against
-        // any division's slice of this CP's sales, even when the deposit
-        // floor (not sales) is what actually won.
+        // Re-expressed as a % of net advance amount so it can multiply
+        // cleanly against any division's slice of this CP's advance
+        // payments, even when the deposit floor (not sales) is what
+        // actually won.
         $cp_effective_pct[$cid] = $net_sales > 0 ? ($commission / $net_sales) : 0.0;
     }
 }
 
-$grand_qty = 0; $grand_amount = 0; $grand_inv = 0; $grand_commission = 0;
-foreach ($rows as $r) { $grand_qty += (float)$r['total_qty']; $grand_amount += (float)$r['total_amount']; $grand_inv += (int)$r['inv_cnt']; }
+$grand_amount = 0; $grand_inv = 0; $grand_commission = 0;
+$grand_adjusted = 0; $grand_balance = 0; $grand_napkin = 0; $grand_diaper = 0;
+foreach ($rows as $r) {
+    $grand_amount   += (float)$r['total_amount'];
+    $grand_inv      += (int)$r['inv_cnt'];
+    $grand_adjusted += (float)$r['total_adjusted'];
+    $grand_balance  += (float)$r['total_balance'];
+    $grand_napkin   += (float)$r['napkin_amount'];
+    $grand_diaper   += (float)$r['diaper_amount'];
+}
 
-// Group rows by district, then by division, then by TP (a TP's sales can
-// still split across several source_cp_id rows within one division, so TPs
-// are collapsed to one line the same way divisions collapse per-CP rows).
+// Group rows by district, then by division, then by TP (a TP's advance
+// payments can still split across several channel_partner_id rows within one
+// division, so TPs are collapsed to one line the same way divisions collapse
+// per-CP rows).
 $by_district = [];
 foreach ($rows as $r) {
     $dist = $r['district_name'];
     $div_key = $r['division_name'] ?? '';
     $tp_key = (int)$r['territory_partner_id'];
-    $cid = (int)$r['source_cp_id'];
+    $cid = (int)$r['channel_partner_id'];
     $pct = $cid > 0 ? ($cp_effective_pct[$cid] ?? 0.0) : NO_CP_COMMISSION_PCT;
     $commission = (float)$r['total_amount'] * $pct;
 
-    if (!isset($by_district[$dist])) $by_district[$dist] = ['divisions' => [], 'qty' => 0, 'amount' => 0, 'inv' => 0, 'commission' => 0];
+    if (!isset($by_district[$dist])) $by_district[$dist] = ['divisions' => [], 'amount' => 0, 'inv' => 0, 'commission' => 0, 'adjusted' => 0, 'balance' => 0, 'napkin' => 0, 'diaper' => 0];
     if (!isset($by_district[$dist]['divisions'][$div_key])) {
         $by_district[$dist]['divisions'][$div_key] = [
-            'division_name' => $r['division_name'], 'inv_cnt' => 0, 'total_qty' => 0, 'total_amount' => 0, 'commission' => 0, 'tps' => [],
+            'division_name' => $r['division_name'], 'inv_cnt' => 0, 'total_amount' => 0, 'commission' => 0,
+            'adjusted' => 0, 'balance' => 0, 'napkin' => 0, 'diaper' => 0, 'tps' => [],
         ];
     }
     $by_district[$dist]['divisions'][$div_key]['inv_cnt']      += (int)$r['inv_cnt'];
-    $by_district[$dist]['divisions'][$div_key]['total_qty']    += (float)$r['total_qty'];
     $by_district[$dist]['divisions'][$div_key]['total_amount'] += (float)$r['total_amount'];
     $by_district[$dist]['divisions'][$div_key]['commission']   += $commission;
+    $by_district[$dist]['divisions'][$div_key]['adjusted']     += (float)$r['total_adjusted'];
+    $by_district[$dist]['divisions'][$div_key]['balance']      += (float)$r['total_balance'];
+    $by_district[$dist]['divisions'][$div_key]['napkin']       += (float)$r['napkin_amount'];
+    $by_district[$dist]['divisions'][$div_key]['diaper']       += (float)$r['diaper_amount'];
 
     if (!isset($by_district[$dist]['divisions'][$div_key]['tps'][$tp_key])) {
         $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key] = [
-            'tp_name' => $r['tp_name'], 'tp_code' => $r['tp_code'], 'inv_cnt' => 0, 'total_qty' => 0, 'total_amount' => 0, 'commission' => 0,
+            'tp_name' => $r['tp_name'], 'tp_code' => $r['tp_code'], 'inv_cnt' => 0, 'total_amount' => 0, 'commission' => 0,
+            'adjusted' => 0, 'balance' => 0, 'napkin' => 0, 'diaper' => 0,
         ];
     }
     $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['inv_cnt']      += (int)$r['inv_cnt'];
-    $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['total_qty']    += (float)$r['total_qty'];
     $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['total_amount'] += (float)$r['total_amount'];
     $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['commission']   += $commission;
+    $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['adjusted']     += (float)$r['total_adjusted'];
+    $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['balance']      += (float)$r['total_balance'];
+    $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['napkin']       += (float)$r['napkin_amount'];
+    $by_district[$dist]['divisions'][$div_key]['tps'][$tp_key]['diaper']       += (float)$r['diaper_amount'];
 
-    $by_district[$dist]['qty']        += (float)$r['total_qty'];
     $by_district[$dist]['amount']     += (float)$r['total_amount'];
     $by_district[$dist]['inv']        += (int)$r['inv_cnt'];
     $by_district[$dist]['commission'] += $commission;
+    $by_district[$dist]['adjusted']   += (float)$r['total_adjusted'];
+    $by_district[$dist]['balance']    += (float)$r['total_balance'];
+    $by_district[$dist]['napkin']     += (float)$r['napkin_amount'];
+    $by_district[$dist]['diaper']     += (float)$r['diaper_amount'];
     $grand_commission                 += $commission;
 }
 // Highest-selling district first, so the ranked share-bars read top to bottom.
@@ -213,7 +265,7 @@ $max_district_amount = $by_district ? max(array_column($by_district, 'amount')) 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>District Sales Report : <?php echo $business_name; ?></title>
+    <title>District Advance Payment Report : <?php echo $business_name; ?></title>
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
@@ -315,8 +367,8 @@ $max_district_amount = $by_district ? max(array_column($by_district, 'amount')) 
 
                     <div class="page-head">
                         <div>
-                            <h1><span class="ic-badge"><i class="material-icons-outlined">map</i></span>District Sales Report</h1>
-                            <p class="page-sub">Company &rarr; Territory Partner sales, broken down by district and division.</p>
+                            <h1><span class="ic-badge"><i class="material-icons-outlined">map</i></span>District Advance Payment Report</h1>
+                            <p class="page-sub">Company &rarr; Territory Partner advance payments, broken down by district and division.</p>
                         </div>
                     </div>
 
@@ -340,11 +392,11 @@ $max_district_amount = $by_district ? max(array_column($by_district, 'amount')) 
                                 </select>
                             </div>
                             <div class="f-group">
-                                <label>Product Type</label>
-                                <select name="gst_filter" class="form-control form-control-sm">
-                                    <option value="all" <?php echo $gst_filter === 'all' ? 'selected' : ''; ?>>All Products</option>
-                                    <option value="gst" <?php echo $gst_filter === 'gst' ? 'selected' : ''; ?>>GST Products</option>
-                                    <option value="non_gst" <?php echo $gst_filter === 'non_gst' ? 'selected' : ''; ?>>Non-GST Products</option>
+                                <label>Category</label>
+                                <select name="category" class="form-control form-control-sm">
+                                    <option value="all" <?php echo $cat_filter === 'all' ? 'selected' : ''; ?>>All Categories</option>
+                                    <option value="napkin" <?php echo $cat_filter === 'napkin' ? 'selected' : ''; ?>>Napkin</option>
+                                    <option value="diaper" <?php echo $cat_filter === 'diaper' ? 'selected' : ''; ?>>Diaper</option>
                                 </select>
                             </div>
                             <div class="f-group" style="min-width:0;">
@@ -358,30 +410,44 @@ $max_district_amount = $by_district ? max(array_column($by_district, 'amount')) 
                     <div class="kpi-row">
                         <div class="kpi-card">
                             <div class="kpi-ic blue"><i class="material-icons-outlined">receipt_long</i></div>
-                            <div><div class="kpi-t">Invoices</div><div class="kpi-v"><?php echo inr_format($grand_inv, 0); ?></div></div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-ic amber"><i class="material-icons-outlined">inventory_2</i></div>
-                            <div><div class="kpi-t">Quantity Sold</div><div class="kpi-v"><?php echo inr_format($grand_qty, 0); ?></div></div>
+                            <div><div class="kpi-t">Advance Payments</div><div class="kpi-v"><?php echo inr_format($grand_inv, 0); ?></div></div>
                         </div>
                         <div class="kpi-card">
                             <div class="kpi-ic green"><i class="material-icons-outlined">payments</i></div>
-                            <div><div class="kpi-t">Total Sales</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_amount, 2); ?></div></div>
+                            <div><div class="kpi-t">Total Advance Amount</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_amount, 2); ?></div></div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-ic amber"><i class="material-icons-outlined">task_alt</i></div>
+                            <div><div class="kpi-t">Adjusted</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_adjusted, 2); ?></div></div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-ic blue"><i class="material-icons-outlined">account_balance_wallet</i></div>
+                            <div><div class="kpi-t">Balance</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_balance, 2); ?></div></div>
                         </div>
                         <div class="kpi-card">
                             <div class="kpi-ic purple"><i class="material-icons-outlined">savings</i></div>
                             <div><div class="kpi-t">CP Commission</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_commission, 2); ?></div></div>
                         </div>
                     </div>
-                    <p class="text-muted" style="font-size:11.5px;margin:-14px 0 20px;">Commission = the sourcing Channel Partner's own winning commission rate (higher of 6% of net sales or 2% of location deposit, per <a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a>) applied to each division's share of that CP's sales. Sales with no Channel Partner attached use a flat 6% of sales, the same sales-based leg of that formula. Not a wallet-credited amount — an estimate for reporting only.</p>
+                    <div class="kpi-row" style="margin-top:-8px;">
+                        <div class="kpi-card">
+                            <div class="kpi-ic amber"><i class="material-icons-outlined">inventory_2</i></div>
+                            <div><div class="kpi-t">Napkin Advance</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_napkin, 2); ?></div></div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-ic amber"><i class="material-icons-outlined">inventory_2</i></div>
+                            <div><div class="kpi-t">Diaper Advance</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_diaper, 2); ?></div></div>
+                        </div>
+                    </div>
+                    <p class="text-muted" style="font-size:11.5px;margin:-14px 0 20px;">Commission = the sourcing Channel Partner's own winning commission rate (higher of 6% of net advance payments or 2% of location deposit, per <a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a>) applied to each division's share of that CP's advance payments. A CP is attributed to a division when that division is directly assigned to the CP (channel_partner_locations) — advance payments carry no Channel Partner of their own. Divisions with no Channel Partner assigned use a flat 6% of advance amount, the same sales-based leg of that formula. Not a wallet-credited amount — an estimate for reporting only.</p>
 
-                    <h5 class="section-title"><i class="material-icons-outlined">layers</i>District / Division-wise Sales</h5>
+                    <h5 class="section-title"><i class="material-icons-outlined">layers</i>District / Division-wise Advance Payments</h5>
 
                     <?php if (empty($by_district)): ?>
                         <div class="dist-card">
                             <div class="empty-state">
                                 <i class="material-icons-outlined">search_off</i>
-                                No sales in this period.
+                                No advance payments in this period.
                             </div>
                         </div>
                     <?php else: $rank = 0; foreach ($by_district as $district_name => $d):
@@ -393,34 +459,40 @@ $max_district_amount = $by_district ? max(array_column($by_district, 'amount')) 
                             <div class="dist-rank">#<?php echo $rank; ?></div>
                             <div class="dist-name"><?php echo htmlspecialchars($district_name); ?></div>
                             <div class="dist-bar-wrap"><div class="dist-bar" style="width:<?php echo $share_pct; ?>%;"></div></div>
-                            <div class="dist-meta"><?php echo inr_format($d['inv'], 0); ?> inv &middot; <?php echo inr_format($d['qty'], 0); ?> qty</div>
+                            <div class="dist-meta"><?php echo inr_format($d['inv'], 0); ?> pmts</div>
                             <div class="dist-amount">&#8377;<?php echo inr_format($d['amount'], 2); ?><span class="dist-commission">&#8377;<?php echo inr_format($d['commission'], 2); ?> commission</span></div>
                             <i class="material-icons-outlined dist-caret">expand_more</i>
                         </div>
                         <div class="dist-body">
                             <div style="overflow-x:auto;">
                             <table class="div-table">
-                                <thead><tr><th>Division</th><th class="num">Invoices</th><th class="num">Quantity</th><th class="num">Sales Amount &#8377;</th><th class="num">Commission &#8377;</th></tr></thead>
+                                <thead><tr><th>Division</th><th class="num">Payments</th><th class="num">Napkin &#8377;</th><th class="num">Diaper &#8377;</th><th class="num">Total &#8377;</th><th class="num">Adjusted &#8377;</th><th class="num">Balance &#8377;</th><th class="num">Commission &#8377;</th></tr></thead>
                                 <tbody>
                                 <?php foreach ($d['divisions'] as $div): ?>
                                     <tr class="div-row" onclick="this.classList.toggle('open')">
                                         <td><span class="div-name"><span class="dot"></span><?php echo htmlspecialchars($div['division_name'] ?? 'Unassigned Division'); ?><i class="material-icons-outlined div-caret">expand_more</i></span></td>
                                         <td class="num"><?php echo inr_format((int)$div['inv_cnt'], 0); ?></td>
-                                        <td class="num"><?php echo inr_format((float)$div['total_qty'], 0); ?></td>
-                                        <td class="num">&#8377;<?php echo inr_format((float)$div['total_amount'], 2); ?></td>
+                                        <td class="num"><?php echo inr_format((float)$div['napkin'], 2); ?></td>
+                                        <td class="num"><?php echo inr_format((float)$div['diaper'], 2); ?></td>
+                                        <td class="num" style="font-weight:700;">&#8377;<?php echo inr_format((float)$div['total_amount'], 2); ?></td>
+                                        <td class="num"><?php echo inr_format((float)$div['adjusted'], 2); ?></td>
+                                        <td class="num"><?php echo inr_format((float)$div['balance'], 2); ?></td>
                                         <td class="num commission-cell">&#8377;<?php echo inr_format((float)$div['commission'], 2); ?></td>
                                     </tr>
                                     <tr class="tp-sub-row">
-                                        <td colspan="5">
+                                        <td colspan="8">
                                             <table class="tp-table">
-                                                <thead><tr><th>Territory Partner</th><th class="num">Invoices</th><th class="num">Quantity</th><th class="num">Sales Amount &#8377;</th><th class="num">Commission &#8377;</th></tr></thead>
+                                                <thead><tr><th>Territory Partner</th><th class="num">Payments</th><th class="num">Napkin &#8377;</th><th class="num">Diaper &#8377;</th><th class="num">Total &#8377;</th><th class="num">Adjusted &#8377;</th><th class="num">Balance &#8377;</th><th class="num">Commission &#8377;</th></tr></thead>
                                                 <tbody>
                                                 <?php foreach ($div['tps'] as $tp): ?>
                                                     <tr>
                                                         <td><span class="tp-name-cell"><i class="material-icons-outlined">person_outline</i><?php echo htmlspecialchars($tp['tp_name']); ?><span class="tp-code"><?php echo htmlspecialchars($tp['tp_code']); ?></span></span></td>
                                                         <td class="num"><?php echo inr_format((int)$tp['inv_cnt'], 0); ?></td>
-                                                        <td class="num"><?php echo inr_format((float)$tp['total_qty'], 0); ?></td>
-                                                        <td class="num">&#8377;<?php echo inr_format((float)$tp['total_amount'], 2); ?></td>
+                                                        <td class="num"><?php echo inr_format((float)$tp['napkin'], 2); ?></td>
+                                                        <td class="num"><?php echo inr_format((float)$tp['diaper'], 2); ?></td>
+                                                        <td class="num" style="font-weight:700;">&#8377;<?php echo inr_format((float)$tp['total_amount'], 2); ?></td>
+                                                        <td class="num"><?php echo inr_format((float)$tp['adjusted'], 2); ?></td>
+                                                        <td class="num"><?php echo inr_format((float)$tp['balance'], 2); ?></td>
                                                         <td class="num commission-cell">&#8377;<?php echo inr_format((float)$tp['commission'], 2); ?></td>
                                                     </tr>
                                                 <?php endforeach; ?>
