@@ -72,7 +72,7 @@ if (!function_exists('espoFunnelSnapshot')) {
         $userFilter = espoUserFilterClause($espoUserId, $conn);
         $from = $conn->real_escape_string($dateFrom);
         $to   = $conn->real_escape_string($dateTo);
-        $sql = "SELECT stage, COUNT(*) AS c FROM opportunity
+        $sql = "SELECT stage, COUNT(*) AS c FROM `opportunity`
                 WHERE deleted = 0 AND created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
                 {$userFilter}
                 GROUP BY stage";
@@ -99,7 +99,7 @@ if (!function_exists('espoConversionTrend')) {
         $leadSql = "SELECT DATE_FORMAT(created_at, '{$dateFormat}') AS period,
                            COUNT(*) AS created,
                            SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) AS converted
-                    FROM lead
+                    FROM `lead`
                     WHERE deleted = 0 AND created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
                     {$userFilter}
                     GROUP BY period ORDER BY period";
@@ -107,7 +107,7 @@ if (!function_exists('espoConversionTrend')) {
         $oppSql = "SELECT DATE_FORMAT(created_at, '{$dateFormat}') AS period,
                           COUNT(*) AS created,
                           SUM(CASE WHEN stage = 'Closed Won' THEN 1 ELSE 0 END) AS won
-                   FROM opportunity
+                   FROM `opportunity`
                    WHERE deleted = 0 AND created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
                    {$userFilter}
                    GROUP BY period ORDER BY period";
@@ -154,7 +154,7 @@ if (!function_exists('espoWonLostSplit')) {
                     SUM(CASE WHEN stage = 'Closed Lost' THEN 1 ELSE 0 END) AS lost,
                     SUM(CASE WHEN stage = 'Closed Won' THEN amount ELSE 0 END) AS won_amount,
                     SUM(CASE WHEN stage = 'Closed Lost' THEN amount ELSE 0 END) AS lost_amount
-                FROM opportunity
+                FROM `opportunity`
                 WHERE deleted = 0 AND close_date BETWEEN '{$from}' AND '{$to}'
                 {$userFilter}";
         $result = $conn->query($sql);
@@ -174,7 +174,7 @@ if (!function_exists('espoAvgSalesCycleDays')) {
         $from = $conn->real_escape_string($dateFrom);
         $to   = $conn->real_escape_string($dateTo);
         $sql = "SELECT AVG(DATEDIFF(close_date, created_at)) AS avg_days
-                FROM opportunity
+                FROM `opportunity`
                 WHERE deleted = 0 AND stage = 'Closed Won'
                 AND close_date BETWEEN '{$from}' AND '{$to}'
                 {$userFilter}";
@@ -233,8 +233,15 @@ if (!function_exists('espoCallsPerConversion')) {
         $r = $conn->query($callSql);
         $calls = $r ? (int)$r->fetch_assoc()['c'] : 0;
 
-        $wonLost = espoWonLostSplit($conn, $espoUserId, $dateFrom, $dateTo);
+        $wonLostSql = "SELECT
+                    SUM(CASE WHEN stage = 'Closed Won' THEN 1 ELSE 0 END) AS won
+                FROM `opportunity`
+                WHERE deleted = 0 AND close_date BETWEEN '{$from}' AND '{$to}'
+                {$userFilter}";
+        $r = $conn->query($wonLostSql);
+        $wonLostRow = $r ? $r->fetch_assoc() : null;
+        $conversions = $wonLostRow ? (int)($wonLostRow['won'] ?? 0) : 0;
 
-        return espoCallsPerConversionRatio($calls, $wonLost['won']);
+        return espoCallsPerConversionRatio($calls, $conversions);
     }
 }
