@@ -6,27 +6,74 @@ require_once("include/DistrictNotes.php");
 error_reporting(0);
 
 ensureDistrictNotesTable($db_conn);
+ensureFixedDistrictColumn($db_conn);
 
 $districts = getBdmAssignedDistrictNames($db_conn, (int)$salesBdmID);
+$fixedDistricts = array_values(array_intersect(getFixedNoteDistricts($db_conn, (int)$salesBdmID), $districts));
+// If the BDM's own assignment changed since fixing (e.g. a reassignment
+// dropped a district), silently prune it rather than keep saving notes
+// against a district they no longer cover.
+
+// Clearing the fix ("Change districts") is its own quick GET action — no
+// need to submit a whole note just to unlock the picker again.
+if (isset($_GET['unfix'])) {
+    setFixedNoteDistricts($db_conn, (int)$salesBdmID, []);
+    header("Location: add-district-note.php");
+    exit;
+}
 
 $errorMsg = '';
 $successMsg = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $district  = trim($_POST['district'] ?? '');
+    // Fixed districts always win over whatever the (hidden) form fields say —
+    // the picker isn't even rendered while fixed, so the posted values should
+    // already match, but this keeps a tampered request from sneaking a
+    // different district through while "fixed" is on.
+    $selectedDistricts = !empty($fixedDistricts) ? $fixedDistricts : array_map('trim', (array)($_POST['district'] ?? []));
+    $selectedDistricts = array_values(array_unique(array_filter($selectedDistricts, fn($d) => $d !== '')));
     $issueText = trim($_POST['issue_text'] ?? '');
     $priority  = $_POST['priority'] ?? 'normal';
     if (!in_array($priority, ['high', 'priority', 'normal'], true)) { $priority = 'normal'; }
+    $noteType  = $_POST['note_type'] ?? 'tp';
+    if (!in_array($noteType, ['software', 'tp'], true)) { $noteType = 'tp'; }
+    $wantsFix  = !empty($_POST['fix_district']);
 
-    // Never trust the posted district on its own — it must be one this BDM
-    // is actually assigned to, same posture as every other BDM-scoped form.
-    if (!in_array($district, $districts, true)) {
-        $errorMsg = 'Select a valid district from your assigned list.';
+    // Never trust the posted districts on their own — every one must be a
+    // district this BDM is actually assigned to, same posture as every other
+    // BDM-scoped form.
+    $invalidDistrict = false;
+    foreach ($selectedDistricts as $d) { if (!in_array($d, $districts, true)) { $invalidDistrict = true; break; } }
+
+    // Same posture for the selected TPs — only ones that actually sit in one
+    // of the selected districts can be tagged, never trusting the posted
+    // names/ids on their own.
+    $selectedTpNames = [];
+    $postedTpIds = array_values(array_unique(array_filter(array_map('trim', (array)($_POST['tp_ids'] ?? []), ), fn($v) => $v !== '')));
+    if (!empty($postedTpIds) && !$invalidDistrict && !empty($selectedDistricts)) {
+        $ph = implode(',', array_fill(0, count($postedTpIds), '?'));
+        $dPh = implode(',', array_fill(0, count($selectedDistricts), '?'));
+        $normDistricts = array_map(fn($n) => mb_strtolower(trim($n)), $selectedDistricts);
+        $tpStmt = $db_conn->prepare(
+            "SELECT name FROM territory_partners WHERE tp_id IN ($ph) AND LOWER(TRIM(branch_district)) IN ($dPh)"
+        );
+        $tpTypes = str_repeat('s', count($postedTpIds)) . str_repeat('s', count($normDistricts));
+        $tpStmt->bind_param($tpTypes, ...array_merge($postedTpIds, $normDistricts));
+        $tpStmt->execute();
+        foreach ($tpStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $r) { $selectedTpNames[] = $r['name']; }
+        $tpStmt->close();
+    }
+    $tpNamesForRow = !empty($selectedTpNames) ? implode(', ', $selectedTpNames) : null;
+
+    if (empty($selectedDistricts) || $invalidDistrict) {
+        $errorMsg = 'Select at least one valid district from your assigned list.';
     } elseif ($issueText === '') {
         $errorMsg = 'Describe the issue before saving.';
     } else {
         $photoPath = null;
-        if (!empty($_FILES['photo']['name']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+        // Photo upload only applies to a Software Issue — a TPs Issue never
+        // shows that field at all, so ignore anything posted alongside it.
+        if ($noteType === 'software' && !empty($_FILES['photo']['name']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
             $file = $_FILES['photo'];
             if ($file['size'] > 10 * 1024 * 1024) {
                 $errorMsg = 'Photo is too large. Maximum allowed size is 10 MB.';
@@ -46,12 +93,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($errorMsg === '') {
+            // One row per selected district — same issue/priority/photo,
+            // so Manage Notes' per-district filter still finds it correctly
+            // under each district it was logged against.
             $stmt = $db_conn->prepare(
-                "INSERT INTO salesbdm_district_notes (bdm_id, district, issue_text, priority, photo_path) VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO salesbdm_district_notes (bdm_id, district, note_type, issue_text, priority, photo_path, tp_names) VALUES (?, ?, ?, ?, ?, ?, ?)"
             );
-            $stmt->bind_param('issss', $salesBdmID, $district, $issueText, $priority, $photoPath);
-            $stmt->execute();
+            foreach ($selectedDistricts as $d) {
+                $stmt->bind_param('issssss', $salesBdmID, $d, $noteType, $issueText, $priority, $photoPath, $tpNamesForRow);
+                $stmt->execute();
+            }
             $stmt->close();
+
+            // Only a fresh pick (the picker was actually shown) can set the
+            // fix — while already fixed, the checkbox isn't rendered at all,
+            // so this never re-writes the same value pointlessly.
+            if (empty($fixedDistricts) && $wantsFix) {
+                setFixedNoteDistricts($db_conn, (int)$salesBdmID, $selectedDistricts);
+            }
+
             header("Location: add-district-note.php?saved=1");
             exit;
         }
@@ -81,6 +141,38 @@ if (isset($_GET['saved'])) { $successMsg = 'Note saved.'; }
         body { font-family: 'Poppins', sans-serif; background:#f4f5fb; }
 
         .dn-wrap { display:flex; justify-content:center; padding:6px 0 40px; }
+
+        .dn-type-switch { display:flex; gap:8px; }
+        .dn-type-btn {
+            flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+            padding:11px 12px; border-radius:10px; border:1.5px solid #e5e7eb; background:#f9fafb;
+            color:#6b7280; font-size:13px; font-weight:700; cursor:pointer; transition:background .15s,border-color .15s,color .15s;
+        }
+        .dn-type-btn input { display:none; }
+        .dn-type-btn .material-icons-outlined { font-size:18px; }
+        .dn-type-btn:hover { background:#f3f4f6; }
+        .dn-type-btn.active { background:#eef0ff; border-color:#c7d2fe; color:#3730a3; }
+
+        .dn-fixed-district {
+            display:flex; align-items:center; gap:8px; background:#eef0ff; border:1.5px solid #c7d2fe;
+            border-radius:10px; padding:10px 14px; font-size:13.5px; font-weight:700; color:#3730a3;
+        }
+        .dn-fixed-district .material-icons-outlined { font-size:17px; color:#5b4fd6; }
+        .dn-fixed-district span { flex:1; }
+        .dn-change-link { font-size:12px; font-weight:700; color:#5b4fd6; text-decoration:underline; white-space:nowrap; }
+        .dn-fix-check {
+            display:flex; align-items:center; gap:6px; margin-top:9px; font-size:12px; font-weight:600;
+            color:#6b7280; cursor:pointer; text-transform:none; letter-spacing:0;
+        }
+        .dn-fix-check .material-icons-outlined { font-size:15px; color:#9ca3af; }
+        .dn-fix-check input { width:15px; height:15px; accent-color:#5b4fd6; }
+
+        .dn-tps-panel { margin-top:12px; background:#f9fafb; border:1px solid #eef0f4; border-radius:10px; padding:10px 12px; }
+        .dn-tps-title {
+            display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:#6b7280;
+            text-transform:uppercase; letter-spacing:.4px; margin-bottom:8px;
+        }
+        .dn-tps-title .material-icons-outlined { font-size:15px; color:#9ca3af; }
         .dn-card {
             background:#fff; border:1px solid rgba(17,17,26,0.06); border-radius:18px;
             max-width:560px; width:100%; overflow:hidden;
@@ -117,22 +209,55 @@ if (isset($_GET['saved'])) { $successMsg = 'Note saved.'; }
         .dn-card .form-control:focus { border-color:#667eea; box-shadow:0 0 0 3px rgba(102,126,234,.14); }
         .dn-card select.form-control { cursor:pointer; }
 
-        /* Searchable district select (select2) restyled to match the plain
-           .form-control fields around it instead of select2's default look. */
+        /* Searchable, multi-select district picker (select2) restyled to match
+           the plain .form-control fields around it instead of select2's
+           default look. Multi-mode renders selections as removable chips. */
         .dn-field .select2-container { width:100% !important; }
-        .dn-field .select2-selection--single {
-            height:auto !important; border-radius:10px !important; border:1.5px solid #e5e7eb !important;
-            padding:9px 13px !important;
+        .dn-field .select2-selection--multiple {
+            min-height:46px !important; border-radius:10px !important; border:1.5px solid #e5e7eb !important;
+            padding:8px 10px !important;
         }
-        .dn-field .select2-selection__rendered { padding:0 !important; font-size:13.5px; line-height:1.4 !important; color:#111827; }
-        .dn-field .select2-selection__arrow { height:38px !important; top:1px !important; }
-        .dn-field .select2-container--default.select2-container--focus .select2-selection--single,
-        .dn-field .select2-container--default .select2-selection--single:focus {
+        /* Select2 renders every chosen chip as an <li> inside this <ul>, packed
+           edge-to-edge by default with only whatever margin each chip sets on
+           itself — switching it to a wrapping flex row with its own gap is what
+           actually gives every chip breathing room on all sides, neat instead
+           of "kasa kasa" (cramped) against its neighbours. */
+        .dn-field .select2-selection__rendered {
+            display:flex !important; flex-wrap:wrap !important; gap:7px !important; padding:2px !important;
+        }
+        .dn-field .select2-selection__choice {
+            background:#eef0ff !important; border-color:#c7d2fe !important; color:#3730a3 !important;
+            border-radius:7px !important; font-size:12.5px !important; font-weight:600 !important; padding:6px 10px !important;
+            margin:0 !important; display:inline-flex !important; align-items:center !important; line-height:1 !important;
+        }
+        .dn-field .select2-selection__choice__remove {
+            color:#5b4fd6 !important; margin-right:6px !important; display:inline-flex !important; align-items:center !important;
+        }
+        .dn-field .select2-search__field { font-size:13.5px !important; margin-top:2px !important; }
+        .dn-field .select2-container--default.select2-container--focus .select2-selection--multiple {
             border-color:#667eea !important; box-shadow:0 0 0 3px rgba(102,126,234,.14);
         }
         .select2-dropdown { border-radius:10px !important; border-color:#e5e7eb !important; overflow:hidden; }
         .select2-search--dropdown .select2-search__field { border-radius:8px !important; padding:6px 10px !important; }
-        .select2-results__option--highlighted { background:#667eea !important; }
+        .select2-results__option--highlighted { background:#f0f1ff !important; color:#111827 !important; }
+
+        /* Checkbox indicator on the right of each option — a plain box that
+           fills in with a check mark once select2 marks that option
+           aria-selected, so multi-picking reads like a checkbox list instead
+           of a single-select highlight. */
+        .select2-results__option { position:relative !important; padding:8px 40px 8px 12px !important; }
+        .select2-results__option::after {
+            content:''; position:absolute; right:12px; top:50%; transform:translateY(-50%);
+            width:17px; height:17px; border:1.5px solid #cbd5e1; border-radius:5px; background:#fff;
+        }
+        .select2-results__option[aria-selected="true"] {
+            background:#f5f5ff !important; color:#3730a3 !important; font-weight:600;
+        }
+        .select2-results__option[aria-selected="true"]::after {
+            background-color:#5b4fd6; border-color:#5b4fd6;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2'%3E%3Cpath d='M3 8l3.5 3.5L13 5'/%3E%3C/svg%3E");
+            background-repeat:no-repeat; background-position:center; background-size:11px;
+        }
 
         .dn-priority-row { display:flex; gap:9px; flex-wrap:wrap; }
         .dn-priority-btn {
@@ -211,13 +336,47 @@ if (isset($_GET['saved'])) { $successMsg = 'Note saved.'; }
                         <div class="dn-body">
                         <form method="post" enctype="multipart/form-data">
                             <div class="dn-field">
-                                <label><i class="material-icons-outlined">location_on</i> District</label>
-                                <select name="district" id="districtSelect" class="form-control" required>
-                                    <option value="">Select district…</option>
-                                    <?php foreach ($districts as $d): ?>
-                                        <option value="<?php echo htmlspecialchars($d, ENT_QUOTES); ?>" <?php echo (($_POST['district'] ?? '') === $d) ? 'selected' : ''; ?>><?php echo htmlspecialchars($d); ?></option>
+                                <label><i class="material-icons-outlined">category</i> Note Type</label>
+                                <?php $postedNoteType = ($_POST['note_type'] ?? 'tp') === 'software' ? 'software' : 'tp'; ?>
+                                <div class="dn-type-switch" id="noteTypeSwitch">
+                                    <label class="dn-type-btn <?php echo $postedNoteType === 'tp' ? 'active' : ''; ?>" data-val="tp">
+                                        <input type="radio" name="note_type" value="tp" <?php echo $postedNoteType === 'tp' ? 'checked' : ''; ?>>
+                                        <i class="material-icons-outlined">storefront</i> TPs Issue
+                                    </label>
+                                    <label class="dn-type-btn <?php echo $postedNoteType === 'software' ? 'active' : ''; ?>" data-val="software">
+                                        <input type="radio" name="note_type" value="software" <?php echo $postedNoteType === 'software' ? 'checked' : ''; ?>>
+                                        <i class="material-icons-outlined">bug_report</i> Software Issue
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="dn-field">
+                                <label><i class="material-icons-outlined">location_on</i> District<span style="text-transform:none;font-weight:500;color:#9ca3af;"> (select one or more)</span></label>
+                                <?php if (!empty($fixedDistricts)): ?>
+                                    <div class="dn-fixed-district">
+                                        <i class="material-icons-outlined">push_pin</i>
+                                        <span><?php echo htmlspecialchars(implode(', ', $fixedDistricts)); ?></span>
+                                        <a href="add-district-note.php?unfix=1" class="dn-change-link">Change</a>
+                                    </div>
+                                    <?php foreach ($fixedDistricts as $fd): ?>
+                                        <input type="hidden" name="district[]" value="<?php echo htmlspecialchars($fd, ENT_QUOTES); ?>">
                                     <?php endforeach; ?>
-                                </select>
+                                <?php else: ?>
+                                    <?php $postedDistricts = (array)($_POST['district'] ?? []); ?>
+                                    <select name="district[]" id="districtSelect" class="form-control" multiple required>
+                                        <?php foreach ($districts as $d): ?>
+                                            <option value="<?php echo htmlspecialchars($d, ENT_QUOTES); ?>" <?php echo in_array($d, $postedDistricts, true) ? 'selected' : ''; ?>><?php echo htmlspecialchars($d); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <label class="dn-fix-check">
+                                        <input type="checkbox" name="fix_district" value="1" <?php echo !empty($_POST['fix_district']) ? 'checked' : ''; ?>>
+                                        <i class="material-icons-outlined">push_pin</i> Fix the selected district(s) so they auto-fill next time
+                                    </label>
+                                <?php endif; ?>
+                                <div id="districtTpsPanel" class="dn-tps-panel" style="display:none;">
+                                    <div class="dn-tps-title"><i class="material-icons-outlined">groups</i> Tag Territory Partner(s) (optional)</div>
+                                    <select id="tpSelect" name="tp_ids[]" multiple class="form-control"></select>
+                                </div>
                             </div>
 
                             <div class="dn-field">
@@ -234,7 +393,7 @@ if (isset($_GET['saved'])) { $successMsg = 'Note saved.'; }
                                     </label>
                                     <label class="dn-priority-btn priority" data-val="priority">
                                         <i class="material-icons-outlined">priority_high</i>
-                                        <input type="radio" name="priority" value="priority"> Priority
+                                        <input type="radio" name="priority" value="priority"> Medium
                                     </label>
                                     <label class="dn-priority-btn normal active" data-val="normal">
                                         <i class="material-icons-outlined">check_circle</i>
@@ -243,7 +402,7 @@ if (isset($_GET['saved'])) { $successMsg = 'Note saved.'; }
                                 </div>
                             </div>
 
-                            <div class="dn-field">
+                            <div class="dn-field" id="photoField" style="<?php echo (($_POST['note_type'] ?? 'tp') === 'software') ? '' : 'display:none;'; ?>">
                                 <label><i class="material-icons-outlined">image</i> Photo (optional)</label>
                                 <label class="dn-drop" id="dropZone">
                                     <i class="material-icons-outlined">cloud_upload</i>
@@ -276,13 +435,62 @@ if (isset($_GET['saved'])) { $successMsg = 'Note saved.'; }
 <script src="../../assets/js/custom.js"></script>
 <script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
 <script>
-$('#districtSelect').select2({ placeholder: 'Select district…', width: '100%' });
+$('#districtSelect').select2({ placeholder: 'Select district(s)…', width: '100%', closeOnSelect: false });
+
+// Ticked TPs survive a district-list refresh (e.g. adding a second district)
+// instead of silently un-ticking whatever was already picked.
+var checkedTpIds = {};
+
+function loadDistrictTps(districts) {
+    var $panel = $('#districtTpsPanel');
+    var $select = $('#tpSelect');
+    if (!districts || !districts.length) { $panel.hide(); return; }
+    $panel.show();
+    $.getJSON('get-district-tps.php', { districts: districts }, function (resp) {
+        var tps = resp.tps || [];
+        if ($select.data('select2')) { $select.select2('destroy'); }
+        $select.empty();
+        tps.forEach(function (t) {
+            if (!t.tp_id) { return; }
+            var $opt = $('<option></option>').val(t.tp_id).text(t.name + (t.active ? '' : ' (inactive)'));
+            if (checkedTpIds[t.tp_id]) { $opt.prop('selected', true); }
+            $select.append($opt);
+        });
+        $select.select2({
+            placeholder: tps.length ? 'Select Territory Partner(s)…' : 'No Territory Partners in this district',
+            width: '100%', closeOnSelect: false
+        });
+        $select.on('change', function () {
+            checkedTpIds = {};
+            ($(this).val() || []).forEach(function (id) { checkedTpIds[id] = true; });
+        });
+    }).fail(function () {
+        $select.empty().append('<option disabled>Could not load Territory Partners</option>');
+    });
+}
+
+$('#districtSelect').on('change', function () { loadDistrictTps($(this).val()); });
+<?php if (!empty($fixedDistricts)): ?>
+loadDistrictTps(<?php echo json_encode($fixedDistricts); ?>);
+<?php endif; ?>
 
 document.querySelectorAll('.dn-priority-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
         document.querySelectorAll('.dn-priority-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         btn.querySelector('input').checked = true;
+    });
+});
+
+// Photo upload only makes sense for a Software Issue — a TPs Issue never
+// needs it, so the field itself only shows for that type.
+document.querySelectorAll('#noteTypeSwitch .dn-type-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#noteTypeSwitch .dn-type-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        btn.querySelector('input').checked = true;
+        var isSoftware = btn.getAttribute('data-val') === 'software';
+        document.getElementById('photoField').style.display = isSoftware ? '' : 'none';
     });
 });
 document.getElementById('photoInput').addEventListener('change', function () {
