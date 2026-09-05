@@ -156,25 +156,29 @@ foreach ($sales_rows as $r) {
 
 // ── CP commission rate lookup ────────────────────────────────────────────────
 // Same rule as cp-wallet-commission-calculator.php's evaluateCpCommission():
-// a CP's commission is whichever is higher — 6% of the CP's net advance
-// payments across the WHOLE period, or 2% of the CP's total location
-// deposit. That decision is made once per CP (deposit isn't tied to any one
-// division), then re-expressed as a single effective %, which is applied to
-// each division's own slice of that CP's advance-payment amount — so a
+// a CP's commission is whichever is higher — 6% of the CP's net NAPKIN
+// advance payments across the WHOLE period, or 2% of the CP's total location
+// deposit. Per product decision, only the napkin leg of a TP's advance
+// payments feeds commission — diaper advance is excluded entirely (it still
+// displays in its own column, it just never contributes to this calc). That
+// decision is made once per CP (deposit isn't tied to any one division),
+// then re-expressed as a single effective %, which is applied to each
+// division's own slice of that CP's NAPKIN advance-payment amount — so a
 // deposit-floor CP still contributes a division-level commission figure
 // using "the same commission concept", just computed as an effective rate
 // instead of a directly-split rupee amount.
 //
-// A CP's net advance payments = the sum of tp_advance_payments.amount across
-// every TP whose resolved division (see main query above) is assigned to
-// that CP in channel_partner_locations — the division-attribution scheme
-// replacing the old direct source_cp_id column (advance payments carry no
-// CP of their own). Divisions with no CP assigned fall to the flat leg below.
+// A CP's net napkin advance payments = the sum of tp_advance_payments.amount
+// (WHERE product_type = 'napkin') across every TP whose resolved division
+// (see main query above) is assigned to that CP in channel_partner_locations
+// — the division-attribution scheme replacing the old direct source_cp_id
+// column (advance payments carry no CP of their own). Divisions with no CP
+// assigned fall to the flat leg below.
 //
 // Divisions with no CP assigned still get a commission figure here, using
-// the same advance-based leg of the formula (6% of advance amount) with no
-// CP to hold a deposit floor against, since there's no real CP for the
-// deposit-floor half of the rule to apply to.
+// the same napkin-advance-based leg of the formula (6% of napkin advance)
+// with no CP to hold a deposit floor against, since there's no real CP for
+// the deposit-floor half of the rule to apply to.
 const NO_CP_COMMISSION_PCT = 0.06;
 $cp_ids = array_values(array_unique(array_filter(array_column($rows, 'channel_partner_id'), fn($v) => (int)$v > 0)));
 $cp_effective_pct = []; // channel_partner_id => effective commission %
@@ -196,6 +200,8 @@ if ($cp_ids) {
     // multiple locations under this CP's divisions must not have its full
     // advance amount counted once per matching location (that would multiply
     // it by however many of its firkas happen to fall under this one CP).
+    // product_type = 'napkin' excludes diaper advance from the commission
+    // base entirely, per product decision.
     $cp_advance_gross = crr($db_conn,
         "WITH RECURSIVE divanc AS (
             SELECT id AS node_id, id AS anc_id FROM partner_location_nodes WHERE depth = 4
@@ -210,7 +216,7 @@ if ($cp_ids) {
          JOIN (SELECT territory_partner_id, COUNT(*) AS n FROM territory_partner_locations GROUP BY territory_partner_id) firka_cnt
               ON firka_cnt.territory_partner_id = tap.territory_partner_id
          WHERE cpl.channel_partner_id IN ({$ph})
-           AND tap.deleted_at IS NULL AND tap.payment_date BETWEEN ? AND ?
+           AND tap.deleted_at IS NULL AND tap.product_type = 'napkin' AND tap.payment_date BETWEEN ? AND ?
          GROUP BY cpl.channel_partner_id",
         $types . 'ss', array_merge($cp_ids, [$from, $to]));
     $cp_gross = [];
@@ -227,14 +233,14 @@ if ($cp_ids) {
     foreach ($cp_deposits as $r) $cp_deposit[(int)$r['channel_partner_id']] = (float)$r['deposit'];
 
     foreach ($cp_ids as $cid) {
-        $net_sales = max(0, $cp_gross[$cid] ?? 0);
+        $net_sales = max(0, $cp_gross[$cid] ?? 0); // net NAPKIN advance only — see $cp_advance_gross above
         $from_sales   = round($net_sales * 0.06, 2);
         $from_deposit = round(($cp_deposit[$cid] ?? 0) * 0.02, 2);
         $commission   = max($from_sales, $from_deposit);
-        // Re-expressed as a % of net advance amount so it can multiply
-        // cleanly against any division's slice of this CP's advance
-        // payments, even when the deposit floor (not sales) is what
-        // actually won.
+        // Re-expressed as a % of net napkin advance amount so it can
+        // multiply cleanly against any division's slice of this CP's
+        // napkin advance payments, even when the deposit floor (not
+        // napkin advance) is what actually won.
         $cp_effective_pct[$cid] = $net_sales > 0 ? ($commission / $net_sales) : 0.0;
     }
 }
@@ -261,7 +267,7 @@ foreach ($rows as $r) {
     $tp_key = (int)$r['territory_partner_id'];
     $cid = (int)$r['channel_partner_id'];
     $pct = $cid > 0 ? ($cp_effective_pct[$cid] ?? 0.0) : NO_CP_COMMISSION_PCT;
-    $commission = (float)$r['total_amount'] * $pct;
+    $commission = (float)$r['napkin_amount'] * $pct; // napkin advance only — diaper advance never feeds commission
 
     $sales_key = $dist . '|' . $div_key . '|' . $tp_key;
     $sales_amt = $sales_by_key[$sales_key] ?? 0.0;
@@ -532,7 +538,7 @@ $max_district_amount = $by_district ? max(array_column($by_district, 'amount')) 
                             <div><div class="kpi-t">Diaper Advance</div><div class="kpi-v">&#8377;<?php echo inr_format($grand_diaper, 2); ?></div></div>
                         </div>
                     </div>
-                    <p class="text-muted" style="font-size:11.5px;margin:-14px 0 20px;">Commission = the sourcing Channel Partner's own winning commission rate (higher of 6% of net advance payments or 2% of location deposit, per <a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a>) applied to each division's share of that CP's advance payments. A CP is attributed to a division when that division is directly assigned to the CP (channel_partner_locations) — advance payments carry no Channel Partner of their own. Divisions with no Channel Partner assigned use a flat 6% of advance amount, the same sales-based leg of that formula. Not a wallet-credited amount — an estimate for reporting only. Sales &#8377; alongside is the TP's actual tp_invoices sales for the same period/scope, shown for comparison — it keeps its own real Channel Partner (tp_invoices.source_cp_id) and is not part of the commission calculation above.</p>
+                    <p class="text-muted" style="font-size:11.5px;margin:-14px 0 20px;">Commission = the sourcing Channel Partner's own winning commission rate (higher of 6% of net <strong>napkin</strong> advance payments or 2% of location deposit, per <a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a>) applied to each division's share of that CP's napkin advance payments only — diaper advance is excluded from commission entirely. A CP is attributed to a division when that division is directly assigned to the CP (channel_partner_locations) — advance payments carry no Channel Partner of their own. Divisions with no Channel Partner assigned use a flat 6% of napkin advance amount, the same sales-based leg of that formula. Not a wallet-credited amount — an estimate for reporting only. Sales &#8377; alongside is the TP's actual tp_invoices sales for the same period/scope, shown for comparison — it keeps its own real Channel Partner (tp_invoices.source_cp_id) and is not part of the commission calculation above.</p>
 
                     <h5 class="section-title"><i class="material-icons-outlined">layers</i>District / Division-wise Advance Payments</h5>
 
