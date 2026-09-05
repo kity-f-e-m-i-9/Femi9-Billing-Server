@@ -99,6 +99,15 @@ if (!empty($salesBdmID)) {
     </li>
 
     <li>
+        <a href=""><i class="material-icons-two-tone">sticky_note_2</i>District Notes
+            <i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+        <ul class="sub-menu">
+            <li><a href="<?php echo $_bdmBase; ?>add-district-note">Add Note</a></li>
+            <li><a href="<?php echo $_bdmBase; ?>manage-district-notes">Manage Notes</a></li>
+        </ul>
+    </li>
+
+    <li>
         <a href=""><i class="material-icons-two-tone">security</i>Security<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
         <ul class="sub-menu">
             <li><a href="<?php echo $_bdmBase; ?>change-password">Change Password</a></li>
