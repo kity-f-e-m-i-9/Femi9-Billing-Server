@@ -4,6 +4,7 @@ include("config.php");
 require_once __DIR__ . '/../shared/TpApproverContext.php';
 require_once __DIR__ . '/../shared/TpProductType.php';
 require_once __DIR__ . '/../shared/TpCourierPayment.php';
+require_once __DIR__ . '/../shared/TpCourierAmountRequest.php';
 error_reporting(0);
 
 if (!isset($_POST['submit_po'])) {
@@ -59,6 +60,7 @@ if (empty($items)) {
 // showed when the TP paid, which could have been a smaller/larger draft),
 // so a since-changed cart can under- or over-shoot what was already paid.
 tpEnsureCourierPaymentTables($db_conn);
+tpEnsureCourierAmountRequestTable($db_conn);
 tpEnsurePickupColumn($db_conn);
 // Only lines still marked 'courier' feed the box/fee calc — a line the TP
 // picks up in person was never charged for, so it's excluded here too, not
@@ -71,6 +73,20 @@ $courierShipment = tpCourierComputeShipmentForItems($db_conn, $courierItems);
 $courierTotalBoxes = $courierShipment['boxes'];
 $courierTotalCovers = $courierShipment['covers'];
 $courierRequiredAmount = tpCourierComputeAmount($db_conn, $productType, $courierTotalBoxes, $courierTotalCovers);
+
+// A Sales BDM-approved amount-change request overrides the raw calculation
+// here too — resolved through the SAME session-draft id flag
+// pay-courier-payment.php uses (see stash-po-draft.php), never by
+// TP/type/box-cover matching, so what the TP was actually shown/charged is
+// what this gate requires. Consumed (tpCourierAmountRequestMarkApplied) once
+// this specific PO is created below, so it's a one-time correction for THIS
+// order only — it must never silently reduce every future cart's fee too.
+$courierRequestId = $_SESSION['po_draft_' . $tp_id]['courier_request_id'] ?? null;
+$courierAmountRequest = $courierRequestId ? tpCourierAmountRequestGetById($db_conn, (int)$courierRequestId, $tp_id) : null;
+if ($courierAmountRequest && $courierAmountRequest['status'] === 'approved') {
+    $courierRequiredAmount = (float)$courierAmountRequest['approved_amount'];
+}
+
 $courierPoolTotal = tpCourierPoolTotal($db_conn, $tp_id, $productType);
 
 if ($courierRequiredAmount > 0 && $courierPoolTotal < $courierRequiredAmount) {
@@ -240,6 +256,10 @@ try {
     $po_id = $db_conn->insert_id;
     $s->close();
 
+    if ($courierAmountRequest && $courierAmountRequest['status'] === 'approved') {
+        tpCourierAmountRequestMarkApplied($db_conn, (int)$courierAmountRequest['id'], $po_id);
+    }
+
     $si = $db_conn->prepare("INSERT INTO tp_purchase_order_items (po_id, product_id, qty, price, discount_percentage, discount_amount, amount, delivery_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     foreach ($items as $item) {
         $si->bind_param("iiidddds", $po_id, $item['pid'], $item['qty'], $item['price'], $item['dpct'], $item['damt'], $item['amount'], $item['method']);
@@ -285,6 +305,14 @@ try {
     }
 
     $db_conn->commit();
+
+    // This draft (and any courier-amount-request tied to it) is fully spent
+    // now that a real PO exists for it — clear it so the TP's NEXT cart
+    // starts clean, never silently inheriting this one's approved amount
+    // just because it happens to end up with identical line items (e.g. a
+    // simple repeat order of the same single product/qty).
+    unset($_SESSION['po_draft_' . $tp_id]);
+
     $_SESSION['successMessage'] = 'Purchase order submitted successfully.';
     header("Location: manage-purchase-orders.php");
     exit;

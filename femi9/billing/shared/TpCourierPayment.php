@@ -174,22 +174,6 @@ function tpEnsurePickupColumn(mysqli $db): void
     }
 }
 
-// Self-migrating: lets the company manually correct the courier amount for
-// one already-submitted order, when the auto box/cover calculation got it
-// wrong for some reason — set once per PO, it then overrides
-// tpCourierComputeAmount()'s own box/cover math for every retry-payment
-// calculation on that specific order (pay-courier-payment.php's po_id
-// branch, upload-courier-payment-screenshot.php's po_id branch) until the
-// company clears it again. Pre-submission carts (no PO yet) have nothing to
-// attach an override to — this only ever applies post-submission.
-function tpEnsureCourierOverrideColumn(mysqli $db): void
-{
-    $col = $db->query("SHOW COLUMNS FROM tp_purchase_orders LIKE 'courier_amount_override'");
-    if ($col && $col->num_rows === 0) {
-        $db->query("ALTER TABLE tp_purchase_orders ADD COLUMN courier_amount_override DECIMAL(10,2) NULL AFTER excess_amount");
-    }
-}
-
 /**
  * Splits a cart into the subset actually needing courier, given a
  * pr_id => 'pickup'|'courier' map (pr_id as a STRING key, matching how the

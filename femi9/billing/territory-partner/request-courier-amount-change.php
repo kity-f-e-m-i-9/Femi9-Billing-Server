@@ -42,7 +42,12 @@ if ($calculatedAmount <= 0) {
     respond(false, 'There is no courier amount to dispute on this order.');
 }
 
-$existing = tpCourierAmountRequestGetActive($db_conn, $tp_id, $productType);
+// A request is tied to THIS specific draft via the stashed id, not looked up
+// by TP/type/shape — see stash-po-draft.php's comment on why that fuzzier
+// match was dropped. If this exact draft already has one, don't allow a
+// second.
+$existingId = $draft['courier_request_id'] ?? null;
+$existing = $existingId ? tpCourierAmountRequestGetById($db_conn, (int)$existingId, $tp_id) : null;
 if ($existing) {
     respond(false, $existing['status'] === 'pending'
         ? 'A request is already pending review for this order.'
@@ -53,6 +58,11 @@ $note = trim((string)($_POST['note'] ?? ''));
 if (mb_strlen($note) > 500) { $note = mb_substr($note, 0, 500); }
 
 $id = tpCourierAmountRequestCreate($db_conn, $tp_id, $productType, $totalBoxes, $totalCovers, $calculatedAmount, $items, $note);
+// Bind this new request to the exact draft it was raised for — every later
+// consumer (pay-courier-payment.php, upload-courier-payment-screenshot.php,
+// purchase-order-action.php) resolves the override through this same flag,
+// never through TP/type/box-cover matching alone.
+$_SESSION['po_draft_' . $tp_id]['courier_request_id'] = $id;
 
 // The request itself is never lost even with no BDM currently covering this
 // TP's district — it still sits in the queue for Company's audit view — but

@@ -46,7 +46,21 @@ if (empty($lines)) {
     exit;
 }
 
-$_SESSION['po_draft_' . (int)$Login_user_IDvl] = [
+// A courier-amount-change request approved for the draft's exact line items
+// (see request-courier-amount-change.php) stays usable ONLY while those
+// exact items keep getting re-stashed unchanged — e.g. the TP goes back and
+// forth between this page and pay-courier-payment.php without touching the
+// cart. The instant a line/qty/method changes, this is a materially
+// different order, so the flag is dropped and the TP falls back to the
+// normal box/cover calculation (or can raise a fresh request for the new
+// cart) — never silently inherits an approval meant for the old cart.
+$draftKey = 'po_draft_' . (int)$Login_user_IDvl;
+$previousLines = $_SESSION[$draftKey]['lines'] ?? null;
+$carryCourierRequestId = ($previousLines !== null && $previousLines === $lines)
+    ? ($_SESSION[$draftKey]['courier_request_id'] ?? null)
+    : null;
+
+$_SESSION[$draftKey] = [
     'lines'                          => $lines,
     'use_default_delivery_address'   => !empty($data['use_default_delivery_address']),
     'custom_delivery_line1'          => (string)($data['custom_delivery_line1']    ?? ''),
@@ -57,6 +71,7 @@ $_SESSION['po_draft_' . (int)$Login_user_IDvl] = [
     'custom_delivery_country'        => (string)($data['custom_delivery_country']  ?? ''),
     'custom_delivery_pincode'        => (string)($data['custom_delivery_pincode']  ?? ''),
     'saved_at'                       => time(),
+    'courier_request_id'             => $carryCourierRequestId,
 ];
 
 echo json_encode(['success' => true]);

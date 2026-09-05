@@ -1,15 +1,15 @@
 <?php
 /**
- * Courier amount CHANGE REQUESTS — a separate, earlier checkpoint than the
- * company-side override in TpCourierPayment.php (tpEnsureCourierOverrideColumn
- * et al., which only applies to an ALREADY-SUBMITTED order). This one fires
- * BEFORE the TP has even paid: if the auto box/cover-calculated courier fee
- * looks wrong on the pre-submission pay-courier-payment.php page, the TP can
- * request a correction instead of paying the shown figure — the request
- * routes to whichever Sales BDM's district assignment covers that TP (see
- * salesbdm/include/BdmTpScope.php for the district-matching this reverses),
- * who sets the actual amount to charge. Company gets a read-only oversight
- * view of every request (who approved, original vs corrected amount).
+ * Courier amount CHANGE REQUESTS — fires BEFORE the TP has even paid: if the
+ * auto box/cover-calculated courier fee looks wrong on the pre-submission
+ * pay-courier-payment.php page, the TP can request a correction instead of
+ * paying the shown figure — the request routes to whichever Sales BDM's
+ * district assignment covers that TP (see salesbdm/include/BdmTpScope.php
+ * for the district-matching this reverses), who sets the actual amount to
+ * charge. Company can also review directly. Company/BDM both get a
+ * read-only-or-actionable view of every request (who approved, original vs
+ * corrected amount). An older company-only per-PO manual override concept
+ * was removed 2026-09-05 in favor of this BDM-approval workflow.
  * Confirmed with the business owner 2026-09-04.
  */
 function tpEnsureCourierAmountRequestTable(mysqli $db): void
@@ -30,10 +30,36 @@ function tpEnsureCourierAmountRequestTable(mysqli $db): void
           reviewed_by_name VARCHAR(255) NULL,
           reviewed_at TIMESTAMP NULL,
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          applied_po_id INT UNSIGNED NULL,
           KEY idx_tcar_tp (territory_partner_id, status),
           KEY idx_tcar_created (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+
+    // Self-migrating add-on for a table created before this column existed.
+    // Marks an approved request as "spent" once the order it was approved
+    // for actually gets submitted — an approval is a one-time correction for
+    // THAT specific order, never a standing discount for every future cart
+    // of the same product type (confirmed 2026-09-05, after a TP saw a
+    // months-old approved amount silently apply to an unrelated new order).
+    $col = $db->query("SHOW COLUMNS FROM tp_courier_amount_requests LIKE 'applied_po_id'");
+    if ($col && $col->num_rows === 0) {
+        $db->query("ALTER TABLE tp_courier_amount_requests ADD COLUMN applied_po_id INT UNSIGNED NULL AFTER created_at");
+    }
+}
+
+/**
+ * Ties an approved request to the PO it was actually used for — after this,
+ * tpCourierAmountRequestGetActive() stops returning it, so the NEXT cart the
+ * TP builds goes back to the normal box/cover calculation instead of
+ * silently reusing this one-time correction.
+ */
+function tpCourierAmountRequestMarkApplied(mysqli $db, int $requestId, int $poId): void
+{
+    $stmt = $db->prepare("UPDATE tp_courier_amount_requests SET applied_po_id = ? WHERE id = ?");
+    $stmt->bind_param('ii', $poId, $requestId);
+    $stmt->execute();
+    $stmt->close();
 }
 
 /**
@@ -73,20 +99,31 @@ function tpFindBdmIdsForTp($db_conn, int $tpId): array
 }
 
 /**
- * The one request this TP/product_type pair should currently act on — the
- * latest non-rejected request. A rejected request is dead history (the TP
- * pays the normal calculated amount, same as if nothing was ever requested)
- * so it's deliberately excluded here; it still shows up in the BDM/Company
- * list views by querying the table directly.
+ * Fetches ONE specific request by id, scoped to this TP and still usable
+ * (not rejected, not already applied to a PO). Deliberately identity-based,
+ * not "latest request matching this TP/product_type" or even "matching this
+ * box/cover count" — an earlier version matched by box/cover shape alone,
+ * which turned out to be too loose: a genuinely DIFFERENT later order that
+ * happened to compute to the same box/cover total (e.g. a different product
+ * mix landing on the same "0 boxes + 1 cover") would silently inherit an old
+ * approval meant for a completely different order (reported 2026-09-05,
+ * twice — once via box/cover mismatch, again via box/cover coincidence).
+ *
+ * The caller is expected to know WHICH request id applies via the session
+ * draft's own 'courier_request_id' flag (see stash-po-draft.php and
+ * request-courier-amount-change.php) — that flag is the actual source of
+ * truth for "is there a request tied to the order in front of me right now",
+ * carried forward only while the draft's line items stay identical, and
+ * dropped the moment the TP changes the cart. This function just resolves
+ * that one id into a row, with ownership/usability re-checked server-side.
  */
-function tpCourierAmountRequestGetActive(mysqli $db, int $tpId, string $productType): ?array
+function tpCourierAmountRequestGetById(mysqli $db, int $requestId, int $tpId): ?array
 {
     $stmt = $db->prepare("
         SELECT * FROM tp_courier_amount_requests
-        WHERE territory_partner_id = ? AND product_type = ? AND status IN ('pending','approved')
-        ORDER BY id DESC LIMIT 1
+        WHERE id = ? AND territory_partner_id = ? AND status IN ('pending','approved') AND applied_po_id IS NULL
     ");
-    $stmt->bind_param('is', $tpId, $productType);
+    $stmt->bind_param('ii', $requestId, $tpId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();

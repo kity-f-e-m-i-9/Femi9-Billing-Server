@@ -9,6 +9,7 @@ require_once __DIR__ . '/../shared/PaymentScreenshotParser.php';
 require_once __DIR__ . '/../shared/ClaudeVisionService.php';
 require_once __DIR__ . '/../shared/TpProductType.php';
 require_once __DIR__ . '/../shared/TpCourierPayment.php';
+require_once __DIR__ . '/../shared/TpCourierAmountRequest.php';
 
 header('Content-Type: application/json');
 
@@ -67,8 +68,7 @@ tpEnsureCourierPaymentTables($db_conn);
 // already-submitted PO's real saved line items, or the pre-submission
 // cart's session draft.
 if ($po_id > 0) {
-    tpEnsureCourierOverrideColumn($db_conn);
-    $poOwnStmt = $db_conn->prepare("SELECT product_type, status, courier_amount_override FROM tp_purchase_orders WHERE id = ? AND territory_partner_id = ?");
+    $poOwnStmt = $db_conn->prepare("SELECT product_type, status FROM tp_purchase_orders WHERE id = ? AND territory_partner_id = ?");
     $poOwnStmt->bind_param('ii', $po_id, $tp_id);
     $poOwnStmt->execute();
     $poOwnRow = $poOwnStmt->get_result()->fetch_assoc();
@@ -94,9 +94,6 @@ if ($po_id > 0) {
     $totalBoxes = $shipment['boxes'];
     $totalCovers = $shipment['covers'];
     $requiredAmount = tpCourierComputeAmount($db_conn, $productType, $totalBoxes, $totalCovers);
-    if ($poOwnRow['courier_amount_override'] !== null) {
-        $requiredAmount = (float)$poOwnRow['courier_amount_override'];
-    }
 } else {
     $draft = $_SESSION['po_draft_' . $tp_id] ?? null;
     if ($draft && !empty($draft['lines'])) {
@@ -109,6 +106,18 @@ if ($po_id > 0) {
         $totalBoxes = $shipment['boxes'];
         $totalCovers = $shipment['covers'];
         $requiredAmount = tpCourierComputeAmount($db_conn, $productType, $totalBoxes, $totalCovers);
+
+        // Same BDM-approved override pay-courier-payment.php shows the TP,
+        // resolved through the same session-draft id flag (never by
+        // TP/type/box-cover matching — see stash-po-draft.php) — without
+        // this, a screenshot for the approved (lower) amount would fail to
+        // match the raw calculated amount and get wrongly flagged.
+        tpEnsureCourierAmountRequestTable($db_conn);
+        $courierRequestId = $draft['courier_request_id'] ?? null;
+        $amountRequest = $courierRequestId ? tpCourierAmountRequestGetById($db_conn, (int)$courierRequestId, $tp_id) : null;
+        if ($amountRequest && $amountRequest['status'] === 'approved') {
+            $requiredAmount = (float)$amountRequest['approved_amount'];
+        }
     }
 }
 

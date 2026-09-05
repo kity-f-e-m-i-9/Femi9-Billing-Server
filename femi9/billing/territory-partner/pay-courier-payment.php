@@ -26,10 +26,8 @@ tpEnsureCourierAmountRequestTable($db_conn);
 $po_id = (int)($_GET['po_id'] ?? 0);
 $items = [];
 
-$courierAmountOverride = null;
 if ($po_id > 0) {
-    tpEnsureCourierOverrideColumn($db_conn);
-    $poStmt = $db_conn->prepare("SELECT product_type, status, courier_amount_override FROM tp_purchase_orders WHERE id = ? AND territory_partner_id = ?");
+    $poStmt = $db_conn->prepare("SELECT product_type, status FROM tp_purchase_orders WHERE id = ? AND territory_partner_id = ?");
     $poStmt->bind_param('ii', $po_id, $tp_id);
     $poStmt->execute();
     $poRow = $poStmt->get_result()->fetch_assoc();
@@ -40,7 +38,6 @@ if ($po_id > 0) {
         exit;
     }
     $productType = $poRow['product_type'];
-    $courierAmountOverride = $poRow['courier_amount_override'] !== null ? (float)$poRow['courier_amount_override'] : null;
 
     tpEnsurePickupColumn($db_conn);
     $itemsStmt = $db_conn->prepare("SELECT product_id, qty, delivery_method FROM tp_purchase_order_items WHERE po_id = ?");
@@ -76,21 +73,14 @@ $totalBoxes = $shipment['boxes'];
 $totalCovers = $shipment['covers'];
 $rate = tpCourierRatePerBox($db_conn, $productType, $totalBoxes);
 $requiredAmount = tpCourierComputeAmount($db_conn, $productType, $totalBoxes, $totalCovers);
-// A company correction to the auto box/cover calculation, if one was set
-// for this specific order — overrides the computed figure entirely rather
-// than adjusting it, since the box/cover breakdown itself may be what was
-// wrong.
-if ($courierAmountOverride !== null) {
-    $requiredAmount = $courierAmountOverride;
-}
 
 // Pre-submission only ("Change Courier Amount" request to the TP's own
-// Sales BDM) — the post-submission (?po_id=) path already has its own,
-// separate company-only correction above (courier_amount_override), so this
-// doesn't apply there.
+// Sales BDM) — a post-submission (?po_id=) retry has no equivalent
+// correction path; the TP just pays whatever the box/cover math says.
 $amountRequest = null;
 if ($po_id === 0) {
-    $amountRequest = tpCourierAmountRequestGetActive($db_conn, $tp_id, $productType);
+    $courierRequestId = $draft['courier_request_id'] ?? null;
+    $amountRequest = $courierRequestId ? tpCourierAmountRequestGetById($db_conn, (int)$courierRequestId, $tp_id) : null;
     if ($amountRequest && $amountRequest['status'] === 'approved') {
         $requiredAmount = (float)$amountRequest['approved_amount'];
     }
@@ -146,6 +136,8 @@ $poolStmt->close();
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
+    <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <style>
@@ -203,6 +195,13 @@ $poolStmt->close();
             display: block; text-align: center; width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             border: none; color: #fff; font-weight: 700; padding: 12px; border-radius: 10px; font-size: 15px; text-decoration: none;
         }
+        .cpay-dispute-btn {
+            display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+            background: #fff7ed; border: 2px solid #fb923c; color: #c2410c; font-weight: 700;
+            padding: 10px; border-radius: 10px; font-size: 13.5px; margin-bottom: 14px; cursor: pointer;
+            transition: background .15s ease-in-out, color .15s ease-in-out;
+        }
+        .cpay-dispute-btn:hover { background: #fb923c; color: #fff; }
         .cpay-continue-btn:hover { color: #fff; opacity: .92; }
         .cpay-continue-disabled { display: block; text-align: center; width: 100%; background: #e5e7eb; color: #9ca3af; font-weight: 700; padding: 12px; border-radius: 10px; font-size: 15px; }
     </style>
@@ -236,9 +235,7 @@ $poolStmt->close();
                             <div class="label">Courier Amount for this order</div>
                             <div class="value">&#8377;<?=number_format($requiredAmount, 2)?></div>
                             <div class="sub">
-                                <?php if ($courierAmountOverride !== null): ?>
-                                Manually corrected by the company
-                                <?php elseif ($amountRequest && $amountRequest['status'] === 'approved'): ?>
+                                <?php if ($amountRequest && $amountRequest['status'] === 'approved'): ?>
                                 Corrected by your Sales BDM (was &#8377;<?=number_format($amountRequest['calculated_amount'],2)?>)
                                 <?php else: ?>
                                 <?php if ($totalBoxes > 0): ?><?=$totalBoxes?> box<?=$totalBoxes !== 1 ? 'es' : ''?> &times; &#8377;<?=number_format($rate,2)?>/box<?php if ($productType === 'napkin' && $totalBoxes > 10): ?> (10+ box rate applied)<?php endif; ?><?php endif; ?>
@@ -268,16 +265,22 @@ $poolStmt->close();
                                 <div style="color:#92400e;font-size:12px;margin-top:3px;">You requested &#8377;<?=number_format($amountRequest['calculated_amount'],2)?> be reviewed<?php if ($amountRequest['note']): ?> — "<?=htmlspecialchars($amountRequest['note'])?>"<?php endif; ?>.</div>
                             </div>
                             <?php elseif (!$amountRequest): ?>
-                            <button type="button" class="btn btn-outline-secondary btn-sm mb-3" style="width:100%;border:2px solid #d1d5db;color:#4b5563;font-weight:600;padding:10px;border-radius:10px;" onclick="document.getElementById('cpayChangeAmountModal').style.display='flex';">
-                                <i class="material-icons-outlined" style="vertical-align:middle;font-size:16px;">edit_note</i> This amount looks wrong — Change Courier Amount
+                            <button type="button" class="cpay-dispute-btn" onclick="document.getElementById('cpayChangeAmountModal').style.display='flex';">
+                                <i class="material-icons-outlined" style="font-size:17px;">edit_note</i> This amount looks wrong — Change Courier Amount
                             </button>
                             <?php endif; ?>
                         <?php endif; ?>
 
                         <?php if ($isPaid): ?>
                         <div class="cpay-card" style="background:#ecfdf5;border-color:#a7f3d0;">
-                            <div style="color:#065f46;font-weight:700;font-size:14px;"><i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;">check_circle</i> Courier payment received — you can go back and submit the purchase order.</div>
+                            <div style="color:#065f46;font-weight:700;font-size:14px;"><i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;">check_circle</i> Courier payment received — taking you back to the purchase order…</div>
                         </div>
+                        <script>
+                        // No manual "Back to Purchase Order" click needed once paid —
+                        // return automatically so the TP doesn't have to notice and tap
+                        // a button themselves (per explicit request, 2026-09-05).
+                        setTimeout(function () { window.location.href = <?=json_encode($backUrl)?>; }, 1200);
+                        </script>
                         <?php else: ?>
                         <div class="cpay-card">
                             <div class="cpay-title"><i class="material-icons-outlined">qr_code_2</i>Scan &amp; Pay</div>
@@ -392,6 +395,10 @@ $poolStmt->close();
     <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
+    <script src="../../assets/plugins/pace/pace.min.js"></script>
+    <script src="../../assets/js/main.min.js"></script>
+    <script src="../../assets/js/custom.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
     <script>
     var MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024;

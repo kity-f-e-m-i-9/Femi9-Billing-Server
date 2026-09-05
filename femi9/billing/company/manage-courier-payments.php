@@ -15,44 +15,18 @@ error_reporting(0);
 // could never submit that order at all. Confirmed as a real deadlock 2026-09-04.
 $title = "Courier Payments";
 tpEnsureCourierPaymentTables($db_conn);
-tpEnsureCourierOverrideColumn($db_conn);
 
 $successMessage = '';
 $errorMessage = '';
-
-// Manual correction for a specific PO's courier amount — for when the auto
-// box/cover calculation got it wrong. Overrides tpCourierComputeAmount()'s
-// own math for every future retry-payment calc on that order (see
-// pay-courier-payment.php / upload-courier-payment-screenshot.php's po_id
-// branches) until cleared. Only meaningful for an already-submitted order
-// (po_id set) — a pre-submission cart has no PO row to attach this to yet.
-if (isset($_POST['set_override'])) {
-    $overridePoId = (int)($_POST['po_id'] ?? 0);
-    $overrideRaw = trim($_POST['override_amount'] ?? '');
-    if ($overridePoId > 0) {
-        if ($overrideRaw === '') {
-            $upd = $db_conn->prepare("UPDATE tp_purchase_orders SET courier_amount_override = NULL WHERE id = ?");
-            $upd->bind_param('i', $overridePoId);
-        } else {
-            $overrideAmount = round((float)$overrideRaw, 2);
-            $upd = $db_conn->prepare("UPDATE tp_purchase_orders SET courier_amount_override = ? WHERE id = ?");
-            $upd->bind_param('di', $overrideAmount, $overridePoId);
-        }
-        $upd->execute();
-        $upd->close();
-        $successMessage = 'Courier amount updated for this order.';
-    }
-}
 
 $statusFilter = in_array($_GET['status'] ?? '', ['pending_review', 'accepted', 'rejected'], true) ? $_GET['status'] : 'pending_review';
 
 $stmt = $db_conn->prepare("
     SELECT c.id, c.territory_partner_id, c.product_type, c.total_boxes, c.total_covers, c.required_amount,
            c.detected_amount, c.reference_number, c.file_path, c.status, c.rejection_reason, c.po_id, c.created_at,
-           tp.name AS tp_name, tp.tp_id AS tp_code, po.courier_amount_override
+           tp.name AS tp_name, tp.tp_id AS tp_code
     FROM tp_courier_payments c
     JOIN territory_partners tp ON tp.id = c.territory_partner_id
-    LEFT JOIN tp_purchase_orders po ON po.id = c.po_id
     WHERE c.status = ?
     ORDER BY c.created_at DESC
     LIMIT 200
@@ -72,6 +46,8 @@ $stmt->close();
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
+    <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <style>
@@ -134,27 +110,10 @@ $stmt->close();
                                 <br>
                                 <?=(int)$r['total_boxes']?> box<?=(int)$r['total_boxes']!==1?'es':''?><?php if ($r['total_covers'] > 0): ?> + <?=(int)$r['total_covers']?> cover<?=(int)$r['total_covers']!==1?'s':''?><?php endif; ?>
                                 — Required: ₹<?=number_format($r['required_amount'],2)?>
-                                <?php if (isset($r['courier_amount_override']) && $r['courier_amount_override'] !== null): ?>
-                                <span style="color:#92400e;font-weight:600;"> (corrected to ₹<?=number_format($r['courier_amount_override'],2)?>)</span>
-                                <?php endif; ?>
                                 <?php if ($r['detected_amount'] !== null): ?> · Detected: ₹<?=number_format($r['detected_amount'],2)?><?php endif; ?>
                                 <br>
                                 <span class="text-muted" style="font-size:11.5px;"><?=date('d-M-Y h:i A', strtotime($r['created_at']))?></span>
                                 <?php if ($r['status'] === 'rejected' && $r['rejection_reason']): ?><br><span style="color:#991b1b;font-size:11.5px;"><?=htmlspecialchars($r['rejection_reason'])?></span><?php endif; ?>
-                                <?php if ($r['po_id']): ?>
-                                <!-- Manual correction for wrong auto box/cover
-                                     calculations — overrides every future
-                                     retry-payment calc on this specific order.
-                                     Only meaningful once a real PO exists. -->
-                                <form method="post" style="margin-top:6px;display:flex;align-items:center;gap:6px;">
-                                    <input type="hidden" name="po_id" value="<?=$r['po_id']?>">
-                                    <input type="number" step="0.01" min="0" name="override_amount" placeholder="Correct amount" value="<?=$r['courier_amount_override'] ?? ''?>" style="width:110px;font-size:11.5px;padding:3px 6px;border:1px solid #d1d5db;border-radius:6px;">
-                                    <button type="submit" name="set_override" style="border:none;background:#eef2ff;color:#4338ca;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:14px;cursor:pointer;">Save</button>
-                                    <?php if ($r['courier_amount_override'] !== null): ?>
-                                    <button type="submit" name="set_override" formnovalidate onclick="this.form.override_amount.value='';" style="border:none;background:#fee2e2;color:#991b1b;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:14px;cursor:pointer;">Clear</button>
-                                    <?php endif; ?>
-                                </form>
-                                <?php endif; ?>
                             </div>
                             <?php if ($r['status'] === 'pending_review'): ?>
                             <div class="mcp-actions">
@@ -172,6 +131,10 @@ $stmt->close();
     <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
+    <script src="../../assets/plugins/pace/pace.min.js"></script>
+    <script src="../../assets/js/main.min.js"></script>
+    <script src="../../assets/js/custom.js"></script>
     <script>
     function courierApprove(id, suggestedAmount) {
         var amt = prompt('Confirm the amount paid in this screenshot:', suggestedAmount);
