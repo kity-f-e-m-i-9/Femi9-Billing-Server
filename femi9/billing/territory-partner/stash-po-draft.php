@@ -31,6 +31,12 @@ foreach ($data['lines'] as $l) {
         'price'    => (float)($l['price'] ?? 0),
         'discPct'  => (float)($l['discPct'] ?? 0),
         'discAmt'  => (float)($l['discAmt'] ?? 0),
+        // 'pickup' (TP collects this line in person, no courier fee) or
+        // 'courier' (default) — set via the "Pick Up Order" modal on
+        // add-purchase-order.php, never left client-controlled beyond this
+        // draft: every downstream courier-fee calc re-reads it from here,
+        // not from anything the TP submits directly at payment time.
+        'method'   => ($l['method'] ?? 'courier') === 'pickup' ? 'pickup' : 'courier',
     ];
 }
 

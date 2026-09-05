@@ -369,7 +369,18 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li>
                         <a href="godown"><i class="material-icons-two-tone">dashboard</i>Company Profile</a>
                     </li>
-					
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">local_shipping</i>Courier<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+							<li><a href="courier-payment-settings">Courier Payment QR</a></li>
+							<li><a href="manage-courier-payments">Courier Payments</a></li>
+							<li><a href="courier-amount-requests">Courier Amount Requests</a></li>
+                        </ul>
+                    </li>
+					<li>
+                        <a href="track-users"><i class="material-icons-two-tone">group</i>Track Users</a>
+                    </li>
+
 					<li>
                     <a href="wallet_request"><i class="material-icons-outlined">wallet</i>Withdraw</a>
                     </li>
@@ -886,7 +897,18 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li>
                         <a href="godown"><i class="material-icons-two-tone">dashboard</i>Company Profile</a>
                     </li>
-					
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">local_shipping</i>Courier<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+							<li><a href="courier-payment-settings">Courier Payment QR</a></li>
+							<li><a href="manage-courier-payments">Courier Payments</a></li>
+							<li><a href="courier-amount-requests">Courier Amount Requests</a></li>
+                        </ul>
+                    </li>
+					<li>
+                        <a href="track-users"><i class="material-icons-two-tone">group</i>Track Users</a>
+                    </li>
+
 					<?php }?>
 					
 					<?php if($resultusertypeGET['users_demo']==1){?>

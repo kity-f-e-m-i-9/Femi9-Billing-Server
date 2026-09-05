@@ -3,6 +3,7 @@ include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpApproverContext.php';
 require_once __DIR__ . '/../shared/TpProductType.php';
+require_once __DIR__ . '/../shared/TpCourierPayment.php';
 error_reporting(0);
 
 date_default_timezone_set("Asia/Kolkata");
@@ -93,6 +94,16 @@ if ($productType === null) {
 }
 
 tpEnsureAdvanceWalletColumns($db_conn);
+tpEnsureCourierPaymentTables($db_conn);
+
+// Courier payment is mandatory before this cart can become a real PO — see
+// purchase-order-action.php for the authoritative server-side gate (this is
+// only a courtesy preview so the button doesn't invite a submit that's just
+// going to bounce). Pool total is independent of the specific cart contents;
+// the exact per-cart required amount is only known once the cart is built,
+// so a courier payment made against an earlier (possibly smaller) cart may
+// not fully cover a since-grown one — purchase-order-action.php catches that.
+$courierPoolTotal = tpCourierPoolTotal($db_conn, (int)$Login_user_IDvl, $productType);
 
 // Product catalog scoped to the chosen type — this is a stock replenishment
 // request to the company, not limited to what the TP already holds (unlike
@@ -286,6 +297,8 @@ $tpDeliveryAddressParts = array_filter([
 
         .apo-add-panel { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; margin-bottom: 6px; }
         .apo-add-panel .form-label { font-size: 11.5px; font-weight: 600; color: #6b7280; margin-bottom: 4px; }
+        #po_pickup_now_label:hover { background: #fef3c7; }
+        #po_pickup_now_label.active { background: #f59e0b; border-color: #f59e0b; color: #fff; }
         /* Bootstrap's plain .col splits Qty/Price/Total/Disc%/Disc(Rs.)/Add
            into 6 equal-width slivers below ~576px — too narrow to read the
            number being typed. Two per row (with Add on its own full-width
@@ -525,6 +538,13 @@ $tpDeliveryAddressParts = array_filter([
                                             <input type="number" min="0" step="any" id="po_disc_amt" placeholder="Disc(Rs.)" class="form-control">
                                         </div>
                                         <div class="col-auto">
+                                            <label class="form-label" style="display:block;">&nbsp;</label>
+                                            <label id="po_pickup_now_label" for="po_pickup_now" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;white-space:nowrap;height:38px;padding:0 14px;border-radius:8px;cursor:pointer;user-select:none;border:1.5px solid #fde68a;background:#fffbeb;color:#92400e;transition:background .15s,border-color .15s,color .15s;">
+                                                <input type="checkbox" id="po_pickup_now" onchange="document.getElementById('po_pickup_now_label').classList.toggle('active', this.checked)" style="width:16px;height:16px;accent-color:#f59e0b;">
+                                                <i class="material-icons-outlined" style="font-size:16px;">storefront</i> Pick up myself
+                                            </label>
+                                        </div>
+                                        <div class="col-auto">
                                             <button type="button" class="btn" id="add" onclick="addPoLine()"><i class="material-icons" style="font-size:16px;vertical-align:middle;">add</i> Add</button>
                                         </div>
                                     </div>
@@ -566,11 +586,70 @@ $tpDeliveryAddressParts = array_filter([
                                 </button>
                             </div>
 
+                            <div id="poCourierCard" class="apo-card" style="<?=$courierPoolTotal > 0 ? 'background:#ecfdf5;border-color:#a7f3d0;' : 'background:#fffbeb;border-color:#fde68a;'?>">
+                                <div class="apo-card-title" style="margin-bottom:8px;"><i class="material-icons-outlined">local_shipping</i>Courier Payment</div>
+                                <div id="poCourierNote">
+                                <?php if ($courierPoolTotal > 0): ?>
+                                <div style="color:#065f46;font-size:13.5px;font-weight:600;margin-bottom:10px;">
+                                    <i class="material-icons-outlined" style="vertical-align:middle;font-size:16px;">check_circle</i>
+                                    &#8377;<?=number_format($courierPoolTotal, 2)?> already paid. If this order's exact courier fee (based on its real box count) comes to more than that, click "Pay Courier Amount" below to see and pay the remaining difference.
+                                </div>
+                                <?php else: ?>
+                                <div style="color:#92400e;font-size:13.5px;margin-bottom:10px;">
+                                    A courier fee (based on your order's box count) must be paid before this order can be submitted. Picking up some or all of it yourself? Use "Pick Up Order" below.
+                                </div>
+                                <?php endif; ?>
+                                </div>
+                                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                                <button type="button" class="btn-submit-po" id="poGoToCourierBtn" onclick="goToCourierPayment()" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                    <i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;">qr_code_2</i>
+                                    Pay Courier Amount
+                                </button>
+                                <button type="button" class="btn-submit-po" id="poPickupBtn" onclick="openPickupModal()" style="background:#fff;border:2px solid #f59e0b;color:#92400e;">
+                                    <i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;">storefront</i>
+                                    Pick Up Order
+                                </button>
+                                </div>
+                            </div>
+
                             <button type="submit" name="submit_po" id="poSubmitBtn" onclick="return confirm('Submit this purchase order?');" class="btn-submit-po">
                                 <i class="material-icons" style="vertical-align:middle;font-size:18px;">add</i> Submit Purchase Order
                             </button>
                             <?php endif; ?>
                         </form>
+
+                        <!-- Pick Up Order modal — per-line "I'll collect this
+                             myself" toggle. A line marked pickup is excluded
+                             from the courier box/fee calc entirely (not
+                             discounted, fully exempt) — see
+                             shared/TpCourierPayment.php's
+                             tpCourierFilterToCourierItems(). -->
+                        <div class="modal fade" id="pickupModal" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-scrollable">
+                                <div class="modal-content" style="border:none;border-radius:14px;overflow:hidden;">
+                                    <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                                        <h6 class="modal-title" style="font-weight:700;color:#1f2937;">
+                                            <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#f59e0b;">storefront</i>
+                                            Which products will you pick up yourself?
+                                        </h6>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body" style="padding:18px 22px;">
+                                        <p style="font-size:12.5px;color:#6b7280;margin-bottom:14px;">
+                                            A product marked "Pick up" is excluded from the courier fee entirely. Anything left as "Courier" still needs to be paid for and delivered.
+                                        </p>
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#1f2937;border-bottom:1px solid #e9ecef;padding-bottom:10px;margin-bottom:10px;cursor:pointer;">
+                                            <input type="checkbox" id="pickupSelectAll" onchange="togglePickupSelectAll(this.checked)" style="width:17px;height:17px;"> Pick up all
+                                        </label>
+                                        <div id="pickupModalList"></div>
+                                    </div>
+                                    <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="savePickupSelections()">Save</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                     </div>
                 </div>
@@ -636,7 +715,8 @@ $tpDeliveryAddressParts = array_filter([
             if (poLines[i].pr_id === prId) { alert('That product is already added.'); return; }
         }
 
-        poLines.push({ pr_id: prId, name: prName, qty: qty, price: price, discPct: discPct, discAmt: discAmt });
+        var pickupNow = document.getElementById('po_pickup_now').checked;
+        poLines.push({ pr_id: prId, name: prName, qty: qty, price: price, discPct: discPct, discAmt: discAmt, method: pickupNow ? 'pickup' : 'courier' });
         renderPoLines();
 
         $(sel).val('').trigger('change');
@@ -645,6 +725,8 @@ $tpDeliveryAddressParts = array_filter([
         document.getElementById('po_total').value = '';
         document.getElementById('po_disc_pct').value = '';
         document.getElementById('po_disc_amt').value = '';
+        document.getElementById('po_pickup_now').checked = false;
+        document.getElementById('po_pickup_now_label').classList.remove('active');
     }
 
     function removePoLine(idx) {
@@ -662,9 +744,12 @@ $tpDeliveryAddressParts = array_filter([
                 var grossTotal = l.qty * l.price;
                 var netTotal = (grossTotal - l.discAmt).toFixed(2);
                 var tr = document.createElement('tr');
+                var pickupBadge = l.method === 'pickup'
+                    ? ' <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;background:#fef3c7;color:#92400e;vertical-align:middle;">Pickup</span>'
+                    : '';
                 tr.innerHTML =
                     '<th>' + (idx + 1) + '</th>' +
-                    '<td>' + l.name + '</td>' +
+                    '<td>' + l.name + pickupBadge + '</td>' +
                     '<td>' + l.qty + '</td>' +
                     '<td>₹' + l.price.toFixed(2) + '</td>' +
                     '<td>₹' + l.discAmt.toFixed(2) + '(' + l.discPct.toFixed(2) + '%)</td>' +
@@ -682,10 +767,81 @@ $tpDeliveryAddressParts = array_filter([
                 '<input type="hidden" name="qty[]" value="' + l.qty + '">' +
                 '<input type="hidden" name="price[]" value="' + l.price + '">' +
                 '<input type="hidden" name="discount_percentage[]" value="' + l.discPct + '">' +
-                '<input type="hidden" name="discount_amount[]" value="' + l.discAmt + '">';
+                '<input type="hidden" name="discount_amount[]" value="' + l.discAmt + '">' +
+                '<input type="hidden" name="pickup_method[]" value="' + (l.method || 'courier') + '">';
         });
 
+        updateCourierNote();
         updatePoSummary();
+    }
+
+    // Whether any line still needs a courier at all — if every line is
+    // marked "pickup", the whole courier requirement (payment button,
+    // client-side gate) drops away entirely, since there's genuinely
+    // nothing left for the box/fee calc to charge for.
+    function cartHasCourierItems() {
+        return poLines.some(function (l) { return l.method !== 'pickup'; });
+    }
+
+    function updateCourierNote() {
+        var card = document.getElementById('poCourierCard');
+        var note = document.getElementById('poCourierNote');
+        var payBtn = document.getElementById('poGoToCourierBtn');
+        if (!card || !note || !payBtn) return;
+
+        if (poLines.length > 0 && !cartHasCourierItems()) {
+            card.style.background = '#ecfdf5';
+            card.style.borderColor = '#a7f3d0';
+            note.innerHTML = '<div style="color:#065f46;font-size:13.5px;font-weight:600;margin-bottom:10px;">' +
+                '<i class="material-icons-outlined" style="vertical-align:middle;font-size:16px;">check_circle</i> ' +
+                'All items marked for pickup — no courier payment needed. You can submit this order directly.</div>';
+            payBtn.style.display = 'none';
+        } else {
+            payBtn.style.display = '';
+            if (courierPoolTotal <= 0) {
+                card.style.background = '#fffbeb';
+                card.style.borderColor = '#fde68a';
+            }
+        }
+    }
+
+    // Pick Up Order modal — lets the TP mark individual lines as "pick up
+    // myself" instead of courier. Reflects/edits poLines[].method directly.
+    function openPickupModal() {
+        if (poLines.length === 0) {
+            alert('Add at least one product first.');
+            return;
+        }
+        var list = document.getElementById('pickupModalList');
+        list.innerHTML = poLines.map(function (l, idx) {
+            var checked = l.method === 'pickup' ? 'checked' : '';
+            return '<label style="display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;margin-bottom:8px;cursor:pointer;">' +
+                '<span>' + l.name + ' <span class="text-muted" style="font-size:11.5px;">(Qty ' + l.qty + ')</span></span>' +
+                '<span style="display:flex;align-items:center;gap:6px;white-space:nowrap;">' +
+                    '<input type="checkbox" class="pickup-line-check" data-idx="' + idx + '" ' + checked + ' style="width:17px;height:17px;"> Pick up myself' +
+                '</span>' +
+            '</label>';
+        }).join('');
+        // "Pick up all" reflects the current state (checked only when every
+        // line is already marked pickup), not just reset to unchecked.
+        document.getElementById('pickupSelectAll').checked = poLines.every(function (l) { return l.method === 'pickup'; });
+        var modal = new bootstrap.Modal(document.getElementById('pickupModal'));
+        modal.show();
+    }
+
+    function togglePickupSelectAll(checked) {
+        document.querySelectorAll('.pickup-line-check').forEach(function (chk) { chk.checked = checked; });
+    }
+
+    function savePickupSelections() {
+        document.querySelectorAll('.pickup-line-check').forEach(function (chk) {
+            var idx = parseInt(chk.getAttribute('data-idx'), 10);
+            if (poLines[idx]) poLines[idx].method = chk.checked ? 'pickup' : 'courier';
+        });
+        renderPoLines();
+        var modalEl = document.getElementById('pickupModal');
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
     }
 
     // Whether an advance-payment submission already exists (pending review
@@ -808,6 +964,52 @@ $tpDeliveryAddressParts = array_filter([
             });
     }
 
+    // Same stash-then-redirect pattern as goToAdvancePayment() above, sending
+    // the TP to pay-courier-payment.php instead — that page recomputes the
+    // required box-based fee itself from the stashed draft, never trusting
+    // any amount computed here client-side.
+    function goToCourierPayment() {
+        if (poLines.length === 0) {
+            alert('Add at least one product before paying the courier amount.');
+            return;
+        }
+
+        var useDefault = document.getElementById('useDefaultDeliveryAddress').checked;
+        var payload = {
+            lines: poLines,
+            use_default_delivery_address: useDefault,
+            custom_delivery_line1: document.getElementById('custom_delivery_line1') ? document.getElementById('custom_delivery_line1').value : '',
+            custom_delivery_line2: document.querySelector('[name="custom_delivery_line2"]') ? document.querySelector('[name="custom_delivery_line2"]').value : '',
+            custom_delivery_city: document.querySelector('[name="custom_delivery_city"]') ? document.querySelector('[name="custom_delivery_city"]').value : '',
+            custom_delivery_district: document.querySelector('[name="custom_delivery_district"]') ? document.querySelector('[name="custom_delivery_district"]').value : '',
+            custom_delivery_state: document.querySelector('[name="custom_delivery_state"]') ? document.querySelector('[name="custom_delivery_state"]').value : '',
+            custom_delivery_country: document.querySelector('[name="custom_delivery_country"]') ? document.querySelector('[name="custom_delivery_country"]').value : '',
+            custom_delivery_pincode: document.querySelector('[name="custom_delivery_pincode"]') ? document.querySelector('[name="custom_delivery_pincode"]').value : ''
+        };
+
+        var btn = document.getElementById('poGoToCourierBtn');
+        btn.disabled = true;
+
+        fetch('stash-po-draft.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    alert(data.message || 'Could not save your order. Please try again.');
+                    btn.disabled = false;
+                    return;
+                }
+                window.location.href = 'pay-courier-payment.php?type=<?=urlencode($productType)?>';
+            })
+            .catch(function() {
+                alert('Could not reach the server — please try again.');
+                btn.disabled = false;
+            });
+    }
+
     $(function() {
         if ($('#pr_select').length) {
             $('#pr_select').select2({ placeholder: 'Search product…', allowClear: true, width: '100%' });
@@ -842,9 +1044,21 @@ $tpDeliveryAddressParts = array_filter([
         }
     });
 
+    var courierPoolTotal = <?=json_encode($courierPoolTotal)?>;
+
     function validatePoLines() {
         if (poLines.length === 0) {
             alert('Add at least one product before submitting.');
+            return false;
+        }
+
+        // Courtesy check only — purchase-order-action.php recomputes the
+        // exact required amount for the real cart and is the actual gate.
+        // This just avoids a pointless round trip when nothing's been paid.
+        // Skipped entirely when every line is marked "pick up myself" —
+        // there's no courier fee to pay in that case at all.
+        if (cartHasCourierItems() && courierPoolTotal <= 0) {
+            alert('Please pay the courier amount before submitting this order.');
             return false;
         }
 

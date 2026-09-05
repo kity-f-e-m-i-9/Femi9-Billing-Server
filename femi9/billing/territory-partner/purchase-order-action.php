@@ -3,6 +3,7 @@ include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpApproverContext.php';
 require_once __DIR__ . '/../shared/TpProductType.php';
+require_once __DIR__ . '/../shared/TpCourierPayment.php';
 error_reporting(0);
 
 if (!isset($_POST['submit_po'])) {
@@ -28,6 +29,7 @@ $qtys     = $_POST['qty']     ?? [];
 $prices   = $_POST['price']   ?? [];
 $disc_pcts = $_POST['discount_percentage'] ?? [];
 $disc_amts = $_POST['discount_amount']     ?? [];
+$methods  = $_POST['pickup_method'] ?? [];
 
 $items = [];
 foreach ($pr_ids as $i => $rpid) {
@@ -38,11 +40,44 @@ foreach ($pr_ids as $i => $rpid) {
     $damt  = round((float)($disc_amts[$i] ?? 0), 2);
     if ($pid < 1 || $qty < 1) continue;
     $amount = round(($qty * $price) - $damt, 2);
-    $items[] = ['pid' => $pid, 'qty' => $qty, 'price' => $price, 'dpct' => $dpct, 'damt' => $damt, 'amount' => $amount];
+    // Defaults to 'courier' for a missing/unrecognized value — nothing is
+    // silently exempted from the courier fee unless the TP explicitly
+    // marked it "pick up myself" via add-purchase-order.php's modal.
+    $method = (($methods[$i] ?? 'courier') === 'pickup') ? 'pickup' : 'courier';
+    $items[] = ['pid' => $pid, 'qty' => $qty, 'price' => $price, 'dpct' => $dpct, 'damt' => $damt, 'amount' => $amount, 'method' => $method];
 }
 
 if (empty($items)) {
     $_SESSION['errorMessage'] = 'Please add at least one product before submitting.';
+    header("Location: add-purchase-order.php");
+    exit;
+}
+
+// Courier payment gate — authoritative check, never trust the earlier
+// courtesy check on add-purchase-order.php. Required amount is recomputed
+// here from the ACTUAL submitted cart (not whatever pay-courier-payment.php
+// showed when the TP paid, which could have been a smaller/larger draft),
+// so a since-changed cart can under- or over-shoot what was already paid.
+tpEnsureCourierPaymentTables($db_conn);
+tpEnsurePickupColumn($db_conn);
+// Only lines still marked 'courier' feed the box/fee calc — a line the TP
+// picks up in person was never charged for, so it's excluded here too, not
+// just at pay-courier-payment.php.
+$courierItems = array_map(
+    fn($it) => ['pid' => $it['pid'], 'qty' => $it['qty']],
+    array_filter($items, fn($it) => $it['method'] !== 'pickup')
+);
+$courierShipment = tpCourierComputeShipmentForItems($db_conn, $courierItems);
+$courierTotalBoxes = $courierShipment['boxes'];
+$courierTotalCovers = $courierShipment['covers'];
+$courierRequiredAmount = tpCourierComputeAmount($db_conn, $productType, $courierTotalBoxes, $courierTotalCovers);
+$courierPoolTotal = tpCourierPoolTotal($db_conn, $tp_id, $productType);
+
+if ($courierRequiredAmount > 0 && $courierPoolTotal < $courierRequiredAmount) {
+    $courierDesc = [];
+    if ($courierTotalBoxes > 0) $courierDesc[] = $courierTotalBoxes . ' box' . ($courierTotalBoxes !== 1 ? 'es' : '');
+    if ($courierTotalCovers > 0) $courierDesc[] = $courierTotalCovers . ' cover' . ($courierTotalCovers !== 1 ? 's' : '');
+    $_SESSION['errorMessage'] = 'Please pay the courier amount (₹' . number_format($courierRequiredAmount, 2) . ' for ' . implode(' + ', $courierDesc) . ') before submitting this order.';
     header("Location: add-purchase-order.php");
     exit;
 }
@@ -205,9 +240,9 @@ try {
     $po_id = $db_conn->insert_id;
     $s->close();
 
-    $si = $db_conn->prepare("INSERT INTO tp_purchase_order_items (po_id, product_id, qty, price, discount_percentage, discount_amount, amount) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $si = $db_conn->prepare("INSERT INTO tp_purchase_order_items (po_id, product_id, qty, price, discount_percentage, discount_amount, amount, delivery_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     foreach ($items as $item) {
-        $si->bind_param("iiidddd", $po_id, $item['pid'], $item['qty'], $item['price'], $item['dpct'], $item['damt'], $item['amount']);
+        $si->bind_param("iiidddds", $po_id, $item['pid'], $item['qty'], $item['price'], $item['dpct'], $item['damt'], $item['amount'], $item['method']);
         $si->execute();
     }
     $si->close();
@@ -220,6 +255,17 @@ try {
     $link->bind_param("ii", $po_id, $tp_id);
     $link->execute();
     $link->close();
+
+    // Same claim-everything-tried pattern for the courier payment pool —
+    // every screenshot uploaded toward this cart (accepted, pending, or
+    // rejected) gets tied to the PO it actually paid for, not just the
+    // accepted ones that met the gate above.
+    $courierLink = $db_conn->prepare(
+        "UPDATE tp_courier_payments SET po_id = ? WHERE territory_partner_id = ? AND product_type = ? AND po_id IS NULL"
+    );
+    $courierLink->bind_param("iis", $po_id, $tp_id, $productType);
+    $courierLink->execute();
+    $courierLink->close();
 
     // Claim every advance-payment submission this order's excess-balance
     // gate relied on, so none of them can silently unlock a later,

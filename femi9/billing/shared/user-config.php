@@ -4,6 +4,27 @@
  * Defines database tables and settings for each user type
  */
 
+// Self-migrating — track_users has no other creation path, so every entry
+// point into the standalone Track portal (login, session check, and
+// Company's own account-management page) calls this before its first query.
+function ensureTrackUsersTable(mysqli $db): void
+{
+    $db->query("
+        CREATE TABLE IF NOT EXISTS track_users (
+          id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          mobile VARCHAR(15) NOT NULL,
+          password VARCHAR(255) NOT NULL,
+          email VARCHAR(255) NULL,
+          account_status VARCHAR(20) NOT NULL DEFAULT 'active',
+          last_login TIMESTAMP NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_track_users_mobile (mobile)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+}
+
 function getUserConfig($userType) {
     $configs = [
         'super_stockiest' => [
@@ -125,6 +146,20 @@ function getUserConfig($userType) {
             'status_active_value' => 'active',
             'name_field'          => 'bdm_name',
             'email_field'         => 'bdm_email',
+        ],
+
+        'track' => [
+            'table'               => 'track_users',
+            'display_name'        => 'Track',
+            'folder'              => 'track',
+            'id_field'            => 'id',
+            'username_field'      => 'mobile',
+            'mobile_field'        => 'mobile',
+            'password_field'      => 'password',
+            'status_field'        => 'account_status',
+            'status_active_value' => 'active',
+            'name_field'          => 'name',
+            'email_field'         => 'email',
         ],
 
         'territory_partner' => [

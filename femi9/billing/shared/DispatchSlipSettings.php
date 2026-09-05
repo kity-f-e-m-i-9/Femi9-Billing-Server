@@ -58,7 +58,7 @@ function dispatchSlipGetOverallSettings(mysqli $db): array
 }
 
 /**
- * The full two-stage Box calculation shared by company/dispatch-slip-print.php,
+ * The full Box calculation shared by company/dispatch-slip-print.php,
  * salesbdm/dispatch-slip-print.php, and the shipping-label pages (which need
  * the same TotalBoxes number to know how many label rows to start with, and
  * the 'boxes' breakdown to know what to pre-fill each one with).
@@ -67,30 +67,45 @@ function dispatchSlipGetOverallSettings(mysqli $db): array
  * 'box_display' (same as before this was extracted into a function), and
  * returns the shipment-level totals plus a per-box product breakdown.
  *
- * The per-box breakdown is NOT a guess — it's reconstructed from the same
- * arithmetic that produced TotalBoxes:
- *   - A line's own Stage-1 boxes are single-product by construction (each is
- *     exactly that line's packs_per_carton units of that one product).
- *   - Stage-2's pooled boxes are filled by walking every line's leftover (or
- *     full qty, for a line with no per-line Box math) in order and packing
- *     it into overall_packs_per_box-sized buckets — the same floor-division
- *     the totals already use, just keeping track of which product filled
- *     which bucket instead of only counting packs. A contribution that
- *     doesn't fit the current bucket splits across the bucket boundary, so
- *     one product can appear more than once across adjacent boxes.
+ * Box-filling stays proportional (2026-09-03 note): two different products
+ * that each have their own carton size still correctly share ONE physical
+ * box based on that real capacity — e.g. two products both boxed 100/carton,
+ * each with 50 leftover packs, fill exactly one shared box together (50+50
+ * = 100 = one full carton's worth), not two. Only the FINAL leftover-vs-cover
+ * decision (Stage 3) changed: it now compares the raw pack count still
+ * sitting in that last incomplete bucket against overall_packs_per_cover
+ * directly (e.g. 35 raw leftover packs > 21 → a box), instead of the
+ * proportional comparison this used before.
+ *   1. Each line's own qty divides by its own packs_per_carton into exact
+ *      full boxes (Stage 1); any remainder is leftover.
+ *   2. Every leftover chunk that HAS a known carton size pools together
+ *      (even across different sizes) into shared boxes, sized by each
+ *      product's own real carton capacity (LCM-normalized internally so
+ *      there's no floating-point rounding) — this is what lets two
+ *      half-full different products correctly combine into one box.
+ *      Carton-less leftover pools separately via overall_packs_per_box.
+ *   3. Whatever's left incomplete after that is compared as a RAW pack
+ *      count against overall_packs_per_cover — more than that and it's one
+ *      more box outright, otherwise it's exactly one cover.
  *
- * @param array $po_items Each row needs 'qty', 'packs_per_carton', 'packs_per_cover', 'productName'.
- * @return array{TotalQty:int,TotalCartons:int,TotalBoxes:int,TotalBoxesDisplay:string,poolQty:int,afterGrouping:int,boxes:array}
- *   'boxes' is a list of $TotalBoxes entries, each array{contents: list<array{product:string,packs:int}>}.
+ * The per-box breakdown is reconstructed from the same walk that produced
+ * TotalBoxes — a contribution that doesn't fit the current bucket splits
+ * across the bucket boundary, so one product can appear in more than one box.
+ *
+ * @param array $po_items Each row needs 'qty', 'packs_per_carton', 'productName'.
+ * @return array{TotalQty:int,TotalCartons:int,TotalBoxes:int,TotalCovers:int,TotalBoxesDisplay:string,poolQty:int,afterGrouping:int,boxes:array}
+ *   'boxes' is a list of $TotalBoxes+$TotalCovers entries, each array{contents: list<array{product:string,packs:int}>}.
  */
 function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
 {
     $overallSettings = dispatchSlipGetOverallSettings($db);
+    $overallBox   = $overallSettings['box'];
+    $overallCover = $overallSettings['cover'];
 
     $TotalQty     = 0;
     $TotalCartons = 0;
     $lineBoxesSum = 0; // sum of each line's own exact box count below
-    $pooledQty    = 0; // each line's leftover (its whole qty, if it has no carton size at all) — pooled for the overall grouping
+    $pooledQty    = 0; // total leftover packs pooled into Stage 2, across every line
     $lineBoxes123 = []; // Stage-1 boxes, each single-product, in line order
     $poolContrib  = []; // ordered list of {product, packs, carton?, idx} chunks feeding Stage 2
     foreach ($po_items as $idx => &$item) {
@@ -100,54 +115,26 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
 
         $ppc = $item['packs_per_carton'];
         $item['carton_display'] = '—';
+        $item['box_display'] = '';
         if ($ppc !== null && $ppc !== '' && (int)$ppc > 0) {
             $ppc_int  = (int)$ppc;
             $cartons  = intdiv($qty, $ppc_int);
             $leftover = $qty % $ppc_int;
             $TotalCartons += $cartons;
             $item['carton_display'] = $cartons . ' ctn' . ($leftover > 0 ? ' + ' . $leftover . ' pack' . ($leftover > 1 ? 's' : '') : '');
-        }
 
-        // Per-line Box column, stage 1 only: this line's qty grouped into
-        // full boxes of its OWN packs_per_carton (the same number the
-        // Cartons column already uses) — e.g. 130 at 100/box is 1 box, 30
-        // left over. Only needs packs_per_carton — a line missing that
-        // entirely has no carton size of its own to group by, so its whole
-        // qty instead flows into the pooled overall grouping below.
-        //
-        // Any leftover here is NOT resolved locally (no more per-line
-        // "does it exceed some threshold" check) — it always goes into the
-        // shipment-wide pool below FIRST, so it gets a chance to combine
-        // with another line that shares the exact same carton size (e.g. a
-        // 34-pack leftover from one product filling out the spare room
-        // left by a 15-pack leftover from a different product, both
-        // 50/carton) before anything decides box vs. cover. Resolving it
-        // per-line up front — as this used to do via packs_per_cover — was
-        // exactly what silently blocked that kind of combining: a leftover
-        // big enough to "win" its own exceed-check became a box on its own
-        // immediately, never getting a chance to be topped up by a sibling
-        // line's smaller leftover first. box_display below is completed
-        // AFTER the pool resolves (see the final pass past Stage 3), once
-        // it's known whether this line's leftover ended up boxed, covered,
-        // or split across both.
-        $item['box_display'] = '';
-        if ($ppc !== null && $ppc !== '' && (int)$ppc > 0) {
-            $ppc_int      = (int)$ppc;
-            $lineBoxes    = intdiv($qty, $ppc_int);
-            $lineLeftover = $qty % $ppc_int;
-            $lineBoxesSum += $lineBoxes;
-            for ($b = 0; $b < $lineBoxes; $b++) {
+            $lineBoxesSum += $cartons;
+            for ($b = 0; $b < $cartons; $b++) {
                 $lineBoxes123[] = ['contents' => [['product' => $productName, 'packs' => $ppc_int]]];
             }
-            if ($lineLeftover > 0) {
+            $item['box_display'] = $cartons > 0 ? $cartons . ' box' . ($cartons > 1 ? 'es' : '') : '';
+            if ($leftover > 0) {
+                $pooledQty += $leftover;
                 // 'carton' tags this chunk with the product's OWN carton
-                // size, so Stage 2 below tries grouping it with other
-                // products that share that exact size before falling back
-                // to the generic overall pool. 'idx' traces it back to this
-                // line for the final box_display pass.
-                $poolContrib[] = ['product' => $productName, 'packs' => $lineLeftover, 'carton' => $ppc_int, 'idx' => $idx];
+                // size, so Stage 2 tries grouping it with other products
+                // that share physical box room proportionally.
+                $poolContrib[] = ['product' => $productName, 'packs' => $leftover, 'carton' => $ppc_int, 'idx' => $idx];
             }
-            $item['box_display'] = $lineBoxes > 0 ? $lineBoxes . ' box' . ($lineBoxes > 1 ? 'es' : '') : '';
         } else {
             $pooledQty += $qty;
             if ($qty > 0) {
@@ -157,40 +144,19 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
     }
     unset($item);
 
-    // Shipment-level box estimate: every line's own exact box count above,
-    // plus, applied to the pooled leftover:
-    //   1. FIRST, pool every leftover chunk that HAS a known carton size —
-    //      even across DIFFERENT sizes — into shared physical boxes. Every
-    //      carton is the SAME physical box; a product's own carton-size
-    //      number just says how many of ITS packs fill one (a bigger pack
-    //      needs fewer to fill the same box). So "room left in a box" is
-    //      tracked as a FRACTION of one box, not a raw pack count — 1 pack
-    //      of a 90/carton product uses 1/90 of a box, 1 pack of a
-    //      100/carton product uses 1/100 — and different products can share
-    //      the leftover room in the same box on that basis (e.g. a
-    //      100/carton product's 60 leftover packs use 60% of a box,
-    //      leaving 40% free for a 90/carton product's leftover packs to
-    //      fill in). Internally this is done with exact integer arithmetic
-    //      (everything converted to a common "box size" — the LCM of every
-    //      carton size involved — so there's no floating-point rounding).
-    //      A leftover with no known carton size (packs_per_carton wasn't
-    //      set on that line at all) never enters this stage.
-    //   2. Any carton-less leftover pools separately, using the generic
-    //      overall_packs_per_box setting (unchanged from before this stage
-    //      existed) — that's the only thing overall_packs_per_box is for now.
-    //   3. Whatever's left incomplete after (1) or (2) is checked against
-    //      overall_packs_per_cover — for (1) this is compared as the SAME
-    //      proportion (overall_packs_per_cover / overall_packs_per_box) of
-    //      a box, since the leftover itself may be a mix of different
-    //      carton sizes with no single raw pack count to compare directly.
-    //      Exceed that proportion and the leftover becomes one more box
-    //      outright; otherwise it's exactly one cover.
     $pooledBoxes123 = [];
     $fullBoxCount   = 0;
     $idxOutcomes    = []; // idx => ordered list of 'box'/'cover' tokens, for the final box_display pass below
 
     // Stage 2a — pool everything with a known carton size together, sharing
-    // box room proportionally (order-preserving: original line order).
+    // box room proportionally (order-preserving: original line order). Every
+    // carton is the SAME physical box; a product's own carton-size number
+    // just says how many of ITS packs fill one (a bigger pack needs fewer to
+    // fill the same box). Tracked as a FRACTION of one box — 1 pack of a
+    // 90/carton product uses 1/90 of a box, 1 pack of a 100/carton product
+    // uses 1/100 — via exact integer arithmetic (everything converted to a
+    // common "box size", the LCM of every carton size involved, so there's
+    // no floating-point rounding).
     $cartonedContrib   = []; // ordered list of {product, packs, carton, idx}
     $cartonlessContrib = []; // chunks with no known carton size of their own
     foreach ($poolContrib as $contrib) {
@@ -200,7 +166,9 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
             $cartonlessContrib[] = $contrib;
         }
     }
-    $leftoverUnits = []; // one entry per incomplete bucket: {contents, sum, ofSize} — 'sum'/'ofSize' are in "one box" units (sum/ofSize = fraction full)
+    // One entry per incomplete bucket: {contents, rawPacks} — 'rawPacks' is
+    // the actual leftover pack count (NOT LCM units), used by Stage 3 below.
+    $leftoverUnits = [];
     if (!empty($cartonedContrib)) {
         $L = 1;
         foreach (array_unique(array_column($cartonedContrib, 'carton')) as $c) {
@@ -208,6 +176,7 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
         }
         $bucket = [];
         $sumUnits = 0;
+        $rawPacks = 0;
         foreach ($cartonedContrib as $contrib) {
             $unitPerPack = intdiv($L, $contrib['carton']); // exact — $L is a multiple of every carton size involved
             $remaining = $contrib['packs'];
@@ -218,6 +187,7 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
                 if ($take > 0) {
                     $bucket[] = ['product' => $contrib['product'], 'packs' => $take, 'idx' => $contrib['idx']];
                     $sumUnits += $take * $unitPerPack;
+                    $rawPacks += $take;
                     $remaining -= $take;
                 }
                 // Close the box once it's full, OR once nothing more fits
@@ -230,18 +200,18 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
                     foreach (array_unique(array_column($bucket, 'idx')) as $i) { $idxOutcomes[$i][] = 'box'; }
                     $bucket = [];
                     $sumUnits = 0;
+                    $rawPacks = 0;
                 }
             }
         }
         if ($sumUnits > 0) {
-            $leftoverUnits[] = ['contents' => $bucket, 'sum' => $sumUnits, 'ofSize' => $L];
+            $leftoverUnits[] = ['contents' => $bucket, 'rawPacks' => $rawPacks];
         }
     }
 
     // Stage 2b — generic overall_packs_per_box pooling for carton-less
     // leftover only (this doesn't feed the per-line box_display pass below,
     // since carton-less lines never had a per-line carton size to begin with).
-    $overallBox = $overallSettings['box'];
     $currentBucket = [];
     $currentSum = 0;
     foreach ($cartonlessContrib as $contrib) {
@@ -263,27 +233,25 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
         }
     }
     if ($currentSum > 0) {
-        $leftoverUnits[] = ['contents' => $currentBucket, 'sum' => $currentSum, 'ofSize' => $overallBox];
+        $leftoverUnits[] = ['contents' => $currentBucket, 'rawPacks' => $currentSum];
     }
 
-    // Stage 3 — each leftover unit, independently, either exceeds the cover
-    // threshold (becomes one more box) or doesn't (stays exactly one cover).
-    // Compared as a PROPORTION of a full box (sum/ofSize vs cover/box),
-    // not a raw pack count — a Stage 2a unit may be a mix of different
-    // carton sizes with no single raw count that means anything on its own.
-    // Either way it's a real physical package and gets its own boxes[]
-    // entry (and so, eventually, its own shipping label) — a cover is only
-    // ever excluded from $TotalBoxes itself, never from the box/label list.
+    // Stage 3 — each leftover unit, independently, compared as a RAW pack
+    // count against overall_packs_per_cover: more than that and it's one
+    // more box outright; at or under it, it stays exactly one cover. Either
+    // way it's a real physical package and gets its own boxes[] entry (and
+    // so, eventually, its own shipping label) — a cover is only ever
+    // excluded from $TotalBoxes itself, never from the box/label list.
     $coverCount = 0;
     $coverQty   = 0;
     foreach ($leftoverUnits as $unit) {
         $pooledBoxes123[] = ['contents' => $unit['contents']];
-        $isBox = ($unit['sum'] * $overallSettings['box']) > ($overallSettings['cover'] * $unit['ofSize']);
+        $isBox = $unit['rawPacks'] > $overallCover;
         if ($isBox) {
             $fullBoxCount++;
         } else {
             $coverCount++;
-            $coverQty += $unit['sum'];
+            $coverQty += $unit['rawPacks'];
         }
         foreach (array_unique(array_column($unit['contents'], 'idx')) as $i) {
             if ($i !== null) { $idxOutcomes[$i][] = $isBox ? 'box' : 'cover'; }
@@ -315,6 +283,7 @@ function dispatchSlipComputeBoxes(mysqli $db, array &$po_items): array
         'TotalQty'          => $TotalQty,
         'TotalCartons'      => $TotalCartons,
         'TotalBoxes'        => $TotalBoxes,
+        'TotalCovers'       => $coverCount,
         'TotalBoxesDisplay' => $TotalBoxesDisplay,
         'poolQty'           => $pooledQty,
         'afterGrouping'     => $coverQty,

@@ -99,6 +99,10 @@ if (!empty($salesBdmID)) {
     </li>
 
     <li>
+        <a href="<?php echo $_bdmBase; ?>courier-amount-requests"><i class="material-icons-two-tone">local_shipping</i>Courier Amount Requests</a>
+    </li>
+
+    <li>
         <a href=""><i class="material-icons-two-tone">security</i>Security<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
         <ul class="sub-menu">
             <li><a href="<?php echo $_bdmBase; ?>change-password">Change Password</a></li>
