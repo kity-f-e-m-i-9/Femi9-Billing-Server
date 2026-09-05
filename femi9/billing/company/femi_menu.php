@@ -306,6 +306,9 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="cp-district-sales-report">District Sales Report</a></li>
                         </ul>
                     </li>
+					<li>
+                        <a href="dashboard-crm"><i class="material-icons-two-tone">insights</i>CRM Dashboard</a>
+                    </li>
 					<!----------------------Territory Partner--------------------------->
 					<li>
                         <a href="#"><i class="material-icons-two-tone">map</i>Territory Partner<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
@@ -795,6 +798,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
 							<li><a href="cp-district-sales-report">District Sales Report</a></li>
                         </ul>
+                    </li>
+					<?php }?>
+					<?php if($resultusertypeGET['dash']==1){?>
+					<li>
+                        <a href="dashboard-crm"><i class="material-icons-two-tone">insights</i>CRM Dashboard</a>
                     </li>
 					<?php }?>
 					<!----------------------Territory Partner--------------------------->
