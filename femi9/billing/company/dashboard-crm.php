@@ -25,6 +25,10 @@ if (!$crmUnavailable) {
     $teamCalls = espoCallActivity($espoConn, null, $from, $to);
     $teamCallsPerConv = espoCallsPerConversion($espoConn, null, $from, $to);
 
+    $_chkEspo = $db_conn->query("SHOW COLUMNS FROM sales_bdm_staff LIKE 'espo_user_id'");
+    if ($_chkEspo && $_chkEspo->num_rows === 0) {
+        $db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN espo_user_id VARCHAR(24) NULL DEFAULT NULL AFTER monthly_target_amount");
+    }
     $bdms = $db_conn->query("SELECT id, bdm_name, espo_user_id FROM sales_bdm_staff ORDER BY bdm_name");
     while ($bdm = $bdms->fetch_assoc()) {
         if (empty($bdm['espo_user_id'])) {
