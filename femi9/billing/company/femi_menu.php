@@ -672,6 +672,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                                     <li><a href="salesbdm-team-report">Our Team Report</a></li>
                                 </ul>
                             </li>
+                            <li><a href="manage-district-notes">District Notes</a></li>
                         </ul>
                     </li>
 					
