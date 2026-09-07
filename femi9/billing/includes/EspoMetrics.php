@@ -22,20 +22,42 @@ if (!function_exists('espoUserFilterClause')) {
     }
 }
 
+// Lead assignment in this EspoCRM instance is NOT stored on
+// lead.assigned_user_id (verified live: that column is NULL on every
+// lead row). Leads use EspoCRM's multi-assignee "Assigned Users" field
+// instead, which lives in the generic entity_user junction table
+// (entity_type='Lead'). Opportunity and Call both use the legacy single
+// assigned_user_id column correctly (verified: populated, entity_user
+// has zero rows for either entity type there) — this filter is scoped
+// to Lead queries only, everything else keeps using
+// espoUserFilterClause() above.
+if (!function_exists('espoLeadUserJoinAndFilter')) {
+    function espoLeadUserJoinAndFilter(?string $espoUserId, mysqli $conn, string $leadAlias = 'l'): array {
+        if ($espoUserId === null || $espoUserId === '') {
+            return ['join' => '', 'filter' => ''];
+        }
+        $escaped = $conn->real_escape_string($espoUserId);
+        $join = " JOIN entity_user eu ON eu.entity_id = {$leadAlias}.id AND eu.entity_type = 'Lead' AND eu.deleted = 0";
+        $filter = " AND eu.user_id = '{$escaped}'";
+        return ['join' => $join, 'filter' => $filter];
+    }
+}
+
 // ---- Internal helpers (table name is a parameter so tests can point them
 //      at a fixture table; public functions below always pass the real
 //      EspoCRM table names) ----
 
 if (!function_exists('espoFunnelSnapshotFromLeadTable')) {
     function espoFunnelSnapshotFromLeadTable(mysqli $conn, string $table, ?string $espoUserId, string $dateFrom, string $dateTo): array {
-        $userFilter = espoUserFilterClause($espoUserId, $conn);
         $from = $conn->real_escape_string($dateFrom);
         $to   = $conn->real_escape_string($dateTo);
+        $leadUser = espoLeadUserJoinAndFilter($espoUserId, $conn, 'l');
 
-        $sql = "SELECT status, COUNT(*) AS c FROM `{$table}`
-                WHERE deleted = 0 AND created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
-                {$userFilter}
-                GROUP BY status";
+        $sql = "SELECT l.status, COUNT(*) AS c FROM `{$table}` l
+                {$leadUser['join']}
+                WHERE l.deleted = 0 AND l.created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
+                {$leadUser['filter']}
+                GROUP BY l.status";
 
         $counts = ['new' => 0, 'assigned' => 0, 'in_process' => 0, 'converted' => 0, 'recycled' => 0, 'dead' => 0];
         $statusMap = [
@@ -95,13 +117,15 @@ if (!function_exists('espoConversionTrend')) {
         $from = $conn->real_escape_string($dateFrom);
         $to   = $conn->real_escape_string($dateTo);
         $dateFormat = $granularity === 'weekly' ? '%x-W%v' : '%Y-%m';
+        $leadUser = espoLeadUserJoinAndFilter($espoUserId, $conn, 'l');
 
-        $leadSql = "SELECT DATE_FORMAT(created_at, '{$dateFormat}') AS period,
+        $leadSql = "SELECT DATE_FORMAT(l.created_at, '{$dateFormat}') AS period,
                            COUNT(*) AS created,
-                           SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) AS converted
-                    FROM `lead`
-                    WHERE deleted = 0 AND created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
-                    {$userFilter}
+                           SUM(CASE WHEN l.status = 'Converted' THEN 1 ELSE 0 END) AS converted
+                    FROM `lead` l
+                    {$leadUser['join']}
+                    WHERE l.deleted = 0 AND l.created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
+                    {$leadUser['filter']}
                     GROUP BY period ORDER BY period";
 
         $oppSql = "SELECT DATE_FORMAT(created_at, '{$dateFormat}') AS period,
