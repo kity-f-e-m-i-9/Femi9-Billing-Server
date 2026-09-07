@@ -104,6 +104,9 @@ tpEnsureCourierPaymentTables($db_conn);
 // so a courier payment made against an earlier (possibly smaller) cart may
 // not fully cover a since-grown one — purchase-order-action.php catches that.
 $courierPoolTotal = tpCourierPoolTotal($db_conn, (int)$Login_user_IDvl, $productType);
+// "Pick up myself" only shows for a TP Company has explicitly opted in
+// (manage-territory-partner.php toggle) — everyone else must pay courier.
+$allowSelfPickup  = tpAllowsSelfPickup($db_conn, (int)$Login_user_IDvl);
 
 // Product catalog scoped to the chosen type — this is a stock replenishment
 // request to the company, not limited to what the TP already holds (unlike
@@ -537,6 +540,7 @@ $tpDeliveryAddressParts = array_filter([
                                             <label class="form-label">Disc(Rs.)</label>
                                             <input type="number" min="0" step="any" id="po_disc_amt" placeholder="Disc(Rs.)" class="form-control">
                                         </div>
+                                        <?php if ($allowSelfPickup): ?>
                                         <div class="col-auto">
                                             <label class="form-label" style="display:block;">&nbsp;</label>
                                             <label id="po_pickup_now_label" for="po_pickup_now" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;white-space:nowrap;height:38px;padding:0 14px;border-radius:8px;cursor:pointer;user-select:none;border:1.5px solid #fde68a;background:#fffbeb;color:#92400e;transition:background .15s,border-color .15s,color .15s;">
@@ -544,6 +548,7 @@ $tpDeliveryAddressParts = array_filter([
                                                 <i class="material-icons-outlined" style="font-size:16px;">storefront</i> Pick up myself
                                             </label>
                                         </div>
+                                        <?php endif; ?>
                                         <div class="col-auto">
                                             <button type="button" class="btn" id="add" onclick="addPoLine()"><i class="material-icons" style="font-size:16px;vertical-align:middle;">add</i> Add</button>
                                         </div>
@@ -594,9 +599,13 @@ $tpDeliveryAddressParts = array_filter([
                                     <i class="material-icons-outlined" style="vertical-align:middle;font-size:16px;">check_circle</i>
                                     &#8377;<?=number_format($courierPoolTotal, 2)?> already paid. If this order's exact courier fee (based on its real box count) comes to more than that, click "Pay Courier Amount" below to see and pay the remaining difference.
                                 </div>
-                                <?php else: ?>
+                                <?php elseif ($allowSelfPickup): ?>
                                 <div style="color:#92400e;font-size:13.5px;margin-bottom:10px;">
                                     A courier fee (based on your order's box count) must be paid before this order can be submitted. Picking up some or all of it yourself? Use "Pick Up Order" below.
+                                </div>
+                                <?php else: ?>
+                                <div style="color:#92400e;font-size:13.5px;margin-bottom:10px;">
+                                    A courier fee (based on your order's box count) must be paid before this order can be submitted.
                                 </div>
                                 <?php endif; ?>
                                 </div>
@@ -605,10 +614,12 @@ $tpDeliveryAddressParts = array_filter([
                                     <i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;">qr_code_2</i>
                                     Pay Courier Amount
                                 </button>
+                                <?php if ($allowSelfPickup): ?>
                                 <button type="button" class="btn-submit-po" id="poPickupBtn" onclick="openPickupModal()" style="background:#fff;border:2px solid #f59e0b;color:#92400e;">
                                     <i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;">storefront</i>
                                     Pick Up Order
                                 </button>
+                                <?php endif; ?>
                                 </div>
                             </div>
 
@@ -623,7 +634,9 @@ $tpDeliveryAddressParts = array_filter([
                              from the courier box/fee calc entirely (not
                              discounted, fully exempt) — see
                              shared/TpCourierPayment.php's
-                             tpCourierFilterToCourierItems(). -->
+                             tpCourierFilterToCourierItems(). Only rendered for
+                             a TP Company has opted into self-pickup. -->
+                        <?php if ($allowSelfPickup): ?>
                         <div class="modal fade" id="pickupModal" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-scrollable">
                                 <div class="modal-content" style="border:none;border-radius:14px;overflow:hidden;">
@@ -650,6 +663,7 @@ $tpDeliveryAddressParts = array_filter([
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
 
                     </div>
                 </div>
@@ -715,7 +729,8 @@ $tpDeliveryAddressParts = array_filter([
             if (poLines[i].pr_id === prId) { alert('That product is already added.'); return; }
         }
 
-        var pickupNow = document.getElementById('po_pickup_now').checked;
+        var pickupNowEl = document.getElementById('po_pickup_now');
+        var pickupNow = pickupNowEl ? pickupNowEl.checked : false;
         poLines.push({ pr_id: prId, name: prName, qty: qty, price: price, discPct: discPct, discAmt: discAmt, method: pickupNow ? 'pickup' : 'courier' });
         renderPoLines();
 
@@ -725,8 +740,10 @@ $tpDeliveryAddressParts = array_filter([
         document.getElementById('po_total').value = '';
         document.getElementById('po_disc_pct').value = '';
         document.getElementById('po_disc_amt').value = '';
-        document.getElementById('po_pickup_now').checked = false;
-        document.getElementById('po_pickup_now_label').classList.remove('active');
+        if (pickupNowEl) {
+            pickupNowEl.checked = false;
+            document.getElementById('po_pickup_now_label').classList.remove('active');
+        }
     }
 
     function removePoLine(idx) {

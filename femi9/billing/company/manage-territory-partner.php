@@ -23,6 +23,8 @@ $_delCol = $db_conn->query("SHOW COLUMNS FROM territory_partners LIKE 'deleted_a
 if ($_delCol && $_delCol->num_rows === 0) {
     $db_conn->query("ALTER TABLE territory_partners ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER is_active");
 }
+require_once __DIR__ . '/../shared/TpCourierPayment.php';
+tpEnsureSelfPickupColumn($db_conn);
 
 // A Sales BDM session only sees Territory Partners inside their own assigned
 // districts (including inactive ones, since this page is also how they'd
@@ -317,6 +319,7 @@ $i = 0;
                                             <th>Updated By</th>
                                             <th>Password</th>
                                             <th>Status</th>
+                                            <th>Self Pickup</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -432,6 +435,15 @@ $i = 0;
                                                 <?php endif; ?>
                                             </td>
                                             <td>
+                                                <label style="display:inline-flex;align-items:center;cursor:pointer;">
+                                                    <input type="checkbox" class="toggle-pickup-cb"
+                                                           data-id="<?php echo $enc_id; ?>"
+                                                           data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>"
+                                                           <?php echo !empty($tp['allow_self_pickup']) ? 'checked' : ''; ?>
+                                                           style="width:17px;height:17px;">
+                                                </label>
+                                            </td>
+                                            <td>
                                                 <div class="actions-group">
                                                     <a href="edit-territory-partner?tpid=<?php echo $enc_id; ?>" class="action-link" title="Edit">
                                                         <i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i>
@@ -528,6 +540,19 @@ $(document).on('click', '.toggle-status-btn', function () {
             $badge.removeClass('badge-active').addClass('badge-inactive').text('Inactive');
         }
     }, 'json').fail(function () { alert('Request failed. Please try again.'); });
+});
+
+$(document).on('change', '.toggle-pickup-cb', function () {
+    var $cb   = $(this);
+    var id    = $cb.data('id');
+    var name  = $cb.data('name');
+    var newVal = $cb.is(':checked') ? 1 : 0;
+
+    $.post('toggle-tp-pickup.php', {
+        csrf_token: CSRF_TOKEN, id: id, allow: newVal
+    }, function (res) {
+        if (!res.success) { alert('Failed. Please try again.'); $cb.prop('checked', !newVal); return; }
+    }, 'json').fail(function () { alert('Request failed. Please try again.'); $cb.prop('checked', !newVal); });
 });
 
 function togglePw(btn) {

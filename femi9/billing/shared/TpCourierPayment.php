@@ -174,6 +174,31 @@ function tpEnsurePickupColumn(mysqli $db): void
     }
 }
 
+// Self-migrating: per-TP switch, set by Company on manage-territory-partner.php
+// (toggle-tp-pickup.php). Defaults to 0 — "pick up myself" only appears for a
+// TP Company has explicitly opted in; every other TP must pay the courier fee,
+// enforced both in the UI (add-purchase-order.php hides the option) and
+// server-side (purchase-order-action.php ignores a tampered pickup_method[]
+// for a TP not opted in).
+function tpEnsureSelfPickupColumn(mysqli $db): void
+{
+    $col = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'allow_self_pickup'");
+    if ($col && $col->num_rows === 0) {
+        $db->query("ALTER TABLE territory_partners ADD COLUMN allow_self_pickup TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active");
+    }
+}
+
+function tpAllowsSelfPickup(mysqli $db, int $tpId): bool
+{
+    tpEnsureSelfPickupColumn($db);
+    $stmt = $db->prepare("SELECT allow_self_pickup FROM territory_partners WHERE id = ?");
+    $stmt->bind_param('i', $tpId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return !empty($row['allow_self_pickup']);
+}
+
 /**
  * Splits a cart into the subset actually needing courier, given a
  * pr_id => 'pickup'|'courier' map (pr_id as a STRING key, matching how the

@@ -32,6 +32,11 @@ $disc_pcts = $_POST['discount_percentage'] ?? [];
 $disc_amts = $_POST['discount_amount']     ?? [];
 $methods  = $_POST['pickup_method'] ?? [];
 
+// Authoritative gate — a TP Company hasn't opted into self-pickup can never
+// get a 'pickup' line through here, no matter what pickup_method[] the
+// client submits (the UI already hides the option, this is the real check).
+$allowSelfPickup = tpAllowsSelfPickup($db_conn, $tp_id);
+
 $items = [];
 foreach ($pr_ids as $i => $rpid) {
     $pid   = (int)$rpid;
@@ -43,8 +48,9 @@ foreach ($pr_ids as $i => $rpid) {
     $amount = round(($qty * $price) - $damt, 2);
     // Defaults to 'courier' for a missing/unrecognized value — nothing is
     // silently exempted from the courier fee unless the TP explicitly
-    // marked it "pick up myself" via add-purchase-order.php's modal.
-    $method = (($methods[$i] ?? 'courier') === 'pickup') ? 'pickup' : 'courier';
+    // marked it "pick up myself" via add-purchase-order.php's modal, AND
+    // Company has enabled self-pickup for this TP.
+    $method = ($allowSelfPickup && ($methods[$i] ?? 'courier') === 'pickup') ? 'pickup' : 'courier';
     $items[] = ['pid' => $pid, 'qty' => $qty, 'price' => $price, 'dpct' => $dpct, 'damt' => $damt, 'amount' => $amount, 'method' => $method];
 }
 
