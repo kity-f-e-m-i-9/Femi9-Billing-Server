@@ -109,6 +109,52 @@ $hasDualPreselected = !empty($dual_locations);
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
 
+    <link href="../../assets/plugins/select2/css/select2.min.css" rel="stylesheet">
+    <style>
+        /* Select2 theme overrides — matches add-tp-advance-payment.php's pattern */
+        .select2-container--default .select2-selection--single {
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            height: auto;
+            padding: 10px 12px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            transition: all 0.3s ease;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 1.5;
+            padding: 0;
+            color: #374151;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 100%;
+            top: 0;
+            right: 8px;
+        }
+        .select2-container--default.select2-container--open .select2-selection--single,
+        .select2-container--default.select2-container--focus .select2-selection--single {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+        .select2-container--default .select2-results__option--highlighted[aria-selected] {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .select2-dropdown {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.95rem;
+        }
+        .select2-search--dropdown .select2-search__field {
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 6px 10px;
+        }
+        .select2-container { width: 100% !important; }
+    </style>
+
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../../assets/images/neptune.png" />
 
@@ -402,6 +448,7 @@ if ($currentTeamLevelId) {
     <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
     <script src="../../assets/plugins/pace/pace.min.js"></script>
     <script src="../../assets/plugins/highlight/highlight.pack.js"></script>
+    <script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
 
@@ -948,6 +995,12 @@ if ($currentTeamLevelId) {
          whole block silently threw, never firing the getJSON request. -->
     <script>
     $(function() {
+        $('#espo_user_id').select2({
+            placeholder: '-- Not linked --',
+            allowClear: true,
+            width: '100%'
+        });
+
         $.getJSON('get-espo-users.php', function(resp) {
             if (resp.error) {
                 $('#espo_user_id').after('<small class="text-danger d-block">CRM data unavailable — cannot load user list.</small>');
@@ -959,6 +1012,10 @@ if ($currentTeamLevelId) {
                 if (u.id === current) opt.prop('selected', true);
                 $('#espo_user_id').append(opt);
             });
+            // Options were appended after select2() already initialized —
+            // refresh so the searchable dropdown picks up the new list and
+            // shows the correct pre-selected value.
+            $('#espo_user_id').trigger('change.select2');
         }).fail(function() {
             $('#espo_user_id').after('<small class="text-danger d-block">Could not load CRM user list — check your connection and try again.</small>');
         });
