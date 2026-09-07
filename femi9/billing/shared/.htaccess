@@ -1,0 +1,4 @@
+# Deny all direct web access to this directory.
+# Everything here is a PHP include/library or a config file (.env, cacert.pem,
+# etc.) meant to be loaded by application code, never requested directly.
+Require all denied

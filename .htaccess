@@ -1,3 +1,10 @@
+# Block direct access to dotfiles (.env, .git, .htaccess itself, etc.)
+# anywhere under this root, regardless of whether a subdirectory has its
+# own .htaccess.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
 RewriteEngine On
 
 # Serve the central login page at the bare domain root, without redirecting
