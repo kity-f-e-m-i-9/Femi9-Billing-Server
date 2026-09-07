@@ -258,22 +258,6 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
     </select>
     <small class="form-text text-muted">Select the EspoCRM user this Sales BDM corresponds to, for CRM dashboard metrics.</small>
 </div>
-<script>
-$(function() {
-    $.getJSON('get-espo-users.php', function(resp) {
-        if (resp.error) {
-            $('#espo_user_id').after('<small class="text-danger d-block">CRM data unavailable — cannot load user list.</small>');
-            return;
-        }
-        var current = <?php echo json_encode($result_product_list['espo_user_id'] ?? ''); ?>;
-        resp.users.forEach(function(u) {
-            var opt = $('<option>').val(u.id).text(u.name + ' (' + u.email + ')');
-            if (u.id === current) opt.prop('selected', true);
-            $('#espo_user_id').append(opt);
-        });
-    });
-});
-</script>
 <br/>
 
 <?php
@@ -956,6 +940,29 @@ if ($currentTeamLevelId) {
             }
         });
     })(jQuery);
+    </script>
+
+    <!-- EspoCRM user-mapping dropdown: must load after jQuery (script tags
+         above) — the original inline placement right after the <select>
+         markup ran before jQuery was loaded, so $ was undefined and the
+         whole block silently threw, never firing the getJSON request. -->
+    <script>
+    $(function() {
+        $.getJSON('get-espo-users.php', function(resp) {
+            if (resp.error) {
+                $('#espo_user_id').after('<small class="text-danger d-block">CRM data unavailable — cannot load user list.</small>');
+                return;
+            }
+            var current = <?php echo json_encode($result_product_list['espo_user_id'] ?? ''); ?>;
+            resp.users.forEach(function(u) {
+                var opt = $('<option>').val(u.id).text(u.name + ' (' + (u.email || 'no email') + ')');
+                if (u.id === current) opt.prop('selected', true);
+                $('#espo_user_id').append(opt);
+            });
+        }).fail(function() {
+            $('#espo_user_id').after('<small class="text-danger d-block">Could not load CRM user list — check your connection and try again.</small>');
+        });
+    });
     </script>
 </body>
 
