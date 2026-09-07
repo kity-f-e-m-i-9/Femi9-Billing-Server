@@ -78,6 +78,10 @@ if (!empty($salesBdmID)) {
         <a href="<?php echo $_bdmBase; ?>tp-invoices"><i class="material-icons-two-tone">receipt_long</i>TP Invoices</a>
     </li>
 
+    <li>
+        <a href="<?php echo $_bdmBase; ?>dashboard-crm"><i class="material-icons-two-tone">insights</i>CRM Dashboard</a>
+    </li>
+
     <?php if ($_hasReports): ?>
     <li>
         <a href=""><i class="material-icons-two-tone">groups</i>Our Team
@@ -105,6 +109,10 @@ if (!empty($salesBdmID)) {
             <li><a href="<?php echo $_bdmBase; ?>add-district-note">Add Note</a></li>
             <li><a href="<?php echo $_bdmBase; ?>manage-district-notes">Manage Notes</a></li>
         </ul>
+    </li>
+
+    <li>
+        <a href="<?php echo $_bdmBase; ?>courier-amount-requests"><i class="material-icons-two-tone">local_shipping</i>Courier Amount Requests</a>
     </li>
 
     <li>

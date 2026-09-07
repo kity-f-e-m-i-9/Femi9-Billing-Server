@@ -10,8 +10,16 @@ $from_date = $_REQUEST['frdate'] ?? date("Y-m-d", strtotime("-6 days"));
 $to_date   = $_REQUEST['todate'] ?? $today;
 
 $statusFilter = $_REQUEST['status_filter'] ?? 'all';
-$allowedStatusFilters = ['all', 'waiting', 'completed', 'cancelled'];
+// 'courier_rejected' isn't a real tp_purchase_orders.status value — it's
+// derived from the linked courier payment's latest status (computed below,
+// once courier_needs_retry exists per order) — so it needs its own filter
+// pass after that, not the SQL-level status match every other option uses.
+$allowedStatusFilters = ['all', 'waiting', 'completed', 'cancelled', 'courier_rejected'];
 if (!in_array($statusFilter, $allowedStatusFilters, true)) $statusFilter = 'all';
+// A courier-rejected order is always still 'waiting' at the order-status
+// level (rejection only ever happens before the order is fulfilled) — reuse
+// that SQL-level scope so the query stays a normal single-status match.
+$sqlStatusFilter = $statusFilter === 'courier_rejected' ? 'waiting' : $statusFilter;
 
 // Computes the same subtotal/discount/payment-status breakdown that used to
 // live only on the separate "Purchased Bill Copy" page — merged in here so
@@ -75,11 +83,11 @@ $stmt = mysqli_prepare($db_conn,
      LEFT JOIN products p ON p.id = i.product_id
      LEFT JOIN super_stockiest ss ON ss.id = o.approver_ss_id
      WHERE o.territory_partner_id=? AND o.order_date BETWEEN ? AND ?"
-    . ($statusFilter !== 'all' ? " AND o.status = ?" : '')
+    . ($sqlStatusFilter !== 'all' ? " AND o.status = ?" : '')
     . "\n     ORDER BY o.order_date DESC, o.id DESC, i.id ASC"
 );
-if ($statusFilter !== 'all') {
-    mysqli_stmt_bind_param($stmt, "isss", $Login_user_IDvl, $from_date, $to_date, $statusFilter);
+if ($sqlStatusFilter !== 'all') {
+    mysqli_stmt_bind_param($stmt, "isss", $Login_user_IDvl, $from_date, $to_date, $sqlStatusFilter);
 } else {
     mysqli_stmt_bind_param($stmt, "iss", $Login_user_IDvl, $from_date, $to_date);
 }
@@ -177,6 +185,48 @@ if ($statusFilter === 'all' || $statusFilter === 'completed') {
         ];
         $invNumbers[$inv['id']] = $inv['invoice_number'];
     }
+}
+
+// Courier payment retry — a waiting order whose most recent linked courier
+// payment attempt was rejected has no way forward otherwise (the order is
+// already submitted; pay-courier-payment.php's normal pre-submission flow
+// needs a session cart draft that no longer exists). "Most recent" matters:
+// an order can carry an earlier rejected attempt followed by a newer
+// pending/accepted retry, which must NOT still show the retry button.
+require_once __DIR__ . '/../shared/TpCourierPayment.php';
+tpEnsureCourierPaymentTables($db_conn);
+$waitingPoIds = array_values(array_filter(array_map(
+    fn($o) => ($o['kind'] === 'po' && $o['status'] === 'waiting') ? $o['po_id'] : null,
+    $orders
+)));
+if (!empty($waitingPoIds)) {
+    $placeholders = implode(',', array_fill(0, count($waitingPoIds), '?'));
+    $types = str_repeat('i', count($waitingPoIds));
+    $cpStmt = $db_conn->prepare(
+        "SELECT c1.po_id, c1.status FROM tp_courier_payments c1
+         INNER JOIN (SELECT po_id, MAX(id) AS max_id FROM tp_courier_payments WHERE po_id IN ($placeholders) GROUP BY po_id) c2
+           ON c2.po_id = c1.po_id AND c2.max_id = c1.id"
+    );
+    $cpStmt->bind_param($types, ...$waitingPoIds);
+    $cpStmt->execute();
+    $latestCourierStatusByPoId = [];
+    foreach ($cpStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $cr) {
+        $latestCourierStatusByPoId[(int)$cr['po_id']] = $cr['status'];
+    }
+    $cpStmt->close();
+
+    foreach ($orders as $key => $o) {
+        if ($o['kind'] === 'po' && $o['status'] === 'waiting') {
+            $orders[$key]['courier_needs_retry'] = ($latestCourierStatusByPoId[$o['po_id']] ?? null) === 'rejected';
+        }
+    }
+}
+
+// The one filter option that isn't a real order-status match — narrows down
+// to just the orders courier_needs_retry flagged above, after the SQL query
+// already scoped everything to 'waiting'.
+if ($statusFilter === 'courier_rejected') {
+    $orders = array_filter($orders, fn($o) => !empty($o['courier_needs_retry']));
 }
 
 uasort($orders, function ($a, $b) {
@@ -367,6 +417,7 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                         <option value="waiting" <?=$statusFilter === 'waiting' ? 'selected' : ''?>>Waiting</option>
                                         <option value="completed" <?=$statusFilter === 'completed' ? 'selected' : ''?>>Completed</option>
                                         <option value="cancelled" <?=$statusFilter === 'cancelled' ? 'selected' : ''?>>Cancelled<?=$cancelledCount ? ' (' . $cancelledCount . ')' : ''?></option>
+                                        <option value="courier_rejected" <?=$statusFilter === 'courier_rejected' ? 'selected' : ''?>>Courier Payment Rejected</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3 d-flex gap-2">
@@ -450,6 +501,11 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                                 <?php endif; ?>
                                                 <?php else: ?>
                                                 <span class="po-status-pill waiting">Waiting</span>
+                                                <?php if (!empty($o['courier_needs_retry'])): ?>
+                                                <div style="margin-top:4px;">
+                                                    <span class="po-status-pill cancelled" style="font-size:9.5px;" title="The company rejected the courier payment screenshot for this order">Courier Payment Rejected</span>
+                                                </div>
+                                                <?php endif; ?>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
@@ -460,6 +516,11 @@ $cancelledCount  = count(array_filter($orders, fn($o) => $o['status'] === 'cance
                                                     <?php if ($o['status'] === 'completed' && $o['tp_invoice_id'] && isset($invNumbers[$o['tp_invoice_id']])): ?>
                                                     <a href="purchased-bill-print.php?id=<?=urlencode(base64_encode($o['tp_invoice_id']))?>" target="_blank" class="po-print-btn" title="Print purchased bill copy">
                                                         <i class="material-icons" style="font-size:14px;">print</i> Print
+                                                    </a>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($o['courier_needs_retry'])): ?>
+                                                    <a href="pay-courier-payment.php?po_id=<?=(int)$o['po_id']?>" class="po-print-btn" style="background:#fffbeb;color:#92400e;border-color:#fde68a;" title="Pay the courier amount again">
+                                                        <i class="material-icons" style="font-size:14px;">qr_code_2</i> Pay Courier Amount
                                                     </a>
                                                     <?php endif; ?>
                                                     <?php if ($o['kind'] === 'po' && $o['status'] === 'waiting'): ?>

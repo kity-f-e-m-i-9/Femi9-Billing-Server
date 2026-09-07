@@ -32,15 +32,20 @@ require_once __DIR__ . '/include/db-connect.php';
 // silently bounced to a logged-out page. filled-firkas.php already had its
 // own $_companyBridgeView handling written (dashboard.php's "View TPs"
 // button links here) but was missing from this list, so it never actually
-// worked. change-password.php and logout.php are deliberately left off —
-// this bridge is read-only, and a company user browsing a BDM's dashboard
-// should never be able to touch that BDM's own login credentials.
+// worked. dashboard-crm.php is the CRM Dashboard nav link that now renders
+// on every salesbdm page's menu (read-only, no POST writes) — without it
+// here, a bridged company user clicking that link gets bounced to a
+// logged-out page instead of seeing the BDM's CRM metrics. change-password.php
+// and logout.php are deliberately left off — this bridge is read-only, and
+// a company user browsing a BDM's dashboard should never be able to touch
+// that BDM's own login credentials.
 $_companyBridgeAllowedScripts = [
     'dashboard.php', 'get-filled-firka-tps.php', 'get-unassigned-firkas.php',
     'get-active-tps.php',
     'my-team.php', 'my-team-report.php', 'tp-advance-payment-report.php',
     'filled-firkas.php', 'tp-purchase-order.php', 'reward-points-tp.php',
     'pending-amount.php', 'tp-invoices.php', 'tp-invoice-print.php',
+    'dashboard-crm.php',
 ];
 if (in_array(basename($_SERVER['SCRIPT_NAME']), $_companyBridgeAllowedScripts, true) && !empty($_COOKIE['femi9_company_bdm_view'])) {
     $db_conn->query("CREATE TABLE IF NOT EXISTS company_bdm_view_bridge (

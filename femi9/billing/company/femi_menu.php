@@ -306,6 +306,9 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="cp-district-sales-report">District Sales Report</a></li>
                         </ul>
                     </li>
+					<li>
+                        <a href="dashboard-crm"><i class="material-icons-two-tone">insights</i>CRM Dashboard</a>
+                    </li>
 					<!----------------------Territory Partner--------------------------->
 					<li>
                         <a href="#"><i class="material-icons-two-tone">map</i>Territory Partner<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
@@ -369,7 +372,18 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li>
                         <a href="godown"><i class="material-icons-two-tone">dashboard</i>Company Profile</a>
                     </li>
-					
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">local_shipping</i>Courier<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+							<li><a href="courier-payment-settings">Courier Payment QR</a></li>
+							<li><a href="manage-courier-payments">Courier Payments</a></li>
+							<li><a href="courier-amount-requests">Courier Amount Requests</a></li>
+                        </ul>
+                    </li>
+					<li>
+                        <a href="track-users"><i class="material-icons-two-tone">group</i>Track Users</a>
+                    </li>
+
 					<li>
                     <a href="wallet_request"><i class="material-icons-outlined">wallet</i>Withdraw</a>
                     </li>
@@ -797,6 +811,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         </ul>
                     </li>
 					<?php }?>
+					<?php if($resultusertypeGET['ms']==1){?>
+					<li>
+                        <a href="dashboard-crm"><i class="material-icons-two-tone">insights</i>CRM Dashboard</a>
+                    </li>
+					<?php }?>
 					<!----------------------Territory Partner--------------------------->
 					<?php if(($resultusertypeGET['territory_partner']??0)==1){?>
 					<li>
@@ -887,7 +906,18 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li>
                         <a href="godown"><i class="material-icons-two-tone">dashboard</i>Company Profile</a>
                     </li>
-					
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">local_shipping</i>Courier<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+							<li><a href="courier-payment-settings">Courier Payment QR</a></li>
+							<li><a href="manage-courier-payments">Courier Payments</a></li>
+							<li><a href="courier-amount-requests">Courier Amount Requests</a></li>
+                        </ul>
+                    </li>
+					<li>
+                        <a href="track-users"><i class="material-icons-two-tone">group</i>Track Users</a>
+                    </li>
+
 					<?php }?>
 					
 					<?php if($resultusertypeGET['users_demo']==1){?>

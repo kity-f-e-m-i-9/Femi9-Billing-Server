@@ -251,6 +251,31 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 <input type="text" name="zone" value="<?=htmlspecialchars($result_product_list['zone'] ?? '');?>" class="form-control" placeholder="optional" onkeypress="restrictSpecialChars(event)">
 </br>
 
+<div class="form-group" style="display:block;">
+    <label class="form-label">Linked EspoCRM User</label>
+    <select name="espo_user_id" id="espo_user_id" class="form-control">
+        <option value="">-- Not linked --</option>
+    </select>
+    <small class="form-text text-muted">Select the EspoCRM user this Sales BDM corresponds to, for CRM dashboard metrics.</small>
+</div>
+<script>
+$(function() {
+    $.getJSON('get-espo-users.php', function(resp) {
+        if (resp.error) {
+            $('#espo_user_id').after('<small class="text-danger d-block">CRM data unavailable — cannot load user list.</small>');
+            return;
+        }
+        var current = <?php echo json_encode($result_product_list['espo_user_id'] ?? ''); ?>;
+        resp.users.forEach(function(u) {
+            var opt = $('<option>').val(u.id).text(u.name + ' (' + u.email + ')');
+            if (u.id === current) opt.prop('selected', true);
+            $('#espo_user_id').append(opt);
+        });
+    });
+});
+</script>
+<br/>
+
 <?php
 $db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_team_levels (
     id INT AUTO_INCREMENT PRIMARY KEY,
