@@ -38,18 +38,11 @@ if (!$crmUnavailable) {
         }
         $eid = $bdm['espo_user_id'];
         $funnel = espoFunnelSnapshot($espoConn, $eid, $from, $to);
-        // Total leads currently assigned to this rep in the range — sum of
-        // every status (New/Assigned/In Process/Converted/Recycled/Dead).
-        // Distinct from $funnel['assigned'], which is only the count of
-        // leads whose EspoCRM *status* is literally "Assigned" (one stage
-        // among several), not "how many leads does this rep have overall."
-        $leadsAssigned = $funnel['new'] + $funnel['assigned'] + $funnel['in_process']
-            + $funnel['converted'] + $funnel['recycled'] + $funnel['dead'];
         $repRows[] = [
             'bdm_name' => $bdm['bdm_name'],
             'linked' => true,
             'funnel' => $funnel,
-            'leads_assigned' => $leadsAssigned,
+            'leads_assigned' => $funnel['leads_assigned'],
             'won_lost' => espoWonLostSplit($espoConn, $eid, $from, $to),
             'calls' => espoCallActivity($espoConn, $eid, $from, $to),
             'calls_per_conv' => espoCallsPerConversion($espoConn, $eid, $from, $to),

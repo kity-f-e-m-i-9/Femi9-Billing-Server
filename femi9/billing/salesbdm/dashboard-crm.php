@@ -29,10 +29,7 @@ if (!$notLinked) {
         $avgCycle = espoAvgSalesCycleDays($espoConn, $myEspoId, $from, $to);
         $calls = espoCallActivity($espoConn, $myEspoId, $from, $to);
         $callsPerConv = espoCallsPerConversion($espoConn, $myEspoId, $from, $to);
-        // Total leads currently assigned to this rep in the range — sum of
-        // every status, matching the company dashboard's per-rep column.
-        $leadsAssigned = $funnel['new'] + $funnel['assigned'] + $funnel['in_process']
-            + $funnel['converted'] + $funnel['recycled'] + $funnel['dead'];
+        $leadsAssigned = $funnel['leads_assigned'];
         $espoConn->close();
     }
 }
