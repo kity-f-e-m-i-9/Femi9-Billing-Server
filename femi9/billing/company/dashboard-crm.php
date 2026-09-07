@@ -37,10 +37,19 @@ if (!$crmUnavailable) {
             continue;
         }
         $eid = $bdm['espo_user_id'];
+        $funnel = espoFunnelSnapshot($espoConn, $eid, $from, $to);
+        // Total leads currently assigned to this rep in the range — sum of
+        // every status (New/Assigned/In Process/Converted/Recycled/Dead).
+        // Distinct from $funnel['assigned'], which is only the count of
+        // leads whose EspoCRM *status* is literally "Assigned" (one stage
+        // among several), not "how many leads does this rep have overall."
+        $leadsAssigned = $funnel['new'] + $funnel['assigned'] + $funnel['in_process']
+            + $funnel['converted'] + $funnel['recycled'] + $funnel['dead'];
         $repRows[] = [
             'bdm_name' => $bdm['bdm_name'],
             'linked' => true,
-            'funnel' => espoFunnelSnapshot($espoConn, $eid, $from, $to),
+            'funnel' => $funnel,
+            'leads_assigned' => $leadsAssigned,
             'won_lost' => espoWonLostSplit($espoConn, $eid, $from, $to),
             'calls' => espoCallActivity($espoConn, $eid, $from, $to),
             'calls_per_conv' => espoCallsPerConversion($espoConn, $eid, $from, $to),
@@ -279,6 +288,7 @@ if (!$crmUnavailable) {
                                         <thead>
                                             <tr>
                                                 <th>BDM</th>
+                                                <th class="num">Leads Assigned</th>
                                                 <th class="num">Leads Converted</th>
                                                 <th class="num">Opps Won</th>
                                                 <th class="num">Opps Lost</th>
@@ -288,7 +298,7 @@ if (!$crmUnavailable) {
                                         </thead>
                                         <tbody>
                                             <?php if (empty($repRows)): ?>
-                                                <tr><td colspan="6">
+                                                <tr><td colspan="7">
                                                     <div class="empty-state">
                                                         <i class="material-icons-outlined">person_search</i>
                                                         <div class="empty-title">No Sales BDM records found</div>
@@ -311,7 +321,7 @@ if (!$crmUnavailable) {
                                                                     <?php echo htmlspecialchars($row['bdm_name']); ?>
                                                                 </div>
                                                             </td>
-                                                            <td colspan="5"><span class="badge-soft unlinked"><i class="material-icons-outlined" style="font-size:13px;">link_off</i>Not linked to a CRM user</span></td>
+                                                            <td colspan="6"><span class="badge-soft unlinked"><i class="material-icons-outlined" style="font-size:13px;">link_off</i>Not linked to a CRM user</span></td>
                                                         </tr>
                                                     <?php else: ?>
                                                         <tr>
@@ -321,6 +331,7 @@ if (!$crmUnavailable) {
                                                                     <?php echo htmlspecialchars($row['bdm_name']); ?>
                                                                 </div>
                                                             </td>
+                                                            <td class="num"><?php echo htmlspecialchars($row['leads_assigned']); ?></td>
                                                             <td class="num"><?php echo htmlspecialchars($row['funnel']['converted']); ?></td>
                                                             <td class="num won-cell"><?php echo htmlspecialchars($row['won_lost']['won']); ?></td>
                                                             <td class="num lost-cell"><?php echo htmlspecialchars($row['won_lost']['lost']); ?></td>
