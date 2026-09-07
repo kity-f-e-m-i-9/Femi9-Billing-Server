@@ -14,6 +14,8 @@ $userTable = $userConfig['table'];
 $userDisplayName = $userConfig['display_name'];
 $business_name = "Femi9 - Happy day Everyday";
 
+ensureTrackUsersTable($db_conn);
+
 if (empty($result_LoGuserDtails)) {
     $select_LoGuserDtails = $db_conn->prepare("SELECT * FROM track_users WHERE mobile = ? LIMIT 1");
     $select_LoGuserDtails->bind_param('s', $_SESSION['LOGIN_USER']);
