@@ -344,9 +344,8 @@ if (!$crmUnavailable) {
     </div>
 
     <!-- Vendor Scripts -->
-    <script src="../../assets/plugins/jquery/jquery-3.4.1.min.js"></script>
-    <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
-    <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
+    <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
+    <script src="../../assets/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../../assets/plugins/pace/pace.min.js"></script>
 
     <!-- Theme Scripts -->
