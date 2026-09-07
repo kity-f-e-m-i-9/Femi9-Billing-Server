@@ -26,7 +26,6 @@ $poStmt->close();
 $todayOrderCount = count($rangePos);
 $poIds = array_column($rangePos, 'id');
 
-$orderAmount = 0.0;
 $receivedAmt = 0.0;
 $locationOrderCounts = []; // district name => order count
 $locationBoxCounts = [];   // district name => box count (to be delivered there)
@@ -40,12 +39,6 @@ foreach ($rangePos as $p) {
 if (!empty($poIds)) {
     $placeholders = implode(',', array_fill(0, count($poIds), '?'));
     $types = str_repeat('i', count($poIds));
-
-    $amtStmt = $db_conn->prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM tp_purchase_order_items WHERE po_id IN ($placeholders)");
-    $amtStmt->bind_param($types, ...$poIds);
-    $amtStmt->execute();
-    $orderAmount = (float)$amtStmt->get_result()->fetch_assoc()['total'];
-    $amtStmt->close();
 
     // One box-count reading per PO (not per screenshot attempt) — a PO can
     // carry more than one tp_courier_payments row across retries, all with
@@ -148,13 +141,6 @@ arsort($locationOrderCounts);
                                     <i class="material-icons-outlined">receipt_long</i>
                                     <div class="label">Order Count</div>
                                     <div class="value"><?=$todayOrderCount?></div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <div class="trk-card">
-                                    <i class="material-icons-outlined">payments</i>
-                                    <div class="label">Order Amount</div>
-                                    <div class="value">&#8377;<?=number_format($orderAmount, 2)?></div>
                                 </div>
                             </div>
                             <div class="col-md-4 col-sm-6">
