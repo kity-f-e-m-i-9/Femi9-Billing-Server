@@ -23,6 +23,12 @@ class ClaudeVisionService {
      * @param string $imagePath Local filesystem path to the image (JPEG/PNG/WEBP/GIF).
      * @param array $priorCorrections Recent reviewer corrections to few-shot from:
      *        [['wrong' => '35', 'correct' => '5', 'field' => 'amount'], ...]
+     * @param ?string $expectedRecipient When given, the recipient check verifies the
+     *        screenshot's payee against THIS exact UPI ID/VPA instead of the generic
+     *        "Femi9 / Femi Nayan LLP / Anand Praveen" name list — used by courier
+     *        payment, where the actual receiving account is whatever the company has
+     *        currently configured (a personal name, not literally "Femi9"), so the
+     *        generic name check would wrongly reject a genuinely correct payment.
      * @return array{
      *   success: bool,
      *   amount: ?float,
@@ -34,7 +40,7 @@ class ClaudeVisionService {
      *   message: string
      * }
      */
-    public function analyzeScreenshot($imagePath, array $priorCorrections = []) {
+    public function analyzeScreenshot($imagePath, array $priorCorrections = [], ?string $expectedRecipient = null) {
         try {
             $imageData = @file_get_contents($imagePath);
             if ($imageData === false) {
@@ -46,7 +52,7 @@ class ClaudeVisionService {
                 return $this->failure('Unsupported image type');
             }
 
-            $prompt = $this->buildPrompt($priorCorrections);
+            $prompt = $this->buildPrompt($priorCorrections, $expectedRecipient);
 
             $payload = [
                 'model' => $this->model,
@@ -87,6 +93,8 @@ class ClaudeVisionService {
                 'amount' => $parsed['amount'],
                 'reference' => $parsed['reference'],
                 'recipient_matches' => (bool)($parsed['recipient_matches'] ?? false),
+                'payment_date' => $parsed['payment_date'] ?? null,
+                'payment_succeeded' => $parsed['payment_succeeded'] ?? true,
                 'confidence' => $parsed['confidence'] ?? 'low',
                 'looks_like_payment_screenshot' => $parsed['looks_like_payment_screenshot'],
                 'reasoning' => $parsed['reasoning'] ?? '',
@@ -98,7 +106,18 @@ class ClaudeVisionService {
         }
     }
 
-    private function buildPrompt(array $priorCorrections) {
+    private function buildPrompt(array $priorCorrections, ?string $expectedRecipient = null) {
+        $recipientInstruction = $expectedRecipient !== null
+            ? "Whether the payment recipient shown in the screenshot (their UPI ID/VPA, "
+              . "e.g. \"name@bank\") is exactly \"{$expectedRecipient}\" (recipient_matches: "
+              . "true) or a different UPI ID/account entirely (recipient_matches: false). "
+              . "Match on the UPI ID itself, not the display name next to it (the display "
+              . "name shown by the paying app is the payer's own saved contact name and may "
+              . "not match)."
+            : "Whether the payment recipient shown in the screenshot is Femi9 / Femi "
+              . "Nayan LLP / Femi Health Care / Anand Praveen (recipient_matches: true) "
+              . "or someone else entirely (recipient_matches: false).";
+
         $prompt = <<<PROMPT
 You are verifying a payment proof screenshot uploaded by a distributor as
 proof of payment to the company "Femi9" (also written as "Femi Nayan LLP",
@@ -120,9 +139,23 @@ Read the screenshot carefully and identify:
    alphanumeric characters. Do not confuse a "Google transaction ID" (an
    internal app ID) with the actual bank/UPI reference if both appear —
    prefer the UPI/bank-side one when both are present.
-4. Whether the payment recipient shown in the screenshot is Femi9 / Femi
-   Nayan LLP / Femi Health Care / Anand Praveen (recipient_matches: true)
-   or someone else entirely (recipient_matches: false).
+4. {$recipientInstruction}
+5. The date the payment was made, if shown on screen (as YYYY-MM-DD; if only
+   a relative label like "Today"/"Yesterday" is shown with no absolute date,
+   or no date at all is visible, return null for this field rather than
+   guessing).
+6. Whether the payment actually SUCCEEDED (payment_succeeded: true) or the
+   screen shows a FAILED/incomplete/error transaction (payment_succeeded:
+   false) — look for explicit failure language such as "not been debited",
+   "transaction failed", "payment unsuccessful", "try again", "retry", a
+   pending/processing spinner with no completion confirmation, or any bank/
+   UPI-limit error message. A completed transaction always shows a clear
+   success indicator (a green checkmark, "Completed", "Successful", a real
+   transaction ID) — if that's genuinely missing and you cannot confirm
+   completion, treat it as payment_succeeded: false rather than assuming
+   success. This is separate from question 1: a failed-payment screen still
+   looks_like_payment_screenshot: true (it's real payment app UI, not proof
+   money actually moved).
 
 Be conservative: if the amount or reference is genuinely unclear, blurry,
 ambiguous, or you are guessing, say so honestly with confidence "low" rather
@@ -151,6 +184,8 @@ Respond with ONLY a JSON object, no other text, in exactly this shape:
   "amount": <number or null>,
   "reference": "<string or null>",
   "recipient_matches": <true or false>,
+  "payment_date": "<YYYY-MM-DD or null>",
+  "payment_succeeded": <true or false>,
   "confidence": "high" or "low",
   "reasoning": "<one short sentence explaining your read, or why confidence is low, or why this isn't a payment screenshot>"
 }
@@ -173,6 +208,16 @@ PROMPT;
             'amount' => is_numeric($decoded['amount'] ?? null) ? (float)$decoded['amount'] : null,
             'reference' => !empty($decoded['reference']) ? trim((string)$decoded['reference']) : null,
             'recipient_matches' => $decoded['recipient_matches'] ?? false,
+            // Defaults to true (assume success) when the model omits this
+            // field entirely, same "don't invent a negative the model never
+            // actually said" posture as looks_like_payment_screenshot above
+            // — an older prompt response or a model that ignores the new
+            // field shouldn't suddenly start rejecting every screenshot.
+            'payment_succeeded' => array_key_exists('payment_succeeded', $decoded)
+                ? (bool)$decoded['payment_succeeded']
+                : true,
+            'payment_date' => (!empty($decoded['payment_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $decoded['payment_date']))
+                ? $decoded['payment_date'] : null,
             'confidence' => in_array($decoded['confidence'] ?? '', ['high', 'low'], true) ? $decoded['confidence'] : 'low',
             // Defaults to true (rather than assuming the negative) when the
             // model omits the field entirely, so older/odd responses fall
@@ -233,6 +278,8 @@ PROMPT;
             'amount' => null,
             'reference' => null,
             'recipient_matches' => false,
+            'payment_date' => null,
+            'payment_succeeded' => true,
             'confidence' => 'low',
             'looks_like_payment_screenshot' => true,
             'reasoning' => '',

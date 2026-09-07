@@ -3,6 +3,7 @@ include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 require_once("include/GodownAccess.php");
 require_once __DIR__ . '/../shared/TpProductType.php';
+require_once __DIR__ . '/../shared/TpCourierPayment.php';
 error_reporting(0);
 
 if (empty($_SESSION['csrf_token'])) {
@@ -27,7 +28,12 @@ if ($filterSubmitted) {
     // clutter the daily work queue; the status filter lets company
     // specifically pull them up.
     $statusFilter = $_GET['status_filter'] ?? 'active';
-    $allowedStatusFilters = ['active', 'waiting', 'completed', 'cancelled', 'all'];
+    // 'courier_pending' and 'pickup' aren't real tp_purchase_orders.status
+    // values — they're derived (linked courier payment still pending_review;
+    // at least one line marked delivery_method='pickup') and filtered in PHP
+    // further down, once that data is loaded, rather than at the SQL WHERE
+    // clause below like the real status values.
+    $allowedStatusFilters = ['active', 'waiting', 'completed', 'cancelled', 'all', 'courier_pending', 'pickup'];
     if (!in_array($statusFilter, $allowedStatusFilters, true)) $statusFilter = 'active';
 } else {
     $from_date = '';
@@ -74,6 +80,7 @@ $_productTypeCol = $db_conn->query("SHOW COLUMNS FROM tp_purchase_orders LIKE 'p
 if ($_productTypeCol && $_productTypeCol->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_purchase_orders ADD COLUMN product_type ENUM('napkin','diaper') NOT NULL DEFAULT 'napkin' AFTER territory_partner_id");
 }
+tpEnsurePickupColumn($db_conn);
 
 $stmt = $db_conn->prepare(
     "SELECT o.id, o.order_date, o.created_at, o.status, o.tp_invoice_id, o.excess_amount, o.product_type,
@@ -86,7 +93,7 @@ $stmt = $db_conn->prepare(
             tp.delivery_city AS tp_delivery_city, tp.delivery_district AS tp_delivery_district,
             tp.delivery_state AS tp_delivery_state, tp.delivery_country AS tp_delivery_country,
             tp.delivery_pincode AS tp_delivery_pincode,
-            i.product_id, i.qty, i.price, i.amount, p.productName
+            i.product_id, i.qty, i.price, i.amount, i.delivery_method, p.productName
      FROM tp_purchase_orders o
      JOIN territory_partners tp ON tp.id = o.territory_partner_id
      LEFT JOIN tp_purchase_order_items i ON i.po_id = o.id
@@ -147,6 +154,8 @@ foreach ($rows as $r) {
             'lines'         => [],
             'total'         => 0,
             'screenshots'   => [],
+            'courier_payments' => [],
+            'has_pickup'    => false,
         ];
     }
     if ($r['product_id']) {
@@ -154,7 +163,17 @@ foreach ($rows as $r) {
         $orders[$oid]['total'] += (float)$r['amount'];
         $pname = $r['productName'] ?? 'Unknown';
         $productTotals[$pname] = ($productTotals[$pname] ?? 0) + (int)$r['qty'];
+        if (($r['delivery_method'] ?? 'courier') === 'pickup') {
+            $orders[$oid]['has_pickup'] = true;
+        }
     }
+}
+
+// 'pickup' is derived (has_pickup, already known from the lines just walked
+// above), not a real o.status the SQL WHERE clause could filter by — narrow
+// down here, before any of the stat cards below are computed from $orders.
+if ($statusFilter === 'pickup') {
+    $orders = array_filter($orders, fn($o) => !empty($o['has_pickup']));
 }
 
 $totalOrders    = count($orders);
@@ -196,6 +215,35 @@ if (!empty($orderIds)) {
         $orders[$sr['po_id']]['screenshots'][] = $sr;
     }
     $stmtS->close();
+
+    tpEnsureCourierPaymentTables($db_conn);
+    $stmtC = $db_conn->prepare(
+        "SELECT id, po_id, file_path, total_boxes, total_covers, required_amount, detected_amount, reference_number, status, rejection_reason
+         FROM tp_courier_payments WHERE po_id IN ($placeholders) ORDER BY id ASC"
+    );
+    $stmtC->bind_param($types, ...$orderIds);
+    $stmtC->execute();
+    $resC = $stmtC->get_result();
+    while ($cr = $resC->fetch_assoc()) {
+        $orders[$cr['po_id']]['courier_payments'][] = $cr;
+    }
+    $stmtC->close();
+}
+
+// 'courier_pending' is derived too — narrow down now that courier_payments
+// is actually populated (couldn't check this any earlier), then recompute
+// every stat card above so they reflect the filtered set, not the full
+// pre-filter one those were originally calculated from.
+if ($statusFilter === 'courier_pending') {
+    $orders = array_filter($orders, function ($o) {
+        foreach ($o['courier_payments'] as $c) {
+            if ($c['status'] === 'pending_review') return true;
+        }
+        return false;
+    });
+    $totalOrders    = count($orders);
+    $totalAmount    = array_sum(array_column($orders, 'total'));
+    $completedCount = count(array_filter($orders, fn($o) => $o['status'] === 'completed'));
 }
 
 // Each TP's current advance balance, batched for every TP appearing in this
@@ -371,6 +419,11 @@ $companyProfiles = $db_conn->query(
             border: 1px solid #e5e7eb; display: block; transition: box-shadow .15s;
         }
         .proof-media a:hover img { box-shadow: 0 4px 14px rgba(16,24,40,.12); }
+        .proof-download-link {
+            display: block; text-align: center; margin-top: 6px; font-size: 11.5px; font-weight: 600;
+            color: #667eea; text-decoration: none;
+        }
+        .proof-download-link:hover { color: #4f46e5; text-decoration: underline; }
         .proof-main { flex: 1; min-width: 0; }
         .proof-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
         .proof-badge {
@@ -380,6 +433,31 @@ $companyProfiles = $db_conn->query(
         .proof-badge.is-accepted { background: #d1fae5; color: #065f46; }
         .proof-badge.is-rejected { background: #fee2e2; color: #991b1b; }
         .proof-badge.is-pending  { background: #fef3c7; color: #92400e; }
+
+        /* Small "alive" feel on the compact table-cell trigger buttons
+           (Payment Proof and Courier Payment) — a gentle lift + shadow on
+           hover, a quick press-down on click, so it reads as tappable
+           before the modal itself even opens. */
+        .proof-view-trigger, .courier-view-trigger {
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+        .proof-view-trigger:hover, .courier-view-trigger:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(16,24,40,.14);
+        }
+        .proof-view-trigger:active, .courier-view-trigger:active {
+            transform: translateY(0) scale(.97);
+        }
+        /* Bootstrap's modal fade is opacity-only by default — adding a
+           slight scale-up makes the open feel less like a flat swap and
+           more like the modal is actually emerging from that button. */
+        #courierProofViewModal .modal-dialog, #proofViewModal .modal-dialog {
+            transition: transform .2s ease-out, opacity .2s ease-out;
+            transform: scale(.96);
+        }
+        #courierProofViewModal.show .modal-dialog, #proofViewModal.show .modal-dialog {
+            transform: scale(1);
+        }
 
         .proof-info-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px 24px; }
         .proof-info-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #9ca3af; margin-bottom: 3px; }
@@ -447,6 +525,8 @@ $companyProfiles = $db_conn->query(
                                                 <option value="completed" <?=$statusFilter === 'completed' ? 'selected' : ''?>>Completed</option>
                                                 <option value="cancelled" <?=$statusFilter === 'cancelled' ? 'selected' : ''?>>Cancelled</option>
                                                 <option value="all" <?=$statusFilter === 'all' ? 'selected' : ''?>>All (including cancelled)</option>
+                                                <option value="courier_pending" <?=$statusFilter === 'courier_pending' ? 'selected' : ''?>>Courier Pending</option>
+                                                <option value="pickup" <?=$statusFilter === 'pickup' ? 'selected' : ''?>>Pickup</option>
                                             </select>
                                         </div>
                                         <div class="col-md-2">
@@ -540,6 +620,7 @@ $companyProfiles = $db_conn->query(
                                             <th>Total</th>
                                             <th>Delivery Address</th>
                                             <th>Payment Proof</th>
+                                            <th>Courier Payment</th>
                                             <th>Order Time</th>
                                             <th>Status</th>
                                             <th>Dispatch Slip</th>
@@ -661,6 +742,35 @@ $companyProfiles = $db_conn->query(
                                                 </a>
                                                 <?php endif; ?>
                                             </td>
+                                            <td>
+                                                <?php if (empty($o['courier_payments'])): ?>
+                                                <span style="font-size:10.5px;color:#9ca3af;">No courier payment on file.</span>
+                                                <?php else:
+                                                    $courierPaidTotal = array_sum(array_map(fn($c) => in_array($c['status'], ['pending_review', 'accepted'], true) ? (float)($c['detected_amount'] ?? $c['required_amount']) : 0, $o['courier_payments']));
+                                                    $courierRequired = (float)$o['courier_payments'][0]['required_amount'];
+                                                    $courierPendingCount = count(array_filter($o['courier_payments'], fn($c) => $c['status'] === 'pending_review'));
+                                                    $courierCovered = $courierPaidTotal >= $courierRequired;
+                                                    $courier_json = htmlspecialchars(json_encode([
+                                                        'required' => $courierRequired,
+                                                        'boxes' => (int)$o['courier_payments'][0]['total_boxes'],
+                                                        'covers' => (int)$o['courier_payments'][0]['total_covers'],
+                                                        'shots' => $o['courier_payments'],
+                                                    ], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+                                                ?>
+                                                <button type="button" class="courier-view-trigger"
+                                                        style="border:none;cursor:pointer;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;<?= $courierPendingCount > 0 ? 'background:#fef3c7;color:#92400e;' : ($courierCovered ? 'background:#d1fae5;color:#065f46;' : 'background:#fee2e2;color:#991b1b;') ?>"
+                                                        data-partner="<?php echo htmlspecialchars($o['tp_name'], ENT_QUOTES); ?>"
+                                                        data-courier="<?php echo $courier_json; ?>">
+                                                    <?php if ($courierPendingCount > 0): ?>
+                                                    Courier: Pending Review (<?=$courierPendingCount?>)
+                                                    <?php elseif ($courierCovered): ?>
+                                                    Courier: Verified ₹<?=number_format($courierRequired, 2)?>
+                                                    <?php else: ?>
+                                                    Courier: Short by ₹<?=number_format($courierRequired - $courierPaidTotal, 2)?>
+                                                    <?php endif; ?>
+                                                </button>
+                                                <?php endif; ?>
+                                            </td>
                                             <td style="white-space:nowrap;font-size:12.5px;color:#4b5563;">
                                                 <?php if (!empty($o['created_at'])): ?>
                                                 <?=date('d M Y', strtotime($o['created_at']))?><br>
@@ -765,6 +875,29 @@ $companyProfiles = $db_conn->query(
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="proofViewModalBody">
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Courier Payment Modal -->
+<div class="modal fade" id="courierProofViewModal" tabindex="-1" aria-labelledby="courierProofViewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-xl">
+        <div class="modal-content" style="border:none;border-radius:16px;overflow:hidden;">
+            <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                <div>
+                    <h6 class="modal-title mb-0" id="courierProofViewModalLabel" style="font-weight:700;color:#1f2937;">
+                        <i class="material-icons-outlined" style="font-size:19px;vertical-align:middle;margin-right:6px;color:#667eea;">local_shipping</i>
+                        Courier Payment
+                    </h6>
+                    <div id="courierProofViewModalSubtitle"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="courierProofViewModalBody">
             </div>
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
@@ -1012,6 +1145,141 @@ function updateProofSubtitle() {
         ' · Verified so far ₹' + acceptedTotal.toFixed(2)
     );
 }
+
+// Courier Payment modal — same trigger→modal pattern as Payment Proof
+// above, kept as its own set of variables/functions (not shared state) so
+// opening one modal never clobbers the other's in-progress data.
+var currentCourierButton = null;
+var currentCourierData = null;
+
+function statusBadgeHtml(status) {
+    var cls = status === 'accepted' ? 'is-accepted' : (status === 'rejected' ? 'is-rejected' : 'is-pending');
+    var text = status === 'accepted' ? 'Accepted' : (status === 'rejected' ? 'Rejected' : 'Pending Review');
+    return '<span class="proof-badge ' + cls + '">' + text + '</span>';
+}
+
+function renderCourierModal() {
+    if (!currentCourierData) return;
+    var d = currentCourierData;
+    var parts = [];
+    if (d.boxes > 0) parts.push(d.boxes + ' box' + (d.boxes !== 1 ? 'es' : ''));
+    if (d.covers > 0) parts.push(d.covers + ' cover' + (d.covers !== 1 ? 's' : ''));
+
+    var html = '<div style="font-size:12.5px;color:#4b5563;margin-bottom:14px;">' +
+        'Required: <b style="color:#1f2937;">₹' + parseFloat(d.required).toFixed(2) + '</b>' +
+        (parts.length ? ' (' + parts.join(' + ') + ')' : '') +
+        '</div>';
+
+    if (!d.shots || !d.shots.length) {
+        html += '<div class="text-muted" style="font-size:13px;">No screenshots uploaded for this order.</div>';
+    } else {
+        d.shots.forEach(function (s) {
+            var fileUrl = '../territory-partner/courier_payment_screenshots/' + encodeURIComponent(s.file_path);
+            var mediaHtml = '<div class="proof-media"><a href="' + fileUrl + '" target="_blank"><img src="' + fileUrl + '" alt="Courier payment screenshot"></a>' +
+                '<a href="' + fileUrl + '" download class="proof-download-link"><i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">download</i> Download</a></div>';
+
+            var amountValue = s.detected_amount !== null
+                ? '<span class="proof-info-value">₹' + parseFloat(s.detected_amount).toFixed(2) + '</span>'
+                : '<span class="proof-info-value muted">Not detected</span>';
+            var refValue = s.reference_number
+                ? '<span class="proof-info-value">' + $('<div>').text(s.reference_number).html() + '</span>'
+                : '<span class="proof-info-value muted">Not detected</span>';
+
+            var infoGrid = '<div class="proof-info-grid">' +
+                '<div><div class="proof-info-label">Amount</div>' + amountValue + '</div>' +
+                '<div><div class="proof-info-label">Reference Number</div>' + refValue + '</div>' +
+                (s.rejection_reason ? '<div class="proof-reason">' + $('<div>').text(s.rejection_reason).html() + '</div>' : '') +
+                '</div>';
+
+            var actionsHtml = '';
+            if (s.status === 'pending_review') {
+                actionsHtml = '<div class="proof-action-panel" data-courier-id="' + s.id + '">' +
+                    '<div class="proof-field-row">' +
+                        '<div class="proof-field"><label>Confirmed Amount</label>' +
+                        '<input type="number" step="0.01" min="0" class="form-control courier-amount-input" style="width:120px;" value="' + (s.detected_amount !== null ? s.detected_amount : d.required) + '"></div>' +
+                        '<button type="button" class="btn btn-success courier-approve-btn">Approve</button>' +
+                        '<button type="button" class="btn btn-outline-danger courier-reject-btn">Reject</button>' +
+                    '</div>' +
+                '</div>';
+            }
+
+            html += '<div class="proof-card">' +
+                    '<div class="proof-card-top">' + statusBadgeHtml(s.status) + '</div>' +
+                    '<div class="proof-card-body">' + mediaHtml +
+                    '<div class="proof-main">' + infoGrid + actionsHtml + '</div>' +
+                    '</div>' +
+                    '</div>';
+        });
+    }
+
+    $('#courierProofViewModalBody').html(html);
+}
+
+function updateCourierSubtitle() {
+    if (!currentCourierData) return;
+    var d = currentCourierData;
+    var coveredTotal = (d.shots || [])
+        .filter(function (s) { return s.status === 'pending_review' || s.status === 'accepted'; })
+        .reduce(function (sum, s) { return sum + (s.detected_amount !== null ? parseFloat(s.detected_amount) : parseFloat(d.required)); }, 0);
+    var count = (d.shots || []).length;
+    $('#courierProofViewModalSubtitle').text(
+        count + ' screenshot' + (count !== 1 ? 's' : '') + ' · Required ₹' + parseFloat(d.required).toFixed(2) +
+        ' · Covered so far ₹' + coveredTotal.toFixed(2)
+    );
+}
+
+$(document).on('click', '.courier-view-trigger', function () {
+    currentCourierButton = $(this);
+    currentCourierData = currentCourierButton.data('courier') || null;
+
+    $('#courierProofViewModalLabel').html(
+        '<i class="material-icons-outlined" style="font-size:19px;vertical-align:middle;margin-right:6px;color:#667eea;">local_shipping</i>' +
+        $('<span>').text(currentCourierButton.data('partner')).html()
+    );
+    updateCourierSubtitle();
+    renderCourierModal();
+    $('#courierProofViewModal').modal('show');
+});
+
+$(document).on('click', '.courier-approve-btn, .courier-reject-btn', function () {
+    var $btn = $(this);
+    var $panel = $btn.closest('.proof-action-panel');
+    var id = parseInt($panel.data('courier-id'), 10);
+    var isApprove = $btn.hasClass('courier-approve-btn');
+    var payload = { courier_payment_id: id, action: isApprove ? 'approve' : 'reject' };
+
+    if (!isApprove) {
+        if (!confirm('Reject this courier payment screenshot?')) return;
+    } else {
+        payload.confirmed_amount = $panel.find('.courier-amount-input').val();
+    }
+
+    $panel.find('button, input').prop('disabled', true);
+    $.post('courier-payment-review-action-ajax.php', payload)
+        .done(function (data) {
+            if (data.success) {
+                var shot = (currentCourierData.shots || []).find(function (s) { return parseInt(s.id, 10) === id; });
+                if (shot) {
+                    shot.status = isApprove ? 'accepted' : 'rejected';
+                    if (isApprove) shot.detected_amount = parseFloat(payload.confirmed_amount);
+                }
+                if (currentCourierButton) currentCourierButton.attr('data-courier', JSON.stringify(currentCourierData));
+                updateCourierSubtitle();
+                renderCourierModal();
+                // The trigger button's own summary badge (pending/verified/short)
+                // only fully re-derives on a fresh page load — reload once the
+                // modal is closed so the table row reflects the new status too.
+                $('#courierProofViewModal').one('hidden.bs.modal', function () { window.location.reload(); });
+            } else {
+                alert(data.message || 'Action failed.');
+                $panel.find('button, input').prop('disabled', false);
+            }
+        })
+        .fail(function () {
+            alert('Could not reach the server.');
+            $panel.find('button, input').prop('disabled', false);
+        });
+});
 
 $(document).on('click', '.proof-view-trigger', function () {
     currentProofButton = $(this);

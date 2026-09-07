@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpCourierPayment.php';
 error_reporting(0);
 
 $tp_id = (int)$Login_user_IDvl;
@@ -60,6 +61,23 @@ foreach ($fileRows as $f) {
     $path = $uploadDir . basename($f['file_path']);
     if (file_exists($path)) unlink($path);
 }
+
+// Release any courier payment already linked to this order back to the
+// TP's unclaimed pool (po_id -> NULL) instead of leaving it orphaned —
+// tp_courier_payments has no FK/cascade on po_id, so without this an
+// accepted/pending payment for a deleted order would sit forever pointing
+// at a PO that no longer exists. This also means the TP never has to
+// re-upload the same screenshot for a replacement order: the pool
+// automatically counts toward whatever they submit next, and the image
+// hash staying non-'rejected' correctly keeps blocking that same
+// screenshot from being uploaded a second time (it's already funding this
+// pool, not gone). A rejected payment is left alone — its po_id already
+// carries no money and no longer matters either way.
+tpEnsureCourierPaymentTables($db_conn);
+$release = $db_conn->prepare("UPDATE tp_courier_payments SET po_id = NULL WHERE po_id = ? AND status != 'rejected'");
+$release->bind_param('i', $po_id);
+$release->execute();
+$release->close();
 
 $del = $db_conn->prepare("DELETE FROM tp_purchase_orders WHERE id = ? AND territory_partner_id = ? AND status = 'waiting'");
 $del->bind_param('ii', $po_id, $tp_id);

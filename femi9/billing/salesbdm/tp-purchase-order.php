@@ -162,6 +162,51 @@ if ($hasTps) {
         ");
         if ($res) while ($r = $res->fetch_assoc()) { $itemsByInvoice[(int)$r['tp_invoice_id']][] = $r; }
     }
+
+    // ── Courier payment status per row — "did the TP actually pay/get
+    // accepted for the courier fee on this order", shown alongside the order
+    // itself rather than making the BDM go hunt for it on a separate page.
+    $courierByPo = []; // po_id => ['has_courier'=>bool, 'status'=>?string, 'amount'=>?float]
+    if (!empty($poIds)) {
+        $poIdList = implode(',', $poIds);
+
+        // A PO with every line marked "pick up myself" never needed a
+        // courier payment at all — delivery_method may not exist yet on an
+        // older row's items (column added later), so a missing value
+        // defaults to 'courier' the same way every other courier check does.
+        $dmRes = $db_conn->query("
+            SELECT po_id, COALESCE(delivery_method,'courier') AS delivery_method
+            FROM tp_purchase_order_items WHERE po_id IN ($poIdList)
+        ");
+        $hasCourierByPo = [];
+        if ($dmRes) while ($r = $dmRes->fetch_assoc()) {
+            $pid = (int)$r['po_id'];
+            if (!isset($hasCourierByPo[$pid])) $hasCourierByPo[$pid] = false;
+            if ($r['delivery_method'] !== 'pickup') $hasCourierByPo[$pid] = true;
+        }
+
+        // Latest courier-payment attempt per PO (a rejected retry can leave
+        // more than one row) — the most recent one is what actually reflects
+        // where things stand now.
+        $cpRes = $db_conn->query("
+            SELECT c.po_id, c.status, c.detected_amount, c.required_amount
+            FROM tp_courier_payments c
+            JOIN (SELECT po_id, MAX(id) AS max_id FROM tp_courier_payments WHERE po_id IN ($poIdList) GROUP BY po_id) latest
+                ON latest.max_id = c.id
+        ");
+        $latestByPo = [];
+        if ($cpRes) while ($r = $cpRes->fetch_assoc()) { $latestByPo[(int)$r['po_id']] = $r; }
+
+        foreach ($poIds as $pid) {
+            $hasCourier = $hasCourierByPo[$pid] ?? true;
+            $latest = $latestByPo[$pid] ?? null;
+            $courierByPo[$pid] = [
+                'has_courier' => $hasCourier,
+                'status'      => $latest['status'] ?? null,
+                'amount'      => $latest ? (float)($latest['detected_amount'] ?? $latest['required_amount']) : null,
+            ];
+        }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -362,12 +407,13 @@ if ($hasTps) {
                                                     <th class="text-right">Items</th>
                                                     <th class="text-right">Amount<?php echo $filter_type ? ' &mdash; ' . ($filter_type === 'napkin' ? 'Napkin' : 'Lumi Diaper') : ''; ?> (&#8377;)</th>
                                                     <th>Status</th>
+                                                    <th>Courier Payment</th>
                                                     <th></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                             <?php if (empty($orders)): ?>
-                                                <tr><td colspan="8" class="text-center text-muted">No purchase order requests in this period.</td></tr>
+                                                <tr><td colspan="9" class="text-center text-muted">No purchase order requests in this period.</td></tr>
                                             <?php else: foreach ($orders as $o):
                                                 $isCompleted = $o['status'] === 'completed' && $o['tp_invoice_id'];
                                                 $amount = $isCompleted ? (float)$o['invoice_total'] : (float)$o['po_item_total'];
@@ -397,6 +443,22 @@ if ($hasTps) {
                                                         <span class="po-status-pill <?php echo htmlspecialchars($o['status']); ?>" <?php echo $o['status']==='cancelled' && $o['cancel_reason'] ? 'title="'.htmlspecialchars($o['cancel_reason'], ENT_QUOTES).'"' : ''; ?>><?php echo ucfirst($o['status']); ?></span>
                                                     </td>
                                                     <td>
+                                                        <?php
+                                                        $cp = $courierByPo[(int)$o['po_id']] ?? ['has_courier' => true, 'status' => null, 'amount' => null];
+                                                        if (!$cp['has_courier']) {
+                                                            echo '<span class="po-status-pill" style="background:#f3f4f6;color:#6b7280;">Pickup</span>';
+                                                        } elseif ($cp['status'] === 'accepted') {
+                                                            echo '<span class="po-status-pill completed">Paid' . ($cp['amount'] !== null ? ' &#8377;' . inr_format($cp['amount'], 2) : '') . '</span>';
+                                                        } elseif ($cp['status'] === 'pending_review') {
+                                                            echo '<span class="po-status-pill waiting">Pending Review</span>';
+                                                        } elseif ($cp['status'] === 'rejected') {
+                                                            echo '<span class="po-status-pill cancelled">Rejected</span>';
+                                                        } else {
+                                                            echo '<span class="po-status-pill" style="background:#f3f4f6;color:#6b7280;">Not Paid</span>';
+                                                        }
+                                                        ?>
+                                                    </td>
+                                                    <td>
                                                         <?php if ($isCompleted): ?>
                                                         <a href="view-tp-invoice.php?id=<?php echo base64_encode($o['tp_invoice_id']); ?>" class="btn btn-sm btn-outline-primary">
                                                             <i class="material-icons" style="font-size:14px;vertical-align:middle;">visibility</i> View
@@ -421,6 +483,7 @@ if ($hasTps) {
                                                 <tr>
                                                     <td colspan="4" class="text-right">Grand Total</td>
                                                     <td class="text-right"><b>&#8377;<?php echo inr_format($grand_total, 2); ?></b></td>
+                                                    <td></td>
                                                     <td></td>
                                                     <td></td>
                                                 </tr>
