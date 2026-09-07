@@ -86,7 +86,11 @@ if (!$crmUnavailable) {
         <![endif]-->
 
     <style>
-        body { background:#f5f5f2; }
+        /* Scoped to the page's own content area, not `body` — the sidebar
+           (.app-sidebar) and its icons/text rely on the app's real body
+           background and rules from main.min.css/custom.css; overriding
+           `body` directly here fought that cascade and broke the sidebar. */
+        .app-content .container-fluid { background:#f5f5f2; margin:-12px -20px; padding:24px 20px; min-height:calc(100vh - 60px); }
 
         .page-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
         .page-head h1 { font-size:22px; font-weight:800; color:#1c1b18; margin:0; display:flex; align-items:center; gap:10px; }
