@@ -13,8 +13,22 @@ if ($conn === null) {
     exit;
 }
 
-$result = $conn->query("SELECT id, first_name, last_name, email FROM user WHERE deleted = 0 ORDER BY first_name, last_name");
+// EspoCRM's `user` table has no `email` column of its own — email
+// addresses live in a separate email_address table, joined through
+// entity_email_address (entity_type='User', primary=1 picks the user's
+// primary address). Also restricted to active, regular users so the
+// dropdown doesn't list API/system accounts or deactivated ex-staff.
+$sql = "SELECT u.id, u.first_name, u.last_name, ea.name AS email
+        FROM user u
+        LEFT JOIN entity_email_address eea
+            ON eea.entity_id = u.id AND eea.entity_type = 'User' AND eea.primary = 1 AND eea.deleted = 0
+        LEFT JOIN email_address ea
+            ON ea.id = eea.email_address_id AND ea.deleted = 0
+        WHERE u.deleted = 0 AND u.is_active = 1 AND u.type = 'regular'
+        ORDER BY u.first_name, u.last_name";
+$result = $conn->query($sql);
 $users = [];
+$queryError = null;
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $users[] = [
@@ -23,7 +37,11 @@ if ($result) {
             'email' => $row['email'],
         ];
     }
+} else {
+    // Surface the real failure instead of silently returning an empty
+    // list with error:null — that's what made this fail invisibly before.
+    $queryError = 'CRM query failed';
 }
 $conn->close();
 
-echo json_encode(['error' => null, 'users' => $users]);
+echo json_encode(['error' => $queryError, 'users' => $users]);

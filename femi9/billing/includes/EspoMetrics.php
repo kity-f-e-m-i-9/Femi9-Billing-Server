@@ -22,33 +22,66 @@ if (!function_exists('espoUserFilterClause')) {
     }
 }
 
+// Lead assignment in this EspoCRM instance is NOT stored on
+// lead.assigned_user_id (verified live: that column is NULL on every
+// lead row). Leads use EspoCRM's multi-assignee "Assigned Users" field
+// instead, which lives in the generic entity_user junction table
+// (entity_type='Lead'). Opportunity and Call both use the legacy single
+// assigned_user_id column correctly (verified: populated, entity_user
+// has zero rows for either entity type there) — this filter is scoped
+// to Lead queries only, everything else keeps using
+// espoUserFilterClause() above.
+if (!function_exists('espoLeadUserJoinAndFilter')) {
+    function espoLeadUserJoinAndFilter(?string $espoUserId, mysqli $conn, string $leadAlias = 'l'): array {
+        if ($espoUserId === null || $espoUserId === '') {
+            return ['join' => '', 'filter' => ''];
+        }
+        $escaped = $conn->real_escape_string($espoUserId);
+        $join = " JOIN entity_user eu ON eu.entity_id = {$leadAlias}.id AND eu.entity_type = 'Lead' AND eu.deleted = 0";
+        $filter = " AND eu.user_id = '{$escaped}'";
+        return ['join' => $join, 'filter' => $filter];
+    }
+}
+
 // ---- Internal helpers (table name is a parameter so tests can point them
 //      at a fixture table; public functions below always pass the real
 //      EspoCRM table names) ----
 
 if (!function_exists('espoFunnelSnapshotFromLeadTable')) {
     function espoFunnelSnapshotFromLeadTable(mysqli $conn, string $table, ?string $espoUserId, string $dateFrom, string $dateTo): array {
-        $userFilter = espoUserFilterClause($espoUserId, $conn);
         $from = $conn->real_escape_string($dateFrom);
         $to   = $conn->real_escape_string($dateTo);
+        $leadUser = espoLeadUserJoinAndFilter($espoUserId, $conn, 'l');
 
-        $sql = "SELECT status, COUNT(*) AS c FROM `{$table}`
-                WHERE deleted = 0 AND created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
-                {$userFilter}
-                GROUP BY status";
+        $sql = "SELECT l.status, COUNT(*) AS c FROM `{$table}` l
+                {$leadUser['join']}
+                WHERE l.deleted = 0 AND l.created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
+                {$leadUser['filter']}
+                GROUP BY l.status";
 
-        $counts = ['new' => 0, 'assigned' => 0, 'in_process' => 0, 'converted' => 0, 'recycled' => 0, 'dead' => 0];
-        $statusMap = [
-            'New' => 'new', 'Assigned' => 'assigned', 'In Process' => 'in_process',
-            'Converted' => 'converted', 'Recycled' => 'recycled', 'Dead' => 'dead',
-        ];
+        // Not a hardcoded status allow-list: EspoCRM's default Lead
+        // statuses are New/Assigned/In Process/Converted/Recycled/Dead,
+        // but this instance's pipeline was customized to
+        // New/Touched/In Progress/Hot/Won/Dropped/Converted (verified
+        // live) — a fixed map silently dropped every lead whose status
+        // wasn't one of the six defaults, undercounting real totals by
+        // ~30% in a live check (Aug 2026, one rep: 231 real vs 156
+        // counted). 'statuses' carries every distinct status this query
+        // finds, keyed by its real EspoCRM name, so "Leads Assigned"
+        // (sum of every status) is always accurate regardless of how the
+        // pipeline is customized. 'converted' stays a named field since
+        // it's a specific, stable EspoCRM concept (the lead became a real
+        // Account/Contact/Opportunity via the Convert action) that the
+        // rest of this file and the dashboard pages key off of by name.
+        $counts = ['statuses' => [], 'converted' => 0];
 
         $result = $conn->query($sql);
         if ($result) {
             while ($row = $result->fetch_assoc()) {
-                $key = $statusMap[$row['status']] ?? null;
-                if ($key !== null) {
-                    $counts[$key] = (int)$row['c'];
+                $c = (int)$row['c'];
+                $counts['statuses'][$row['status']] = $c;
+                if ($row['status'] === 'Converted') {
+                    $counts['converted'] = $c;
                 }
             }
         }
@@ -68,6 +101,10 @@ if (!function_exists('espoCallsPerConversionRatio')) {
 if (!function_exists('espoFunnelSnapshot')) {
     function espoFunnelSnapshot(mysqli $conn, ?string $espoUserId, string $dateFrom, string $dateTo): array {
         $leadCounts = espoFunnelSnapshotFromLeadTable($conn, 'lead', $espoUserId, $dateFrom, $dateTo);
+        // Total leads assigned in range = every status combined, computed
+        // once here (not re-derived per dashboard page) so it can't drift
+        // out of sync with whatever the real pipeline's status set is.
+        $leadCounts['leads_assigned'] = array_sum($leadCounts['statuses']);
 
         $userFilter = espoUserFilterClause($espoUserId, $conn);
         $from = $conn->real_escape_string($dateFrom);
@@ -95,13 +132,15 @@ if (!function_exists('espoConversionTrend')) {
         $from = $conn->real_escape_string($dateFrom);
         $to   = $conn->real_escape_string($dateTo);
         $dateFormat = $granularity === 'weekly' ? '%x-W%v' : '%Y-%m';
+        $leadUser = espoLeadUserJoinAndFilter($espoUserId, $conn, 'l');
 
-        $leadSql = "SELECT DATE_FORMAT(created_at, '{$dateFormat}') AS period,
+        $leadSql = "SELECT DATE_FORMAT(l.created_at, '{$dateFormat}') AS period,
                            COUNT(*) AS created,
-                           SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) AS converted
-                    FROM `lead`
-                    WHERE deleted = 0 AND created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
-                    {$userFilter}
+                           SUM(CASE WHEN l.status = 'Converted' THEN 1 ELSE 0 END) AS converted
+                    FROM `lead` l
+                    {$leadUser['join']}
+                    WHERE l.deleted = 0 AND l.created_at BETWEEN '{$from}' AND '{$to} 23:59:59'
+                    {$leadUser['filter']}
                     GROUP BY period ORDER BY period";
 
         $oppSql = "SELECT DATE_FORMAT(created_at, '{$dateFormat}') AS period,
@@ -173,7 +212,14 @@ if (!function_exists('espoAvgSalesCycleDays')) {
         $userFilter = espoUserFilterClause($espoUserId, $conn);
         $from = $conn->real_escape_string($dateFrom);
         $to   = $conn->real_escape_string($dateTo);
-        $sql = "SELECT AVG(DATEDIFF(close_date, created_at)) AS avg_days
+        // GREATEST(0, ...) clamps each opportunity's own cycle length at 0
+        // before averaging — a real (if rare) data-quality issue in EspoCRM
+        // lets close_date be backdated earlier than created_at (e.g. a deal
+        // entered into the CRM a few days after it actually closed),
+        // producing a nonsensical negative day count for that one row. This
+        // keeps such rows from dragging the whole average negative, while
+        // still counting them as same-day closes rather than excluding them.
+        $sql = "SELECT AVG(GREATEST(0, DATEDIFF(close_date, created_at))) AS avg_days
                 FROM `opportunity`
                 WHERE deleted = 0 AND stage = 'Closed Won'
                 AND close_date BETWEEN '{$from}' AND '{$to}'

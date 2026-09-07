@@ -3,9 +3,10 @@
 // Manual run: php EspoMetricsTest.php
 // Uses an in-memory-style fixture: connects to any reachable MySQL server
 // (reusing the app's own DB credentials/host is fine) but creates its
-// `lead`/`opportunity`/`call` fixture tables inside a dedicated, disposable
-// `espo_metrics_test` schema — never inside the app's production database —
-// to test aggregation math without needing real EspoCRM credentials.
+// `lead`/`opportunity`/`call`/`entity_user` fixture tables inside a
+// dedicated, disposable `espo_metrics_test` schema — never inside the
+// app's production database — to test aggregation math without needing
+// real EspoCRM credentials.
 
 require_once __DIR__ . '/../EspoMetrics.php';
 require_once __DIR__ . '/../../company/include/db-connect.php'; // reuses $db_conn's credentials/host only — fixtures live in their own throwaway schema, never the app's production database
@@ -70,26 +71,54 @@ function assertArrayContains($array, $key, $value, $label) {
 // (inside the isolated espo_metrics_test schema selected above — the schema
 // was just freshly created, so no pre-existing tables to clean up here)
 
-// Create lead table
+// Create lead table — no assigned_user_id column: this EspoCRM instance's
+// real `lead` table has that column but it's always NULL. Assignment is
+// stored in the multi-assignee entity_user junction table instead
+// (verified live against the real instance) — the fixture below matches
+// that reality rather than the unused legacy column, so this test
+// actually exercises espoLeadUserJoinAndFilter().
 $conn->query("CREATE TABLE `lead` (
     id VARCHAR(24) PRIMARY KEY,
     status VARCHAR(50),
     created_at DATETIME,
-    assigned_user_id VARCHAR(24),
     deleted TINYINT DEFAULT 0
 )");
 
-// Insert lead test data
-$conn->query("INSERT INTO `lead` (id, status, created_at, assigned_user_id, deleted) VALUES
-    ('l1', 'Converted', '2026-08-01 10:00:00', 'u1', 0),
-    ('l2', 'New', '2026-08-02 10:00:00', 'u1', 0),
-    ('l3', 'Converted', '2026-08-03 10:00:00', 'u2', 0),
-    ('l4', 'In Process', '2026-08-05 10:00:00', 'u1', 0),
-    ('l5', 'Assigned', '2026-08-06 10:00:00', 'u2', 0),
-    ('l6', 'Dead', '2026-08-07 10:00:00', 'u1', 1),
-    ('l7', 'Recycled', '2026-08-08 10:00:00', 'u1', 0),
-    ('l8', 'Converted', '2026-09-01 10:00:00', 'u1', 0),
-    ('l9', 'Converted', '2026-09-05 10:00:00', 'u2', 0)");
+// Create entity_user junction table (generic across entity types in real
+// EspoCRM — used here for Lead assignment only, matching production).
+$conn->query("CREATE TABLE entity_user (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    entity_id VARCHAR(24),
+    user_id VARCHAR(24),
+    entity_type VARCHAR(50),
+    deleted TINYINT DEFAULT 0
+)");
+
+// Insert lead test data (same ids/statuses/dates as before, assignment
+// moved to entity_user below instead of an assigned_user_id column)
+$conn->query("INSERT INTO `lead` (id, status, created_at, deleted) VALUES
+    ('l1', 'Converted', '2026-08-01 10:00:00', 0),
+    ('l2', 'New', '2026-08-02 10:00:00', 0),
+    ('l3', 'Converted', '2026-08-03 10:00:00', 0),
+    ('l4', 'In Process', '2026-08-05 10:00:00', 0),
+    ('l5', 'Assigned', '2026-08-06 10:00:00', 0),
+    ('l6', 'Dead', '2026-08-07 10:00:00', 1),
+    ('l7', 'Recycled', '2026-08-08 10:00:00', 0),
+    ('l8', 'Converted', '2026-09-01 10:00:00', 0),
+    ('l9', 'Converted', '2026-09-05 10:00:00', 0)");
+
+// Same assignment mapping as the old assigned_user_id column had:
+// u1 -> l1,l2,l4,l6(deleted),l7,l8 ; u2 -> l3,l5,l9
+$conn->query("INSERT INTO entity_user (entity_id, user_id, entity_type, deleted) VALUES
+    ('l1', 'u1', 'Lead', 0),
+    ('l2', 'u1', 'Lead', 0),
+    ('l3', 'u2', 'Lead', 0),
+    ('l4', 'u1', 'Lead', 0),
+    ('l5', 'u2', 'Lead', 0),
+    ('l6', 'u1', 'Lead', 0),
+    ('l7', 'u1', 'Lead', 0),
+    ('l8', 'u1', 'Lead', 0),
+    ('l9', 'u2', 'Lead', 0)");
 
 // Create opportunity table
 $conn->query("CREATE TABLE `opportunity` (
@@ -151,7 +180,8 @@ echo "=== TEST 1: espoFunnelSnapshot (public function) ===\n";
 // Test whole-team funnel
 $snapshot = espoFunnelSnapshot($conn, null, '2026-08-01', '2026-09-09');
 assertEqual($snapshot['converted'], 4, 'espoFunnelSnapshot: whole-team converted count (l1,l3,l8,l9)');
-assertEqual($snapshot['new'], 1, 'espoFunnelSnapshot: whole-team new count (l2)');
+assertEqual($snapshot['statuses']['New'], 1, 'espoFunnelSnapshot: whole-team new count (l2)');
+assertEqual($snapshot['leads_assigned'], 8, 'espoFunnelSnapshot: whole-team leads_assigned sums every status (l1-l5,l7-l9; l6 deleted)');
 assertEqual(isset($snapshot['opp_stages']) && is_array($snapshot['opp_stages']), true, 'espoFunnelSnapshot: opp_stages is array');
 assertArrayContains($snapshot['opp_stages'], 'Closed Won', 4, 'espoFunnelSnapshot: whole-team 4 Closed Won opportunities');
 assertArrayContains($snapshot['opp_stages'], 'Closed Lost', 2, 'espoFunnelSnapshot: whole-team 2 Closed Lost opportunities');
@@ -159,8 +189,40 @@ assertArrayContains($snapshot['opp_stages'], 'Closed Lost', 2, 'espoFunnelSnapsh
 // Test per-rep funnel
 $snapshotU1 = espoFunnelSnapshot($conn, 'u1', '2026-08-01', '2026-09-09');
 assertEqual($snapshotU1['converted'], 2, 'espoFunnelSnapshot: per-rep (u1) converted count (l1,l8)');
-assertEqual($snapshotU1['new'], 1, 'espoFunnelSnapshot: per-rep (u1) new count (l2)');
+assertEqual($snapshotU1['statuses']['New'], 1, 'espoFunnelSnapshot: per-rep (u1) new count (l2)');
 assertArrayContains($snapshotU1['opp_stages'], 'Closed Won', 2, 'espoFunnelSnapshot: per-rep (u1) 2 Closed Won');
+
+echo "\n";
+
+// Regression test for a real bug: a fixed status allow-list
+// (New/Assigned/In Process/Converted/Recycled/Dead — EspoCRM's defaults)
+// silently dropped leads whose status was outside that list, undercounting
+// leads_assigned by ~30% on the real instance, which uses a fully custom
+// pipeline (New/Touched/In Progress/Hot/Won/Dropped). A lead in a
+// non-default status must still be counted in leads_assigned.
+$conn->query("INSERT INTO `lead` (id, status, created_at, deleted) VALUES ('l11', 'Hot', '2026-07-15 10:00:00', 0)");
+$conn->query("INSERT INTO entity_user (entity_id, user_id, entity_type, deleted) VALUES ('l11', 'u1', 'Lead', 0)");
+$customStatusSnapshot = espoFunnelSnapshot($conn, 'u1', '2026-07-15', '2026-07-15');
+assertEqual($customStatusSnapshot['leads_assigned'], 1, 'espoFunnelSnapshot: non-default status (Hot) still counted in leads_assigned');
+assertEqual($customStatusSnapshot['statuses']['Hot'], 1, 'espoFunnelSnapshot: non-default status appears in statuses map by its real name');
+assertEqual($customStatusSnapshot['converted'], 0, 'espoFunnelSnapshot: non-default status does not count as converted');
+
+echo "\n";
+
+// A lead with two entity_user rows (rare in production — verified zero
+// occurrences on the real instance, but the join must not silently
+// double-count if it ever happens) must still count once in a
+// whole-team query, and once each in each assignee's own query.
+$conn->query("INSERT INTO `lead` (id, status, created_at, deleted) VALUES ('l10', 'New', '2026-07-01 10:00:00', 0)");
+$conn->query("INSERT INTO entity_user (entity_id, user_id, entity_type, deleted) VALUES
+    ('l10', 'u1', 'Lead', 0),
+    ('l10', 'u3', 'Lead', 0)");
+$multiAssigneeSnapshot = espoFunnelSnapshot($conn, null, '2026-07-01', '2026-07-01');
+assertEqual($multiAssigneeSnapshot['leads_assigned'], 1, 'espoFunnelSnapshot: multi-assignee lead counted once whole-team, not once per assignee');
+$multiAssigneeSnapshotU1 = espoFunnelSnapshot($conn, 'u1', '2026-07-01', '2026-07-01');
+assertEqual($multiAssigneeSnapshotU1['leads_assigned'], 1, 'espoFunnelSnapshot: multi-assignee lead visible to u1');
+$multiAssigneeSnapshotU3 = espoFunnelSnapshot($conn, 'u3', '2026-07-01', '2026-07-01');
+assertEqual($multiAssigneeSnapshotU3['leads_assigned'], 1, 'espoFunnelSnapshot: multi-assignee lead also visible to u3');
 
 echo "\n";
 
@@ -234,6 +296,14 @@ assertEqual($avgDays, 8.8, 'espoAvgSalesCycleDays: whole-team average (8.8 days)
 // Test per-rep (u1: o1 with 9 days, o5 with 4 days => (9+4)/2 = 6.5)
 $avgDaysU1 = espoAvgSalesCycleDays($conn, 'u1', '2026-08-01', '2026-09-09');
 assertEqual($avgDaysU1, 6.5, 'espoAvgSalesCycleDays: per-rep (u1) average (6.5 days)');
+
+// A real (if rare) EspoCRM data-quality case: close_date backdated before
+// created_at (e.g. entered into the CRM a few days after actually closing).
+// Must clamp to 0 for that row, not drag the average negative.
+$conn->query("INSERT INTO `opportunity` (id, stage, amount, created_at, close_date, assigned_user_id, deleted) VALUES
+    ('o9', 'Closed Won', 5000.00, '2026-07-10 09:00:00', '2026-07-06', 'u1', 0)");
+$avgDaysBackdated = espoAvgSalesCycleDays($conn, 'u1', '2026-07-01', '2026-07-31');
+assertEqual($avgDaysBackdated, 0.0, 'espoAvgSalesCycleDays: backdated close_date clamps to 0, not negative');
 
 echo "\n";
 
