@@ -197,7 +197,14 @@ if (!function_exists('espoAvgSalesCycleDays')) {
         $userFilter = espoUserFilterClause($espoUserId, $conn);
         $from = $conn->real_escape_string($dateFrom);
         $to   = $conn->real_escape_string($dateTo);
-        $sql = "SELECT AVG(DATEDIFF(close_date, created_at)) AS avg_days
+        // GREATEST(0, ...) clamps each opportunity's own cycle length at 0
+        // before averaging — a real (if rare) data-quality issue in EspoCRM
+        // lets close_date be backdated earlier than created_at (e.g. a deal
+        // entered into the CRM a few days after it actually closed),
+        // producing a nonsensical negative day count for that one row. This
+        // keeps such rows from dragging the whole average negative, while
+        // still counting them as same-day closes rather than excluding them.
+        $sql = "SELECT AVG(GREATEST(0, DATEDIFF(close_date, created_at))) AS avg_days
                 FROM `opportunity`
                 WHERE deleted = 0 AND stage = 'Closed Won'
                 AND close_date BETWEEN '{$from}' AND '{$to}'

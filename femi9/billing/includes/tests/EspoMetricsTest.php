@@ -281,6 +281,14 @@ assertEqual($avgDays, 8.8, 'espoAvgSalesCycleDays: whole-team average (8.8 days)
 $avgDaysU1 = espoAvgSalesCycleDays($conn, 'u1', '2026-08-01', '2026-09-09');
 assertEqual($avgDaysU1, 6.5, 'espoAvgSalesCycleDays: per-rep (u1) average (6.5 days)');
 
+// A real (if rare) EspoCRM data-quality case: close_date backdated before
+// created_at (e.g. entered into the CRM a few days after actually closing).
+// Must clamp to 0 for that row, not drag the average negative.
+$conn->query("INSERT INTO `opportunity` (id, stage, amount, created_at, close_date, assigned_user_id, deleted) VALUES
+    ('o9', 'Closed Won', 5000.00, '2026-07-10 09:00:00', '2026-07-06', 'u1', 0)");
+$avgDaysBackdated = espoAvgSalesCycleDays($conn, 'u1', '2026-07-01', '2026-07-31');
+assertEqual($avgDaysBackdated, 0.0, 'espoAvgSalesCycleDays: backdated close_date clamps to 0, not negative');
+
 echo "\n";
 
 // ========== TEST 5: espoCallActivity ==========
