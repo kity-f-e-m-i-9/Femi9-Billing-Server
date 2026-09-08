@@ -797,8 +797,25 @@ class StockService
                 if (!$externalTransaction) $this->db->rollback();
                 return ['success' => false, 'reason' => 'no_stock_row'];
             }
-            $before      = (int) $row['closing_qty'];
-            $after       = max(0, $before - $qty);
+            $before = (int) $row['closing_qty'];
+
+            // The transferred-in qty may have already been partly sold/moved
+            // out since the transfer happened. Reversing blindly would
+            // silently floor closing_qty at 0 and destroy that legitimate
+            // stock movement (see STOCK_AUDIT_2026.md). Refuse instead —
+            // the caller (internal_transfer_delete.php) must surface this
+            // so the transfer can be reconciled manually before deleting.
+            if ($before < $qty) {
+                if (!$externalTransaction) $this->db->rollback();
+                return [
+                    'success'   => false,
+                    'reason'    => 'insufficient_stock_to_reverse',
+                    'available' => $before,
+                    'requested' => $qty,
+                ];
+            }
+
+            $after       = $before - $qty;
             $newInputQty = max(0, (int) $row['input_qty'] - $qty);
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'input_qty'   => $newInputQty,
