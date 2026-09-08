@@ -73,7 +73,7 @@ $i = $start_from;
                                             </thead>
                                             <tbody>
 <?php
-$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID='$Login_user_IDvl' AND s.onboard_userTYPE='$Login_user_TYPEvl' ORDER BY s.id DESC";
+$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID='$Login_user_IDvl' AND s.onboard_userTYPE='$Login_user_TYPEvl' AND s.deleted_at IS NULL ORDER BY s.id DESC";
 $fetch_shops = mysqli_query($db_conn, $select_shops);
 while ($result_shop = mysqli_fetch_array($fetch_shops)) {
     $rowid = base64_encode($result_shop["id"]);
