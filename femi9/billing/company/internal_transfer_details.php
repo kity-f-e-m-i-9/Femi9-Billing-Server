@@ -133,7 +133,24 @@ $sucMessage = $_SESSION['sucMessage'];
 					</script>
 <?php  unset($_SESSION['sucMessage']); } ?>
 
-						
+<?php
+// Check for error message in session (e.g. delete refused because the
+// transferred stock was already partly consumed — see internal_transfer_delete.php)
+if (isset($_SESSION['errorMessage'])) {
+$errorMessage = $_SESSION['errorMessage'];
+?>
+                      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                      <script>
+                        Swal.fire({
+                          icon: 'error',
+                          title: 'Cannot Delete',
+                          text: '<?php echo addslashes($errorMessage); ?>',
+                          confirmButtonText: 'OK'
+                        });
+					</script>
+<?php  unset($_SESSION['errorMessage']); } ?>
+
+
 <?php
 //----Continuos Serial Number In Next Page.......................
 $num_rec_per_page=30;
