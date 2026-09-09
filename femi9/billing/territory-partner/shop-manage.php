@@ -117,7 +117,7 @@ $i = $start_from;
                                             </thead>
                                             <tbody>
 <?php
-$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID=? AND s.onboard_userTYPE=?";
+$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID=? AND s.onboard_userTYPE=? AND s.deleted_at IS NULL";
 $filter_types = "is";
 $filter_params = [$Login_user_IDvl, $Login_user_TYPEvl];
 if ($filter_district > 0) {

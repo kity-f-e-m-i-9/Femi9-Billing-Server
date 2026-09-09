@@ -74,7 +74,7 @@ $shopRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE t
                                         <select required name="new_customer_id" class="js-states form-control">
                                             <option value="" hidden>Select</option>
                                             <?php
-                                            $shops = mysqli_query($db_conn, "SELECT * FROM shop WHERE onboard_userTYPE='$Login_user_TYPEvl' AND onboard_userID='$Login_user_IDvl' ORDER BY name ASC");
+                                            $shops = mysqli_query($db_conn, "SELECT * FROM shop WHERE onboard_userTYPE='$Login_user_TYPEvl' AND onboard_userID='$Login_user_IDvl' AND deleted_at IS NULL ORDER BY name ASC");
                                             while ($s = mysqli_fetch_array($shops)) { ?>
                                             <option value="<?php echo $s['temp_id']; ?>"><?php echo strtoupper($s['name']); ?>, <?php echo $s['mobile_number']; ?></option>
                                             <?php } ?>

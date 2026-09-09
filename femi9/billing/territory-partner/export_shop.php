@@ -15,7 +15,7 @@ header("Content-Disposition: attachment; filename=$file");
 $output = fopen("php://output", "w");
 fputcsv($output, ['Category', 'ID', 'Name', 'State', 'District', 'Division', 'Firka', 'Pincode', 'Country Code', 'Mobile Number', 'Landline', 'Email ID', 'Address', 'GSTIN']);
 
-$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID=? AND s.onboard_userTYPE=?";
+$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID=? AND s.onboard_userTYPE=? AND s.deleted_at IS NULL";
 $filter_types = "is";
 $filter_params = [$Login_user_IDvl, $Login_user_TYPEvl];
 if ($filter_district > 0) {

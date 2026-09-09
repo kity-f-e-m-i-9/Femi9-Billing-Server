@@ -24,7 +24,7 @@ $shopList = [];
 $stmt = mysqli_prepare($db_conn,
     "SELECT id, name, district_id, taluk_id, firka_id
      FROM shop
-     WHERE onboard_userID=? AND onboard_userTYPE='territory_partner'
+     WHERE onboard_userID=? AND onboard_userTYPE='territory_partner' AND deleted_at IS NULL
      ORDER BY name ASC"
 );
 mysqli_stmt_bind_param($stmt, "s", $Login_user_IDvl);
