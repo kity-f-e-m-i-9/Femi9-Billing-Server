@@ -105,7 +105,8 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 											<th style="text-align:right;">Input Stock Qty</th>
 											<th style="text-align:right;">Sales Qty</th>
 											<th style="text-align:right;">Return Qty</th>
-											<th style="text-align:right;">Sent Qty</th>
+											<th style="text-align:right;">Internal Transfer Qty</th>
+											<th style="text-align:right;">Sent Qty (Demo/Free/Damage)</th>
 											</tr>
                                             </thead>
 											
@@ -238,13 +239,15 @@ $fetch_sum_INTRN_qty=mysqli_query($db_conn,$select_sum_INTRN_qty);
 $result_sum_INTRN_qty=mysqli_fetch_array($fetch_sum_INTRN_qty);
 if($result_sum_INTRN_qty[0]!=NULL){ $Total_INTRN_qty=$result_sum_INTRN_qty[0];}else{ $Total_INTRN_qty="0";}
 
-$Average_sent_qty=$Total_DFD_qty+$Total_INTRN_qty;						
+// Sent Qty is demo/free/damage only now; internal transfer shown as its own column.
+$Average_sent_qty=$Total_DFD_qty;
 						?>
                        <tr>
                         <td><?php echo $Result_productDetils["productName"];?></td>
 						<td align="right"><?php echo $Total_input_qty;?></td>
 						<td align="right"><?php echo $Average_total_sales;?></td>
 						<td align="right"><?php echo $Average_total_salesReturn;?></td>
+						<td align="right"><?php echo $Total_INTRN_qty;?></td>
 						<td align="right"><?php echo $Average_sent_qty;?></td>
                         </tr>
 						<?php }?>

@@ -152,7 +152,8 @@ while($result_Godown=mysqli_fetch_array($fetch_Godowndetails))
 											<th>Opening Stock Date</th>
 											<th style="text-align:right;">Input Stock Qty</th>
 											<th style="text-align:right;">Sales Qty</th>
-											<th style="text-align:right;">Sent Qty</th>
+											<th style="text-align:right;">Internal Transfer Qty</th>
+											<th style="text-align:right;">Sent Qty (Demo/Free/Damage)</th>
 											<th style="text-align:right;">Closing Qty</th>
 											<?php if (is_neksomo_login($db_conn)): ?>
 											<th style="text-align:right;">Closing Qty (Pieces)</th>
@@ -165,6 +166,8 @@ while($result_Godown=mysqli_fetch_array($fetch_Godowndetails))
 $user_id_Loginvl=$result_Godown['id'];
 $total_closing_pieces=0;
 $total_closing_qty_shown=0;
+$total_intrn_transfer=0;
+$total_sent_other=0;
 $renderedProductIds=[];
 // Whether this table is for Neksomo's own godown — the only place a mapped
 // company product's real `stock.closing_qty` alone understates what's truly
@@ -210,6 +213,18 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 						$ClosingStockPieces=($ClosingStock*$PiecesPerPack)+$ExtraPieces;
 						$total_closing_pieces+=$ClosingStockPieces;
 						$total_closing_qty_shown+=$ClosingStock;
+						// stock.sent_qty bundles internal transfers AND demo/free/damage (and
+						// PLT transfers) into one column (see StockService::transferOut() —
+						// every "goods leaving this godown" path shares the same counter).
+						// Internal transfer is broken out here from the internal_transfer
+						// table itself (send_from side, cumulative to date) so it can be
+						// shown separately; the remainder is demo/free/damage(+PLT).
+						$select_intrnQty="select sum(qty) from internal_transfer where product_id='$StockProductID' and send_from='$user_id_Loginvl'";
+						$Fetch_intrnQty=mysqli_query($db_conn,$select_intrnQty);
+						$IntrnTransferQty=(int)(mysqli_fetch_row($Fetch_intrnQty)[0] ?? 0);
+						$total_intrn_transfer+=$IntrnTransferQty;
+						$SentQtyOther=max(0,(int)$Result_OPStock['sent_qty']-$IntrnTransferQty);
+						$total_sent_other+=$SentQtyOther;
 										?>
                                                 <tr>
                                                     <td><?php echo $Result_productDetils["productName"];?></td>
@@ -222,8 +237,11 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 						<!-------SALES QTY------------->
 						<td align="right"><?php echo $Result_OPStock['sales_qty'];?></td>
 
-						<!-------INTERNAL TRANSFER + DEMO/FREE/DAMAGE------------->
-						<td align="right"><?php echo $Result_OPStock['sent_qty'];?></td>
+						<!-------INTERNAL TRANSFER------------->
+						<td align="right"><?php echo $IntrnTransferQty;?></td>
+
+						<!-------DEMO/FREE/DAMAGE (+ PLT)------------->
+						<td align="right"><?php echo $SentQtyOther;?></td>
 
 						<td align="right"><b><?php echo $ClosingStock;?></b></td>
 						<?php if (is_neksomo_login($db_conn)): ?>
@@ -264,6 +282,7 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 													<td align="right">0</td>
 													<td align="right">0</td>
 													<td align="right">0</td>
+													<td align="right">0</td>
 													<td align="right"><b><?php echo $poolAvailable; ?></b></td>
 													<?php if (is_neksomo_login($db_conn)): ?>
 													<td align="right"><b><?php echo $virtualClosingPieces; ?></b></td>
@@ -278,7 +297,9 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 
 										 <tfoot>
 										 <tr>
-										<td colspan="6" style="text-align:right;">Total Stock Qty</td>
+										<td colspan="5" style="text-align:right;">Total</td>
+										<td align="right"><b><?=$total_intrn_transfer;?></b></td>
+										<td align="right"><b><?=$total_sent_other;?></b></td>
 										<td align="right"><b><?=$total_closing_qty_shown;?></b></td>
 										<?php if (is_neksomo_login($db_conn)): ?>
 										<td align="right"><b><?=$total_closing_pieces;?></b></td>

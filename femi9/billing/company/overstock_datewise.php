@@ -213,17 +213,21 @@ function computeStockMovement($db_conn, $prid, $fromDate, $toDate, $companyIdsSq
     $input_qty           = $input_qty + $intrn_in + $plt_in;
     $total_sales        = $ot_sales + $sls1 + $sls2 + $sls3;
     $total_sales_return = $ot_return + $sls_return;
-    $total_sent          = $dfd + $intrn + $plt_out;
+    // Internal transfer (outbound leg only, godown-to-godown) shown as its own
+    // column, separate from demo/free/damage + PLT-out below.
+    $internal_transfer   = $intrn;
+    $total_sent          = $dfd + $plt_out;
 
     return [
         'input_qty'          => $input_qty,
         'total_sales'        => $total_sales,
         'total_sales_return' => $total_sales_return,
+        'internal_transfer'  => $internal_transfer,
         'total_sent'         => $total_sent,
         'manuf_qty'          => $manuf,
         // Credits (input, returns, manufacturer purchase) add to stock;
-        // sales and sent (demo/free/damage + internal transfer) remove from it.
-        'net_change'         => $input_qty + $total_sales_return + $manuf - $total_sales - $total_sent,
+        // sales, internal transfer, and sent (demo/free/damage + PLT) remove from it.
+        'net_change'         => $input_qty + $total_sales_return + $manuf - $total_sales - $internal_transfer - $total_sent,
     ];
 }
 
@@ -291,7 +295,9 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sales Qty (Pieces)</th><?php endif; ?>
 											<th style="text-align:right;">Return Qty</th>
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Return Qty (Pieces)</th><?php endif; ?>
-											<th style="text-align:right;">Sent Qty</th>
+											<th style="text-align:right;">Internal Transfer Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Internal Transfer Qty (Pieces)</th><?php endif; ?>
+											<th style="text-align:right;">Sent Qty (Demo/Free/Damage)</th>
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sent Qty (Pieces)</th><?php endif; ?>
 <?php if ($showManufPurchases): ?><th style="text-align:right;">Manufacturer Purchase Qty</th><?php endif; ?>
 <?php if ($showManufPurchases && is_neksomo_login($db_conn)): ?><th style="text-align:right;">Manufacturer Purchase Qty (Pieces)</th><?php endif; ?>
@@ -316,6 +322,8 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sales']*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $m['total_sales_return'];?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sales_return']*$PiecesPerPack;?></td><?php endif; ?>
+						<td align="right"><?php echo $m['internal_transfer'];?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['internal_transfer']*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $m['total_sent'];?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sent']*$PiecesPerPack;?></td><?php endif; ?>
 						<?php if ($showManufPurchases): ?><td align="right"><?php echo $m['manuf_qty'];?></td><?php endif; ?>
