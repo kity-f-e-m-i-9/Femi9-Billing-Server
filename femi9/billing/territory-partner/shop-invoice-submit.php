@@ -147,6 +147,14 @@ try {
     $existingReceipt = $s->get_result()->fetch_assoc();
     $s->close();
 
+    // Whether this invoice was ever actually submitted before THIS call — the
+    // real signal for "first submission" vs "re-editing an already-submitted
+    // invoice". NOT the same as $_SESSION['ACTIONEDIT'] !== 'edit': a field
+    // order (order-to-invoice.php) always redirects into shop-invoice-add.php
+    // with action=edit even on its very first submission, so that flag alone
+    // wrongly looked like a re-edit and skipped the reward below.
+    $isFirstSubmission = !$existingReceipt;
+
     if ($existingReceipt) {
         $new_received   = (float)$existingReceipt['received'] + $receivedamount;
         $new_receivable = round($total_amount - $new_received);
@@ -187,7 +195,7 @@ try {
     exit;
 }
 
-if (!isset($_SESSION['ACTIONEDIT']) || $_SESSION['ACTIONEDIT'] !== 'edit') {
+if ($isFirstSubmission) {
     $invoice_number = $inv['inv_number'] ?? '';
     $rewardResult = checkAndAwardDailyReward(
         $db_conn,
