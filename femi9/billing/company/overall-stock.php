@@ -153,7 +153,7 @@ while($result_Godown=mysqli_fetch_array($fetch_Godowndetails))
 											<th style="text-align:right;">Input Stock Qty</th>
 											<th style="text-align:right;">Sales Qty</th>
 											<th style="text-align:right;">Internal Transfer Qty</th>
-											<th style="text-align:right;">Sent Qty (Demo/Free/Damage)</th>
+											<th style="text-align:right;">Movement to CP</th>
 											<th style="text-align:right;">Closing Qty</th>
 											<?php if (is_neksomo_login($db_conn)): ?>
 											<th style="text-align:right;">Closing Qty (Pieces)</th>
@@ -213,18 +213,28 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 						$ClosingStockPieces=($ClosingStock*$PiecesPerPack)+$ExtraPieces;
 						$total_closing_pieces+=$ClosingStockPieces;
 						$total_closing_qty_shown+=$ClosingStock;
-						// stock.sent_qty bundles internal transfers AND demo/free/damage (and
-						// PLT transfers) into one column (see StockService::transferOut() —
-						// every "goods leaving this godown" path shares the same counter).
-						// Internal transfer is broken out here from the internal_transfer
-						// table itself (send_from side, cumulative to date) so it can be
-						// shown separately; the remainder is demo/free/damage(+PLT).
+						// Internal transfer broken out from the internal_transfer table itself
+						// (send_from side, cumulative to date).
 						$select_intrnQty="select sum(qty) from internal_transfer where product_id='$StockProductID' and send_from='$user_id_Loginvl'";
 						$Fetch_intrnQty=mysqli_query($db_conn,$select_intrnQty);
 						$IntrnTransferQty=(int)(mysqli_fetch_row($Fetch_intrnQty)[0] ?? 0);
 						$total_intrn_transfer+=$IntrnTransferQty;
-						$SentQtyOther=max(0,(int)$Result_OPStock['sent_qty']-$IntrnTransferQty);
-						$total_sent_other+=$SentQtyOther;
+
+						// Demo/Free/Damage folded into Sales Qty (goods that left as demo/
+						// free/damage grouped with sales rather than shown separately).
+						$select_dfdQty="select sum(qty) from demofreedamage where product_id='$StockProductID' and userid='$user_id_Loginvl'";
+						$Fetch_dfdQty=mysqli_query($db_conn,$select_dfdQty);
+						$DfdQty=(int)(mysqli_fetch_row($Fetch_dfdQty)[0] ?? 0);
+						$SalesQtyShown=(int)$Result_OPStock['sales_qty']+$DfdQty;
+
+						// "Movement to CP" — stock physically transferred from this godown to
+						// a Channel Partner via add-godown-to-location.php (pl-godown-
+						// transfer-action.php, transfer_type='godown_to_location'), distinct
+						// from the invoiced CP sales already counted in Sales Qty above.
+						$select_plt2cpQty="select sum(i.quantity) from pl_godown_transfer_items i inner join pl_godown_transfers t on t.id=i.transfer_id where t.transfer_type='godown_to_location' and i.product_id='$StockProductID' and t.godown_id='$user_id_Loginvl'";
+						$Fetch_plt2cpQty=mysqli_query($db_conn,$select_plt2cpQty);
+						$MovementToCP=(int)(mysqli_fetch_row($Fetch_plt2cpQty)[0] ?? 0);
+						$total_sent_other+=$MovementToCP;
 										?>
                                                 <tr>
                                                     <td><?php echo $Result_productDetils["productName"];?></td>
@@ -234,14 +244,14 @@ $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and us
 						<!-------PURCHASE QTY------------->
 						<td align="right"><?php echo $Result_OPStock['input_qty'];?></td>
 
-						<!-------SALES QTY------------->
-						<td align="right"><?php echo $Result_OPStock['sales_qty'];?></td>
+						<!-------SALES QTY (incl. Demo/Free/Damage)------------->
+						<td align="right"><?php echo $SalesQtyShown;?></td>
 
 						<!-------INTERNAL TRANSFER------------->
 						<td align="right"><?php echo $IntrnTransferQty;?></td>
 
-						<!-------DEMO/FREE/DAMAGE (+ PLT)------------->
-						<td align="right"><?php echo $SentQtyOther;?></td>
+						<!-------MOVEMENT TO CP------------->
+						<td align="right"><?php echo $MovementToCP;?></td>
 
 						<td align="right"><b><?php echo $ClosingStock;?></b></td>
 						<?php if (is_neksomo_login($db_conn)): ?>
