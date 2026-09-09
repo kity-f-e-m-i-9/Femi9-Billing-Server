@@ -123,7 +123,7 @@ foreach ($layers as $_layer):
 <div style="display:flex;align-items:center;gap:5px;">
     <div style="flex:0 0 20%;">
         <label class="form-label">Country Code*</label>
-        <select name="country_code" required class="form-control">
+        <select id="country_code" name="country_code" required class="form-control" onchange="adjustMobileValidation(this.value)">
             <?php
             $selectCountry = "select * from country order by id asc";
             $fetchCountry = mysqli_query($db_conn, $selectCountry);
@@ -135,10 +135,32 @@ foreach ($layers as $_layer):
     </div>
     <div style="flex:1;">
         <label class="form-label">Mobile Number*</label>
-        <input type="text" required name="mobile_number" pattern="[1-9]{1}[0-9]{9}" class="form-control" maxlength="10">
+        <input type="text" id="mobile_number_input" required name="mobile_number" pattern="[1-9]{1}[0-9]{9}" class="form-control" maxlength="10">
     </div>
 </div>
 <br/>
+<script>
+// India (+91) keeps the strict exact-10-digit check; any other country code
+// (e.g. Nepal +977) relaxes to 10-14 digits, since we can't validate every
+// country's real mobile length rule here. Runs on selection change AND once
+// on load, in case the browser restores a previously-picked country on
+// refresh without firing onchange.
+function adjustMobileValidation(countryCode) {
+    var input = document.getElementById('mobile_number_input');
+    if (!input) return;
+    if (countryCode === '+91') {
+        input.setAttribute('pattern', '[1-9]{1}[0-9]{9}');
+        input.setAttribute('maxlength', '10');
+    } else {
+        input.setAttribute('pattern', '[1-9]{1}[0-9]{9,13}');
+        input.setAttribute('maxlength', '14');
+    }
+}
+document.addEventListener('DOMContentLoaded', function () {
+    var sel = document.getElementById('country_code');
+    if (sel) adjustMobileValidation(sel.value);
+});
+</script>
 
 <label class="form-label">Landline Number</label>
 <input type="text" name="landline" class="form-control">
