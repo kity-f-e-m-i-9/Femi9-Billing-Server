@@ -73,7 +73,7 @@ $cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_cate
 <div style="display:flex;align-items:center;gap:5px;">
     <div style="flex:0 0 20%;">
         <label class="form-label">Country Code*</label>
-        <select name="country_code" required class="form-control">
+        <select id="country_code" name="country_code" required class="form-control" onchange="adjustMobileValidation(this.value)">
             <option value="<?php echo $shop['country_code']; ?>" hidden><?php echo $shop['country_code']; ?></option>
             <?php $rc = mysqli_query($db_conn, "SELECT * FROM country ORDER BY c_name ASC");
             while ($rowc = mysqli_fetch_array($rc)) { ?>
@@ -83,9 +83,30 @@ $cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_cate
     </div>
     <div style="flex:1;">
         <label class="form-label">Mobile Number*</label>
-        <input type="text" required name="mobile_number" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo htmlspecialchars($shop['mobile_number']); ?>" class="form-control" maxlength="10">
+        <input type="text" id="mobile_number_input" required name="mobile_number" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo htmlspecialchars($shop['mobile_number']); ?>" class="form-control" maxlength="14">
     </div>
 </div><br/>
+<script>
+// India (+91) keeps the strict exact-10-digit check; any other country code
+// (e.g. Nepal +977) relaxes to 10-14 digits. Runs on selection change AND
+// once on load so an existing non-India shop's saved number isn't clipped
+// by the default India-strict maxlength/pattern before the user touches it.
+function adjustMobileValidation(countryCode) {
+    var input = document.getElementById('mobile_number_input');
+    if (!input) return;
+    if (countryCode === '+91') {
+        input.setAttribute('pattern', '[1-9]{1}[0-9]{9}');
+        input.setAttribute('maxlength', '10');
+    } else {
+        input.setAttribute('pattern', '[1-9]{1}[0-9]{9,13}');
+        input.setAttribute('maxlength', '14');
+    }
+}
+document.addEventListener('DOMContentLoaded', function () {
+    var sel = document.getElementById('country_code');
+    if (sel) adjustMobileValidation(sel.value);
+});
+</script>
 
 <label class="form-label">Landline Number</label>
 <input type="text" onkeypress="restrictlandline(event)" value="<?php echo htmlspecialchars($shop['landline']); ?>" name="landline" class="form-control"><br/>
