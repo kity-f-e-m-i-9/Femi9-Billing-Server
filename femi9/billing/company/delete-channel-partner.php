@@ -14,6 +14,13 @@ $cp = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 if (!$cp) { header("Location: manage-channel-partner"); exit; }
 
+// A Sales BDM session may only delete a CP inside their own assigned districts.
+if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
+    require_once __DIR__ . '/../salesbdm/include/BdmCpScope.php';
+    $_myCpIds = getBdmAssignedCpIds($db_conn, (int)$salesBdmID, true);
+    if (!in_array($cp_db_id, $_myCpIds, true)) { header("Location: manage-channel-partner"); exit; }
+}
+
 // Delete — channel_partner_locations rows cascade automatically
 $stmt_del = $db_conn->prepare("DELETE FROM channel_partners WHERE id = ?");
 $stmt_del->bind_param("i", $cp_db_id);

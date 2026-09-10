@@ -99,7 +99,23 @@ if (!empty($salesBdmID)) {
         <ul class="sub-menu">
             <li><a href="<?php echo $_companyBase; ?>add-territory-partner">Add Territory Partner</a></li>
             <li><a href="<?php echo $_companyBase; ?>manage-territory-partner">Manage Territory Partner</a></li>
+            <li><a href="<?php echo $_companyBase; ?>manage-field-orders">Field Orders</a></li>
+            <li><a href="<?php echo $_companyBase; ?>field-orders-summary">Field Orders Summary</a></li>
         </ul>
+    </li>
+
+    <li>
+        <a href=""><i class="material-icons-two-tone">store</i>Channel Partner
+            <i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+        <ul class="sub-menu">
+            <li><a href="<?php echo $_companyBase; ?>add-channel-partner">Add Channel Partner</a></li>
+            <li><a href="<?php echo $_companyBase; ?>manage-channel-partner">Manage Channel Partner</a></li>
+            <li><a href="<?php echo $_companyBase; ?>cp-stock">CP Stock Details</a></li>
+        </ul>
+    </li>
+
+    <li>
+        <a href="<?php echo $_companyBase; ?>bdm-ms-shop-view"><i class="material-icons-two-tone">storefront</i>District Shop View</a>
     </li>
 
     <li>

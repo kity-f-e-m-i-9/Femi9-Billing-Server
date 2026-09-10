@@ -36,6 +36,16 @@ foreach ($_addr_cols as $_col => $_def) {
     }
 }
 
+// A Sales BDM session may only insert/edit within their own assigned
+// districts — used below to filter submitted location_ids and, on update,
+// to verify the CP being edited actually belongs to this BDM. Mirrors
+// territory-partner-action.php's own BDM scoping.
+$_isBdm = ($Login_user_TYPEvl ?? '') === 'salesbdm';
+if ($_isBdm) {
+    require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
+    require_once __DIR__ . '/../salesbdm/include/BdmCpScope.php';
+}
+
 $action = $_POST['action'] ?? '';
 
 // ── INSERT ────────────────────────────────────────────────────────────────────
@@ -68,6 +78,10 @@ if ($action === 'insert-channel-partner') {
     $password_hash        = password_hash($raw_password, PASSWORD_DEFAULT);
     $created_by           = $_SESSION['LOGIN_USER'] ?? '';
     $location_ids         = array_filter(array_map('intval', $_POST['location_ids'] ?? []));
+
+    if ($_isBdm) {
+        $location_ids = array_values(array_filter($location_ids, fn($lid) => isLocationInBdmDistricts($db_conn, (int)$salesBdmID, $lid)));
+    }
 
     if (!$name || !$mobile || !$branch_line1 || !$delivery_line1) {
         header("Location: add-channel-partner?error=1");
@@ -197,6 +211,12 @@ if ($action === 'update-channel-partner') {
     $gst_enabled          = isset($_POST['cp_gst_enabled']) ? 1 : 0;
     $created_by           = $_SESSION['LOGIN_USER'] ?? '';
     $location_ids         = array_filter(array_map('intval', $_POST['location_ids'] ?? []));
+
+    if ($_isBdm) {
+        $_myCpIds = getBdmAssignedCpIds($db_conn, (int)$salesBdmID, true);
+        if (!in_array($cp_db_id, $_myCpIds, true)) { header("Location: manage-channel-partner"); exit; }
+        $location_ids = array_values(array_filter($location_ids, fn($lid) => isLocationInBdmDistricts($db_conn, (int)$salesBdmID, $lid)));
+    }
 
     if (!$cp_db_id || !$name || !$mobile || !$branch_line1 || !$delivery_line1) {
         header("Location: manage-channel-partner?error=1");

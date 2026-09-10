@@ -286,6 +286,15 @@ function courierClassifyFromOcr(array $ocrResult, float $requiredAmount, ?string
             'reason' => 'Could not confirm the payment was made to ' . $expectedUpi . ' — needs manual review.',
             'raw_text' => $ocrResult['raw_text']];
     }
+    // Same transaction/reference ID requirement as the Claude Vision path
+    // (classifyCourierVisionResult) — no ID means outright reject, per
+    // confirmed business decision: a screenshot without a visible
+    // transaction ID is not acceptable proof of payment at all.
+    if (empty($ocrResult['reference'])) {
+        return ['status' => 'rejected', 'amount' => $ocrResult['amount'], 'reference' => null, 'payment_date' => null,
+            'reason' => 'This screenshot does not show a transaction ID. Please upload a screenshot that clearly shows the transaction/reference ID.',
+            'raw_text' => $ocrResult['raw_text']];
+    }
     return ['status' => 'accepted', 'amount' => $requiredAmount, 'reference' => $ocrResult['reference'], 'payment_date' => null, 'reason' => null, 'raw_text' => $ocrResult['raw_text']];
 }
 
@@ -345,6 +354,17 @@ function classifyCourierVisionResult(array $v, float $requiredAmount, ?string $e
     if ($expectedUpi !== null && !$v['recipient_matches']) {
         return ['status' => 'pending_review', 'amount' => $v['amount'], 'reference' => $v['reference'], 'payment_date' => $paymentDate,
             'reason' => 'Could not confirm the payment was made to ' . $expectedUpi . ' — needs manual review.',
+            'raw_text' => $raw];
+    }
+    // A transaction/reference ID (UTR, UPI ref, etc.) is required proof this
+    // is a real, traceable payment — without it there's nothing to look up
+    // or dedupe against later, so this can't auto-accept even if the amount
+    // and recipient otherwise look right. Outright rejected, per confirmed
+    // business decision: a screenshot without a visible transaction ID is
+    // not acceptable proof of payment at all.
+    if (empty($v['reference'])) {
+        return ['status' => 'rejected', 'amount' => $v['amount'], 'reference' => null, 'payment_date' => $paymentDate,
+            'reason' => 'This screenshot does not show a transaction ID. Please upload a screenshot that clearly shows the transaction/reference ID.',
             'raw_text' => $raw];
     }
     return ['status' => 'accepted', 'amount' => $requiredAmount, 'reference' => $v['reference'], 'payment_date' => $paymentDate, 'reason' => null, 'raw_text' => $raw];

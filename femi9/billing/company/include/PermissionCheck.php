@@ -37,10 +37,11 @@ function requirePermission(string $perm): void
     }
 
     // Sales BDM sessions never appear in admin_log — checksession.php already
-    // scoped which pages they can even reach, so a BDM session hitting the
-    // one perm those pages check ('territory_partner') is always allowed here.
+    // scoped which pages they can even reach, so a BDM session hitting one of
+    // the perms those pages check ('territory_partner', 'channel_partner') is
+    // always allowed here.
     if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
-        if ($perm === 'territory_partner') { return; }
+        if ($perm === 'territory_partner' || $perm === 'channel_partner' || $perm === 'ms') { return; }
         denyAccess();
     }
 

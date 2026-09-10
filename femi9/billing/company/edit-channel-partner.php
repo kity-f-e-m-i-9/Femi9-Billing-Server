@@ -18,6 +18,13 @@ $cp = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 if (!$cp) { header("Location: manage-channel-partner"); exit; }
 
+// A Sales BDM session may only edit a CP inside their own assigned districts.
+if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
+    require_once __DIR__ . '/../salesbdm/include/BdmCpScope.php';
+    $_myCpIds = getBdmAssignedCpIds($db_conn, (int)$salesBdmID, true);
+    if (!in_array($cp_db_id, $_myCpIds, true)) { header("Location: manage-channel-partner"); exit; }
+}
+
 // ── Currently assigned locations (with names for the picker) ─────────────────
 $stmt_cur = $db_conn->prepare("
     SELECT n.id, n.name, COALESCE(n.target_amount, 0) AS target_amount
@@ -147,12 +154,12 @@ $preselected_json = json_encode(array_map(function($loc) {
 <div class="app align-content-stretch d-flex flex-wrap">
 
     <div class="app-sidebar">
-        <?php include("logo.php"); ?>
-        <?php include("femi_menu.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/logo.php' : 'logo.php'); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/femi_menu.php' : 'femi_menu.php'); ?>
     </div>
 
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/app-header.php' : 'app-header.php'); ?>
 
         <div class="app-content">
             <div class="content-wrapper">
