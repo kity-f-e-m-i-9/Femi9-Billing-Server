@@ -4,7 +4,7 @@ include("config.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
-if (!isset($_REQUEST['addInvoice2'])) { header("Location: shop-invoice-add.php"); exit; }
+if (!isset($_REQUEST['addInvoice2']) && !isset($_REQUEST['updateHeaderOnly'])) { header("Location: shop-invoice-add.php"); exit; }
 
 $inv_id      = $_POST['inv_id']      ?? '';
 $invuser     = $_POST['invuser']     ?? 'shop';
@@ -21,6 +21,11 @@ $tp_id       = (int)$Login_user_IDvl;
 $s = $db_conn->prepare("UPDATE user_invoice SET to_user_id=?,date=?,inv_year=? WHERE inv_id=? AND from_user_type=? AND from_user_id=?");
 $s->bind_param('sssss' . 'i', $customer_id, $date, $inv_year, $inv_id, $Login_user_TYPEvl, $tp_id);
 $s->execute(); $s->close();
+
+if (isset($_POST['updateHeaderOnly'])) {
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&DateUpdated&&invuser=$invuser&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
+    exit;
+}
 
 $s = $db_conn->prepare("SELECT gst_type,buyer_gsttype FROM user_invoice WHERE inv_id=? LIMIT 1");
 $s->bind_param('s', $inv_id);

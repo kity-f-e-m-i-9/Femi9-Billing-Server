@@ -459,13 +459,24 @@ $district_sales = mis_all($db_conn,
 // ═══════════════════════════════════════════════════════════════════════════
 // 6. TOP SHOPS & CUSTOMERS (Salesperson Performance)
 // ═══════════════════════════════════════════════════════════════════════════
+// Pre-aggregate line items to ONE row per invoice (SUM(qty) per inv_id) BEFORE
+// joining to the invoice header — joining straight to user_invoice_items/
+// invoice_items here previously fanned a single multi-line invoice out into
+// one row per product line, so COUNT(*) and SUM(header.total) both counted
+// that same invoice's header once per line item (a 14-line, ₹26,356 invoice
+// read as "14 invoices" totalling ₹3,68,984 = 26356*14). This subquery
+// collapses items to one row per invoice first, so the join back to the
+// header is 1:1 and COUNT(*)/SUM(total) reflect real invoices.
 $top_shops = mis_all($db_conn,
     "SELECT s.name shop_name, COUNT(*) inv_cnt,
             COALESCE(SUM(ui.total),0) revenue,
-            COALESCE(SUM(uii.qty),0) units
+            COALESCE(SUM(itm.qty),0) units
      FROM user_invoice ui
      JOIN shop s ON s.temp_id = ui.to_user_id
-     LEFT JOIN user_invoice_items uii ON uii.inv_id = ui.inv_id AND uii.from_user_id=? AND uii.from_user_type=?
+     LEFT JOIN (
+         SELECT inv_id, SUM(qty) qty FROM user_invoice_items
+         WHERE from_user_id=? AND from_user_type=? GROUP BY inv_id
+     ) itm ON itm.inv_id = ui.inv_id
      WHERE ui.from_user_id=? AND ui.from_user_type=? AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
      GROUP BY s.temp_id, s.name ORDER BY revenue DESC LIMIT 10",
     'isisss', [$uid, $utype, $uid, $utype, $from, $to]);
@@ -473,10 +484,13 @@ $top_shops = mis_all($db_conn,
 $top_customers = mis_all($db_conn,
     "SELECT COALESCE(c.name,'Walking Customer') cust_name, COUNT(*) inv_cnt,
             COALESCE(SUM(i.total),0) revenue,
-            COALESCE(SUM(ii.qty),0) units
+            COALESCE(SUM(itm.qty),0) units
      FROM invoice i
      LEFT JOIN customers c ON c.id = i.customer_id
-     LEFT JOIN invoice_items ii ON ii.inv_id = i.inv_id AND ii.user_id=? AND ii.user_type=?
+     LEFT JOIN (
+         SELECT inv_id, SUM(qty) qty FROM invoice_items
+         WHERE user_id=? AND user_type=? GROUP BY inv_id
+     ) itm ON itm.inv_id = i.inv_id
      WHERE i.user_id=? AND i.user_type=? AND i.sub_total>0 AND i.date BETWEEN ? AND ?
      GROUP BY i.customer_id, c.name ORDER BY revenue DESC LIMIT 10",
     'isisss', [$uid, $utype, $uid, $utype, $from, $to]);

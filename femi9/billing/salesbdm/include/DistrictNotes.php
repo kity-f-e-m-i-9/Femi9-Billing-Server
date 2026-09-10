@@ -74,6 +74,49 @@ function ensureNoteStatusColumn($db_conn): void {
     }
 }
 
+// What was actually done to resolve the issue — required at the moment a
+// note is marked completed (not optional), so "Completed" always has an
+// answer to "what did you do about it" instead of just a silent status flip.
+function ensureResolutionNoteColumn($db_conn): void {
+    $col = $db_conn->query("SHOW COLUMNS FROM salesbdm_district_notes LIKE 'resolution_note'");
+    if ($col && $col->num_rows === 0) {
+        $db_conn->query("ALTER TABLE salesbdm_district_notes ADD COLUMN resolution_note VARCHAR(500) NULL AFTER status");
+    }
+}
+
+// Corrects the note's own content after the fact (a typo, wrong priority,
+// wrong type) — deliberately leaves district/TP tags/photo untouched, since
+// changing those is a bigger structural edit than "fix what I typed", and
+// leaves status/resolution_note alone too (that's its own separate workflow,
+// not part of a content edit). $bdmId is null for Company's own edit
+// endpoint, which may correct any BDM's note; passed for the BDM's own
+// endpoint, which may only touch its own notes.
+//
+// Existence/ownership is checked with its own SELECT first, then the UPDATE
+// runs unconditionally — MySQL's affected_rows is 0 when a save doesn't
+// actually change any value (e.g. re-saving with the same text), which would
+// otherwise be wrongly reported as "not found/not yours" on every no-op edit.
+function updateDistrictNote($db_conn, int $id, ?int $bdmId, string $issueText, string $priority, string $noteType): bool {
+    if ($bdmId !== null) {
+        $chk = $db_conn->prepare("SELECT id FROM salesbdm_district_notes WHERE id = ? AND bdm_id = ?");
+        $chk->bind_param('ii', $id, $bdmId);
+    } else {
+        $chk = $db_conn->prepare("SELECT id FROM salesbdm_district_notes WHERE id = ?");
+        $chk->bind_param('i', $id);
+    }
+    $chk->execute();
+    $exists = (bool)$chk->get_result()->fetch_assoc();
+    $chk->close();
+    if (!$exists) { return false; }
+
+    $stmt = $db_conn->prepare("UPDATE salesbdm_district_notes SET issue_text = ?, priority = ?, note_type = ? WHERE id = ?");
+    $stmt->bind_param('sssi', $issueText, $priority, $noteType, $id);
+    $stmt->execute();
+    $ok = $stmt->error === '';
+    $stmt->close();
+    return $ok;
+}
+
 function districtNoteStatusLabel(string $status): string {
     switch ($status) {
         case 'in_progress': return 'In Progress';

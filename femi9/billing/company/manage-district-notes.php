@@ -7,6 +7,7 @@ error_reporting(0);
 
 ensureDistrictNotesTable($db_conn);
 ensureNoteStatusColumn($db_conn);
+ensureResolutionNoteColumn($db_conn);
 
 // Company sees every BDM's notes — no district/bdm scoping like the BDM's
 // own version of this page, since this is the escalation/oversight view.
@@ -134,8 +135,14 @@ foreach ($notes as $n) { if ($n['priority'] === 'high') $highOpenCount++; }
         .dn-status-btn.dn-status-start.active { background:#f59e0b; border-color:#f59e0b; color:#fff; cursor:default; }
         .dn-status-btn.dn-status-start.active:hover { transform:none; }
 
-        .dn-status-btn.dn-status-complete { background:#ecfdf5; border-color:#a7f3d0; color:#059669; }
-        .dn-status-btn.dn-status-complete:hover { background:#d1fae5; border-color:#6ee7b7; color:#065f46; }
+        /* Orange, not green — an actionable "still in progress, click to
+           complete" button must read as visually distinct from the actual
+           green Completed badge, or the two get mistaken for each other
+           at a glance. Confirmed 2026-09-05. */
+        .dn-status-btn.dn-status-complete { background:#fff7ed; border-color:#fdba74; color:#c2410c; }
+        .dn-status-btn.dn-status-complete:hover { background:#ffedd5; border-color:#fb923c; color:#9a3412; }
+        .dn-spin { animation: dn-spin-anim 1.8s linear infinite; }
+        @keyframes dn-spin-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .dn-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 4px 4px; flex-wrap:wrap; }
         .dn-pagination-info { font-size:12px; color:#6b7280; }
@@ -254,11 +261,13 @@ foreach ($notes as $n) { if ($n['priority'] === 'high') $highOpenCount++; }
                                         <th>Priority</th>
                                         <th>Photo</th>
                                         <th>Status</th>
+                                        <th>Note</th>
+                                        <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                 <?php if (empty($notes)): ?>
-                                    <tr><td colspan="9" class="text-center text-muted" style="padding:24px;">No notes found for this filter.</td></tr>
+                                    <tr><td colspan="11" class="text-center text-muted" style="padding:24px;">No notes found for this filter.</td></tr>
                                 <?php else: foreach ($notes as $n):
                                     [$bg, $fg] = districtNotePriorityColors($n['priority']);
                                     $status = $n['status'] ?? 'open';
@@ -290,15 +299,27 @@ foreach ($notes as $n) { if ($n['priority'] === 'high') $highOpenCount++; }
                                             <div class="dn-status-cell" data-id="<?php echo (int)$n['id']; ?>" data-status="<?php echo htmlspecialchars($status, ENT_QUOTES); ?>">
                                             <?php if ($status === 'completed'): ?>
                                                 <span class="dn-badge" style="background:#d1fae5;color:#065f46;"><i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">check_circle</i> Completed</span>
-                                            <?php else: ?>
-                                                <button type="button" class="dn-status-btn dn-status-start <?php echo $status === 'in_progress' ? 'active' : ''; ?>" data-set="in_progress" title="<?php echo $status === 'in_progress' ? 'In Progress' : 'Start'; ?>">
-                                                    <i class="material-icons-outlined"><?php echo $status === 'in_progress' ? 'autorenew' : 'play_arrow'; ?></i>
-                                                </button>
+                                            <?php elseif ($status === 'in_progress'): ?>
+                                                <!-- Only one action makes sense once it's in progress — advance
+                                                     straight to the completion modal, no separate "in progress"
+                                                     button sitting there with nothing left to do. -->
                                                 <button type="button" class="dn-status-btn dn-status-complete" data-set="completed" title="Mark Completed">
-                                                    <i class="material-icons-outlined">check</i>
+                                                    <i class="material-icons-outlined dn-spin">autorenew</i>
+                                                </button>
+                                            <?php else: ?>
+                                                <button type="button" class="dn-status-btn dn-status-start" data-set="in_progress" title="Start">
+                                                    <i class="material-icons-outlined">play_arrow</i>
                                                 </button>
                                             <?php endif; ?>
                                             </div>
+                                        </td>
+                                        <td class="dn-resolution-note-cell" style="max-width:220px;white-space:normal;font-size:12px;color:#4b5563;">
+                                            <?php echo $n['resolution_note'] ? htmlspecialchars($n['resolution_note']) : '<span class="text-muted">&mdash;</span>'; ?>
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openDnEdit(<?php echo (int)$n['id']; ?>, <?php echo htmlspecialchars(json_encode($n['issue_text']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($n['priority']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($n['note_type'] ?? 'tp'), ENT_QUOTES); ?>)">
+                                                <i class="material-icons-outlined" style="font-size:14px;vertical-align:-2px;">edit</i> Edit
+                                            </button>
                                         </td>
                                     </tr>
                                 <?php endforeach; endif; ?>
@@ -333,6 +354,60 @@ foreach ($notes as $n) { if ($n['priority'] === 'high') $highOpenCount++; }
         </div>
     </div>
 </div>
+
+<!-- Completion note modal — "Mark Completed" never fires directly, it always
+     stops here first so there's a permanent record of what was actually done. -->
+<div class="modal fade" id="dnCompleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" style="font-weight:700;"><i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;color:#059669;">check_circle</i> Mark Completed</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;">What was done to resolve this?</label>
+                <textarea id="dnCompleteNote" class="form-control" rows="3" placeholder="e.g. Visited the shop and corrected the stock count"></textarea>
+                <div id="dnCompleteError" style="color:#991b1b;font-size:12px;margin-top:6px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" id="dnCompleteSubmit">Mark Completed</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="dnEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" style="font-weight:700;"><i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;color:#667eea;">edit</i> Edit Note</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;">Issue</label>
+                <textarea id="dnEditIssue" class="form-control" rows="3" style="margin-bottom:12px;"></textarea>
+                <label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;">Type</label>
+                <select id="dnEditType" class="form-control" style="margin-bottom:12px;">
+                    <option value="tp">TPs Issue</option>
+                    <option value="software">Software Issue</option>
+                </select>
+                <label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;">Priority</label>
+                <select id="dnEditPriority" class="form-control">
+                    <option value="high">High Priority</option>
+                    <option value="priority">Medium</option>
+                    <option value="normal">Normal</option>
+                </select>
+                <div id="dnEditError" style="color:#991b1b;font-size:12px;margin-top:8px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="dnEditSubmit">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -345,28 +420,91 @@ foreach ($notes as $n) { if ($n['priority'] === 'high') $highOpenCount++; }
 $('#bdmSelect').select2({ width: '200px', placeholder: 'All BDMs' });
 $('#districtSelect').select2({ width: '180px', placeholder: 'All Districts' });
 
+var dnCompleteCell = null;
+
 $(document).on('click', '.dn-status-btn', function () {
     var $btn = $(this);
-    if ($btn.hasClass('active') || $btn.prop('disabled')) { return; }
-    var $cell = $btn.closest('.dn-status-cell');
+    if ($btn.prop('disabled')) { return; }
     var newStatus = $btn.data('set');
+
+    if (newStatus === 'completed') {
+        dnCompleteCell = $btn.closest('.dn-status-cell');
+        $('#dnCompleteNote').val('');
+        $('#dnCompleteError').text('');
+        $('#dnCompleteModal').modal('show');
+        return;
+    }
+
+    var $cell = $btn.closest('.dn-status-cell');
     $cell.find('.dn-status-btn').prop('disabled', true);
     $.post('update-district-note-status.php', { id: $cell.data('id'), status: newStatus }, function (resp) {
         if (!resp.success) {
-            alert('Could not update status. Please try again.');
+            alert(resp.message || 'Could not update status. Please try again.');
             $cell.find('.dn-status-btn').prop('disabled', false);
             return;
         }
-        if (newStatus === 'completed') {
-            $cell.html('<span class="dn-badge" style="background:#d1fae5;color:#065f46;"><i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">check_circle</i> Completed</span>');
-        } else {
-            $cell.data('status', 'in_progress');
-            $cell.find('.dn-status-start').addClass('active').attr('title', 'In Progress').html('<i class="material-icons-outlined">autorenew</i>').prop('disabled', true);
-            $cell.find('.dn-status-complete').prop('disabled', false);
-        }
+        $cell.data('status', 'in_progress');
+        $cell.html('<button type="button" class="dn-status-btn dn-status-complete" data-set="completed" title="Mark Completed"><i class="material-icons-outlined dn-spin">autorenew</i></button>');
     }, 'json').fail(function () {
         alert('Could not update status. Please try again.');
         $cell.find('.dn-status-btn').prop('disabled', false);
+    });
+});
+
+$('#dnCompleteSubmit').on('click', function () {
+    var note = $.trim($('#dnCompleteNote').val());
+    if (!note) {
+        $('#dnCompleteError').text('Please describe what was done before marking this completed.');
+        return;
+    }
+    var $cell = dnCompleteCell;
+    var $submitBtn = $(this);
+    $submitBtn.prop('disabled', true);
+    $.post('update-district-note-status.php', { id: $cell.data('id'), status: 'completed', resolution_note: note }, function (resp) {
+        $submitBtn.prop('disabled', false);
+        if (!resp.success) {
+            $('#dnCompleteError').text(resp.message || 'Could not update status. Please try again.');
+            return;
+        }
+        $('#dnCompleteModal').modal('hide');
+        $cell.html('<span class="dn-badge" style="background:#d1fae5;color:#065f46;"><i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">check_circle</i> Completed</span>');
+        $cell.closest('tr').find('.dn-resolution-note-cell').text(note);
+    }, 'json').fail(function () {
+        $submitBtn.prop('disabled', false);
+        $('#dnCompleteError').text('Could not reach the server. Please try again.');
+    });
+});
+
+var dnEditId = null;
+function openDnEdit(id, issueText, priority, noteType) {
+    dnEditId = id;
+    $('#dnEditIssue').val(issueText);
+    $('#dnEditPriority').val(priority);
+    $('#dnEditType').val(noteType);
+    $('#dnEditError').text('');
+    $('#dnEditModal').modal('show');
+}
+$('#dnEditSubmit').on('click', function () {
+    var issueText = $.trim($('#dnEditIssue').val());
+    if (!issueText) {
+        $('#dnEditError').text('Describe the issue before saving.');
+        return;
+    }
+    var $submitBtn = $(this);
+    $submitBtn.prop('disabled', true);
+    $.post('edit-district-note-ajax.php', {
+        id: dnEditId, issue_text: issueText, priority: $('#dnEditPriority').val(), note_type: $('#dnEditType').val()
+    }, function (resp) {
+        $submitBtn.prop('disabled', false);
+        if (!resp.success) {
+            $('#dnEditError').text(resp.message || 'Could not save. Please try again.');
+            return;
+        }
+        $('#dnEditModal').modal('hide');
+        window.location.reload();
+    }, 'json').fail(function () {
+        $submitBtn.prop('disabled', false);
+        $('#dnEditError').text('Could not reach the server. Please try again.');
     });
 });
 </script>

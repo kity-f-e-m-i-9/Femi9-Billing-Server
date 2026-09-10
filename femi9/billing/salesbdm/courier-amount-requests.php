@@ -159,6 +159,8 @@ if ($hasTps) {
                                         <td>
                                             <?php if ($r['status'] === 'pending'): ?>
                                             <button type="button" class="btn btn-primary btn-sm" onclick="openCarReview(<?php echo $r['id']; ?>, <?php echo (float)$r['calculated_amount']; ?>)">Review</button>
+                                            <?php elseif ($r['status'] === 'approved'): ?>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openCarEdit(<?php echo $r['id']; ?>, <?php echo (float)$r['approved_amount']; ?>)">Edit</button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -183,6 +185,19 @@ if ($hasTps) {
             <button type="button" class="btn btn-light" style="flex:1;" onclick="document.getElementById('carReviewModal').style.display='none';">Cancel</button>
             <button type="button" class="btn btn-danger" style="flex:1;" onclick="submitCarReview('rejected')">Reject</button>
             <button type="button" class="btn btn-success" style="flex:1;" onclick="submitCarReview('approved')">Approve</button>
+        </div>
+    </div>
+</div>
+
+<div id="carEditModal" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.55);z-index:1050;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:14px;padding:22px;max-width:400px;width:100%;">
+        <div style="font-weight:700;font-size:15px;color:#1f2937;margin-bottom:10px;">Correct Approved Amount</div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Amount (&#8377;)</label>
+        <input type="number" id="carEditAmount" step="0.01" min="0" class="form-control" style="margin-bottom:12px;">
+        <div id="carEditStatus" style="font-size:12.5px;margin-bottom:8px;"></div>
+        <div style="display:flex;gap:10px;">
+            <button type="button" class="btn btn-light" style="flex:1;" onclick="document.getElementById('carEditModal').style.display='none';">Cancel</button>
+            <button type="button" class="btn btn-primary" style="flex:1;" onclick="submitCarEdit()">Save</button>
         </div>
     </div>
 </div>
@@ -212,6 +227,32 @@ function submitCarReview(decision) {
     fetch('courier-amount-request-review-ajax.php', {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'id=' + encodeURIComponent(carActiveId) + '&decision=' + encodeURIComponent(decision) + '&amount=' + encodeURIComponent(amount)
+    })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) { window.location.reload(); }
+            else { statusEl.textContent = data.message || 'Could not save.'; statusEl.style.color = '#991b1b'; }
+        })
+        .catch(function() { statusEl.textContent = 'Could not reach the server.'; statusEl.style.color = '#991b1b'; });
+}
+
+var carEditId = null;
+function openCarEdit(id, approvedAmount) {
+    carEditId = id;
+    document.getElementById('carEditAmount').value = approvedAmount;
+    document.getElementById('carEditStatus').textContent = '';
+    document.getElementById('carEditModal').style.display = 'flex';
+}
+function submitCarEdit() {
+    var amount = document.getElementById('carEditAmount').value;
+    var statusEl = document.getElementById('carEditStatus');
+    if (!amount || parseFloat(amount) < 0) {
+        statusEl.textContent = 'Enter a valid amount.'; statusEl.style.color = '#991b1b'; return;
+    }
+    statusEl.textContent = 'Saving…'; statusEl.style.color = '#6b7280';
+    fetch('courier-amount-request-edit-ajax.php', {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'id=' + encodeURIComponent(carEditId) + '&amount=' + encodeURIComponent(amount)
     })
         .then(function(r) { return r.json(); })
         .then(function(data) {

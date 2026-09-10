@@ -305,6 +305,16 @@ flatpickr("#editInvoiceDate", {
 </div>
 </div>
 
+<div class="row g-3" style="margin-top:0;">
+<div class="col-md-6">
+<!-- Standalone header-only save: the Add-Product button further down only
+     exists when amount_received_fully==0, and even then it forces picking a
+     product/qty/price just to change the date. formnovalidate skips those
+     required fields so this button always works on its own. -->
+<button type="submit" name="updateHeaderOnly" value="1" formnovalidate class="btn btn-outline-primary" style="width:100%;"><i class="material-icons" style="font-size:18px;vertical-align:middle;">save</i> Save Date/Customer</button>
+</div>
+</div>
+
 <?php if ($amount_received_fully == 0) { ?>
 <div class="product-add-section">
 <div class="section-header" style="border:none;padding-bottom:10px;margin-bottom:12px;"><i class="material-icons">add_shopping_cart</i>Add Product</div>
