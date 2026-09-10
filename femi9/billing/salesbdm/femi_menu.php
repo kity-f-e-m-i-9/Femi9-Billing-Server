@@ -115,7 +115,7 @@ if (!empty($salesBdmID)) {
     </li>
 
     <li>
-        <a href="<?php echo $_companyBase; ?>bdm-ms-shop-view"><i class="material-icons-two-tone">storefront</i>District Shop View</a>
+        <a href="<?php echo $_companyBase; ?>bdm-ms-shop-view"><i class="material-icons-two-tone">storefront</i>DM Report</a>
     </li>
 
     <li>
