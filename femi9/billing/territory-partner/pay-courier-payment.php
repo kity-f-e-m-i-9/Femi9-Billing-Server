@@ -401,6 +401,32 @@ $poolStmt->close();
     <script src="../../assets/js/custom.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
     <script>
+    <?php if ($amountRequest && $amountRequest['status'] === 'pending'): ?>
+    // Polls for the Sales BDM's decision on the pending "Change Courier
+    // Amount" request so the TP sees it land live instead of having to
+    // notice and manually reload — reloads the whole page once decided,
+    // simplest way to pick up the new required amount/QR everywhere it's
+    // used rather than duplicating that render logic here. Confirmed
+    // 2026-09-11.
+    (function pollCourierAmountRequest() {
+        fetch('check-courier-amount-request-status.php?request_id=<?=(int)$amountRequest['id']?>')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                // tpCourierAmountRequestGetById() only ever returns a row
+                // while status is 'pending' or 'approved' — a rejection (or
+                // any other change) makes it disappear entirely, so
+                // 'not_found' here means "no longer pending" just as much
+                // as an explicit 'approved'/'rejected' would.
+                if (data.status !== 'pending') {
+                    window.location.reload();
+                } else {
+                    setTimeout(pollCourierAmountRequest, 10000);
+                }
+            })
+            .catch(function() { setTimeout(pollCourierAmountRequest, 10000); });
+    })();
+    <?php endif; ?>
+
     var MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024;
 
     function uploadCourierScreenshot() {

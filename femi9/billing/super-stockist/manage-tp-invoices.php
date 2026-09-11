@@ -117,6 +117,7 @@ $i = 0;
         .action-btn.print  { color:#0369a1; } .action-btn.print:hover  { background:#e0f2fe; }
         .action-btn.delete { color:#dc2626; } .action-btn.delete:hover { background:#fee2e2; }
         .action-btn.ship   { color:#92400e; } .action-btn.ship:hover   { background:#fef3c7; }
+        .action-btn.cn     { color:#dc2626; } .action-btn.cn:hover     { background:#fee2e2; }
         .courier-chip { display:inline-block; background:#fef3c7; color:#92400e; border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600; }
         .filter-card { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-radius:10px; padding:18px 20px; margin-bottom:20px; }
         .filter-card .form-label { color:#fff; font-weight:500; margin-bottom:4px; font-size:12.5px; }
@@ -258,6 +259,9 @@ $i = 0;
                                                     <i class="material-icons-outlined" style="font-size:19px;">label</i>
                                                 </a>
                                                 <?php endif; ?>
+                                                <a href="tp-cnote-new?inv_id=<?php echo $inv['id']; ?>" class="action-btn cn" title="Credit Note / Return">
+                                                    <i class="material-icons-outlined" style="font-size:19px;">assignment_return</i>
+                                                </a>
                                                 <form method="POST" action="delete-tp-invoice" class="d-inline">
                                                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                                                     <input type="hidden" name="invoice_enc" value="<?php echo $enc; ?>">
