@@ -29,11 +29,13 @@ function tp_b2b_resolve_is_intra($buyer_gstin, $tp_state_code, $fallback_is_intr
 }
 
 if (!function_exists('tp_b2b_buyer_add')) {
-function tp_b2b_buyer_add(&$buyers, $key, $name, $type, $gstin, $inv, $taxable, $is_intra, $gst_amount) {
+function tp_b2b_buyer_add(&$buyers, $key, $name, $type, $gstin, $inv, $taxable, $is_intra, $gst_amount, $inv_date = null) {
     if (!isset($buyers[$key])) {
         $buyers[$key] = ['name' => $name, 'type' => $type, 'gstin' => $gstin, 'invoices' => [], 'taxable' => 0, 'cgst' => 0, 'sgst' => 0, 'igst' => 0];
     }
-    $buyers[$key]['invoices'][$inv] = true;
+    if (!isset($buyers[$key]['invoices'][$inv])) {
+        $buyers[$key]['invoices'][$inv] = $inv_date;
+    }
     $buyers[$key]['taxable'] += $taxable;
     if ($is_intra) { $buyers[$key]['cgst'] += $gst_amount / 2; $buyers[$key]['sgst'] += $gst_amount / 2; }
     else { $buyers[$key]['igst'] += $gst_amount; }
@@ -65,7 +67,7 @@ function tp_compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $tp_id, $from_date,
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
         $is_intra = tp_b2b_resolve_is_intra($r['bgstin'], $tp_state_code, $r['gst_type']=='inner');
-        tp_b2b_buyer_add($b2b_buyers, 'shop_'.$r['bname'].'_'.$r['bgstin'], $r['bname'], 'Shop', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt']);
+        tp_b2b_buyer_add($b2b_buyers, 'shop_'.$r['bname'].'_'.$r['bgstin'], $r['bname'], 'Shop', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt'], $r['date']);
     }
 
     // Customer sales. gst_percentage>0 only.
@@ -83,7 +85,7 @@ function tp_compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $tp_id, $from_date,
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
         $is_intra = tp_b2b_resolve_is_intra($r['bgstin'], $tp_state_code, $r['gst_type']=='inner');
-        tp_b2b_buyer_add($b2b_buyers, 'customer_'.$r['bname'].'_'.$r['bgstin'], $r['bname'], 'Customer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt']);
+        tp_b2b_buyer_add($b2b_buyers, 'customer_'.$r['bname'].'_'.$r['bgstin'], $r['bname'], 'Customer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt'], $r['date']);
     }
 
     // Net out each buyer's own registered-person credit notes (returns).

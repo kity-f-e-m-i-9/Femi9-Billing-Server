@@ -28,17 +28,32 @@ function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
     return $rate . '% (Mixed)';
 }
 
+// $b['invoices'] is [invoice_number => date]. Sorted by invoice number
+// (natural/alphanumeric order) so the numbers and dates columns list in a
+// predictable, cross-referenceable order.
+function b2b_sorted_invoices($invoices) {
+    $sorted = $invoices;
+    uksort($sorted, 'strnatcmp');
+    return $sorted;
+}
+function b2b_invoice_dates_label($invoices) {
+    return implode(', ', array_map(function ($d) {
+        return $d ? date("d/m/Y", strtotime($d)) : '—';
+    }, array_values(b2b_sorted_invoices($invoices))));
+}
+
 // ✅ Excel (CSV) export — same rows/columns as the on-screen table.
 if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     ob_start();
     $csv_rows = [];
-    $csv_rows[] = ['#', 'Buyer', 'Type', 'GSTIN', 'Invoice Number(s)', 'GST %', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total'];
+    $csv_rows[] = ['#', 'Buyer', 'Type', 'GSTIN', 'Invoice Number(s)', 'Invoice Date(s)', 'GST %', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total'];
     $sn = 0;
     foreach ($b2b_buyers as $b) {
         $sn++;
         $gst_amt = $b['cgst'] + $b['sgst'] + $b['igst'];
         $csv_rows[] = [
-            $sn, $b['name'] ?: '—', $b['type'], $b['gstin'] ?: '—', implode(', ', array_keys($b['invoices'])),
+            $sn, $b['name'] ?: '—', $b['type'], $b['gstin'] ?: '—', implode(', ', array_keys(b2b_sorted_invoices($b['invoices']))),
+            b2b_invoice_dates_label($b['invoices']),
             gst_percentage_label($b['taxable'], $gst_amt, $gst_slabs),
             number_format($b['taxable'], 2, '.', ''),
             number_format($b['cgst'], 2, '.', ''),
@@ -47,7 +62,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
             number_format($b['taxable'] + $gst_amt, 2, '.', ''),
         ];
     }
-    $csv_rows[] = ['', '', '', '', 'Grand Total', '',
+    $csv_rows[] = ['', '', '', '', '', 'Grand Total', '',
         number_format($grand_taxable, 2, '.', ''),
         number_format($grand_cgst, 2, '.', ''),
         number_format($grand_sgst, 2, '.', ''),
@@ -130,6 +145,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <th>Type</th>
                                         <th>GSTIN</th>
                                         <th>Invoice Number(s)</th>
+                                        <th>Invoice Date(s)</th>
                                         <th>GST %</th>
                                         <th>Taxable Value</th>
                                         <th>CGST</th>
@@ -140,14 +156,15 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                 </thead>
                                 <tbody>
                                     <?php if (empty($b2b_buyers)) { ?>
-                                    <tr><td colspan="11" style="text-align:center; padding:20px;">No B2B buyers in this period.</td></tr>
+                                    <tr><td colspan="12" style="text-align:center; padding:20px;">No B2B buyers in this period.</td></tr>
                                     <?php } else { $sn = 0; foreach ($b2b_buyers as $b): $sn++; $gst_amt = $b['cgst'] + $b['sgst'] + $b['igst']; ?>
                                     <tr>
                                         <td><?= $sn ?></td>
                                         <td><?= htmlspecialchars($b['name'] ?: '—') ?></td>
                                         <td><?= htmlspecialchars($b['type']) ?></td>
                                         <td><?= htmlspecialchars($b['gstin'] ?: '—') ?></td>
-                                        <td><?= htmlspecialchars(implode(', ', array_keys($b['invoices']))) ?></td>
+                                        <td><?= htmlspecialchars(implode(', ', array_keys(b2b_sorted_invoices($b['invoices'])))) ?></td>
+                                        <td><?= htmlspecialchars(b2b_invoice_dates_label($b['invoices'])) ?></td>
                                         <td align="center"><?= gst_percentage_label($b['taxable'], $gst_amt, $gst_slabs) ?></td>
                                         <td align="right"><?= inr_format($b['taxable'], 2) ?></td>
                                         <td align="right"><?= inr_format($b['cgst'], 2) ?></td>
@@ -159,7 +176,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="5" align="right"><b>Grand Total</b></td>
+                                        <td colspan="6" align="right"><b>Grand Total</b></td>
                                         <td></td>
                                         <td align="right"><b><?= inr_format($grand_taxable, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($grand_cgst, 2) ?></b></td>
