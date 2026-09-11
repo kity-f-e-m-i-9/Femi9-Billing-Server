@@ -557,10 +557,18 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<!-------------HSN-wise B2B / B2C split (rated supplies only)---------->
 							<br/>
 							<h3>Table 4 &amp; 7 — Rated (Taxable) Supplies, B2B vs B2C, HSN-wise</h3>
+							<?php
+							// GST UQC (Unit Quantity Code) for a product's unit_type — the standard
+							// codes the GST portal expects; this catalog only uses two units.
+							function gst_uqc_label($unit_type) {
+								return $unit_type === 'pack' ? 'PAC-PACKS' : 'PCS-PIECES';
+							}
+							?>
 							<table id="gsttablevl" style="height:auto;">
 							<tr>
 							<th>HSN</th>
 							<th>GST Rate</th>
+							<th>UQC</th>
 							<th>B2B Qty</th>
 							<th>B2B Taxable Value</th>
 							<th>B2C Qty</th>
@@ -570,12 +578,16 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							// B2B = buyer_gsttype='register' (has GSTIN on file), B2C = 'unregister'.
 							// Restricted to gst_percentage > 0 rows only — nil-rated goods have no
 							// B2B/B2C filing relevance and are covered by the Nil Rated table above.
-							$select_hsnwise_rated="SELECT DISTINCT hsn, gst FROM products WHERE gst > 0 AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY hsn ASC, gst ASC";
+							// unit_type is included in the grouping since a HSN+rate pair maps to a
+							// single unit_type in this catalog (verified: no HSN/rate combo mixes
+							// pieces and pack), so it's safe to show one UQC per row.
+							$select_hsnwise_rated="SELECT DISTINCT hsn, gst, unit_type FROM products WHERE gst > 0 AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY hsn ASC, gst ASC";
 							$fetch_hsnwise_rated=mysqli_query($db_conn,$select_hsnwise_rated);
 							$B2B_grand_val = 0; $B2C_grand_val = 0;
 							while($result_hsnwise_rated=mysqli_fetch_array($fetch_hsnwise_rated)){
 								$hsn_code=$result_hsnwise_rated['hsn'];
 								$hsn_rate=(float)$result_hsnwise_rated['gst'];
+								$hsn_uqc=gst_uqc_label($result_hsnwise_rated['unit_type']);
 
 								$b2b_qty = 0; $b2b_val = 0; $b2c_qty = 0; $b2c_val = 0;
 								foreach (['register' => true, 'unregister' => false] as $bg => $is_b2b) {
@@ -620,6 +632,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<tr>
 							<td style="text-align:left;"><?=$hsn_code;?></td>
 							<td style="text-align:left;"><?=$hsn_rate;?>%</td>
+							<td style="text-align:left;"><?=$hsn_uqc;?></td>
 							<td style="text-align:left;"><?=$b2b_qty;?></td>
 							<td style="text-align:left;"><?=inr_format($b2b_val, 2);?></td>
 							<td style="text-align:left;"><?=$b2c_qty;?></td>
@@ -627,7 +640,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							</tr>
 							<?php }?>
 							<tr>
-							<td colspan="3" style="text-align:right;"><b>Total</b></td>
+							<td colspan="4" style="text-align:right;"><b>Total</b></td>
 							<td><b><?=inr_format($B2B_grand_val, 2);?></b></td>
 							<td></td>
 							<td><b><?=inr_format($B2C_grand_val, 2);?></b></td>

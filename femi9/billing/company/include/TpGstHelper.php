@@ -69,7 +69,7 @@ function tp_sales_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
         SELECT tpi.id AS tp_invoice_id, tpi.invoice_number, tpi.invoice_date,
                tp.name AS tp_name, tp.mobile AS tp_mobile,
                tp.branch_state AS tp_state, tp.gstin AS tp_gstin, cg.state AS godown_state,
-               tpii.amount, tpii.quantity, p.gst AS gst_percentage, p.gst_type AS product_gst_type, p.hsn
+               tpii.amount, tpii.quantity, p.gst AS gst_percentage, p.gst_type AS product_gst_type, p.hsn, p.unit_type
         FROM tp_invoices tpi
         JOIN territory_partners tp ON tp.id = tpi.territory_partner_id
         JOIN tp_invoice_items tpii ON tpii.tp_invoice_id = tpi.id
