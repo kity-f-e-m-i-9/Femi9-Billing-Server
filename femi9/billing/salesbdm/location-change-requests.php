@@ -168,13 +168,18 @@ if ($hasDistricts) {
     <div style="background:#fff;border-radius:14px;padding:22px;max-width:420px;width:100%;">
         <div style="font-weight:700;font-size:15px;color:#1f2937;margin-bottom:4px;">Review Location Change Request</div>
         <div id="lcrShopName" style="font-size:13px;color:#4b5563;margin-bottom:12px;"></div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Recaptures to grant (if approving)</label>
+        <select id="lcrRecaptures" class="form-control" style="margin-bottom:12px;">
+            <option value="2" selected>2 (full reset)</option>
+            <option value="1">1 (one more attempt only)</option>
+        </select>
         <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Reason (required to approve)</label>
         <textarea id="lcrReason" class="form-control" rows="3" style="margin-bottom:12px;" placeholder="Why are you approving/rejecting this request?"></textarea>
         <div id="lcrReviewStatus" style="font-size:12.5px;margin-bottom:8px;"></div>
         <div style="display:flex;gap:10px;">
             <button type="button" class="btn btn-light" style="flex:1;" onclick="document.getElementById('lcrReviewModal').style.display='none';">Cancel</button>
             <button type="button" class="btn btn-danger" style="flex:1;" onclick="submitLcrReview('rejected')">Reject</button>
-            <button type="button" class="btn btn-success" style="flex:1;" onclick="submitLcrReview('approved')">Approve (+2 recaptures)</button>
+            <button type="button" class="btn btn-success" style="flex:1;" onclick="submitLcrReview('approved')">Approve</button>
         </div>
     </div>
 </div>
@@ -192,6 +197,7 @@ function openLcrReview(id, shopName) {
     lcrActiveId = id;
     document.getElementById('lcrShopName').textContent = shopName;
     document.getElementById('lcrReason').value = '';
+    document.getElementById('lcrRecaptures').value = '2';
     document.getElementById('lcrReviewStatus').textContent = '';
     document.getElementById('lcrReviewModal').style.display = 'flex';
 }
@@ -201,10 +207,11 @@ function submitLcrReview(decision) {
     if (decision === 'approved' && !reason) {
         statusEl.textContent = 'Please enter a reason for accepting this request.'; statusEl.style.color = '#991b1b'; return;
     }
+    var recaptures = document.getElementById('lcrRecaptures').value;
     statusEl.textContent = 'Saving…'; statusEl.style.color = '#6b7280';
     fetch('location-change-request-action.php', {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'id=' + encodeURIComponent(lcrActiveId) + '&decision=' + encodeURIComponent(decision) + '&reason=' + encodeURIComponent(reason)
+        body: 'id=' + encodeURIComponent(lcrActiveId) + '&decision=' + encodeURIComponent(decision) + '&reason=' + encodeURIComponent(reason) + '&recaptures=' + encodeURIComponent(recaptures)
     })
         .then(function(r) { return r.json(); })
         .then(function(data) {

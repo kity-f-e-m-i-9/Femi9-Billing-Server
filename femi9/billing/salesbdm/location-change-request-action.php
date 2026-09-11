@@ -15,6 +15,11 @@ function respond(bool $ok, string $message = ''): void
 $id = (int)($_POST['id'] ?? 0);
 $decision = $_POST['decision'] ?? '';
 $reason = trim($_POST['reason'] ?? '');
+// How many fresh recaptures to grant on approval — 2 (full reset) by
+// default, but a BDM can grant just 1 if they only want to allow one more
+// correction attempt instead of resetting the shop back to a clean slate.
+$recaptures = (int)($_POST['recaptures'] ?? 2);
+if ($recaptures < 1 || $recaptures > 2) { $recaptures = 2; }
 if ($id <= 0 || !in_array($decision, ['approved', 'rejected'], true)) {
     respond(false, 'Invalid request.');
 }
@@ -47,9 +52,12 @@ try {
     $stmt->close();
 
     if ($decision === 'approved') {
-        // Unlocks 2 fresh manual recaptures for this shop (see
-        // edit-ss-action.php's location_recapture_count enforcement).
-        $db_conn->query("UPDATE ms_shop SET location_recapture_count=0 WHERE id='$shop_id'");
+        // Unlocks $recaptures fresh manual recaptures for this shop — the
+        // limit is 2 for life (edit-ss-action.php), so granting N more means
+        // setting the count back to (2 - N): 0 for a full reset (2 more
+        // attempts), 1 if only one more attempt should be allowed.
+        $newCount = 2 - $recaptures;
+        $db_conn->query("UPDATE ms_shop SET location_recapture_count=$newCount WHERE id='$shop_id'");
     }
 
     $db_conn->commit();
