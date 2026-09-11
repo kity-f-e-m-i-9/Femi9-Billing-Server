@@ -166,3 +166,27 @@ function tpCourierAmountRequestReview(mysqli $db, int $requestId, string $status
     $stmt->close();
     return $ok;
 }
+
+/**
+ * Corrects the approved amount on a request that's already been decided —
+ * for fixing a typo/mistake after the fact, not a fresh review. Only ever
+ * touches an 'approved' row (a 'rejected' one has no amount to correct, and
+ * a 'pending' one should go through tpCourierAmountRequestReview() instead).
+ * Re-stamps reviewed_by/reviewed_at so the audit trail shows who made the
+ * correction and when — but if the request was already consumed by a
+ * submitted PO (applied_po_id set), this edit is record-keeping only and
+ * has no effect on what the TP already paid for that order.
+ */
+function tpCourierAmountRequestEditAmount(mysqli $db, int $requestId, float $newAmount, ?int $bdmId, string $reviewerName): bool
+{
+    $stmt = $db->prepare("
+        UPDATE tp_courier_amount_requests
+        SET approved_amount = ?, reviewed_by_bdm_id = ?, reviewed_by_name = ?, reviewed_at = NOW()
+        WHERE id = ? AND status = 'approved'
+    ");
+    $stmt->bind_param('disi', $newAmount, $bdmId, $reviewerName, $requestId);
+    $stmt->execute();
+    $ok = $stmt->affected_rows > 0;
+    $stmt->close();
+    return $ok;
+}

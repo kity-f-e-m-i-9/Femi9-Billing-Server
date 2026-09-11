@@ -22,12 +22,19 @@ if (!in_array($type, ['tp', 'cp']) || empty($enc_id) || !in_array($new_status, [
 $id = (int)base64_decode($enc_id);
 if (!$id) { echo json_encode(['success' => false]); exit; }
 
-// A Sales BDM session may only toggle a TP inside their own assigned districts.
+// A Sales BDM session may only toggle a TP/CP inside their own assigned districts.
 if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
-    if ($type !== 'tp') { echo json_encode(['success' => false]); exit; }
-    require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
-    $_myTpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
-    if (!in_array($id, $_myTpIds, true)) { echo json_encode(['success' => false]); exit; }
+    if ($type === 'tp') {
+        require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
+        $_myTpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
+        if (!in_array($id, $_myTpIds, true)) { echo json_encode(['success' => false]); exit; }
+    } elseif ($type === 'cp') {
+        require_once __DIR__ . '/../salesbdm/include/BdmCpScope.php';
+        $_myCpIds = getBdmAssignedCpIds($db_conn, (int)$salesBdmID, true);
+        if (!in_array($id, $_myCpIds, true)) { echo json_encode(['success' => false]); exit; }
+    } else {
+        echo json_encode(['success' => false]); exit;
+    }
 }
 
 $table = $type === 'tp' ? 'territory_partners' : 'channel_partners';

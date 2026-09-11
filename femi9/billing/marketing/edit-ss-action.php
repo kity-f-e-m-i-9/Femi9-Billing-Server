@@ -37,15 +37,55 @@ $update_id=$_REQUEST['update_id'];
 	
 	$google_location=str_replace("'","&#39;",$_POST["google_location"]);
 
+	$_col = mysqli_query($db_conn, "SHOW COLUMNS FROM ms_shop LIKE 'location_recapture_count'");
+	if ($_col && mysqli_num_rows($_col) === 0) {
+		mysqli_query($db_conn, "ALTER TABLE ms_shop ADD COLUMN location_recapture_count INT NOT NULL DEFAULT 0");
+	}
+
 	$latitude=isset($_POST["latitude"]) && $_POST["latitude"]!=='' ? floatval($_POST["latitude"]) : null;
 	$longitude=isset($_POST["longitude"]) && $_POST["longitude"]!=='' ? floatval($_POST["longitude"]) : null;
-	if($latitude===null || $longitude===null)
-	{
-		$select_existing_latlng="select latitude, longitude from ms_shop where id='$update_id'";
-		$fetch_existing_latlng=mysqli_query($db_conn,$select_existing_latlng);
-		$existing_latlng=mysqli_fetch_assoc($fetch_existing_latlng);
-		if($latitude===null) { $latitude=$existing_latlng['latitude']; }
-		if($longitude===null) { $longitude=$existing_latlng['longitude']; }
+
+	$select_existing_latlng="select latitude, longitude from ms_shop where id='$update_id'";
+	$fetch_existing_latlng=mysqli_query($db_conn,$select_existing_latlng);
+	$existing_latlng=mysqli_fetch_assoc($fetch_existing_latlng);
+	$existing_lat = $existing_latlng['latitude'] !== null ? (float)$existing_latlng['latitude'] : null;
+	$existing_lng = $existing_latlng['longitude'] !== null ? (float)$existing_latlng['longitude'] : null;
+
+	// A location change is only counted when the DM actually submitted a
+	// different lat/lng than what's already saved (the hidden fields on
+	// edit-ss.php only change value after a successful "Re-capture Location"
+	// click). The very FIRST time a shop ever gets a manually-captured
+	// location (existing_lat/lng were NULL — most shops start this way,
+	// added before any location existed) is free and doesn't count — only
+	// CORRECTING an already-set location counts toward the 2-per-shop
+	// lifetime limit, enforced server-side since the button-disable on the
+	// form is only a UX nicety.
+	$isLocationChange = $latitude !== null && $longitude !== null
+		&& ($existing_lat === null || $existing_lng === null || abs($latitude - $existing_lat) > 0.0000001 || abs($longitude - $existing_lng) > 0.0000001);
+	$isFirstCapture = $isLocationChange && ($existing_lat === null || $existing_lng === null);
+	$isCorrection = $isLocationChange && !$isFirstCapture;
+
+	if ($isFirstCapture) {
+		// Free — $latitude/$longitude already hold the new value, nothing
+		// else to do.
+	} elseif ($isCorrection) {
+		// Atomic increment-with-guard in one statement — the "is it still
+		// under 2" check and the increment happen as a single UPDATE, so two
+		// concurrent edits of the same shop (e.g. two open tabs) can't both
+		// read the same pre-increment count and both sneak a 3rd recapture
+		// through. affected_rows()===0 means the limit was already reached
+		// (by this request or one that beat it to the row) at the instant
+		// this ran, not from a stale count read earlier in the request.
+		mysqli_query($db_conn, "update ms_shop set location_recapture_count = location_recapture_count + 1 where id='$update_id' and location_recapture_count < 2");
+		if (mysqli_affected_rows($db_conn) === 0) {
+			// Limit reached — keep the shop's existing, locked location and
+			// ignore whatever new coordinates were just submitted.
+			$latitude = $existing_lat;
+			$longitude = $existing_lng;
+		}
+	} else {
+		if($latitude===null) { $latitude=$existing_lat; }
+		if($longitude===null) { $longitude=$existing_lng; }
 	}
 	$latitude_sql=$latitude===null ? "NULL" : "'".$latitude."'";
 	$longitude_sql=$longitude===null ? "NULL" : "'".$longitude."'";

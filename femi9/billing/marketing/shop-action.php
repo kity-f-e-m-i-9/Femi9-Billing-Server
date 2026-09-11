@@ -69,12 +69,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	$latitude_sql=$latitude===null ? "NULL" : "'".$latitude."'";
 	$longitude_sql=$longitude===null ? "NULL" : "'".$longitude."'";
 
-	$select_count_dist="select count(*) as numShop from ms_shop where mobile_number='$mobile_number' and ms_id='$ms_id'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
-	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
-	if($result_count_dist['numShop']==0)
+	// Same shop re-added under a different DM (or the same DM typed it again)
+	// with just the capitalisation/spacing changed — match address, mobile,
+	// taluk, district and pincode all case-insensitive/trimmed, not just
+	// mobile_number+ms_id, so this actually catches cross-DM duplicates.
+	// A genuine location correction for a shop that's really already in the
+	// system goes through the Location Change Request flow instead of a
+	// second "Add Shop", so it stays tied to the one real shop record.
+	$select_dup="select id from ms_shop where LOWER(TRIM(address))=LOWER(TRIM('$address')) and LOWER(TRIM(mobile_number))=LOWER(TRIM('$mobile_number')) and LOWER(TRIM(taluk_name))=LOWER(TRIM('$taluk_name')) and LOWER(TRIM(district_name))=LOWER(TRIM('$district_name')) and LOWER(TRIM(pincode))=LOWER(TRIM('$pincode')) limit 1";
+	$fetch_dup=mysqli_query($db_conn,$select_dup);
+	$dupRow=$fetch_dup ? mysqli_fetch_assoc($fetch_dup) : null;
+	if($dupRow)
 	{
-		
+		echo "<script>window.location='add_ss.php?distalready&existingshop=".base64_encode($dupRow['id'])."';</script>";
+		exit;
+	}
+
+	{
+
     //upload user icon
 	$small_jpg= $_FILES['user_icon']['name'];
 	if($small_jpg!=NULL)
@@ -99,14 +111,7 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		mysqli_query($db_conn,$sql);
 		
 		echo "<script>window.location='".$viewurl."';</script>";
-
-
-}else{
-		//this districtwise super stockiest already exists.
-		echo "<script>window.location='".$addurl."';</script>";
 	}
-	
-	
-	
+
 }
 ?>

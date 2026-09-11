@@ -83,12 +83,12 @@ $cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_cate
     </div>
     <div style="flex:1;">
         <label class="form-label">Mobile Number*</label>
-        <input type="text" id="mobile_number_input" required name="mobile_number" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo htmlspecialchars($shop['mobile_number']); ?>" class="form-control" maxlength="14">
+        <input type="text" id="mobile_number_input" required name="mobile_number" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo htmlspecialchars($shop['mobile_number']); ?>" class="form-control" maxlength="15">
     </div>
 </div><br/>
 <script>
 // India (+91) keeps the strict exact-10-digit check; any other country code
-// (e.g. Nepal +977) relaxes to 10-14 digits. Runs on selection change AND
+// (e.g. Nepal +977) relaxes to 10-15 digits. Runs on selection change AND
 // once on load so an existing non-India shop's saved number isn't clipped
 // by the default India-strict maxlength/pattern before the user touches it.
 function adjustMobileValidation(countryCode) {
@@ -98,8 +98,8 @@ function adjustMobileValidation(countryCode) {
         input.setAttribute('pattern', '[1-9]{1}[0-9]{9}');
         input.setAttribute('maxlength', '10');
     } else {
-        input.setAttribute('pattern', '[1-9]{1}[0-9]{9,13}');
-        input.setAttribute('maxlength', '14');
+        input.setAttribute('pattern', '[1-9]{1}[0-9]{9,14}');
+        input.setAttribute('maxlength', '15');
     }
 }
 document.addEventListener('DOMContentLoaded', function () {

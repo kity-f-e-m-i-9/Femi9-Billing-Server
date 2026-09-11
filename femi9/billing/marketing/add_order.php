@@ -194,6 +194,18 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                 <div class="content-wrapper">
                     <div class="container-fluid">
 
+                        <?php if (isset($_SESSION['errorMessage'])): $_errMsg = $_SESSION['errorMessage']; unset($_SESSION['errorMessage']); ?>
+                        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                        <script>
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: '<?php echo addslashes($_errMsg); ?>',
+                            confirmButtonText: 'OK'
+                        });
+                        </script>
+                        <?php endif; ?>
+
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
@@ -413,7 +425,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <br/>
                                                     <div id="orderGrandTotal" style="font-weight:600;margin-bottom:10px;"></div>
 
-                                                    <button type="submit" name="add_order_get" onclick="return confirm('Please confirm');" class="btn btn-primary">
+                                                    <button type="submit" name="add_order_get" onclick="return confirmGetOrderSubmit();" class="btn btn-primary">
                                                         <i class="material-icons">add</i> Add
                                                     </button>
 
@@ -802,6 +814,41 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
             return R * c;
         }
 
+        // Get Order can only be submitted while the DM is physically near the
+        // shop — confirmed 2026-09-11. Client-side only checks distance when
+        // this shop already has a KNOWN saved lat/lng (data-lat/lng below) —
+        // a shop with none is geocoded from its own stored address, not the
+        // DM's GPS, by order_action_get.php server-side (never client-side —
+        // that's an external API call this page shouldn't be making on every
+        // keystroke), which then does the real distance check itself. So a
+        // no-location shop always falls through to the plain confirm() here;
+        // the server may still reject it if its address can't be geocoded.
+        var GET_ORDER_MAX_METERS = 75;
+        window.confirmGetOrderSubmit = function confirmGetOrderSubmit() {
+            if (capturedLat === null || capturedLng === null) {
+                alert('Could not get your current location. Please enable location access and try again — Get Order requires you to be at the shop.');
+                return false;
+            }
+            var selected = document.getElementById('shop_select');
+            var opt = selected ? selected.options[selected.selectedIndex] : null;
+            if (opt && opt.getAttribute('data-geocode-failed') === '1') {
+                alert("This shop's address could not be automatically located. Please edit the shop and manually capture its location before taking a Get Order here.");
+                return false;
+            }
+            var shopLat = opt ? parseFloat(opt.getAttribute('data-lat')) : NaN;
+            var shopLng = opt ? parseFloat(opt.getAttribute('data-lng')) : NaN;
+            if (!opt || !opt.value || isNaN(shopLat) || isNaN(shopLng)) {
+                return confirm('Please confirm');
+            }
+            var meters = distanceMeters(capturedLat, capturedLng, shopLat, shopLng);
+            if (meters > GET_ORDER_MAX_METERS) {
+                var distText = meters >= 1000 ? (meters / 1000).toFixed(2) + ' km' : Math.round(meters) + ' m';
+                alert('You are ' + distText + ' away from this shop\'s saved location. Get Order can only be submitted within ' + GET_ORDER_MAX_METERS + ' m of the shop — please move closer and try again.');
+                return false;
+            }
+            return confirm('Please confirm');
+        }
+
         function updateShopDistance(andShowToast) {
             var infoEl = document.getElementById('shopDistanceInfo');
             if (!infoEl || capturedLat === null || capturedLng === null) { return; }
@@ -853,7 +900,46 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
             );
         }
 
-        $('#shop_select').on('change', function() { updateShopDistance(true); });
+        // Shows the distance warning as soon as a shop is picked — not only
+        // after Add is clicked — so a DM who's clearly nowhere near the shop
+        // finds out before filling in products, not after. Most shops already
+        // have data-lat/data-lng baked into the <option> (updateShopDistance
+        // handles those directly); a shop with none is geocoded here via its
+        // stored address, same lookup order_action_get.php does at submit
+        // time — this is just a preview, nothing is saved until Add is
+        // actually pressed.
+        $('#shop_select').on('change', function() {
+            var opt = this.options[this.selectedIndex];
+            var infoEl = document.getElementById('shopDistanceInfo');
+            if (!opt || !opt.value) { if (infoEl) infoEl.textContent = ''; return; }
+            opt.removeAttribute('data-geocode-failed');
+            var hasLat = opt.getAttribute('data-lat');
+            var hasLng = opt.getAttribute('data-lng');
+            if (hasLat && hasLng && hasLat !== '' && hasLng !== '') {
+                updateShopDistance(true);
+                return;
+            }
+            if (infoEl) infoEl.textContent = '📍 Checking this shop\'s location…';
+            fetch('geocode-shop.php?shop_id=' + encodeURIComponent(opt.value))
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (this.value !== opt.value) return; // shop changed again while this was in flight
+                    if (data && data.lat && data.lng) {
+                        opt.setAttribute('data-lat', data.lat);
+                        opt.setAttribute('data-lng', data.lng);
+                        updateShopDistance(true);
+                    } else {
+                        // Marked so confirmGetOrderSubmit() blocks right away
+                        // instead of letting the DM fill in products only to
+                        // have order_action_get.php reject it at the end.
+                        opt.setAttribute('data-geocode-failed', '1');
+                        if (infoEl) infoEl.textContent = '⚠️ Could not verify this shop\'s location — please edit the shop and capture its location before taking a Get Order here.';
+                    }
+                }.bind(this))
+                .catch(function() {
+                    if (infoEl) infoEl.textContent = '';
+                });
+        });
     })();
     </script>
 

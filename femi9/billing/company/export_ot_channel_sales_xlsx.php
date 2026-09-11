@@ -28,6 +28,7 @@ set_time_limit(300); // 5 minutes
 // Include required files with error suppression
 @include("checksession.php");
 @include("config.php");
+require_once __DIR__ . '/../shared/TpProductType.php';
 
 // Clear any accumulated output before Excel generation
 ob_clean();
@@ -117,9 +118,13 @@ if (!$from_date_obj || !$to_date_obj || $from_date > $to_date) {
     exit;
 }
 
+// Napkin / Diaper filter — same split as the report page (shared/TpProductType.php)
+$filter_type = (isset($_POST['type_filter']) && in_array($_POST['type_filter'], ['napkin', 'diaper'], true)) ? $_POST['type_filter'] : '';
+
 // --------- Load products (for dynamic columns) ----------
 $products = [];
-$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
+$__typeWhere = $filter_type !== '' ? ' AND ' . tpProductTypeSqlFilter($filter_type, 'products') : '';
+$stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL)$__typeWhere ORDER BY id ASC");
 if (!$stmt_products) {
     ob_end_clean();
     header('Content-Type: text/plain; charset=utf-8');

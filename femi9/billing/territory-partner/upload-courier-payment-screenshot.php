@@ -144,6 +144,15 @@ if ($existingCount >= 5) {
     respond(['success' => false, 'message' => 'You can upload a maximum of 5 screenshots.'], 400);
 }
 
+// A TP can split the courier amount across multiple screenshots (e.g. two
+// separate UPI payments of ₹450 + ₹30 for a ₹480 total) — each one is
+// checked against what's still OWED (required minus the pool already built
+// from earlier pending_review/accepted screenshots), not the full required
+// amount, otherwise every screenshot after the first would look like a
+// mismatch and get wrongly rejected. Confirmed 2026-09-11.
+$poolSoFar = $po_id > 0 ? tpCourierPoolTotalForPo($db_conn, $po_id) : tpCourierPoolTotal($db_conn, $tp_id, $productType);
+$remainingAmount = max(0, round($requiredAmount - $poolSoFar, 2));
+
 $file = $_FILES['screenshot'] ?? null;
 if (!$file || $file['error'] === UPLOAD_ERR_NO_FILE) {
     respond(['success' => false, 'message' => 'No file received.'], 400);
@@ -209,7 +218,7 @@ try {
     $vision = new ClaudeVisionService();
     $visionResult = $vision->analyzeScreenshot($file['tmp_name'], [], $expectedUpi);
     if ($visionResult['success']) {
-        $classification = classifyCourierVisionResult($visionResult, $requiredAmount, $expectedUpi);
+        $classification = classifyCourierVisionResult($visionResult, $remainingAmount, $expectedUpi);
     }
 } catch (\Throwable $e) {
     // Falls through to OCR fallback.
@@ -228,7 +237,7 @@ if ($classification === null) {
     }
 
     if ($ocrAvailable) {
-        $classification = courierClassifyFromOcr(PaymentScreenshotParser::classify($ocrText), $requiredAmount, $expectedUpi);
+        $classification = courierClassifyFromOcr(PaymentScreenshotParser::classify($ocrText), $remainingAmount, $expectedUpi);
     } else {
         $classification = [
             'status' => 'pending_review',
@@ -262,7 +271,7 @@ function courierTextLooksLikeFailure(string $text): bool {
     return false;
 }
 
-function courierClassifyFromOcr(array $ocrResult, float $requiredAmount, ?string $expectedUpi): array {
+function courierClassifyFromOcr(array $ocrResult, float $remainingAmount, ?string $expectedUpi): array {
     if ($ocrResult['status'] === 'rejected'
         && strpos($ocrResult['reason'] ?? '', "doesn't look like a payment screenshot") !== false) {
         return $ocrResult + ['payment_date' => null];
@@ -276,9 +285,13 @@ function courierClassifyFromOcr(array $ocrResult, float $requiredAmount, ?string
         return ['status' => 'pending_review', 'amount' => null, 'reference' => $ocrResult['reference'], 'payment_date' => null,
             'reason' => 'Could not clearly read the paid amount from this screenshot.', 'raw_text' => $ocrResult['raw_text']];
     }
-    if (abs((float)$ocrResult['amount'] - $requiredAmount) > 1.0) {
+    // A TP can split the courier payment across up to 5 screenshots — this
+    // one only needs to NOT exceed what's still owed (a rupee of slack for
+    // OCR rounding), not match the full amount exactly. Underpaying is fine;
+    // the remaining balance just waits for another screenshot.
+    if ((float)$ocrResult['amount'] - $remainingAmount > 1.0) {
         return ['status' => 'rejected', 'amount' => $ocrResult['amount'], 'reference' => $ocrResult['reference'], 'payment_date' => null,
-            'reason' => 'The amount in this screenshot (₹' . number_format((float)$ocrResult['amount'], 2) . ') does not match the required courier amount (₹' . number_format($requiredAmount, 2) . ').',
+            'reason' => 'The amount in this screenshot (₹' . number_format((float)$ocrResult['amount'], 2) . ') is more than what\'s still owed (₹' . number_format($remainingAmount, 2) . ').',
             'raw_text' => $ocrResult['raw_text']];
     }
     if ($expectedUpi !== null && stripos($ocrResult['raw_text'], $expectedUpi) === false) {
@@ -286,7 +299,20 @@ function courierClassifyFromOcr(array $ocrResult, float $requiredAmount, ?string
             'reason' => 'Could not confirm the payment was made to ' . $expectedUpi . ' — needs manual review.',
             'raw_text' => $ocrResult['raw_text']];
     }
-    return ['status' => 'accepted', 'amount' => $requiredAmount, 'reference' => $ocrResult['reference'], 'payment_date' => null, 'reason' => null, 'raw_text' => $ocrResult['raw_text']];
+    // Same transaction/reference ID requirement as the Claude Vision path
+    // (classifyCourierVisionResult) — no ID means outright reject, per
+    // confirmed business decision: a screenshot without a visible
+    // transaction ID is not acceptable proof of payment at all.
+    if (empty($ocrResult['reference'])) {
+        return ['status' => 'rejected', 'amount' => $ocrResult['amount'], 'reference' => null, 'payment_date' => null,
+            'reason' => 'This screenshot does not show a transaction ID. Please upload a screenshot that clearly shows the transaction/reference ID.',
+            'raw_text' => $ocrResult['raw_text']];
+    }
+    // Store the screenshot's OWN detected amount (not the full required
+    // amount) — the pool functions (tpCourierPoolTotal/tpCourierPoolTotalForPo)
+    // sum every accepted/pending_review screenshot's amount to track partial
+    // payments, so overwriting this with the full total would double-count.
+    return ['status' => 'accepted', 'amount' => $ocrResult['amount'], 'reference' => $ocrResult['reference'], 'payment_date' => null, 'reason' => null, 'raw_text' => $ocrResult['raw_text']];
 }
 
 // Requires BOTH the amount to match AND (when a UPI ID is configured) the
@@ -297,7 +323,7 @@ function courierClassifyFromOcr(array $ocrResult, float $requiredAmount, ?string
 // is the safe middle ground either way, reviewed on the company's Courier
 // Payment column (tp-today-orders.php), same Approve/Reject pattern as the
 // advance-payment submission queue.
-function classifyCourierVisionResult(array $v, float $requiredAmount, ?string $expectedUpi): array {
+function classifyCourierVisionResult(array $v, float $remainingAmount, ?string $expectedUpi): array {
     $raw = 'Claude vision: amount=' . ($v['amount'] ?? 'null') . ' reference=' . ($v['reference'] ?? 'null')
         . ' payment_date=' . ($v['payment_date'] ?? 'null') . ' confidence=' . $v['confidence']
         . ' looks_like_payment_screenshot=' . ($v['looks_like_payment_screenshot'] ? 'true' : 'false')
@@ -324,11 +350,14 @@ function classifyCourierVisionResult(array $v, float $requiredAmount, ?string $e
         return ['status' => 'pending_review', 'amount' => null, 'reference' => $v['reference'], 'payment_date' => $paymentDate,
             'reason' => 'Could not clearly read the paid amount from this screenshot.', 'raw_text' => $raw];
     }
-    // A rupee of rounding slack for OCR/vision reads a paisa off — anything
-    // beyond that is a genuine mismatch, not noise.
-    if (abs((float)$v['amount'] - $requiredAmount) > 1.0) {
+    // A TP can split the courier payment across up to 5 screenshots — this
+    // one only needs to NOT exceed what's still owed (a rupee of slack for
+    // vision reading a paisa off), not match the full amount exactly.
+    // Underpaying is fine; the remaining balance just waits for another
+    // screenshot. Confirmed 2026-09-11.
+    if ((float)$v['amount'] - $remainingAmount > 1.0) {
         return ['status' => 'rejected', 'amount' => $v['amount'], 'reference' => $v['reference'], 'payment_date' => $paymentDate,
-            'reason' => 'The amount in this screenshot (₹' . number_format((float)$v['amount'], 2) . ') does not match the required courier amount (₹' . number_format($requiredAmount, 2) . ').',
+            'reason' => 'The amount in this screenshot (₹' . number_format((float)$v['amount'], 2) . ') is more than what\'s still owed (₹' . number_format($remainingAmount, 2) . ').',
             'raw_text' => $raw];
     }
     // The payment must have been made TODAY (the same day this order is
@@ -347,7 +376,22 @@ function classifyCourierVisionResult(array $v, float $requiredAmount, ?string $e
             'reason' => 'Could not confirm the payment was made to ' . $expectedUpi . ' — needs manual review.',
             'raw_text' => $raw];
     }
-    return ['status' => 'accepted', 'amount' => $requiredAmount, 'reference' => $v['reference'], 'payment_date' => $paymentDate, 'reason' => null, 'raw_text' => $raw];
+    // A transaction/reference ID (UTR, UPI ref, etc.) is required proof this
+    // is a real, traceable payment — without it there's nothing to look up
+    // or dedupe against later, so this can't auto-accept even if the amount
+    // and recipient otherwise look right. Outright rejected, per confirmed
+    // business decision: a screenshot without a visible transaction ID is
+    // not acceptable proof of payment at all.
+    if (empty($v['reference'])) {
+        return ['status' => 'rejected', 'amount' => $v['amount'], 'reference' => null, 'payment_date' => $paymentDate,
+            'reason' => 'This screenshot does not show a transaction ID. Please upload a screenshot that clearly shows the transaction/reference ID.',
+            'raw_text' => $raw];
+    }
+    // Store the screenshot's OWN detected amount (not the full required
+    // amount) — the pool functions (tpCourierPoolTotal/tpCourierPoolTotalForPo)
+    // sum every accepted/pending_review screenshot's amount to track partial
+    // payments, so overwriting this with the full total would double-count.
+    return ['status' => 'accepted', 'amount' => $v['amount'], 'reference' => $v['reference'], 'payment_date' => $paymentDate, 'reason' => null, 'raw_text' => $raw];
 }
 
 // A reference already used to fund an accepted advance-payment or PO-excess

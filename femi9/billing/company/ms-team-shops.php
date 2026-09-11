@@ -6,6 +6,22 @@ error_reporting(0);
 $idsParam = $_GET['ms_ids'] ?? '';
 $ids = array_filter(array_map('intval', explode(',', $idsParam)));
 
+// A Sales BDM session may only view shops for marketing staff whose own
+// assigned district falls inside their own assigned districts — same scope
+// bdm-ms-shop-view.php already applies when building this link, re-checked
+// here since ms_ids arrives as a tamperable GET param.
+if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
+    require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
+    require_once __DIR__ . '/../marketing/include/AssignedLocations.php';
+    $bdmDistricts = array_map(fn($n) => mb_strtolower(trim($n)), getBdmAssignedDistrictNames($db_conn, (int)$salesBdmID));
+    $ids = array_values(array_filter($ids, function ($msId) use ($db_conn, $bdmDistricts) {
+        foreach (getMsAssignedDistricts($db_conn, $msId) as $d) {
+            if (in_array(mb_strtolower(trim($d['name'])), $bdmDistricts, true)) { return true; }
+        }
+        return false;
+    }));
+}
+
 $fromDate = $_GET['from_date'] ?? '';
 $toDate = $_GET['to_date'] ?? '';
 $fromDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate) ? $fromDate : '';
@@ -88,12 +104,12 @@ if (!empty($ids)) {
 <div class="app align-content-stretch d-flex flex-wrap">
 
     <div class="app-sidebar">
-        <?php include("logo.php"); ?>
-        <?php include("femi_menu.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/logo.php' : 'logo.php'); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/femi_menu.php' : 'femi_menu.php'); ?>
     </div>
 
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/app-header.php' : 'app-header.php'); ?>
 
         <div class="app-content">
             <div class="content-wrapper">

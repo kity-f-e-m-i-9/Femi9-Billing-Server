@@ -508,7 +508,7 @@ $stmt_states->close();
     // Invoice number auto-suggest + duplicate warning
     // Only tracked for WEBSITE / ID CONCEPT / WHATSAPP SALES (WEB/ID/WA sequences).
     // ----------------------------------------------------------------
-    const TRACKED_INVOICE_CATS = ['WEBSITE', 'ID CONCEPT', 'WHATSAPP SALES'];
+    const TRACKED_INVOICE_CATS = ['WEBSITE', 'ID CONCEPT', 'WHATSAPP SALES', 'DIGITAL ORDERS'];
     let invoiceNumberIsDuplicate = false;
 
     // True if ANY currently-selected product row is a diaper product — the

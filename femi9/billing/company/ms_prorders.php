@@ -75,13 +75,13 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
     <div class="app align-content-stretch d-flex flex-wrap">
 	
         <div class="app-sidebar">
-            <?php include("logo.php");?>
-            <?php include("femi_menu.php");?>
+            <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/logo.php' : 'logo.php');?>
+            <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/femi_menu.php' : 'femi_menu.php');?>
         </div>
 		
         <div class="app-container">
             
-          <?php include("app-header.php");?>
+          <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/app-header.php' : 'app-header.php');?>
 			
             <div class="app-content">
                 <div class="content-wrapper">
@@ -118,6 +118,22 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 						    $se_msids = array_values(array_unique(array_filter(array_map('intval', explode(',', $_REQUEST['se_msids'])))));
 						} elseif ($se_msid !== '') {
 						    $se_msids = [(int)$se_msid];
+						}
+						// A Sales BDM session may only view orders for marketing staff whose own
+						// assigned district falls inside their own assigned districts — se_msid(s)
+						// arrives as a tamperable GET/POST param, so re-check here even though
+						// bdm-ms-shop-view.php only ever links to staff already in scope.
+						if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
+						    require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
+						    require_once __DIR__ . '/../marketing/include/AssignedLocations.php';
+						    $_bdmDistrictsMs = array_map(fn($n) => mb_strtolower(trim($n)), getBdmAssignedDistrictNames($db_conn, (int)$salesBdmID));
+						    $se_msids = array_values(array_filter($se_msids, function ($msId) use ($db_conn, $_bdmDistrictsMs) {
+						        foreach (getMsAssignedDistricts($db_conn, $msId) as $d) {
+						            if (in_array(mb_strtolower(trim($d['name'])), $_bdmDistrictsMs, true)) { return true; }
+						        }
+						        return false;
+						    }));
+						    $se_msid = $se_msids[0] ?? '';
 						}
 						$isTeamMode = count($se_msids) > 1;
 						$msIdListSql = implode(',', $se_msids ?: [0]);

@@ -141,7 +141,7 @@ foreach ($layers as $_layer):
 <br/>
 <script>
 // India (+91) keeps the strict exact-10-digit check; any other country code
-// (e.g. Nepal +977) relaxes to 10-14 digits, since we can't validate every
+// (e.g. Nepal +977) relaxes to 10-15 digits, since we can't validate every
 // country's real mobile length rule here. Runs on selection change AND once
 // on load, in case the browser restores a previously-picked country on
 // refresh without firing onchange.
@@ -152,8 +152,8 @@ function adjustMobileValidation(countryCode) {
         input.setAttribute('pattern', '[1-9]{1}[0-9]{9}');
         input.setAttribute('maxlength', '10');
     } else {
-        input.setAttribute('pattern', '[1-9]{1}[0-9]{9,13}');
-        input.setAttribute('maxlength', '14');
+        input.setAttribute('pattern', '[1-9]{1}[0-9]{9,14}');
+        input.setAttribute('maxlength', '15');
     }
 }
 document.addEventListener('DOMContentLoaded', function () {

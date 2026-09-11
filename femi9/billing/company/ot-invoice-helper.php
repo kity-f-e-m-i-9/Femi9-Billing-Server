@@ -9,6 +9,7 @@ $prefixMap = [
     'WEBSITE'        => 'WEB',
     'ID CONCEPT'     => 'ID',
     'WHATSAPP SALES' => 'WA',
+    'DIGITAL ORDERS' => 'DO',
 ];
 
 $action     = $_GET['action'] ?? '';
@@ -133,6 +134,33 @@ if ($action === 'next') {
             : $prefix . '/' . $fy . '/' . $paddedNum;
 
         echo json_encode(['number' => $nextNumber]);
+        exit;
+    }
+
+    // DIGITAL ORDERS — DO/<fy>/NN, shared counter scoped to the current
+    // financial year, no entity marker, zero-padded to 2 digits to match the
+    // existing series (e.g. DO/26-27/01, .../02, ... .../10).
+    if ($cat === 'DIGITAL ORDERS') {
+        $likePattern = $prefix . '/' . $fy . '/%';
+        $stmt = $db_conn->prepare(
+            "SELECT inv_number FROM ot_sales_invoice WHERE cat = ? AND inv_number LIKE ?"
+        );
+        $stmt->bind_param('ss', $cat, $likePattern);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $max = 0;
+        while ($row = $result->fetch_assoc()) {
+            $parts = explode('/', $row['inv_number']);
+            $suffix = end($parts);
+            if (ctype_digit($suffix)) {
+                $max = max($max, (int)$suffix);
+            }
+        }
+        $stmt->close();
+
+        $paddedNum = str_pad((string)($max + 1), 2, '0', STR_PAD_LEFT);
+        echo json_encode(['number' => $prefix . '/' . $fy . '/' . $paddedNum]);
         exit;
     }
 

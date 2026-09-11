@@ -2,7 +2,17 @@
 ob_start();
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('channel_partner');
+// config.php unconditionally sets $Login_user_TYPEvl='company' — save the
+// BDM bridge's identity first and restore it after, otherwise every check
+// below (menu switch, district scoping) silently thinks this is a company
+// session and shows/serves everything unfiltered.
+$_bdmSessType = $Login_user_TYPEvl ?? null;
+$_bdmSessId   = $salesBdmID ?? null;
 include("config.php");
+if ($_bdmSessType === 'salesbdm') {
+    $Login_user_TYPEvl = $_bdmSessType;
+    $salesBdmID = $_bdmSessId;
+}
 
 // Clear filters
 if (isset($_GET['clear_filters']) || isset($_POST['clear_all'])) {
@@ -14,6 +24,15 @@ if (isset($_GET['clear_filters']) || isset($_POST['clear_all'])) {
 }
 
 mysqli_set_charset($db_conn, 'utf8mb4');
+
+// A Sales BDM session only sees stock for Channel Partners inside their own
+// assigned districts — mirrors manage-channel-partner.php's own BDM scoping.
+$_isBdm = ($Login_user_TYPEvl ?? '') === 'salesbdm';
+$_bdmCpIdsForStock = null;
+if ($_isBdm) {
+    require_once __DIR__ . '/../salesbdm/include/BdmCpScope.php';
+    $_bdmCpIdsForStock = getBdmAssignedCpIds($db_conn, (int)$salesBdmID, true);
+}
 
 // CP filter (optional — empty = show all)
 $selected_cp_id   = '';
@@ -49,6 +68,9 @@ $where_parts = ["cp.is_active = 1"];
 if ($selected_cp_id !== '') {
     $esc_cp = $db_conn->real_escape_string($selected_cp_id);
     $where_parts[] = "cp.cp_id = '$esc_cp'";
+}
+if ($_bdmCpIdsForStock !== null) {
+    $where_parts[] = 'cp.id IN (' . (empty($_bdmCpIdsForStock) ? '0' : implode(',', array_map('intval', $_bdmCpIdsForStock))) . ')';
 }
 $where_sql = implode(' AND ', $where_parts);
 
@@ -94,7 +116,11 @@ if (!empty($cp_rows)) {
 
 // CP list for dropdown
 $cp_list = [];
-$cp_list_res = mysqli_query($db_conn, "SELECT cp_id, name FROM channel_partners WHERE is_active = 1 ORDER BY name ASC LIMIT 1000");
+$cp_list_where = 'WHERE is_active = 1';
+if ($_bdmCpIdsForStock !== null) {
+    $cp_list_where .= ' AND id IN (' . (empty($_bdmCpIdsForStock) ? '0' : implode(',', array_map('intval', $_bdmCpIdsForStock))) . ')';
+}
+$cp_list_res = mysqli_query($db_conn, "SELECT cp_id, name FROM channel_partners $cp_list_where ORDER BY name ASC LIMIT 1000");
 if ($cp_list_res) while ($r = mysqli_fetch_assoc($cp_list_res)) $cp_list[] = $r;
 ?>
 <!DOCTYPE html>
@@ -170,12 +196,12 @@ if ($cp_list_res) while ($r = mysqli_fetch_assoc($cp_list_res)) $cp_list[] = $r;
 <body>
 <div class="app align-content-stretch d-flex flex-wrap">
     <div class="app-sidebar">
-        <?php include("logo.php"); ?>
-        <?php include("femi_menu.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/logo.php' : 'logo.php'); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/femi_menu.php' : 'femi_menu.php'); ?>
     </div>
 
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/app-header.php' : 'app-header.php'); ?>
 
         <div class="app-content">
             <div class="content-wrapper">

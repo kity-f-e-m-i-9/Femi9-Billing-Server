@@ -195,7 +195,10 @@ $i= $start_from;
 				<?php 
 				$select_prdetails_header="select * from `products` order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
-				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
+				$productsList = [];
+					while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){
+					$productsList[] = $result_prdetails_header;
+					?>
 				<th><?=$result_prdetails_header['productName'];?></th>
 				<?php }?>
 
@@ -218,86 +221,95 @@ $select_product_list="select distinct tempid from ot_sales where date between '$
 $select_product_list="select distinct ot_sales.tempid from ot_sales join ot_sales_invoice on ot_sales_invoice.tempid=ot_sales.tempid where ot_sales_invoice.inv_number='".mysqli_real_escape_string($db_conn,$se_invoice)."' and ot_sales.godownid IN (" . godown_ids_subquery($db_conn) . ")";
 }
 
-
 $fetch_product_list=mysqli_query($db_conn,$select_product_list);
-while($result_product_list=mysqli_fetch_array($fetch_product_list))
-										{
-											
-						$tempid=$result_product_list["tempid"];
-						$select_productDetils="select * from ot_sales where tempid='$tempid'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
-						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
-						
-						//GODOWN DETAILS
-						$godownid=$Result_productDetils['godownid'];
-						$select_godowndetails="select * from company_godown where id='$godownid' AND " . godown_finance_filter_sql($db_conn);
-						$fetch_godowndetails=mysqli_query($db_conn,$select_godowndetails);
-						$result_godowndetails=mysqli_fetch_array($fetch_godowndetails);
-						
-						//Ot sales Inovice
-						$select_productDetils122="select * from ot_sales_invoice where tempid='$tempid'";
-						$Fetch_productDetils122=mysqli_query($db_conn,$select_productDetils122);
-						$Result_productDetils122=mysqli_fetch_array($Fetch_productDetils122);
-						$ot_invoice_number=$Result_productDetils122['inv_number'];
-						?>
-                                            
+$tempidList = [];
+while($result_product_list=mysqli_fetch_array($fetch_product_list)) {
+	$tempidList[] = $result_product_list["tempid"];
+}
+
+// ---- Batch-fetch everything these rows need in ~5 queries total, instead
+// of the old per-row (and per-product-per-row) query storm — up to ~46
+// queries PER invoice before this, which is why a 1-month filter (~1000+
+// invoices) took minutes and sometimes timed out. Confirmed 2026-09-10. ----
+$salesByTempid = [];   // tempid => first ot_sales row (header fields)
+$qtyByTempidProd = []; // tempid => [prid => qty]
+$godownMap = [];       // godownid => company_godown row
+$invoiceMap = [];      // tempid => ot_sales_invoice row
+$stateMap = [];        // state_id => st_name
+
+if (!empty($tempidList)) {
+	$tempidsEsc = implode(',', array_map(function($t) use ($db_conn) { return "'" . mysqli_real_escape_string($db_conn, $t) . "'"; }, $tempidList));
+
+	$allSalesRes = mysqli_query($db_conn, "select * from ot_sales where tempid in ($tempidsEsc)");
+	while ($row = mysqli_fetch_assoc($allSalesRes)) {
+		$tid = $row['tempid'];
+		if (!isset($salesByTempid[$tid])) { $salesByTempid[$tid] = $row; }
+		$qtyByTempidProd[$tid][$row['prid']] = $row['qty'];
+	}
+
+	$godownIds = array_unique(array_filter(array_column($salesByTempid, 'godownid')));
+	if (!empty($godownIds)) {
+		$gIdsEsc = implode(',', array_map('intval', $godownIds));
+		$gres = mysqli_query($db_conn, "select * from company_godown where id in ($gIdsEsc) AND " . godown_finance_filter_sql($db_conn));
+		while ($g = mysqli_fetch_assoc($gres)) { $godownMap[$g['id']] = $g; }
+	}
+
+	$invRes = mysqli_query($db_conn, "select * from ot_sales_invoice where tempid in ($tempidsEsc)");
+	while ($iv = mysqli_fetch_assoc($invRes)) {
+		if (!isset($invoiceMap[$iv['tempid']])) { $invoiceMap[$iv['tempid']] = $iv; }
+	}
+
+	$stateIds = array_unique(array_filter(array_column($salesByTempid, 'state_id')));
+	if (!empty($stateIds)) {
+		$sIdsEsc = implode(',', array_map('intval', $stateIds));
+		$sres = mysqli_query($db_conn, "select id, st_name from `state` where id in ($sIdsEsc)");
+		while ($s = mysqli_fetch_assoc($sres)) { $stateMap[(int)$s['id']] = $s['st_name']; }
+	}
+}
+
+foreach ($tempidList as $tempid) {
+	$Result_productDetils = $salesByTempid[$tempid] ?? null;
+	if (!$Result_productDetils) { continue; }
+
+	$godownid = $Result_productDetils['godownid'];
+	$result_godowndetails = $godownMap[$godownid] ?? [];
+
+	$Result_productDetils122 = $invoiceMap[$tempid] ?? [];
+	$ot_invoice_number = $Result_productDetils122['inv_number'] ?? '';
+	?>
+
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-				<td><?php echo $result_godowndetails["gname"];?></td>
+				<td><?php echo $result_godowndetails["gname"] ?? '';?></td>
 													<td><?php echo $Result_productDetils["cat"];?></td>
-													
-													<td><?php echo $Result_productDetils122["coupon_code"];?></td>
-													<td><?php echo $Result_productDetils122["website_commission"];?></td>
-													
+
+													<td><?php echo $Result_productDetils122["coupon_code"] ?? '';?></td>
+													<td><?php echo $Result_productDetils122["website_commission"] ?? '';?></td>
+
 					<td><?php echo date("d/m/y",strtotime($Result_productDetils["date"]));?></td>
 					<td><?php echo $Result_productDetils["order_number"];?></td>
 					<td><?php echo $ot_invoice_number;?></td>
-					
+
 					<td><?php echo $Result_productDetils["customer_name"];?></td>
 					<td><?php echo $Result_productDetils["customer_mobile"];?></td>
-					
-					<?php 
+
+					<?php
 $get_stateID=$Result_productDetils['state_id'];
 if($get_stateID!=NULL && $get_stateID!=0)
 {
-$select_stateList12="select * from `state` where id='$get_stateID'";
-$fetch_staeList12=mysqli_query($db_conn,$select_stateList12);
-$result_stateList12=mysqli_fetch_array($fetch_staeList12);
-$STName=$result_stateList12['st_name'];
+$STName = $stateMap[(int)$get_stateID] ?? '';
 }else{
 	$STName="<a href='ot-sale-edit?tempid=".base64_encode($tempid)."'>Update State</a>";
 }
 ?>
 					<td><?php echo $STName;?></td>
 					<td><?php echo $Result_productDetils["customer_address"];?></td>
-					
-					
+
+
 				<!------------------------PRODUCT WISE SALES QTY------------------------------->
-				<?php $select_prdetails_header="select * from `products` order by `id` asc";
-				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
-				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){
-					
+				<?php foreach ($productsList as $result_prdetails_header) {
 					$prid_header=$result_prdetails_header['id'];
-					
-					//SALES QTY
-					$select_SUM_QTY="select qty from ot_sales where tempid='$tempid' and prid='$prid_header'";
-					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
-					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
-					if($result_SUM_QTY['qty']!=NULL){ $slsqty=$result_SUM_QTY['qty'];} else{ $slsqty="0";}
-					
-					//SALES Return QTY
-					/*
-					$select_Return_QTY="select qty from ot_sales_return where tempid='$tempid' and prid='$prid_header'";
-					$fetch_Return_QTY=mysqli_query($db_conn,$select_Return_QTY);
-					$result_Return_QTY=mysqli_fetch_array($fetch_Return_QTY);
-					if($result_Return_QTY['qty']!=NULL){ $slsRtnqty=$result_Return_QTY['qty'];} else{ $slsRtnqty="0";}
-					
-					
-					$net_sls_qty=$slsqty-$slsRtnqty;
-					*/
-					
-					$net_sls_qty=$slsqty;
-						
+					$net_sls_qty = $qtyByTempidProd[$tempid][$prid_header] ?? 0;
 				?>
 				<th><?=$net_sls_qty;?></th>
 				<?php }?>

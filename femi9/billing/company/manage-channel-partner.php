@@ -14,6 +14,18 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+// A Sales BDM session only sees Channel Partners inside their own assigned
+// districts (including inactive ones, since this page is also how they'd
+// reactivate one) — company staff see everyone, unfiltered. Mirrors
+// manage-territory-partner.php's own BDM scoping.
+$_isBdm = ($Login_user_TYPEvl ?? '') === 'salesbdm';
+$_bdmCpWhere = '';
+if ($_isBdm) {
+    require_once __DIR__ . '/../salesbdm/include/BdmCpScope.php';
+    $_bdmCpIds = getBdmAssignedCpIds($db_conn, (int)$salesBdmID, true);
+    $_bdmCpWhere = 'WHERE cp.id IN (' . (empty($_bdmCpIds) ? '0' : implode(',', array_map('intval', $_bdmCpIds))) . ')';
+}
+
 // ── Fetch all channel partners with location count, names and total deposit ───
 $result = $db_conn->query("
     SELECT cp.*,
@@ -26,6 +38,7 @@ $result = $db_conn->query("
     LEFT JOIN partner_location_nodes n ON n.id = cpl.location_id
     LEFT JOIN partner_location_nodes pn ON pn.id = n.parent_id
     LEFT JOIN partner_location_layers pll ON pll.depth = n.depth
+    $_bdmCpWhere
     GROUP BY cp.id
     ORDER BY cp.id
 ");
@@ -81,12 +94,12 @@ $i = 0;
 <div class="app align-content-stretch d-flex flex-wrap">
 
     <div class="app-sidebar">
-        <?php include("logo.php"); ?>
-        <?php include("femi_menu.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/logo.php' : 'logo.php'); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/femi_menu.php' : 'femi_menu.php'); ?>
     </div>
 
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <?php include((($Login_user_TYPEvl ?? '') === 'salesbdm') ? '../salesbdm/app-header.php' : 'app-header.php'); ?>
 
         <div class="app-content">
             <div class="content-wrapper">

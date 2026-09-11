@@ -76,10 +76,15 @@ if ($_ar) {
 foreach ($districtsByMs as $msId => $names) { $districtsByMs[$msId] = implode(', ', array_keys($names)); }
 
 // ── Staff, grouped by level (for card click) and by manager (for drill-down) ──
+$_chkDel = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'deleted_at'");
+if ($_chkDel && $_chkDel->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL");
+}
 $staffRows = $db_conn->query("
     SELECT ms.id, ms.ms_name, ms.manager_id, ms.team_level_id, tl.level_name, tl.level_rank
     FROM marketing_staff ms
     LEFT JOIN marketing_team_levels tl ON tl.id = ms.team_level_id
+    WHERE ms.deleted_at IS NULL
     ORDER BY tl.level_rank ASC, ms.ms_name ASC
 ")->fetch_all(MYSQLI_ASSOC);
 
