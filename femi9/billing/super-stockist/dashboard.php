@@ -658,7 +658,7 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
 	$resultghountduplicate_DIST1345=mysqli_fetch_array($fetcghountduplicate_DIST1345);
 	if($resultghountduplicate_DIST1345[0]!=NULL){echo $resultghountduplicate_DIST1345[0];}else{ echo "0";}
 	?>
-	
+
 	</span>
                                             </div>
                                         </div>
@@ -666,9 +666,44 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
                                 </div>
                             </div>
 							<!--------------------end***--------------------------------------->
-							
-							
-							
+
+
+
+							<!------------------------------------------------------------->
+                            <div class="col-xl-3">
+                                <a href="tp-stock-view.php" style="text-decoration:none;color:inherit;">
+                                <div class="card widget widget-stats" style="cursor:pointer;">
+                                    <div class="card-body">
+                                        <div class="widget-stats-container d-flex">
+                                            <div class="widget-stats-icon widget-stats-icon-danger">
+                                                <i class="material-icons-outlined">paid</i>
+                                            </div>
+
+
+                                            <div class="widget-stats-content flex-fill">
+                                   <span class="widget-stats-title">Territory&nbsp;Partner&nbsp;wise</span>
+                                   <span class="widget-stats-amount">
+	<?php
+	$select_tp_stock_SS = "SELECT COALESCE(SUM(tps.closing_qty),0) AS total_tp_stock
+		FROM territory_partner_stock tps
+		JOIN territory_partners tp ON tp.id = tps.territory_partner_id
+		WHERE tp.onboard_ss_id = '$Login_user_IDvl'";
+	$fetch_tp_stock_SS = mysqli_query($db_conn, $select_tp_stock_SS);
+	$result_tp_stock_SS = mysqli_fetch_array($fetch_tp_stock_SS);
+	echo $result_tp_stock_SS['total_tp_stock'] ?? "0";
+	?>
+
+	</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                </a>
+                            </div>
+							<!--------------------end***--------------------------------------->
+
+
+
 							</div>
 							<h2><b>Users</b></h2>
 							<div class="row">
@@ -713,9 +748,30 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
                                     </div>
                                 </div>
                             </div>
-							
+
+							<div class="col-xl-3">
+                                <div class="card widget widget-stats">
+                                    <div class="card-body">
+                                        <div class="widget-stats-container d-flex">
+                                            <div class="widget-stats-icon widget-stats-icon-warning">
+                                                <i class="material-icons-outlined">person</i>
+                                            </div>
+                       <div class="widget-stats-content flex-fill">
+                       <span class="widget-stats-title">Territory Partner</span>
+					    <?php
+	$Selectcount_TP="select count(*) as numcountTP from territory_partners where onboard_ss_id='$Login_user_IDvl'";
+	$Fetchcount_TP=mysqli_query($db_conn,$Selectcount_TP);
+	$Resultcount_TP=mysqli_fetch_array($Fetchcount_TP);
+	?>
+                       <span class="widget-stats-amount"><?=$Resultcount_TP['numcountTP'];?></span>
+                       </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
 							</div>
-							
+
 							<h2><b>Locations</b></h2>
 							<div class="row">
 							<div class="col-xl-3">

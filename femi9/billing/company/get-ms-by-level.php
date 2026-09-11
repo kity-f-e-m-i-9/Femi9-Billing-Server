@@ -20,7 +20,11 @@ if ($_chkMgr && $_chkMgr->num_rows === 0) {
     $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN manager_id INT NULL DEFAULT NULL AFTER team_level_id");
 }
 
-$stmt = $db_conn->prepare("SELECT id, ms_name FROM marketing_staff WHERE team_level_id = ? AND id != ? ORDER BY ms_name ASC");
+$_chkDel = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'deleted_at'");
+if ($_chkDel && $_chkDel->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL");
+}
+$stmt = $db_conn->prepare("SELECT id, ms_name FROM marketing_staff WHERE team_level_id = ? AND id != ? AND deleted_at IS NULL ORDER BY ms_name ASC");
 $stmt->bind_param("ii", $level_id, $exclude_ms_id);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

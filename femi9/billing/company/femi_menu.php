@@ -687,6 +687,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                                 </ul>
                             </li>
                             <li><a href="manage-district-notes">District Notes</a></li>
+                            <li><a href="location-change-requests">Location Change Requests</a></li>
                         </ul>
                     </li>
 					

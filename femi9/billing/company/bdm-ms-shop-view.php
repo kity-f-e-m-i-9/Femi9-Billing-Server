@@ -40,10 +40,15 @@ $ordersDateParam = $hasDateFilter ? ('&frdate=' . urlencode($fromDate) . '&todat
 
 // ── Every marketing staff member, then keep only those whose own assigned
 // district falls inside this BDM's districts. ──────────────────────────────
+$_chkDel = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'deleted_at'");
+if ($_chkDel && $_chkDel->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL");
+}
 $staffRows = $db_conn->query("
     SELECT ms.id, ms.ms_name, ms.team_level_id, tl.level_name
     FROM marketing_staff ms
     LEFT JOIN marketing_team_levels tl ON tl.id = ms.team_level_id
+    WHERE ms.deleted_at IS NULL
     ORDER BY tl.level_rank ASC, ms.ms_name ASC
 ")->fetch_all(MYSQLI_ASSOC);
 

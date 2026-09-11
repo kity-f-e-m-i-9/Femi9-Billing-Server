@@ -147,7 +147,11 @@ $i= $start_from;
 												$teamLevelMap[(int)$rowTeamLevel['id']] = $rowTeamLevel['level_name'];
 											}
 										}
-										$select_product_list="select * from marketing_staff order by id desc";
+										$_chkDel = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'deleted_at'");
+if ($_chkDel && $_chkDel->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL");
+}
+$select_product_list="select * from marketing_staff where deleted_at is null order by id desc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{

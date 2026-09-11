@@ -115,7 +115,12 @@ if (!empty($salesBdmID)) {
     </li>
 
     <li>
-        <a href="<?php echo $_companyBase; ?>bdm-ms-shop-view"><i class="material-icons-two-tone">storefront</i>DM Report</a>
+        <a href=""><i class="material-icons-two-tone">storefront</i>District Manager
+            <i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+        <ul class="sub-menu">
+            <li><a href="<?php echo $_companyBase; ?>bdm-ms-shop-view">DM Report</a></li>
+            <li><a href="<?php echo $_bdmBase; ?>location-change-requests">Location Change Requests</a></li>
+        </ul>
     </li>
 
     <li>

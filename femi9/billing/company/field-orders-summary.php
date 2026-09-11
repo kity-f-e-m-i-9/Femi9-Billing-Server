@@ -121,6 +121,14 @@ $grand = ['get_order'=>0,'pending'=>0,'incomplete'=>0,'completed'=>0,'no_order'=
 foreach ($tpSummary as $s) {
     foreach ($grand as $k => $v) { $grand[$k] += $s[$k]; }
 }
+
+// Totals row above is always computed from the FULL set — only the table
+// body is paginated, so "Total" never silently reflects just page 1.
+$perPage = 15;
+$totalTpCount = count($tpSummary);
+$totalPages = max(1, (int)ceil($totalTpCount / $perPage));
+$page = max(1, min($totalPages, (int)($_GET['page'] ?? 1)));
+$pagedSummary = array_slice($tpSummary, ($page - 1) * $perPage, $perPage, true);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -204,6 +212,7 @@ foreach ($tpSummary as $s) {
                                         <table class="mt">
                                             <thead>
                                                 <tr>
+                                                    <th>S.No</th>
                                                     <th>TP</th>
                                                     <th>Get Order</th>
                                                     <th>Pending</th>
@@ -216,9 +225,10 @@ foreach ($tpSummary as $s) {
                                             </thead>
                                             <tbody>
                                                 <?php if (empty($tpSummary)): ?>
-                                                <tr><td colspan="8" class="text-center text-muted">No field order entries in this date range.</td></tr>
-                                                <?php else: foreach ($tpSummary as $s): ?>
+                                                <tr><td colspan="9" class="text-center text-muted">No field order entries in this date range.</td></tr>
+                                                <?php else: $_sno = ($page - 1) * $perPage; foreach ($pagedSummary as $s): $_sno++; ?>
                                                 <tr>
+                                                    <td><?=$_sno?></td>
                                                     <td>
                                                         <?=htmlspecialchars($s['name'] ?? '-')?>
                                                         <?php if (!empty($s['code'])): ?><br/><span class="text-muted" style="font-size:11px;"><?=htmlspecialchars($s['code'])?></span><?php endif; ?>
@@ -236,6 +246,7 @@ foreach ($tpSummary as $s) {
                                             <?php if (!empty($tpSummary)): ?>
                                             <tfoot>
                                                 <tr>
+                                                    <td></td>
                                                     <td>Total</td>
                                                     <td><?=$grand['get_order']?></td>
                                                     <td><?=$grand['pending']?></td>
@@ -249,6 +260,28 @@ foreach ($tpSummary as $s) {
                                             <?php endif; ?>
                                         </table>
                                         </div>
+
+                                        <?php if ($totalPages > 1): ?>
+                                        <nav class="mt-3">
+                                            <ul class="pagination justify-content-center" style="margin-bottom:0;">
+                                                <?php
+                                                $qs = $_GET;
+                                                function _foPageLink($qs, $p) { $qs['page'] = $p; return '?' . http_build_query($qs); }
+                                                ?>
+                                                <?php if ($page > 1): ?>
+                                                <li class="page-item"><a class="page-link" href="<?=htmlspecialchars(_foPageLink($qs, $page - 1))?>">Previous</a></li>
+                                                <?php endif; ?>
+                                                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                                                <li class="page-item <?=($i == $page) ? 'active' : ''?>"><a class="page-link" href="<?=htmlspecialchars(_foPageLink($qs, $i))?>"><?=$i?></a></li>
+                                                <?php endfor; ?>
+                                                <?php if ($page < $totalPages): ?>
+                                                <li class="page-item"><a class="page-link" href="<?=htmlspecialchars(_foPageLink($qs, $page + 1))?>">Next</a></li>
+                                                <?php endif; ?>
+                                            </ul>
+                                            <p class="text-center text-muted small mt-2">Showing <?=(($page-1)*$perPage)+1?>–<?=min($page*$perPage, $totalTpCount)?> of <?=$totalTpCount?> TPs</p>
+                                        </nav>
+                                        <?php endif; ?>
+
                                         <p class="text-muted" style="font-size:11.5px;margin:10px 0 0;">"Get Order Value" is an estimate (qty &times; outlet price, minus captured discount) — the TP hasn't set a real price until invoicing. "Converted Value" is the actual invoice total, once submitted. Cancelled visits are excluded from every column.</p>
                                     </div>
                                 </div>

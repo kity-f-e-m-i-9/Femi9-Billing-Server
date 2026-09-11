@@ -37,15 +37,40 @@ $update_id=$_REQUEST['update_id'];
 	
 	$google_location=str_replace("'","&#39;",$_POST["google_location"]);
 
+	$_col = mysqli_query($db_conn, "SHOW COLUMNS FROM ms_shop LIKE 'location_recapture_count'");
+	if ($_col && mysqli_num_rows($_col) === 0) {
+		mysqli_query($db_conn, "ALTER TABLE ms_shop ADD COLUMN location_recapture_count INT NOT NULL DEFAULT 0");
+	}
+
 	$latitude=isset($_POST["latitude"]) && $_POST["latitude"]!=='' ? floatval($_POST["latitude"]) : null;
 	$longitude=isset($_POST["longitude"]) && $_POST["longitude"]!=='' ? floatval($_POST["longitude"]) : null;
-	if($latitude===null || $longitude===null)
-	{
-		$select_existing_latlng="select latitude, longitude from ms_shop where id='$update_id'";
-		$fetch_existing_latlng=mysqli_query($db_conn,$select_existing_latlng);
-		$existing_latlng=mysqli_fetch_assoc($fetch_existing_latlng);
-		if($latitude===null) { $latitude=$existing_latlng['latitude']; }
-		if($longitude===null) { $longitude=$existing_latlng['longitude']; }
+
+	$select_existing_latlng="select latitude, longitude, location_recapture_count from ms_shop where id='$update_id'";
+	$fetch_existing_latlng=mysqli_query($db_conn,$select_existing_latlng);
+	$existing_latlng=mysqli_fetch_assoc($fetch_existing_latlng);
+	$existing_lat = $existing_latlng['latitude'] !== null ? (float)$existing_latlng['latitude'] : null;
+	$existing_lng = $existing_latlng['longitude'] !== null ? (float)$existing_latlng['longitude'] : null;
+	$recaptureCount = (int)($existing_latlng['location_recapture_count'] ?? 0);
+
+	// A recapture is only counted when the DM actually submitted a different
+	// lat/lng than what's already saved (the hidden hidden fields on
+	// edit-ss.php only change value after a successful "Re-capture Location"
+	// click) — max 2 recaptures per shop for life, enforced here server-side
+	// since the button-disable on the form is only a UX nicety.
+	$isRecapture = $latitude !== null && $longitude !== null
+		&& ($existing_lat === null || $existing_lng === null || abs($latitude - $existing_lat) > 0.0000001 || abs($longitude - $existing_lng) > 0.0000001);
+
+	if ($isRecapture && $existing_lat !== null && $existing_lng !== null && $recaptureCount >= 2) {
+		// Limit reached — keep the shop's existing, locked location and
+		// ignore whatever new coordinates were just submitted.
+		$latitude = $existing_lat;
+		$longitude = $existing_lng;
+	} elseif ($isRecapture) {
+		$recaptureCount++;
+		mysqli_query($db_conn, "update ms_shop set location_recapture_count='$recaptureCount' where id='$update_id'");
+	} else {
+		if($latitude===null) { $latitude=$existing_lat; }
+		if($longitude===null) { $longitude=$existing_lng; }
 	}
 	$latitude_sql=$latitude===null ? "NULL" : "'".$latitude."'";
 	$longitude_sql=$longitude===null ? "NULL" : "'".$longitude."'";

@@ -5,10 +5,26 @@ $manage_url="manage_ss.php";
 $manage_title="Manage Shop";
 $message_title="Shop";
 
+$_col = mysqli_query($db_conn, "SHOW COLUMNS FROM ms_shop LIKE 'location_recapture_count'");
+if ($_col && mysqli_num_rows($_col) === 0) {
+	mysqli_query($db_conn, "ALTER TABLE ms_shop ADD COLUMN location_recapture_count INT NOT NULL DEFAULT 0");
+}
+require_once __DIR__ . "/../shared/ShopLocationChangeRequest.php";
+ensureShopLocationChangeRequestsTable($db_conn);
+
 $get_id=base64_decode($_REQUEST['prid']);
 $select_product_list="select * from ms_shop where id='$get_id'";
 				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
+$recaptureCount = (int)($result_product_list['location_recapture_count'] ?? 0);
+$recaptureLimitReached = $recaptureCount >= 2;
+
+$pendingLocationRequest = null;
+if ($recaptureLimitReached) {
+	$get_id_esc = (int)$get_id;
+	$pendingRes = mysqli_query($db_conn, "SELECT id, requested_at FROM ms_shop_location_requests WHERE shop_id='$get_id_esc' AND status='pending' ORDER BY id DESC LIMIT 1");
+	$pendingLocationRequest = $pendingRes ? mysqli_fetch_assoc($pendingRes) : null;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -194,11 +210,24 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 			<input type="hidden" name="latitude" id="latitude" value="<?=$result_product_list['latitude'];?>">
 			<input type="hidden" name="longitude" id="longitude" value="<?=$result_product_list['longitude'];?>">
 			<div style="margin-top:8px;">
-				<button type="button" id="captureLocationBtn" class="btn btn-secondary btn-sm">
+				<button type="button" id="captureLocationBtn" class="btn btn-secondary btn-sm"<?php if ($recaptureLimitReached) { echo ' disabled'; } ?>>
 					<i class="material-icons" style="font-size:16px; vertical-align:middle;">my_location</i> Re-capture Location
 				</button>
-				<span id="captureLocationStatus" style="margin-left:8px; font-size:13px;"></span>
+				<span id="captureLocationStatus" style="margin-left:8px; font-size:13px;<?php if ($recaptureLimitReached) { echo ' color:red;'; } ?>"><?php if (!$recaptureLimitReached) { echo "Recaptures used: " . $recaptureCount . " / 2"; } ?></span>
 			</div>
+			<?php if ($recaptureLimitReached) { ?>
+			<div style="margin-top:8px;">
+				<?php if ($pendingLocationRequest) { ?>
+				<div class="alert alert-info" style="padding:8px 12px; margin-bottom:0;">Maximum location recapture limit (2) reached for this shop. Location change request sent — waiting for your Sales BDM to approve it.</div>
+				<?php } else { ?>
+				<div class="alert alert-warning" style="padding:8px 12px; margin-bottom:8px;">Maximum location recapture limit (2) reached for this shop. Contact your Sales BDM if it needs to change.</div>
+				<button type="button" id="requestLocationChangeBtn" class="btn btn-warning btn-sm" data-shop-id="<?=(int)$get_id;?>">
+					<i class="material-icons" style="font-size:16px; vertical-align:middle;">pin_drop</i> Request Location Change
+				</button>
+				<span id="requestLocationChangeStatus" style="margin-left:8px; font-size:13px;"></span>
+				<?php } ?>
+			</div>
+			<?php } ?>
 			<div id="latLngDisplay" style="margin-top:6px; font-size:13px; color:#333;"><?php if($result_product_list['latitude']!=NULL && $result_product_list['longitude']!=NULL){ echo 'Lat: '.$result_product_list['latitude'].', Lng: '.$result_product_list['longitude']; } ?></div>
 			<br/>
 	
@@ -309,6 +338,39 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     });
+
+    var reqLocBtn = document.getElementById('requestLocationChangeBtn');
+    if (reqLocBtn) {
+        reqLocBtn.addEventListener('click', function() {
+            if (!confirm('Send a location change request to your Sales BDM for this shop?')) { return; }
+            var statusEl = document.getElementById('requestLocationChangeStatus');
+            reqLocBtn.disabled = true;
+            statusEl.textContent = 'Sending request…';
+            statusEl.style.color = '#555';
+            fetch('request-location-change.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'request_location_change=1&shop_id=' + encodeURIComponent(reqLocBtn.getAttribute('data-shop-id'))
+            })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data && data.success) {
+                        statusEl.textContent = 'Request sent to your Sales BDM.';
+                        statusEl.style.color = 'green';
+                        window.location.reload();
+                    } else {
+                        statusEl.textContent = (data && data.message) ? data.message : 'Could not send request.';
+                        statusEl.style.color = 'red';
+                        reqLocBtn.disabled = false;
+                    }
+                })
+                .catch(function() {
+                    statusEl.textContent = 'Could not reach the server.';
+                    statusEl.style.color = 'red';
+                    reqLocBtn.disabled = false;
+                });
+        });
+    }
 
     </script>
 </body>

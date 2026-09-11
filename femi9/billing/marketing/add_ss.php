@@ -68,7 +68,7 @@ $assignedDistricts = getMsAssignedDistricts($db_conn, (int)$markeingSTFID);
                             <div class="col">
                                 <div class="page-description">
 								
-								<?php if(isset($_REQUEST['distalready'])){?><div class="alert alert-danger">Shop Details Already Exists.</div><?php }?>
+								<?php if(isset($_REQUEST['distalready'])){?><div class="alert alert-danger">Shop Details Already Exists.<?php if(isset($_REQUEST['existingshop'])){?> <a href="edit-ss.php?prid=<?=htmlspecialchars($_REQUEST['existingshop']);?>&amp;dupBlocked=1">View the existing shop</a> — if its location needs to be corrected, use "Request Location Change" there.<?php }?></div><?php }?>
 								<?php if(isset($_REQUEST['invaliddistrict'])){?><div class="alert alert-danger">Please select a valid District/Taluk from the list.</div><?php }?>
 								
                                     <h1>

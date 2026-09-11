@@ -137,6 +137,12 @@ foreach ($visits as $oid => &$v) {
 unset($v);
 
 $visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filter);
+
+$perPage = 15;
+$totalVisitCount = count($visits);
+$totalPages = max(1, (int)ceil($totalVisitCount / $perPage));
+$page = max(1, min($totalPages, (int)($_GET['page'] ?? 1)));
+$visits = array_slice($visits, ($page - 1) * $perPage, $perPage, true);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -263,6 +269,7 @@ $visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filte
                                         <table class="mt">
                                             <thead>
                                                 <tr>
+                                                    <th>S.No</th>
                                                     <th>Date</th>
                                                     <th>TP</th>
                                                     <th>Shop</th>
@@ -273,9 +280,10 @@ $visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filte
                                             </thead>
                                             <tbody>
                                                 <?php if (empty($visits)): ?>
-                                                <tr><td colspan="6" class="text-center text-muted">No field order entries in this date range.</td></tr>
-                                                <?php else: foreach ($visits as $oid => $v): ?>
+                                                <tr><td colspan="7" class="text-center text-muted">No field order entries in this date range.</td></tr>
+                                                <?php else: $_sno = ($page - 1) * $perPage; foreach ($visits as $oid => $v): $_sno++; ?>
                                                 <tr>
+                                                    <td><?=$_sno?></td>
                                                     <td><?=htmlspecialchars(date("d-m-Y", strtotime($v['order_date'])))?></td>
                                                     <td>
                                                         <?=htmlspecialchars($v['tp_name'] ?? '-')?>
@@ -326,6 +334,27 @@ $visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filte
                                             </tbody>
                                         </table>
                                         </div>
+
+                                        <?php if ($totalPages > 1): ?>
+                                        <nav class="mt-3">
+                                            <ul class="pagination justify-content-center" style="margin-bottom:0;">
+                                                <?php
+                                                $qs = $_GET;
+                                                function _foPageLink($qs, $p) { $qs['page'] = $p; return '?' . http_build_query($qs); }
+                                                ?>
+                                                <?php if ($page > 1): ?>
+                                                <li class="page-item"><a class="page-link" href="<?=htmlspecialchars(_foPageLink($qs, $page - 1))?>">Previous</a></li>
+                                                <?php endif; ?>
+                                                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                                                <li class="page-item <?=($i == $page) ? 'active' : ''?>"><a class="page-link" href="<?=htmlspecialchars(_foPageLink($qs, $i))?>"><?=$i?></a></li>
+                                                <?php endfor; ?>
+                                                <?php if ($page < $totalPages): ?>
+                                                <li class="page-item"><a class="page-link" href="<?=htmlspecialchars(_foPageLink($qs, $page + 1))?>">Next</a></li>
+                                                <?php endif; ?>
+                                            </ul>
+                                            <p class="text-center text-muted small mt-2">Showing <?=(($page-1)*$perPage)+1?>–<?=min($page*$perPage, $totalVisitCount)?> of <?=$totalVisitCount?> entries</p>
+                                        </nav>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
