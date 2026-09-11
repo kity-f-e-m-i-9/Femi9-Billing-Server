@@ -15,7 +15,40 @@
  * Requires TpGstHelper.php's tp_sales_gst_lines() to already have been run for
  * this godown/period — pass its result as $tp_sls_lines (GSTR1.php computes
  * this once via gst_details.php and reuses it here to avoid a second query).
+ *
+ * CGST/SGST vs IGST is decided from the buyer's own GSTIN (its first 2
+ * digits are the GST state code) compared against the selling godown's
+ * state_code, not from the invoice's own stored gst_type flag — the GSTIN is
+ * the authoritative signal for which state a buyer is actually registered
+ * in. Falls back to the stored gst_type/state-name flag only when the
+ * buyer's GSTIN doesn't validate (real data has junk placeholders in some
+ * GSTIN fields — "N8", "O", "-," etc.), see b2b_resolve_is_intra().
  */
+
+// GSTIN's first 2 digits are the buyer's GST state code — the authoritative
+// signal for intra/inter, since a buyer's billed/shipping address can differ
+// from the state their GST registration is actually held in. Falls back to
+// the invoice's own stored gst_type flag whenever the GSTIN doesn't validate
+// (real data has junk placeholders like "N8", "O", "-," in some GSTIN fields
+// — see b2b_buyer_add's caller for how this fallback is wired in).
+if (!function_exists('b2b_gstin_state_code')) {
+function b2b_gstin_state_code($gstin) {
+    $g = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string)$gstin));
+    if (!preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/', $g)) return null;
+    return substr($g, 0, 2);
+}
+}
+
+// Resolves is_intra for a buyer row: GSTIN state code vs. the selling
+// godown's own state_code when the GSTIN validates, else the invoice's own
+// stored gst_type-derived flag ($fallback_is_intra).
+if (!function_exists('b2b_resolve_is_intra')) {
+function b2b_resolve_is_intra($buyer_gstin, $godown_state_code, $fallback_is_intra) {
+    $buyer_code = b2b_gstin_state_code($buyer_gstin);
+    if ($buyer_code === null || empty($godown_state_code)) return $fallback_is_intra;
+    return $buyer_code === (string)$godown_state_code;
+}
+}
 
 if (!function_exists('b2b_buyer_add')) {
 function b2b_buyer_add(&$buyers, $key, $name, $type, $gstin, $inv, $taxable, $is_intra, $gst_amount) {
@@ -32,6 +65,10 @@ function b2b_buyer_add(&$buyers, $key, $name, $type, $gstin, $inv, $taxable, $is
 if (!function_exists('compute_b2b_buyers')) {
 function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_date, $to_date, array $tp_sls_lines) {
     $b2b_buyers = [];
+
+    $godown_state_code = '';
+    $gres = mysqli_query($db_conn, "select state_code from company_godown where id='$get_godown_id'");
+    if ($grow = mysqli_fetch_assoc($gres)) { $godown_state_code = $grow['state_code']; }
 
     // Network sales (SS/ST/DT/Shop). gst_percentage>0 only.
     $q = "
@@ -51,7 +88,8 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     ";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
-        b2b_buyer_add($b2b_buyers, $r['to_user_type'].'_'.$r['to_user_id'], $r['bname'], ucfirst(str_replace('_',' ',$r['to_user_type'])), $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
+        $is_intra = b2b_resolve_is_intra($r['bgstin'], $godown_state_code, $r['gst_type']=='inner');
+        b2b_buyer_add($b2b_buyers, $r['to_user_type'].'_'.$r['to_user_id'], $r['bname'], ucfirst(str_replace('_',' ',$r['to_user_type'])), $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt']);
     }
 
     // Customer sales. gst_percentage>0 only.
@@ -68,7 +106,8 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     ";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
-        b2b_buyer_add($b2b_buyers, 'customer_'.$r['customer_id'], $r['bname'], 'Customer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
+        $is_intra = b2b_resolve_is_intra($r['bgstin'], $godown_state_code, $r['gst_type']=='inner');
+        b2b_buyer_add($b2b_buyers, 'customer_'.$r['customer_id'], $r['bname'], 'Customer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt']);
     }
 
     // OT sales. gst>0 only.
@@ -82,7 +121,8 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     ";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
-        b2b_buyer_add($b2b_buyers, 'ot_'.$r['bgstin'].'_'.$r['bname'], $r['bname'], 'OT Sale', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
+        $is_intra = b2b_resolve_is_intra($r['bgstin'], $godown_state_code, $r['gst_type']=='inner');
+        b2b_buyer_add($b2b_buyers, 'ot_'.$r['bgstin'].'_'.$r['bname'], $r['bname'], 'OT Sale', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt']);
     }
 
     // TP invoices — reuses the caller's already-computed per-line list (see
@@ -90,7 +130,8 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     // registered + rated-only filter.
     foreach ($tp_sls_lines as $l) {
         if (!$l['is_registered'] || (float)$l['gst_percentage'] <= 0) continue;
-        b2b_buyer_add($b2b_buyers, 'tp_'.$l['tp_invoice_id'], $l['tp_name'], 'Territory Partner', $l['tp_gstin'], $l['invoice_number'], $l['taxable_value'], $l['is_intra'], $l['gst_amount']);
+        $is_intra = b2b_resolve_is_intra($l['tp_gstin'], $godown_state_code, $l['is_intra']);
+        b2b_buyer_add($b2b_buyers, 'tp_'.$l['tp_invoice_id'], $l['tp_name'], 'Territory Partner', $l['tp_gstin'], $l['invoice_number'], $l['taxable_value'], $is_intra, $l['gst_amount']);
     }
 
     // Internal transfers (company godown -> company godown, e.g. Neksomo ->
@@ -111,7 +152,8 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     ";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
-        $is_intra = strtolower(trim($r['to_state'])) == strtolower(trim($r['from_state']));
+        $fallback_is_intra = strtolower(trim($r['to_state'])) == strtolower(trim($r['from_state']));
+        $is_intra = b2b_resolve_is_intra($r['bgstin'], $godown_state_code, $fallback_is_intra);
         b2b_buyer_add($b2b_buyers, 'godown_'.$r['send_to'], $r['bname'], 'Internal Transfer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt']);
     }
 
@@ -131,8 +173,9 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     while ($r = mysqli_fetch_assoc($res)) {
         $key = $r['from_usertype'].'_'.$r['from_userid'];
         if (!isset($b2b_buyers[$key])) continue;
+        $is_intra = b2b_resolve_is_intra($b2b_buyers[$key]['gstin'], $godown_state_code, $r['gst_type']=='inner');
         $b2b_buyers[$key]['taxable'] -= (float)$r['taxable'];
-        if ($r['gst_type']=='inner') { $b2b_buyers[$key]['cgst'] -= (float)$r['gst_amt']/2; $b2b_buyers[$key]['sgst'] -= (float)$r['gst_amt']/2; }
+        if ($is_intra) { $b2b_buyers[$key]['cgst'] -= (float)$r['gst_amt']/2; $b2b_buyers[$key]['sgst'] -= (float)$r['gst_amt']/2; }
         else { $b2b_buyers[$key]['igst'] -= (float)$r['gst_amt']; }
     }
 
