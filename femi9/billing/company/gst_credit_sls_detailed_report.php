@@ -142,16 +142,27 @@ function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
     return $rate . '% (Mixed)';
 }
 
+// Splits a row's gst_amount into cgst/sgst/igst. The whole page is already
+// filtered to one $gst_type (intra 'inner' vs inter 'outer'), so every row
+// splits the same way — intra halves into CGST+SGST, inter goes to IGST.
+$is_intra_page = ($gst_type != 'outer');
+function split_gst($gst_amount, $is_intra) {
+    if ($is_intra) { $half = $gst_amount / 2; return [$half, $half, 0]; }
+    return [0, 0, $gst_amount];
+}
+[$grand_cgst, $grand_sgst, $grand_igst] = split_gst($overall_gst, $is_intra_page);
+
 // ✅ Excel (CSV) export — same three row sets as the on-screen table, same
 // columns, so the download always matches what's currently displayed.
 if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     ob_start();
     $sn = 0;
     $csv_rows = [];
-    $csv_rows[] = ['#', 'Customer Type', 'Customer Name', 'Customer Mobile', 'GSTIN', 'Invoice Number', 'Invoice Date', 'Return Date', 'GST %', 'Taxable Value', 'GST Amount', 'Total Return Value'];
+    $csv_rows[] = ['#', 'Customer Type', 'Customer Name', 'Customer Mobile', 'GSTIN', 'Invoice Number', 'Invoice Date', 'Return Date', 'GST %', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Return Value'];
 
     foreach ($rows1 as $row) {
         $sn++;
+        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $is_intra_page);
         $csv_rows[] = [
             $sn,
             $customer_type_labels[$row['customer_usertype']] ?? ucfirst(str_replace('_', ' ', $row['customer_usertype'])),
@@ -160,37 +171,47 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
             date("d/m/Y", strtotime($row['return_date'])),
             gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs),
             number_format($row['total_sls_amount'], 2, '.', ''),
-            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($cgst, 2, '.', ''),
+            number_format($sgst, 2, '.', ''),
+            number_format($igst, 2, '.', ''),
             number_format($row['total_sls_amount'] + $row['gst_amount'], 2, '.', ''),
         ];
     }
     foreach ($rows2 as $row) {
         $sn++;
+        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $is_intra_page);
         $csv_rows[] = [
             $sn, 'Customer', $row['cust_name'], $row['cust_mobile'], $row['cust_gstin'], $row['inv_number'],
             date("d/m/Y", strtotime($row['invoice_date'])),
             date("d/m/Y", strtotime($row['return_date'])),
             gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs),
             number_format($row['total_sls_amount'], 2, '.', ''),
-            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($cgst, 2, '.', ''),
+            number_format($sgst, 2, '.', ''),
+            number_format($igst, 2, '.', ''),
             number_format($row['total_sls_amount'] + $row['gst_amount'], 2, '.', ''),
         ];
     }
     foreach ($rows3 as $row) {
         $sn++;
+        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $is_intra_page);
         $csv_rows[] = [
             $sn, 'Territory Partner', $row['tp_name'], $row['tp_mobile'], $row['tp_gstin'], $row['invoice_number'],
             date("d/m/Y", strtotime($row['invoice_date'])),
             date("d/m/Y", strtotime($row['return_date'])),
             gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs),
             number_format($row['taxable_value'], 2, '.', ''),
-            number_format($row['gst_amount'], 2, '.', ''),
+            number_format($cgst, 2, '.', ''),
+            number_format($sgst, 2, '.', ''),
+            number_format($igst, 2, '.', ''),
             number_format($row['taxable_value'] + $row['gst_amount'], 2, '.', ''),
         ];
     }
     $csv_rows[] = ['', '', '', '', '', '', '', '', 'Grand Total',
         number_format($overall_total, 2, '.', ''),
-        number_format($overall_gst, 2, '.', ''),
+        number_format($grand_cgst, 2, '.', ''),
+        number_format($grand_sgst, 2, '.', ''),
+        number_format($grand_igst, 2, '.', ''),
         number_format($overall_total + $overall_gst, 2, '.', ''),
     ];
 
@@ -282,14 +303,18 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <th>Return Date</th>
                                         <th>GST %</th>
                                         <th>Taxable Value</th>
-                                        <th>GST Amount</th>
+                                        <th>CGST</th>
+                                        <th>SGST</th>
+                                        <th>IGST</th>
                                         <th>Total Return Value (Rs.)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php $sn = 0; ?>
 
-                                    <?php foreach ($rows1 as $row): $sn++; ?>
+                                    <?php foreach ($rows1 as $row): $sn++;
+                                        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $is_intra_page);
+                                    ?>
                                     <tr>
                                         <td><?= $sn ?></td>
                                         <td><?= htmlspecialchars($customer_type_labels[$row['customer_usertype']] ?? ucfirst(str_replace('_', ' ', $row['customer_usertype']))) ?></td>
@@ -301,12 +326,16 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <td><?= date("d/m/Y", strtotime($row['return_date'])) ?></td>
                                         <td align="center"><?= gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs) ?></td>
                                         <td align="right"><?= inr_format($row['total_sls_amount'], 2) ?></td>
-                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
+                                        <td align="right"><?= inr_format($cgst, 2) ?></td>
+                                        <td align="right"><?= inr_format($sgst, 2) ?></td>
+                                        <td align="right"><?= inr_format($igst, 2) ?></td>
                                         <td align="right"><b><?= inr_format($row['total_sls_amount'] + $row['gst_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
-                                    <?php foreach ($rows2 as $row): $sn++; ?>
+                                    <?php foreach ($rows2 as $row): $sn++;
+                                        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $is_intra_page);
+                                    ?>
                                     <tr>
                                         <td><?= $sn ?></td>
                                         <td>Customer</td>
@@ -318,12 +347,16 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <td><?= date("d/m/Y", strtotime($row['return_date'])) ?></td>
                                         <td align="center"><?= gst_percentage_label($row['total_sls_amount'], $row['gst_amount'], $gst_slabs) ?></td>
                                         <td align="right"><?= inr_format($row['total_sls_amount'], 2) ?></td>
-                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
+                                        <td align="right"><?= inr_format($cgst, 2) ?></td>
+                                        <td align="right"><?= inr_format($sgst, 2) ?></td>
+                                        <td align="right"><?= inr_format($igst, 2) ?></td>
                                         <td align="right"><b><?= inr_format($row['total_sls_amount'] + $row['gst_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
-                                    <?php foreach ($rows3 as $row): $sn++; ?>
+                                    <?php foreach ($rows3 as $row): $sn++;
+                                        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $is_intra_page);
+                                    ?>
                                     <tr>
                                         <td><?= $sn ?></td>
                                         <td>Territory Partner</td>
@@ -335,14 +368,16 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <td><?= date("d/m/Y", strtotime($row['return_date'])) ?></td>
                                         <td align="center"><?= gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs) ?></td>
                                         <td align="right"><?= inr_format($row['taxable_value'], 2) ?></td>
-                                        <td align="right"><?= inr_format($row['gst_amount'], 2) ?></td>
+                                        <td align="right"><?= inr_format($cgst, 2) ?></td>
+                                        <td align="right"><?= inr_format($sgst, 2) ?></td>
+                                        <td align="right"><?= inr_format($igst, 2) ?></td>
                                         <td align="right"><b><?= inr_format($row['taxable_value'] + $row['gst_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
 
                                     <?php if ($sn === 0): ?>
                                     <tr>
-                                        <td colspan="12" style="text-align:center; padding:20px;">No records found.</td>
+                                        <td colspan="14" style="text-align:center; padding:20px;">No records found.</td>
                                     </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -350,7 +385,9 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                     <tr>
                                         <td colspan="9" align="right"><b>Grand Total</b></td>
                                         <td align="right"><b><?= inr_format($overall_total, 2) ?></b></td>
-                                        <td align="right"><b><?= inr_format($overall_gst, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($grand_cgst, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($grand_sgst, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($grand_igst, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($overall_total + $overall_gst, 2) ?></b></td>
                                     </tr>
                                 </tfoot>

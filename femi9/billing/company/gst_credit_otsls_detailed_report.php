@@ -69,9 +69,12 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     $csv_rows = [];
     $header = ['#', 'Customer Name', 'Customer Mobile'];
     if ($buyer_gsttype == "register") $header[] = 'GSTIN';
-    $header = array_merge($header, ['Invoice Number', 'Invoice Date', 'Return Date', 'GST %', 'Taxable Value', 'GST Amount', 'Total Return Value']);
+    $header = array_merge($header, ['Invoice Number', 'Invoice Date', 'Return Date', 'GST %', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Return Value']);
     $csv_rows[] = $header;
 
+    // ot_sales_return has no GST-amount column of its own (see comment on the
+    // query above), so CGST/SGST/IGST are always 0 here — shown as their own
+    // columns anyway for structural consistency with the other detail pages.
     $sn = 0;
     foreach ($rows as $row) {
         $sn++;
@@ -83,7 +86,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
             date("d/m/Y", strtotime($row['return_date'])),
             ($row['gst_percentage'] > 0 ? $row['gst_percentage'].'%' : '0%'),
             number_format($row['total_sls_amount'], 2, '.', ''),
-            '0.00',
+            '0.00', '0.00', '0.00',
             number_format($row['total_sls_amount'], 2, '.', ''),
         ]);
         $csv_rows[] = $line;
@@ -92,7 +95,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     if ($buyer_gsttype == "register") $total_row[] = '';
     $total_row = array_merge($total_row, ['', '', '', 'Grand Total',
         number_format($overall_total, 2, '.', ''),
-        '0.00',
+        '0.00', '0.00', '0.00',
         number_format($overall_total, 2, '.', ''),
     ]);
     $csv_rows[] = $total_row;
@@ -201,14 +204,16 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <th>Return Date</th>
                                         <th>GST %</th>
                                         <th>Taxable Value</th>
-                                        <th>GST Amount</th>
+                                        <th>CGST</th>
+                                        <th>SGST</th>
+                                        <th>IGST</th>
                                         <th>Total Return Value(Rs.)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($rows)): ?>
                                     <tr>
-                                        <td colspan="<?= $buyer_gsttype == 'register' ? 10 : 9 ?>" style="text-align:center; padding:20px;">
+                                        <td colspan="<?= $buyer_gsttype == 'register' ? 12 : 11 ?>" style="text-align:center; padding:20px;">
                                             No records found for the selected criteria.
                                         </td>
                                     </tr>
@@ -227,6 +232,8 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <td align="center"><?= $row['gst_percentage'] > 0 ? $row['gst_percentage'].'%' : '0%' ?></td>
                                         <td align="right"><?= inr_format($row['total_sls_amount'], 2) ?></td>
                                         <td align="right"><?= inr_format(0, 2) ?></td>
+                                        <td align="right"><?= inr_format(0, 2) ?></td>
+                                        <td align="right"><?= inr_format(0, 2) ?></td>
                                         <td align="right"><b><?= inr_format($row['total_sls_amount'], 2) ?></b></td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -243,6 +250,8 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <td><b>Grand Total</b></td>
                                         <td></td>
                                         <td align="right"><b><?= inr_format($overall_total, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format(0, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format(0, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format(0, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($overall_total, 2) ?></b></td>
                                     </tr>
