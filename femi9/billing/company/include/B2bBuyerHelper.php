@@ -15,17 +15,76 @@
  * Requires TpGstHelper.php's tp_sales_gst_lines() to already have been run for
  * this godown/period — pass its result as $tp_sls_lines (GSTR1.php computes
  * this once via gst_details.php and reuses it here to avoid a second query).
+ *
+ * CGST/SGST vs IGST is decided from the buyer's own GSTIN (its first 2
+ * digits are the GST state code) compared against the selling godown's
+ * state_code, not from the invoice's own stored gst_type flag — the GSTIN is
+ * the authoritative signal for which state a buyer is actually registered
+ * in. Falls back to the stored gst_type/state-name flag only when the
+ * buyer's GSTIN doesn't validate (real data has junk placeholders in some
+ * GSTIN fields — "N8", "O", "-," etc.), see b2b_resolve_is_intra().
  */
 
+// GSTIN's first 2 digits are the buyer's GST state code — the authoritative
+// signal for intra/inter, since a buyer's billed/shipping address can differ
+// from the state their GST registration is actually held in. Falls back to
+// the invoice's own stored gst_type flag whenever the GSTIN doesn't validate
+// (real data has junk placeholders like "N8", "O", "-," in some GSTIN fields
+// — see b2b_buyer_add's caller for how this fallback is wired in).
+if (!function_exists('b2b_gstin_state_code')) {
+function b2b_gstin_state_code($gstin) {
+    $g = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string)$gstin));
+    if (!preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/', $g)) return null;
+    return substr($g, 0, 2);
+}
+}
+
+// Resolves is_intra for a buyer row: GSTIN state code vs. the selling
+// godown's own state_code when the GSTIN validates, else the invoice's own
+// stored gst_type-derived flag ($fallback_is_intra).
+if (!function_exists('b2b_resolve_is_intra')) {
+function b2b_resolve_is_intra($buyer_gstin, $godown_state_code, $fallback_is_intra) {
+    $buyer_code = b2b_gstin_state_code($buyer_gstin);
+    if ($buyer_code === null || empty($godown_state_code)) return $fallback_is_intra;
+    return $buyer_code === (string)$godown_state_code;
+}
+}
+
+// GST UQC (Unit Quantity Code) for a product's unit_type — the standard code
+// the GST portal expects; this catalog only uses two units.
+if (!function_exists('gst_uqc_label')) {
+function gst_uqc_label($unit_type) {
+    return $unit_type === 'pack' ? 'PAC-PACKS' : 'PCS-PIECES';
+}
+}
+
 if (!function_exists('b2b_buyer_add')) {
-function b2b_buyer_add(&$buyers, $key, $name, $type, $gstin, $inv, $taxable, $is_intra, $gst_amount) {
+function b2b_buyer_add(&$buyers, $key, $name, $type, $gstin, $inv, $taxable, $is_intra, $gst_amount, $inv_date = null, $unit_type = null) {
     if (!isset($buyers[$key])) {
-        $buyers[$key] = ['name' => $name, 'type' => $type, 'gstin' => $gstin, 'invoices' => [], 'taxable' => 0, 'cgst' => 0, 'sgst' => 0, 'igst' => 0];
+        $buyers[$key] = ['name' => $name, 'type' => $type, 'gstin' => $gstin, 'invoices' => [], 'taxable' => 0, 'cgst' => 0, 'sgst' => 0, 'igst' => 0, 'unit_types' => []];
     }
-    $buyers[$key]['invoices'][$inv] = true;
+    // Keyed by invoice number so the same invoice split across multiple
+    // product lines still only records one date; first date wins (all lines
+    // of one invoice share the same date, so this is just picking any of them).
+    if (!isset($buyers[$key]['invoices'][$inv])) {
+        $buyers[$key]['invoices'][$inv] = $inv_date;
+    }
+    if ($unit_type !== null) { $buyers[$key]['unit_types'][$unit_type] = true; }
     $buyers[$key]['taxable'] += $taxable;
     if ($is_intra) { $buyers[$key]['cgst'] += $gst_amount / 2; $buyers[$key]['sgst'] += $gst_amount / 2; }
     else { $buyers[$key]['igst'] += $gst_amount; }
+}
+}
+
+// A buyer's invoices in the period can span products with different
+// unit_types (e.g. pieces and pack); shown as "Mixed" when more than one
+// appears, matching the existing GST% "Mixed" convention for blended rows.
+if (!function_exists('b2b_uqc_label')) {
+function b2b_uqc_label(array $unit_types) {
+    $keys = array_keys($unit_types);
+    if (count($keys) === 0) return '—';
+    if (count($keys) > 1) return 'Mixed';
+    return gst_uqc_label($keys[0]);
 }
 }
 
@@ -33,56 +92,70 @@ if (!function_exists('compute_b2b_buyers')) {
 function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_date, $to_date, array $tp_sls_lines) {
     $b2b_buyers = [];
 
-    // Network sales (SS/ST/DT/Shop). gst_percentage>0 only.
+    $godown_state_code = '';
+    $gres = mysqli_query($db_conn, "select state_code from company_godown where id='$get_godown_id'");
+    if ($grow = mysqli_fetch_assoc($gres)) { $godown_state_code = $grow['state_code']; }
+
+    // Network sales (SS/ST/DT/Shop). gst_percentage>0 only. Grouped by
+    // product's unit_type too so a buyer whose invoices mix pieces- and
+    // pack-unit products still shows both in b2b_uqc_label() (each combo
+    // becomes its own row here, folded back together by b2b_buyer_add's
+    // buyer-level accumulation).
     $q = "
-        SELECT uii.to_user_type, uii.to_user_id, ui.inv_number, uii.gst_type,
+        SELECT uii.to_user_type, uii.to_user_id, ui.inv_number, uii.gst_type, MAX(uii.date) AS date, p.unit_type,
                SUM(uii.total-uii.gstamount_total) AS taxable, SUM(uii.gstamount_total) AS gst_amt,
                COALESCE(ss.name,st.name,dt.name,sh.name) AS bname,
                COALESCE(ss.gstin,st.gstin,dt.gstin,sh.gstin) AS bgstin
         FROM user_invoice_items uii
         LEFT JOIN user_invoice ui ON ui.inv_id = uii.inv_id
+        LEFT JOIN products p ON p.id = uii.pr_id
         LEFT JOIN super_stockiest ss ON uii.to_user_type='super_stockiest' AND ss.temp_id=uii.to_user_id
         LEFT JOIN stockiest       st ON uii.to_user_type='stockiest'       AND st.temp_id=uii.to_user_id
         LEFT JOIN distributor     dt ON uii.to_user_type='distributor'     AND dt.temp_id=uii.to_user_id
         LEFT JOIN shop            sh ON uii.to_user_type='shop'            AND sh.temp_id=uii.to_user_id
         WHERE uii.from_user_type='$Login_user_TYPEvl' AND uii.from_user_id='$get_godown_id'
           AND uii.buyer_gsttype='register' AND uii.gst_percentage>0 AND uii.date BETWEEN '$from_date' AND '$to_date'
-        GROUP BY uii.to_user_type, uii.to_user_id, ui.inv_number, uii.gst_type, ss.name, st.name, dt.name, sh.name, ss.gstin, st.gstin, dt.gstin, sh.gstin
+        GROUP BY uii.to_user_type, uii.to_user_id, ui.inv_number, uii.gst_type, p.unit_type, ss.name, st.name, dt.name, sh.name, ss.gstin, st.gstin, dt.gstin, sh.gstin
     ";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
-        b2b_buyer_add($b2b_buyers, $r['to_user_type'].'_'.$r['to_user_id'], $r['bname'], ucfirst(str_replace('_',' ',$r['to_user_type'])), $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
+        $is_intra = b2b_resolve_is_intra($r['bgstin'], $godown_state_code, $r['gst_type']=='inner');
+        b2b_buyer_add($b2b_buyers, $r['to_user_type'].'_'.$r['to_user_id'], $r['bname'], ucfirst(str_replace('_',' ',$r['to_user_type'])), $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt'], $r['date'], $r['unit_type']);
     }
 
     // Customer sales. gst_percentage>0 only.
     $q = "
-        SELECT ii.customer_id, i.inv_number, ii.gst_type,
+        SELECT ii.customer_id, i.inv_number, ii.gst_type, MAX(ii.date) AS date, p.unit_type,
                SUM(ii.total-ii.gstamount_total) AS taxable, SUM(ii.gstamount_total) AS gst_amt,
                c.name AS bname, c.gstin AS bgstin
         FROM invoice_items ii
         LEFT JOIN invoice i ON i.inv_id = ii.inv_id
         LEFT JOIN customers c ON c.id = ii.customer_id
+        LEFT JOIN products p ON p.id = ii.pr_id
         WHERE ii.user_type='$Login_user_TYPEvl' AND ii.user_id='$get_godown_id'
           AND ii.buyer_gsttype='register' AND ii.gst_percentage>0 AND ii.date BETWEEN '$from_date' AND '$to_date'
-        GROUP BY ii.customer_id, i.inv_number, ii.gst_type, c.name, c.gstin
+        GROUP BY ii.customer_id, i.inv_number, ii.gst_type, p.unit_type, c.name, c.gstin
     ";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
-        b2b_buyer_add($b2b_buyers, 'customer_'.$r['customer_id'], $r['bname'], 'Customer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
+        $is_intra = b2b_resolve_is_intra($r['bgstin'], $godown_state_code, $r['gst_type']=='inner');
+        b2b_buyer_add($b2b_buyers, 'customer_'.$r['customer_id'], $r['bname'], 'Customer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt'], $r['date'], $r['unit_type']);
     }
 
     // OT sales. gst>0 only.
     $q = "
-        SELECT s.tempid, i.inv_number, s.gst_type, s.customer_name AS bname, s.gst_number AS bgstin,
+        SELECT s.tempid, i.inv_number, s.gst_type, s.customer_name AS bname, s.gst_number AS bgstin, MAX(s.date) AS date, p.unit_type,
                SUM(s.total-s.gst_amount) AS taxable, SUM(s.gst_amount) AS gst_amt
         FROM ot_sales s
         LEFT JOIN ot_sales_invoice i ON i.tempid = s.tempid
+        LEFT JOIN products p ON p.id = s.prid
         WHERE s.godownid='$get_godown_id' AND s.buyer_gsttype='register' AND s.gst>0 AND s.date BETWEEN '$from_date' AND '$to_date'
-        GROUP BY s.tempid, i.inv_number, s.gst_type, s.customer_name, s.gst_number
+        GROUP BY s.tempid, i.inv_number, s.gst_type, p.unit_type, s.customer_name, s.gst_number
     ";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
-        b2b_buyer_add($b2b_buyers, 'ot_'.$r['bgstin'].'_'.$r['bname'], $r['bname'], 'OT Sale', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $r['gst_type']=='inner', (float)$r['gst_amt']);
+        $is_intra = b2b_resolve_is_intra($r['bgstin'], $godown_state_code, $r['gst_type']=='inner');
+        b2b_buyer_add($b2b_buyers, 'ot_'.$r['bgstin'].'_'.$r['bname'], $r['bname'], 'OT Sale', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt'], $r['date'], $r['unit_type']);
     }
 
     // TP invoices — reuses the caller's already-computed per-line list (see
@@ -90,7 +163,8 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     // registered + rated-only filter.
     foreach ($tp_sls_lines as $l) {
         if (!$l['is_registered'] || (float)$l['gst_percentage'] <= 0) continue;
-        b2b_buyer_add($b2b_buyers, 'tp_'.$l['tp_invoice_id'], $l['tp_name'], 'Territory Partner', $l['tp_gstin'], $l['invoice_number'], $l['taxable_value'], $l['is_intra'], $l['gst_amount']);
+        $is_intra = b2b_resolve_is_intra($l['tp_gstin'], $godown_state_code, $l['is_intra']);
+        b2b_buyer_add($b2b_buyers, 'tp_'.$l['tp_invoice_id'], $l['tp_name'], 'Territory Partner', $l['tp_gstin'], $l['invoice_number'], $l['taxable_value'], $is_intra, $l['gst_amount'], $l['invoice_date'], $l['unit_type'] ?? null);
     }
 
     // Internal transfers (company godown -> company godown, e.g. Neksomo ->
@@ -100,19 +174,21 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     // concept exists in this system, so no return-netting step is needed.
     $q = "
         SELECT it.send_to, cg.gname AS bname, cg.gstin AS bgstin, cg.state AS to_state, it_from.state AS from_state,
-               COALESCE(iti.inv_number, it.tempid) AS inv_number, it.gst_type,
+               COALESCE(iti.inv_number, it.tempid) AS inv_number, it.gst_type, MAX(it.date) AS date, p.unit_type,
                SUM(it.total - it.gst_amount) AS taxable, SUM(it.gst_amount) AS gst_amt
         FROM internal_transfer it
         LEFT JOIN internal_transfer_invoice iti ON iti.tempid = it.tempid
+        LEFT JOIN products p ON p.id = it.product_id
         JOIN company_godown cg ON cg.id = it.send_to
         JOIN company_godown it_from ON it_from.id = it.send_from
         WHERE it.send_from='$get_godown_id' AND it.gst>0 AND it.date BETWEEN '$from_date' AND '$to_date'
-        GROUP BY it.send_to, cg.gname, cg.gstin, cg.state, it_from.state, COALESCE(iti.inv_number, it.tempid), it.gst_type
+        GROUP BY it.send_to, cg.gname, cg.gstin, cg.state, it_from.state, COALESCE(iti.inv_number, it.tempid), it.gst_type, p.unit_type
     ";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
-        $is_intra = strtolower(trim($r['to_state'])) == strtolower(trim($r['from_state']));
-        b2b_buyer_add($b2b_buyers, 'godown_'.$r['send_to'], $r['bname'], 'Internal Transfer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt']);
+        $fallback_is_intra = strtolower(trim($r['to_state'])) == strtolower(trim($r['from_state']));
+        $is_intra = b2b_resolve_is_intra($r['bgstin'], $godown_state_code, $fallback_is_intra);
+        b2b_buyer_add($b2b_buyers, 'godown_'.$r['send_to'], $r['bname'], 'Internal Transfer', $r['bgstin'], $r['inv_number'], (float)$r['taxable'], $is_intra, (float)$r['gst_amt'], $r['date'], $r['unit_type']);
     }
 
     // Net out each buyer's own registered-person credit notes (returns),
@@ -131,8 +207,9 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     while ($r = mysqli_fetch_assoc($res)) {
         $key = $r['from_usertype'].'_'.$r['from_userid'];
         if (!isset($b2b_buyers[$key])) continue;
+        $is_intra = b2b_resolve_is_intra($b2b_buyers[$key]['gstin'], $godown_state_code, $r['gst_type']=='inner');
         $b2b_buyers[$key]['taxable'] -= (float)$r['taxable'];
-        if ($r['gst_type']=='inner') { $b2b_buyers[$key]['cgst'] -= (float)$r['gst_amt']/2; $b2b_buyers[$key]['sgst'] -= (float)$r['gst_amt']/2; }
+        if ($is_intra) { $b2b_buyers[$key]['cgst'] -= (float)$r['gst_amt']/2; $b2b_buyers[$key]['sgst'] -= (float)$r['gst_amt']/2; }
         else { $b2b_buyers[$key]['igst'] -= (float)$r['gst_amt']; }
     }
 

@@ -105,7 +105,8 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 											<th style="text-align:right;">Input Stock Qty</th>
 											<th style="text-align:right;">Sales Qty</th>
 											<th style="text-align:right;">Return Qty</th>
-											<th style="text-align:right;">Sent Qty</th>
+											<th style="text-align:right;">Internal Transfer Qty</th>
+											<th style="text-align:right;">Movement to CP</th>
 											</tr>
                                             </thead>
 											
@@ -207,15 +208,6 @@ $fetch_sum_SLSreturn_qty=mysqli_query($db_conn,$select_sum_SLSreturn_qty);
 $result_sum_SLSreturn_qty=mysqli_fetch_array($fetch_sum_SLSreturn_qty);
 if($result_sum_SLSreturn_qty[0]!=NULL){ $Total_SLSreturn_qty=$result_sum_SLSreturn_qty[0];}else{ $Total_SLSreturn_qty="0";}
 
-//AVERAGE SALES
-$Average_total_sales=$Total_OTSLS_qty+$Total_SLS1_qty+$Total_SLS2_qty+$Total_SLS3_qty;
-$Average_total_salesReturn=$Total_OTSLSrtn_qty+$Total_SLSreturn_qty;
-
-//Total sales qty
-$Total_slsQTY=$Average_total_sales-$Average_total_salesReturn;
-
-
-
 //DEMO/FREE/DAMAGE — same "all channels" scope as SALES-1/2 above.
 if($_REQUEST['godownid']==NULL)
 {
@@ -226,6 +218,13 @@ $select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_dat
 $fetch_sum_DFD_qty=mysqli_query($db_conn,$select_sum_DFD_qty);
 $result_sum_DFD_qty=mysqli_fetch_array($fetch_sum_DFD_qty);
 if($result_sum_DFD_qty[0]!=NULL){ $Total_DFD_qty=$result_sum_DFD_qty[0];}else{ $Total_DFD_qty="0";}
+
+//AVERAGE SALES — demo/free/damage folded in alongside invoiced sales.
+$Average_total_sales=$Total_OTSLS_qty+$Total_SLS1_qty+$Total_SLS2_qty+$Total_SLS3_qty+$Total_DFD_qty;
+$Average_total_salesReturn=$Total_OTSLSrtn_qty+$Total_SLSreturn_qty;
+
+//Total sales qty
+$Total_slsQTY=$Average_total_sales-$Average_total_salesReturn;
 
 //INTERNAL TRANSFER
 if($_REQUEST['godownid']==NULL)
@@ -238,14 +237,27 @@ $fetch_sum_INTRN_qty=mysqli_query($db_conn,$select_sum_INTRN_qty);
 $result_sum_INTRN_qty=mysqli_fetch_array($fetch_sum_INTRN_qty);
 if($result_sum_INTRN_qty[0]!=NULL){ $Total_INTRN_qty=$result_sum_INTRN_qty[0];}else{ $Total_INTRN_qty="0";}
 
-$Average_sent_qty=$Total_DFD_qty+$Total_INTRN_qty;						
+// MOVEMENT TO CP — stock physically transferred from this godown to a
+// Channel Partner via add-godown-to-location.php (pl-godown-transfer-
+// action.php, transfer_type='godown_to_location'), distinct from the
+// invoiced CP sales already counted in Sales Qty above.
+if($_REQUEST['godownid']==NULL)
+{
+$select_sum_PLT_qty="select sum(i.quantity) from pl_godown_transfer_items i inner join pl_godown_transfers t on t.id=i.transfer_id where t.transfer_date='$report_date' and i.product_id='$report_prid' and t.transfer_type='godown_to_location'";
+}else{
+$select_sum_PLT_qty="select sum(i.quantity) from pl_godown_transfer_items i inner join pl_godown_transfers t on t.id=i.transfer_id where t.transfer_date='$report_date' and i.product_id='$report_prid' and t.transfer_type='godown_to_location' and t.godown_id IN ($get_company_ids_sql)";
+}
+$fetch_sum_PLT_qty=mysqli_query($db_conn,$select_sum_PLT_qty);
+$result_sum_PLT_qty=mysqli_fetch_array($fetch_sum_PLT_qty);
+if($result_sum_PLT_qty[0]!=NULL){ $Total_MovementToCP_qty=$result_sum_PLT_qty[0];}else{ $Total_MovementToCP_qty="0";}
 						?>
                        <tr>
                         <td><?php echo $Result_productDetils["productName"];?></td>
 						<td align="right"><?php echo $Total_input_qty;?></td>
 						<td align="right"><?php echo $Average_total_sales;?></td>
 						<td align="right"><?php echo $Average_total_salesReturn;?></td>
-						<td align="right"><?php echo $Average_sent_qty;?></td>
+						<td align="right"><?php echo $Total_INTRN_qty;?></td>
+						<td align="right"><?php echo $Total_MovementToCP_qty;?></td>
                         </tr>
 						<?php }?>
 										

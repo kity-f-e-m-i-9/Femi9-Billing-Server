@@ -211,19 +211,29 @@ function computeStockMovement($db_conn, $prid, $fromDate, $toDate, $companyIdsSq
     }
 
     $input_qty           = $input_qty + $intrn_in + $plt_in;
-    $total_sales        = $ot_sales + $sls1 + $sls2 + $sls3;
+    // Demo/Free/Damage folded into Sales Qty — goods that left the godown as
+    // demo/free/damage are grouped with sales rather than shown separately.
+    $total_sales        = $ot_sales + $sls1 + $sls2 + $sls3 + $dfd;
     $total_sales_return = $ot_return + $sls_return;
-    $total_sent          = $dfd + $intrn + $plt_out;
+    // Internal transfer (outbound leg only, godown-to-godown) shown as its own column.
+    $internal_transfer   = $intrn;
+    // "Movement to CP" — stock physically transferred from this godown to a
+    // Channel Partner via add-godown-to-location.php (pl-godown-transfer-
+    // action.php, transfer_type='godown_to_location'), distinct from the
+    // invoiced CP sales already counted in Sales Qty above.
+    $movement_to_cp       = $plt_out;
 
     return [
         'input_qty'          => $input_qty,
         'total_sales'        => $total_sales,
         'total_sales_return' => $total_sales_return,
-        'total_sent'         => $total_sent,
+        'internal_transfer'  => $internal_transfer,
+        'movement_to_cp'      => $movement_to_cp,
         'manuf_qty'          => $manuf,
         // Credits (input, returns, manufacturer purchase) add to stock;
-        // sales and sent (demo/free/damage + internal transfer) remove from it.
-        'net_change'         => $input_qty + $total_sales_return + $manuf - $total_sales - $total_sent,
+        // sales (incl. demo/free/damage), internal transfer, and movement to
+        // CP remove from it.
+        'net_change'         => $input_qty + $total_sales_return + $manuf - $total_sales - $internal_transfer - $movement_to_cp,
     ];
 }
 
@@ -291,8 +301,10 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sales Qty (Pieces)</th><?php endif; ?>
 											<th style="text-align:right;">Return Qty</th>
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Return Qty (Pieces)</th><?php endif; ?>
-											<th style="text-align:right;">Sent Qty</th>
-<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sent Qty (Pieces)</th><?php endif; ?>
+											<th style="text-align:right;">Internal Transfer Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Internal Transfer Qty (Pieces)</th><?php endif; ?>
+											<th style="text-align:right;">Movement to CP</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Movement to CP (Pieces)</th><?php endif; ?>
 <?php if ($showManufPurchases): ?><th style="text-align:right;">Manufacturer Purchase Qty</th><?php endif; ?>
 <?php if ($showManufPurchases && is_neksomo_login($db_conn)): ?><th style="text-align:right;">Manufacturer Purchase Qty (Pieces)</th><?php endif; ?>
 											<th style="text-align:right;">Closing Stock</th>
@@ -316,8 +328,10 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sales']*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $m['total_sales_return'];?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sales_return']*$PiecesPerPack;?></td><?php endif; ?>
-						<td align="right"><?php echo $m['total_sent'];?></td>
-						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sent']*$PiecesPerPack;?></td><?php endif; ?>
+						<td align="right"><?php echo $m['internal_transfer'];?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['internal_transfer']*$PiecesPerPack;?></td><?php endif; ?>
+						<td align="right"><?php echo $m['movement_to_cp'];?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['movement_to_cp']*$PiecesPerPack;?></td><?php endif; ?>
 						<?php if ($showManufPurchases): ?><td align="right"><?php echo $m['manuf_qty'];?></td><?php endif; ?>
 						<?php if ($showManufPurchases && is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['manuf_qty']*$PiecesPerPack;?></td><?php endif; ?>
 						<?php // Closing stock is only meaningful once scoped to specific company

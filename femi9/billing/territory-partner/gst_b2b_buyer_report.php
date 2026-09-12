@@ -1,24 +1,14 @@
 <?php
-include("checksession.php"); require_once("include/GodownAccess.php");
+include("checksession.php");
 include("config.php");
 error_reporting(0);
 
-$from_date     = mysqli_real_escape_string($db_conn, $_REQUEST['frd']);
-$to_date       = mysqli_real_escape_string($db_conn, $_REQUEST['tod']);
-$get_godown_id = mysqli_real_escape_string($db_conn, $_REQUEST['gid']);
+$from_date = $_REQUEST['frd'] ?? '';
+$to_date   = $_REQUEST['tod'] ?? '';
+$tp_id     = $Login_user_IDvl;
 
-if (!empty($get_godown_id) && !is_godown_allowed($db_conn, (int)$get_godown_id)) {
-    header("Location: overall-stock?unauthorized"); exit;
-}
-
-$select_Godown_details = "SELECT * FROM company_godown WHERE id='$get_godown_id'";
-$fetch_Godown_details  = mysqli_query($db_conn, $select_Godown_details);
-$result_Godown_details = mysqli_fetch_array($fetch_Godown_details);
-
-require_once "include/TpGstHelper.php";
-require_once "include/B2bBuyerHelper.php";
-$tp_sls_lines = tp_sales_gst_lines($db_conn, $from_date, $to_date, "tpi.source_godown_id = '$get_godown_id'");
-$b2b_buyers = compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_date, $to_date, $tp_sls_lines);
+require_once __DIR__ . '/include/TpB2bBuyerHelper.php';
+$b2b_buyers = tp_compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $tp_id, $from_date, $to_date);
 
 $grand_taxable = 0; $grand_cgst = 0; $grand_sgst = 0; $grand_igst = 0;
 foreach ($b2b_buyers as $b) {
@@ -27,7 +17,7 @@ foreach ($b2b_buyers as $b) {
 $grand_gst = $grand_cgst + $grand_sgst + $grand_igst;
 
 // Effective GST% for a row = gst_amount / taxable_value * 100 — same helper
-// convention as gst_sls_detailed_report.php.
+// convention as company/gst_b2b_buyer_report.php.
 $gst_slabs = [0, 5, 12, 18, 28];
 function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
     if ((float)$taxable_value == 0.0) return $gst_amount == 0 ? '0%' : 'Mixed';
@@ -39,8 +29,8 @@ function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
 }
 
 // $b['invoices'] is [invoice_number => date]. Sorted by invoice number
-// (natural/alphanumeric order, e.g. "G/26-27/9" before "G/26-27/10") so the
-// numbers and dates columns list in a predictable, cross-referenceable order.
+// (natural/alphanumeric order) so the numbers and dates columns list in a
+// predictable, cross-referenceable order.
 function b2b_sorted_invoices($invoices) {
     $sorted = $invoices;
     uksort($sorted, 'strnatcmp');
@@ -52,12 +42,11 @@ function b2b_invoice_dates_label($invoices) {
     }, array_values(b2b_sorted_invoices($invoices))));
 }
 
-// ✅ Excel (CSV) export — same rows/columns as the on-screen table, same
-// pattern as gst_sls_detailed_report.php's export.
+// ✅ Excel (CSV) export — same rows/columns as the on-screen table.
 if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     ob_start();
     $csv_rows = [];
-    $csv_rows[] = ['#', 'Buyer', 'Type', 'GSTIN', 'Invoice Number(s)', 'Invoice Date(s)', 'UQC', 'GST %', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total'];
+    $csv_rows[] = ['#', 'Buyer', 'Type', 'GSTIN', 'Invoice Number(s)', 'Invoice Date(s)', 'GST %', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total'];
     $sn = 0;
     foreach ($b2b_buyers as $b) {
         $sn++;
@@ -65,7 +54,6 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
         $csv_rows[] = [
             $sn, $b['name'] ?: '—', $b['type'], $b['gstin'] ?: '—', implode(', ', array_keys(b2b_sorted_invoices($b['invoices']))),
             b2b_invoice_dates_label($b['invoices']),
-            b2b_uqc_label($b['unit_types'] ?? []),
             gst_percentage_label($b['taxable'], $gst_amt, $gst_slabs),
             number_format($b['taxable'], 2, '.', ''),
             number_format($b['cgst'], 2, '.', ''),
@@ -74,7 +62,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
             number_format($b['taxable'] + $gst_amt, 2, '.', ''),
         ];
     }
-    $csv_rows[] = ['', '', '', '', '', '', 'Grand Total', '',
+    $csv_rows[] = ['', '', '', '', '', 'Grand Total', '',
         number_format($grand_taxable, 2, '.', ''),
         number_format($grand_cgst, 2, '.', ''),
         number_format($grand_sgst, 2, '.', ''),
@@ -102,9 +90,6 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Responsive Admin Dashboard Template">
-    <meta name="keywords" content="admin,dashboard">
-    <meta name="author" content="stacks">
     <title>GSTR1 : <?php echo htmlspecialchars($business_name); ?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -117,10 +102,6 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../../assets/images/neptune.png" />
-    <!--[if lt IE 9]>
-    <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
-    <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-    <![endif]-->
     <style type="text/css">
     #gsttablevl tr th { border: 1px solid #000; padding: 5px; }
     #gsttablevl tr td { border: 1px solid #000; padding: 5px; }
@@ -144,10 +125,10 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <tr>
                                             <td>
                                                 <h1>GSTR1 &gt; Table 4 &mdash; B2B Buyer-Wise Detail</h1>
-                                                <h5><?= htmlspecialchars($result_Godown_details['gname'] ?? '') ?> &middot; <?= date("d/m/Y", strtotime($from_date)) ?> to <?= date("d/m/Y", strtotime($to_date)) ?></h5>
+                                                <h5><?= date("d/m/Y", strtotime($from_date)) ?> to <?= date("d/m/Y", strtotime($to_date)) ?></h5>
                                             </td>
                                             <td align="right" valign="top">
-                                                <a href="?frd=<?= urlencode($from_date) ?>&amp;tod=<?= urlencode($to_date) ?>&amp;gid=<?= urlencode($get_godown_id) ?>&amp;export=csv" title="Export to Excel"><img src="../../assets/images/excel-3-32.png"></a>
+                                                <a href="?frd=<?= urlencode($from_date) ?>&amp;tod=<?= urlencode($to_date) ?>&amp;export=csv" title="Export to Excel"><img src="../../assets/images/excel-3-32.png"></a>
                                             </td>
                                         </tr>
                                     </table>
@@ -165,7 +146,6 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <th>GSTIN</th>
                                         <th>Invoice Number(s)</th>
                                         <th>Invoice Date(s)</th>
-                                        <th>UQC</th>
                                         <th>GST %</th>
                                         <th>Taxable Value</th>
                                         <th>CGST</th>
@@ -176,7 +156,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                 </thead>
                                 <tbody>
                                     <?php if (empty($b2b_buyers)) { ?>
-                                    <tr><td colspan="13" style="text-align:center; padding:20px;">No B2B buyers in this period.</td></tr>
+                                    <tr><td colspan="12" style="text-align:center; padding:20px;">No B2B buyers in this period.</td></tr>
                                     <?php } else { $sn = 0; foreach ($b2b_buyers as $b): $sn++; $gst_amt = $b['cgst'] + $b['sgst'] + $b['igst']; ?>
                                     <tr>
                                         <td><?= $sn ?></td>
@@ -185,7 +165,6 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <td><?= htmlspecialchars($b['gstin'] ?: '—') ?></td>
                                         <td><?= htmlspecialchars(implode(', ', array_keys(b2b_sorted_invoices($b['invoices'])))) ?></td>
                                         <td><?= htmlspecialchars(b2b_invoice_dates_label($b['invoices'])) ?></td>
-                                        <td><?= htmlspecialchars(b2b_uqc_label($b['unit_types'] ?? [])) ?></td>
                                         <td align="center"><?= gst_percentage_label($b['taxable'], $gst_amt, $gst_slabs) ?></td>
                                         <td align="right"><?= inr_format($b['taxable'], 2) ?></td>
                                         <td align="right"><?= inr_format($b['cgst'], 2) ?></td>
@@ -197,7 +176,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="7" align="right"><b>Grand Total</b></td>
+                                        <td colspan="6" align="right"><b>Grand Total</b></td>
                                         <td></td>
                                         <td align="right"><b><?= inr_format($grand_taxable, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($grand_cgst, 2) ?></b></td>
@@ -219,9 +198,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
     <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
     <script src="../../assets/plugins/pace/pace.min.js"></script>
-    <script src="../../assets/plugins/apexcharts/apexcharts.min.js"></script>
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
-    <script src="../../assets/js/pages/dashboard.js"></script>
 </body>
 </html>

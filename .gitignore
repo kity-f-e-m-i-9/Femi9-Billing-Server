@@ -14,3 +14,6 @@ femi9/billing/territory-partner/courier_qr/*
 # Local DB credentials — must never be reverted by git checkout/reset/pull.
 femi9/billing/shared/.env
 femi9/billing/super-stockist/.env
+
+# Local DB backup dumps from data migrations - not source code
+/db_backups/

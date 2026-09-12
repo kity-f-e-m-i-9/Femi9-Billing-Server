@@ -7,7 +7,7 @@ $from_date     = mysqli_real_escape_string($db_conn, $_REQUEST['frd']);
 $to_date       = mysqli_real_escape_string($db_conn, $_REQUEST['tod']);
 $get_godown_id = mysqli_real_escape_string($db_conn, $_REQUEST['gid']);
 
-if (!is_godown_allowed($db_conn, (int)$get_godown_id)) {
+if (!empty($get_godown_id) && !is_godown_allowed($db_conn, (int)$get_godown_id)) {
     header("Location: overall-stock?unauthorized"); exit;
 }
 
@@ -15,53 +15,14 @@ $select_Godown_details = "SELECT * FROM company_godown WHERE id='$get_godown_id'
 $fetch_Godown_details  = mysqli_query($db_conn, $select_Godown_details);
 $result_Godown_details = mysqli_fetch_array($fetch_Godown_details);
 
-// ✅ Single JOIN query — was 4 queries per row (distinct tempids × 4).
-// total-gst_amount strips the GST out for the taxable-value column, same
-// convention used everywhere else on GSTR1 (internal_transfer.taxable_value
-// is unreliable/unpopulated, see gst_details.php).
-$select_Report = "
-    SELECT
-        it.tempid,
-        MAX(it.date)          AS transfer_date,
-        MAX(it.send_to)       AS send_to,
-        MAX(iti.inv_number)   AS inv_number,
-        MAX(cg.gname)         AS gname,
-        MAX(cg.gstin)         AS company_gstin,
-        SUM(it.total)         AS total_sls_amount,
-        SUM(it.gst_amount)    AS gst_amount
-    FROM internal_transfer it
-    LEFT JOIN internal_transfer_invoice iti ON iti.tempid = it.tempid
-    LEFT JOIN company_godown cg ON cg.id = (
-        SELECT send_to FROM internal_transfer WHERE tempid = it.tempid LIMIT 1
-    )
-    WHERE it.date BETWEEN '$from_date' AND '$to_date'
-      AND it.send_from = '$get_godown_id'
-    GROUP BY it.tempid
-    ORDER BY MAX(it.date) ASC
-";
-$fetch_Report = mysqli_query($db_conn, $select_Report);
-
-// Selling godown's own state_code, used to check each transfer's receiving
-// company's GSTIN state-code against it (same approach as
-// include/B2bBuyerHelper.php's b2b_resolve_is_intra(), reused here) — more
-// reliable than a state-name string comparison since GSTIN is authoritative.
-require_once __DIR__ . '/include/B2bBuyerHelper.php';
-$godown_state_code = '';
-$gres = mysqli_query($db_conn, "select state_code from company_godown where id='$get_godown_id'");
-if ($grow = mysqli_fetch_assoc($gres)) { $godown_state_code = $grow['state_code']; }
-
-$rows = [];
-$overall_total = 0; $overall_gst = 0;
-while ($row = mysqli_fetch_assoc($fetch_Report)) {
-    $row['taxable_value'] = $row['total_sls_amount'] - $row['gst_amount'];
-    $row['is_intra'] = b2b_resolve_is_intra($row['company_gstin'], $godown_state_code, true);
-    $overall_total += $row['taxable_value'];
-    $overall_gst   += $row['gst_amount'];
-    $rows[] = $row;
-}
+require_once "include/TpGstHelper.php";
+require_once "include/B2cInvoiceHelper.php";
+$tp_sls_lines    = tp_sales_gst_lines($db_conn, $from_date, $to_date, "tpi.source_godown_id = '$get_godown_id'");
+$tp_credit_lines = tp_credit_gst_lines($db_conn, $from_date, $to_date, "tpi.source_godown_id = '$get_godown_id'");
+$invoices = compute_b2c_invoices($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_date, $to_date, $tp_sls_lines, $tp_credit_lines);
 
 // Effective GST% for a row = gst_amount / taxable_value * 100 — same helper
-// convention as gst_sls_detailed_report.php.
+// convention as gst_sls_detailed_report.php / gst_b2b_buyer_report.php.
 $gst_slabs = [0, 5, 12, 18, 28];
 function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
     if ((float)$taxable_value == 0.0) return $gst_amount == 0 ? '0%' : 'Mixed';
@@ -72,45 +33,37 @@ function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
     return $rate . '% (Mixed)';
 }
 
-function split_gst($gst_amount, $is_intra) {
-    if ($is_intra) { $half = $gst_amount / 2; return [$half, $half, 0]; }
-    return [0, 0, $gst_amount];
-}
-
-// Grand total split: sum each row's own cgst/sgst/igst rather than
-// re-deriving from the blended total, since rows can differ in state.
-$grand_cgst = 0; $grand_sgst = 0; $grand_igst = 0;
-foreach ($rows as $row) {
-    [$c, $s, $i] = split_gst($row['gst_amount'], $row['is_intra']);
-    $grand_cgst += $c; $grand_sgst += $s; $grand_igst += $i;
+$grand_taxable = 0; $grand_gst = 0; $grand_cgst = 0; $grand_sgst = 0; $grand_igst = 0;
+foreach ($invoices as $inv) {
+    $grand_taxable += $inv['taxable']; $grand_gst += $inv['gst_amount'];
+    $grand_cgst += $inv['cgst']; $grand_sgst += $inv['sgst']; $grand_igst += $inv['igst'];
 }
 
 // ✅ Excel (CSV) export — same rows/columns as the on-screen table.
 if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
     ob_start();
     $csv_rows = [];
-    $csv_rows[] = ['#', 'Company Name', 'GSTIN', 'Invoice Number', 'Invoice Date', 'GST %', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Sales Amount'];
+    $csv_rows[] = ['#', 'Channel', 'Buyer Name', 'Mobile', 'Invoice Number', 'Invoice Date', 'GST %', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total'];
     $sn = 0;
-    foreach ($rows as $row) {
+    foreach ($invoices as $inv) {
         $sn++;
-        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $row['is_intra']);
         $csv_rows[] = [
-            $sn, $row['gname'], $row['company_gstin'], $row['inv_number'],
-            date("d/m/Y", strtotime($row['transfer_date'])),
-            gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs),
-            number_format($row['taxable_value'], 2, '.', ''),
-            number_format($cgst, 2, '.', ''),
-            number_format($sgst, 2, '.', ''),
-            number_format($igst, 2, '.', ''),
-            number_format($row['total_sls_amount'], 2, '.', ''),
+            $sn, $inv['type'], $inv['name'] ?: '—', $inv['mobile'] ?: '—', $inv['invoice_number'],
+            date("d/m/Y", strtotime($inv['date'])),
+            gst_percentage_label($inv['taxable'], $inv['gst_amount'], $gst_slabs),
+            number_format($inv['taxable'], 2, '.', ''),
+            number_format($inv['cgst'], 2, '.', ''),
+            number_format($inv['sgst'], 2, '.', ''),
+            number_format($inv['igst'], 2, '.', ''),
+            number_format($inv['taxable'] + $inv['gst_amount'], 2, '.', ''),
         ];
     }
-    $csv_rows[] = ['', '', '', '', '', 'Grand Total',
-        number_format($overall_total, 2, '.', ''),
+    $csv_rows[] = ['', '', '', '', '', '', 'Grand Total',
+        number_format($grand_taxable, 2, '.', ''),
         number_format($grand_cgst, 2, '.', ''),
         number_format($grand_sgst, 2, '.', ''),
         number_format($grand_igst, 2, '.', ''),
-        number_format($overall_total + $overall_gst, 2, '.', ''),
+        number_format($grand_taxable + $grand_gst, 2, '.', ''),
     ];
 
     $csv_content = '';
@@ -122,7 +75,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
 
     ob_end_clean();
     header("Content-type: text/csv");
-    header("Content-Disposition: attachment; filename=GST_Internal_Transfer_Detailed_Report.csv");
+    header("Content-Disposition: attachment; filename=GST_B2C_Invoice_Report.csv");
     echo $csv_content;
     exit;
 }
@@ -174,7 +127,8 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                     <table style="width:100%;">
                                         <tr>
                                             <td>
-                                                <h1>GSTR1 &gt; Detailed Internal Transfer Report</h1>
+                                                <h1>GSTR1 &gt; Table 7 &mdash; B2C (Others) Invoice-Wise Detail</h1>
+                                                <h5><?= htmlspecialchars($result_Godown_details['gname'] ?? '') ?> &middot; <?= date("d/m/Y", strtotime($from_date)) ?> to <?= date("d/m/Y", strtotime($to_date)) ?></h5>
                                             </td>
                                             <td align="right" valign="top">
                                                 <a href="?frd=<?= urlencode($from_date) ?>&amp;tod=<?= urlencode($to_date) ?>&amp;gid=<?= urlencode($get_godown_id) ?>&amp;export=csv" title="Export to Excel"><img src="../../assets/images/excel-3-32.png"></a>
@@ -190,8 +144,9 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Company Name</th>
-                                        <th>GSTIN</th>
+                                        <th>Channel</th>
+                                        <th>Buyer Name</th>
+                                        <th>Mobile</th>
                                         <th>Invoice Number</th>
                                         <th>Invoice Date</th>
                                         <th>GST %</th>
@@ -199,42 +154,38 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <th>CGST</th>
                                         <th>SGST</th>
                                         <th>IGST</th>
-                                        <th>Total Sales Amount</th>
+                                        <th>Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if (empty($rows)): ?>
-                                    <tr>
-                                        <td colspan="11" style="text-align:center; padding:20px;">No records found.</td>
-                                    </tr>
-                                    <?php else: ?>
-                                    <?php $sn = 0; foreach ($rows as $row): $sn++;
-                                        [$cgst, $sgst, $igst] = split_gst($row['gst_amount'], $row['is_intra']);
-                                    ?>
+                                    <?php if (empty($invoices)) { ?>
+                                    <tr><td colspan="12" style="text-align:center; padding:20px;">No B2C (rated) invoices in this period.</td></tr>
+                                    <?php } else { $sn = 0; foreach ($invoices as $inv): $sn++; ?>
                                     <tr>
                                         <td><?= $sn ?></td>
-                                        <td><?= htmlspecialchars($row['gname']) ?></td>
-                                        <td><?= htmlspecialchars($row['company_gstin']) ?></td>
-                                        <td><?= htmlspecialchars($row['inv_number']) ?></td>
-                                        <td><?= date("d/m/Y", strtotime($row['transfer_date'])) ?></td>
-                                        <td align="center"><?= gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs) ?></td>
-                                        <td align="right"><?= inr_format($row['taxable_value'], 2) ?></td>
-                                        <td align="right"><?= inr_format($cgst, 2) ?></td>
-                                        <td align="right"><?= inr_format($sgst, 2) ?></td>
-                                        <td align="right"><?= inr_format($igst, 2) ?></td>
-                                        <td align="right"><b><?= inr_format($row['total_sls_amount'], 2) ?></b></td>
+                                        <td><?= htmlspecialchars($inv['type']) ?></td>
+                                        <td><?= htmlspecialchars($inv['name'] ?: '—') ?></td>
+                                        <td><?= htmlspecialchars($inv['mobile'] ?: '—') ?></td>
+                                        <td><?= htmlspecialchars($inv['invoice_number']) ?></td>
+                                        <td><?= date("d/m/Y", strtotime($inv['date'])) ?></td>
+                                        <td align="center"><?= gst_percentage_label($inv['taxable'], $inv['gst_amount'], $gst_slabs) ?></td>
+                                        <td align="right"><?= inr_format($inv['taxable'], 2) ?></td>
+                                        <td align="right"><?= inr_format($inv['cgst'], 2) ?></td>
+                                        <td align="right"><?= inr_format($inv['sgst'], 2) ?></td>
+                                        <td align="right"><?= inr_format($inv['igst'], 2) ?></td>
+                                        <td align="right"><b><?= inr_format($inv['taxable'] + $inv['gst_amount'], 2) ?></b></td>
                                     </tr>
-                                    <?php endforeach; ?>
-                                    <?php endif; ?>
+                                    <?php endforeach; } ?>
                                 </tbody>
                                 <tfoot>
                                     <tr>
                                         <td colspan="6" align="right"><b>Grand Total</b></td>
-                                        <td align="right"><b><?= inr_format($overall_total, 2) ?></b></td>
+                                        <td></td>
+                                        <td align="right"><b><?= inr_format($grand_taxable, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($grand_cgst, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($grand_sgst, 2) ?></b></td>
                                         <td align="right"><b><?= inr_format($grand_igst, 2) ?></b></td>
-                                        <td align="right"><b><?= inr_format($overall_total + $overall_gst, 2) ?></b></td>
+                                        <td align="right"><b><?= inr_format($grand_taxable + $grand_gst, 2) ?></b></td>
                                     </tr>
                                 </tfoot>
                             </table>

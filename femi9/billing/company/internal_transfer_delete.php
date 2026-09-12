@@ -48,11 +48,22 @@ if ($row) {
         );
 
         // Remove destination godown stock (input_qty ↓, closing_qty ↓) — FOR UPDATE + ledger
-        $stockService->reverseTransferIn(
+        $reverseInResult = $stockService->reverseTransferIn(
             $product_id, $Login_user_TYPEvl, $send_to, $qty,
             'transfer', $tempid, $createdBy,
             true
         );
+
+        if (($reverseInResult['success'] ?? false) === false
+            && ($reverseInResult['reason'] ?? '') === 'insufficient_stock_to_reverse') {
+            $db_conn->rollback();
+            $available = $reverseInResult['available'];
+            $_SESSION['errorMessage'] = "Cannot delete this transfer — only {$available} of the "
+                . "original {$qty} units are still in stock at the destination (the rest has "
+                . "already been sold or moved on). Please reconcile manually before deleting.";
+            echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=$tempid';</script>";
+            exit;
+        }
 
         $db_conn->commit();
 
