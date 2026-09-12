@@ -43,7 +43,14 @@ function getTpAssignedDistrictNames($db_conn, int $tpId): array {
             $currentId = (int)$node['parent_id'];
             $currentDepth = $depth - 1;
             $guard = 0;
-            while ($currentId > 0 && $currentDepth > $districtDepth && $guard < 10) {
+            // >= not > : currentDepth is the depth of the node we're about
+            // to fetch next, so when it equals districtDepth exactly, that
+            // node IS the district and still needs fetching/checking below —
+            // a strict > stops one iteration too early and walks straight
+            // past the district without ever reading it. Confirmed 2026-09-12
+            // (a TP assigned at Firka depth, 3 levels below District, always
+            // came back with zero districts under the old strict check).
+            while ($currentId > 0 && $currentDepth >= $districtDepth && $guard < 10) {
                 $upStmt = $db_conn->prepare("SELECT id, name, depth, parent_id FROM partner_location_nodes WHERE id = ?");
                 $upStmt->bind_param('i', $currentId);
                 $upStmt->execute();
