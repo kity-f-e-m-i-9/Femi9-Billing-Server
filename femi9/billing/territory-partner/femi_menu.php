@@ -77,6 +77,15 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
         </li>
 
         <li>
+            <a href=""><i class="material-icons-two-tone">sticky_note_2</i>District Notes
+                <i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+            <ul class="sub-menu">
+                <li><a href="add-district-note.php">Add Note</a></li>
+                <li><a href="manage-district-notes.php">Manage Notes</a></li>
+            </ul>
+        </li>
+
+        <li>
             <a href="#"><i class="material-icons-two-tone">done</i>Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
             <ul class="sub-menu">
                 <li><a href="overall-stock.php">Overall Stock</a></li>

@@ -1,0 +1,456 @@
+<?php
+include("checksession.php");
+include("config.php");
+require_once("include/TpDistrictScope.php");
+require_once("include/DistrictNotes.php");
+error_reporting(0);
+
+ensureDistrictNotesTable($db_conn);
+ensureNoteStatusColumn($db_conn);
+ensureResolutionNoteColumn($db_conn);
+
+$tp_id = (int)$Login_user_IDvl;
+$districts = getTpAssignedDistrictNames($db_conn, $tp_id);
+
+$filter_from     = $_GET['from_date'] ?? date('Y-m-01');
+$filter_to       = $_GET['to_date']   ?? date('Y-m-d');
+$filter_district = $_GET['district']  ?? '';
+if ($filter_district !== '' && !in_array($filter_district, $districts, true)) { $filter_district = ''; }
+$filter_priority = $_GET['priority']  ?? '';
+if (!in_array($filter_priority, ['high', 'priority', 'normal', ''], true)) { $filter_priority = ''; }
+$filter_status = $_GET['status'] ?? '';
+if (!in_array($filter_status, ['open', 'in_progress', 'completed', ''], true)) { $filter_status = ''; }
+$filter_type = $_GET['note_type'] ?? '';
+if (!in_array($filter_type, ['software', 'tp', ''], true)) { $filter_type = ''; }
+
+$where  = ["tp_id = ?", "DATE(created_at) BETWEEN ? AND ?"];
+$params = [$tp_id, $filter_from, $filter_to];
+$types  = "iss";
+if ($filter_district !== '') {
+    $where[]  = "district = ?";
+    $params[] = $filter_district;
+    $types   .= "s";
+}
+if ($filter_priority !== '') {
+    $where[]  = "priority = ?";
+    $params[] = $filter_priority;
+    $types   .= "s";
+}
+if ($filter_status !== '') {
+    $where[]  = "status = ?";
+    $params[] = $filter_status;
+    $types   .= "s";
+}
+if ($filter_type !== '') {
+    $where[]  = "note_type = ?";
+    $params[] = $filter_type;
+    $types   .= "s";
+}
+
+// Total count first (same WHERE, no LIMIT) so pagination links reflect the
+// full filtered result, not just what's on the current page.
+$countSql = "SELECT COUNT(*) AS cnt FROM tp_district_notes WHERE " . implode(" AND ", $where);
+$countStmt = $db_conn->prepare($countSql);
+$countStmt->bind_param($types, ...$params);
+$countStmt->execute();
+$totalNotes = (int)($countStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+$countStmt->close();
+
+$perPage    = 10;
+$totalPages = max(1, (int)ceil($totalNotes / $perPage));
+$page       = max(1, min($totalPages, (int)($_GET['page'] ?? 1)));
+$offset     = ($page - 1) * $perPage;
+
+$sql = "SELECT * FROM tp_district_notes WHERE " . implode(" AND ", $where) . " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+$stmt = $db_conn->prepare($sql);
+$stmt->bind_param($types . 'ii', ...array_merge($params, [$perPage, $offset]));
+$stmt->execute();
+$notes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Manage District Notes : <?php echo $business_name; ?></title>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
+    <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
+    <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
+    <link href="../../assets/css/main.min.css" rel="stylesheet">
+    <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="../../assets/images/neptune.png">
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        .mis-filter { background:#fff; border:1px solid rgba(11,11,11,0.10); border-radius:10px; padding:14px 18px; margin-bottom:20px; }
+        .mt { width:100%; border-collapse:collapse; font-size:13px; }
+        .mt th { background:#f7f7f6; font-weight:600; color:#52514e; padding:8px 11px; text-align:left; border-bottom:1px solid #e1e0d9; white-space:nowrap; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px; }
+        .mt td { padding:8px 11px; border-bottom:1px solid #e1e0d9; vertical-align:middle; }
+        .dn-badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; white-space:nowrap; }
+        .dn-thumb { width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid #e5e7eb; cursor:pointer; }
+        .dn-issue { max-width:340px; white-space:normal; }
+
+        .dn-status-cell { display:flex; gap:6px; align-items:center; }
+        .dn-status-btn {
+            width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+            cursor:pointer; transition:background .15s,border-color .15s,color .15s,transform .1s;
+            padding:0; border:1.5px solid transparent;
+        }
+        .dn-status-btn .material-icons-outlined { font-size:17px; }
+        .dn-status-btn:hover { transform:scale(1.08); }
+        .dn-status-btn:disabled { opacity:.55; cursor:wait; transform:none; }
+
+        .dn-status-btn.dn-status-start { background:#eff6ff; border-color:#bfdbfe; color:#2563eb; }
+        .dn-status-btn.dn-status-start:hover { background:#dbeafe; }
+        .dn-status-btn.dn-status-start.active { background:#f59e0b; border-color:#f59e0b; color:#fff; cursor:default; }
+        .dn-status-btn.dn-status-start.active:hover { transform:none; }
+
+        .dn-status-btn.dn-status-complete { background:#fff7ed; border-color:#fdba74; color:#c2410c; }
+        .dn-status-btn.dn-status-complete:hover { background:#ffedd5; border-color:#fb923c; color:#9a3412; }
+        .dn-spin { animation: dn-spin-anim 1.8s linear infinite; }
+        @keyframes dn-spin-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .dn-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 4px 4px; flex-wrap:wrap; }
+        .dn-pagination-info { font-size:12px; color:#6b7280; }
+        .dn-pagination-links { display:flex; gap:4px; flex-wrap:wrap; }
+        .dn-page-link {
+            min-width:30px; height:30px; padding:0 8px; border-radius:7px; border:1px solid #e5e7eb; background:#fff;
+            color:#374151; font-size:12.5px; font-weight:600; display:flex; align-items:center; justify-content:center;
+            text-decoration:none;
+        }
+        .dn-page-link:hover { background:#f3f4f6; color:#374151; }
+        .dn-page-link.active { background:#667eea; border-color:#667eea; color:#fff; }
+        .dn-page-link.disabled { opacity:.4; pointer-events:none; }
+    </style>
+</head>
+<body>
+<div class="app align-content-stretch d-flex flex-wrap">
+    <div class="app-sidebar">
+        <?php include("logo.php"); ?>
+        <?php include("femi_menu.php"); ?>
+    </div>
+    <div class="app-container">
+        <?php include("app-header.php"); ?>
+        <div class="app-content">
+            <div class="content-wrapper">
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="col">
+                            <div class="page-description">
+                                <h1>
+                                    <table class="headertble">
+                                        <tr>
+                                            <td>Manage District Notes</td>
+                                            <td><a href="add-district-note.php" class="btn btn-primary btn-sm"><i class="material-icons-outlined" style="font-size:16px;vertical-align:-3px;">add</i> Add Note</a></td>
+                                        </tr>
+                                    </table>
+                                </h1>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mis-filter">
+                        <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+                            <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">From</label>
+                                <input type="date" name="from_date" value="<?php echo htmlspecialchars($filter_from); ?>" class="form-control form-control-sm">
+                            </div>
+                            <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">To</label>
+                                <input type="date" name="to_date" value="<?php echo htmlspecialchars($filter_to); ?>" class="form-control form-control-sm">
+                            </div>
+                            <?php if (count($districts) > 1): ?>
+                            <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">District</label>
+                                <select name="district" class="form-control form-control-sm">
+                                    <option value="">All Districts</option>
+                                    <?php foreach ($districts as $d): ?>
+                                        <option value="<?php echo htmlspecialchars($d, ENT_QUOTES); ?>" <?php echo $filter_district === $d ? 'selected' : ''; ?>><?php echo htmlspecialchars($d); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <?php endif; ?>
+                            <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Priority</label>
+                                <select name="priority" class="form-control form-control-sm">
+                                    <option value="">All</option>
+                                    <option value="high" <?php echo $filter_priority === 'high' ? 'selected' : ''; ?>>High Priority</option>
+                                    <option value="priority" <?php echo $filter_priority === 'priority' ? 'selected' : ''; ?>>Medium</option>
+                                    <option value="normal" <?php echo $filter_priority === 'normal' ? 'selected' : ''; ?>>Normal</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Type</label>
+                                <select name="note_type" class="form-control form-control-sm">
+                                    <option value="">All</option>
+                                    <option value="tp" <?php echo $filter_type === 'tp' ? 'selected' : ''; ?>>Field Issue</option>
+                                    <option value="software" <?php echo $filter_type === 'software' ? 'selected' : ''; ?>>Software Issue</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Status</label>
+                                <select name="status" class="form-control form-control-sm">
+                                    <option value="">All</option>
+                                    <option value="open" <?php echo $filter_status === 'open' ? 'selected' : ''; ?>>Open</option>
+                                    <option value="in_progress" <?php echo $filter_status === 'in_progress' ? 'selected' : ''; ?>>In Progress</option>
+                                    <option value="completed" <?php echo $filter_status === 'completed' ? 'selected' : ''; ?>>Completed</option>
+                                </select>
+                            </div>
+                            <div><button type="submit" class="btn btn-primary btn-sm">Apply</button></div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body" style="overflow-x:auto;">
+                            <table class="mt">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>District</th>
+                                        <th>Type</th>
+                                        <th>Issue</th>
+                                        <th>Priority</th>
+                                        <th>Photo</th>
+                                        <th>Status</th>
+                                        <th>Note</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php if (empty($notes)): ?>
+                                    <tr><td colspan="9" class="text-center text-muted" style="padding:24px;">No notes found for this filter.</td></tr>
+                                <?php else: foreach ($notes as $n):
+                                    [$bg, $fg] = districtNotePriorityColors($n['priority']);
+                                    $status = $n['status'] ?? 'open';
+                                ?>
+                                    <tr>
+                                        <td><?php echo date('d M Y', strtotime($n['created_at'])); ?><br><span class="text-muted" style="font-size:11px;"><?php echo date('h:i A', strtotime($n['created_at'])); ?></span></td>
+                                        <td><?php echo htmlspecialchars($n['district']); ?></td>
+                                        <td>
+                                            <?php $noteType = $n['note_type'] ?? 'tp'; ?>
+                                            <span class="dn-badge" style="<?php echo $noteType === 'software' ? 'background:#ede9fe;color:#5b21b6;' : 'background:#e0f2fe;color:#075985;'; ?>">
+                                                <i class="material-icons-outlined" style="font-size:12px;vertical-align:-2px;"><?php echo $noteType === 'software' ? 'bug_report' : 'storefront'; ?></i>
+                                                <?php echo htmlspecialchars(districtNoteTypeLabel($noteType)); ?>
+                                            </span>
+                                        </td>
+                                        <td class="dn-issue"><?php echo nl2br(htmlspecialchars($n['issue_text'])); ?></td>
+                                        <td><span class="dn-badge" style="background:<?php echo $bg; ?>;color:<?php echo $fg; ?>;"><?php echo htmlspecialchars(districtNotePriorityLabel($n['priority'])); ?></span></td>
+                                        <td>
+                                            <?php if (!empty($n['photo_path'])): ?>
+                                                <a href="district_note_photos/<?php echo htmlspecialchars($n['photo_path'], ENT_QUOTES); ?>" target="_blank" rel="noopener">
+                                                    <img class="dn-thumb" src="district_note_photos/<?php echo htmlspecialchars($n['photo_path'], ENT_QUOTES); ?>" alt="Photo">
+                                                </a>
+                                            <?php else: ?>
+                                                <span class="text-muted" style="font-size:11px;">&mdash;</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <div class="dn-status-cell" data-id="<?php echo (int)$n['id']; ?>" data-status="<?php echo htmlspecialchars($status, ENT_QUOTES); ?>">
+                                            <?php if ($status === 'completed'): ?>
+                                                <span class="dn-badge" style="background:#d1fae5;color:#065f46;"><i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">check_circle</i> Completed</span>
+                                            <?php elseif ($status === 'in_progress'): ?>
+                                                <button type="button" class="dn-status-btn dn-status-complete" data-set="completed" title="Mark Completed">
+                                                    <i class="material-icons-outlined dn-spin">autorenew</i>
+                                                </button>
+                                            <?php else: ?>
+                                                <button type="button" class="dn-status-btn dn-status-start" data-set="in_progress" title="Start">
+                                                    <i class="material-icons-outlined">play_arrow</i>
+                                                </button>
+                                            <?php endif; ?>
+                                            </div>
+                                        </td>
+                                        <td class="dn-resolution-note-cell" style="max-width:220px;white-space:normal;font-size:12px;color:#4b5563;">
+                                            <?php echo $n['resolution_note'] ? htmlspecialchars($n['resolution_note']) : '<span class="text-muted">&mdash;</span>'; ?>
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openDnEdit(<?php echo (int)$n['id']; ?>, <?php echo htmlspecialchars(json_encode($n['issue_text']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($n['priority']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($n['note_type'] ?? 'tp'), ENT_QUOTES); ?>)">
+                                                <i class="material-icons-outlined" style="font-size:14px;vertical-align:-2px;">edit</i> Edit
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                                </tbody>
+                            </table>
+
+                            <?php if ($totalNotes > 0): ?>
+                            <?php
+                            function dnPageUrl(int $p): string {
+                                $q = $_GET;
+                                $q['page'] = $p;
+                                return 'manage-district-notes.php?' . http_build_query($q);
+                            }
+                            $rangeStart = $offset + 1;
+                            $rangeEnd = min($offset + $perPage, $totalNotes);
+                            ?>
+                            <div class="dn-pagination">
+                                <div class="dn-pagination-info">Showing <?php echo $rangeStart; ?>&ndash;<?php echo $rangeEnd; ?> of <?php echo $totalNotes; ?></div>
+                                <div class="dn-pagination-links">
+                                    <a href="<?php echo htmlspecialchars(dnPageUrl(max(1, $page - 1))); ?>" class="dn-page-link <?php echo $page <= 1 ? 'disabled' : ''; ?>">&lsaquo;</a>
+                                    <?php for ($p = 1; $p <= $totalPages; $p++): ?>
+                                        <a href="<?php echo htmlspecialchars(dnPageUrl($p)); ?>" class="dn-page-link <?php echo $p === $page ? 'active' : ''; ?>"><?php echo $p; ?></a>
+                                    <?php endfor; ?>
+                                    <a href="<?php echo htmlspecialchars(dnPageUrl(min($totalPages, $page + 1))); ?>" class="dn-page-link <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">&rsaquo;</a>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="dnCompleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" style="font-weight:700;"><i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;color:#059669;">check_circle</i> Mark Completed</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;">What was done to resolve this?</label>
+                <textarea id="dnCompleteNote" class="form-control" rows="3" placeholder="e.g. Visited the shop and corrected the stock count"></textarea>
+                <div id="dnCompleteError" style="color:#991b1b;font-size:12px;margin-top:6px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" id="dnCompleteSubmit">Mark Completed</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="dnEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" style="font-weight:700;"><i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;color:#667eea;">edit</i> Edit Note</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;">Issue</label>
+                <textarea id="dnEditIssue" class="form-control" rows="3" style="margin-bottom:12px;"></textarea>
+                <label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;">Type</label>
+                <select id="dnEditType" class="form-control" style="margin-bottom:12px;">
+                    <option value="tp">Field Issue</option>
+                    <option value="software">Software Issue</option>
+                </select>
+                <label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;">Priority</label>
+                <select id="dnEditPriority" class="form-control">
+                    <option value="high">High Priority</option>
+                    <option value="priority">Medium</option>
+                    <option value="normal">Normal</option>
+                </select>
+                <div id="dnEditError" style="color:#991b1b;font-size:12px;margin-top:8px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="dnEditSubmit">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
+<script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
+<script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+<script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
+<script src="../../assets/plugins/pace/pace.min.js"></script>
+<script src="../../assets/js/main.min.js"></script>
+<script src="../../assets/js/custom.js"></script>
+<script>
+var dnCompleteCell = null;
+
+$(document).on('click', '.dn-status-btn', function () {
+    var $btn = $(this);
+    if ($btn.prop('disabled')) { return; }
+    var newStatus = $btn.data('set');
+
+    if (newStatus === 'completed') {
+        dnCompleteCell = $btn.closest('.dn-status-cell');
+        $('#dnCompleteNote').val('');
+        $('#dnCompleteError').text('');
+        $('#dnCompleteModal').modal('show');
+        return;
+    }
+
+    var $cell = $btn.closest('.dn-status-cell');
+    $cell.find('.dn-status-btn').prop('disabled', true);
+    $.post('update-note-status.php', { id: $cell.data('id'), status: newStatus }, function (resp) {
+        if (!resp.success) {
+            alert(resp.message || 'Could not update status. Please try again.');
+            $cell.find('.dn-status-btn').prop('disabled', false);
+            return;
+        }
+        $cell.data('status', 'in_progress');
+        $cell.html('<button type="button" class="dn-status-btn dn-status-complete" data-set="completed" title="Mark Completed"><i class="material-icons-outlined dn-spin">autorenew</i></button>');
+    }, 'json').fail(function () {
+        alert('Could not update status. Please try again.');
+        $cell.find('.dn-status-btn').prop('disabled', false);
+    });
+});
+
+$('#dnCompleteSubmit').on('click', function () {
+    var note = $.trim($('#dnCompleteNote').val());
+    if (!note) {
+        $('#dnCompleteError').text('Please describe what was done before marking this completed.');
+        return;
+    }
+    var $cell = dnCompleteCell;
+    var $submitBtn = $(this);
+    $submitBtn.prop('disabled', true);
+    $.post('update-note-status.php', { id: $cell.data('id'), status: 'completed', resolution_note: note }, function (resp) {
+        $submitBtn.prop('disabled', false);
+        if (!resp.success) {
+            $('#dnCompleteError').text(resp.message || 'Could not update status. Please try again.');
+            return;
+        }
+        $('#dnCompleteModal').modal('hide');
+        $cell.html('<span class="dn-badge" style="background:#d1fae5;color:#065f46;"><i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">check_circle</i> Completed</span>');
+        $cell.closest('tr').find('.dn-resolution-note-cell').text(note);
+    }, 'json').fail(function () {
+        $submitBtn.prop('disabled', false);
+        $('#dnCompleteError').text('Could not reach the server. Please try again.');
+    });
+});
+
+var dnEditId = null;
+function openDnEdit(id, issueText, priority, noteType) {
+    dnEditId = id;
+    $('#dnEditIssue').val(issueText);
+    $('#dnEditPriority').val(priority);
+    $('#dnEditType').val(noteType);
+    $('#dnEditError').text('');
+    $('#dnEditModal').modal('show');
+}
+$('#dnEditSubmit').on('click', function () {
+    var issueText = $.trim($('#dnEditIssue').val());
+    if (!issueText) {
+        $('#dnEditError').text('Describe the issue before saving.');
+        return;
+    }
+    var $submitBtn = $(this);
+    $submitBtn.prop('disabled', true);
+    $.post('edit-district-note-ajax.php', {
+        id: dnEditId, issue_text: issueText, priority: $('#dnEditPriority').val(), note_type: $('#dnEditType').val()
+    }, function (resp) {
+        $submitBtn.prop('disabled', false);
+        if (!resp.success) {
+            $('#dnEditError').text(resp.message || 'Could not save. Please try again.');
+            return;
+        }
+        $('#dnEditModal').modal('hide');
+        window.location.reload();
+    }, 'json').fail(function () {
+        $submitBtn.prop('disabled', false);
+        $('#dnEditError').text('Could not reach the server. Please try again.');
+    });
+});
+</script>
+</body>
+</html>
