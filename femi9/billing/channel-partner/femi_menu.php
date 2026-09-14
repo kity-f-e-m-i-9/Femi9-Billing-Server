@@ -17,6 +17,14 @@
         </li>
 
         <li>
+            <a href="#"><i class="material-icons-two-tone">shopping_cart</i>Purchase Order<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+            <ul class="sub-menu">
+                <li><a href="add-purchase-order.php">New Purchase Order</a></li>
+                <li><a href="manage-purchase-orders.php">My Purchase Orders</a></li>
+            </ul>
+        </li>
+
+        <li>
             <a href="my-territory-partners.php"><i class="material-icons-two-tone">people</i>My TPs</a>
         </li>
 
