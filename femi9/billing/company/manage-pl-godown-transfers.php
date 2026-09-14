@@ -152,7 +152,7 @@ if ($is_search) { $total_pages = 1; $page = 1; $offset = 0; }
 
 // ── Paginated transfers ───────────────────────────────────────────────────────
 $list_sql = "
-    SELECT t.id, t.transfer_type, t.transfer_date, t.ref_number, t.note, t.created_by, t.created_at,
+    SELECT t.id, t.transfer_type, t.transfer_date, t.ref_number, t.note, t.created_by, t.created_at, t.source_po_id,
            g.gname AS godown_name,
            COALESCE(cp.name, pln.name) AS location_name,
            COUNT(ti.id) AS product_count,
@@ -575,7 +575,12 @@ $i = 0;
                                     <?php foreach ($transfers as $t): ?>
                                         <tr>
                                             <td style="color:#9ca3af;"><?php echo $offset + (++$i); ?></td>
-                                            <td><code style="font-size:12px;background:#f3f4f6;padding:2px 7px;border-radius:4px;"><?php echo htmlspecialchars($t['ref_number']); ?></code></td>
+                                            <td>
+                                                <code style="font-size:12px;background:#f3f4f6;padding:2px 7px;border-radius:4px;"><?php echo htmlspecialchars($t['ref_number']); ?></code>
+                                                <?php if (!empty($t['source_po_id'])): ?>
+                                                <span class="badge badge-info" style="font-size:9.5px;" title="Created from a CP purchase order request">From CP Order #<?=(int)$t['source_po_id']?></span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td>
                                                 <?php if ($t['transfer_type'] === 'godown_to_location'): ?>
                                                     <span class="type-badge-in">Godown → Location</span>
