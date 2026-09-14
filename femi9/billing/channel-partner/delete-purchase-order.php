@@ -1,7 +1,10 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/CpPurchaseOrderBalance.php';
 error_reporting(0);
+
+cpEnsurePurchaseOrderTables($db_conn);
 
 $po_id = (int)($_POST['po_id'] ?? 0);
 if ($po_id < 1) {
