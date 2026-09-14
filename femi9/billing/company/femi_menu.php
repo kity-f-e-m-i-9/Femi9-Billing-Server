@@ -304,7 +304,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
 							<li><a href="cp-district-sales-report">District Sales Report</a></li>
-							<li><a href="cp-today-orders.php"><i class="material-icons-two-tone">inventory_2</i>CP Purchase Orders</a></li>
+							<li><a href="cp-today-orders.php">CP Purchase Orders</a></li>
                         </ul>
                     </li>
 					<li>
@@ -810,7 +810,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
 							<li><a href="cp-district-sales-report">District Sales Report</a></li>
-							<li><a href="cp-today-orders.php"><i class="material-icons-two-tone">inventory_2</i>CP Purchase Orders</a></li>
+							<li><a href="cp-today-orders.php">CP Purchase Orders</a></li>
                         </ul>
                     </li>
 					<?php }?>
