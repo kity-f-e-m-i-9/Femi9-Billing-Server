@@ -50,6 +50,20 @@ if ($productType === null) {
     </style>
 </head>
 <body>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<?php if (isset($_SESSION['successMessage'])) {
+    $sm = $_SESSION['successMessage']; ?>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>Swal.fire({ icon:'success', title:'Success', text:'<?php echo $sm; ?>', confirmButtonText:'OK' });</script>
+<?php unset($_SESSION['successMessage']); } ?>
+
+<?php if (isset($_SESSION['errorMessage'])) {
+    $em = $_SESSION['errorMessage']; ?>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>Swal.fire({ icon:'error', title:'Warning', text:'<?php echo $em; ?>', confirmButtonText:'OK' });</script>
+<?php unset($_SESSION['errorMessage']); } ?>
+
     <div class="app align-content-stretch d-flex flex-wrap">
         <div class="app-sidebar">
             <?php include("logo.php");?>
