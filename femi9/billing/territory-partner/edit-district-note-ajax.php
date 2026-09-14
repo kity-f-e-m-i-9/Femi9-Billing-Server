@@ -13,13 +13,14 @@ function respond(bool $ok, string $message = ''): void
 
 $id = (int)($_POST['id'] ?? 0);
 $issueText = trim($_POST['issue_text'] ?? '');
-$priority = $_POST['priority'] ?? 'normal';
+// A TP doesn't set priority themselves (see add-district-note.php) — an
+// edit can't sneak one in either, regardless of what's posted.
+$priority = 'normal';
 $noteType = $_POST['note_type'] ?? 'tp';
 
 if ($id <= 0 || $issueText === '') {
     respond(false, 'Describe the issue before saving.');
 }
-if (!in_array($priority, ['high', 'priority', 'normal'], true)) { $priority = 'normal'; }
 if (!in_array($noteType, ['software', 'tp'], true)) { $noteType = 'tp'; }
 
 ensureDistrictNotesTable($db_conn);

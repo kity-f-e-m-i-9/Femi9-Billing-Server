@@ -16,8 +16,6 @@ $filter_from     = $_GET['from_date'] ?? date('Y-m-01');
 $filter_to       = $_GET['to_date']   ?? date('Y-m-d');
 $filter_district = $_GET['district']  ?? '';
 if ($filter_district !== '' && !in_array($filter_district, $districts, true)) { $filter_district = ''; }
-$filter_priority = $_GET['priority']  ?? '';
-if (!in_array($filter_priority, ['high', 'priority', 'normal', ''], true)) { $filter_priority = ''; }
 $filter_status = $_GET['status'] ?? '';
 if (!in_array($filter_status, ['open', 'in_progress', 'completed', ''], true)) { $filter_status = ''; }
 $filter_type = $_GET['note_type'] ?? '';
@@ -29,11 +27,6 @@ $types  = "iss";
 if ($filter_district !== '') {
     $where[]  = "district = ?";
     $params[] = $filter_district;
-    $types   .= "s";
-}
-if ($filter_priority !== '') {
-    $where[]  = "priority = ?";
-    $params[] = $filter_priority;
     $types   .= "s";
 }
 if ($filter_status !== '') {
@@ -175,15 +168,6 @@ $stmt->close();
                             </div>
                             <?php endif; ?>
                             <div>
-                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Priority</label>
-                                <select name="priority" class="form-control form-control-sm">
-                                    <option value="">All</option>
-                                    <option value="high" <?php echo $filter_priority === 'high' ? 'selected' : ''; ?>>High Priority</option>
-                                    <option value="priority" <?php echo $filter_priority === 'priority' ? 'selected' : ''; ?>>Medium</option>
-                                    <option value="normal" <?php echo $filter_priority === 'normal' ? 'selected' : ''; ?>>Normal</option>
-                                </select>
-                            </div>
-                            <div>
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Type</label>
                                 <select name="note_type" class="form-control form-control-sm">
                                     <option value="">All</option>
@@ -213,7 +197,6 @@ $stmt->close();
                                         <th>District</th>
                                         <th>Type</th>
                                         <th>Issue</th>
-                                        <th>Priority</th>
                                         <th>Photo</th>
                                         <th>Status</th>
                                         <th>Note</th>
@@ -222,9 +205,8 @@ $stmt->close();
                                 </thead>
                                 <tbody>
                                 <?php if (empty($notes)): ?>
-                                    <tr><td colspan="9" class="text-center text-muted" style="padding:24px;">No notes found for this filter.</td></tr>
+                                    <tr><td colspan="8" class="text-center text-muted" style="padding:24px;">No notes found for this filter.</td></tr>
                                 <?php else: foreach ($notes as $n):
-                                    [$bg, $fg] = districtNotePriorityColors($n['priority']);
                                     $status = $n['status'] ?? 'open';
                                 ?>
                                     <tr>
@@ -238,7 +220,6 @@ $stmt->close();
                                             </span>
                                         </td>
                                         <td class="dn-issue"><?php echo nl2br(htmlspecialchars($n['issue_text'])); ?></td>
-                                        <td><span class="dn-badge" style="background:<?php echo $bg; ?>;color:<?php echo $fg; ?>;"><?php echo htmlspecialchars(districtNotePriorityLabel($n['priority'])); ?></span></td>
                                         <td>
                                             <?php if (!empty($n['photo_path'])): ?>
                                                 <a href="district_note_photos/<?php echo htmlspecialchars($n['photo_path'], ENT_QUOTES); ?>" target="_blank" rel="noopener">
@@ -267,7 +248,7 @@ $stmt->close();
                                             <?php echo $n['resolution_note'] ? htmlspecialchars($n['resolution_note']) : '<span class="text-muted">&mdash;</span>'; ?>
                                         </td>
                                         <td>
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openDnEdit(<?php echo (int)$n['id']; ?>, <?php echo htmlspecialchars(json_encode($n['issue_text']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($n['priority']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($n['note_type'] ?? 'tp'), ENT_QUOTES); ?>)">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openDnEdit(<?php echo (int)$n['id']; ?>, <?php echo htmlspecialchars(json_encode($n['issue_text']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($n['note_type'] ?? 'tp'), ENT_QUOTES); ?>)">
                                                 <i class="material-icons-outlined" style="font-size:14px;vertical-align:-2px;">edit</i> Edit
                                             </button>
                                         </td>
@@ -339,12 +320,6 @@ $stmt->close();
                 <select id="dnEditType" class="form-control" style="margin-bottom:12px;">
                     <option value="tp">Field Issue</option>
                     <option value="software">Software Issue</option>
-                </select>
-                <label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;">Priority</label>
-                <select id="dnEditPriority" class="form-control">
-                    <option value="high">High Priority</option>
-                    <option value="priority">Medium</option>
-                    <option value="normal">Normal</option>
                 </select>
                 <div id="dnEditError" style="color:#991b1b;font-size:12px;margin-top:8px;"></div>
             </div>
@@ -420,10 +395,9 @@ $('#dnCompleteSubmit').on('click', function () {
 });
 
 var dnEditId = null;
-function openDnEdit(id, issueText, priority, noteType) {
+function openDnEdit(id, issueText, noteType) {
     dnEditId = id;
     $('#dnEditIssue').val(issueText);
-    $('#dnEditPriority').val(priority);
     $('#dnEditType').val(noteType);
     $('#dnEditError').text('');
     $('#dnEditModal').modal('show');
@@ -437,7 +411,7 @@ $('#dnEditSubmit').on('click', function () {
     var $submitBtn = $(this);
     $submitBtn.prop('disabled', true);
     $.post('edit-district-note-ajax.php', {
-        id: dnEditId, issue_text: issueText, priority: $('#dnEditPriority').val(), note_type: $('#dnEditType').val()
+        id: dnEditId, issue_text: issueText, note_type: $('#dnEditType').val()
     }, function (resp) {
         $submitBtn.prop('disabled', false);
         if (!resp.success) {

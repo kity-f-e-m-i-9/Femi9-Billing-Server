@@ -25,8 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $selectedDistricts = array_values(array_unique(array_filter($selectedDistricts, fn($d) => $d !== '')));
     }
     $issueText = trim($_POST['issue_text'] ?? '');
-    $priority  = $_POST['priority'] ?? 'normal';
-    if (!in_array($priority, ['high', 'priority', 'normal'], true)) { $priority = 'normal'; }
+    // A TP doesn't set priority themselves — every note they log saves as
+    // 'normal'; triage/escalation is something Company/BDM do on their own
+    // review side, not the TP's call to make when filing it.
+    $priority  = 'normal';
     $noteType  = $_POST['note_type'] ?? 'tp';
     if (!in_array($noteType, ['software', 'tp'], true)) { $noteType = 'tp'; }
 
@@ -201,20 +203,6 @@ if (isset($_GET['saved'])) { $successMsg = 'Note saved.'; }
             background-repeat:no-repeat; background-position:center; background-size:11px;
         }
 
-        .dn-priority-row { display:flex; gap:9px; flex-wrap:wrap; }
-        .dn-priority-btn {
-            flex:1; min-width:112px; display:flex; flex-direction:column; align-items:center; gap:4px;
-            text-align:center; padding:12px 10px; border-radius:11px; cursor:pointer;
-            font-size:12.5px; font-weight:700; border:1.5px solid #e5e7eb; background:#f9fafb; color:#9ca3af;
-            transition: background .15s, border-color .15s, color .15s, transform .1s;
-        }
-        .dn-priority-btn:hover { transform: translateY(-1px); }
-        .dn-priority-btn input { display:none; }
-        .dn-priority-btn .material-icons-outlined { font-size:19px; }
-        .dn-priority-btn.high.active { background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
-        .dn-priority-btn.priority.active { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
-        .dn-priority-btn.normal.active { background:#e0e7ff; border-color:#a5b4fc; color:#3730a3; }
-
         .dn-drop {
             border:1.5px dashed #d1d5db; border-radius:12px; padding:18px 14px; text-align:center;
             cursor:pointer; transition: border-color .15s, background .15s; background:#fafafc;
@@ -318,24 +306,6 @@ if (isset($_GET['saved'])) { $successMsg = 'Note saved.'; }
                                 <textarea name="issue_text" class="form-control" rows="4" placeholder="Describe the issue…" required><?php echo htmlspecialchars($_POST['issue_text'] ?? ''); ?></textarea>
                             </div>
 
-                            <div class="dn-field">
-                                <label><i class="material-icons-outlined">flag</i> Priority</label>
-                                <div class="dn-priority-row" id="priorityRow">
-                                    <label class="dn-priority-btn high" data-val="high">
-                                        <i class="material-icons-outlined">error</i>
-                                        <input type="radio" name="priority" value="high"> High Priority
-                                    </label>
-                                    <label class="dn-priority-btn priority" data-val="priority">
-                                        <i class="material-icons-outlined">priority_high</i>
-                                        <input type="radio" name="priority" value="priority"> Medium
-                                    </label>
-                                    <label class="dn-priority-btn normal active" data-val="normal">
-                                        <i class="material-icons-outlined">check_circle</i>
-                                        <input type="radio" name="priority" value="normal" checked> Normal
-                                    </label>
-                                </div>
-                            </div>
-
                             <div class="dn-field" id="photoField" style="<?php echo (($_POST['note_type'] ?? 'tp') === 'software') ? '' : 'display:none;'; ?>">
                                 <label><i class="material-icons-outlined">image</i> Photo (optional)</label>
                                 <label class="dn-drop" id="dropZone">
@@ -370,14 +340,6 @@ if (isset($_GET['saved'])) { $successMsg = 'Note saved.'; }
 <script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
 <script>
 $('#districtSelect').select2({ placeholder: 'Select district(s)…', width: '100%', closeOnSelect: false });
-
-document.querySelectorAll('.dn-priority-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-        document.querySelectorAll('.dn-priority-btn').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        btn.querySelector('input').checked = true;
-    });
-});
 
 // Photo upload only makes sense for a Software Issue — a Field Issue never
 // needs it, so the field itself only shows for that type.
