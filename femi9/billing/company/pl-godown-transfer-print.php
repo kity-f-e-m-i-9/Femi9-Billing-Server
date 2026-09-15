@@ -8,14 +8,20 @@ date_default_timezone_set("Asia/Kolkata");
 $transfer_id = (int)($_GET['id'] ?? 0);
 if ($transfer_id <= 0) { header("Location: manage-pl-godown-transfers"); exit; }
 
-// Transfer header
+// Transfer header — location_id and cp_id are mutually exclusive (a transfer
+// goes either to a partner_location_nodes location or to a channel partner
+// directly, e.g. a CP-order-originated transfer), so both joins must be LEFT
+// or a real transfer silently disappears from this query. Matches the same
+// COALESCE(cp.name, pln.name) pattern already used in
+// manage-pl-godown-transfers.php / get-transfer-items.php.
 $stmt = $db_conn->prepare("
     SELECT t.*, g.gname AS godown_name, g.address_line1, g.address_line2,
            g.gstin, g.state, g.state_code, g.contact, g.email, g.logo,
-           pln.name AS location_name
+           COALESCE(cp.name, pln.name) AS location_name
     FROM pl_godown_transfers t
     JOIN company_godown g ON g.id = t.godown_id AND (" . godown_finance_filter_sql($db_conn, 'g') . ")
-    JOIN partner_location_nodes pln ON pln.id = t.location_id
+    LEFT JOIN partner_location_nodes pln ON pln.id = t.location_id
+    LEFT JOIN channel_partners cp ON cp.id = t.cp_id
     WHERE t.id = ?
     LIMIT 1
 ");
