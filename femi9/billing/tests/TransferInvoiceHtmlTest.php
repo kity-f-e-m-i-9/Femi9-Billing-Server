@@ -30,6 +30,8 @@ assertTrue(strpos($html, htmlspecialchars($cp['name'])) !== false, "renders the 
 assertTrue(strpos($html, htmlspecialchars($product['productName'])) !== false, "renders the line-item product name");
 assertTrue(strpos($html, htmlspecialchars($product['hsn'])) !== false, "renders the line-item HSN code");
 assertTrue(strpos($html, 'SGST') !== false && strpos($html, 'CGST') !== false, "renders both SGST and CGST rows for a GST-liable transfer");
+assertTrue(strpos($html, 'SGST (') !== false, "single-rate transfer's SGST row DOES include a bracketed percentage");
+assertTrue(strpos($html, 'CGST (') !== false, "single-rate transfer's CGST row DOES include a bracketed percentage");
 assertTrue(strpos($html, 'IGST') === false, "never renders an IGST row (matches TP's template exactly)");
 assertTrue(strpos($html, 'Discount') === false && strpos($html, 'Courier') === false, "never renders Discount or Courier rows (neither concept exists for a transfer)");
 assertTrue(strpos($html, htmlspecialchars($data['result_Godown']['gname'])) !== false, "renders the godown (seller) name");
@@ -77,6 +79,38 @@ if ($location && $godown && $product) {
     assertTrue(substr_count($loc_html, 'GSTIN') === 1, "does NOT render a buyer GSTIN label for a location buyer (only the seller's GSTIN/UIN appears, not a second buyer-side GSTIN line)");
 } else {
     echo "SKIP: no partner_location_nodes row found in dev DB — skipping location-buyer (no GSTIN) assertion\n";
+}
+$db_conn->rollback();
+
+// --- Scenario: mixed GST-rate transfer -> SGST/CGST labels suppress the
+// percentage, but the HSN-wise per-row percentages stay correct ---
+$db_conn->begin_transaction();
+$gst_rates = $db_conn->query("SELECT DISTINCT gst FROM products WHERE gst > 0 AND mrp > 0")->fetch_all(MYSQLI_ASSOC);
+if (count($gst_rates) >= 2 && $godown && $cp) {
+    $rate_a = $gst_rates[0]['gst'];
+    $rate_b = $gst_rates[1]['gst'];
+    $product_a = $db_conn->query("SELECT id, hsn, gst FROM products WHERE gst = $rate_a AND mrp > 0 LIMIT 1")->fetch_assoc();
+    $product_b = $db_conn->query("SELECT id, hsn, gst FROM products WHERE gst = $rate_b AND mrp > 0 LIMIT 1")->fetch_assoc();
+
+    $db_conn->query("INSERT INTO pl_godown_transfers (transfer_type, godown_id, cp_id, transfer_date, ref_number, note, created_by) VALUES ('godown_to_location', {$godown['id']}, {$cp['id']}, CURDATE(), 'TEST-HTML-MIXEDGST', 'test', 'harness')");
+    $mixed_transfer_id = $db_conn->insert_id;
+    $db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($mixed_transfer_id, {$product_a['id']}, 1)");
+    $db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($mixed_transfer_id, {$product_b['id']}, 1)");
+
+    $mixed_data = load_transfer_invoice_data($db_conn, $mixed_transfer_id);
+    $mixed_html = render_transfer_invoice_html($mixed_data, $mixed_data['has_carton_data']);
+
+    assertTrue($mixed_data['has_mixed_gst_rates'] === true, "data layer reports has_mixed_gst_rates true for a two-distinct-rate transfer");
+    assertTrue(preg_match('/SGST\s*\(/', $mixed_html) !== 1, "mixed-rate transfer's SGST label does NOT include a bracketed percentage");
+    assertTrue(preg_match('/CGST\s*\(/', $mixed_html) !== 1, "mixed-rate transfer's CGST label does NOT include a bracketed percentage");
+    assertTrue(strpos($mixed_html, '<i>SGST</i>') !== false, "mixed-rate transfer still renders a plain 'SGST' label");
+    assertTrue(strpos($mixed_html, '<i>CGST</i>') !== false, "mixed-rate transfer still renders a plain 'CGST' label");
+    // The HSN-wise summary table's per-row percentages are computed per-HSN
+    // (independent of has_mixed_gst_rates) and must remain correct.
+    assertTrue(strpos($mixed_html, fmt_gst_pct($product_a['gst'] / 2) . '%') !== false, "HSN-wise table still shows product A's correct per-HSN rate");
+    assertTrue(strpos($mixed_html, fmt_gst_pct($product_b['gst'] / 2) . '%') !== false, "HSN-wise table still shows product B's correct per-HSN rate");
+} else {
+    echo "SKIP: dev DB does not have at least two distinct non-zero GST rates among its products — skipping mixed-GST-rate label suppression assertion\n";
 }
 $db_conn->rollback();
 

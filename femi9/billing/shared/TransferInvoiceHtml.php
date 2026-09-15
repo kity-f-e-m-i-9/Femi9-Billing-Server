@@ -18,6 +18,7 @@ function render_transfer_invoice_html(array $ctx, bool $show_carton_cols): strin
     // Expected keys in $ctx: result_Invoice_Details, result_Godown,
     // invoice_items, TotalAMount123, Totalquantity123, totalgstamount,
     // hsn_totals, hsn_gst_totals, hsn_gst_pct, __inv_gst_pct,
+    // has_mixed_gst_rates,
     // TotalCartons123, has_carton_data, grand_total, has_gst_product,
     // invoice_heading, result (amount-in-words), TAXresult (tax-amount-in-
     // words), Currency_symbol, Currency_Name.
@@ -220,16 +221,24 @@ Terms of Delivery<br/>&nbsp;
     $SGST = inr_format($totalgstamount / 2, 2);
     $CGST = inr_format($totalgstamount / 2, 2);
     $__half_pct = fmt_gst_pct($__inv_gst_pct / 2);
+    // The blended percentage is only accurate when every GST-bearing line
+    // shares one rate — when the transfer mixes rates (e.g. 5% and 18%
+    // products in the same transfer), showing either line's rate on the
+    // combined SGST/CGST total would be misleading, so the label is
+    // suppressed to plain "SGST"/"CGST" in that case. The amounts below
+    // stay correct either way; only this label is affected.
+    $__sgst_label = empty($has_mixed_gst_rates) ? "SGST ({$__half_pct}%)" : 'SGST';
+    $__cgst_label = empty($has_mixed_gst_rates) ? "CGST ({$__half_pct}%)" : 'CGST';
 ?>
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>SGST (<?= $__half_pct; ?>%)</i></b></td>
+<td></td><td id="rightlaign"><b><i><?= $__sgst_label; ?></i></b></td>
 <td></td><td></td>
 <?php if ($show_carton_cols): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td>
 <td id="rightlaign"><b><?= $Currency_symbol; ?>&nbsp;<?= $SGST; ?></b></td>
 </tr>
 <tr id="bottombordervl">
-<td></td><td id="rightlaign"><b><i>CGST (<?= $__half_pct; ?>%)</i></b></td>
+<td></td><td id="rightlaign"><b><i><?= $__cgst_label; ?></i></b></td>
 <td></td><td></td>
 <?php if ($show_carton_cols): ?><td></td><td></td><?php endif; ?>
 <td></td><td></td><td></td><td></td><td></td>
