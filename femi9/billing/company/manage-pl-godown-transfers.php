@@ -711,6 +711,17 @@ $(function () {
         $.getJSON('get-transfer-items.php', { id: id }, function (d) {
             if (d.error) { $body.html('<div class="alert alert-danger">' + d.error + '</div>'); return; }
             var t = d.transfer;
+
+            // CP-order-originated transfers have a real invoice-cum-delivery-note
+            // document behind them — link straight to it instead of the plain
+            // internal-transfer receipt.
+            if (t.cp_invoice_enc) {
+                $('#printTransferBtn').attr('href', 'cp-invoice-print.php?id=' + t.cp_invoice_enc)
+                    .html('<i class="material-icons" style="font-size:16px;vertical-align:middle;">print</i> Print Invoice');
+            } else {
+                $('#printTransferBtn').attr('href', 'pl-godown-transfer-print.php?id=' + id)
+                    .html('<i class="material-icons" style="font-size:16px;vertical-align:middle;">print</i> Print Receipt');
+            }
             var typeLabel = t.transfer_type === 'godown_to_location'
                 ? '<span class="type-badge-in">Godown → Location</span>'
                 : '<span class="type-badge-out">Location → Godown</span>';

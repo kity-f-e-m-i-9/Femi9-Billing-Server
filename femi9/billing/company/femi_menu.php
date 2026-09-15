@@ -305,7 +305,6 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
 							<li><a href="cp-district-sales-report">District Sales Report</a></li>
 							<li><a href="cp-today-orders.php">CP Purchase Orders</a></li>
-							<li><a href="manage-cp-invoices.php">CP Invoices</a></li>
                         </ul>
                     </li>
 					<li>
@@ -820,7 +819,6 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
 							<li><a href="cp-district-sales-report">District Sales Report</a></li>
 							<li><a href="cp-today-orders.php">CP Purchase Orders</a></li>
-							<li><a href="manage-cp-invoices.php">CP Invoices</a></li>
                         </ul>
                     </li>
 					<?php }?>

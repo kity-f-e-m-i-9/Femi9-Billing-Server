@@ -195,7 +195,7 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
 
                     <!-- Page Header -->
                     <div class="row">
-                        <div class="col d-flex justify-content-between align-items-center flex-wrap">
+                        <div class="col">
                             <div class="page-description">
                                 <h1>
                                     <table class="headertble"><tr>
@@ -203,7 +203,6 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
                                     </tr></table>
                                 </h1>
                             </div>
-                            <a href="manage-cp-invoices.php" class="btn btn-primary m-b-xs">Manage CP Invoices</a>
                         </div>
                     </div>
 
