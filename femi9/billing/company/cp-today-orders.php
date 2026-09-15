@@ -51,7 +51,7 @@ if ($typeFilter !== '') {
 }
 
 $stmt = $db_conn->prepare(
-    "SELECT o.id, o.order_date, o.status, o.transfer_id, o.cancel_reason, o.product_type, o.channel_partner_id,
+    "SELECT o.id, o.order_date, o.status, o.transfer_id, o.cp_invoice_id, o.cancel_reason, o.product_type, o.channel_partner_id,
             cp.name AS cp_name, cp.cp_id AS cp_code,
             i.product_id, i.qty, i.price, i.amount, p.productName
      FROM channel_partner_purchase_orders o
@@ -75,6 +75,7 @@ foreach ($rows as $r) {
             'display_date'       => $r['order_date'],
             'status'             => $r['status'],
             'transfer_id'        => $r['transfer_id'],
+            'cp_invoice_id'      => $r['cp_invoice_id'],
             'cancel_reason'      => $r['cancel_reason'],
             'product_type'       => $r['product_type'] ?? 'napkin',
             'cp_id'              => (int)$r['channel_partner_id'],
@@ -340,6 +341,9 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
                                             <td>
                                                 <?php if ($o['status'] === 'completed'): ?>
                                                 <span class="badge-completed">Completed</span>
+                                                <?php if (!empty($o['cp_invoice_id'])): ?>
+                                                <br><a href="cp-invoice-print.php?id=<?=base64_encode((string)$o['cp_invoice_id'])?>" target="_blank" style="font-size:11px;">View Invoice</a>
+                                                <?php endif; ?>
                                                 <?php elseif ($o['status'] === 'cancelled'): ?>
                                                 <span class="badge-cancelled" <?=$o['cancel_reason'] ? 'title="' . htmlspecialchars($o['cancel_reason'], ENT_QUOTES) . '"' : ''?>>Cancelled</span>
                                                 <?php else: ?>
