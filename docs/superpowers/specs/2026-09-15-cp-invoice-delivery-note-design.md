@@ -27,7 +27,7 @@ touched by this spec.)
 | | TP (existing) | CP (new, this spec) |
 |---|---|---|
 | Approval artifact | `tp_invoices` + `tp_invoice_items` | `cp_invoices` + `cp_invoice_items` (new) |
-| Invoice numbering | `tpInvoiceNextNumber()`, format `TP/{fy}/{seq}` | `cpInvoiceNextNumber()`, format `CP/{fy}/{seq}` (new service, same locking pattern) |
+| Invoice numbering | `tpInvoiceNextNumber()`, format `TP/{fy}/{seq}` | `cpInvoiceNextNumber()`, format `CPDN/{fy}/{seq}` (new service, same locking pattern) |
 | Stock movement | Debit company godown/CP stock, credit `territory_partner_stock` | Debit company godown stock, credit `channel_partner_stock` — **unchanged**, already correct in `cp-po-action.php` |
 | Delivery note | None | Same document as the invoice — same number, same row, no separate table |
 | Invoice + DN print | `tp-invoice-print.php` + `shared/TpInvoiceHtml.php` | `cp-invoice-print.php` + `shared/CpInvoiceHtml.php` (new), one page labeled as both |
@@ -77,14 +77,14 @@ of the entry-point file), consistent with `tpInvoiceEnsureSequenceSchema()`.
 
 **`shared/CpInvoiceNumberService.php`** — direct copy of
 `shared/TpInvoiceNumberService.php`'s pattern: `cpInvoiceNextNumber($db,
-$source, $invoiceDate, $padDigits=3)`, format `CP/{fy}/{seq}` (single source,
+$source, $invoiceDate, $padDigits=3)`, format `CPDN/{fy}/{seq}` (single source,
 `'CO'`, since Company is CP's only approver — no per-SS branching needed).
 Caller must already be inside a transaction. Uses `INSERT IGNORE` +
 `SELECT ... FOR UPDATE` row lock on `cp_inv_sequence` scoped by source, with
 the same self-healing `MAX(SUBSTRING_INDEX(invoice_number,'/',-1))`
 cross-check against `cp_invoices` to recover from any counter drift.
 
-This one number (`CP/26-27/00001`) is what prints as both the invoice number
+This one number (`CPDN/26-27/00001`) is what prints as both the invoice number
 and the delivery note number — no second sequence, no second table.
 
 ## Changes to `company/cp-po-action.php`

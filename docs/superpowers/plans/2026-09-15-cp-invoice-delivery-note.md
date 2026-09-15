@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - One invoice per approved PO; the invoice **is** the delivery note — single number, single row, no separate DN table (spec: "New DB objects", "Explicitly out of scope").
-- Invoice number format `CP/{fy}/{seq}` (e.g. `CP/26-27/00001`), single source `'CO'` — Company is CP's only approver (spec: "New numbering service").
+- Invoice number format `CPDN/{fy}/{seq}` (e.g. `CPDN/26-27/00001`), single source `'CO'` — Company is CP's only approver (spec: "New numbering service").
 - Number generation and invoice insertion must happen inside the same DB transaction as the existing stock-transfer logic in `cp-po-action.php` — no transfer without an invoice, no invoice without a transfer (spec: "Changes to `company/cp-po-action.php`").
 - The existing `pl_godown_transfers` row and all its stock-locking logic are kept unchanged, not replaced (spec: "What TP has that CP will now get").
 - No GST tax-invoice framing on the print page — plain invoice-cum-delivery-note headed "Tax Invoice cum Delivery Note" with pricing and a signature block (spec: "New print view").
@@ -29,7 +29,7 @@
 
 **Interfaces:**
 - Produces: `function cpInvoiceEnsureSequenceSchema(mysqli $db): void` — self-migrating, creates `cp_inv_sequence` table if missing (columns: `source VARCHAR(10) NOT NULL PRIMARY KEY`, `last_val INT UNSIGNED NOT NULL DEFAULT 0`, `fy VARCHAR(5) NOT NULL DEFAULT ''`).
-- Produces: `function cpInvoiceNextNumber(mysqli $db, string $source, string $invoiceDate, int $padDigits = 3): string` — must be called inside an active transaction; returns `"CP/$fy/$seq"` for `$source === 'CO'`.
+- Produces: `function cpInvoiceNextNumber(mysqli $db, string $source, string $invoiceDate, int $padDigits = 3): string` — must be called inside an active transaction; returns `"CPDN/$fy/$seq"` for `$source === 'CO'`.
 
 - [ ] **Step 1: Write `CpInvoiceNumberService.php`**
 
@@ -39,7 +39,7 @@
  * CpInvoiceNumberService — auto-generated CP invoice number series.
  *
  * Company is CP's only approver, so there is only one source, 'CO', and the
- * number carries no source tag: CP/{fiscal-year}/{seq}. Mirrors
+ * number carries no source tag: CPDN/{fiscal-year}/{seq}. Mirrors
  * TpInvoiceNumberService.php's locking/self-healing pattern exactly, with
  * its own independent sequence table (cp_inv_sequence) so CP and TP
  * invoice numbering never contend with or influence each other.
@@ -80,7 +80,7 @@ function cpInvoiceNextNumber(mysqli $db, string $source, string $invoiceDate, in
     $db->query("SELECT last_val, fy FROM cp_inv_sequence WHERE source='$source_esc' FOR UPDATE");
     $seq_row = $db->query("SELECT last_val, fy FROM cp_inv_sequence WHERE source='$source_esc'")->fetch_assoc();
 
-    $like_pattern = "CP/$current_fy/%";
+    $like_pattern = "CPDN/$current_fy/%";
     $max_res = $db->query("SELECT MAX(CAST(SUBSTRING_INDEX(invoice_number, '/', -1) AS UNSIGNED)) AS max_val FROM cp_invoices WHERE invoice_number LIKE '$like_pattern'");
     $actual_max = (int)(($max_res->fetch_assoc())['max_val'] ?? 0);
 
@@ -90,7 +90,7 @@ function cpInvoiceNextNumber(mysqli $db, string $source, string $invoiceDate, in
     $db->query("UPDATE cp_inv_sequence SET last_val=$next_val, fy='$current_fy' WHERE source='$source_esc'");
 
     $seq_str = str_pad((string)$next_val, $padDigits, '0', STR_PAD_LEFT);
-    return "CP/$current_fy/$seq_str";
+    return "CPDN/$current_fy/$seq_str";
 }
 ```
 
@@ -121,7 +121,7 @@ if ($t && $t->num_rows === 0) {
 
 $date = date('Y-m-d');
 $num1 = cpInvoiceNextNumber($db_conn, 'CO', $date);
-assertTrue((bool)preg_match('#^CP/\d{2}-\d{2}/\d{3}$#', $num1), "first number matches CP/{fy}/{seq} format, got $num1");
+assertTrue((bool)preg_match('#^CPDN/\d{2}-\d{2}/\d{3}$#', $num1), "first number matches CPDN/{fy}/{seq} format, got $num1");
 
 // Simulate the number actually being used (insert it), then request the next one.
 $db_conn->query("INSERT INTO cp_invoices (invoice_number) VALUES ('$num1')");
@@ -510,7 +510,7 @@ $db_conn->query("UPDATE channel_partner_purchase_orders SET status='completed', 
 // Assertions
 $invRow = $db_conn->query("SELECT * FROM cp_invoices WHERE id=$cp_invoice_id")->fetch_assoc();
 assertTrue($invRow !== null, "cp_invoices row was created");
-assertTrue((bool)preg_match('#^CP/\d{2}-\d{2}/\d{3}$#', $invRow['invoice_number']), "invoice_number matches CP/{fy}/{seq}, got {$invRow['invoice_number']}");
+assertTrue((bool)preg_match('#^CPDN/\d{2}-\d{2}/\d{3}$#', $invRow['invoice_number']), "invoice_number matches CPDN/{fy}/{seq}, got {$invRow['invoice_number']}");
 assertTrue(abs((float)$invRow['total_amount'] - $grand_total) < 0.001, "total_amount matches the PO's grand total");
 assertTrue((int)$invRow['transfer_id'] === $transfer_id, "invoice links to the same transfer_id the stock movement created");
 
