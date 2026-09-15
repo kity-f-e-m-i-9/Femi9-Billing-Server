@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0); include("config.php");
+<?php include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('channel_partner'); date_default_timezone_set("Asia/Kolkata"); error_reporting(0); include("config.php");
 
 require_once __DIR__ . '/../shared/CpInvoiceData.php';
 require_once __DIR__ . '/../shared/CpInvoiceHtml.php';

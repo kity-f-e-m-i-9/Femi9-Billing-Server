@@ -1,6 +1,7 @@
 <?php
 // femi9/billing/tests/CpPoInvoiceActionTest.php
 // Run: php femi9/billing/tests/CpPoInvoiceActionTest.php
+date_default_timezone_set("Asia/Kolkata");
 require_once __DIR__ . '/../company/include/db-connect.php'; // provides $db_conn
 require_once __DIR__ . '/../shared/CpPurchaseOrderBalance.php';
 require_once __DIR__ . '/../shared/CpInvoiceSchema.php';

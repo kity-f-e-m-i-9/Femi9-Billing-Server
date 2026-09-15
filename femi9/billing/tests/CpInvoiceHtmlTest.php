@@ -38,7 +38,7 @@ assertTrue($data !== null, "load_cp_invoice_data returned valid data (default ad
 $html = render_cp_invoice_html($data);
 
 // Original assertions from the brief - default delivery address branch
-assertTrue(strpos($html, 'TAX INVOICE CUM DELIVERY NOTE') !== false, "renders the combined invoice+DN heading");
+assertTrue(strpos($html, 'INVOICE CUM DELIVERY NOTE') !== false, "renders the combined invoice+DN heading");
 assertTrue(strpos($html, htmlspecialchars($inv_num)) !== false, "renders the invoice number");
 assertTrue(strpos($html, htmlspecialchars($product['productName'])) !== false, "renders the line-item product name");
 assertTrue(strpos($html, "Receiver's Signature") !== false, "renders a goods-receipt signature block");

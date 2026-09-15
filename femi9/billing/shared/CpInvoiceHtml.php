@@ -23,7 +23,7 @@ function render_cp_invoice_html(array $invData): string {
     <div class="maincontainar" style="padding:20px;font-family:Arial,sans-serif;">
         <div style="text-align:center;margin-bottom:10px;">
             <h3 style="margin:0;"><?= htmlspecialchars($business_name) ?></h3>
-            <h5 style="margin:4px 0;letter-spacing:1px;">TAX INVOICE CUM DELIVERY NOTE</h5>
+            <h5 style="margin:4px 0;letter-spacing:1px;">INVOICE CUM DELIVERY NOTE</h5>
         </div>
         <table width="100%" style="border-collapse:collapse;margin-bottom:12px;">
             <tr>
