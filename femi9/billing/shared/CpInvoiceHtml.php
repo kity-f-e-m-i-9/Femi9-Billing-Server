@@ -12,11 +12,11 @@ function render_cp_invoice_html(array $invData): string {
     $items = $invData['result_Items'];
     $business_name = $invData['business_name'];
 
-    $delivery_line1 = $inv['use_default_delivery_address'] ? $inv['branch_line1'] : $inv['custom_delivery_line1'];
-    $delivery_line2 = $inv['use_default_delivery_address'] ? $inv['branch_line2'] : $inv['custom_delivery_line2'];
-    $delivery_city  = $inv['use_default_delivery_address'] ? $inv['branch_city']  : $inv['custom_delivery_city'];
-    $delivery_state = $inv['use_default_delivery_address'] ? $inv['branch_state'] : $inv['custom_delivery_state'];
-    $delivery_pin   = $inv['use_default_delivery_address'] ? $inv['branch_pincode'] : $inv['custom_delivery_pincode'];
+    $delivery_line1 = $inv['use_default_delivery_address'] ? $inv['branch_line1'] : ($inv['custom_delivery_line1'] ?? '');
+    $delivery_line2 = $inv['use_default_delivery_address'] ? $inv['branch_line2'] : ($inv['custom_delivery_line2'] ?? '');
+    $delivery_city  = $inv['use_default_delivery_address'] ? $inv['branch_city']  : ($inv['custom_delivery_city'] ?? '');
+    $delivery_state = $inv['use_default_delivery_address'] ? $inv['branch_state'] : ($inv['custom_delivery_state'] ?? '');
+    $delivery_pin   = $inv['use_default_delivery_address'] ? $inv['branch_pincode'] : ($inv['custom_delivery_pincode'] ?? '');
 
     ob_start();
     ?>
@@ -30,14 +30,14 @@ function render_cp_invoice_html(array $invData): string {
                 <td style="width:50%;vertical-align:top;border:1px solid #ccc;padding:8px;">
                     <strong>Bill To / Deliver To:</strong><br>
                     <?= htmlspecialchars($inv['cp_name']) ?> (<?= htmlspecialchars($inv['cp_code']) ?>)<br>
-                    <?= htmlspecialchars(trim($delivery_line1 . ' ' . $delivery_line2)) ?><br>
-                    <?= htmlspecialchars(trim($delivery_city . ' ' . $delivery_state . ' ' . $delivery_pin)) ?><br>
+                    <?= htmlspecialchars(implode(' ', array_filter([$delivery_line1, $delivery_line2]))) ?><br>
+                    <?= htmlspecialchars(implode(' ', array_filter([$delivery_city, $delivery_state, $delivery_pin]))) ?><br>
                     <?php if (!empty($inv['cp_gstin'])): ?>GSTIN: <?= htmlspecialchars($inv['cp_gstin']) ?><br><?php endif; ?>
                     <?php if (!empty($inv['cp_mobile'])): ?>Mobile: <?= htmlspecialchars($inv['cp_mobile']) ?><?php endif; ?>
                 </td>
                 <td style="width:50%;vertical-align:top;border:1px solid #ccc;padding:8px;">
                     <strong>Invoice / Delivery Note No:</strong> <?= htmlspecialchars($inv['invoice_number']) ?><br>
-                    <strong>Date:</strong> <?= htmlspecialchars(date('d-M-Y', strtotime($inv['invoice_date']))) ?><br>
+                    <strong>Date:</strong> <?= htmlspecialchars(date('d-M-Y', strtotime($inv['invoice_date']) ?: 0)) ?><br>
                     <strong>Dispatched From:</strong> <?= htmlspecialchars($inv['godown_name'] ?? '-') ?>
                 </td>
             </tr>
