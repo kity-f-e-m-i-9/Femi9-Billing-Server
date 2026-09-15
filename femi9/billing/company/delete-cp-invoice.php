@@ -1,6 +1,7 @@
 <?php
 ob_start();
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('channel_partner');
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {

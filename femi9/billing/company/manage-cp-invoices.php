@@ -56,7 +56,7 @@ $sql = "
            gd.gname AS godown_name
     FROM cp_invoices cpi
     JOIN channel_partners cp ON cp.id = cpi.channel_partner_id
-    LEFT JOIN company_godown gd ON gd.id = cpi.source_godown_id
+    LEFT JOIN company_godown gd ON gd.id = cpi.source_godown_id AND (" . godown_finance_filter_sql($db_conn, 'gd') . ")
     $where_sql
     ORDER BY cpi.created_at DESC
 ";
