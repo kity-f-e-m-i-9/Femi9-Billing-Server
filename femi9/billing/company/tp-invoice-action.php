@@ -174,19 +174,28 @@ $tp_id            = (int)($_POST['tp_id'] ?? 0);
 // PO-sourced invoices inherit the PO's own type (read-only — the form's
 // hidden field already carries it, but re-resolved from the DB here rather
 // than trusted from POST); a direct invoice takes the submitted selector.
+$po_locked_cp_id = 0;
 if ($po_id > 0) {
-    $poTypeStmt = $db_conn->prepare("SELECT product_type FROM tp_purchase_orders WHERE id=? LIMIT 1");
+    $poTypeStmt = $db_conn->prepare("SELECT product_type, preferred_cp_id FROM tp_purchase_orders WHERE id=? LIMIT 1");
     $poTypeStmt->bind_param("i", $po_id);
     $poTypeStmt->execute();
     $poTypeRow = $poTypeStmt->get_result()->fetch_assoc();
     $poTypeStmt->close();
     $productType = tpResolveProductType($poTypeRow['product_type'] ?? null);
+    $po_locked_cp_id = (int)($poTypeRow['preferred_cp_id'] ?? 0);
 } else {
     $productType = tpResolveProductType($_POST['product_type'] ?? null);
 }
 $source_loc_id    = (int)($_POST['source_location_id'] ?? 0) ?: null;
 $source_cp_id     = (int)($_POST['source_cp_id'] ?? 0);
 $source_godown_id = (int)($_POST['source_godown_id'] ?? 0);
+
+// A PO the TP submitted against a specific CP's stock must be invoiced from
+// that same CP — never trust the posted source over this, since the "Use
+// company godown instead" toggle is only hidden client-side.
+if ($po_locked_cp_id > 0 && $source_cp_id !== $po_locked_cp_id) {
+    header("Location: add-tp-invoice?po_id=" . $po_id . "&error=unauthorized"); exit;
+}
 $invoice_date     = trim($_POST['invoice_date'] ?? date('Y-m-d'));
 $courier_charges  = round((float)($_POST['courier_charges'] ?? 0), 2);
 if ($courier_charges < 0) $courier_charges = 0;

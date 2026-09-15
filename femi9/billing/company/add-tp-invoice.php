@@ -21,19 +21,24 @@ $godowns_list = $gd_result ? $gd_result->fetch_all(MYSQLI_ASSOC) : [];
 $prefill_po_id = (int)($_GET['po_id'] ?? 0);
 $prefill_tp_id = 0;
 $prefill_items = [];
+// Set when the TP submitted this PO against a specific channel partner's
+// stock (add-purchase-order.php's "Submit To: [CP]" option) — locks the
+// invoice source to that same CP so Company can't re-route it to a godown.
+$prefill_cp_id = 0;
 // Read-only, inherited from the PO — an invoice billed from a PO always
 // carries that PO's type; a direct/manual invoice (no po_id) gets an
 // explicit selector further down instead. Defaults to napkin only for the
 // direct-invoice case (the selector overrides it before submit).
 $prefill_product_type = 'napkin';
 if ($prefill_po_id > 0) {
-    $poStmt = $db_conn->prepare("SELECT territory_partner_id, product_type FROM tp_purchase_orders WHERE id=? AND status IN ('waiting','cancelled')");
+    $poStmt = $db_conn->prepare("SELECT territory_partner_id, product_type, preferred_cp_id FROM tp_purchase_orders WHERE id=? AND status IN ('waiting','cancelled')");
     $poStmt->bind_param("i", $prefill_po_id);
     $poStmt->execute();
     $poRow = $poStmt->get_result()->fetch_assoc();
     $poStmt->close();
     if ($poRow) {
         $prefill_tp_id = (int)$poRow['territory_partner_id'];
+        $prefill_cp_id = (int)($poRow['preferred_cp_id'] ?? 0);
         $prefill_product_type = tpResolveProductType($poRow['product_type'] ?? null);
         $itStmt = $db_conn->prepare("SELECT product_id, qty FROM tp_purchase_order_items WHERE po_id=?");
         $itStmt->bind_param("i", $prefill_po_id);
@@ -604,6 +609,7 @@ $(document).ready(function() {
     /* ── Prefill from a TP purchase order (tp-today-orders.php "Invoice" button) ── */
     var prefillTpId  = <?php echo (int)$prefill_tp_id; ?>;
     var prefillItems = <?php echo json_encode($prefill_items); ?>;
+    var prefillCpId  = <?php echo (int)$prefill_cp_id; ?>;
     var prefillDone  = false;
 
     function tryAutoAddPrefill() {
@@ -703,7 +709,17 @@ $(document).ready(function() {
         $.getJSON('get-tp-source-locations.php?tp_id=' + tp_id, function (res) {
             if (res.status === 'ok' && res.sources.length) {
                 currentCpSources = res.sources;
-                showCpSource();
+                var lockedSrc = null;
+                if (prefillCpId) {
+                    $.each(res.sources, function (_, s) {
+                        if (parseInt(s.cp_db_id) === prefillCpId) lockedSrc = s;
+                    });
+                }
+                if (lockedSrc) {
+                    showLockedCpSource(lockedSrc);
+                } else {
+                    showCpSource();
+                }
             } else {
                 // No CP found — fall back to godown selection
                 currentCpSources = [];
@@ -727,6 +743,17 @@ $(document).ready(function() {
         }
         $('#sourceToggleLink').text('Use company godown instead');
         $('#sourceToggle').show();
+    }
+
+    /* ── Locked CP source: this invoice is billing a PO the TP submitted
+       against a specific channel partner's stock — no toggle, no dropdown,
+       so Company can't silently switch it to godown/company stock. ── */
+    function showLockedCpSource(src) {
+        sourceMode = 'cp';
+        $('#sourceLabel').text('Channel Partner');
+        $('#sourceHint').text('Locked — this purchase order was submitted against this channel partner\'s stock');
+        useSource(src);
+        $('#sourceToggle').hide();
     }
 
     /* ── Show godown source, with option to switch back to CP (if resolved) ── */
