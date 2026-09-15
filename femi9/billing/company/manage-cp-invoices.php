@@ -172,7 +172,7 @@ foreach ($invoices as $inv) {
                             <select name="cp_id" class="form-control" style="width:200px;">
                                 <option value="">All Channel Partners</option>
                                 <?php foreach ($cps as $cp): ?>
-                                <option value="<?=$cp['id']?>" <?=$filter_cp_id === (int)$cp['id'] ? 'selected' : ''?>><?=htmlspecialchars($cp['name'])?> (<?=htmlspecialchars($cp['cp_code'])?>)</option>
+                                <option value="<?=(int)$cp['id']?>" <?=$filter_cp_id === (int)$cp['id'] ? 'selected' : ''?>><?=htmlspecialchars($cp['name'])?> (<?=htmlspecialchars($cp['cp_code'])?>)</option>
                                 <?php endforeach; ?>
                             </select>
                             <input type="date" name="date_from" class="form-control" style="width:160px;" value="<?=htmlspecialchars($filter_date_from)?>" placeholder="From">
@@ -213,12 +213,12 @@ foreach ($invoices as $inv) {
                                     <td><?=htmlspecialchars($inv['godown_name'] ?? '-')?></td>
                                     <td>₹<?=number_format((float)$inv['total_amount'], 2)?></td>
                                     <td>
-                                        <a href="cp-invoice-print.php?id=<?=$enc?>" target="_blank" class="action-btn view" title="View / Print">
+                                        <a href="cp-invoice-print.php?id=<?=htmlspecialchars($enc)?>" target="_blank" class="action-btn view" title="View / Print">
                                             <i class="material-icons" style="font-size:16px;vertical-align:middle;">visibility</i>
                                         </a>
                                         <form method="POST" action="delete-cp-invoice.php" style="display:inline" onsubmit="return confirm('Delete invoice <?=htmlspecialchars($inv['invoice_number'], ENT_QUOTES)?>? This only removes the invoice record — stock is not affected.');">
                                             <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($_SESSION['csrf_token'])?>">
-                                            <input type="hidden" name="invoice_enc" value="<?=$enc?>">
+                                            <input type="hidden" name="invoice_enc" value="<?=htmlspecialchars($enc)?>">
                                             <button type="submit" class="action-btn delete" title="Delete Invoice">
                                                 <i class="material-icons" style="font-size:16px;vertical-align:middle;">delete</i>
                                             </button>
