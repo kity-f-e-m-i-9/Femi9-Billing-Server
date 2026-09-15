@@ -143,6 +143,10 @@ function load_transfer_invoice_data(mysqli $db_conn, int $transfer_id): ?array {
     $hsn_gst_totals   = [];
     $hsn_gst_pct      = [];
     $__inv_gst_pct    = 0;
+    $__line_gst_rates = []; // every line's own rate, not HSN-keyed — two
+    // different-rate lines that happen to share one HSN code would
+    // otherwise collide in $hsn_gst_pct (last line wins), silently hiding
+    // a real rate mix from has_mixed_gst_rates below.
     foreach ($invoice_items as &$item) {
         $qty           = (int)$item['quantity'];
         $mrp           = (float)$item['mrp'];
@@ -172,6 +176,7 @@ function load_transfer_invoice_data(mysqli $db_conn, int $transfer_id): ?array {
         $hsn_gst_totals[$hsn] = ($hsn_gst_totals[$hsn] ?? 0) + $gst_amount;
         $hsn_gst_pct[$hsn]    = $gst_pct;
         $__inv_gst_pct        = max($__inv_gst_pct, $gst_pct);
+        $__line_gst_rates[]   = $gst_pct;
     }
     unset($item);
 
@@ -195,11 +200,12 @@ function load_transfer_invoice_data(mysqli $db_conn, int $transfer_id): ?array {
 
     // Whether the SGST/CGST total rows' single blended percentage (derived
     // from $__inv_gst_pct, the MAX rate across all lines) is potentially
-    // inaccurate: true when the GST-bearing lines span more than one
+    // inaccurate: true when the GST-bearing LINES (not HSN codes — two
+    // different-rate products can share one HSN) span more than one
     // distinct rate. A 0% line contributes nothing to the SGST/CGST total
     // in the first place, so it's excluded here — a mix of "0% and 5%"
     // isn't a mixed-rate label problem, only "5% and 18%" (etc.) is.
-    $__nonzero_gst_rates = array_filter(array_unique(array_values($hsn_gst_pct)), fn($pct) => $pct > 0);
+    $__nonzero_gst_rates = array_filter(array_unique($__line_gst_rates), fn($pct) => $pct > 0);
     $has_mixed_gst_rates = count($__nonzero_gst_rates) > 1;
 
     $grand_total     = $TotalAMount123 + $totalgstamount;

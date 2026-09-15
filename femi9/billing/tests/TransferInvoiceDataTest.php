@@ -69,30 +69,52 @@ $nobuyer_data = load_transfer_invoice_data($db_conn, $nobuyer_transfer_id);
 assertTrue($nobuyer_data === null, "load_transfer_invoice_data returns null for a transfer with neither cp_id nor location_id set (no resolvable buyer)");
 
 // ── Scenario 5: mixed GST-rate transfer -> has_mixed_gst_rates is true ──
+// Prefer two real products at different rates if the dev DB happens to have
+// them; otherwise insert two temporary product rows (inside this same
+// rolled-back transaction) so the true branch of has_mixed_gst_rates is
+// actually exercised end-to-end rather than skipped — a prior run of this
+// harness found only one distinct non-zero GST rate in the dev DB and had
+// to SKIP this scenario, leaving the logic verified only by code review.
 $gst_rates = $db_conn->query("SELECT DISTINCT gst FROM products WHERE gst > 0 AND mrp > 0")->fetch_all(MYSQLI_ASSOC);
 if (count($gst_rates) >= 2) {
     $rate_a = $gst_rates[0]['gst'];
     $rate_b = $gst_rates[1]['gst'];
     $product_a = $db_conn->query("SELECT id FROM products WHERE gst = $rate_a AND mrp > 0 LIMIT 1")->fetch_assoc();
     $product_b = $db_conn->query("SELECT id FROM products WHERE gst = $rate_b AND mrp > 0 LIMIT 1")->fetch_assoc();
-
-    $db_conn->query("INSERT INTO pl_godown_transfers (transfer_type, godown_id, cp_id, transfer_date, ref_number, note, created_by) VALUES ('godown_to_location', {$godown['id']}, {$cp['id']}, CURDATE(), 'TEST-MIXEDGST-REF', 'test', 'harness')");
-    $mixed_transfer_id = $db_conn->insert_id;
-    $db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($mixed_transfer_id, {$product_a['id']}, 1)");
-    $db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($mixed_transfer_id, {$product_b['id']}, 1)");
-
-    $mixed_data = load_transfer_invoice_data($db_conn, $mixed_transfer_id);
-    assertTrue($mixed_data['has_mixed_gst_rates'] === true, "has_mixed_gst_rates is true for a transfer with two distinct non-zero GST rates among its line items");
-
-    // ── Scenario 6 (control): single-rate transfer -> has_mixed_gst_rates false
-    $db_conn->query("INSERT INTO pl_godown_transfers (transfer_type, godown_id, cp_id, transfer_date, ref_number, note, created_by) VALUES ('godown_to_location', {$godown['id']}, {$cp['id']}, CURDATE(), 'TEST-SINGLEGST-REF', 'test', 'harness')");
-    $single_transfer_id = $db_conn->insert_id;
-    $db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($single_transfer_id, {$product_a['id']}, 1)");
-    $single_data = load_transfer_invoice_data($db_conn, $single_transfer_id);
-    assertTrue($single_data['has_mixed_gst_rates'] === false, "has_mixed_gst_rates is false for a transfer whose line items share one GST rate");
 } else {
-    echo "SKIP: dev DB does not have at least two distinct non-zero GST rates among its products — skipping has_mixed_gst_rates scenario\n";
+    // Copy a real product's full row via SELECT * so every NOT NULL column
+    // this table happens to have is satisfied, then override only the
+    // columns this scenario cares about (name, gst, mrp) — safer than
+    // hand-listing every required column and risking a missed one.
+    $template = $db_conn->query("SELECT * FROM products LIMIT 1")->fetch_assoc();
+    unset($template['id']);
+    $cols_a = $template; $cols_a['productName'] = 'TEST MIXED GST PRODUCT A'; $cols_a['gst'] = 5; $cols_a['mrp'] = 100;
+    $cols_b = $template; $cols_b['productName'] = 'TEST MIXED GST PRODUCT B'; $cols_b['gst'] = 18; $cols_b['mrp'] = 100;
+    $col_names = implode(',', array_keys($cols_a));
+
+    $vals_a = implode(',', array_map(fn($v) => $v === null ? 'NULL' : "'" . $db_conn->real_escape_string($v) . "'", array_values($cols_a)));
+    $db_conn->query("INSERT INTO products ($col_names) VALUES ($vals_a)");
+    $product_a = ['id' => $db_conn->insert_id];
+
+    $vals_b = implode(',', array_map(fn($v) => $v === null ? 'NULL' : "'" . $db_conn->real_escape_string($v) . "'", array_values($cols_b)));
+    $db_conn->query("INSERT INTO products ($col_names) VALUES ($vals_b)");
+    $product_b = ['id' => $db_conn->insert_id];
 }
+
+$db_conn->query("INSERT INTO pl_godown_transfers (transfer_type, godown_id, cp_id, transfer_date, ref_number, note, created_by) VALUES ('godown_to_location', {$godown['id']}, {$cp['id']}, CURDATE(), 'TEST-MIXEDGST-REF', 'test', 'harness')");
+$mixed_transfer_id = $db_conn->insert_id;
+$db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($mixed_transfer_id, {$product_a['id']}, 1)");
+$db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($mixed_transfer_id, {$product_b['id']}, 1)");
+
+$mixed_data = load_transfer_invoice_data($db_conn, $mixed_transfer_id);
+assertTrue($mixed_data['has_mixed_gst_rates'] === true, "has_mixed_gst_rates is true for a transfer with two distinct non-zero GST rates among its line items");
+
+// ── Scenario 6 (control): single-rate transfer -> has_mixed_gst_rates false
+$db_conn->query("INSERT INTO pl_godown_transfers (transfer_type, godown_id, cp_id, transfer_date, ref_number, note, created_by) VALUES ('godown_to_location', {$godown['id']}, {$cp['id']}, CURDATE(), 'TEST-SINGLEGST-REF', 'test', 'harness')");
+$single_transfer_id = $db_conn->insert_id;
+$db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($single_transfer_id, {$product_a['id']}, 1)");
+$single_data = load_transfer_invoice_data($db_conn, $single_transfer_id);
+assertTrue($single_data['has_mixed_gst_rates'] === false, "has_mixed_gst_rates is false for a transfer whose line items share one GST rate");
 
 $db_conn->rollback(); // never persist test data
 echo "All TransferInvoiceData tests passed.\n";

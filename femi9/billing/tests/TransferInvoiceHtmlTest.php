@@ -84,6 +84,14 @@ $db_conn->rollback();
 
 // --- Scenario: mixed GST-rate transfer -> SGST/CGST labels suppress the
 // percentage, but the HSN-wise per-row percentages stay correct ---
+// Prefer two real distinct-rate products if the dev DB has them; otherwise
+// insert two temporary product rows (same rolled-back transaction) with
+// distinct HSNs AND distinct rates, so this scenario is never silently
+// skipped and genuinely exercises the true branch end-to-end. (A same-HSN
+// different-rate pairing would also be a valid test of has_mixed_gst_rates
+// itself, but would break this test's own HSN-wise-table assertions below,
+// which expect two separate HSN rows — so this fixture deliberately keeps
+// the two temp products on different HSNs.)
 $db_conn->begin_transaction();
 $gst_rates = $db_conn->query("SELECT DISTINCT gst FROM products WHERE gst > 0 AND mrp > 0")->fetch_all(MYSQLI_ASSOC);
 if (count($gst_rates) >= 2 && $godown && $cp) {
@@ -91,7 +99,22 @@ if (count($gst_rates) >= 2 && $godown && $cp) {
     $rate_b = $gst_rates[1]['gst'];
     $product_a = $db_conn->query("SELECT id, hsn, gst FROM products WHERE gst = $rate_a AND mrp > 0 LIMIT 1")->fetch_assoc();
     $product_b = $db_conn->query("SELECT id, hsn, gst FROM products WHERE gst = $rate_b AND mrp > 0 LIMIT 1")->fetch_assoc();
+} elseif ($godown && $cp) {
+    $template = $db_conn->query("SELECT * FROM products LIMIT 1")->fetch_assoc();
+    unset($template['id']);
+    $esc = fn($v) => $v === null ? 'NULL' : "'" . $db_conn->real_escape_string($v) . "'";
 
+    $cols_a = $template; $cols_a['productName'] = 'TEST HTML MIXED GST A'; $cols_a['gst'] = 5; $cols_a['mrp'] = 100; $cols_a['hsn'] = 'TESTHSNA';
+    $col_names = implode(',', array_keys($cols_a));
+    $db_conn->query("INSERT INTO products ($col_names) VALUES (" . implode(',', array_map($esc, array_values($cols_a))) . ")");
+    $product_a = ['id' => $db_conn->insert_id, 'hsn' => $cols_a['hsn'], 'gst' => $cols_a['gst']];
+
+    $cols_b = $template; $cols_b['productName'] = 'TEST HTML MIXED GST B'; $cols_b['gst'] = 18; $cols_b['mrp'] = 100; $cols_b['hsn'] = 'TESTHSNB';
+    $db_conn->query("INSERT INTO products ($col_names) VALUES (" . implode(',', array_map($esc, array_values($cols_b))) . ")");
+    $product_b = ['id' => $db_conn->insert_id, 'hsn' => $cols_b['hsn'], 'gst' => $cols_b['gst']];
+}
+
+if (isset($product_a) && isset($product_b)) {
     $db_conn->query("INSERT INTO pl_godown_transfers (transfer_type, godown_id, cp_id, transfer_date, ref_number, note, created_by) VALUES ('godown_to_location', {$godown['id']}, {$cp['id']}, CURDATE(), 'TEST-HTML-MIXEDGST', 'test', 'harness')");
     $mixed_transfer_id = $db_conn->insert_id;
     $db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($mixed_transfer_id, {$product_a['id']}, 1)");
@@ -110,7 +133,7 @@ if (count($gst_rates) >= 2 && $godown && $cp) {
     assertTrue(strpos($mixed_html, fmt_gst_pct($product_a['gst'] / 2) . '%') !== false, "HSN-wise table still shows product A's correct per-HSN rate");
     assertTrue(strpos($mixed_html, fmt_gst_pct($product_b['gst'] / 2) . '%') !== false, "HSN-wise table still shows product B's correct per-HSN rate");
 } else {
-    echo "SKIP: dev DB does not have at least two distinct non-zero GST rates among its products — skipping mixed-GST-rate label suppression assertion\n";
+    echo "SKIP: no godown/CP available to build the mixed-GST-rate transfer fixture\n";
 }
 $db_conn->rollback();
 
