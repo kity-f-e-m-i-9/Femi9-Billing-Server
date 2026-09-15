@@ -104,9 +104,10 @@ tpEnsureCourierPaymentTables($db_conn);
 // so a courier payment made against an earlier (possibly smaller) cart may
 // not fully cover a since-grown one — purchase-order-action.php catches that.
 $courierPoolTotal = tpCourierPoolTotal($db_conn, (int)$Login_user_IDvl, $productType);
-// "Pick up myself" only shows for a TP Company has explicitly opted in
-// (manage-territory-partner.php toggle) — everyone else must pay courier.
-$allowSelfPickup  = tpAllowsSelfPickup($db_conn, (int)$Login_user_IDvl);
+// "Pick up myself" only shows for a TP Company has explicitly opted in for
+// THIS product type (manage-territory-partner.php has a separate toggle per
+// Napkin/Diaper) — everyone else must pay courier.
+$allowSelfPickup  = tpAllowsSelfPickup($db_conn, (int)$Login_user_IDvl, $productType);
 
 // Product catalog scoped to the chosen type — this is a stock replenishment
 // request to the company, not limited to what the TP already holds (unlike
@@ -119,6 +120,46 @@ if ($resProd) while ($p = mysqli_fetch_assoc($resProd)) $productList[] = $p;
 // per order — otherwise everything routes to Company exactly as before, and
 // $assignedSs stays null so the selector never renders.
 $assignedSs = tpGetAssignedSs($db_conn, (int)$Login_user_IDvl);
+
+// If a Channel Partner's coverage area includes one of this TP's own
+// assigned locations, the TP can additionally choose to source stock from
+// that CP directly — same walk-up-the-location-tree resolution
+// company/get-tp-source-locations.php uses to find a covering CP for a TP,
+// just scoped to this TP's own login instead of trusting a posted tp_id.
+// This is purely a STOCK SOURCE preference, tagged onto the order as
+// preferred_cp_id — it doesn't create a third advance-balance pool; a
+// CP-sourced order still draws from and is approved against the Company
+// pool exactly like a plain Company order (per explicit instruction,
+// 2026-09-15). Only the product picker changes, to the CP's own real stock.
+$myCp = null;
+$tpLocRes = mysqli_query($db_conn, "SELECT location_id FROM territory_partner_locations WHERE territory_partner_id=" . (int)$Login_user_IDvl);
+if ($tpLocRes) {
+    while ($locRow = mysqli_fetch_assoc($tpLocRes)) {
+        $loc_id = (int)$locRow['location_id'];
+        $cpRes = mysqli_query($db_conn, "
+            WITH RECURSIVE ancestors AS (
+                SELECT id, parent_id, 0 AS steps
+                FROM partner_location_nodes
+                WHERE id = $loc_id
+                UNION ALL
+                SELECT n.id, n.parent_id, a.steps + 1
+                FROM partner_location_nodes n
+                INNER JOIN ancestors a ON n.id = a.parent_id
+                WHERE a.parent_id IS NOT NULL
+            )
+            SELECT cp.id AS cp_db_id, cp.cp_id AS cp_code, cp.name AS cp_name
+            FROM ancestors a
+            JOIN channel_partner_locations cpl ON cpl.location_id = a.id
+            JOIN channel_partners cp ON cp.id = cpl.channel_partner_id
+            ORDER BY a.steps ASC
+            LIMIT 1
+        ");
+        if ($cpRes && ($found = mysqli_fetch_assoc($cpRes))) {
+            $myCp = $found;
+            break;
+        }
+    }
+}
 
 // Available advance balance and reserved-by-waiting-orders amount, computed
 // per approver pool — reused as-is (same query, just filtered by approver)
@@ -402,22 +443,35 @@ $tpDeliveryAddressParts = array_filter([
                             <input type="hidden" id="advBalanceVal" value="<?=$advBalance?>">
                             <input type="hidden" name="approver_type" id="approver_type_input" value="company">
                             <input type="hidden" name="product_type" value="<?=htmlspecialchars($productType)?>">
+                            <input type="hidden" name="preferred_cp_id" id="preferred_cp_id_input" value="">
 
-                            <?php if ($assignedSs !== null): ?>
+                            <?php if ($assignedSs !== null || $myCp !== null): ?>
                             <div class="apo-card">
                                 <div class="apo-card-title"><i class="material-icons-outlined">alt_route</i>Submit To</div>
                                 <div class="row g-2">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
                                             <input type="radio" name="approver_choice" value="company" checked onchange="onApproverChange()"> Company
                                         </label>
                                     </div>
-                                    <div class="col-md-6">
+                                    <?php if ($assignedSs !== null): ?>
+                                    <div class="col-md-4">
                                         <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
                                             <input type="radio" name="approver_choice" value="ss" onchange="onApproverChange()"> <?=htmlspecialchars($assignedSs['name'])?> (Super Stockist)
                                         </label>
                                     </div>
+                                    <?php endif; ?>
+                                    <?php if ($myCp !== null): ?>
+                                    <div class="col-md-4">
+                                        <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
+                                            <input type="radio" name="approver_choice" value="cp" data-cp-id="<?=(int)$myCp['cp_db_id']?>" onchange="onApproverChange()"> <?=htmlspecialchars($myCp['cp_name'])?> (<?=htmlspecialchars($myCp['cp_code'])?>)
+                                        </label>
+                                    </div>
+                                    <?php endif; ?>
                                 </div>
+                                <?php if ($myCp !== null): ?>
+                                <div id="cpStockHint" class="text-muted" style="font-size:12px;margin-top:8px;display:none;">Only products currently in stock at <?=htmlspecialchars($myCp['cp_name'])?> are shown below.</div>
+                                <?php endif; ?>
                             </div>
                             <?php endif; ?>
 
@@ -698,6 +752,11 @@ $tpDeliveryAddressParts = array_filter([
         var sel = document.getElementById('pr_select');
         var opt = sel.options[sel.selectedIndex];
         document.getElementById('po_price').value = str ? (opt.getAttribute('data-price') || '') : '';
+        // Only present on CP-sourced options — caps the qty field at what
+        // that CP actually has, so a TP can't request more than their CP
+        // can supply. Absent entirely for Company/SS's unrestricted list.
+        var avail = str ? opt.getAttribute('data-avail') : null;
+        document.getElementById('po_qty').max = avail || '';
         poTotal();
     }
 
@@ -725,6 +784,12 @@ $tpDeliveryAddressParts = array_filter([
 
         if (!prId) { alert('Select a product.'); return; }
         if (qty <= 0) { alert('Enter a valid qty.'); return; }
+        var selOpt = sel.options[sel.selectedIndex];
+        var availAttr = selOpt ? selOpt.getAttribute('data-avail') : null;
+        if (availAttr !== null && qty > parseInt(availAttr)) {
+            alert('Only ' + availAttr + ' available in stock at this CP.');
+            return;
+        }
         for (var i = 0; i < poLines.length; i++) {
             if (poLines[i].pr_id === prId) { alert('That product is already added.'); return; }
         }
@@ -879,21 +944,85 @@ $tpDeliveryAddressParts = array_filter([
     var hasEligibleAdvanceSubmission = eligibleSubmissionByApprover.company.has;
     var eligibleAdvanceSubmissionTotal = eligibleSubmissionByApprover.company.total;
 
+    // The static, unfiltered <option> list rendered server-side for Company/SS
+    // — captured once so switching back from CP mode can restore it exactly,
+    // instead of re-fetching or losing it.
+    var defaultProductOptionsHtml = null;
+    var cpHintEl = document.getElementById('cpStockHint');
+
     function onApproverChange() {
         var choice = document.querySelector('input[name="approver_choice"]:checked');
         var approver = choice ? choice.value : 'company';
-        document.getElementById('approver_type_input').value = approver;
+        // A CP-sourced order still draws from and is approved against the
+        // Company advance pool — 'cp' is a stock-source tag, not a third
+        // balance pool (see the PHP comment above $myCp). approver_type
+        // posted to the server is therefore always 'company' or 'ss'.
+        document.getElementById('approver_type_input').value = (approver === 'cp') ? 'company' : approver;
 
-        var bal = advBalanceByApprover[approver];
+        var balKey = (approver === 'cp') ? 'company' : approver;
+        var bal = advBalanceByApprover[balKey];
         if (bal === null || bal === undefined) bal = 0;
         document.getElementById('advBalanceVal').value = bal;
         document.getElementById('advBalanceDisplay').textContent = bal.toFixed(2);
         document.getElementById('advBalanceDisplay2').textContent = bal.toFixed(2);
 
-        hasEligibleAdvanceSubmission = eligibleSubmissionByApprover[approver].has;
-        eligibleAdvanceSubmissionTotal = eligibleSubmissionByApprover[approver].total;
+        hasEligibleAdvanceSubmission = eligibleSubmissionByApprover[balKey].has;
+        eligibleAdvanceSubmissionTotal = eligibleSubmissionByApprover[balKey].total;
+
+        if (approver === 'cp') {
+            var cpId = choice.getAttribute('data-cp-id');
+            document.getElementById('preferred_cp_id_input').value = cpId;
+            loadCpProducts(cpId);
+            if (cpHintEl) cpHintEl.style.display = '';
+        } else {
+            document.getElementById('preferred_cp_id_input').value = '';
+            restoreDefaultProducts();
+            if (cpHintEl) cpHintEl.style.display = 'none';
+        }
 
         updatePoSummary();
+    }
+
+    // Swaps the product picker to only what this CP actually has in stock —
+    // the TP can't request more than the CP they'll actually collect from
+    // can supply. Falls back to the full catalog list on any load failure
+    // rather than leaving the picker stuck on "Loading…".
+    function loadCpProducts(cpId) {
+        var sel = document.getElementById('pr_select');
+        if (!defaultProductOptionsHtml) { defaultProductOptionsHtml = sel.innerHTML; }
+        $(sel).val('').trigger('change');
+        document.getElementById('po_price').value = '';
+        sel.innerHTML = '<option value="">Loading…</option>';
+        sel.disabled = true;
+        $.getJSON('get-cp-products.php?cp_id=' + encodeURIComponent(cpId) + '&product_type=<?=urlencode($productType)?>', function (data) {
+            var opts = '<option value=""></option>';
+            (data || []).forEach(function (p) {
+                opts += '<option value="' + p.product_id + '" data-price="' + p.rate + '" data-avail="' + p.available_qty + '">' + escHtmlPo(p.productName) + '</option>';
+            });
+            sel.innerHTML = opts;
+            sel.disabled = false;
+            if (!data || !data.length) {
+                sel.innerHTML = '<option value="">No stock available at this CP</option>';
+                sel.disabled = true;
+            }
+        }).fail(function () {
+            sel.innerHTML = defaultProductOptionsHtml;
+            sel.disabled = false;
+        });
+    }
+
+    function restoreDefaultProducts() {
+        var sel = document.getElementById('pr_select');
+        if (defaultProductOptionsHtml) {
+            $(sel).val('').trigger('change');
+            document.getElementById('po_price').value = '';
+            sel.innerHTML = defaultProductOptionsHtml;
+            sel.disabled = false;
+        }
+    }
+
+    function escHtmlPo(str) {
+        return $('<div>').text(str == null ? '' : str).html();
     }
 
     function poGrandTotal() {

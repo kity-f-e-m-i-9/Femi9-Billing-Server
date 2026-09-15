@@ -25,6 +25,51 @@ tpEnsureAdvanceWalletColumns($db_conn);
 // TP actually has that SS assignment before honoring 'ss'.
 $approver = tpResolveApprover($db_conn, $tp_id, $_POST['approver_type'] ?? null);
 
+// Same for a "Submit To: [Channel Partner]" stock-source preference — never
+// trust the posted cp_id on its own; re-derive which CP (if any) actually
+// covers this TP's own assigned location(s) and only keep the posted value
+// if it matches one of those. This is a stock-source tag only (see
+// add-purchase-order.php's $myCp comment) — it never changes approver_type/
+// approver_ss_id above, so the Company advance-balance gate this order is
+// checked against below is completely unaffected by it.
+$preferredCpId = (int)($_POST['preferred_cp_id'] ?? 0);
+if ($preferredCpId > 0) {
+    $myCpIds = [];
+    $tpLocRes = $db_conn->query("SELECT location_id FROM territory_partner_locations WHERE territory_partner_id=$tp_id");
+    if ($tpLocRes) {
+        while ($locRow = $tpLocRes->fetch_assoc()) {
+            $loc_id = (int)$locRow['location_id'];
+            $cpRes = $db_conn->query("
+                WITH RECURSIVE ancestors AS (
+                    SELECT id, parent_id, 0 AS steps
+                    FROM partner_location_nodes
+                    WHERE id = $loc_id
+                    UNION ALL
+                    SELECT n.id, n.parent_id, a.steps + 1
+                    FROM partner_location_nodes n
+                    INNER JOIN ancestors a ON n.id = a.parent_id
+                    WHERE a.parent_id IS NOT NULL
+                )
+                SELECT cp.id AS cp_db_id
+                FROM ancestors a
+                JOIN channel_partner_locations cpl ON cpl.location_id = a.id
+                JOIN channel_partners cp ON cp.id = cpl.channel_partner_id
+                ORDER BY a.steps ASC
+                LIMIT 1
+            ");
+            if ($cpRes && ($found = $cpRes->fetch_assoc())) { $myCpIds[] = (int)$found['cp_db_id']; }
+        }
+    }
+    if (!in_array($preferredCpId, $myCpIds, true)) { $preferredCpId = 0; }
+}
+$preferredCpIdSql = $preferredCpId > 0 ? $preferredCpId : null;
+
+// Self-migrating — see the INSERT below.
+$_col = $db_conn->query("SHOW COLUMNS FROM tp_purchase_orders LIKE 'preferred_cp_id'");
+if ($_col && $_col->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_purchase_orders ADD COLUMN preferred_cp_id INT NULL AFTER approver_ss_id");
+}
+
 $pr_ids   = $_POST['pr_id']   ?? [];
 $qtys     = $_POST['qty']     ?? [];
 $prices   = $_POST['price']   ?? [];
@@ -32,10 +77,11 @@ $disc_pcts = $_POST['discount_percentage'] ?? [];
 $disc_amts = $_POST['discount_amount']     ?? [];
 $methods  = $_POST['pickup_method'] ?? [];
 
-// Authoritative gate — a TP Company hasn't opted into self-pickup can never
-// get a 'pickup' line through here, no matter what pickup_method[] the
-// client submits (the UI already hides the option, this is the real check).
-$allowSelfPickup = tpAllowsSelfPickup($db_conn, $tp_id);
+// Authoritative gate — a TP Company hasn't opted into self-pickup for THIS
+// product type can never get a 'pickup' line through here, no matter what
+// pickup_method[] the client submits (the UI already hides the option, this
+// is the real check).
+$allowSelfPickup = tpAllowsSelfPickup($db_conn, $tp_id, $productType);
 
 $items = [];
 foreach ($pr_ids as $i => $rpid) {
@@ -248,13 +294,13 @@ $db_conn->begin_transaction();
 try {
     $s = $db_conn->prepare(
         "INSERT INTO tp_purchase_orders
-            (territory_partner_id, product_type, approver_type, approver_ss_id, order_date, status, excess_amount, use_default_delivery_address,
+            (territory_partner_id, product_type, approver_type, approver_ss_id, preferred_cp_id, order_date, status, excess_amount, use_default_delivery_address,
              custom_delivery_line1, custom_delivery_line2, custom_delivery_city, custom_delivery_district,
              custom_delivery_state, custom_delivery_country, custom_delivery_pincode)
-         VALUES (?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $s->bind_param(
-        "issisdisssssss", $tp_id, $productType, $approver['type'], $approver['ss_id'], $order_date, $excessAmount, $useDefaultDelivery,
+        "issiisdisssssss", $tp_id, $productType, $approver['type'], $approver['ss_id'], $preferredCpIdSql, $order_date, $excessAmount, $useDefaultDelivery,
         $customDeliveryLine1, $customDeliveryLine2, $customDeliveryCity, $customDeliveryDistrict,
         $customDeliveryState, $customDeliveryCountry, $customDeliveryPincode
     );
