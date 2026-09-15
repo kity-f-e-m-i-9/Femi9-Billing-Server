@@ -174,29 +174,50 @@ function tpEnsurePickupColumn(mysqli $db): void
     }
 }
 
-// Self-migrating: per-TP switch, set by Company on manage-territory-partner.php
-// (toggle-tp-pickup.php). Defaults to 0 — "pick up myself" only appears for a
-// TP Company has explicitly opted in; every other TP must pay the courier fee,
-// enforced both in the UI (add-purchase-order.php hides the option) and
-// server-side (purchase-order-action.php ignores a tampered pickup_method[]
-// for a TP not opted in).
+// Self-migrating: per-TP, per-product-type switch, set by Company on
+// manage-territory-partner.php (toggle-tp-pickup.php). Defaults to 0 —
+// "pick up myself" only appears for a TP Company has explicitly opted in
+// for THAT product type; every other TP/type combination must pay the
+// courier fee, enforced both in the UI (add-purchase-order.php hides the
+// option) and server-side (purchase-order-action.php ignores a tampered
+// pickup_method[] for a TP not opted in for the cart's product type).
+//
+// Originally a single allow_self_pickup column covering both Napkin and
+// Diaper together — split 2026-09-15 so Company can opt a TP into self-pickup
+// for one product type without the other. The old column is backfilled into
+// both new ones below (once) so no TP silently loses pickup access it
+// already had; the old column itself is left in place, unused, rather than
+// dropped, since nothing else reads it.
 function tpEnsureSelfPickupColumn(mysqli $db): void
 {
-    $col = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'allow_self_pickup'");
+    $hadNapkinCol = true;
+    $col = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'allow_self_pickup_napkin'");
     if ($col && $col->num_rows === 0) {
-        $db->query("ALTER TABLE territory_partners ADD COLUMN allow_self_pickup TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active");
+        $hadNapkinCol = false;
+        $db->query("ALTER TABLE territory_partners ADD COLUMN allow_self_pickup_napkin TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active");
+    }
+    $col2 = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'allow_self_pickup_diaper'");
+    if ($col2 && $col2->num_rows === 0) {
+        $db->query("ALTER TABLE territory_partners ADD COLUMN allow_self_pickup_diaper TINYINT(1) NOT NULL DEFAULT 0 AFTER allow_self_pickup_napkin");
+    }
+    if (!$hadNapkinCol) {
+        $oldCol = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'allow_self_pickup'");
+        if ($oldCol && $oldCol->num_rows > 0) {
+            $db->query("UPDATE territory_partners SET allow_self_pickup_napkin = allow_self_pickup, allow_self_pickup_diaper = allow_self_pickup WHERE allow_self_pickup = 1");
+        }
     }
 }
 
-function tpAllowsSelfPickup(mysqli $db, int $tpId): bool
+function tpAllowsSelfPickup(mysqli $db, int $tpId, string $productType): bool
 {
     tpEnsureSelfPickupColumn($db);
-    $stmt = $db->prepare("SELECT allow_self_pickup FROM territory_partners WHERE id = ?");
+    $col = $productType === 'diaper' ? 'allow_self_pickup_diaper' : 'allow_self_pickup_napkin';
+    $stmt = $db->prepare("SELECT $col AS allowed FROM territory_partners WHERE id = ?");
     $stmt->bind_param('i', $tpId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return !empty($row['allow_self_pickup']);
+    return !empty($row['allowed']);
 }
 
 /**

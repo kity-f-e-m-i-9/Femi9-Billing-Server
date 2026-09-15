@@ -103,6 +103,10 @@ $i = 0;
     <style>
         body { font-family: 'Poppins', sans-serif; }
 
+        .pickup-bulk { font-weight: 400; text-transform: none; letter-spacing: normal; margin-top: 2px; font-size: 11px; }
+        .pickup-bulk-link { color: #667eea; text-decoration: none; cursor: pointer; }
+        .pickup-bulk-link:hover { text-decoration: underline; }
+
         .stat-card {
             background: #fff;
             border-radius: 10px;
@@ -319,7 +323,20 @@ $i = 0;
                                             <th>Updated By</th>
                                             <th>Password</th>
                                             <th>Status</th>
-                                            <th>Self Pickup</th>
+                                            <th>
+                                                Napkin Pickup
+                                                <div class="pickup-bulk">
+                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-allow="1">All</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-allow="0">None</a>
+                                                </div>
+                                            </th>
+                                            <th>
+                                                Lumi Pickup
+                                                <div class="pickup-bulk">
+                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-allow="1">All</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-allow="0">None</a>
+                                                </div>
+                                            </th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -438,8 +455,19 @@ $i = 0;
                                                 <label style="display:inline-flex;align-items:center;cursor:pointer;">
                                                     <input type="checkbox" class="toggle-pickup-cb"
                                                            data-id="<?php echo $enc_id; ?>"
+                                                           data-type="napkin"
                                                            data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>"
-                                                           <?php echo !empty($tp['allow_self_pickup']) ? 'checked' : ''; ?>
+                                                           <?php echo !empty($tp['allow_self_pickup_napkin']) ? 'checked' : ''; ?>
+                                                           style="width:17px;height:17px;">
+                                                </label>
+                                            </td>
+                                            <td>
+                                                <label style="display:inline-flex;align-items:center;cursor:pointer;">
+                                                    <input type="checkbox" class="toggle-pickup-cb"
+                                                           data-id="<?php echo $enc_id; ?>"
+                                                           data-type="diaper"
+                                                           data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>"
+                                                           <?php echo !empty($tp['allow_self_pickup_diaper']) ? 'checked' : ''; ?>
                                                            style="width:17px;height:17px;">
                                                 </label>
                                             </td>
@@ -545,14 +573,29 @@ $(document).on('click', '.toggle-status-btn', function () {
 $(document).on('change', '.toggle-pickup-cb', function () {
     var $cb   = $(this);
     var id    = $cb.data('id');
-    var name  = $cb.data('name');
+    var type  = $cb.data('type');
     var newVal = $cb.is(':checked') ? 1 : 0;
 
     $.post('toggle-tp-pickup.php', {
-        csrf_token: CSRF_TOKEN, id: id, allow: newVal
+        csrf_token: CSRF_TOKEN, id: id, type: type, allow: newVal
     }, function (res) {
         if (!res.success) { alert('Failed. Please try again.'); $cb.prop('checked', !newVal); return; }
     }, 'json').fail(function () { alert('Request failed. Please try again.'); $cb.prop('checked', !newVal); });
+});
+
+$(document).on('click', '.pickup-bulk-link', function (e) {
+    e.preventDefault();
+    var type  = $(this).data('type');
+    var allow = $(this).data('allow');
+    var label = allow ? 'ON' : 'OFF';
+    if (!confirm('Turn ' + label + ' self-pickup for ' + (type === 'diaper' ? 'Lumi Diaper' : 'Napkin') + ' for every Territory Partner shown here?')) return;
+
+    $.post('toggle-tp-pickup-bulk.php', {
+        csrf_token: CSRF_TOKEN, type: type, allow: allow
+    }, function (res) {
+        if (!res.success) { alert('Failed. Please try again.'); return; }
+        $('.toggle-pickup-cb[data-type="' + type + '"]').prop('checked', !!allow);
+    }, 'json').fail(function () { alert('Request failed. Please try again.'); });
 });
 
 function togglePw(btn) {
