@@ -36,4 +36,48 @@ assertTrue(strpos($html, htmlspecialchars($data['result_Godown']['gname'])) !== 
 assertTrue(strpos($html, 'Seal and Signature') !== false, "renders a signature block");
 
 $db_conn->rollback();
+
+// --- Scenario: gst=0 product -> "Bill of Supply" heading instead of "Tax Invoice" ---
+$db_conn->begin_transaction();
+$zero_gst_product = $db_conn->query("SELECT id, productName, mrp, gst, gst_type, hsn FROM products WHERE gst = 0 AND mrp > 0 LIMIT 1")->fetch_assoc();
+if ($zero_gst_product && $godown && $cp) {
+    $db_conn->query("INSERT INTO pl_godown_transfers (transfer_type, godown_id, cp_id, transfer_date, ref_number, note, created_by) VALUES ('godown_to_location', {$godown['id']}, {$cp['id']}, CURDATE(), 'TEST-HTML-BOS', 'test', 'harness')");
+    $bos_transfer_id = $db_conn->insert_id;
+    $db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($bos_transfer_id, {$zero_gst_product['id']}, 2)");
+
+    $bos_data = load_transfer_invoice_data($db_conn, $bos_transfer_id);
+    $bos_html = render_transfer_invoice_html($bos_data, $bos_data['has_carton_data']);
+
+    assertTrue(strpos($bos_html, 'Bill of Supply') !== false, "renders 'Bill of Supply' heading for a gst=0 (non-GST-liable) transfer");
+    assertTrue(strpos($bos_html, 'Tax Invoice') === false, "does NOT render 'Tax Invoice' heading for a gst=0 transfer");
+} else {
+    echo "SKIP: no product with gst=0 and mrp>0 found in dev DB — skipping Bill of Supply heading assertion\n";
+}
+$db_conn->rollback();
+
+// --- Scenario: location_id destination (no cp_id) -> shows location name, no GSTIN label for buyer ---
+$db_conn->begin_transaction();
+$location = $db_conn->query("SELECT id, name FROM partner_location_nodes LIMIT 1")->fetch_assoc();
+if ($location && $godown && $product) {
+    $db_conn->query("INSERT INTO pl_godown_transfers (transfer_type, godown_id, location_id, transfer_date, ref_number, note, created_by) VALUES ('godown_to_location', {$godown['id']}, {$location['id']}, CURDATE(), 'TEST-HTML-LOC', 'test', 'harness')");
+    $loc_transfer_id = $db_conn->insert_id;
+    $db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($loc_transfer_id, {$product['id']}, 2)");
+
+    $loc_data = load_transfer_invoice_data($db_conn, $loc_transfer_id);
+    $loc_html = render_transfer_invoice_html($loc_data, $loc_data['has_carton_data']);
+
+    assertTrue($loc_data['result_Invoice_Details']['is_cp_buyer'] === false, "location-destination transfer is NOT flagged as a CP buyer");
+    assertTrue(strpos($loc_html, htmlspecialchars($location['name'])) !== false, "renders the partner_location_nodes location's name as the buyer");
+    // The seller (godown) section always prints "GSTIN/UIN :" regardless of
+    // buyer type, so a blanket absence-of-"GSTIN" check would be wrong. The
+    // buyer-side GSTIN line only prints "GSTIN: ..." (no "/UIN") and only
+    // when buyer_gstin is non-empty (TransferInvoiceHtml.php line ~126) — so
+    // for a location buyer (no GSTIN column) exactly one "GSTIN" occurrence
+    // (the seller's) should appear, not two.
+    assertTrue(substr_count($loc_html, 'GSTIN') === 1, "does NOT render a buyer GSTIN label for a location buyer (only the seller's GSTIN/UIN appears, not a second buyer-side GSTIN line)");
+} else {
+    echo "SKIP: no partner_location_nodes row found in dev DB — skipping location-buyer (no GSTIN) assertion\n";
+}
+$db_conn->rollback();
+
 echo "All TransferInvoiceHtml tests passed.\n";
