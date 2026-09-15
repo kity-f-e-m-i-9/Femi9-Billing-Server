@@ -2,6 +2,7 @@
 ob_start();
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('channel_partner');
+date_default_timezone_set("Asia/Kolkata");
 require_once("include/GodownAccess.php");
 require_once __DIR__ . '/../shared/CpPurchaseOrderBalance.php';
 require_once __DIR__ . '/../shared/CpInvoiceNumberService.php';
