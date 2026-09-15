@@ -4,6 +4,8 @@ include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('channel_partner');
 require_once("include/GodownAccess.php");
 require_once __DIR__ . '/../shared/CpPurchaseOrderBalance.php';
+require_once __DIR__ . '/../shared/CpInvoiceNumberService.php';
+require_once __DIR__ . '/../shared/CpInvoiceSchema.php';
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
@@ -21,8 +23,13 @@ if ($po_id < 1 || !in_array($action, ['approve', 'reject'], true)) {
 }
 
 cpEnsurePurchaseOrderTables($db_conn);
+cpEnsureInvoiceTables($db_conn);
 
-$poStmt = $db_conn->prepare("SELECT id, channel_partner_id, status FROM channel_partner_purchase_orders WHERE id = ? LIMIT 1");
+$poStmt = $db_conn->prepare("SELECT id, channel_partner_id, status, product_type,
+    use_default_delivery_address, custom_delivery_line1, custom_delivery_line2,
+    custom_delivery_city, custom_delivery_district, custom_delivery_state,
+    custom_delivery_country, custom_delivery_pincode
+    FROM channel_partner_purchase_orders WHERE id = ? LIMIT 1");
 $poStmt->bind_param("i", $po_id);
 $poStmt->execute();
 $po = $poStmt->get_result()->fetch_assoc();
@@ -149,14 +156,54 @@ try {
     }
     $ti->close();
 
-    $s = $db_conn->prepare("UPDATE channel_partner_purchase_orders SET status='completed', transfer_id=? WHERE id=? AND status='waiting'");
-    $s->bind_param("ii", $transfer_id, $po_id);
+    $invoice_date = date('Y-m-d');
+    $inv_num = cpInvoiceNextNumber($db_conn, 'CO', $invoice_date);
+    $grand_total = array_sum(array_column($poItems, 'amount'));
+
+    $ih = $db_conn->prepare("INSERT INTO cp_invoices
+        (invoice_number, channel_partner_id, source_godown_id, product_type, invoice_date,
+         total_amount, use_default_delivery_address, custom_delivery_line1, custom_delivery_line2,
+         custom_delivery_city, custom_delivery_district, custom_delivery_state,
+         custom_delivery_country, custom_delivery_pincode, transfer_id, created_by, created_by_user_type)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'company')");
+    $use_default = (int)($po['use_default_delivery_address'] ?? 1);
+    $product_type = $po['product_type'] ?? 'napkin';
+    // Type string built column-by-column against the VALUES list above:
+    // invoice_number(s) channel_partner_id(i) source_godown_id(i) product_type(s)
+    // invoice_date(s) total_amount(d) use_default_delivery_address(i)
+    // custom_delivery_line1..pincode(s x7) transfer_id(i) created_by(s)
+    // = "siissdisssssssis" (16 chars for 16 placeholders; 'company' is a literal, not bound)
+    $ih->bind_param(
+        "siissdisssssssis",
+        $inv_num, $cp_id, $godown_id, $product_type, $invoice_date,
+        $grand_total, $use_default,
+        $po['custom_delivery_line1'], $po['custom_delivery_line2'], $po['custom_delivery_city'],
+        $po['custom_delivery_district'], $po['custom_delivery_state'], $po['custom_delivery_country'],
+        $po['custom_delivery_pincode'], $transfer_id, $created_by
+    );
+    $ih->execute();
+    $cp_invoice_id = $db_conn->insert_id;
+    $ih->close();
+
+    $ii = $db_conn->prepare("INSERT INTO cp_invoice_items (cp_invoice_id, product_id, quantity, rate, amount) VALUES (?,?,?,?,?)");
+    foreach ($poItems as $item) {
+        $pid = (int)$item['product_id'];
+        $qty = (int)$item['qty'];
+        $rate = (float)$item['price'];
+        $amount = (float)$item['amount'];
+        $ii->bind_param("iiidd", $cp_invoice_id, $pid, $qty, $rate, $amount);
+        $ii->execute();
+    }
+    $ii->close();
+
+    $s = $db_conn->prepare("UPDATE channel_partner_purchase_orders SET status='completed', transfer_id=?, cp_invoice_id=? WHERE id=? AND status='waiting'");
+    $s->bind_param("iii", $transfer_id, $cp_invoice_id, $po_id);
     $s->execute();
     if ($s->affected_rows < 1) throw new Exception("Purchase order was no longer waiting");
     $s->close();
 
     $db_conn->commit();
-    header("Location: cp-today-orders.php?approved=1&ref=" . urlencode($ref_id)); exit;
+    header("Location: cp-today-orders.php?approved=1&ref=" . urlencode($ref_id) . "&inv=" . urlencode($inv_num)); exit;
 
 } catch (\Throwable $e) {
     $db_conn->rollback();
