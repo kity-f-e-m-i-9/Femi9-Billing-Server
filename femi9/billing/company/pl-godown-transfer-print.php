@@ -22,7 +22,7 @@ $show_carton_cols = $invData['has_carton_data'];
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Transfer Invoice <?php echo htmlspecialchars($invData['result_Invoice_Details']['ref_number']); ?> : <?php echo $business_name; ?></title>
+    <title>Delivery Slip <?php echo htmlspecialchars($invData['result_Invoice_Details']['dn_number']); ?> : <?php echo $business_name; ?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">

@@ -24,8 +24,9 @@ $db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, 
 $data = load_transfer_invoice_data($db_conn, $transfer_id);
 $html = render_transfer_invoice_html($data, $data['has_carton_data']);
 
-assertTrue(strpos($html, 'Tax Invoice') !== false, "renders the 'Tax Invoice' heading for a GST-liable transfer");
-assertTrue(strpos($html, 'TEST-HTML-REF') !== false, "renders the transfer's ref_number as the Invoice #");
+assertTrue(strpos($html, 'Delivery Slip') !== false, "renders the 'Delivery Slip' heading for a GST-liable transfer");
+assertTrue(strpos($html, 'TEST-HTML-REF') !== false, "renders the transfer's ref_number in the Reference No. field");
+assertTrue((bool)preg_match('~Delivery Slip \#.*?CPDN/\d{2}-\d{2}/\d{3}~s', $html), "renders the persisted dn_number (CPDN/{fy}/{seq}) as the Delivery Slip #");
 assertTrue(strpos($html, htmlspecialchars($cp['name'])) !== false, "renders the CP buyer's name");
 assertTrue(strpos($html, htmlspecialchars($product['productName'])) !== false, "renders the line-item product name");
 assertTrue(strpos($html, htmlspecialchars($product['hsn'])) !== false, "renders the line-item HSN code");
@@ -39,7 +40,8 @@ assertTrue(strpos($html, 'Seal and Signature') !== false, "renders a signature b
 
 $db_conn->rollback();
 
-// --- Scenario: gst=0 product -> "Bill of Supply" heading instead of "Tax Invoice" ---
+// --- Scenario: gst=0 product -> heading is STILL "Delivery Slip" (no longer
+// varies by GST liability — was "Bill of Supply" before this change) ---
 $db_conn->begin_transaction();
 $zero_gst_product = $db_conn->query("SELECT id, productName, mrp, gst, gst_type, hsn FROM products WHERE gst = 0 AND mrp > 0 LIMIT 1")->fetch_assoc();
 if ($zero_gst_product && $godown && $cp) {
@@ -50,10 +52,11 @@ if ($zero_gst_product && $godown && $cp) {
     $bos_data = load_transfer_invoice_data($db_conn, $bos_transfer_id);
     $bos_html = render_transfer_invoice_html($bos_data, $bos_data['has_carton_data']);
 
-    assertTrue(strpos($bos_html, 'Bill of Supply') !== false, "renders 'Bill of Supply' heading for a gst=0 (non-GST-liable) transfer");
+    assertTrue(strpos($bos_html, 'Delivery Slip') !== false, "renders 'Delivery Slip' heading for a gst=0 (non-GST-liable) transfer too");
+    assertTrue(strpos($bos_html, 'Bill of Supply') === false, "does NOT render 'Bill of Supply' heading for a gst=0 transfer");
     assertTrue(strpos($bos_html, 'Tax Invoice') === false, "does NOT render 'Tax Invoice' heading for a gst=0 transfer");
 } else {
-    echo "SKIP: no product with gst=0 and mrp>0 found in dev DB — skipping Bill of Supply heading assertion\n";
+    echo "SKIP: no product with gst=0 and mrp>0 found in dev DB — skipping zero-GST heading assertion\n";
 }
 $db_conn->rollback();
 

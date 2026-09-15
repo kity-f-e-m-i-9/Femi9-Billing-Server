@@ -133,12 +133,12 @@ Consignee &amp; Buyer:<br/>
 <td valign="top">
 <table id="second_topvl">
 <tr id="border_nbottom">
-<td>Invoice #<br/><b><?= htmlspecialchars($result_Invoice_Details['ref_number']); ?></b></td>
-<td>Invoice Date:<br/><b><?= date("d M Y", strtotime($result_Invoice_Details['transfer_date'])); ?></b></td>
+<td>Delivery Slip #<br/><b><?= htmlspecialchars($result_Invoice_Details['dn_number']); ?></b></td>
+<td>Delivery Slip Date:<br/><b><?= date("d M Y", strtotime($result_Invoice_Details['transfer_date'])); ?></b></td>
 </tr>
 <tr id="border_nbottom" valign="top">
 <td height="50">Mode/Terms of Payment<br/>&nbsp;</td>
-<td>Reference No. &amp; Date<br/>&nbsp;</td>
+<td>Reference No. &amp; Date<br/><b><?= htmlspecialchars($result_Invoice_Details['ref_number']); ?></b></td>
 </tr>
 <tr id="border_nbottom" valign="top">
 <td height="50">Buyer's Order No.<br/>&nbsp;</td>

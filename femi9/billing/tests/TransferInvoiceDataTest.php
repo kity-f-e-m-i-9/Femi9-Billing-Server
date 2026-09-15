@@ -38,7 +38,23 @@ $expected_taxable = $product['gst_type'] === 'inclusive'
 assertTrue(abs($data['TotalAMount123'] - $expected_taxable) < 0.01, "taxable total matches the expected MRP-based computation, got {$data['TotalAMount123']} expected $expected_taxable");
 assertTrue($data['totalgstamount'] > 0, "GST amount is nonzero for a GST-liable product");
 assertTrue(abs($data['grand_total'] - ($data['TotalAMount123'] + $data['totalgstamount'])) < 0.01, "grand_total = taxable total + GST amount");
-assertTrue($data['invoice_heading'] === 'Tax Invoice', "heading is exactly 'Tax Invoice' for a GST-liable transfer");
+assertTrue($data['invoice_heading'] === 'Delivery Slip', "heading is always exactly 'Delivery Slip', regardless of GST liability");
+
+// dn_number is generated once (from the shared CPDN counter also used by CP
+// invoices) and persisted onto the transfer row — re-loading the same
+// transfer must return the identical number, not a freshly generated one.
+assertTrue((bool)preg_match('#^CPDN/\d{2}-\d{2}/\d{3}$#', $data['result_Invoice_Details']['dn_number']), "dn_number matches CPDN/{fy}/{seq} format (3-digit padding, same as CP invoices), got {$data['result_Invoice_Details']['dn_number']}");
+$data_reload = load_transfer_invoice_data($db_conn, $transfer_id);
+assertTrue($data_reload['result_Invoice_Details']['dn_number'] === $data['result_Invoice_Details']['dn_number'], "reloading the same transfer returns the SAME dn_number, not a freshly generated one");
+
+// A second, different transfer's first print must get a different number
+// than the first transfer's (both drawn from the same counter, so this also
+// confirms the counter actually advances between calls).
+$db_conn->query("INSERT INTO pl_godown_transfers (transfer_type, godown_id, cp_id, transfer_date, ref_number, note, created_by) VALUES ('godown_to_location', {$godown['id']}, {$cp['id']}, CURDATE(), 'TEST-INV-REF-2', 'test', 'harness')");
+$transfer_id_2 = $db_conn->insert_id;
+$db_conn->query("INSERT INTO pl_godown_transfer_items (transfer_id, product_id, quantity) VALUES ($transfer_id_2, {$product['id']}, 1)");
+$data_2 = load_transfer_invoice_data($db_conn, $transfer_id_2);
+assertTrue($data_2['result_Invoice_Details']['dn_number'] !== $data['result_Invoice_Details']['dn_number'], "a different transfer's dn_number differs from the first transfer's (counter genuinely advances)");
 
 // ── Scenario 2: location-destination transfer (no CP) ──────────────────
 $loc = $db_conn->query("SELECT id, name FROM partner_location_nodes LIMIT 1")->fetch_assoc();

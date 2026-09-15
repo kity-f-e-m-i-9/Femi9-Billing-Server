@@ -16,6 +16,29 @@
 
 require_once __DIR__ . '/number-format-helpers.php';
 require_once __DIR__ . '/../company/include/GodownAccess.php';
+require_once __DIR__ . '/CpInvoiceNumberService.php';
+
+if (!function_exists('transferInvoiceEnsureDnColumn')) {
+    // Self-migrating: pl_godown_transfers.dn_number stores the Delivery Slip
+    // number once generated, so re-printing the same transfer always shows
+    // the same number instead of burning a fresh one from the shared CPDN
+    // counter on every view. Deliberately reuses the exact same
+    // cp_inv_sequence counter cpInvoiceNextNumber() already issues CP
+    // invoice numbers from (per explicit product decision) rather than a
+    // separate series — both consumers only ever advance the counter
+    // through that one function, so it stays authoritative and monotonic
+    // for both.
+    function transferInvoiceEnsureDnColumn(mysqli $db): void {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+
+        $col = $db->query("SHOW COLUMNS FROM pl_godown_transfers LIKE 'dn_number'");
+        if ($col && $col->num_rows === 0) {
+            $db->query("ALTER TABLE pl_godown_transfers ADD COLUMN dn_number VARCHAR(30) NULL AFTER ref_number");
+        }
+    }
+}
 
 if (!function_exists('fmt_gst_pct')) {
     // Trims a rate like 1.50 down to "1.5" or 9.00 down to "9" — CGST/SGST
@@ -29,11 +52,13 @@ if (!function_exists('fmt_gst_pct')) {
 }
 
 function load_transfer_invoice_data(mysqli $db_conn, int $transfer_id): ?array {
+    transferInvoiceEnsureDnColumn($db_conn);
+
     // Transfer header + seller (godown) + buyer (CP or location — mutually
     // exclusive per row, same pattern already fixed in
     // pl-godown-transfer-print.php's own header query).
     $stmt = $db_conn->prepare("
-        SELECT t.id AS transfer_id, t.ref_number, t.transfer_date, t.created_by, t.created_at,
+        SELECT t.id AS transfer_id, t.ref_number, t.dn_number, t.transfer_date, t.created_by, t.created_at,
                g.gname, g.address_line1, g.address_line2, g.gstin, g.state, g.state_code,
                g.contact, g.email, g.logo, g.acname, g.acnumber, g.bankname, g.branchname,
                g.ifsc, g.upinumber,
@@ -87,9 +112,39 @@ function load_transfer_invoice_data(mysqli $db_conn, int $transfer_id): ?array {
         return null;
     }
 
+    // Generate the Delivery Slip number once, on first print, and persist it
+    // — every later view/reprint of this same transfer must show the same
+    // number rather than drawing a new one from the shared counter each
+    // time. cpInvoiceNextNumber() takes its own FOR UPDATE lock on the
+    // sequence row, so this is safe under concurrent first-prints of
+    // different transfers; a UPDATE ... WHERE dn_number IS NULL guard below
+    // additionally makes a racing double-print of the SAME transfer safe —
+    // only one of two concurrent first-prints can win the write, and the
+    // loser simply re-reads the winner's number instead of leaking an
+    // unused sequence value.
+    $dn_number = $row['dn_number'];
+    if (empty($dn_number)) {
+        $dn_number = cpInvoiceNextNumber($db_conn, 'CO', $row['transfer_date']);
+        $upd = $db_conn->prepare("UPDATE pl_godown_transfers SET dn_number = ? WHERE id = ? AND dn_number IS NULL");
+        $upd->bind_param("si", $dn_number, $transfer_id);
+        $upd->execute();
+        if ($upd->affected_rows === 0) {
+            // Lost the race to a concurrent first-print of this same
+            // transfer — re-read whatever number it actually stored instead
+            // of showing the one we just generated but didn't persist.
+            $re = $db_conn->prepare("SELECT dn_number FROM pl_godown_transfers WHERE id = ?");
+            $re->bind_param("i", $transfer_id);
+            $re->execute();
+            $dn_number = $re->get_result()->fetch_assoc()['dn_number'] ?? $dn_number;
+            $re->close();
+        }
+        $upd->close();
+    }
+
     $result_Invoice_Details = [
         'transfer_id'         => $row['transfer_id'],
         'ref_number'          => $row['ref_number'],
+        'dn_number'           => $dn_number,
         'transfer_date'       => $row['transfer_date'],
         'created_by'          => $row['created_by'],
         'created_at'          => $row['created_at'],
@@ -210,7 +265,7 @@ function load_transfer_invoice_data(mysqli $db_conn, int $transfer_id): ?array {
 
     $grand_total     = $TotalAMount123 + $totalgstamount;
     $has_gst_product = $totalgstamount > 0;
-    $invoice_heading = $has_gst_product ? 'Tax Invoice' : 'Bill of Supply';
+    $invoice_heading = 'Delivery Slip'; // always — no longer 'Tax Invoice'/'Bill of Supply' per explicit decision
 
     $result    = number_to_words_inr($grand_total);
     $TAXresult = number_to_words_inr($totalgstamount);
