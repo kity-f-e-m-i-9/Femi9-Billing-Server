@@ -45,7 +45,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
         .section-header i { color:#2563eb; font-size:19px; }
         .field-hint { font-size:12px; color:#94a3b8; margin-top:7px; }
         .product-add-section { background:#f8fafc; border:2px dashed #cbd5e1; border-radius:12px; padding:20px; margin-top:20px; }
-        .product-add-grid { display:grid; grid-template-columns:2.5fr 1fr auto; gap:14px; align-items:end; }
+        .product-add-grid { display:grid; grid-template-columns:2fr 1fr 1fr auto; gap:14px; align-items:end; }
         .input-group-modern { display:flex; flex-direction:column; }
         .input-group-modern label { font-size:12px; color:#64748b; font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.4px; }
         .input-group-modern .form-control { border:2px solid #e5e7eb; border-radius:8px; padding:10px 12px; font-size:14px; }
@@ -61,7 +61,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
         .row-num { width:28px; height:28px; background:#f1f5f9; color:#64748b; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; }
         .badge-remove { background:#fee2e2; color:#991b1b; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:600; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:3px; }
         .badge-remove:hover { background:#fecaca; }
-        @media (max-width:768px) { .product-add-grid { grid-template-columns:1fr 1fr; } .product-add-grid .input-group-modern:last-child { grid-column:1/-1; } }
+        @media (max-width:768px) { .product-add-grid { grid-template-columns:1fr 1fr; } .product-add-grid .input-group-modern:nth-child(3), .product-add-grid .input-group-modern:last-child { grid-column:1/-1; } }
         @keyframes spin { to { transform:rotate(360deg); } }
     </style>
 </head>
@@ -142,6 +142,10 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
                                         <label><span id="rateLabelText">Rate/Piece (₹)</span> <span style="color:#ef4444;">*</span></label>
                                         <input type="number" id="rateInput" class="form-control" min="0" step="any" placeholder="0.00">
                                     </div>
+                                    <div class="input-group-modern">
+                                        <label>Qty Purchased <span style="color:#ef4444;">*</span></label>
+                                        <input type="number" id="qtyInput" class="form-control" min="1" step="1" placeholder="0">
+                                    </div>
                                     <div class="input-group-modern" style="align-items:flex-end;">
                                         <button type="button" class="btn-add-product" id="addProductBtn" onclick="addProduct()">
                                             <i class="material-icons">add</i> Add
@@ -155,12 +159,12 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>#</th><th>Product</th><th>Rate (₹)</th><th></th>
+                                            <th>#</th><th>Product</th><th>Rate (₹)</th><th>Qty Purchased</th><th></th>
                                         </tr>
                                     </thead>
                                     <tbody id="productBody">
                                         <tr class="empty-row" id="emptyRow">
-                                            <td colspan="4">
+                                            <td colspan="5">
                                                 <i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>
                                                 No products added yet
                                             </td>
@@ -229,14 +233,16 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
             var name       = $opt.text().trim();
             var isPack     = $opt.data('unit-type') === 'pack';
             var rate       = parseFloat($('#rateInput').val());
+            var qty        = parseInt($('#qtyInput').val());
 
             if (!product_id)             { showAddError('Please select a product.'); return; }
             if (isNaN(rate) || rate < 0) { showAddError('Please enter a valid rate.'); return; }
+            if (isNaN(qty) || qty <= 0)  { showAddError('Please enter a valid quantity purchased.'); return; }
             if (rateItems.find(function (i) { return i.product_id === product_id; })) {
                 showAddError('This product is already added.'); return;
             }
 
-            rateItems.push({ product_id: product_id, name: name, rate: rate, unitLabel: isPack ? '/pack' : '/pc' });
+            rateItems.push({ product_id: product_id, name: name, rate: rate, qty: qty, unitLabel: isPack ? '/pack' : '/pc' });
             renderTable();
             resetAddForm();
         };
@@ -249,7 +255,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
         function renderTable() {
             var $body = $('#productBody').empty();
             if (!rateItems.length) {
-                $body.html('<tr class="empty-row"><td colspan="4"><i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>No products added yet</td></tr>');
+                $body.html('<tr class="empty-row"><td colspan="5"><i class="material-icons" style="font-size:40px;display:block;margin-bottom:10px;color:#cbd5e1;">inventory_2</i>No products added yet</td></tr>');
                 updateSubmitState(); return;
             }
             $.each(rateItems, function (i, item) {
@@ -258,6 +264,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
                     '<td><span class="row-num">' + (i + 1) + '</span></td>' +
                     '<td><strong>' + escHtml(item.name) + '</strong></td>' +
                     '<td>₹' + fmtCost(item.rate) + item.unitLabel + '</td>' +
+                    '<td>' + item.qty + '</td>' +
                     '<td><button type="button" class="badge-remove" onclick="removeProduct(' + i + ')"><i class="material-icons" style="font-size:14px;vertical-align:middle;">delete</i> Remove</button></td>' +
                     '</tr>'
                 );
@@ -275,6 +282,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
             $.each(rateItems, function (_, item) {
                 html += '<input type="hidden" name="product_id[]"     value="' + item.product_id + '">';
                 html += '<input type="hidden" name="rate_per_piece[]" value="' + item.rate + '">';
+                html += '<input type="hidden" name="qty_purchased[]"  value="' + item.qty + '">';
             });
             $('#hiddenRateInputs').html(html);
         }
@@ -288,6 +296,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
         function resetAddForm() {
             $('#productSelect').val('');
             $('#rateInput').val('');
+            $('#qtyInput').val('');
             $('#rateLabelText').text('Rate/Piece (₹)');
             $('#gstHint').text('');
             hideAddError();
