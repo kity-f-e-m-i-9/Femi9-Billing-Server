@@ -1,0 +1,31 @@
+<?php
+include("checksession.php");
+include("config.php");
+require_once("include/DistrictNotes.php");
+header('Content-Type: application/json');
+error_reporting(0);
+
+function respond(bool $ok, string $message = ''): void
+{
+    echo json_encode(['success' => $ok, 'message' => $message]);
+    exit;
+}
+
+$id = (int)($_POST['id'] ?? 0);
+$issueText = trim($_POST['issue_text'] ?? '');
+// A TP doesn't set priority themselves (see add-district-note.php) — an
+// edit can't sneak one in either, regardless of what's posted.
+$priority = 'normal';
+$noteType = $_POST['note_type'] ?? 'tp';
+
+if ($id <= 0 || $issueText === '') {
+    respond(false, 'Describe the issue before saving.');
+}
+if (!in_array($noteType, ['software', 'tp'], true)) { $noteType = 'tp'; }
+
+ensureDistrictNotesTable($db_conn);
+
+// A TP may only edit their own notes — never trust the posted id alone.
+$ok = updateDistrictNote($db_conn, $id, (int)$Login_user_IDvl, $issueText, $priority, $noteType);
+
+respond($ok, $ok ? '' : 'Could not save — this note may not belong to you, or no longer exists.');

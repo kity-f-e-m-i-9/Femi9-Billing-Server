@@ -47,7 +47,10 @@ if ($col && $col->num_rows === 0) {
 
 // ── Filters ───────────────────────────────────────────────────────────────────
 $filter_state_id    = (int)($_GET['state_id']    ?? 0);
-$filter_location_id = (int)($_GET['location_id'] ?? 0);
+// Multi-select — a company operating across several divisions can now pick
+// 2-3 at once instead of filtering one at a time. Kept as a plain array of
+// ints rather than a single value throughout.
+$filter_location_ids = array_values(array_unique(array_filter(array_map('intval', (array)($_GET['location_id'] ?? [])))));
 $filter_tp_id       = (int)($_GET['tp_id']       ?? 0);
 $filter_date_from   = trim($_GET['date_from'] ?? '');
 $filter_date_to     = trim($_GET['date_to']   ?? '');
@@ -121,10 +124,10 @@ $where  = ['(tpi.source_cp_id > 0 OR tpi.source_godown_id > 0)'];
 $params = [];
 $types  = '';
 
-if ($filter_location_id > 0) {
-    $where[]  = "tpi.source_location_id = ?";
-    $params[] = $filter_location_id;
-    $types   .= 'i';
+if (!empty($filter_location_ids)) {
+    $placeholders = implode(',', array_fill(0, count($filter_location_ids), '?'));
+    $where[]  = "tpi.source_location_id IN ($placeholders)";
+    foreach ($filter_location_ids as $lid) { $params[] = $lid; $types .= 'i'; }
 } elseif ($filter_state_id > 0) {
     // Locations that ARE the state node, or whose parent IS the state node (old invoices only)
     $where[]  = "(pln.id IS NOT NULL AND (pln.id = ? OR pln.parent_id = ?))";
@@ -278,6 +281,25 @@ $i = 0;
         .filter-card .btn-clear { background:rgba(255,255,255,0.18); color:#fff; border:1px solid rgba(255,255,255,0.4); border-radius:6px; padding:7px 14px; font-size:13px; height:36px; line-height:1; cursor:pointer; transition:all .15s; text-decoration:none; display:inline-flex; align-items:center; }
         .filter-card .btn-clear:hover { background:rgba(255,255,255,0.28); color:#fff; }
         .filter-active-badge { display:inline-block; background:#fbbf24; color:#78350f; border-radius:5px; padding:2px 8px; font-size:11px; font-weight:700; margin-left:8px; vertical-align:middle; }
+
+        /* Checkbox multi-select dropdown — Location filter, so a company
+           covering several divisions can pick 2-3 at once instead of
+           filtering one at a time. */
+        .ms-dropdown { position:relative; }
+        .ms-dropdown-toggle { text-align:left; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .ms-dropdown-toggle::after { content:'▾'; float:right; opacity:.6; }
+        .ms-dropdown-panel {
+            display:none; position:absolute; top:calc(100% + 4px); left:0; z-index:50;
+            background:#fff; border:1px solid #e5e7eb; border-radius:8px; min-width:100%;
+            max-height:260px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,.15); padding:6px 0;
+        }
+        .ms-dropdown-panel.open { display:block; }
+        .ms-dropdown-option {
+            display:flex; align-items:center; gap:8px; padding:7px 14px; font-size:13px; color:#1f2937;
+            cursor:pointer; white-space:nowrap; font-weight:400;
+        }
+        .ms-dropdown-option:hover { background:#f3f4f6; }
+        .ms-dropdown-option input { margin:0; cursor:pointer; }
     </style>
 </head>
 <body>
@@ -354,16 +376,19 @@ $i = 0;
                                         <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">location_on</i>
                                         Location
                                     </label>
-                                    <select name="location_id" id="filter_location" class="form-control" onchange="cascadeTps()">
-                                        <option value="">All Locations</option>
-                                        <?php foreach ($locations as $loc): ?>
-                                        <option value="<?php echo $loc['id']; ?>"
-                                            data-parent="<?php echo (int)($loc['depth'] == 2 ? $loc['id'] : $loc['parent_id']); ?>"
-                                            <?php echo $filter_location_id == $loc['id'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($loc['name']); ?>
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <div class="ms-dropdown" id="filter_location_dd">
+                                        <button type="button" class="form-control ms-dropdown-toggle" id="filter_location_toggle">All Locations</button>
+                                        <div class="ms-dropdown-panel" id="filter_location_panel">
+                                            <?php foreach ($locations as $loc): ?>
+                                            <label class="ms-dropdown-option" data-parent="<?php echo (int)($loc['depth'] == 2 ? $loc['id'] : $loc['parent_id']); ?>">
+                                                <input type="checkbox" name="location_id[]" value="<?php echo $loc['id']; ?>"
+                                                    onchange="cascadeTps()"
+                                                    <?php echo in_array($loc['id'], $filter_location_ids, true) ? 'checked' : ''; ?>>
+                                                <?php echo htmlspecialchars($loc['name']); ?>
+                                            </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-lg-3 col-sm-6">
                                     <label class="form-label">
@@ -414,7 +439,7 @@ $i = 0;
                                             <i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">filter_list</i>
                                             Filter
                                         </button>
-                                        <?php if ($filter_state_id || $filter_location_id || $filter_tp_id || $filter_date_from || $filter_date_to || $filter_type): ?>
+                                        <?php if ($filter_state_id || !empty($filter_location_ids) || $filter_tp_id || $filter_date_from || $filter_date_to || $filter_type): ?>
                                         <a href="manage-tp-invoices" class="btn-clear">
                                             <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:3px;">close</i>
                                             Clear
@@ -460,14 +485,33 @@ $i = 0;
                             <span class="card-header-title">
                                 <i class="material-icons-outlined">receipt_long</i>
                                 All TP Invoices
-                                <?php if ($filter_state_id || $filter_location_id || $filter_tp_id || $filter_date_from || $filter_date_to): ?>
+                                <?php if ($filter_state_id || !empty($filter_location_ids) || $filter_tp_id || $filter_date_from || $filter_date_to): ?>
                                 <span class="filter-active-badge">Filtered</span>
                                 <?php endif; ?>
                             </span>
-                            <a href="add-tp-invoice" class="btn-add">
-                                <i class="material-icons" style="font-size:16px;">add</i>
-                                New Invoice
-                            </a>
+                            <span style="display:flex;gap:8px;">
+                                <?php
+                                // Same filters currently applied to the on-screen list (state/location(s)/
+                                // TP/date range/type) get carried straight into the export, so what's
+                                // downloaded always matches what's showing.
+                                $exportQuery = http_build_query(array_filter([
+                                    'state_id'    => $filter_state_id ?: null,
+                                    'location_id' => $filter_location_ids ?: null,
+                                    'tp_id'       => $filter_tp_id ?: null,
+                                    'date_from'   => $filter_date_from ?: null,
+                                    'date_to'     => $filter_date_to ?: null,
+                                    'type_filter' => $filter_type ?: null,
+                                ]));
+                                ?>
+                                <a href="export-tp-invoices-xlsx.php?<?php echo htmlspecialchars($exportQuery); ?>" class="btn-add" style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);">
+                                    <i class="material-icons-outlined" style="font-size:16px;">download</i>
+                                    Export Excel
+                                </a>
+                                <a href="add-tp-invoice" class="btn-add">
+                                    <i class="material-icons" style="font-size:16px;">add</i>
+                                    New Invoice
+                                </a>
+                            </span>
                         </div>
                         <div class="card-body">
                             <div style="overflow-x:auto;">
@@ -605,7 +649,7 @@ $i = 0;
                                                 <a href="<?php echo htmlspecialchars($__wa_url, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="action-btn print" title="Share to WhatsApp">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="#25D366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.29-1.39c1.44.79 3.06 1.2 4.71 1.2h.01c5.46 0 9.9-4.45 9.9-9.9C21.91 6.45 17.5 2 12.04 2zm5.8 14.03c-.24.68-1.4 1.32-1.93 1.4-.5.08-1.13.11-1.82-.11-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.79-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.66.5.24.58.83 2 .9 2.15.07.15.12.32.02.51-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.02 1.12 1 2.06 1.31 2.35 1.46.29.15.46.13.63-.08.17-.21.72-.84.92-1.13.19-.29.38-.24.64-.14.26.1 1.65.78 1.94.92.29.15.48.22.55.34.07.13.07.72-.17 1.4z"/></svg>
                                                 </a>
-                                                <a href="tp-cnote-new?inv_id=<?php echo $inv['id']; ?>" class="action-btn cn" title="Credit Note / Return">
+                                                <a href="tp-cnote-new?inv_id=<?php echo $inv['id']; ?>" class="action-btn cn" title="TP Return Invoice">
                                                     <i class="material-icons-outlined" style="font-size:19px;">assignment_return</i>
                                                 </a>
                                                 <?php if ($courier > 0): ?>
@@ -699,36 +743,51 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 <script>
+function getCheckedLocationIds() {
+    return Array.from(document.querySelectorAll('#filter_location_panel input[type=checkbox]:checked'))
+        .map(function(cb) { return parseInt(cb.value) || 0; })
+        .filter(Boolean);
+}
+
+function updateLocationToggleLabel() {
+    var checked = Array.from(document.querySelectorAll('#filter_location_panel input[type=checkbox]:checked'));
+    var toggle = document.getElementById('filter_location_toggle');
+    if (checked.length === 0) {
+        toggle.textContent = 'All Locations';
+    } else if (checked.length === 1) {
+        toggle.textContent = checked[0].closest('.ms-dropdown-option').textContent.trim();
+    } else {
+        toggle.textContent = checked.length + ' Locations selected';
+    }
+}
+
 function cascadeLocations() {
-    var stateId  = parseInt(document.getElementById('filter_state').value) || 0;
-    var locSel   = document.getElementById('filter_location');
-    var tpSel    = document.getElementById('filter_tp');
+    var stateId = parseInt(document.getElementById('filter_state').value) || 0;
 
     // Show/hide location options based on selected state
-    Array.from(locSel.options).forEach(function(opt) {
-        if (!opt.value) return;
-        var parent = parseInt(opt.dataset.parent) || 0;
-        opt.hidden = stateId > 0 && parent !== stateId;
+    document.querySelectorAll('#filter_location_panel .ms-dropdown-option').forEach(function(label) {
+        var parent = parseInt(label.dataset.parent) || 0;
+        var hide = stateId > 0 && parent !== stateId;
+        label.style.display = hide ? 'none' : '';
+        // A now-hidden location shouldn't stay silently checked/filtering.
+        if (hide) { label.querySelector('input').checked = false; }
     });
 
-    // If the currently selected location is now hidden, reset it
-    var selLoc = locSel.querySelector('option:checked');
-    if (selLoc && selLoc.value && selLoc.hidden) locSel.value = '';
-
+    updateLocationToggleLabel();
     cascadeTps();
 }
 
 function cascadeTps() {
-    var stateId = parseInt(document.getElementById('filter_state').value)   || 0;
-    var locId   = parseInt(document.getElementById('filter_location').value) || 0;
+    var stateId = parseInt(document.getElementById('filter_state').value) || 0;
+    var locIds  = getCheckedLocationIds();
     var tpSel   = document.getElementById('filter_tp');
 
     Array.from(tpSel.options).forEach(function(opt) {
         if (!opt.value) return;
         var locs   = (opt.dataset.locations || '').split(',').map(Number).filter(Boolean);
         var states = (opt.dataset.states    || '').split(',').map(Number).filter(Boolean);
-        if (locId > 0) {
-            opt.hidden = !locs.includes(locId);
+        if (locIds.length > 0) {
+            opt.hidden = !locIds.some(function(id) { return locs.includes(id); });
         } else if (stateId > 0) {
             opt.hidden = !states.includes(stateId);
         } else {
@@ -739,7 +798,21 @@ function cascadeTps() {
     // If the currently selected TP is now hidden, reset it
     var selTp = tpSel.querySelector('option:checked');
     if (selTp && selTp.value && selTp.hidden) tpSel.value = '';
+
+    updateLocationToggleLabel();
 }
+
+// Open/close the checkbox dropdown panel, closing on an outside click.
+document.getElementById('filter_location_toggle').addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.getElementById('filter_location_panel').classList.toggle('open');
+});
+document.addEventListener('click', function(e) {
+    var dd = document.getElementById('filter_location_dd');
+    if (!dd.contains(e.target)) {
+        document.getElementById('filter_location_panel').classList.remove('open');
+    }
+});
 
 // Apply cascade on page load to reflect any server-side selected values
 document.addEventListener('DOMContentLoaded', function() {

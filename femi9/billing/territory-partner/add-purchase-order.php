@@ -104,9 +104,16 @@ tpEnsureCourierPaymentTables($db_conn);
 // so a courier payment made against an earlier (possibly smaller) cart may
 // not fully cover a since-grown one — purchase-order-action.php catches that.
 $courierPoolTotal = tpCourierPoolTotal($db_conn, (int)$Login_user_IDvl, $productType);
-// "Pick up myself" only shows for a TP Company has explicitly opted in
-// (manage-territory-partner.php toggle) — everyone else must pay courier.
-$allowSelfPickup  = tpAllowsSelfPickup($db_conn, (int)$Login_user_IDvl);
+// "Pick up myself" only shows for a TP Company has opted into self-pickup
+// for THIS product type — manage-territory-partner.php's Pickup Restriction
+// dropdown per Napkin/Diaper, which can allow it for every order ('all') or
+// only for CP-sourced orders ('cp_only'); everyone else must pay courier.
+// Scaffolding below renders whenever the mode isn't 'disabled' — the actual
+// live availability (once the TP picks an approver) is handled by this
+// page's own JS, refreshPickupAvailability(), since 'cp_only' depends on a
+// choice made after this page has already rendered.
+$pickupMode = tpPickupMode($db_conn, (int)$Login_user_IDvl, $productType);
+$allowSelfPickup = ($pickupMode !== 'disabled');
 
 // Product catalog scoped to the chosen type — this is a stock replenishment
 // request to the company, not limited to what the TP already holds (unlike
@@ -119,6 +126,46 @@ if ($resProd) while ($p = mysqli_fetch_assoc($resProd)) $productList[] = $p;
 // per order — otherwise everything routes to Company exactly as before, and
 // $assignedSs stays null so the selector never renders.
 $assignedSs = tpGetAssignedSs($db_conn, (int)$Login_user_IDvl);
+
+// If a Channel Partner's coverage area includes one of this TP's own
+// assigned locations, the TP can additionally choose to source stock from
+// that CP directly — same walk-up-the-location-tree resolution
+// company/get-tp-source-locations.php uses to find a covering CP for a TP,
+// just scoped to this TP's own login instead of trusting a posted tp_id.
+// This is purely a STOCK SOURCE preference, tagged onto the order as
+// preferred_cp_id — it doesn't create a third advance-balance pool; a
+// CP-sourced order still draws from and is approved against the Company
+// pool exactly like a plain Company order (per explicit instruction,
+// 2026-09-15). Only the product picker changes, to the CP's own real stock.
+$myCp = null;
+$tpLocRes = mysqli_query($db_conn, "SELECT location_id FROM territory_partner_locations WHERE territory_partner_id=" . (int)$Login_user_IDvl);
+if ($tpLocRes) {
+    while ($locRow = mysqli_fetch_assoc($tpLocRes)) {
+        $loc_id = (int)$locRow['location_id'];
+        $cpRes = mysqli_query($db_conn, "
+            WITH RECURSIVE ancestors AS (
+                SELECT id, parent_id, 0 AS steps
+                FROM partner_location_nodes
+                WHERE id = $loc_id
+                UNION ALL
+                SELECT n.id, n.parent_id, a.steps + 1
+                FROM partner_location_nodes n
+                INNER JOIN ancestors a ON n.id = a.parent_id
+                WHERE a.parent_id IS NOT NULL
+            )
+            SELECT cp.id AS cp_db_id, cp.cp_id AS cp_code, cp.name AS cp_name
+            FROM ancestors a
+            JOIN channel_partner_locations cpl ON cpl.location_id = a.id
+            JOIN channel_partners cp ON cp.id = cpl.channel_partner_id
+            ORDER BY a.steps ASC
+            LIMIT 1
+        ");
+        if ($cpRes && ($found = mysqli_fetch_assoc($cpRes))) {
+            $myCp = $found;
+            break;
+        }
+    }
+}
 
 // Available advance balance and reserved-by-waiting-orders amount, computed
 // per approver pool — reused as-is (same query, just filtered by approver)
@@ -317,8 +364,11 @@ $tpDeliveryAddressParts = array_filter([
         }
         #add:hover, #add:focus { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,.35); color: #fff; }
 
-        .apo-table-wrap { border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; margin-top: 18px; }
-        .apo-table-wrap table { width: 100%; margin: 0; }
+        /* Product/Qty/Price/Disc/Total/action never fit six-across on a
+           phone — scroll the table itself sideways instead of letting it
+           force the whole page wider than the screen. */
+        .apo-table-wrap { border: 1px solid #f1f5f9; border-radius: 10px; overflow-x: auto; margin-top: 18px; }
+        .apo-table-wrap table { width: 100%; margin: 0; min-width: 520px; }
         .apo-table-wrap thead th {
             background: #f8fafc; color: #64748b; font-size: 11px; font-weight: 700;
             text-transform: uppercase; letter-spacing: .4px; padding: 10px 14px; border-bottom: 2px solid #e5e7eb;
@@ -402,22 +452,35 @@ $tpDeliveryAddressParts = array_filter([
                             <input type="hidden" id="advBalanceVal" value="<?=$advBalance?>">
                             <input type="hidden" name="approver_type" id="approver_type_input" value="company">
                             <input type="hidden" name="product_type" value="<?=htmlspecialchars($productType)?>">
+                            <input type="hidden" name="preferred_cp_id" id="preferred_cp_id_input" value="">
 
-                            <?php if ($assignedSs !== null): ?>
+                            <?php if ($assignedSs !== null || $myCp !== null): ?>
                             <div class="apo-card">
                                 <div class="apo-card-title"><i class="material-icons-outlined">alt_route</i>Submit To</div>
                                 <div class="row g-2">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
                                             <input type="radio" name="approver_choice" value="company" checked onchange="onApproverChange()"> Company
                                         </label>
                                     </div>
-                                    <div class="col-md-6">
+                                    <?php if ($assignedSs !== null): ?>
+                                    <div class="col-md-4">
                                         <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
                                             <input type="radio" name="approver_choice" value="ss" onchange="onApproverChange()"> <?=htmlspecialchars($assignedSs['name'])?> (Super Stockist)
                                         </label>
                                     </div>
+                                    <?php endif; ?>
+                                    <?php if ($myCp !== null): ?>
+                                    <div class="col-md-4">
+                                        <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
+                                            <input type="radio" name="approver_choice" value="cp" data-cp-id="<?=(int)$myCp['cp_db_id']?>" onchange="onApproverChange()"> <?=htmlspecialchars($myCp['cp_name'])?> (<?=htmlspecialchars($myCp['cp_code'])?>)
+                                        </label>
+                                    </div>
+                                    <?php endif; ?>
                                 </div>
+                                <?php if ($myCp !== null): ?>
+                                <div id="cpStockHint" class="text-muted" style="font-size:12px;margin-top:8px;display:none;">Only products currently in stock at <?=htmlspecialchars($myCp['cp_name'])?> are shown below.</div>
+                                <?php endif; ?>
                             </div>
                             <?php endif; ?>
 
@@ -665,6 +728,40 @@ $tpDeliveryAddressParts = array_filter([
                         </div>
                         <?php endif; ?>
 
+                        <!-- Switching Submit To → Channel Partner mid-cart: any
+                             line already added that this CP doesn't actually
+                             stock (or doesn't have enough of) can't silently
+                             ride along — the TP must explicitly confirm
+                             dropping it, or the switch itself is cancelled and
+                             the cart stays exactly as it was under
+                             Company/SS. See checkCpStockMismatch() /
+                             showCpSwitchWarning() in the script below. -->
+                        <?php if ($myCp !== null): ?>
+                        <div class="modal fade" id="cpSwitchWarningModal" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-scrollable">
+                                <div class="modal-content" style="border:none;border-radius:14px;overflow:hidden;">
+                                    <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                                        <h6 class="modal-title" style="font-weight:700;color:#1f2937;">
+                                            <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#ef4444;">error_outline</i>
+                                            Not in stock at this Channel Partner
+                                        </h6>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body" style="padding:18px 22px;">
+                                        <p style="font-size:12.5px;color:#6b7280;margin-bottom:14px;">
+                                            These products already added to your cart aren't available (or don't have enough stock) at this Channel Partner. Remove them and continue, or cancel to keep this order with your current Submit To.
+                                        </p>
+                                        <div id="cpSwitchWarningList"></div>
+                                    </div>
+                                    <div class="modal-footer" style="border-top:1px solid #e9ecef;flex-wrap:wrap;gap:8px;">
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCpSwitch()">Cancel — Keep Current</button>
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="confirmCpSwitchRemoveItems()">Remove &amp; Continue</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                     </div>
                 </div>
             </div>
@@ -692,12 +789,24 @@ $tpDeliveryAddressParts = array_filter([
         document.getElementById('customDeliveryFields').classList.toggle('show', !useDefault);
     }
 
+    // 'disabled' | 'all' | 'cp_only' — see shared/TpCourierPayment.php's
+    // tpPickupMode(). 'cp_only' means pickup is only actually usable once
+    // the TP has the CP submit-to option selected below, so live-toggled by
+    // refreshPickupAvailability() rather than baked in at page render.
+    var pickupMode      = <?php echo json_encode($pickupMode); ?>;
+    var currentApprover = 'company';
+
     var poLines = [];
 
     function showPoPrice(str) {
         var sel = document.getElementById('pr_select');
         var opt = sel.options[sel.selectedIndex];
         document.getElementById('po_price').value = str ? (opt.getAttribute('data-price') || '') : '';
+        // Only present on CP-sourced options — caps the qty field at what
+        // that CP actually has, so a TP can't request more than their CP
+        // can supply. Absent entirely for Company/SS's unrestricted list.
+        var avail = str ? opt.getAttribute('data-avail') : null;
+        document.getElementById('po_qty').max = avail || '';
         poTotal();
     }
 
@@ -725,6 +834,12 @@ $tpDeliveryAddressParts = array_filter([
 
         if (!prId) { alert('Select a product.'); return; }
         if (qty <= 0) { alert('Enter a valid qty.'); return; }
+        var selOpt = sel.options[sel.selectedIndex];
+        var availAttr = selOpt ? selOpt.getAttribute('data-avail') : null;
+        if (availAttr !== null && qty > parseInt(availAttr)) {
+            alert('Only ' + availAttr + ' available in stock at this CP.');
+            return;
+        }
         for (var i = 0; i < poLines.length; i++) {
             if (poLines[i].pr_id === prId) { alert('That product is already added.'); return; }
         }
@@ -879,21 +994,201 @@ $tpDeliveryAddressParts = array_filter([
     var hasEligibleAdvanceSubmission = eligibleSubmissionByApprover.company.has;
     var eligibleAdvanceSubmissionTotal = eligibleSubmissionByApprover.company.total;
 
+    // The static, unfiltered <option> list rendered server-side for Company/SS
+    // — captured once so switching back from CP mode can restore it exactly,
+    // instead of re-fetching or losing it.
+    var defaultProductOptionsHtml = null;
+    var cpHintEl = document.getElementById('cpStockHint');
+
+    // Switching Submit To → this Channel Partner while the cart already has
+    // lines added under Company/SS needs a detour: those lines were added
+    // with no stock constraint at all, so some may not exist (or not have
+    // enough qty) at this specific CP. Checked against the CP's real stock
+    // before the switch is allowed to actually happen — see
+    // showCpSwitchWarning()/cancelCpSwitch()/confirmCpSwitchRemoveItems().
+    var pendingCpSwitchChoice = null;
+    var pendingCpMismatchedIds = [];
+
     function onApproverChange() {
         var choice = document.querySelector('input[name="approver_choice"]:checked');
         var approver = choice ? choice.value : 'company';
-        document.getElementById('approver_type_input').value = approver;
 
-        var bal = advBalanceByApprover[approver];
+        if (approver === 'cp' && poLines.length > 0) {
+            var cpId = choice.getAttribute('data-cp-id');
+            $.getJSON('get-cp-products.php?cp_id=' + encodeURIComponent(cpId) + '&product_type=<?=urlencode($productType)?>', function (data) {
+                var stockMap = {};
+                (data || []).forEach(function (p) { stockMap[p.product_id] = parseInt(p.available_qty) || 0; });
+                var mismatched = [];
+                poLines.forEach(function (l) {
+                    var avail = stockMap.hasOwnProperty(l.pr_id) ? stockMap[l.pr_id] : null;
+                    if (avail === null || avail < l.qty) mismatched.push({ pr_id: l.pr_id, name: l.name, qty: l.qty, avail: avail });
+                });
+                if (mismatched.length > 0) {
+                    pendingCpSwitchChoice = choice;
+                    pendingCpMismatchedIds = mismatched.map(function (m) { return m.pr_id; });
+                    showCpSwitchWarning(mismatched);
+                } else {
+                    applyApproverChange(choice, approver);
+                }
+            }).fail(function () {
+                // Couldn't verify — let the normal switch proceed; loadCpProducts()
+                // has its own failure handling for a genuinely broken fetch.
+                applyApproverChange(choice, approver);
+            });
+            return;
+        }
+
+        applyApproverChange(choice, approver);
+    }
+
+    function showCpSwitchWarning(mismatched) {
+        var list = document.getElementById('cpSwitchWarningList');
+        list.innerHTML = mismatched.map(function (m) {
+            var reason = (m.avail === null) ? 'Not available at this CP' : ('Only ' + m.avail + ' in stock (need ' + m.qty + ')');
+            return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border:1px solid #fee2e2;background:#fef2f2;border-radius:10px;padding:10px 14px;margin-bottom:8px;">' +
+                '<span>' + escHtmlPo(m.name) + ' <span class="text-muted" style="font-size:11.5px;">(Qty ' + m.qty + ')</span></span>' +
+                '<span style="font-size:11px;font-weight:700;color:#991b1b;white-space:nowrap;">' + escHtmlPo(reason) + '</span>' +
+            '</div>';
+        }).join('');
+        var modal = new bootstrap.Modal(document.getElementById('cpSwitchWarningModal'));
+        modal.show();
+    }
+
+    // TP declined to drop the mismatched items — the radio never actually
+    // changed in applyApproverChange(), so currentApprover still holds
+    // whatever was active before this attempt; just re-check that radio.
+    function cancelCpSwitch() {
+        var prevRadio = document.querySelector('input[name="approver_choice"][value="' + currentApprover + '"]');
+        if (prevRadio) prevRadio.checked = true;
+        pendingCpSwitchChoice = null;
+        pendingCpMismatchedIds = [];
+        var modalEl = document.getElementById('cpSwitchWarningModal');
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+
+    function confirmCpSwitchRemoveItems() {
+        if (!pendingCpSwitchChoice) return;
+        poLines = poLines.filter(function (l) { return pendingCpMismatchedIds.indexOf(l.pr_id) === -1; });
+        renderPoLines();
+        var choice = pendingCpSwitchChoice;
+        pendingCpSwitchChoice = null;
+        pendingCpMismatchedIds = [];
+        applyApproverChange(choice, 'cp');
+        var modalEl = document.getElementById('cpSwitchWarningModal');
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+
+    function applyApproverChange(choice, approver) {
+        currentApprover = approver;
+        // A CP-sourced order still draws from and is approved against the
+        // Company advance pool — 'cp' is a stock-source tag, not a third
+        // balance pool (see the PHP comment above $myCp). approver_type
+        // posted to the server is therefore always 'company' or 'ss'.
+        document.getElementById('approver_type_input').value = (approver === 'cp') ? 'company' : approver;
+
+        var balKey = (approver === 'cp') ? 'company' : approver;
+        var bal = advBalanceByApprover[balKey];
         if (bal === null || bal === undefined) bal = 0;
         document.getElementById('advBalanceVal').value = bal;
         document.getElementById('advBalanceDisplay').textContent = bal.toFixed(2);
         document.getElementById('advBalanceDisplay2').textContent = bal.toFixed(2);
 
-        hasEligibleAdvanceSubmission = eligibleSubmissionByApprover[approver].has;
-        eligibleAdvanceSubmissionTotal = eligibleSubmissionByApprover[approver].total;
+        hasEligibleAdvanceSubmission = eligibleSubmissionByApprover[balKey].has;
+        eligibleAdvanceSubmissionTotal = eligibleSubmissionByApprover[balKey].total;
 
+        if (approver === 'cp') {
+            var cpId = choice.getAttribute('data-cp-id');
+            document.getElementById('preferred_cp_id_input').value = cpId;
+            loadCpProducts(cpId);
+            if (cpHintEl) cpHintEl.style.display = '';
+        } else {
+            document.getElementById('preferred_cp_id_input').value = '';
+            restoreDefaultProducts();
+            if (cpHintEl) cpHintEl.style.display = 'none';
+        }
+
+        refreshPickupAvailability();
         updatePoSummary();
+    }
+
+    // Whether "pick up myself" is actually usable right now, given both the
+    // Company-set pickup mode for this TP/type and which approver is
+    // currently chosen — 'cp_only' only counts once the CP option is picked.
+    function pickupCurrentlyAllowed() {
+        return pickupMode === 'all' || (pickupMode === 'cp_only' && currentApprover === 'cp');
+    }
+
+    // Live-toggles the pickup UI whenever the approver choice changes —
+    // needed because 'cp_only' mode's real availability isn't known until
+    // the TP picks an approver, which happens after this page has already
+    // rendered. Any line already marked "pickup" is reset to "courier" the
+    // moment pickup becomes unavailable, so a cart built while CP was
+    // selected can't silently keep a pickup exemption after switching to
+    // Company.
+    function refreshPickupAvailability() {
+        var allowed = pickupCurrentlyAllowed();
+        var addLineLabel = document.getElementById('po_pickup_now_label');
+        var pickupBtn = document.getElementById('poPickupBtn');
+        if (addLineLabel) addLineLabel.style.display = allowed ? '' : 'none';
+        if (pickupBtn) pickupBtn.style.display = allowed ? '' : 'none';
+
+        if (!allowed) {
+            var pickupNowEl = document.getElementById('po_pickup_now');
+            if (pickupNowEl) {
+                pickupNowEl.checked = false;
+                if (addLineLabel) addLineLabel.classList.remove('active');
+            }
+            var changed = false;
+            poLines.forEach(function (l) {
+                if (l.method === 'pickup') { l.method = 'courier'; changed = true; }
+            });
+            if (changed) { renderPoLines(); return; }
+        }
+        updateCourierNote();
+    }
+
+    // Swaps the product picker to only what this CP actually has in stock —
+    // the TP can't request more than the CP they'll actually collect from
+    // can supply. Falls back to the full catalog list on any load failure
+    // rather than leaving the picker stuck on "Loading…".
+    function loadCpProducts(cpId) {
+        var sel = document.getElementById('pr_select');
+        if (!defaultProductOptionsHtml) { defaultProductOptionsHtml = sel.innerHTML; }
+        $(sel).val('').trigger('change');
+        document.getElementById('po_price').value = '';
+        sel.innerHTML = '<option value="">Loading…</option>';
+        sel.disabled = true;
+        $.getJSON('get-cp-products.php?cp_id=' + encodeURIComponent(cpId) + '&product_type=<?=urlencode($productType)?>', function (data) {
+            var opts = '<option value=""></option>';
+            (data || []).forEach(function (p) {
+                opts += '<option value="' + p.product_id + '" data-price="' + p.rate + '" data-avail="' + p.available_qty + '">' + escHtmlPo(p.productName) + '</option>';
+            });
+            sel.innerHTML = opts;
+            sel.disabled = false;
+            if (!data || !data.length) {
+                sel.innerHTML = '<option value="">No stock available at this CP</option>';
+                sel.disabled = true;
+            }
+        }).fail(function () {
+            sel.innerHTML = defaultProductOptionsHtml;
+            sel.disabled = false;
+        });
+    }
+
+    function restoreDefaultProducts() {
+        var sel = document.getElementById('pr_select');
+        if (defaultProductOptionsHtml) {
+            $(sel).val('').trigger('change');
+            document.getElementById('po_price').value = '';
+            sel.innerHTML = defaultProductOptionsHtml;
+            sel.disabled = false;
+        }
+    }
+
+    function escHtmlPo(str) {
+        return $('<div>').text(str == null ? '' : str).html();
     }
 
     function poGrandTotal() {
@@ -1032,6 +1327,9 @@ $tpDeliveryAddressParts = array_filter([
             $('#pr_select').select2({ placeholder: 'Search product…', allowClear: true, width: '100%' });
         }
         toggleDeliveryFields();
+        // Company defaults to checked on load — hide the pickup UI up front
+        // if this TP/type's mode is 'cp_only' (only usable once CP is chosen).
+        refreshPickupAvailability();
 
         // Restore a draft saved before being sent to add-advance-payment.php.
         var draft = <?=json_encode($poDraft)?>;

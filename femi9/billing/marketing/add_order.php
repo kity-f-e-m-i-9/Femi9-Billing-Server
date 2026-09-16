@@ -823,7 +823,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         // keystroke), which then does the real distance check itself. So a
         // no-location shop always falls through to the plain confirm() here;
         // the server may still reject it if its address can't be geocoded.
-        var GET_ORDER_MAX_METERS = 75;
+        var GET_ORDER_MAX_METERS = 100;
         window.confirmGetOrderSubmit = function confirmGetOrderSubmit() {
             if (capturedLat === null || capturedLng === null) {
                 alert('Could not get your current location. Please enable location access and try again — Get Order requires you to be at the shop.');

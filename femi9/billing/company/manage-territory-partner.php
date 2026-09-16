@@ -24,7 +24,7 @@ if ($_delCol && $_delCol->num_rows === 0) {
     $db_conn->query("ALTER TABLE territory_partners ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER is_active");
 }
 require_once __DIR__ . '/../shared/TpCourierPayment.php';
-tpEnsureSelfPickupColumn($db_conn);
+tpEnsurePickupModeColumn($db_conn);
 
 // A Sales BDM session only sees Territory Partners inside their own assigned
 // districts (including inactive ones, since this page is also how they'd
@@ -102,6 +102,51 @@ $i = 0;
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <style>
         body { font-family: 'Poppins', sans-serif; }
+
+        .pickup-bulk { font-weight: 400; text-transform: none; letter-spacing: normal; margin-top: 2px; font-size: 11px; }
+        .pickup-bulk-link { color: #667eea; text-decoration: none; cursor: pointer; }
+        .pickup-bulk-link:hover { text-decoration: underline; }
+
+        .pickup-mode-wrap { position: relative; display: inline-block; }
+        .pickup-mode-wrap::after {
+            content: '\25BE';
+            position: absolute;
+            right: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #fff;
+            font-size: 11px;
+            pointer-events: none;
+        }
+        .pickup-mode-wrap.pm-disabled::after { color: #6b7280; }
+
+        .pickup-mode-select {
+            -webkit-appearance: none;
+            appearance: none;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 7px 28px 7px 12px;
+            border-radius: 20px;
+            color: #fff;
+            min-width: 168px;
+            box-shadow: 0 2px 6px rgba(102,126,234,.25);
+            transition: box-shadow .15s;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .pickup-mode-select:hover { box-shadow: 0 3px 10px rgba(102,126,234,.4); }
+        .pickup-mode-select:focus { box-shadow: 0 0 0 3px rgba(102,126,234,.25); }
+        .pickup-mode-select option { color: #1f2937; font-weight: 500; }
+        .pickup-mode-select.pm-disabled {
+            color: #4b5563;
+            box-shadow: 0 2px 6px rgba(0,0,0,.06);
+            background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+        }
+        .pickup-mode-select.pm-cp_only {
+            background: linear-gradient(135deg, #06b6d4 0%, #667eea 100%);
+        }
 
         .stat-card {
             background: #fff;
@@ -319,7 +364,22 @@ $i = 0;
                                             <th>Updated By</th>
                                             <th>Password</th>
                                             <th>Status</th>
-                                            <th>Self Pickup</th>
+                                            <th>
+                                                Napkin Pickup
+                                                <div class="pickup-bulk">
+                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="all">All Orders</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="cp_only">CP Only</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="disabled">Disabled</a>
+                                                </div>
+                                            </th>
+                                            <th>
+                                                Lumi Pickup
+                                                <div class="pickup-bulk">
+                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="all">All Orders</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="cp_only">CP Only</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="disabled">Disabled</a>
+                                                </div>
+                                            </th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -434,14 +494,27 @@ $i = 0;
                                                     <span class="badge-inactive">Inactive</span>
                                                 <?php endif; ?>
                                             </td>
+                                            <?php $pmNapkin = in_array($tp['pickup_mode_napkin'] ?? 'disabled', ['disabled','all','cp_only'], true) ? $tp['pickup_mode_napkin'] : 'disabled'; ?>
                                             <td>
-                                                <label style="display:inline-flex;align-items:center;cursor:pointer;">
-                                                    <input type="checkbox" class="toggle-pickup-cb"
-                                                           data-id="<?php echo $enc_id; ?>"
-                                                           data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>"
-                                                           <?php echo !empty($tp['allow_self_pickup']) ? 'checked' : ''; ?>
-                                                           style="width:17px;height:17px;">
-                                                </label>
+                                                <span class="pickup-mode-wrap pm-<?php echo $pmNapkin; ?>">
+                                                    <select class="pickup-mode-select pm-<?php echo $pmNapkin; ?>" data-id="<?php echo $enc_id; ?>" data-type="napkin"
+                                                            data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
+                                                        <option value="disabled" <?php echo $pmNapkin === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
+                                                        <option value="all" <?php echo $pmNapkin === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
+                                                        <option value="cp_only" <?php echo $pmNapkin === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                    </select>
+                                                </span>
+                                            </td>
+                                            <?php $pmDiaper = in_array($tp['pickup_mode_diaper'] ?? 'disabled', ['disabled','all','cp_only'], true) ? $tp['pickup_mode_diaper'] : 'disabled'; ?>
+                                            <td>
+                                                <span class="pickup-mode-wrap pm-<?php echo $pmDiaper; ?>">
+                                                    <select class="pickup-mode-select pm-<?php echo $pmDiaper; ?>" data-id="<?php echo $enc_id; ?>" data-type="diaper"
+                                                            data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
+                                                        <option value="disabled" <?php echo $pmDiaper === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
+                                                        <option value="all" <?php echo $pmDiaper === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
+                                                        <option value="cp_only" <?php echo $pmDiaper === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                    </select>
+                                                </span>
                                             </td>
                                             <td>
                                                 <div class="actions-group">
@@ -542,17 +615,43 @@ $(document).on('click', '.toggle-status-btn', function () {
     }, 'json').fail(function () { alert('Request failed. Please try again.'); });
 });
 
-$(document).on('change', '.toggle-pickup-cb', function () {
-    var $cb   = $(this);
-    var id    = $cb.data('id');
-    var name  = $cb.data('name');
-    var newVal = $cb.is(':checked') ? 1 : 0;
+function setPickupModeClass($sel, mode) {
+    $sel.removeClass('pm-disabled pm-all pm-cp_only').addClass('pm-' + mode);
+    $sel.closest('.pickup-mode-wrap').removeClass('pm-disabled pm-all pm-cp_only').addClass('pm-' + mode);
+}
+
+$(document).on('change', '.pickup-mode-select', function () {
+    var $sel = $(this);
+    var id   = $sel.data('id');
+    var type = $sel.data('type');
+    var newVal = $sel.val();
+    var prevVal = $sel.data('prev-val') || 'disabled';
 
     $.post('toggle-tp-pickup.php', {
-        csrf_token: CSRF_TOKEN, id: id, allow: newVal
+        csrf_token: CSRF_TOKEN, id: id, type: type, mode: newVal
     }, function (res) {
-        if (!res.success) { alert('Failed. Please try again.'); $cb.prop('checked', !newVal); return; }
-    }, 'json').fail(function () { alert('Request failed. Please try again.'); $cb.prop('checked', !newVal); });
+        if (!res.success) { alert('Failed. Please try again.'); $sel.val(prevVal); setPickupModeClass($sel, prevVal); return; }
+        $sel.data('prev-val', newVal);
+        setPickupModeClass($sel, newVal);
+    }, 'json').fail(function () { alert('Request failed. Please try again.'); $sel.val(prevVal); setPickupModeClass($sel, prevVal); });
+});
+$('.pickup-mode-select').each(function () { $(this).data('prev-val', $(this).val()); });
+
+$(document).on('click', '.pickup-bulk-link', function (e) {
+    e.preventDefault();
+    var type  = $(this).data('type');
+    var mode  = $(this).data('mode');
+    var modeLabel = mode === 'all' ? 'Enabled — All Orders' : (mode === 'cp_only' ? 'Enabled — CP Orders Only' : 'Disabled');
+    if (!confirm('Set ' + (type === 'diaper' ? 'Lumi Diaper' : 'Napkin') + ' pickup to "' + modeLabel + '" for every Territory Partner shown here?')) return;
+
+    $.post('toggle-tp-pickup-bulk.php', {
+        csrf_token: CSRF_TOKEN, type: type, mode: mode
+    }, function (res) {
+        if (!res.success) { alert('Failed. Please try again.'); return; }
+        $('.pickup-mode-select[data-type="' + type + '"]').val(mode).data('prev-val', mode).each(function () {
+            setPickupModeClass($(this), mode);
+        });
+    }, 'json').fail(function () { alert('Request failed. Please try again.'); });
 });
 
 function togglePw(btn) {

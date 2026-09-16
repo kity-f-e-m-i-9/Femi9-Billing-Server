@@ -43,7 +43,7 @@ if (isset($_REQUEST['add_order_get'])) {
 		return [(float)$loc['lat'], (float)$loc['lng']];
 	}
 
-	// Server-side mirror of add_order.php's client-side 75m check — never
+	// Server-side mirror of add_order.php's client-side 100m check — never
 	// trust the browser alone, since a POST here can bypass the JS entirely.
 	// A shop with NO saved lat/lng gets geocoded from its own stored address
 	// (Google Geocoding, not the DM's GPS) — ~73% of existing shops have no
@@ -83,9 +83,9 @@ if (isset($_REQUEST['add_order_get'])) {
 	$dLng = deg2rad($shopLng - $longitude);
 	$a = sin($dLat / 2) ** 2 + cos(deg2rad($latitude)) * cos(deg2rad($shopLat)) * sin($dLng / 2) ** 2;
 	$distanceMeters = $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
-	if ($distanceMeters > 75) {
+	if ($distanceMeters > 100) {
 		$distText = $distanceMeters >= 1000 ? round($distanceMeters / 1000, 2) . " km" : round($distanceMeters) . " m";
-		$_SESSION['errorMessage'] = "You are $distText away from this shop's location. Get Order can only be submitted within 75 m of the shop.";
+		$_SESSION['errorMessage'] = "You are $distText away from this shop's location. Get Order can only be submitted within 100 m of the shop.";
 		header("Location: add_order.php");
 		exit;
 	}

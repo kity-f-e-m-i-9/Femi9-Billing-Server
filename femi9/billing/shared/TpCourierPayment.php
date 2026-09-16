@@ -174,29 +174,90 @@ function tpEnsurePickupColumn(mysqli $db): void
     }
 }
 
-// Self-migrating: per-TP switch, set by Company on manage-territory-partner.php
-// (toggle-tp-pickup.php). Defaults to 0 — "pick up myself" only appears for a
-// TP Company has explicitly opted in; every other TP must pay the courier fee,
-// enforced both in the UI (add-purchase-order.php hides the option) and
-// server-side (purchase-order-action.php ignores a tampered pickup_method[]
-// for a TP not opted in).
+// Self-migrating: per-TP, per-product-type switch, set by Company on
+// manage-territory-partner.php (toggle-tp-pickup.php). Defaults to 0 —
+// "pick up myself" only appears for a TP Company has explicitly opted in
+// for THAT product type; every other TP/type combination must pay the
+// courier fee, enforced both in the UI (add-purchase-order.php hides the
+// option) and server-side (purchase-order-action.php ignores a tampered
+// pickup_method[] for a TP not opted in for the cart's product type).
+//
+// Originally a single allow_self_pickup column covering both Napkin and
+// Diaper together — split 2026-09-15 so Company can opt a TP into self-pickup
+// for one product type without the other. The old column is backfilled into
+// both new ones below (once) so no TP silently loses pickup access it
+// already had; the old column itself is left in place, unused, rather than
+// dropped, since nothing else reads it.
 function tpEnsureSelfPickupColumn(mysqli $db): void
 {
-    $col = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'allow_self_pickup'");
+    $hadNapkinCol = true;
+    $col = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'allow_self_pickup_napkin'");
     if ($col && $col->num_rows === 0) {
-        $db->query("ALTER TABLE territory_partners ADD COLUMN allow_self_pickup TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active");
+        $hadNapkinCol = false;
+        $db->query("ALTER TABLE territory_partners ADD COLUMN allow_self_pickup_napkin TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active");
+    }
+    $col2 = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'allow_self_pickup_diaper'");
+    if ($col2 && $col2->num_rows === 0) {
+        $db->query("ALTER TABLE territory_partners ADD COLUMN allow_self_pickup_diaper TINYINT(1) NOT NULL DEFAULT 0 AFTER allow_self_pickup_napkin");
+    }
+    if (!$hadNapkinCol) {
+        $oldCol = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'allow_self_pickup'");
+        if ($oldCol && $oldCol->num_rows > 0) {
+            $db->query("UPDATE territory_partners SET allow_self_pickup_napkin = allow_self_pickup, allow_self_pickup_diaper = allow_self_pickup WHERE allow_self_pickup = 1");
+        }
     }
 }
 
-function tpAllowsSelfPickup(mysqli $db, int $tpId): bool
+// Pickup eligibility can be scoped to CP-sourced orders only — added
+// 2026-09-16 so Company can let a TP pick up in person from a Channel
+// Partner while still requiring courier payment for the same TP/type when
+// ordering from Company's own godown. Replaces the old plain ON/OFF
+// allow_self_pickup_napkin/diaper checkbox with a 3-way mode; backfilled
+// once from those columns (1 => 'all', 0 => 'disabled') so no TP silently
+// loses pickup access it already had. The old boolean columns are left in
+// place, unused, same posture as allow_self_pickup before them.
+function tpEnsurePickupModeColumn(mysqli $db): void
 {
-    tpEnsureSelfPickupColumn($db);
-    $stmt = $db->prepare("SELECT allow_self_pickup FROM territory_partners WHERE id = ?");
+    $hadNapkinCol = true;
+    $col = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'pickup_mode_napkin'");
+    if ($col && $col->num_rows === 0) {
+        $hadNapkinCol = false;
+        $db->query("ALTER TABLE territory_partners ADD COLUMN pickup_mode_napkin ENUM('disabled','all','cp_only') NOT NULL DEFAULT 'disabled' AFTER allow_self_pickup_diaper");
+    }
+    $col2 = $db->query("SHOW COLUMNS FROM territory_partners LIKE 'pickup_mode_diaper'");
+    if ($col2 && $col2->num_rows === 0) {
+        $db->query("ALTER TABLE territory_partners ADD COLUMN pickup_mode_diaper ENUM('disabled','all','cp_only') NOT NULL DEFAULT 'disabled' AFTER pickup_mode_napkin");
+    }
+    if (!$hadNapkinCol) {
+        tpEnsureSelfPickupColumn($db);
+        $db->query("UPDATE territory_partners SET
+            pickup_mode_napkin = IF(allow_self_pickup_napkin = 1, 'all', 'disabled'),
+            pickup_mode_diaper = IF(allow_self_pickup_diaper = 1, 'all', 'disabled')");
+    }
+}
+
+function tpPickupMode(mysqli $db, int $tpId, string $productType): string
+{
+    tpEnsurePickupModeColumn($db);
+    $col = $productType === 'diaper' ? 'pickup_mode_diaper' : 'pickup_mode_napkin';
+    $stmt = $db->prepare("SELECT $col AS mode FROM territory_partners WHERE id = ?");
     $stmt->bind_param('i', $tpId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return !empty($row['allow_self_pickup']);
+    $mode = $row['mode'] ?? 'disabled';
+    return in_array($mode, ['disabled', 'all', 'cp_only'], true) ? $mode : 'disabled';
+}
+
+// $isCpSourced must reflect the SAME server-re-validated CP tag
+// purchase-order-action.php resolves for preferred_cp_id — never trust a
+// client-posted "this is a CP order" flag on its own.
+function tpAllowsSelfPickup(mysqli $db, int $tpId, string $productType, bool $isCpSourced = false): bool
+{
+    $mode = tpPickupMode($db, $tpId, $productType);
+    if ($mode === 'all') return true;
+    if ($mode === 'cp_only') return $isCpSourced;
+    return false;
 }
 
 /**

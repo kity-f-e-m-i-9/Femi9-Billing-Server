@@ -259,7 +259,7 @@ $i = 0;
                                                     <i class="material-icons-outlined" style="font-size:19px;">label</i>
                                                 </a>
                                                 <?php endif; ?>
-                                                <a href="tp-cnote-new?inv_id=<?php echo $inv['id']; ?>" class="action-btn cn" title="Credit Note / Return">
+                                                <a href="tp-cnote-new?inv_id=<?php echo $inv['id']; ?>" class="action-btn cn" title="TP Return Invoice">
                                                     <i class="material-icons-outlined" style="font-size:19px;">assignment_return</i>
                                                 </a>
                                                 <form method="POST" action="delete-tp-invoice" class="d-inline">

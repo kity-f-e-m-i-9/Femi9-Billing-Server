@@ -73,7 +73,7 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>TP Credit Note : <?php echo $business_name; ?></title>
+    <title>TP Return Invoice : <?php echo $business_name; ?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
@@ -108,7 +108,7 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                     <div class="row"><div class="col">
                         <div class="page-description">
                             <h1><table class="headertble"><tr>
-                                <td>TP Credit Note</td>
+                                <td>TP Return Invoice</td>
                                 <td><a href="tp-cnote-manage" title="Manage CNs">&#9776;</a>&nbsp;<a href="manage-tp-invoices" title="TP Invoices">&#x21A9;</a></td>
                             </tr></table></h1>
                         </div>
