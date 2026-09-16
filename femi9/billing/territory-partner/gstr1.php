@@ -366,7 +366,12 @@ if ($from_month != '') {
                         <div style="clear:both;"></div>
                         <br/>
 
-                        <h1 style="margin-top:20px;">GSTR-1 Filing Summary</h1>
+                        <table style="width:100%;">
+                        <tr>
+                        <td><h1 style="margin-top:20px;">GSTR-1 Filing Summary</h1></td>
+                        <td align="right" valign="top"><a href="export_gstr1?frdate=<?=urlencode($from_month);?>&todate=<?=urlencode($to_month);?>" title="Export to Excel"><img src="../../assets/images/excel-3-32.png"></a></td>
+                        </tr>
+                        </table>
                         <p style="color:#666;margin-top:-8px;">Standard GST portal table layout &mdash; Table 4 (B2B), Table 7 (B2C), Table 8 (Nil/Exempt/Non-GST), Table 12 (HSN Summary), Table 13 (Documents Issued).</p>
 
                         <table id="gsttablevl">
