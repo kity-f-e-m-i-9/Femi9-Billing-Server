@@ -1,0 +1,9 @@
+.claude
+vendor
+femi9/vendor
+femi9/billing/shared/.env
+**/logs/*.log
+**/login_attempts.log
+**/login_rate_limit.json
+docker/db-init/*.sql
+db_backups

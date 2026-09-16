@@ -1,0 +1,49 @@
+# Self-contained handoff: no `git clone` needed. Both images already have
+# the full code (with .git baked in) and a safe demo database. Load the
+# exported images (`docker load -i ...`), then:
+#   docker compose -f docker-compose.handoff.yml up
+#
+# Login: http://localhost:8080/femi9/billing/login/
+#   Mobile 9000000001 / Password Demo@123
+#
+# Their edits go into the `app_code` named volume, which persists across
+# restarts — do `docker compose exec app sh` to get a shell, set up git
+# identity/credentials once, then `git add`/`commit`/`push` from inside.
+services:
+  app:
+    image: femi9-billing-app:handoff
+    ports:
+      - "8080:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      DB_NAME: billing0femi9_billingapp
+      APP_URL: http://localhost:8080
+    volumes:
+      - app_code:/var/www/html
+    restart: unless-stopped
+
+  db:
+    image: femi9-billing-db:handoff
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: billing0femi9_billingapp
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  app_code:
+  db_data:

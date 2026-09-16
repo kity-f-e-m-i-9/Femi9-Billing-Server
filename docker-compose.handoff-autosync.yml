@@ -1,0 +1,28 @@
+# Add-on for docker-compose.handoff.yml: auto commits/pushes their code
+# changes so they never have to run git by hand.
+#
+#   docker compose -f docker-compose.handoff.yml -f docker-compose.handoff-autosync.yml up
+#
+# Requires their laptop to already have git push access configured (SSH key
+# or a credential helper) — this reuses their host ~/.ssh and ~/.gitconfig,
+# it carries no credentials of its own. Watches the same `app_code` volume
+# the app container serves, so it sees every edit whether made through the
+# app container's shell or an IDE attached to it.
+services:
+  sync:
+    image: alpine:3.20
+    working_dir: /repo
+    volumes:
+      - app_code:/repo
+      - ${HOME}/.gitconfig:/root/.gitconfig:ro
+      - ${HOME}/.ssh:/root/.ssh:ro
+    environment:
+      SYNC_DEBOUNCE_SECONDS: 10
+      GIT_AUTOSYNC_NAME: auto-sync
+      GIT_AUTOSYNC_EMAIL: auto-sync@local
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "apk add --no-cache git inotify-tools openssh-client >/dev/null &&
+       chmod +x /repo/docker/auto-sync.sh &&
+       /repo/docker/auto-sync.sh"
+    restart: unless-stopped
