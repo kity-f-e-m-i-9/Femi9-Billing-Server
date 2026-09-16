@@ -5,6 +5,7 @@ include("checksession.php");
 include("config.php");
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
+require_once("include/StockLots.php");
 
 $__usertype = get_login_usertype($db_conn);
 if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
@@ -280,6 +281,23 @@ try {
             $item['gst_rate'], $item['gst_type'], $item['total_cost'], $item['taxable_value'], $item['gst_amount'], $item['ledger_id']
         );
         $itemStmt->execute();
+
+        // Only whole packs actually credited to stock become a lot — a
+        // purchase that only topped up the loose-piece remainder (qty_packs
+        // === 0) has nothing to record yet; it'll become a lot once enough
+        // further pieces accumulate to complete a pack (a future purchase's
+        // own recordLot call, once that purchase's qty_packs > 0).
+        if ($item['qty_packs'] > 0) {
+            // Rate is per PIECE in the purchase form; stock_lots tracks
+            // pack-based qty (matching stock.closing_qty), so the lot's rate
+            // must be per PACK: cost_per_piece * pieces_per_pack.
+            $ratePerPack = round($item['cost'] * $item['pieces_per_pack'], 6);
+            StockLots::recordLot(
+                $db_conn, $item['pid'], 'company', (string) $neksomoGodownId,
+                $ratePerPack, $item['qty_packs'], $purchase_date,
+                'neksomo_purchase', (string) $purchase_id, $created_by
+            );
+        }
     }
     $itemStmt->close();
 
