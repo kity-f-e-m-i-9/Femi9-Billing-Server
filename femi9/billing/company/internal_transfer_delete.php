@@ -16,7 +16,7 @@ if ($rowid <= 0) {
 
 // Fetch the transfer row before deletion (prepared statement — no injection)
 $stmt = $db_conn->prepare(
-    "SELECT product_id, qty, send_from, send_to FROM internal_transfer WHERE id = ?"
+    "SELECT product_id, qty, returned_qty, send_from, send_to FROM internal_transfer WHERE id = ?"
 );
 $stmt->bind_param('i', $rowid);
 $stmt->execute();
@@ -25,7 +25,10 @@ $stmt->close();
 
 if ($row) {
     $product_id = (int)    $row['product_id'];
-    $qty        = (int)    $row['qty'];
+    // Some of this line's qty may have already been reversed via a partial
+    // "Return Stock" action — only the remainder is still actually applied
+    // to stock, so only that much should be reversed on delete.
+    $qty        = (int) $row['qty'] - (int) $row['returned_qty'];
     $send_from  = (string) $row['send_from'];
     $send_to    = (string) $row['send_to'];
 
@@ -40,19 +43,24 @@ if ($row) {
         $stmtDel->execute();
         $stmtDel->close();
 
-        // Restore source godown stock (sent_qty ↓, closing_qty ↑) — FOR UPDATE + ledger
-        $stockService->reverseTransferOut(
-            $product_id, $Login_user_TYPEvl, $send_from, $qty,
-            'transfer', $tempid, $createdBy,
-            true
-        );
+        // If the line was already fully returned via "Return Stock", there's
+        // nothing left applied to stock to reverse — just drop the record.
+        $reverseInResult = ['success' => true];
+        if ($qty > 0) {
+            // Restore source godown stock (sent_qty ↓, closing_qty ↑) — FOR UPDATE + ledger
+            $stockService->reverseTransferOut(
+                $product_id, $Login_user_TYPEvl, $send_from, $qty,
+                'transfer', $tempid, $createdBy,
+                true
+            );
 
-        // Remove destination godown stock (input_qty ↓, closing_qty ↓) — FOR UPDATE + ledger
-        $reverseInResult = $stockService->reverseTransferIn(
-            $product_id, $Login_user_TYPEvl, $send_to, $qty,
-            'transfer', $tempid, $createdBy,
-            true
-        );
+            // Remove destination godown stock (input_qty ↓, closing_qty ↓) — FOR UPDATE + ledger
+            $reverseInResult = $stockService->reverseTransferIn(
+                $product_id, $Login_user_TYPEvl, $send_to, $qty,
+                'transfer', $tempid, $createdBy,
+                true
+            );
+        }
 
         if (($reverseInResult['success'] ?? false) === false
             && ($reverseInResult['reason'] ?? '') === 'insufficient_stock_to_reverse') {

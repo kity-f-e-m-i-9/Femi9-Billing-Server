@@ -161,6 +161,7 @@ if(isset($_REQUEST['add-users']))
     if(isset($_REQUEST['channel_partner']) && $_REQUEST['channel_partner']==1){$channel_partner="1";}else{$channel_partner="0";}
     if(isset($_REQUEST['territory_partner']) && $_REQUEST['territory_partner']==1){$territory_partner="1";}else{$territory_partner="0";}
     if(isset($_REQUEST['stock_transfers']) && $_REQUEST['stock_transfers']==1){$stock_transfers="1";}else{$stock_transfers="0";}
+    if(isset($_REQUEST['internal_transfer']) && $_REQUEST['internal_transfer']==1){$internal_transfer="1";}else{$internal_transfer="0";}
 
 
 		$insert_users="update admin_log set password='$encryptedPassword',dash='$dash',report='$report',
@@ -170,7 +171,7 @@ if(isset($_REQUEST['add-users']))
         ss='$ss',st='$st',dt='$dt',sdt='$sdt',shop='$shop',cus='$cus',ms='$ms',unassigned='$unassigned',remap='$remap',
         users_network='$users_network',payment_entry='$add_payment_entry',manage_payment_entry='$manage_payment_entry',consolidated_payment_entry='$consolidated_payment_entry',bonus_calculator='$bonus_calculator',manage_bonus_points='$manage_bonus_points',
         add_input_stock='$add_input_stock',manage_input_stock='$manage_input_stock',add_input_stock_users='$add_input_stock_users',manage_input_stock_users='$manage_input_stock_users',
-        partner_location='$partner_location',channel_partner='$channel_partner',territory_partner='$territory_partner',stock_transfers='$stock_transfers' where id='$update_id'";
+        partner_location='$partner_location',channel_partner='$channel_partner',territory_partner='$territory_partner',stock_transfers='$stock_transfers',internal_transfer='$internal_transfer' where id='$update_id'";
 		mysqli_query($db_conn,$insert_users);
 		
 		
@@ -589,6 +590,15 @@ $ex_catid = array_filter(explode("#", $catid));
         				<input type="checkbox" value="1" name="stock_transfers">
         				<?php }?>
         				Stock Transfers</label>
+				    </td>
+				    <td>
+        				<label>
+        				<?php if($result_count_users['internal_transfer']==1){?>
+        				<input type="checkbox" value="1" checked name="internal_transfer">
+        				<?php }else{?>
+        				<input type="checkbox" value="1" name="internal_transfer">
+        				<?php }?>
+        				Internal Stock Transfer</label>
 				    </td>
 				</tr>
 

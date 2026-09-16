@@ -253,12 +253,14 @@ $i= $start_from;
 						$SubTotal=$PR_qty*$PR_rate;
 						$PR_discount=$ResultRecords["discount"];
 						$PR_total=$SubTotal-$PR_discount;
+						$PR_returned=(int)($ResultRecords["returned_qty"] ?? 0);
+						$PR_returnable=$PR_qty-$PR_returned;
 											?>
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
                    <td><?php echo $Result_productDetils["productName"];?></td>
-					<td><?php echo inr_format($PR_qty, 1);?></td>
+					<td><?php echo inr_format($PR_qty, 1); if($PR_returned > 0){ echo '<br/><small class="text-muted">Returned: '.inr_format($PR_returned, 1).'</small>'; } ?></td>
 					<td><?php echo inr_format($PR_rate, 2);?></td>
 					<td><?php echo inr_format($SubTotal, 2);?></td>
 					<td><?php echo inr_format($PR_discount, 2);?></td>
@@ -266,8 +268,35 @@ $i= $start_from;
 													
 																										<td>
 													    <div class="actions-group">
+													        <?php if($PR_returnable > 0){ ?>
+													        <a href="#" class="action-link" title="Return Stock" data-bs-toggle="modal" data-bs-target="#returnModal<?=$ResultRecords['id'];?>"><i class="material-icons-outlined" style="font-size:17px;color:#f59e0b;">undo</i></a>
+													        <?php } ?>
 													        <a href="internal_transfer_delete?Roowid=<?=$RowID;?>&&tempid=<?=$tempid;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
+
+													    <?php if($PR_returnable > 0){ ?>
+													    <div class="modal fade" id="returnModal<?=$ResultRecords['id'];?>" tabindex="-1" aria-labelledby="returnModalLabel<?=$ResultRecords['id'];?>" aria-hidden="true">
+													        <div class="modal-dialog">
+													            <div class="modal-content">
+													                <div class="modal-header">
+													                    <h5 class="modal-title" id="returnModalLabel<?=$ResultRecords['id'];?>">Return Stock<br/><?php echo $Result_productDetils["productName"];?></h5>
+													                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+													                </div>
+													                <form method="post" onsubmit="return confirm('Return this quantity to the source godown?');" action="internal_transfer_return_action">
+													                    <input type="hidden" name="Roowid" value="<?=$RowID;?>">
+													                    <input type="hidden" name="tempid" value="<?=$tempid;?>">
+													                    <div class="example-content" style="padding:20px;">
+													                        <div class="form-floating mb-3">
+													                            <input type="number" name="return_qty" placeholder="Quantity to Return" class="form-control" id="returnQty<?=$ResultRecords['id'];?>" min="1" max="<?=$PR_returnable;?>" required>
+													                            <label for="returnQty<?=$ResultRecords['id'];?>">Quantity to Return (max <?=$PR_returnable;?>)</label>
+													                        </div>
+													                        <button type="submit" class="btn btn-primary"><i class="material-icons">undo</i>Return</button>
+													                    </div>
+													                </form>
+													            </div>
+													        </div>
+													    </div>
+													    <?php } ?>
 													</td>
                                                 </tr>
                                            

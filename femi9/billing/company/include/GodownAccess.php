@@ -18,6 +18,19 @@ if (isset($db_conn) && $db_conn instanceof mysqli) {
     }
 }
 
+// function_exists guards below: this file is require_once'd from 140+ call
+// sites using a mix of relative ("include/GodownAccess.php") and __DIR__-
+// based absolute paths. On a case-insensitive filesystem (macOS default),
+// a request URL whose directory casing differs from the real on-disk
+// casing (e.g. "femi9 billing server" vs "Femi9 Billing Server") makes
+// PHP's require_once dedupe-by-literal-path fail to recognize the two
+// spellings as the same file, so it can load and execute this file twice
+// in one request — the second run threw "Cannot redeclare
+// get_login_usertype()" without this guard. See
+// docs/superpowers/plans/2026-09-15-transfer-tax-invoice.md's Task 1,
+// which added a second __DIR__-based require_once of this file from
+// shared/TransferInvoiceData.php, exposing the gap.
+if (!function_exists('get_login_usertype')) {
 function get_login_usertype($db_conn) {
     static $cached = null;
     if ($cached !== null) return $cached;
@@ -65,3 +78,4 @@ function is_godown_allowed($db_conn, $godownId) {
 function godown_ids_subquery($db_conn) {
     return "SELECT id FROM company_godown WHERE " . godown_finance_filter_sql($db_conn);
 }
+} // end function_exists('get_login_usertype') guard
