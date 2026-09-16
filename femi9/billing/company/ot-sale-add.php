@@ -430,6 +430,9 @@ $stmt_states->close();
                                                     <button type="submit" name="add-record" class="btn btn-primary">
                                                         <i class="material-icons">add</i> Submit
                                                     </button>
+                                                    <button type="submit" name="add-draft-record" class="btn btn-outline-secondary" title="Save without affecting stock — come back and finish it later">
+                                                        <i class="material-icons">save</i> Save as Draft
+                                                    </button>
                                                 </span>
 
                                             </div>

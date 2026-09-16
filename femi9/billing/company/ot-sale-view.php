@@ -2,6 +2,20 @@
 require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
 require_once("include/GodownAccess.php");
 error_reporting(0);
+
+// Self-migrating — see ot-sale-action.php's INSERT branch for where this
+// gets set ('confirmed' or 'draft').
+$_statusColView = $db_conn->query("SHOW COLUMNS FROM ot_sales_invoice LIKE 'status'");
+if ($_statusColView && $_statusColView->num_rows === 0) {
+    $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
+}
+
+// Distinct category list actually present in the data, for the Category
+// filter — reflects whatever's really filterable rather than a hardcoded
+// list that could drift from ot_cat.
+$_catListRes = $db_conn->query("SELECT DISTINCT cat FROM ot_sales_invoice WHERE cat IS NOT NULL AND cat != '' ORDER BY cat ASC");
+$_catFilterOptions = [];
+if ($_catListRes) { while ($_r = $_catListRes->fetch_assoc()) { $_catFilterOptions[] = $_r['cat']; } }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -111,8 +125,10 @@ $errorMessage = $_SESSION['sucMessage'];
 									}
 									
 									$se_invoice=trim($_REQUEST['se_invoice'] ?? '');
+									$se_cat=trim($_REQUEST['se_cat'] ?? '');
+									$se_status=trim($_REQUEST['se_status'] ?? '');
 									?>
-									
+
 <form method="post" enctype="multipart/form-data" action="ot-sale-view">
 <div class="overviewcontainar">
 <div id="searchleftcont">
@@ -122,6 +138,23 @@ $errorMessage = $_SESSION['sucMessage'];
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
 <input type="date" required="" name="todate" value="<?=$se_toDate;?>" class="form-control">
+</div>
+<div id="searchleftcont">
+<label class="form-label">Category</label>
+<select name="se_cat" class="form-control">
+<option value="">All Categories</option>
+<?php foreach ($_catFilterOptions as $_catOpt): ?>
+<option value="<?=htmlspecialchars($_catOpt, ENT_QUOTES)?>" <?=($se_cat === $_catOpt ? 'selected' : '')?>><?=htmlspecialchars($_catOpt, ENT_QUOTES)?></option>
+<?php endforeach; ?>
+</select>
+</div>
+<div id="searchleftcont">
+<label class="form-label">Status</label>
+<select name="se_status" class="form-control">
+<option value="">All Statuses</option>
+<option value="confirmed" <?=($se_status === 'confirmed' ? 'selected' : '')?>>Confirmed</option>
+<option value="draft" <?=($se_status === 'draft' ? 'selected' : '')?>>Draft</option>
+</select>
 </div>
 
 <div id="searchbuttoncont">
@@ -182,6 +215,7 @@ $i= $start_from;
                                                     <th>S.No</th>
 													<th>Company Profile</th>
 													<th>Category</th>
+													<th>Status</th>
 													<th>Coupon Code</th>
 													<th>Commission(Rs.)</th>
 													<th>Date</th>
@@ -213,12 +247,22 @@ $i= $start_from;
 											
 											<tbody>
 <?php
+// Category and Status both live on ot_sales_invoice, so both branches now
+// join it (previously only the invoice-number branch did) to filter on them.
+$_otExtraFilter = '';
+if ($se_cat !== '') {
+    $_otExtraFilter .= " AND ot_sales_invoice.cat = '" . mysqli_real_escape_string($db_conn, $se_cat) . "'";
+}
+if ($se_status !== '') {
+    $_otExtraFilter .= " AND COALESCE(ot_sales_invoice.status, 'confirmed') = '" . mysqli_real_escape_string($db_conn, $se_status) . "'";
+}
+
 if(empty($se_invoice))
 {
-$select_product_list="select distinct tempid from ot_sales where date between '$se_fromDate' and '$se_toDate' and godownid IN (" . godown_ids_subquery($db_conn) . ")";
+$select_product_list="select distinct ot_sales.tempid from ot_sales join ot_sales_invoice on ot_sales_invoice.tempid=ot_sales.tempid where ot_sales.date between '$se_fromDate' and '$se_toDate' and ot_sales.godownid IN (" . godown_ids_subquery($db_conn) . ") $_otExtraFilter";
 }else
 {
-$select_product_list="select distinct ot_sales.tempid from ot_sales join ot_sales_invoice on ot_sales_invoice.tempid=ot_sales.tempid where ot_sales_invoice.inv_number='".mysqli_real_escape_string($db_conn,$se_invoice)."' and ot_sales.godownid IN (" . godown_ids_subquery($db_conn) . ")";
+$select_product_list="select distinct ot_sales.tempid from ot_sales join ot_sales_invoice on ot_sales_invoice.tempid=ot_sales.tempid where ot_sales_invoice.inv_number='".mysqli_real_escape_string($db_conn,$se_invoice)."' and ot_sales.godownid IN (" . godown_ids_subquery($db_conn) . ") $_otExtraFilter";
 }
 
 $fetch_product_list=mysqli_query($db_conn,$select_product_list);
@@ -282,6 +326,8 @@ foreach ($tempidList as $tempid) {
                                                     <td><?php echo ++$i; ?></td>
 				<td><?php echo $result_godowndetails["gname"] ?? '';?></td>
 													<td><?php echo $Result_productDetils["cat"];?></td>
+													<?php $ot_row_status = $Result_productDetils122["status"] ?? 'confirmed'; ?>
+													<td><?php if ($ot_row_status === 'draft'): ?><span class="badge badge-warning">Draft</span><?php else: ?><span class="badge badge-success">Confirmed</span><?php endif; ?></td>
 
 													<td><?php echo $Result_productDetils122["coupon_code"] ?? '';?></td>
 													<td><?php echo $Result_productDetils122["website_commission"] ?? '';?></td>

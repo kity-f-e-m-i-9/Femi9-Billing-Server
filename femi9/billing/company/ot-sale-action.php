@@ -9,7 +9,21 @@ include("RemoveSpecialChar.php");
 // ============================================================
 // INSERT
 // ============================================================
-if (isset($_REQUEST['add-record'])) {
+if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
+
+    // A draft is saved exactly like a real OT sale record-for-record, but
+    // never touches stock (no pre-validation, no StockService deduction) and
+    // never runs the coupon-commission side effect below — it's a
+    // placeholder the company can come back and finish later, not yet a
+    // real transaction. See ot-sale-add.php's "Save as Draft" button and
+    // ot-sale-view.php's Status filter.
+    $isDraft = isset($_REQUEST['add-draft-record']);
+
+    // Self-migrating — see the INSERT below.
+    $_statusCol = $db_conn->query("SHOW COLUMNS FROM ot_sales_invoice LIKE 'status'");
+    if ($_statusCol && $_statusCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
+    }
 
     $tempid         = str_replace("'", "&#39;", $_REQUEST['tempid']);
     $godownid       = str_replace("'", "&#39;", $_REQUEST['godownid']);
@@ -125,17 +139,20 @@ if (isset($_REQUEST['add-record'])) {
     $stockService = new StockService($db_conn);
     $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
-    // Pre-validate all stock levels before touching the DB
-    for ($i = 0; $i < $number; $i++) {
-        $pid = (int)($product_id_ex[$i] ?? 0);
-        $qty = (int) RemoveSpecialChar($qty_ex[$i] ?? 0);
-        if (!$pid || $qty <= 0) continue;
+    // Pre-validate all stock levels before touching the DB — skipped for a
+    // draft, since nothing is actually being deducted yet.
+    if (!$isDraft) {
+        for ($i = 0; $i < $number; $i++) {
+            $pid = (int)($product_id_ex[$i] ?? 0);
+            $qty = (int) RemoveSpecialChar($qty_ex[$i] ?? 0);
+            if (!$pid || $qty <= 0) continue;
 
-        $available = $stockService->getClosingQty($pid, $Login_user_TYPEvl, $godownid);
-        if ($available === null || $available < $qty) {
-            $_SESSION['errorMessageOT'] = "Insufficient stock for product #$pid. Available: " . ($available ?? 0) . ", Requested: $qty";
-            echo "<script>window.location='ot-sale-add?InvalidStock&&AlertStockError';</script>";
-            exit;
+            $available = $stockService->getClosingQty($pid, $Login_user_TYPEvl, $godownid);
+            if ($available === null || $available < $qty) {
+                $_SESSION['errorMessageOT'] = "Insufficient stock for product #$pid. Available: " . ($available ?? 0) . ", Requested: $qty";
+                echo "<script>window.location='ot-sale-add?InvalidStock&&AlertStockError';</script>";
+                exit;
+            }
         }
     }
 
@@ -183,14 +200,15 @@ if (isset($_REQUEST['add-record'])) {
             $stmt->close();
 
             if ($invExists === 0) {
+                $statusValue = $isDraft ? 'draft' : 'confirmed';
                 $stmt = $db_conn->prepare(
                     "INSERT INTO ot_sales_invoice
                         (tempid, inv_id, inv_number, courier_charges, wallet_amount,
-                         subtotal, round_off, total, buyer_gsttype, cat)
-                     VALUES (?, '0', ?, ?, ?, '0', '0', '0', ?, ?)"
+                         subtotal, round_off, total, buyer_gsttype, cat, status)
+                     VALUES (?, '0', ?, ?, ?, '0', '0', '0', ?, ?, ?)"
                 );
-                $stmt->bind_param('ssddss', $tempid, $inv_number, $courier_charges,
-                                   $wallet_amount, $buyer_gsttype, $catname);
+                $stmt->bind_param('ssddsss', $tempid, $inv_number, $courier_charges,
+                                   $wallet_amount, $buyer_gsttype, $catname, $statusValue);
                 $stmt->execute();
                 $stmt->close();
             }
@@ -229,11 +247,14 @@ if (isset($_REQUEST['add-record'])) {
             $stmt->close();
 
             // Deduct stock via StockService (FOR UPDATE lock + ledger entry)
-            $stockService->otDeduct(
-                $product_id_value, $Login_user_TYPEvl, (string)$godownid,
-                $qty_value, $tempid, $createdBy,
-                true // externalTransaction — outer tx owns commit
-            );
+            // — skipped entirely for a draft, which must never move stock.
+            if (!$isDraft) {
+                $stockService->otDeduct(
+                    $product_id_value, $Login_user_TYPEvl, (string)$godownid,
+                    $qty_value, $tempid, $createdBy,
+                    true // externalTransaction — outer tx owns commit
+                );
+            }
         }
 
         $db_conn->commit();
@@ -275,8 +296,9 @@ if (isset($_REQUEST['add-record'])) {
         mysqli_query($db_conn, $update_roundvalue);
     }
 
-    // Coupon commission logic (unchanged)
-    if ($_REQUEST['coupon_code'] != NULL) {
+    // Coupon commission logic (unchanged) — skipped for a draft, since it's
+    // not a confirmed transaction yet; commission is only ever earned once.
+    if (!$isDraft && $_REQUEST['coupon_code'] != NULL) {
         $coupon_code = $_REQUEST['coupon_code'];
         preg_match('/-(.*?)-/', $coupon_code, $matches);
         $coupon_usertype = $matches[1] ?? '';
@@ -331,6 +353,12 @@ if (isset($_REQUEST['add-record'])) {
                 mysqli_query($db_conn, $update_ot_sales_invoice);
             }
         }
+    }
+
+    if ($isDraft) {
+        $_SESSION['sucMessage'] = "Saved as draft — stock has not been affected. Come back and edit it any time before finalizing.";
+        echo "<script>window.location='ot-sale-view?DraftSaved';</script>";
+        exit;
     }
 
     echo "<script>window.location='ot-sale-print?tempid=$tempid';</script>";
@@ -398,10 +426,22 @@ if (isset($_REQUEST['updateRecord'])) {
     // Per-product qty/rate/discount edit (ot-sale-edit.php's Product Details
     // table) -- adjust `stock` by only the delta between old and new qty for
     // each line, same approach as ot-sale-item-edit.php's single-row editor.
+    // Never touches stock for a draft invoice — see the INSERT branch above;
+    // a draft only starts moving stock once it's actually finalized.
     $item_ids   = $_POST['item_id']       ?? [];
     $item_qtys  = $_POST['item_qty']      ?? [];
     $item_rates = $_POST['item_price']    ?? [];
     $item_discs = $_POST['item_discount'] ?? [];
+
+    $_statusColUpd = $db_conn->query("SHOW COLUMNS FROM ot_sales_invoice LIKE 'status'");
+    if ($_statusColUpd && $_statusColUpd->num_rows === 0) {
+        $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
+    }
+    $stmtStatusUpd = $db_conn->prepare("SELECT status FROM ot_sales_invoice WHERE tempid = ?");
+    $stmtStatusUpd->bind_param('s', $tempid);
+    $stmtStatusUpd->execute();
+    $isDraftInvoice = (($stmtStatusUpd->get_result()->fetch_assoc()['status'] ?? 'confirmed') === 'draft');
+    $stmtStatusUpd->close();
 
     if (!empty($item_ids)) {
         $stockServiceUpd = new StockService($db_conn);
@@ -428,13 +468,13 @@ if (isset($_REQUEST['updateRecord'])) {
                 $lineGodownid  = (string) $oldItem['godownid'];
                 $delta         = $newQty - $oldQty;
 
-                if ($delta > 0) {
+                if (!$isDraftInvoice && $delta > 0) {
                     $available = $stockServiceUpd->getClosingQty($lineProductId, $Login_user_TYPEvl, $lineGodownid);
                     if ($available === null || $available < $delta) {
                         throw new StockException("Insufficient stock for product #$lineProductId. Available: " . ($available ?? 0) . ", Extra needed: $delta");
                     }
                     $stockServiceUpd->otDeduct($lineProductId, $Login_user_TYPEvl, $lineGodownid, $delta, $tempid, $createdByUpd, true);
-                } elseif ($delta < 0) {
+                } elseif (!$isDraftInvoice && $delta < 0) {
                     $stockServiceUpd->otReverse($lineProductId, $Login_user_TYPEvl, $lineGodownid, -$delta, $tempid, $createdByUpd, true);
                 }
 
