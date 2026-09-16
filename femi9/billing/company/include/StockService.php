@@ -696,8 +696,20 @@ class StockService
                 'transfer_out', $qty, $before, $after,
                 $refType, $refId, '', $createdBy
             );
+
+            $consumed = StockLots::consumeFifo(
+                $this->db, $productId, $userType, $userId, $qty,
+                fn() => $this->fallbackRate($productId)
+            );
+            StockLots::writeConsumption($this->db, $ledgerId, $consumed);
+
+            $totalTaken = array_sum(array_column($consumed, 'qty_taken'));
+            $weightedRate = $totalTaken > 0
+                ? array_sum(array_map(fn($c) => $c['qty_taken'] * $c['rate'], $consumed)) / $totalTaken
+                : 0.0;
+
             if (!$externalTransaction) $this->db->commit();
-            return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
+            return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after, 'consumed_rate' => $weightedRate];
         } catch (\Throwable $e) {
             if (!$externalTransaction) $this->db->rollback();
             throw $e;
@@ -717,7 +729,8 @@ class StockService
         string $refType,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?float $lotRate = null   // weighted-avg cost carried from the source transferOut; null = skip lot creation
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
@@ -747,6 +760,14 @@ class StockService
                 'transfer_in', $qty, $before, $after,
                 $refType, $refId, '', $createdBy
             );
+
+            if ($lotRate !== null) {
+                StockLots::recordLot(
+                    $this->db, $productId, $userType, $userId, $lotRate, $qty,
+                    date('Y-m-d'), 'transfer_in', $refId, $createdBy
+                );
+            }
+
             if (!$externalTransaction) $this->db->commit();
             return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
         } catch (\Throwable $e) {
@@ -789,6 +810,21 @@ class StockService
                 'transfer_out_reverse', $qty, $before, $after,
                 $refType, $refId, '', $createdBy
             );
+
+            // Restock the exact lot(s) the original transferOut drew from.
+            $origStmt = $this->db->prepare(
+                "SELECT id FROM stock_ledger
+                 WHERE ref_type = ? AND ref_id = ? AND product_id = ? AND action = 'transfer_out'
+                 ORDER BY id DESC LIMIT 1"
+            );
+            $origStmt->bind_param('ssi', $refType, $refId, $productId);
+            $origStmt->execute();
+            $origLedgerId = $origStmt->get_result()->fetch_assoc()['id'] ?? null;
+            $origStmt->close();
+            if ($origLedgerId !== null) {
+                StockLots::restoreConsumption($this->db, (int) $origLedgerId);
+            }
+
             if (!$externalTransaction) $this->db->commit();
             return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
         } catch (\Throwable $e) {
