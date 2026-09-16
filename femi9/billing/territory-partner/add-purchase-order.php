@@ -364,8 +364,11 @@ $tpDeliveryAddressParts = array_filter([
         }
         #add:hover, #add:focus { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,.35); color: #fff; }
 
-        .apo-table-wrap { border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; margin-top: 18px; }
-        .apo-table-wrap table { width: 100%; margin: 0; }
+        /* Product/Qty/Price/Disc/Total/action never fit six-across on a
+           phone — scroll the table itself sideways instead of letting it
+           force the whole page wider than the screen. */
+        .apo-table-wrap { border: 1px solid #f1f5f9; border-radius: 10px; overflow-x: auto; margin-top: 18px; }
+        .apo-table-wrap table { width: 100%; margin: 0; min-width: 520px; }
         .apo-table-wrap thead th {
             background: #f8fafc; color: #64748b; font-size: 11px; font-weight: 700;
             text-transform: uppercase; letter-spacing: .4px; padding: 10px 14px; border-bottom: 2px solid #e5e7eb;
@@ -725,6 +728,40 @@ $tpDeliveryAddressParts = array_filter([
                         </div>
                         <?php endif; ?>
 
+                        <!-- Switching Submit To → Channel Partner mid-cart: any
+                             line already added that this CP doesn't actually
+                             stock (or doesn't have enough of) can't silently
+                             ride along — the TP must explicitly confirm
+                             dropping it, or the switch itself is cancelled and
+                             the cart stays exactly as it was under
+                             Company/SS. See checkCpStockMismatch() /
+                             showCpSwitchWarning() in the script below. -->
+                        <?php if ($myCp !== null): ?>
+                        <div class="modal fade" id="cpSwitchWarningModal" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-scrollable">
+                                <div class="modal-content" style="border:none;border-radius:14px;overflow:hidden;">
+                                    <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                                        <h6 class="modal-title" style="font-weight:700;color:#1f2937;">
+                                            <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#ef4444;">error_outline</i>
+                                            Not in stock at this Channel Partner
+                                        </h6>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body" style="padding:18px 22px;">
+                                        <p style="font-size:12.5px;color:#6b7280;margin-bottom:14px;">
+                                            These products already added to your cart aren't available (or don't have enough stock) at this Channel Partner. Remove them and continue, or cancel to keep this order with your current Submit To.
+                                        </p>
+                                        <div id="cpSwitchWarningList"></div>
+                                    </div>
+                                    <div class="modal-footer" style="border-top:1px solid #e9ecef;flex-wrap:wrap;gap:8px;">
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCpSwitch()">Cancel — Keep Current</button>
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="confirmCpSwitchRemoveItems()">Remove &amp; Continue</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                     </div>
                 </div>
             </div>
@@ -963,9 +1000,87 @@ $tpDeliveryAddressParts = array_filter([
     var defaultProductOptionsHtml = null;
     var cpHintEl = document.getElementById('cpStockHint');
 
+    // Switching Submit To → this Channel Partner while the cart already has
+    // lines added under Company/SS needs a detour: those lines were added
+    // with no stock constraint at all, so some may not exist (or not have
+    // enough qty) at this specific CP. Checked against the CP's real stock
+    // before the switch is allowed to actually happen — see
+    // showCpSwitchWarning()/cancelCpSwitch()/confirmCpSwitchRemoveItems().
+    var pendingCpSwitchChoice = null;
+    var pendingCpMismatchedIds = [];
+
     function onApproverChange() {
         var choice = document.querySelector('input[name="approver_choice"]:checked');
         var approver = choice ? choice.value : 'company';
+
+        if (approver === 'cp' && poLines.length > 0) {
+            var cpId = choice.getAttribute('data-cp-id');
+            $.getJSON('get-cp-products.php?cp_id=' + encodeURIComponent(cpId) + '&product_type=<?=urlencode($productType)?>', function (data) {
+                var stockMap = {};
+                (data || []).forEach(function (p) { stockMap[p.product_id] = parseInt(p.available_qty) || 0; });
+                var mismatched = [];
+                poLines.forEach(function (l) {
+                    var avail = stockMap.hasOwnProperty(l.pr_id) ? stockMap[l.pr_id] : null;
+                    if (avail === null || avail < l.qty) mismatched.push({ pr_id: l.pr_id, name: l.name, qty: l.qty, avail: avail });
+                });
+                if (mismatched.length > 0) {
+                    pendingCpSwitchChoice = choice;
+                    pendingCpMismatchedIds = mismatched.map(function (m) { return m.pr_id; });
+                    showCpSwitchWarning(mismatched);
+                } else {
+                    applyApproverChange(choice, approver);
+                }
+            }).fail(function () {
+                // Couldn't verify — let the normal switch proceed; loadCpProducts()
+                // has its own failure handling for a genuinely broken fetch.
+                applyApproverChange(choice, approver);
+            });
+            return;
+        }
+
+        applyApproverChange(choice, approver);
+    }
+
+    function showCpSwitchWarning(mismatched) {
+        var list = document.getElementById('cpSwitchWarningList');
+        list.innerHTML = mismatched.map(function (m) {
+            var reason = (m.avail === null) ? 'Not available at this CP' : ('Only ' + m.avail + ' in stock (need ' + m.qty + ')');
+            return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border:1px solid #fee2e2;background:#fef2f2;border-radius:10px;padding:10px 14px;margin-bottom:8px;">' +
+                '<span>' + escHtmlPo(m.name) + ' <span class="text-muted" style="font-size:11.5px;">(Qty ' + m.qty + ')</span></span>' +
+                '<span style="font-size:11px;font-weight:700;color:#991b1b;white-space:nowrap;">' + escHtmlPo(reason) + '</span>' +
+            '</div>';
+        }).join('');
+        var modal = new bootstrap.Modal(document.getElementById('cpSwitchWarningModal'));
+        modal.show();
+    }
+
+    // TP declined to drop the mismatched items — the radio never actually
+    // changed in applyApproverChange(), so currentApprover still holds
+    // whatever was active before this attempt; just re-check that radio.
+    function cancelCpSwitch() {
+        var prevRadio = document.querySelector('input[name="approver_choice"][value="' + currentApprover + '"]');
+        if (prevRadio) prevRadio.checked = true;
+        pendingCpSwitchChoice = null;
+        pendingCpMismatchedIds = [];
+        var modalEl = document.getElementById('cpSwitchWarningModal');
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+
+    function confirmCpSwitchRemoveItems() {
+        if (!pendingCpSwitchChoice) return;
+        poLines = poLines.filter(function (l) { return pendingCpMismatchedIds.indexOf(l.pr_id) === -1; });
+        renderPoLines();
+        var choice = pendingCpSwitchChoice;
+        pendingCpSwitchChoice = null;
+        pendingCpMismatchedIds = [];
+        applyApproverChange(choice, 'cp');
+        var modalEl = document.getElementById('cpSwitchWarningModal');
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+
+    function applyApproverChange(choice, approver) {
         currentApprover = approver;
         // A CP-sourced order still draws from and is approved against the
         // Company advance pool — 'cp' is a stock-source tag, not a third
