@@ -107,6 +107,40 @@ $i = 0;
         .pickup-bulk-link { color: #667eea; text-decoration: none; cursor: pointer; }
         .pickup-bulk-link:hover { text-decoration: underline; }
 
+        .pickup-mode-select {
+            -webkit-appearance: none;
+            appearance: none;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 7px 28px 7px 12px;
+            border-radius: 20px;
+            color: #fff;
+            min-width: 168px;
+            box-shadow: 0 2px 6px rgba(102,126,234,.25);
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 10px 6px;
+            transition: box-shadow .15s, transform .1s;
+            background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%),
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='white'/></svg>");
+        }
+        .pickup-mode-select:hover { box-shadow: 0 3px 10px rgba(102,126,234,.4); }
+        .pickup-mode-select:focus { box-shadow: 0 0 0 3px rgba(102,126,234,.25); }
+        .pickup-mode-select option { color: #1f2937; font-weight: 500; }
+        .pickup-mode-select.pm-disabled {
+            color: #4b5563;
+            box-shadow: 0 2px 6px rgba(0,0,0,.06);
+            background-image: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%),
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%236b7280'/></svg>");
+        }
+        .pickup-mode-select.pm-cp_only {
+            background-image: linear-gradient(135deg, #06b6d4 0%, #667eea 100%),
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='white'/></svg>");
+        }
+
         .stat-card {
             background: #fff;
             border-radius: 10px;
@@ -453,20 +487,22 @@ $i = 0;
                                                     <span class="badge-inactive">Inactive</span>
                                                 <?php endif; ?>
                                             </td>
+                                            <?php $pmNapkin = in_array($tp['pickup_mode_napkin'] ?? 'disabled', ['disabled','all','cp_only'], true) ? $tp['pickup_mode_napkin'] : 'disabled'; ?>
                                             <td>
-                                                <select class="pickup-mode-select" data-id="<?php echo $enc_id; ?>" data-type="napkin"
-                                                        data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>" style="font-size:12px;padding:3px 6px;">
-                                                    <option value="disabled" <?php echo ($tp['pickup_mode_napkin'] ?? 'disabled') === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
-                                                    <option value="all" <?php echo ($tp['pickup_mode_napkin'] ?? '') === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
-                                                    <option value="cp_only" <?php echo ($tp['pickup_mode_napkin'] ?? '') === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                <select class="pickup-mode-select pm-<?php echo $pmNapkin; ?>" data-id="<?php echo $enc_id; ?>" data-type="napkin"
+                                                        data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
+                                                    <option value="disabled" <?php echo $pmNapkin === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
+                                                    <option value="all" <?php echo $pmNapkin === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
+                                                    <option value="cp_only" <?php echo $pmNapkin === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
                                                 </select>
                                             </td>
+                                            <?php $pmDiaper = in_array($tp['pickup_mode_diaper'] ?? 'disabled', ['disabled','all','cp_only'], true) ? $tp['pickup_mode_diaper'] : 'disabled'; ?>
                                             <td>
-                                                <select class="pickup-mode-select" data-id="<?php echo $enc_id; ?>" data-type="diaper"
-                                                        data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>" style="font-size:12px;padding:3px 6px;">
-                                                    <option value="disabled" <?php echo ($tp['pickup_mode_diaper'] ?? 'disabled') === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
-                                                    <option value="all" <?php echo ($tp['pickup_mode_diaper'] ?? '') === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
-                                                    <option value="cp_only" <?php echo ($tp['pickup_mode_diaper'] ?? '') === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                <select class="pickup-mode-select pm-<?php echo $pmDiaper; ?>" data-id="<?php echo $enc_id; ?>" data-type="diaper"
+                                                        data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
+                                                    <option value="disabled" <?php echo $pmDiaper === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
+                                                    <option value="all" <?php echo $pmDiaper === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
+                                                    <option value="cp_only" <?php echo $pmDiaper === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
                                                 </select>
                                             </td>
                                             <td>
@@ -568,6 +604,10 @@ $(document).on('click', '.toggle-status-btn', function () {
     }, 'json').fail(function () { alert('Request failed. Please try again.'); });
 });
 
+function setPickupModeClass($sel, mode) {
+    $sel.removeClass('pm-disabled pm-all pm-cp_only').addClass('pm-' + mode);
+}
+
 $(document).on('change', '.pickup-mode-select', function () {
     var $sel = $(this);
     var id   = $sel.data('id');
@@ -578,9 +618,10 @@ $(document).on('change', '.pickup-mode-select', function () {
     $.post('toggle-tp-pickup.php', {
         csrf_token: CSRF_TOKEN, id: id, type: type, mode: newVal
     }, function (res) {
-        if (!res.success) { alert('Failed. Please try again.'); $sel.val(prevVal); return; }
+        if (!res.success) { alert('Failed. Please try again.'); $sel.val(prevVal); setPickupModeClass($sel, prevVal); return; }
         $sel.data('prev-val', newVal);
-    }, 'json').fail(function () { alert('Request failed. Please try again.'); $sel.val(prevVal); });
+        setPickupModeClass($sel, newVal);
+    }, 'json').fail(function () { alert('Request failed. Please try again.'); $sel.val(prevVal); setPickupModeClass($sel, prevVal); });
 });
 $('.pickup-mode-select').each(function () { $(this).data('prev-val', $(this).val()); });
 
@@ -595,7 +636,9 @@ $(document).on('click', '.pickup-bulk-link', function (e) {
         csrf_token: CSRF_TOKEN, type: type, mode: mode
     }, function (res) {
         if (!res.success) { alert('Failed. Please try again.'); return; }
-        $('.pickup-mode-select[data-type="' + type + '"]').val(mode).data('prev-val', mode);
+        $('.pickup-mode-select[data-type="' + type + '"]').val(mode).data('prev-val', mode).each(function () {
+            setPickupModeClass($(this), mode);
+        });
     }, 'json').fail(function () { alert('Request failed. Please try again.'); });
 });
 
