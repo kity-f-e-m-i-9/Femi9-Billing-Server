@@ -107,6 +107,19 @@ $i = 0;
         .pickup-bulk-link { color: #667eea; text-decoration: none; cursor: pointer; }
         .pickup-bulk-link:hover { text-decoration: underline; }
 
+        .pickup-mode-wrap { position: relative; display: inline-block; }
+        .pickup-mode-wrap::after {
+            content: '\25BE';
+            position: absolute;
+            right: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #fff;
+            font-size: 11px;
+            pointer-events: none;
+        }
+        .pickup-mode-wrap.pm-disabled::after { color: #6b7280; }
+
         .pickup-mode-select {
             -webkit-appearance: none;
             appearance: none;
@@ -120,12 +133,8 @@ $i = 0;
             color: #fff;
             min-width: 168px;
             box-shadow: 0 2px 6px rgba(102,126,234,.25);
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            background-size: 10px 6px;
-            transition: box-shadow .15s, transform .1s;
-            background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%),
-                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='white'/></svg>");
+            transition: box-shadow .15s;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         .pickup-mode-select:hover { box-shadow: 0 3px 10px rgba(102,126,234,.4); }
         .pickup-mode-select:focus { box-shadow: 0 0 0 3px rgba(102,126,234,.25); }
@@ -133,12 +142,10 @@ $i = 0;
         .pickup-mode-select.pm-disabled {
             color: #4b5563;
             box-shadow: 0 2px 6px rgba(0,0,0,.06);
-            background-image: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%),
-                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%236b7280'/></svg>");
+            background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
         }
         .pickup-mode-select.pm-cp_only {
-            background-image: linear-gradient(135deg, #06b6d4 0%, #667eea 100%),
-                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='white'/></svg>");
+            background: linear-gradient(135deg, #06b6d4 0%, #667eea 100%);
         }
 
         .stat-card {
@@ -489,21 +496,25 @@ $i = 0;
                                             </td>
                                             <?php $pmNapkin = in_array($tp['pickup_mode_napkin'] ?? 'disabled', ['disabled','all','cp_only'], true) ? $tp['pickup_mode_napkin'] : 'disabled'; ?>
                                             <td>
-                                                <select class="pickup-mode-select pm-<?php echo $pmNapkin; ?>" data-id="<?php echo $enc_id; ?>" data-type="napkin"
-                                                        data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
-                                                    <option value="disabled" <?php echo $pmNapkin === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
-                                                    <option value="all" <?php echo $pmNapkin === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
-                                                    <option value="cp_only" <?php echo $pmNapkin === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
-                                                </select>
+                                                <span class="pickup-mode-wrap pm-<?php echo $pmNapkin; ?>">
+                                                    <select class="pickup-mode-select pm-<?php echo $pmNapkin; ?>" data-id="<?php echo $enc_id; ?>" data-type="napkin"
+                                                            data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
+                                                        <option value="disabled" <?php echo $pmNapkin === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
+                                                        <option value="all" <?php echo $pmNapkin === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
+                                                        <option value="cp_only" <?php echo $pmNapkin === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                    </select>
+                                                </span>
                                             </td>
                                             <?php $pmDiaper = in_array($tp['pickup_mode_diaper'] ?? 'disabled', ['disabled','all','cp_only'], true) ? $tp['pickup_mode_diaper'] : 'disabled'; ?>
                                             <td>
-                                                <select class="pickup-mode-select pm-<?php echo $pmDiaper; ?>" data-id="<?php echo $enc_id; ?>" data-type="diaper"
-                                                        data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
-                                                    <option value="disabled" <?php echo $pmDiaper === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
-                                                    <option value="all" <?php echo $pmDiaper === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
-                                                    <option value="cp_only" <?php echo $pmDiaper === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
-                                                </select>
+                                                <span class="pickup-mode-wrap pm-<?php echo $pmDiaper; ?>">
+                                                    <select class="pickup-mode-select pm-<?php echo $pmDiaper; ?>" data-id="<?php echo $enc_id; ?>" data-type="diaper"
+                                                            data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
+                                                        <option value="disabled" <?php echo $pmDiaper === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
+                                                        <option value="all" <?php echo $pmDiaper === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
+                                                        <option value="cp_only" <?php echo $pmDiaper === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                    </select>
+                                                </span>
                                             </td>
                                             <td>
                                                 <div class="actions-group">
@@ -606,6 +617,7 @@ $(document).on('click', '.toggle-status-btn', function () {
 
 function setPickupModeClass($sel, mode) {
     $sel.removeClass('pm-disabled pm-all pm-cp_only').addClass('pm-' + mode);
+    $sel.closest('.pickup-mode-wrap').removeClass('pm-disabled pm-all pm-cp_only').addClass('pm-' + mode);
 }
 
 $(document).on('change', '.pickup-mode-select', function () {
