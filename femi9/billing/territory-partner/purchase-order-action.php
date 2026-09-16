@@ -78,10 +78,12 @@ $disc_amts = $_POST['discount_amount']     ?? [];
 $methods  = $_POST['pickup_method'] ?? [];
 
 // Authoritative gate — a TP Company hasn't opted into self-pickup for THIS
-// product type can never get a 'pickup' line through here, no matter what
+// product type (and, when the mode is 'cp_only', for THIS specific order's
+// source) can never get a 'pickup' line through here, no matter what
 // pickup_method[] the client submits (the UI already hides the option, this
-// is the real check).
-$allowSelfPickup = tpAllowsSelfPickup($db_conn, $tp_id, $productType);
+// is the real check). $preferredCpId is already re-derived/validated above
+// (never trusts the raw POST), so it's safe to use as the CP-sourced flag.
+$allowSelfPickup = tpAllowsSelfPickup($db_conn, $tp_id, $productType, $preferredCpId > 0);
 
 $items = [];
 foreach ($pr_ids as $i => $rpid) {

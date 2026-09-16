@@ -24,7 +24,7 @@ if ($_delCol && $_delCol->num_rows === 0) {
     $db_conn->query("ALTER TABLE territory_partners ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER is_active");
 }
 require_once __DIR__ . '/../shared/TpCourierPayment.php';
-tpEnsureSelfPickupColumn($db_conn);
+tpEnsurePickupModeColumn($db_conn);
 
 // A Sales BDM session only sees Territory Partners inside their own assigned
 // districts (including inactive ones, since this page is also how they'd
@@ -326,15 +326,17 @@ $i = 0;
                                             <th>
                                                 Napkin Pickup
                                                 <div class="pickup-bulk">
-                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-allow="1">All</a> /
-                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-allow="0">None</a>
+                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="all">All Orders</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="cp_only">CP Only</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="disabled">Disabled</a>
                                                 </div>
                                             </th>
                                             <th>
                                                 Lumi Pickup
                                                 <div class="pickup-bulk">
-                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-allow="1">All</a> /
-                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-allow="0">None</a>
+                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="all">All Orders</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="cp_only">CP Only</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="disabled">Disabled</a>
                                                 </div>
                                             </th>
                                             <th>Actions</th>
@@ -452,24 +454,20 @@ $i = 0;
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <label style="display:inline-flex;align-items:center;cursor:pointer;">
-                                                    <input type="checkbox" class="toggle-pickup-cb"
-                                                           data-id="<?php echo $enc_id; ?>"
-                                                           data-type="napkin"
-                                                           data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>"
-                                                           <?php echo !empty($tp['allow_self_pickup_napkin']) ? 'checked' : ''; ?>
-                                                           style="width:17px;height:17px;">
-                                                </label>
+                                                <select class="pickup-mode-select" data-id="<?php echo $enc_id; ?>" data-type="napkin"
+                                                        data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>" style="font-size:12px;padding:3px 6px;">
+                                                    <option value="disabled" <?php echo ($tp['pickup_mode_napkin'] ?? 'disabled') === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
+                                                    <option value="all" <?php echo ($tp['pickup_mode_napkin'] ?? '') === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
+                                                    <option value="cp_only" <?php echo ($tp['pickup_mode_napkin'] ?? '') === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                </select>
                                             </td>
                                             <td>
-                                                <label style="display:inline-flex;align-items:center;cursor:pointer;">
-                                                    <input type="checkbox" class="toggle-pickup-cb"
-                                                           data-id="<?php echo $enc_id; ?>"
-                                                           data-type="diaper"
-                                                           data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>"
-                                                           <?php echo !empty($tp['allow_self_pickup_diaper']) ? 'checked' : ''; ?>
-                                                           style="width:17px;height:17px;">
-                                                </label>
+                                                <select class="pickup-mode-select" data-id="<?php echo $enc_id; ?>" data-type="diaper"
+                                                        data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>" style="font-size:12px;padding:3px 6px;">
+                                                    <option value="disabled" <?php echo ($tp['pickup_mode_diaper'] ?? 'disabled') === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
+                                                    <option value="all" <?php echo ($tp['pickup_mode_diaper'] ?? '') === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
+                                                    <option value="cp_only" <?php echo ($tp['pickup_mode_diaper'] ?? '') === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                </select>
                                             </td>
                                             <td>
                                                 <div class="actions-group">
@@ -570,31 +568,34 @@ $(document).on('click', '.toggle-status-btn', function () {
     }, 'json').fail(function () { alert('Request failed. Please try again.'); });
 });
 
-$(document).on('change', '.toggle-pickup-cb', function () {
-    var $cb   = $(this);
-    var id    = $cb.data('id');
-    var type  = $cb.data('type');
-    var newVal = $cb.is(':checked') ? 1 : 0;
+$(document).on('change', '.pickup-mode-select', function () {
+    var $sel = $(this);
+    var id   = $sel.data('id');
+    var type = $sel.data('type');
+    var newVal = $sel.val();
+    var prevVal = $sel.data('prev-val') || 'disabled';
 
     $.post('toggle-tp-pickup.php', {
-        csrf_token: CSRF_TOKEN, id: id, type: type, allow: newVal
+        csrf_token: CSRF_TOKEN, id: id, type: type, mode: newVal
     }, function (res) {
-        if (!res.success) { alert('Failed. Please try again.'); $cb.prop('checked', !newVal); return; }
-    }, 'json').fail(function () { alert('Request failed. Please try again.'); $cb.prop('checked', !newVal); });
+        if (!res.success) { alert('Failed. Please try again.'); $sel.val(prevVal); return; }
+        $sel.data('prev-val', newVal);
+    }, 'json').fail(function () { alert('Request failed. Please try again.'); $sel.val(prevVal); });
 });
+$('.pickup-mode-select').each(function () { $(this).data('prev-val', $(this).val()); });
 
 $(document).on('click', '.pickup-bulk-link', function (e) {
     e.preventDefault();
     var type  = $(this).data('type');
-    var allow = $(this).data('allow');
-    var label = allow ? 'ON' : 'OFF';
-    if (!confirm('Turn ' + label + ' self-pickup for ' + (type === 'diaper' ? 'Lumi Diaper' : 'Napkin') + ' for every Territory Partner shown here?')) return;
+    var mode  = $(this).data('mode');
+    var modeLabel = mode === 'all' ? 'Enabled — All Orders' : (mode === 'cp_only' ? 'Enabled — CP Orders Only' : 'Disabled');
+    if (!confirm('Set ' + (type === 'diaper' ? 'Lumi Diaper' : 'Napkin') + ' pickup to "' + modeLabel + '" for every Territory Partner shown here?')) return;
 
     $.post('toggle-tp-pickup-bulk.php', {
-        csrf_token: CSRF_TOKEN, type: type, allow: allow
+        csrf_token: CSRF_TOKEN, type: type, mode: mode
     }, function (res) {
         if (!res.success) { alert('Failed. Please try again.'); return; }
-        $('.toggle-pickup-cb[data-type="' + type + '"]').prop('checked', !!allow);
+        $('.pickup-mode-select[data-type="' + type + '"]').val(mode).data('prev-val', mode);
     }, 'json').fail(function () { alert('Request failed. Please try again.'); });
 });
 

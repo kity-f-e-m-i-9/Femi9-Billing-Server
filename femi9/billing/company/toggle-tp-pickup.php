@@ -13,10 +13,10 @@ if (!isset($_POST['csrf_token'], $_SESSION['csrf_token']) || !hash_equals($_SESS
 }
 
 $enc_id = $_POST['id'] ?? '';
-$allow  = array_key_exists('allow', $_POST) ? (int)$_POST['allow'] : -1;
+$mode   = $_POST['mode'] ?? '';
 $type   = ($_POST['type'] ?? 'napkin') === 'diaper' ? 'diaper' : 'napkin';
 
-if (empty($enc_id) || !in_array($allow, [0, 1])) {
+if (empty($enc_id) || !in_array($mode, ['disabled', 'all', 'cp_only'], true)) {
     echo json_encode(['success' => false]); exit;
 }
 
@@ -30,11 +30,11 @@ if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
     if (!in_array($id, $_myTpIds, true)) { echo json_encode(['success' => false]); exit; }
 }
 
-tpEnsureSelfPickupColumn($db_conn);
-$col = $type === 'diaper' ? 'allow_self_pickup_diaper' : 'allow_self_pickup_napkin';
+tpEnsurePickupModeColumn($db_conn);
+$col = $type === 'diaper' ? 'pickup_mode_diaper' : 'pickup_mode_napkin';
 $stmt = $db_conn->prepare("UPDATE territory_partners SET $col = ? WHERE id = ?");
-$stmt->bind_param("ii", $allow, $id);
+$stmt->bind_param("si", $mode, $id);
 $ok = $stmt->execute();
 $stmt->close();
 
-echo json_encode(['success' => $ok, 'type' => $type, 'allow' => $allow]);
+echo json_encode(['success' => $ok, 'type' => $type, 'mode' => $mode]);

@@ -12,14 +12,15 @@ if (!isset($_POST['csrf_token'], $_SESSION['csrf_token']) || !hash_equals($_SESS
     echo json_encode(['success' => false, 'error' => 'csrf']); exit;
 }
 
-$allow = array_key_exists('allow', $_POST) ? (int)$_POST['allow'] : -1;
-$type  = ($_POST['type'] ?? 'napkin') === 'diaper' ? 'diaper' : 'napkin';
-if (!in_array($allow, [0, 1], true)) {
+$mode = $_POST['mode'] ?? '';
+$type = ($_POST['type'] ?? 'napkin') === 'diaper' ? 'diaper' : 'napkin';
+if (!in_array($mode, ['disabled', 'all', 'cp_only'], true)) {
     echo json_encode(['success' => false]); exit;
 }
 
-tpEnsureSelfPickupColumn($db_conn);
-$col = $type === 'diaper' ? 'allow_self_pickup_diaper' : 'allow_self_pickup_napkin';
+tpEnsurePickupModeColumn($db_conn);
+$col = $type === 'diaper' ? 'pickup_mode_diaper' : 'pickup_mode_napkin';
+$modeEsc = $db_conn->real_escape_string($mode);
 
 // A Sales BDM session may only bulk-toggle TPs inside their own assigned
 // districts — same scoping as the single-TP toggle.
@@ -28,9 +29,9 @@ if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
     $myTpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
     if (empty($myTpIds)) { echo json_encode(['success' => true, 'affected' => 0]); exit; }
     $idList = implode(',', array_map('intval', $myTpIds));
-    $db_conn->query("UPDATE territory_partners SET $col = $allow WHERE id IN ($idList)");
+    $db_conn->query("UPDATE territory_partners SET $col = '$modeEsc' WHERE id IN ($idList)");
 } else {
-    $db_conn->query("UPDATE territory_partners SET $col = $allow");
+    $db_conn->query("UPDATE territory_partners SET $col = '$modeEsc'");
 }
 
-echo json_encode(['success' => true, 'type' => $type, 'allow' => $allow, 'affected' => $db_conn->affected_rows]);
+echo json_encode(['success' => true, 'type' => $type, 'mode' => $mode, 'affected' => $db_conn->affected_rows]);

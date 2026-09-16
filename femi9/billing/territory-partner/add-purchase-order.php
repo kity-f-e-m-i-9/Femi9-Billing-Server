@@ -104,10 +104,16 @@ tpEnsureCourierPaymentTables($db_conn);
 // so a courier payment made against an earlier (possibly smaller) cart may
 // not fully cover a since-grown one — purchase-order-action.php catches that.
 $courierPoolTotal = tpCourierPoolTotal($db_conn, (int)$Login_user_IDvl, $productType);
-// "Pick up myself" only shows for a TP Company has explicitly opted in for
-// THIS product type (manage-territory-partner.php has a separate toggle per
-// Napkin/Diaper) — everyone else must pay courier.
-$allowSelfPickup  = tpAllowsSelfPickup($db_conn, (int)$Login_user_IDvl, $productType);
+// "Pick up myself" only shows for a TP Company has opted into self-pickup
+// for THIS product type — manage-territory-partner.php's Pickup Restriction
+// dropdown per Napkin/Diaper, which can allow it for every order ('all') or
+// only for CP-sourced orders ('cp_only'); everyone else must pay courier.
+// Scaffolding below renders whenever the mode isn't 'disabled' — the actual
+// live availability (once the TP picks an approver) is handled by this
+// page's own JS, refreshPickupAvailability(), since 'cp_only' depends on a
+// choice made after this page has already rendered.
+$pickupMode = tpPickupMode($db_conn, (int)$Login_user_IDvl, $productType);
+$allowSelfPickup = ($pickupMode !== 'disabled');
 
 // Product catalog scoped to the chosen type — this is a stock replenishment
 // request to the company, not limited to what the TP already holds (unlike
@@ -746,6 +752,13 @@ $tpDeliveryAddressParts = array_filter([
         document.getElementById('customDeliveryFields').classList.toggle('show', !useDefault);
     }
 
+    // 'disabled' | 'all' | 'cp_only' — see shared/TpCourierPayment.php's
+    // tpPickupMode(). 'cp_only' means pickup is only actually usable once
+    // the TP has the CP submit-to option selected below, so live-toggled by
+    // refreshPickupAvailability() rather than baked in at page render.
+    var pickupMode      = <?php echo json_encode($pickupMode); ?>;
+    var currentApprover = 'company';
+
     var poLines = [];
 
     function showPoPrice(str) {
@@ -953,6 +966,7 @@ $tpDeliveryAddressParts = array_filter([
     function onApproverChange() {
         var choice = document.querySelector('input[name="approver_choice"]:checked');
         var approver = choice ? choice.value : 'company';
+        currentApprover = approver;
         // A CP-sourced order still draws from and is approved against the
         // Company advance pool — 'cp' is a stock-source tag, not a third
         // balance pool (see the PHP comment above $myCp). approver_type
@@ -980,7 +994,44 @@ $tpDeliveryAddressParts = array_filter([
             if (cpHintEl) cpHintEl.style.display = 'none';
         }
 
+        refreshPickupAvailability();
         updatePoSummary();
+    }
+
+    // Whether "pick up myself" is actually usable right now, given both the
+    // Company-set pickup mode for this TP/type and which approver is
+    // currently chosen — 'cp_only' only counts once the CP option is picked.
+    function pickupCurrentlyAllowed() {
+        return pickupMode === 'all' || (pickupMode === 'cp_only' && currentApprover === 'cp');
+    }
+
+    // Live-toggles the pickup UI whenever the approver choice changes —
+    // needed because 'cp_only' mode's real availability isn't known until
+    // the TP picks an approver, which happens after this page has already
+    // rendered. Any line already marked "pickup" is reset to "courier" the
+    // moment pickup becomes unavailable, so a cart built while CP was
+    // selected can't silently keep a pickup exemption after switching to
+    // Company.
+    function refreshPickupAvailability() {
+        var allowed = pickupCurrentlyAllowed();
+        var addLineLabel = document.getElementById('po_pickup_now_label');
+        var pickupBtn = document.getElementById('poPickupBtn');
+        if (addLineLabel) addLineLabel.style.display = allowed ? '' : 'none';
+        if (pickupBtn) pickupBtn.style.display = allowed ? '' : 'none';
+
+        if (!allowed) {
+            var pickupNowEl = document.getElementById('po_pickup_now');
+            if (pickupNowEl) {
+                pickupNowEl.checked = false;
+                if (addLineLabel) addLineLabel.classList.remove('active');
+            }
+            var changed = false;
+            poLines.forEach(function (l) {
+                if (l.method === 'pickup') { l.method = 'courier'; changed = true; }
+            });
+            if (changed) { renderPoLines(); return; }
+        }
+        updateCourierNote();
     }
 
     // Swaps the product picker to only what this CP actually has in stock —
@@ -1161,6 +1212,9 @@ $tpDeliveryAddressParts = array_filter([
             $('#pr_select').select2({ placeholder: 'Search product…', allowClear: true, width: '100%' });
         }
         toggleDeliveryFields();
+        // Company defaults to checked on load — hide the pickup UI up front
+        // if this TP/type's mode is 'cp_only' (only usable once CP is chosen).
+        refreshPickupAvailability();
 
         // Restore a draft saved before being sent to add-advance-payment.php.
         var draft = <?=json_encode($poDraft)?>;
