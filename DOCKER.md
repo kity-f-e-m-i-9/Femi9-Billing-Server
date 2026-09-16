@@ -6,16 +6,19 @@ Two ways to hand this to another developer, both using the same
 ## Common first-time setup (both modes)
 
 1. Clone the repo and `cd` into it.
-2. (Optional but needed for real data) Export a DB dump and drop it in
-   `docker/db-init/` — see `docker/db-init/README.md`. Without this the
-   app starts but every page needing a table will fail, since MySQL
-   starts empty. Their DB stays local to their machine — nothing they do
-   to it syncs back to anyone else's database.
-3. Run:
+2. Run:
    ```
    docker compose up --build
    ```
-4. Open http://localhost:8080/femi9/billing/login/
+3. Open http://localhost:8080/femi9/billing/login/ and sign in as the demo
+   Territory Partner — mobile `9000000001`, password `Demo@123`.
+
+The DB comes pre-seeded (full schema + public state/district reference data
++ a synthetic demo login and product catalog — no real customer/business
+data, see `docker/db-init/README.md`). Their DB stays entirely local to
+their machine — nothing they do to it syncs back to anyone else's database.
+Want your own real data instead? Drop a dump in `docker/db-init/` before
+the first run — see that folder's README.
 
 Docker downloads PHP, MySQL, and all Composer packages by itself —
 nothing needs to be installed on the host except Docker.

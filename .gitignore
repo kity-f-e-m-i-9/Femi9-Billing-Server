@@ -18,5 +18,10 @@ femi9/billing/super-stockist/.env
 # Local DB backup dumps from data migrations - not source code
 /db_backups/
 
-# Per-developer DB seed dump for the Docker setup - not source code
+# Per-developer real DB dump for the Docker setup - not source code, never
+# commit real data here. The checked-in files below are the exceptions:
+# schema-only + synthetic demo data, safe to ship with the repo.
 /docker/db-init/*.sql
+!/docker/db-init/01-schema.sql
+!/docker/db-init/02-reference-data.sql
+!/docker/db-init/03-dummy-seed.sql
