@@ -17,3 +17,6 @@ femi9/billing/super-stockist/.env
 
 # Local DB backup dumps from data migrations - not source code
 /db_backups/
+
+# Per-developer DB seed dump for the Docker setup - not source code
+/docker/db-init/*.sql

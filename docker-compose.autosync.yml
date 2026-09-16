@@ -1,0 +1,30 @@
+# Optional add-on: run alongside docker-compose.yml to auto-commit and
+# auto-push their code changes for you, without them running git by hand.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.autosync.yml up --build
+#
+# Requires their laptop to already have git credentials set up (SSH key or
+# a credential helper) with push access to the repo — the container just
+# reuses their host git/SSH config, it does not carry any credentials of
+# its own.
+services:
+  sync:
+    image: alpine:3.20
+    working_dir: /repo
+    volumes:
+      - .:/repo
+      - ${HOME}/.gitconfig:/root/.gitconfig:ro
+      - ${HOME}/.ssh:/root/.ssh:ro
+    environment:
+      SYNC_DEBOUNCE_SECONDS: 10
+      # Only used for the auto-generated commits' author; push still uses
+      # their mounted SSH key / credential helper.
+      GIT_AUTOSYNC_NAME: auto-sync
+      GIT_AUTOSYNC_EMAIL: auto-sync@local
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "apk add --no-cache git inotify-tools openssh-client >/dev/null &&
+       chmod +x /repo/docker/auto-sync.sh &&
+       /repo/docker/auto-sync.sh"
+    restart: unless-stopped
