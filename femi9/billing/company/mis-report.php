@@ -492,15 +492,32 @@ if ($scope === 'company') {
     $gp_return_params[] = $from;
     $gp_return_params[] = $to;
 }
-// $gp_cost_rate_subq is interpolated twice below (once in the SELECT's
-// margin expression, once in the trailing WHERE ... IS NOT NULL filter),
-// so its two `effective_date <= ?` placeholders need binding twice over —
-// once ahead of $gp_params (the sold subquery) and once after
-// $gp_return_params (the return subquery), matching placeholder order in
-// the SQL text below exactly.
-$gp_all_params = array_merge([$to, $to], $gp_params, $gp_return_params, [$to, $to]);
+// Cost is no longer "the single rate effective as of the period-end date"
+// applied to the whole period's quantity — it's the actual FIFO lot(s) each
+// sale drew from at the moment it happened, summed from
+// stock_ledger_lot_consumption (populated by StockService::deduct() —
+// see StockLots.php). Falls back to $gp_cost_rate_subq's old per-product
+// lookup automatically wherever no lot data exists yet (pre-migration
+// stock via the opening_balance backfill, or a sale source that never
+// calls StockService at all, e.g. TP invoices — see StockService::
+// fallbackRate(), the same formula, invoked inside StockLots::consumeFifo()
+// at sale time instead of once here at report time).
+$gp_cogs_subq = "(
+    SELECT sl.product_id, SUM(slc.qty_taken * slc.rate) AS cogs
+    FROM stock_ledger sl
+    JOIN stock_ledger_lot_consumption slc ON slc.stock_ledger_id = sl.id
+    WHERE sl.action = 'deduct'
+      AND sl.ref_type IN ('invoice','user_invoice','ot_sale')
+      AND sl.user_type = ?
+      AND DATE(sl.created_at) BETWEEN ? AND ?
+    GROUP BY sl.product_id
+)";
+$gp_cogs_params = [$utype, $from, $to];
 $gross_profit = (float)cval($db_conn,
-    "SELECT COALESCE(SUM((sold.sold_rate / {$gp_sold_rate_gst_divisor} - {$gp_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
+    "SELECT COALESCE(SUM(
+         sold.sold_rate / {$gp_sold_rate_gst_divisor} * (sold.qty_sold - COALESCE(ret.qty_returned,0))
+         - COALESCE(cogs.cogs, 0) * (sold.qty_sold - COALESCE(ret.qty_returned,0)) / NULLIF(sold.qty_sold, 0)
+     ), 0)
      FROM (
          SELECT s.pr_id, SUM(s.qty) qty_sold, SUM(s.line_total)/NULLIF(SUM(s.qty),0) sold_rate
          FROM (
@@ -527,8 +544,9 @@ $gross_profit = (float)cval($db_conn,
          ) r
          GROUP BY r.pr_id
      ) ret ON ret.pr_id = sold.pr_id
-     WHERE {$gp_cost_rate_subq} IS NOT NULL",
-    str_repeat('s', count($gp_all_params)), $gp_all_params);
+     LEFT JOIN {$gp_cogs_subq} cogs ON cogs.product_id = sold.pr_id",
+    str_repeat('s', count($gp_params) + count($gp_return_params) + count($gp_cogs_params)),
+    array_merge($gp_params, $gp_return_params, $gp_cogs_params));
 
 $total_expenses = 0.0;
 $net_profit = null;
@@ -604,6 +622,12 @@ if ($scope === 'company' && !$is_neksomo_view) {
            AND r.effective_date <= ?
          ORDER BY r.effective_date DESC LIMIT 1)";
     $gp_diaper_all_params = array_merge([$to], $gp_params, $gp_return_params, [$to]);
+    // $gp_cost_rate_subq's two `effective_date <= ?` placeholders need
+    // binding twice over — once ahead of $gp_params (the sold subquery) and
+    // once after $gp_return_params (the return subquery) — for this
+    // admin/LLP-only napkin query below, which (unlike the FIFO-costed main
+    // Gross Profit query above) still uses the old single-rate lookup.
+    $gp_all_params = array_merge([$to, $to], $gp_params, $gp_return_params, [$to, $to]);
 
     $grand_gross_profit_llp = (float)cval($db_conn,
         "SELECT COALESCE(SUM((sold.sold_rate / {$gp_sold_rate_gst_divisor} - {$gp_cost_rate_subq}) * (sold.qty_sold - COALESCE(ret.qty_returned,0))), 0)
