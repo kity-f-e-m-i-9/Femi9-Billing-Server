@@ -67,7 +67,7 @@ try {
     // Lock the stock row
     $s = $db_conn->prepare(
         "SELECT returnqty, closing_qty FROM stock
-          WHERE product_id = ? AND user_type = ? AND user_id = ?
+          WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL
           FOR UPDATE"
     );
     $s->bind_param('iss', $prid, $Login_user_TYPEvl, $godownid);
@@ -90,7 +90,7 @@ try {
 
     $s = $db_conn->prepare(
         "UPDATE stock SET returnqty = ?, closing_qty = ?, updated_at = NOW()
-          WHERE product_id = ? AND user_type = ? AND user_id = ?"
+          WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL"
     );
     $s->bind_param('iiiss', $newReturnQty, $newClosingQty, $prid, $Login_user_TYPEvl, $godownid);
     $s->execute();
