@@ -1150,7 +1150,9 @@ $tpDeliveryAddressParts = array_filter([
     // Company-set pickup mode for this TP/type and which approver is
     // currently chosen — 'cp_only' only counts once the CP option is picked.
     function pickupCurrentlyAllowed() {
-        return pickupMode === 'all' || (pickupMode === 'cp_only' && currentApprover === 'cp');
+        // 'cp_only' covers CP OR SS — both are somewhere a TP can physically
+        // collect from; only a plain Company order needs courier.
+        return pickupMode === 'all' || (pickupMode === 'cp_only' && (currentApprover === 'cp' || currentApprover === 'ss'));
     }
 
     // Live-toggles the pickup UI whenever the approver choice changes —

@@ -81,9 +81,12 @@ $methods  = $_POST['pickup_method'] ?? [];
 // product type (and, when the mode is 'cp_only', for THIS specific order's
 // source) can never get a 'pickup' line through here, no matter what
 // pickup_method[] the client submits (the UI already hides the option, this
-// is the real check). $preferredCpId is already re-derived/validated above
-// (never trusts the raw POST), so it's safe to use as the CP-sourced flag.
-$allowSelfPickup = tpAllowsSelfPickup($db_conn, $tp_id, $productType, $preferredCpId > 0);
+// is the real check). 'cp_only' allows pickup for CP OR SS orders (both are
+// physically collectible), just not a plain Company order — $preferredCpId
+// is already re-derived/validated above (never trusts the raw POST), and
+// $approver['type'] is Company's own re-resolved value (tpResolveApprover()
+// above), so both are safe to use here.
+$allowSelfPickup = tpAllowsSelfPickup($db_conn, $tp_id, $productType, $preferredCpId > 0 || $approver['type'] === 'ss');
 
 $items = [];
 foreach ($pr_ids as $i => $rpid) {

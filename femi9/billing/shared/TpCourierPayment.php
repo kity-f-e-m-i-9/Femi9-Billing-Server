@@ -249,14 +249,18 @@ function tpPickupMode(mysqli $db, int $tpId, string $productType): string
     return in_array($mode, ['disabled', 'all', 'cp_only'], true) ? $mode : 'disabled';
 }
 
-// $isCpSourced must reflect the SAME server-re-validated CP tag
-// purchase-order-action.php resolves for preferred_cp_id — never trust a
-// client-posted "this is a CP order" flag on its own.
-function tpAllowsSelfPickup(mysqli $db, int $tpId, string $productType, bool $isCpSourced = false): bool
+// 'cp_only' really means "picked up from someone other than Company's own
+// godown" — a Channel Partner OR a Super Stockist, since a TP can
+// physically collect from either one the same way; only a plain Company
+// order is far enough away that courier is the only option. $isPickupEligibleSource
+// must reflect the SAME server-re-validated signal purchase-order-action.php
+// uses (preferred_cp_id for CP, resolved approver_type for SS) — never trust
+// a client-posted flag on its own.
+function tpAllowsSelfPickup(mysqli $db, int $tpId, string $productType, bool $isPickupEligibleSource = false): bool
 {
     $mode = tpPickupMode($db, $tpId, $productType);
     if ($mode === 'all') return true;
-    if ($mode === 'cp_only') return $isCpSourced;
+    if ($mode === 'cp_only') return $isPickupEligibleSource;
     return false;
 }
 
