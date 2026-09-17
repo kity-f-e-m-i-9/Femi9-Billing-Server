@@ -151,25 +151,25 @@ try {
 
     $stmtChkProd = $db_conn->prepare(
         "SELECT COUNT(*) AS cnt FROM stock
-         WHERE product_id = ? AND user_type = ? AND user_id = ?
+         WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL
          FOR UPDATE"                                     // lock row during transaction
     );
 
     $stmtInsertStock = $db_conn->prepare(
         "INSERT INTO stock
-             (product_id, opening_qty, opening_date, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id)
-         VALUES (?, 0, ?, 0, 0, 0, 0, 0, ?, ?)"
+             (product_id, opening_qty, opening_date, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id)
+         VALUES (?, 0, ?, 0, 0, 0, 0, 0, ?, ?, NULL)"
     );
 
     $stmtGetStock = $db_conn->prepare(
         "SELECT input_qty, closing_qty FROM stock
-         WHERE product_id = ? AND user_type = ? AND user_id = ?
+         WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL
          FOR UPDATE"
     );
 
     $stmtUpdateStock = $db_conn->prepare(
         "UPDATE stock SET input_qty = ?, closing_qty = ?
-         WHERE product_id = ? AND user_type = ? AND user_id = ?"
+         WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL"
     );
 
     foreach ($rows as $row) {
