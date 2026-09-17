@@ -43,6 +43,10 @@ function assertEqual($actual, $expected, $label) {
 }
 
 // ========== SETUP: real `stock` / `stock_ledger` table shapes ==========
+// warehouse_id added 2026-09-17 (Phase 1 of the per-godown split-stock
+// spec) — every stock row now needs it, even when this test never passes
+// a warehouse itself (StockService::lockStockRow() always includes
+// "AND warehouse_id IS NULL"/"= ?" in its WHERE clause).
 $conn->query("CREATE TABLE stock (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
@@ -56,7 +60,9 @@ $conn->query("CREATE TABLE stock (
     extra_pieces INT UNSIGNED NOT NULL DEFAULT 0,
     user_type VARCHAR(255) NOT NULL,
     user_id VARCHAR(255) NOT NULL,
-    updated_at TIMESTAMP NULL
+    warehouse_id INT NULL,
+    updated_at TIMESTAMP NULL,
+    UNIQUE KEY uq_stock_entity_warehouse (product_id, user_type, user_id, warehouse_id)
 )");
 
 $conn->query("CREATE TABLE stock_ledger (
@@ -64,6 +70,7 @@ $conn->query("CREATE TABLE stock_ledger (
     product_id INT NOT NULL,
     user_type VARCHAR(255) NOT NULL,
     user_id VARCHAR(255) NOT NULL,
+    warehouse_id INT NULL,
     action VARCHAR(50) NOT NULL,
     qty INT NOT NULL,
     qty_before INT NOT NULL,

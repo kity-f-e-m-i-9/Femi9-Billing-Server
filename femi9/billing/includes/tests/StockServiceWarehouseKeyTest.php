@@ -78,6 +78,69 @@ $conn->query("CREATE TABLE stock_ledger (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )");
 
+// StockService::deduct()/transferOut()/otDeduct() call ensureNeksomoTopUp(),
+// which queries company_godown via NeksomoStockBridge.php's
+// get_neksomo_godown_id(). An empty table (no NEKSOMO HYGIENE INDUSTRIES row)
+// is enough — the lookup returns 0, and every Neksomo-pool code path
+// early-returns for any user_id that isn't that real godown id, which none
+// of this test's fixture rows are.
+$conn->query("CREATE TABLE company_godown (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    gname VARCHAR(255) NOT NULL
+)");
+
+// deduct()/transferOut() also call StockLots::consumeFifo(), which queries
+// stock_lots regardless of warehouse (FIFO lot warehouse-awareness is
+// Phase 4, out of scope here) — an empty table is enough; no lots means
+// consumeFifo() falls back to fallbackRate() and returns no consumption.
+$conn->query("CREATE TABLE stock_lots (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    user_type VARCHAR(32) NOT NULL,
+    user_id VARCHAR(32) NOT NULL,
+    rate DECIMAL(12,6) NOT NULL,
+    qty_purchased INT NOT NULL,
+    qty_remaining INT NOT NULL,
+    purchase_date DATE NOT NULL,
+    ref_type VARCHAR(32) NOT NULL,
+    ref_id VARCHAR(64) NULL,
+    created_by VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)");
+
+$conn->query("CREATE TABLE stock_ledger_lot_consumption (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    stock_ledger_id INT NOT NULL,
+    stock_lot_id INT NULL,
+    qty_taken INT NOT NULL,
+    rate DECIMAL(12,6) NOT NULL
+)");
+
+// fallbackRate() (used when no lot covers a deduct) queries these two rate
+// tables — empty is fine, COALESCE(...) in that query falls through to 0.
+$conn->query("CREATE TABLE neksomo_llp_piece_rates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    effective_date DATE NOT NULL,
+    rate_per_piece DECIMAL(10,2) NOT NULL,
+    gst_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+    gst_type VARCHAR(10) NOT NULL DEFAULT 'exclusive'
+)");
+
+$conn->query("CREATE TABLE femi9_llp_sale_rates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    effective_date DATE NOT NULL,
+    rate_per_piece DECIMAL(10,2) NOT NULL,
+    gst_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+    gst_type VARCHAR(10) NOT NULL DEFAULT 'exclusive'
+)");
+
+$conn->query("CREATE TABLE products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    pieces_per_pack INT NULL
+)");
+
 // ---- Two rows for the SAME product/entity, different warehouses ----
 $conn->query("INSERT INTO stock
     (product_id, opening_qty, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id)
@@ -121,6 +184,50 @@ assertEqual($ledgerRowNull['warehouse_id'], null, 'writeLedger(warehouse=null) r
 // ---- Backward compatibility: omitting the parameter entirely behaves like null ----
 $rowOmitted = callPrivate($stockService, 'lockStockRow', [14, 'company', '1']);
 assertEqual((int)$rowOmitted['closing_qty'], 200, 'lockStockRow with warehouse param omitted defaults to null (unassigned row)');
+
+// ---- Public API: deduct/credit correctly scope by warehouse_id ----
+// Two independent stock pools for the same product/entity, different godowns.
+$conn->query("INSERT INTO stock
+    (product_id, opening_qty, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id)
+    VALUES (20, 0, 100, 0, 0, 0, 100, 'company', '5', 201)");
+$conn->query("INSERT INTO stock
+    (product_id, opening_qty, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id)
+    VALUES (20, 0, 50, 0, 0, 0, 50, 'company', '5', 202)");
+
+// Deduct 30 from warehouse 201 only — warehouse 202's 50 units must be untouched.
+$deductResult = $stockService->deduct(20, 'company', '5', 30, 'adjustment', 'wh-test-1', 'tester', false, 201);
+assertEqual($deductResult['success'], true, 'deduct(warehouse=201) succeeds');
+$wh201After = $conn->query("SELECT closing_qty FROM stock WHERE product_id=20 AND user_type='company' AND user_id='5' AND warehouse_id=201")->fetch_assoc();
+$wh202After = $conn->query("SELECT closing_qty FROM stock WHERE product_id=20 AND user_type='company' AND user_id='5' AND warehouse_id=202")->fetch_assoc();
+assertEqual((int)$wh201After['closing_qty'], 70, 'deduct(warehouse=201) reduces only the 201 row (100 -> 70)');
+assertEqual((int)$wh202After['closing_qty'], 50, 'deduct(warehouse=201) leaves the 202 row untouched (still 50)');
+
+// Deducting more than warehouse 201 has left (70) must fail even though
+// warehouse 202 + 201 combined would cover it — no cross-warehouse fallback.
+try {
+    $stockService->deduct(20, 'company', '5', 71, 'adjustment', 'wh-test-2', 'tester', false, 201);
+    assertEqual('no exception thrown', 'StockException', 'deduct(warehouse=201, qty=71) throws StockException (insufficient in that warehouse alone)');
+} catch (StockException $e) {
+    assertEqual(true, true, 'deduct(warehouse=201, qty=71) throws StockException (insufficient in that warehouse alone)');
+}
+
+// credit() with a warehouse_id on a brand-new product/entity/warehouse combo
+// creates a row carrying that warehouse_id.
+$creditResult = $stockService->credit(21, 'company', '5', 40, 'adjustment', 'wh-test-3', 'tester', false, 301);
+assertEqual($creditResult['success'], true, 'credit(warehouse=301) on new row succeeds');
+$newRow = $conn->query("SELECT closing_qty, warehouse_id FROM stock WHERE product_id=21 AND user_type='company' AND user_id='5' AND warehouse_id=301")->fetch_assoc();
+assertEqual((int)$newRow['closing_qty'], 40, 'credit(warehouse=301) created row has correct closing_qty');
+assertEqual((int)$newRow['warehouse_id'], 301, 'credit(warehouse=301) created row carries the warehouse_id');
+
+// Backward compatibility: calling deduct/credit with NO warehouse arg at all
+// (today's exact call shape, 8 positional args) must still work unchanged.
+$conn->query("INSERT INTO stock
+    (product_id, opening_qty, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id)
+    VALUES (22, 0, 10, 0, 0, 0, 10, 'company', '5', NULL)");
+$legacyDeduct = $stockService->deduct(22, 'company', '5', 5, 'adjustment', 'wh-test-4', 'tester', false);
+assertEqual($legacyDeduct['success'], true, 'deduct() called with the pre-Phase-1 8-argument shape still succeeds');
+$legacyRow = $conn->query("SELECT closing_qty FROM stock WHERE product_id=22 AND user_type='company' AND user_id='5' AND warehouse_id IS NULL")->fetch_assoc();
+assertEqual((int)$legacyRow['closing_qty'], 5, 'deduct() with no warehouse arg updates the unassigned row exactly as before');
 
 // ========== TEARDOWN ==========
 $conn->select_db('information_schema');
