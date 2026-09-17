@@ -119,7 +119,7 @@ $allowSelfPickup = ($pickupMode !== 'disabled');
 // request to the company, not limited to what the TP already holds (unlike
 // Field Order).
 $productList = [];
-$resProd = mysqli_query($db_conn, "SELECT id, productName, stockist_price FROM products WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) AND " . tpProductTypeSqlFilter($productType, 'products') . " ORDER BY productName ASC");
+$resProd = mysqli_query($db_conn, "SELECT id, productName, stockist_price, packs_per_carton FROM products WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) AND " . tpProductTypeSqlFilter($productType, 'products') . " ORDER BY productName ASC");
 if ($resProd) while ($p = mysqli_fetch_assoc($resProd)) $productList[] = $p;
 
 // If this TP is assigned to a Super Stockist, they get a choice of approver
@@ -578,7 +578,7 @@ $tpDeliveryAddressParts = array_filter([
                                     <select class="form-control mb-2" id="pr_select" onchange="showPoPrice(this.value)">
                                         <option value=""></option>
                                         <?php foreach ($productList as $p): ?>
-                                        <option value="<?=$p['id']?>" data-price="<?=htmlspecialchars($p['stockist_price'])?>"><?=htmlspecialchars($p['productName'])?></option>
+                                        <option value="<?=$p['id']?>" data-price="<?=htmlspecialchars($p['stockist_price'])?>" data-ppc="<?=(int)($p['packs_per_carton'] ?? 0)?>"><?=htmlspecialchars($p['productName'])?></option>
                                         <?php endforeach; ?>
                                     </select>
 
@@ -586,6 +586,7 @@ $tpDeliveryAddressParts = array_filter([
                                         <div class="col">
                                             <label class="form-label">Qty</label>
                                             <input type="number" min="1" id="po_qty" onkeyup="poTotal()" placeholder="Qty" class="form-control">
+                                            <div id="po_qty_ppc_hint" style="display:none;font-size:11px;color:#f59e0b;font-weight:600;margin-top:3px;"></div>
                                         </div>
                                         <div class="col">
                                             <label class="form-label">Price</label>
@@ -789,6 +790,11 @@ $tpDeliveryAddressParts = array_filter([
         document.getElementById('customDeliveryFields').classList.toggle('show', !useDefault);
     }
 
+    // Diaper purchase orders must be ordered in whole cartons — see
+    // showPoPrice()/addPoLine()'s packs_per_carton (data-ppc) enforcement
+    // below. Napkin orders are unaffected; not requested for that type.
+    var isDiaperType = <?php echo json_encode($productType === 'diaper'); ?>;
+
     // 'disabled' | 'all' | 'cp_only' — see shared/TpCourierPayment.php's
     // tpPickupMode(). 'cp_only' means pickup is only actually usable once
     // the TP has the CP submit-to option selected below, so live-toggled by
@@ -806,7 +812,25 @@ $tpDeliveryAddressParts = array_filter([
         // that CP actually has, so a TP can't request more than their CP
         // can supply. Absent entirely for Company/SS's unrestricted list.
         var avail = str ? opt.getAttribute('data-avail') : null;
-        document.getElementById('po_qty').max = avail || '';
+        var qtyInput = document.getElementById('po_qty');
+        qtyInput.max = avail || '';
+
+        // Diaper qty must land on a whole-carton multiple — see addPoLine()
+        // for the actual enforcement; this just steers the input + shows why.
+        var ppcHint = document.getElementById('po_qty_ppc_hint');
+        var ppc = (isDiaperType && str) ? (parseInt(opt.getAttribute('data-ppc'), 10) || 0) : 0;
+        if (ppc > 0) {
+            qtyInput.step = ppc;
+            qtyInput.min = ppc;
+            if (ppcHint) {
+                ppcHint.textContent = 'Carton = ' + ppc + ' — enter ' + ppc + ', ' + (ppc * 2) + ', ' + (ppc * 3) + '… only';
+                ppcHint.style.display = '';
+            }
+        } else {
+            qtyInput.step = 1;
+            qtyInput.min = 1;
+            if (ppcHint) ppcHint.style.display = 'none';
+        }
         poTotal();
     }
 
@@ -838,6 +862,15 @@ $tpDeliveryAddressParts = array_filter([
         var availAttr = selOpt ? selOpt.getAttribute('data-avail') : null;
         if (availAttr !== null && qty > parseInt(availAttr)) {
             alert('Only ' + availAttr + ' available in stock at this CP.');
+            return;
+        }
+        // Diaper orders must be placed in whole cartons — packs_per_carton
+        // (data-ppc) is this product's carton size; the qty input's step/min
+        // above already steers toward this, but re-checked here since the
+        // field can still be typed/pasted around that.
+        var ppcAttr = (isDiaperType && selOpt) ? (parseInt(selOpt.getAttribute('data-ppc'), 10) || 0) : 0;
+        if (ppcAttr > 0 && qty % ppcAttr !== 0) {
+            alert('Qty must be a multiple of ' + ppcAttr + ' for this product (1 carton = ' + ppcAttr + ') — e.g. ' + ppcAttr + ', ' + (ppcAttr * 2) + ', ' + (ppcAttr * 3) + '.');
             return;
         }
         for (var i = 0; i < poLines.length; i++) {
@@ -1163,7 +1196,7 @@ $tpDeliveryAddressParts = array_filter([
         $.getJSON('get-cp-products.php?cp_id=' + encodeURIComponent(cpId) + '&product_type=<?=urlencode($productType)?>', function (data) {
             var opts = '<option value=""></option>';
             (data || []).forEach(function (p) {
-                opts += '<option value="' + p.product_id + '" data-price="' + p.rate + '" data-avail="' + p.available_qty + '">' + escHtmlPo(p.productName) + '</option>';
+                opts += '<option value="' + p.product_id + '" data-price="' + p.rate + '" data-avail="' + p.available_qty + '" data-ppc="' + (p.packs_per_carton || 0) + '">' + escHtmlPo(p.productName) + '</option>';
             });
             sel.innerHTML = opts;
             sel.disabled = false;

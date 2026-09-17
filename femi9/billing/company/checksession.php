@@ -22,6 +22,7 @@ $_bdmAllowedScripts = [
     'add-territory-partner.php', 'manage-territory-partner.php', 'edit-territory-partner.php',
     'territory-partner-action.php', 'delete-territory-partner.php', 'toggle-partner-status.php',
     'get-tp-flat-nodes.php', 'search-referral-user.php',
+    'toggle-tp-pickup.php', 'toggle-tp-pickup-bulk.php',
     'add-channel-partner.php', 'manage-channel-partner.php', 'edit-channel-partner.php',
     'channel-partner-action.php', 'delete-channel-partner.php', 'cp-stock.php', 'get-cp-flat-nodes.php',
     'manage-field-orders.php', 'field-orders-summary.php',

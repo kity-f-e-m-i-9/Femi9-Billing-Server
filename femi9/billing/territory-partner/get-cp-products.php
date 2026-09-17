@@ -18,7 +18,7 @@ if (!$cp_id) { echo json_encode([]); exit; }
 $productType = tpResolveProductType($_GET['product_type'] ?? null);
 $stmt = $db_conn->prepare("
     SELECT p.id AS product_id, p.productName, cps.closing_qty AS available_qty,
-           COALESCE(NULLIF(p.stockist_price, 0), p.mrp, 0) AS rate
+           COALESCE(NULLIF(p.stockist_price, 0), p.mrp, 0) AS rate, p.packs_per_carton
     FROM channel_partner_stock cps
     JOIN products p ON p.id = cps.product_id
     WHERE cps.channel_partner_id = ? AND cps.closing_qty > 0 AND p.deleted_at IS NULL

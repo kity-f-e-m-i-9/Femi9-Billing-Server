@@ -108,6 +108,32 @@ if (empty($items)) {
     exit;
 }
 
+// Diaper orders must be placed in whole cartons — add-purchase-order.php's
+// qty field already steers/blocks this client-side, but that's UX only; a
+// raw POST could bypass it, so re-checked here against each product's own
+// packs_per_carton before the order is ever created.
+if ($productType === 'diaper') {
+    $ppcPlaceholders = implode(',', array_fill(0, count($items), '?'));
+    $ppcTypes = str_repeat('i', count($items));
+    $ppcStmt = $db_conn->prepare("SELECT id, packs_per_carton FROM products WHERE id IN ($ppcPlaceholders)");
+    $ppcStmt->bind_param($ppcTypes, ...array_column($items, 'pid'));
+    $ppcStmt->execute();
+    $ppcByPid = [];
+    foreach ($ppcStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $ppcByPid[(int)$row['id']] = $row['packs_per_carton'] !== null ? (int)$row['packs_per_carton'] : 0;
+    }
+    $ppcStmt->close();
+
+    foreach ($items as $item) {
+        $ppc = $ppcByPid[$item['pid']] ?? 0;
+        if ($ppc > 0 && $item['qty'] % $ppc !== 0) {
+            $_SESSION['errorMessage'] = 'Diaper products must be ordered in whole cartons. Please adjust the quantity to a multiple of the carton size and try again.';
+            header("Location: add-purchase-order.php");
+            exit;
+        }
+    }
+}
+
 // Courier payment gate — authoritative check, never trust the earlier
 // courtesy check on add-purchase-order.php. Required amount is recomputed
 // here from the ACTUAL submitted cart (not whatever pay-courier-payment.php
