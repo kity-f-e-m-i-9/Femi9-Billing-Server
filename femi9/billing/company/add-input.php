@@ -76,6 +76,14 @@ while ($row = $resProd->fetch_assoc()) {
     $products[] = $row;
 }
 
+// ── Godown (warehouse) list ──────────────────────────────────────────────────
+// Same shape as manage-warehouses.php and femi9/billing/warehouse/dashboard.php.
+$warehouses = [];
+$resWh = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+while ($row = $resWh->fetch_assoc()) {
+    $warehouses[] = $row;
+}
+
 ob_end_flush();
 ?>
 <!DOCTYPE html>
@@ -198,6 +206,20 @@ ob_end_flush();
                                                     <input type="date" required name="input_date"
                                                            value="<?= date('Y-m-d') ?>"
                                                            class="form-control">
+                                                </div>
+
+                                                <!-- Godown (physical warehouse) -->
+                                                <div class="mb-3">
+                                                    <label class="form-label">Godown</label>
+                                                    <select name="warehouse_id" class="form-control">
+                                                        <option value="">— Not assigned —</option>
+                                                        <?php foreach ($warehouses as $wh): ?>
+                                                            <option value="<?= (int) $wh['id'] ?>">
+                                                                <?= htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8') ?><?= $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '' ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <div class="form-text">Physical storage location this stock is being received into. Leave blank if not tracked by godown.</div>
                                                 </div>
 
                                                 <!-- ── Multi-product rows ─────────────────── -->
