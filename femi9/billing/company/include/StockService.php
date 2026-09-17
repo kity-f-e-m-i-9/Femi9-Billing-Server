@@ -954,15 +954,22 @@ class StockService
     /**
      * Lock the stock row for this entity using SELECT … FOR UPDATE.
      * Must be called inside an active transaction.
+     *
+     * $warehouseId null means "unassigned" — matches every pre-Phase-1 row,
+     * since NULL is its own distinct identity in uq_stock_entity_warehouse.
      */
-    private function lockStockRow(int $productId, string $userType, string $userId): ?array
+    private function lockStockRow(int $productId, string $userType, string $userId, ?int $warehouseId = null): ?array
     {
-        $stmt = $this->db->prepare(
-            "SELECT * FROM stock
-              WHERE product_id = ? AND user_type = ? AND user_id = ?
-              FOR UPDATE"
-        );
-        $stmt->bind_param('iss', $productId, $userType, $userId);
+        $sql = "SELECT * FROM stock
+                  WHERE product_id = ? AND user_type = ? AND user_id = ?
+                    AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?') . "
+                  FOR UPDATE";
+        $stmt = $this->db->prepare($sql);
+        if ($warehouseId === null) {
+            $stmt->bind_param('iss', $productId, $userType, $userId);
+        } else {
+            $stmt->bind_param('issi', $productId, $userType, $userId, $warehouseId);
+        }
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -977,7 +984,8 @@ class StockService
         int    $productId,
         string $userType,
         string $userId,
-        array  $fields
+        array  $fields,
+        ?int   $warehouseId = null
     ): void {
         $setParts = [];
         $types    = '';
@@ -991,11 +999,16 @@ class StockService
 
         $setParts[] = '`updated_at` = NOW()';
         $sql  = 'UPDATE stock SET ' . implode(', ', $setParts)
-              . ' WHERE product_id = ? AND user_type = ? AND user_id = ?';
+              . ' WHERE product_id = ? AND user_type = ? AND user_id = ?'
+              . ' AND warehouse_id ' . ($warehouseId === null ? 'IS NULL' : '= ?');
         $types .= 'iss';
         $values[] = $productId;
         $values[] = $userType;
         $values[] = $userId;
+        if ($warehouseId !== null) {
+            $types .= 'i';
+            $values[] = $warehouseId;
+        }
 
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param($types, ...$values);
@@ -1018,17 +1031,18 @@ class StockService
         string $refType,
         string $refId,
         string $note,
-        string $createdBy
+        string $createdBy,
+        ?int   $warehouseId = null
     ): int {
         $stmt = $this->db->prepare(
             "INSERT INTO stock_ledger
-                (product_id, user_type, user_id, action, qty,
+                (product_id, user_type, user_id, warehouse_id, action, qty,
                  qty_before, qty_after, ref_type, ref_id, note, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $stmt->bind_param(
-            'isssiiissss',
-            $productId, $userType, $userId, $action, $qty,
+            'issisiiissss',
+            $productId, $userType, $userId, $warehouseId, $action, $qty,
             $qtyBefore, $qtyAfter, $refType, $refId, $note, $createdBy
         );
         $stmt->execute();
