@@ -166,6 +166,95 @@ assertEqual((int)$newProductRows['c'], 1, 'Brand-new product creates exactly one
 assertEqual($newProductRow['warehouse_id'], null, 'Brand-new product\'s row has warehouse_id NULL (unassigned)');
 assertEqual((int)$newProductRow['closing_qty'], 10, 'Brand-new product\'s row has the correct closing_qty');
 
+// ---- Replicate input-action.php's POST-PHASE-3a statement shapes: same
+// four statements, but warehouse_id is now a real conditional parameter
+// instead of a hardcoded NULL literal. ----
+function runInputActionFlowWithWarehouse($conn, int $pid, string $userType, string $userId, int $qty, string $inputDate, ?int $warehouseId) {
+    $chkSql = "SELECT COUNT(*) AS cnt FROM stock
+               WHERE product_id = ? AND user_type = ? AND user_id = ?
+                 AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?') . "
+               FOR UPDATE";
+    $stmtChkProd = $conn->prepare($chkSql);
+    if ($warehouseId === null) {
+        $stmtChkProd->bind_param('iss', $pid, $userType, $userId);
+    } else {
+        $stmtChkProd->bind_param('issi', $pid, $userType, $userId, $warehouseId);
+    }
+    $stmtChkProd->execute();
+    $cntProd = (int) $stmtChkProd->get_result()->fetch_assoc()['cnt'];
+    $stmtChkProd->close();
+
+    if ($cntProd === 0) {
+        $stmtInsertStock = $conn->prepare(
+            "INSERT INTO stock
+                 (product_id, opening_qty, opening_date, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id)
+             VALUES (?, 0, ?, 0, 0, 0, 0, 0, ?, ?, ?)"
+        );
+        $stmtInsertStock->bind_param('isssi', $pid, $inputDate, $userType, $userId, $warehouseId);
+        $stmtInsertStock->execute();
+        $stmtInsertStock->close();
+    }
+
+    $getSql = "SELECT input_qty, closing_qty FROM stock
+               WHERE product_id = ? AND user_type = ? AND user_id = ?
+                 AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?') . "
+               FOR UPDATE";
+    $stmtGetStock = $conn->prepare($getSql);
+    if ($warehouseId === null) {
+        $stmtGetStock->bind_param('iss', $pid, $userType, $userId);
+    } else {
+        $stmtGetStock->bind_param('issi', $pid, $userType, $userId, $warehouseId);
+    }
+    $stmtGetStock->execute();
+    $stockRow = $stmtGetStock->get_result()->fetch_assoc();
+    $stmtGetStock->close();
+
+    $newInputQty   = (int) $stockRow['input_qty']   + $qty;
+    $newClosingQty = (int) $stockRow['closing_qty'] + $qty;
+
+    $updSql = "UPDATE stock SET input_qty = ?, closing_qty = ?
+               WHERE product_id = ? AND user_type = ? AND user_id = ?
+                 AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?');
+    $stmtUpdateStock = $conn->prepare($updSql);
+    if ($warehouseId === null) {
+        $stmtUpdateStock->bind_param('iiiss', $newInputQty, $newClosingQty, $pid, $userType, $userId);
+    } else {
+        $stmtUpdateStock->bind_param('iiissi', $newInputQty, $newClosingQty, $pid, $userType, $userId, $warehouseId);
+    }
+    $stmtUpdateStock->execute();
+    $stmtUpdateStock->close();
+}
+
+// ---- Test: tagging to a real warehouse (555) creates/updates that
+// warehouse's row specifically, leaving any unassigned row for the same
+// product untouched. ----
+$conn->query("INSERT INTO stock
+    (product_id, opening_qty, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id)
+    VALUES (32, 0, 20, 0, 0, 0, 20, 'company', '1', NULL)");
+
+runInputActionFlowWithWarehouse($conn, 32, 'company', '1', 15, '2026-09-17', 555);
+
+$wh555 = $conn->query("SELECT closing_qty FROM stock WHERE product_id=32 AND user_type='company' AND user_id='1' AND warehouse_id=555")->fetch_assoc();
+$unassignedFor32 = $conn->query("SELECT closing_qty FROM stock WHERE product_id=32 AND user_type='company' AND user_id='1' AND warehouse_id IS NULL")->fetch_assoc();
+
+assertEqual($wh555 !== null, true, 'Tagging to warehouse 555 creates a new warehouse-555 row');
+assertEqual((int)$wh555['closing_qty'], 15, 'Warehouse-555 row has the correct closing_qty');
+assertEqual((int)$unassignedFor32['closing_qty'], 20, 'Unassigned row for the same product is completely untouched');
+
+// ---- Test: a second submission tagged to the SAME warehouse (555)
+// correctly accumulates onto that warehouse's row, not the unassigned one. ----
+runInputActionFlowWithWarehouse($conn, 32, 'company', '1', 5, '2026-09-17', 555);
+$wh555After2nd = $conn->query("SELECT closing_qty FROM stock WHERE product_id=32 AND user_type='company' AND user_id='1' AND warehouse_id=555")->fetch_assoc();
+assertEqual((int)$wh555After2nd['closing_qty'], 20, 'Second submission to warehouse 555 accumulates correctly (15 + 5 = 20)');
+
+// ---- Test: omitting warehouse_id (null) still hits the unassigned row —
+// the exact Global Constraint this phase must not regress. ----
+runInputActionFlowWithWarehouse($conn, 32, 'company', '1', 3, '2026-09-17', null);
+$unassignedFor32After = $conn->query("SELECT closing_qty FROM stock WHERE product_id=32 AND user_type='company' AND user_id='1' AND warehouse_id IS NULL")->fetch_assoc();
+$wh555Unchanged = $conn->query("SELECT closing_qty FROM stock WHERE product_id=32 AND user_type='company' AND user_id='1' AND warehouse_id=555")->fetch_assoc();
+assertEqual((int)$unassignedFor32After['closing_qty'], 23, 'null warehouse_id still correctly accumulates onto the unassigned row (20 + 3 = 23)');
+assertEqual((int)$wh555Unchanged['closing_qty'], 20, 'Warehouse-555 row remains untouched by the null-warehouse submission');
+
 // ========== TEARDOWN ==========
 $conn->select_db('information_schema');
 $conn->query("DROP DATABASE IF EXISTS `" . TEST_SCHEMA . "`");

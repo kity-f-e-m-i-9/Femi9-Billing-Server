@@ -51,6 +51,12 @@ $godownId   = filter_var($_POST['godownid']    ?? 0, FILTER_VALIDATE_INT);
 $inputDate  = $_POST['input_date'] ?? '';
 $tempId     = preg_replace('/[^A-Z0-9\/]/', '', strtoupper($_POST['tempid'] ?? ''));
 
+// Optional: which physical godown (warehouse) this stock is being received
+// into. Blank/absent means "unassigned" — the same behavior this workflow
+// has always had. FILTER_VALIDATE_INT returns false for an empty string,
+// so the `?: null` coalesces both "absent" and "blank selected" to null.
+$warehouseId = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
+
 if (!$godownId || $godownId <= 0) {
     redirectTo('add-input?invalid');
 }
@@ -151,25 +157,28 @@ try {
 
     $stmtChkProd = $db_conn->prepare(
         "SELECT COUNT(*) AS cnt FROM stock
-         WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL
+         WHERE product_id = ? AND user_type = ? AND user_id = ?
+           AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?') . "
          FOR UPDATE"                                     // lock row during transaction
     );
 
     $stmtInsertStock = $db_conn->prepare(
         "INSERT INTO stock
              (product_id, opening_qty, opening_date, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id)
-         VALUES (?, 0, ?, 0, 0, 0, 0, 0, ?, ?, NULL)"
+         VALUES (?, 0, ?, 0, 0, 0, 0, 0, ?, ?, ?)"
     );
 
     $stmtGetStock = $db_conn->prepare(
         "SELECT input_qty, closing_qty FROM stock
-         WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL
+         WHERE product_id = ? AND user_type = ? AND user_id = ?
+           AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?') . "
          FOR UPDATE"
     );
 
     $stmtUpdateStock = $db_conn->prepare(
         "UPDATE stock SET input_qty = ?, closing_qty = ?
-         WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL"
+         WHERE product_id = ? AND user_type = ? AND user_id = ?
+           AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?')
     );
 
     foreach ($rows as $row) {
@@ -185,17 +194,25 @@ try {
         $stmtInsertInput->execute();
 
         // 2. Ensure a stock row exists for this product / godown
-        $stmtChkProd->bind_param('isi', $pid, $userType, $userId);
+        if ($warehouseId === null) {
+            $stmtChkProd->bind_param('iss', $pid, $userType, $userId);
+        } else {
+            $stmtChkProd->bind_param('issi', $pid, $userType, $userId, $warehouseId);
+        }
         $stmtChkProd->execute();
         $cntProd = (int) $stmtChkProd->get_result()->fetch_assoc()['cnt'];
 
         if ($cntProd === 0) {
-            $stmtInsertStock->bind_param('issi', $pid, $inputDate, $userType, $userId);
+            $stmtInsertStock->bind_param('isssi', $pid, $inputDate, $userType, $userId, $warehouseId);
             $stmtInsertStock->execute();
         }
 
         // 3. Read current stock quantities (locked)
-        $stmtGetStock->bind_param('isi', $pid, $userType, $userId);
+        if ($warehouseId === null) {
+            $stmtGetStock->bind_param('iss', $pid, $userType, $userId);
+        } else {
+            $stmtGetStock->bind_param('issi', $pid, $userType, $userId, $warehouseId);
+        }
         $stmtGetStock->execute();
         $stockRow = $stmtGetStock->get_result()->fetch_assoc();
 
@@ -203,7 +220,11 @@ try {
         $newClosingQty = (int) $stockRow['closing_qty'] + $qty;
 
         // 4. Update stock
-        $stmtUpdateStock->bind_param('iiisi', $newInputQty, $newClosingQty, $pid, $userType, $userId);
+        if ($warehouseId === null) {
+            $stmtUpdateStock->bind_param('iiiss', $newInputQty, $newClosingQty, $pid, $userType, $userId);
+        } else {
+            $stmtUpdateStock->bind_param('iiissi', $newInputQty, $newClosingQty, $pid, $userType, $userId, $warehouseId);
+        }
         $stmtUpdateStock->execute();
 
         // 5. Write ledger entry (audit trail)
