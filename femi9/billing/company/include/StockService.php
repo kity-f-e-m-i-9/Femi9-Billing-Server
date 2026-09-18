@@ -46,7 +46,8 @@ class StockService
         string $refType,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) {
             $this->db->begin_transaction();
@@ -55,7 +56,7 @@ class StockService
         try {
             $this->ensureNeksomoTopUp($productId, $userType, $userId, $qty, $createdBy);
 
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
 
             if ($row === null) {
                 throw new StockException(
@@ -75,12 +76,12 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'sales_qty'   => (int)$row['sales_qty'] + $qty,
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
 
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'deduct', $qty, $before, $after,
-                $refType, $refId, '', $createdBy
+                $refType, $refId, '', $createdBy, $warehouseId
             );
 
             $consumed = StockLots::consumeFifo(
@@ -114,24 +115,25 @@ class StockService
         string $refType,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) {
             $this->db->begin_transaction();
         }
 
         try {
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
 
             if ($row === null) {
                 // Create a new stock row for this buyer
                 $stmt = $this->db->prepare(
                     "INSERT INTO stock
                         (product_id, opening_qty, opening_date, input_qty, sales_qty,
-                         sent_qty, returnqty, closing_qty, user_type, user_id, updated_at)
-                     VALUES (?, 0, CURDATE(), ?, 0, 0, 0, ?, ?, ?, NOW())"
+                         sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id, updated_at)
+                     VALUES (?, 0, CURDATE(), ?, 0, 0, 0, ?, ?, ?, ?, NOW())"
                 );
-                $stmt->bind_param('iiiss', $productId, $qty, $qty, $userType, $userId);
+                $stmt->bind_param('iiissi', $productId, $qty, $qty, $userType, $userId, $warehouseId);
                 $stmt->execute();
                 $stmt->close();
 
@@ -144,13 +146,13 @@ class StockService
                 $this->updateStockSnapshot($productId, $userType, $userId, [
                     'input_qty'   => (int)$row['input_qty'] + $qty,
                     'closing_qty' => $after,
-                ]);
+                ], $warehouseId);
             }
 
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'credit', $qty, $before, $after,
-                $refType, $refId, '', $createdBy
+                $refType, $refId, '', $createdBy, $warehouseId
             );
 
             if (!$externalTransaction) {
@@ -179,14 +181,15 @@ class StockService
         string $refType,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) {
             $this->db->begin_transaction();
         }
 
         try {
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
 
             if ($row === null) {
                 if (!$externalTransaction) $this->db->rollback();
@@ -200,12 +203,12 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'sales_qty'   => $newSalesQty,
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
 
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'reverse_deduct', $qty, $before, $after,
-                $refType, $refId, '', $createdBy
+                $refType, $refId, '', $createdBy, $warehouseId
             );
 
             // Restock the exact lot(s) the original deduct drew from, found
@@ -249,14 +252,15 @@ class StockService
         string $refType,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) {
             $this->db->begin_transaction();
         }
 
         try {
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
 
             if ($row === null) {
                 if (!$externalTransaction) $this->db->rollback();
@@ -270,12 +274,12 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'input_qty'   => $newInputQty,
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
 
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'reverse_credit', $qty, $before, $after,
-                $refType, $refId, '', $createdBy
+                $refType, $refId, '', $createdBy, $warehouseId
             );
 
             if (!$externalTransaction) {
@@ -305,14 +309,16 @@ class StockService
         int    $qty,
         string $refType,
         string $refId,
-        string $createdBy
+        string $createdBy,
+        ?int   $sellerWarehouseId = null,
+        ?int   $buyerWarehouseId = null
     ): array {
         $this->db->begin_transaction();
 
         try {
             $deductResult = $this->deduct(
                 $productId, $sellerType, $sellerId, $qty,
-                $refType, $refId, $createdBy, true
+                $refType, $refId, $createdBy, true, $sellerWarehouseId
             );
 
             $creditResult = ['success' => true, 'ledger_id' => null];
@@ -320,7 +326,7 @@ class StockService
             if (in_array($buyerType, self::STOCK_MAINTAINING_TYPES, true)) {
                 $creditResult = $this->credit(
                     $productId, $buyerType, $buyerId, $qty,
-                    $refType, $refId, $createdBy, true
+                    $refType, $refId, $createdBy, true, $buyerWarehouseId
                 );
             }
 
@@ -356,13 +362,13 @@ class StockService
         string $refId,
         string $createdBy
     ): int {
-        // One query: sum qty per (product, user, action) for all four action types.
+        // One query: sum qty per (product, user, warehouse, action) for all four action types.
         $stmt = $this->db->prepare(
-            "SELECT product_id, user_type, user_id, action, SUM(qty) AS qty
+            "SELECT product_id, user_type, user_id, warehouse_id, action, SUM(qty) AS qty
                FROM stock_ledger
               WHERE ref_type = ? AND ref_id = ?
                 AND action IN ('deduct','credit','reverse_deduct','reverse_credit')
-              GROUP BY product_id, user_type, user_id, action"
+              GROUP BY product_id, user_type, user_id, warehouse_id, action"
         );
         $stmt->bind_param('ss', $refType, $refId);
         $stmt->execute();
@@ -373,13 +379,15 @@ class StockService
             return 0;
         }
 
-        // Index totals by party key → action totals.
+        // Index totals by party+warehouse key → action totals.
         $totals = [];
         foreach ($rows as $row) {
-            $key = $row['product_id'] . '|' . $row['user_type'] . '|' . $row['user_id'];
+            $whKey = $row['warehouse_id'] === null ? 'null' : $row['warehouse_id'];
+            $key = $row['product_id'] . '|' . $row['user_type'] . '|' . $row['user_id'] . '|' . $whKey;
             $totals[$key]['product_id']   = (int)    $row['product_id'];
             $totals[$key]['user_type']    = (string)  $row['user_type'];
             $totals[$key]['user_id']      = (string)  $row['user_id'];
+            $totals[$key]['warehouse_id'] = $row['warehouse_id'] === null ? null : (int) $row['warehouse_id'];
             $totals[$key][$row['action']] = (int)     $row['qty'];
         }
 
@@ -388,16 +396,17 @@ class StockService
         try {
             $count = 0;
             foreach ($totals as $data) {
-                $productId = $data['product_id'];
-                $userType  = $data['user_type'];
-                $userId    = $data['user_id'];
+                $productId   = $data['product_id'];
+                $userType    = $data['user_type'];
+                $userId      = $data['user_id'];
+                $warehouseId = $data['warehouse_id'];
 
                 // Net seller deductions still applied
                 $netDeduct = ($data['deduct'] ?? 0) - ($data['reverse_deduct'] ?? 0);
                 if ($netDeduct > 0) {
                     $this->reverseDeduct(
                         $productId, $userType, $userId, $netDeduct,
-                        $refType, $refId, $createdBy, true
+                        $refType, $refId, $createdBy, true, $warehouseId
                     );
                     $count++;
                 }
@@ -407,7 +416,7 @@ class StockService
                 if ($netCredit > 0) {
                     $this->reverseCredit(
                         $productId, $userType, $userId, $netCredit,
-                        $refType, $refId, $createdBy, true
+                        $refType, $refId, $createdBy, true, $warehouseId
                     );
                     $count++;
                 }
@@ -470,13 +479,17 @@ class StockService
      * in whatever's still available from that shared pool, read-only (no
      * mutation) — actual conversion only happens at the point of deduction.
      */
-    public function getClosingQty(int $productId, string $userType, string $userId): ?int
+    public function getClosingQty(int $productId, string $userType, string $userId, ?int $warehouseId = null): ?int
     {
-        $stmt = $this->db->prepare(
-            "SELECT closing_qty FROM stock
-              WHERE product_id = ? AND user_type = ? AND user_id = ?"
-        );
-        $stmt->bind_param('iss', $productId, $userType, $userId);
+        $sql = "SELECT closing_qty FROM stock
+                  WHERE product_id = ? AND user_type = ? AND user_id = ?
+                    AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?');
+        $stmt = $this->db->prepare($sql);
+        if ($warehouseId === null) {
+            $stmt->bind_param('iss', $productId, $userType, $userId);
+        } else {
+            $stmt->bind_param('issi', $productId, $userType, $userId, $warehouseId);
+        }
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -498,11 +511,12 @@ class StockService
         int    $qty,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
             if ($row === null) {
                 if (!$externalTransaction) $this->db->rollback();
                 return ['success' => false, 'reason' => 'no_stock_row'];
@@ -512,11 +526,11 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'input_qty'   => (int)$row['input_qty'] + $qty,
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'return_accept', $qty, $before, $after,
-                'return', $refId, '', $createdBy
+                'return', $refId, '', $createdBy, $warehouseId
             );
             if (!$externalTransaction) $this->db->commit();
             return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
@@ -537,11 +551,12 @@ class StockService
         int    $qty,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
             if ($row === null) {
                 if (!$externalTransaction) $this->db->rollback();
                 return ['success' => false, 'reason' => 'no_stock_row'];
@@ -552,11 +567,11 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'returnqty'   => $newReturnQty,
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'return_reject', $qty, $before, $after,
-                'return', $refId, '', $createdBy
+                'return', $refId, '', $createdBy, $warehouseId
             );
             if (!$externalTransaction) $this->db->commit();
             return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
@@ -577,13 +592,14 @@ class StockService
         int    $qty,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
             $this->ensureNeksomoTopUp($productId, $userType, $userId, $qty, $createdBy);
 
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
             if ($row === null) {
                 if (!$externalTransaction) $this->db->rollback();
                 throw new StockException("No stock row for product=$productId type=$userType id=$userId");
@@ -598,11 +614,11 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'sales_qty'   => (int)$row['sales_qty'] + $qty,
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'ot_deduct', $qty, $before, $after,
-                'ot_sale', $refId, '', $createdBy
+                'ot_sale', $refId, '', $createdBy, $warehouseId
             );
             if (!$externalTransaction) $this->db->commit();
             return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
@@ -623,11 +639,12 @@ class StockService
         int    $qty,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
             if ($row === null) {
                 if (!$externalTransaction) $this->db->rollback();
                 return ['success' => false, 'reason' => 'no_stock_row'];
@@ -637,11 +654,11 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'sales_qty'   => max(0, (int)$row['sales_qty'] - $qty),
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'ot_reverse', $qty, $before, $after,
-                'ot_sale', $refId, '', $createdBy
+                'ot_sale', $refId, '', $createdBy, $warehouseId
             );
             if (!$externalTransaction) $this->db->commit();
             return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
@@ -668,13 +685,14 @@ class StockService
         string $refType,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
             $this->ensureNeksomoTopUp($productId, $userType, $userId, $qty, $createdBy);
 
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
             if ($row === null) {
                 throw new StockException(
                     "No stock record for product=$productId user_type=$userType user_id=$userId"
@@ -690,11 +708,11 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'sent_qty'    => (int) $row['sent_qty'] + $qty,
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'transfer_out', $qty, $before, $after,
-                $refType, $refId, '', $createdBy
+                $refType, $refId, '', $createdBy, $warehouseId
             );
 
             $consumed = StockLots::consumeFifo(
@@ -730,19 +748,20 @@ class StockService
         string $refId,
         string $createdBy,
         bool   $externalTransaction = false,
-        ?float $lotRate = null   // weighted-avg cost carried from the source transferOut; null = skip lot creation
+        ?float $lotRate = null,   // weighted-avg cost carried from the source transferOut; null = skip lot creation
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
             if ($row === null) {
                 $stmt = $this->db->prepare(
                     "INSERT INTO stock
                         (product_id, opening_qty, opening_date, input_qty, sales_qty,
-                         sent_qty, returnqty, closing_qty, user_type, user_id, updated_at)
-                     VALUES (?, 0, CURDATE(), ?, 0, 0, 0, ?, ?, ?, NOW())"
+                         sent_qty, returnqty, closing_qty, user_type, user_id, warehouse_id, updated_at)
+                     VALUES (?, 0, CURDATE(), ?, 0, 0, 0, ?, ?, ?, ?, NOW())"
                 );
-                $stmt->bind_param('iiiss', $productId, $qty, $qty, $userType, $userId);
+                $stmt->bind_param('iiissi', $productId, $qty, $qty, $userType, $userId, $warehouseId);
                 $stmt->execute();
                 $stmt->close();
                 $before = 0;
@@ -753,12 +772,12 @@ class StockService
                 $this->updateStockSnapshot($productId, $userType, $userId, [
                     'input_qty'   => (int) $row['input_qty'] + $qty,
                     'closing_qty' => $after,
-                ]);
+                ], $warehouseId);
             }
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'transfer_in', $qty, $before, $after,
-                $refType, $refId, '', $createdBy
+                $refType, $refId, '', $createdBy, $warehouseId
             );
 
             if ($lotRate !== null) {
@@ -789,11 +808,12 @@ class StockService
         string $refType,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
             if ($row === null) {
                 if (!$externalTransaction) $this->db->rollback();
                 return ['success' => false, 'reason' => 'no_stock_row'];
@@ -804,11 +824,11 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'sent_qty'    => $newSentQty,
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'transfer_out_reverse', $qty, $before, $after,
-                $refType, $refId, '', $createdBy
+                $refType, $refId, '', $createdBy, $warehouseId
             );
 
             // Restock the exact lot(s) the original transferOut drew from.
@@ -846,11 +866,12 @@ class StockService
         string $refType,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
-            $row = $this->lockStockRow($productId, $userType, $userId);
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
             if ($row === null) {
                 if (!$externalTransaction) $this->db->rollback();
                 return ['success' => false, 'reason' => 'no_stock_row'];
@@ -878,11 +899,11 @@ class StockService
             $this->updateStockSnapshot($productId, $userType, $userId, [
                 'input_qty'   => $newInputQty,
                 'closing_qty' => $after,
-            ]);
+            ], $warehouseId);
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'transfer_in_reverse', $qty, $before, $after,
-                $refType, $refId, '', $createdBy
+                $refType, $refId, '', $createdBy, $warehouseId
             );
             if (!$externalTransaction) $this->db->commit();
             return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
@@ -954,15 +975,22 @@ class StockService
     /**
      * Lock the stock row for this entity using SELECT … FOR UPDATE.
      * Must be called inside an active transaction.
+     *
+     * $warehouseId null means "unassigned" — matches every pre-Phase-1 row,
+     * since NULL is its own distinct identity in uq_stock_entity_warehouse.
      */
-    private function lockStockRow(int $productId, string $userType, string $userId): ?array
+    private function lockStockRow(int $productId, string $userType, string $userId, ?int $warehouseId = null): ?array
     {
-        $stmt = $this->db->prepare(
-            "SELECT * FROM stock
-              WHERE product_id = ? AND user_type = ? AND user_id = ?
-              FOR UPDATE"
-        );
-        $stmt->bind_param('iss', $productId, $userType, $userId);
+        $sql = "SELECT * FROM stock
+                  WHERE product_id = ? AND user_type = ? AND user_id = ?
+                    AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?') . "
+                  FOR UPDATE";
+        $stmt = $this->db->prepare($sql);
+        if ($warehouseId === null) {
+            $stmt->bind_param('iss', $productId, $userType, $userId);
+        } else {
+            $stmt->bind_param('issi', $productId, $userType, $userId, $warehouseId);
+        }
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -977,7 +1005,8 @@ class StockService
         int    $productId,
         string $userType,
         string $userId,
-        array  $fields
+        array  $fields,
+        ?int   $warehouseId = null
     ): void {
         $setParts = [];
         $types    = '';
@@ -991,11 +1020,16 @@ class StockService
 
         $setParts[] = '`updated_at` = NOW()';
         $sql  = 'UPDATE stock SET ' . implode(', ', $setParts)
-              . ' WHERE product_id = ? AND user_type = ? AND user_id = ?';
+              . ' WHERE product_id = ? AND user_type = ? AND user_id = ?'
+              . ' AND warehouse_id ' . ($warehouseId === null ? 'IS NULL' : '= ?');
         $types .= 'iss';
         $values[] = $productId;
         $values[] = $userType;
         $values[] = $userId;
+        if ($warehouseId !== null) {
+            $types .= 'i';
+            $values[] = $warehouseId;
+        }
 
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param($types, ...$values);
@@ -1018,17 +1052,18 @@ class StockService
         string $refType,
         string $refId,
         string $note,
-        string $createdBy
+        string $createdBy,
+        ?int   $warehouseId = null
     ): int {
         $stmt = $this->db->prepare(
             "INSERT INTO stock_ledger
-                (product_id, user_type, user_id, action, qty,
+                (product_id, user_type, user_id, warehouse_id, action, qty,
                  qty_before, qty_after, ref_type, ref_id, note, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $stmt->bind_param(
-            'isssiiissss',
-            $productId, $userType, $userId, $action, $qty,
+            'issisiiissss',
+            $productId, $userType, $userId, $warehouseId, $action, $qty,
             $qtyBefore, $qtyAfter, $refType, $refId, $note, $createdBy
         );
         $stmt->execute();

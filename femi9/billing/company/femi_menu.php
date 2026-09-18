@@ -537,6 +537,10 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         </ul>
                     </li>
 
+					<li>
+                        <a href="manage-warehouses"><i class="material-icons-two-tone">warehouse</i>Manage Godowns</a>
+                    </li>
+
 					<!-----<li class="active-page">
                         <a href="manage-coupon"><i class="material-icons-two-tone">done</i>Coupons</a>
                     </li>---->

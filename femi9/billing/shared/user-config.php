@@ -175,6 +175,20 @@ function getUserConfig($userType) {
             'name_field'          => 'name',
             'email_field'         => 'email',
         ],
+
+        'warehouse' => [
+            'table'               => 'warehouse_users',
+            'display_name'        => 'Godown',
+            'folder'              => 'warehouse',
+            'id_field'            => 'id',
+            'username_field'      => 'mobile',
+            'mobile_field'        => 'mobile',
+            'password_field'      => 'password',
+            'status_field'        => 'account_status',
+            'status_active_value' => 'active',
+            'name_field'          => 'name',
+            'email_field'         => null,
+        ],
     ];
     
     return $configs[$userType] ?? null;
@@ -194,6 +208,7 @@ function getCentralLoginTypes() {
         'super_stockiest',
         'super_distributor',
         'territory_partner',
+        'warehouse',
     ];
 }
 ?>
