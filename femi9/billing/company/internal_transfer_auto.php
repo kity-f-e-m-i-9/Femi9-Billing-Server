@@ -230,13 +230,14 @@ if (!empty($requirements)) {
         }
         var html = '';
         items.forEach(function (it) {
-            html += '<div class="bd-row" data-source-id="' + it.source_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;padding:8px 4px;">' +
-                '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:0;">' +
-                    '<input type="checkbox" class="bd-check" data-qty="' + it.qty + '" data-source-id="' + it.source_id + '" checked style="margin-right:8px;flex-shrink:0;">' +
+            html += '<div class="bd-row" data-source-id="' + it.source_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;padding:8px 4px;flex-wrap:wrap;">' +
+                '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:160px;">' +
+                    '<input type="checkbox" class="bd-check" data-source-id="' + it.source_id + '" checked style="margin-right:8px;flex-shrink:0;">' +
                     '<span style="overflow-wrap:anywhere;">' + escBd(it.label) + '</span>' +
                 '</label>' +
-                '<span style="font-weight:600;white-space:nowrap;">' + it.qty + '</span>' +
-                '<button type="button" class="btn btn-sm btn-outline-danger bd-not-today" data-source-id="' + it.source_id + '" style="white-space:nowrap;font-size:11px;padding:2px 8px;">Not Today</button>' +
+                '<input type="number" min="0" max="' + it.qty + '" class="form-control form-control-sm bd-qty-input" data-source-id="' + it.source_id + '" ' +
+                    'value="' + it.qty + '" style="width:80px;flex-shrink:0;" title="Max ' + it.qty + ' — this order\'s own qty">' +
+                '<button type="button" class="btn btn-sm btn-outline-danger bd-not-today" data-source-id="' + it.source_id + '" style="white-space:nowrap;font-size:11px;padding:2px 8px;flex-shrink:0;">Not Today</button>' +
             '</div>';
         });
         el.innerHTML = html;
@@ -254,7 +255,14 @@ if (!empty($requirements)) {
         if (currentBreakdownPid === null) return;
         var total = 0;
         document.querySelectorAll('.bd-check:checked').forEach(function (chk) {
-            total += parseInt(chk.getAttribute('data-qty'), 10) || 0;
+            var sourceId = chk.getAttribute('data-source-id');
+            var qtyInput = document.querySelector('.bd-qty-input[data-source-id="' + sourceId.replace(/"/g, '') + '"]');
+            var maxQty = qtyInput ? parseInt(qtyInput.getAttribute('max'), 10) || 0 : 0;
+            var val = qtyInput ? parseInt(qtyInput.value, 10) : 0;
+            if (isNaN(val) || val < 0) val = 0;
+            if (val > maxQty) val = maxQty; // never more than that order actually needs
+            if (qtyInput) qtyInput.value = val;
+            total += val;
         });
 
         var pid = currentBreakdownPid;
