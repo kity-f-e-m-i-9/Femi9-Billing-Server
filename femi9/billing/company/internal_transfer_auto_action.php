@@ -1,0 +1,175 @@
+<?php
+include("checksession.php");
+require_once("include/GodownAccess.php");
+require_once("include/StockService.php");
+require_once("include/NeksomoStockBridge.php");
+require_once("include/AutoTransferDemand.php");
+include("config.php");
+include("RemoveSpecialChar.php");
+
+error_reporting(0);
+
+$productIds = $_REQUEST['product_id'] ?? [];
+$qtyArr     = $_REQUEST['qty'] ?? [];
+
+if (!is_array($productIds) || count($productIds) === 0) {
+    $_SESSION['errorMessage'] = "No products submitted.";
+    echo "<script>window.location='internal_transfer_auto?invalid';</script>";
+    exit;
+}
+
+$neksomoId    = get_neksomo_godown_id($db_conn);
+$healthcareId = resolve_godown_id_by_gname($db_conn, 'FEMI HEALTH CARE');
+$llpId        = resolve_godown_id_by_gname($db_conn, 'FEMI NAYAN LLP');
+
+if (!$neksomoId || !$healthcareId || !$llpId) {
+    $_SESSION['errorMessage'] = "Required company profiles not found.";
+    echo "<script>window.location='internal_transfer_auto?misconfigured';</script>";
+    exit;
+}
+
+$rows = [];
+foreach ($productIds as $i => $rawPid) {
+    $pid = (int) $rawPid;
+    $qty = (int) RemoveSpecialChar($qtyArr[$i] ?? '0');
+    if ($pid <= 0 || $qty <= 0) continue;
+    $rows[] = ['pid' => $pid, 'qty' => $qty];
+}
+
+if (empty($rows)) {
+    $_SESSION['errorMessage'] = "No valid quantities submitted.";
+    echo "<script>window.location='internal_transfer_auto?invalid';</script>";
+    exit;
+}
+
+$stockService = new StockService($db_conn);
+$createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
+$username     = htmlspecialchars(strip_tags(trim($_SESSION['LOGIN_USER'] ?? '')), ENT_QUOTES, 'UTF-8');
+$usertype     = htmlspecialchars(strip_tags(trim($Login_user_TYPEvl ?? '')), ENT_QUOTES, 'UTF-8');
+$date         = date('Y-m-d');
+
+$tempidBase = 'AUTO' . date('YmdHis') . str_pad((string) random_int(0, 999), 3, '0', STR_PAD_LEFT);
+$tempid1 = $tempidBase . '-N1'; // Neksomo -> Healthcare
+$tempid2 = $tempidBase . '-N2'; // Healthcare -> LLP
+
+$cappedRows = [];
+
+$db_conn->begin_transaction();
+
+try {
+    $stmtInvChk = $db_conn->prepare("SELECT COUNT(*) AS n FROM internal_transfer_invoice WHERE tempid = ?");
+    $stmtInvIns = $db_conn->prepare(
+        "INSERT INTO internal_transfer_invoice (tempid, inv_id, inv_number, courier_charges)
+         VALUES (?, '0', ?, '0')"
+    );
+    $stmtProdIns = $db_conn->prepare(
+        "INSERT INTO internal_transfer
+             (tempid, send_from, send_to, date, product_id, qty, price, discount,
+              sub_total, gst, gst_type, taxable_value, gst_amount, total, hsn, username, usertype)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    $stmtProd = $db_conn->prepare("SELECT gst, gst_type, hsn FROM products WHERE id = ?");
+
+    /**
+     * Writes one internal_transfer_invoice (once per tempid) + one
+     * internal_transfer row, then performs the StockService
+     * transferOut/transferIn pair. Returns the actual qty moved
+     * (may be less than $qty if stock is insufficient at commit time).
+     */
+    $writeLeg = function (
+        string $tempid, string $sendFrom, string $sendTo, int $pid, int $qty
+    ) use (
+        $db_conn, $stockService, $createdBy, $username, $usertype, $date,
+        $stmtInvChk, $stmtInvIns, $stmtProdIns, $stmtProd, $Login_user_TYPEvl
+    ): int {
+        $available = $stockService->getClosingQty($pid, $Login_user_TYPEvl, $sendFrom);
+        $actualQty = min($qty, (int) ($available ?? 0));
+        if ($actualQty <= 0) return 0;
+
+        $stmtProd->bind_param('i', $pid);
+        $stmtProd->execute();
+        $prod = $stmtProd->get_result()->fetch_assoc();
+        if (!$prod) return 0;
+
+        $gst      = (float) $prod['gst'];
+        $gstType  = ($prod['gst_type'] === 'inclusive') ? 'inclusive' : 'exclusive';
+        $hsn      = $prod['hsn'];
+        $subTotal = 0.0; // auto transfer carries no manual rate entry; billing rate stays 0, cost flows via consumed_rate
+
+        if ($gstType === 'inclusive') {
+            $total         = $subTotal;
+            $taxableValue  = number_format($total / (1 + $gst / 100), 2, '.', '');
+            $gstAmount     = number_format($total - $taxableValue, 2, '.', '');
+        } else {
+            $taxableValue = number_format($subTotal, 2, '.', '');
+            $gstAmount    = number_format($subTotal * $gst / 100, 2, '.', '');
+            $total        = (float) $taxableValue + (float) $gstAmount;
+        }
+
+        $stmtInvChk->bind_param('s', $tempid);
+        $stmtInvChk->execute();
+        if ((int) $stmtInvChk->get_result()->fetch_assoc()['n'] === 0) {
+            $invNumber = $tempid;
+            $stmtInvIns->bind_param('ss', $tempid, $invNumber);
+            $stmtInvIns->execute();
+        }
+
+        $rate = 0.0;
+        $disc = 0.0;
+        $stmtProdIns->bind_param(
+            'ssssiiddddsssssss',
+            $tempid, $sendFrom, $sendTo, $date, $pid, $actualQty,
+            $rate, $disc, $subTotal, $gst, $gstType, $taxableValue, $gstAmount, $total, $hsn,
+            $username, $usertype
+        );
+        $stmtProdIns->execute();
+
+        $outResult = $stockService->transferOut(
+            $pid, $Login_user_TYPEvl, $sendFrom, $actualQty,
+            'transfer', $tempid, $createdBy, true
+        );
+        $stockService->transferIn(
+            $pid, $Login_user_TYPEvl, $sendTo, $actualQty,
+            'transfer', $tempid, $createdBy, true,
+            $outResult['consumed_rate'] ?? null
+        );
+
+        return $actualQty;
+    };
+
+    foreach ($rows as $row) {
+        $pid = $row['pid'];
+        $requestedQty = $row['qty'];
+
+        $legOneQty = $writeLeg($tempid1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty);
+        if ($legOneQty <= 0) continue;
+
+        $legTwoQty = $writeLeg($tempid2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty);
+
+        if ($legTwoQty < $requestedQty) {
+            $cappedRows[] = "Product #$pid: requested $requestedQty, transferred $legTwoQty";
+        }
+    }
+
+    $stmtInvChk->close();
+    $stmtInvIns->close();
+    $stmtProdIns->close();
+    $stmtProd->close();
+
+    $db_conn->commit();
+} catch (StockException $e) {
+    $db_conn->rollback();
+    $_SESSION['errorMessage'] = "Stock error: " . $e->getMessage();
+    echo "<script>window.location='internal_transfer_auto?InvalidStock&&AlertStockError';</script>";
+    exit;
+} catch (\Throwable $e) {
+    $db_conn->rollback();
+    error_log("internal_transfer_auto_action error: " . $e->getMessage());
+    $_SESSION['errorMessage'] = "An error occurred. Please try again.";
+    echo "<script>window.location='internal_transfer_auto?saveerror';</script>";
+    exit;
+}
+
+$_SESSION['sucMessage'] = "Auto transfer complete (Neksomo->Healthcare: $tempid1, Healthcare->LLP: $tempid2)."
+    . (empty($cappedRows) ? "" : " Capped: " . implode('; ', $cappedRows));
+echo "<script>window.location='internal_transfer_manage';</script>";
