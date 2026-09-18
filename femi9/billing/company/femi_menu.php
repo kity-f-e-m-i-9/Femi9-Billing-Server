@@ -64,6 +64,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="internal_transfer">Add Internal Stock Transfer</a></li>
 						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
+						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
 						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
 						<li><a href="purchase-bills-hc-to-llp">Purchase Bills (Health Care → LLP)</a></li>
                         </ul>
@@ -181,6 +182,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <a href="#"><i class="material-icons-two-tone">inventory_2</i>Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="neksomo-purchase-stock.php">Purchase Stock</a></li>
+						<li><a href="neksomo-piece-pack-convert.php">Convert Pieces &harr; Packs</a></li>
 						<li><a href="neksomo-company-stock.php">Company Stock</a></li>
                         </ul>
                     </li>
@@ -218,6 +220,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="internal_transfer">Add Internal Stock Transfer</a></li>
 						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
+						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
 						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
                         </ul>
                     </li>
@@ -347,6 +350,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="internal_transfer">Add Internal Stock Transfer</a></li>
 						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
+						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
 						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
                         </ul>
                     </li>
@@ -873,6 +877,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 						<li><a href="internal_transfer">Add Internal Stock Transfer</a></li>
 						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
+						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
 						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
                         </ul>
                     </li>
@@ -1235,4 +1240,4 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 
 <?php }?>
                 </ul>
-            </div>
+            </div>

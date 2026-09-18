@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
+require_once("include/GodownAccess.php");
 include("config.php");
 date_default_timezone_set("Asia/Kolkata");
 
@@ -117,10 +118,18 @@ if ($usertype === 'admin') {
 // ---------------------------------------------------------------
 // Fetch godown list
 // ---------------------------------------------------------------
-$stmt_godown = $db_conn->prepare("SELECT id, gname FROM company_godown ORDER BY id ASC");
+$stmt_godown = $db_conn->prepare("SELECT id, gname FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY id ASC");
 $stmt_godown->execute();
 $all_godowns = $stmt_godown->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_godown->close();
+
+// ---------------------------------------------------------------
+// Fetch active physical warehouses (godowns) list
+// ---------------------------------------------------------------
+$stmt_warehouse = $db_conn->prepare("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+$stmt_warehouse->execute();
+$all_warehouses = $stmt_warehouse->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt_warehouse->close();
 
 // ---------------------------------------------------------------
 // Fetch state list
@@ -243,6 +252,18 @@ $stmt_states->close();
                                                     <?php foreach ($all_godowns as $gd): ?>
                                                         <option value="<?= (int)$gd['id'] ?>">
                                                             <?= htmlspecialchars($gd['gname'], ENT_QUOTES) ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <br>
+
+                                                <!-- Godown (physical warehouse) -->
+                                                <label class="form-label">Godown (physical)</label>
+                                                <select name="warehouse_id" class="form-control">
+                                                    <option value="">— Not tracked —</option>
+                                                    <?php foreach ($all_warehouses as $wh): ?>
+                                                        <option value="<?= (int)$wh['id'] ?>">
+                                                            <?= htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8') ?><?= $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '' ?>
                                                         </option>
                                                     <?php endforeach; ?>
                                                 </select>

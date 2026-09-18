@@ -52,7 +52,9 @@ $selectRcd_VLSS1="select * from ".$tblenma." order by id asc";
 										
 //GET PRODCUTWISE STOCK
 $usrid_VLSS1=$resultRcd_VLSS1['temp_id'];
-$select_marketstock_VLDIST_VLSS1="select * from stock where user_type='$usertype_stock' and user_id='$usrid_VLSS1'";
+// GROUP BY product_id, summing across any per-warehouse rows — a
+// product's stock can now be split across physical godowns (H1/G1/G2)
+$select_marketstock_VLDIST_VLSS1="select product_id, sum(closing_qty) as closing_qty from stock where user_type='$usertype_stock' and user_id='$usrid_VLSS1' group by product_id";
 $fetch_marketstock_VLDIST_VLSS1=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS1);
 while($result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS1))
 {
@@ -120,7 +122,9 @@ $taluk_name_VLSS2=$taluk_id_VLSS2;
 										
 //GET PRODCUTWISE STOCK
 $usrid_VLSS2=$resultRcd_VLSS2['temp_id'];
-$select_marketstock_VLDIST_VLSS2="select * from stock where user_type='$usertype_stock' and user_id='$usrid_VLSS2'";
+// GROUP BY product_id, summing across any per-warehouse rows — a
+// product's stock can now be split across physical godowns (H1/G1/G2)
+$select_marketstock_VLDIST_VLSS2="select product_id, sum(closing_qty) as closing_qty from stock where user_type='$usertype_stock' and user_id='$usrid_VLSS2' group by product_id";
 $fetch_marketstock_VLDIST_VLSS2=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS2);
 while($result_marketstock_VLDIST_VLSS2=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS2))
 {

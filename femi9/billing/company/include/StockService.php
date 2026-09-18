@@ -86,7 +86,8 @@ class StockService
 
             $consumed = StockLots::consumeFifo(
                 $this->db, $productId, $userType, $userId, $qty,
-                fn() => $this->fallbackRate($productId)
+                fn() => $this->fallbackRate($productId),
+                $warehouseId
             );
             StockLots::writeConsumption($this->db, $ledgerId, $consumed);
 
@@ -472,12 +473,13 @@ class StockService
     /**
      * Return the current closing_qty for a stock entity (no lock).
      *
-     * For a company product mapped to a Neksomo product, when this is being
-     * asked at the NEKSOMO HYGIENE INDUSTRIES godown, the real `stock` row
-     * alone understates what's truly available — Neksomo's own purchases
-     * never credit that row directly (see NeksomoStockBridge.php). This adds
-     * in whatever's still available from that shared pool, read-only (no
-     * mutation) — actual conversion only happens at the point of deduction.
+     * Always the godown's own real stock.closing_qty — pack-based, same as
+     * every other product. Neksomo purchases now proactively convert their
+     * pool into real stock right after purchase (see
+     * neksomo-manufacturer-purchase-action.php), so this no longer needs to
+     * add in unconverted pool availability; ensureNeksomoTopUp() remains as
+     * the deduction-time safety net for any pool stock a purchase-time
+     * conversion missed.
      */
     public function getClosingQty(int $productId, string $userType, string $userId, ?int $warehouseId = null): ?int
     {
@@ -493,11 +495,7 @@ class StockService
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
-        $real = $row ? (int)$row['closing_qty'] : null;
-
-        $pool = $this->neksomoPoolAvailable($productId, $userType, $userId);
-        if ($pool <= 0) return $real;
-        return ($real ?? 0) + $pool;
+        return $row ? (int)$row['closing_qty'] : null;
     }
 
     /**
@@ -717,7 +715,8 @@ class StockService
 
             $consumed = StockLots::consumeFifo(
                 $this->db, $productId, $userType, $userId, $qty,
-                fn() => $this->fallbackRate($productId)
+                fn() => $this->fallbackRate($productId),
+                $warehouseId
             );
             StockLots::writeConsumption($this->db, $ledgerId, $consumed);
 
@@ -783,7 +782,8 @@ class StockService
             if ($lotRate !== null) {
                 StockLots::recordLot(
                     $this->db, $productId, $userType, $userId, $lotRate, $qty,
-                    date('Y-m-d'), 'transfer_in', $refId, $createdBy
+                    date('Y-m-d'), 'transfer_in', $refId, $createdBy,
+                    $warehouseId
                 );
             }
 
@@ -913,29 +913,131 @@ class StockService
         }
     }
 
+    /**
+     * Assemble packCount whole packs out of loose pieces (Pieces -> Pack).
+     * Decrements extra_pieces by (piecesPerPack * packCount), increments
+     * closing_qty by packCount. Throws StockException if extra_pieces is
+     * insufficient, or if no stock row exists for this key.
+     * Writes a single 'pieces_to_pack' ledger entry per call — qty/
+     * qty_before/qty_after track closing_qty (the pack-based figure),
+     * matching every other ledger entry's convention.
+     */
+    public function convertPiecesToPack(
+        int    $productId,
+        string $userType,
+        string $userId,
+        int    $piecesPerPack,
+        int    $packCount,
+        string $refId,
+        string $createdBy,
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
+    ): array {
+        if (!$externalTransaction) $this->db->begin_transaction();
+        try {
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
+            if ($row === null) {
+                throw new StockException(
+                    "No stock record for product=$productId user_type=$userType user_id=$userId"
+                );
+            }
+            $piecesNeeded = $piecesPerPack * $packCount;
+            $currentPieces = (int) $row['extra_pieces'];
+            if ($currentPieces < $piecesNeeded) {
+                throw new StockException(
+                    "Insufficient pieces to assemble $packCount pack(s) of product=$productId. Available=$currentPieces, Needed=$piecesNeeded"
+                );
+            }
+
+            $before = (int) $row['closing_qty'];
+            $after  = $before + $packCount;
+            $this->updateStockSnapshot($productId, $userType, $userId, [
+                'closing_qty'  => $after,
+                'extra_pieces' => $currentPieces - $piecesNeeded,
+            ], $warehouseId);
+
+            $ledgerId = $this->writeLedger(
+                $productId, $userType, $userId,
+                'pieces_to_pack', $packCount, $before, $after,
+                'conversion', $refId, '', $createdBy, $warehouseId
+            );
+
+            if (!$externalTransaction) $this->db->commit();
+            return [
+                'success' => true,
+                'ledger_id' => $ledgerId,
+                'closing_qty_after' => $after,
+                'extra_pieces_after' => $currentPieces - $piecesNeeded,
+            ];
+        } catch (\Throwable $e) {
+            if (!$externalTransaction) $this->db->rollback();
+            throw $e;
+        }
+    }
+
+    /**
+     * Break packCount whole packs into loose pieces (Pack -> Pieces).
+     * Decrements closing_qty by packCount, increments extra_pieces by
+     * (piecesPerPack * packCount). Throws StockException if closing_qty
+     * is insufficient, or if no stock row exists for this key.
+     * Writes a single 'pack_to_pieces' ledger entry per call.
+     */
+    public function convertPackToPieces(
+        int    $productId,
+        string $userType,
+        string $userId,
+        int    $piecesPerPack,
+        int    $packCount,
+        string $refId,
+        string $createdBy,
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
+    ): array {
+        if (!$externalTransaction) $this->db->begin_transaction();
+        try {
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
+            if ($row === null) {
+                throw new StockException(
+                    "No stock record for product=$productId user_type=$userType user_id=$userId"
+                );
+            }
+            $before = (int) $row['closing_qty'];
+            if ($before < $packCount) {
+                throw new StockException(
+                    "Insufficient packs to break open for product=$productId. Available=$before, Requested=$packCount"
+                );
+            }
+            $after = $before - $packCount;
+            $piecesGained = $piecesPerPack * $packCount;
+            $newPieces = (int) $row['extra_pieces'] + $piecesGained;
+
+            $this->updateStockSnapshot($productId, $userType, $userId, [
+                'closing_qty'  => $after,
+                'extra_pieces' => $newPieces,
+            ], $warehouseId);
+
+            $ledgerId = $this->writeLedger(
+                $productId, $userType, $userId,
+                'pack_to_pieces', $packCount, $before, $after,
+                'conversion', $refId, '', $createdBy, $warehouseId
+            );
+
+            if (!$externalTransaction) $this->db->commit();
+            return [
+                'success' => true,
+                'ledger_id' => $ledgerId,
+                'closing_qty_after' => $after,
+                'extra_pieces_after' => $newPieces,
+            ];
+        } catch (\Throwable $e) {
+            if (!$externalTransaction) $this->db->rollback();
+            throw $e;
+        }
+    }
+
     // -------------------------------------------------------------------------
     // PRIVATE HELPERS
     // -------------------------------------------------------------------------
-
-    /**
-     * Read-only: how much of a Neksomo product's shared pool is still
-     * available for $productId, if it's mapped and this is the Neksomo
-     * godown. 0 for every other product/godown (near-zero overhead).
-     *
-     * Uses purchased-minus-sold only (not get_neksomo_pool_available_packs(),
-     * which also subtracts already-converted stock) — conversion is a
-     * bookkeeping/visibility bridge that lets a mapped company product's own
-     * stock row draw from this pool, not a real stock movement that depletes
-     * what Neksomo itself can still send elsewhere. The same physical goods
-     * remain transferable from Neksomo's own godown regardless of how much
-     * has already been converted for other godowns' use.
-     */
-    private function neksomoPoolAvailable(int $productId, string $userType, string $userId): int
-    {
-        if ($userType !== 'company') return 0;
-        if ((int)$userId !== get_neksomo_godown_id($this->db)) return 0;
-        return get_neksomo_pool_purchased_minus_sold_packs($this->db, $productId);
-    }
 
     /**
      * Draws exactly the shortfall (never more) out of a Neksomo product's

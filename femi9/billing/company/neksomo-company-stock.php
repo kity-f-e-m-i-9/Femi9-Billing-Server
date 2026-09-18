@@ -132,11 +132,26 @@ $total_closing = 0;
 $total_closing_pieces = 0;
 
 $nks_condition = $section['exclude_nks'] ? "AND p.temp_id NOT LIKE 'NKS-%'" : "";
-$select_OPStock = "SELECT s.*, p.productName, p.pieces_per_pack
+// GROUP BY s.product_id, summing across any per-warehouse rows — a
+// product's stock can now be split across multiple physical godowns
+// (H1/G1/G2), and this report shows one aggregated line per product,
+// same as before physical warehouses existed. opening_date has no sum
+// equivalent, so MIN() picks the earliest one across a product's rows.
+// p.productName/p.pieces_per_pack are functionally dependent on
+// s.product_id, safe to select alongside the GROUP BY.
+$select_OPStock = "SELECT s.product_id, p.productName, p.pieces_per_pack,
+                        MIN(s.opening_date) as opening_date,
+                        SUM(s.opening_qty) as opening_qty,
+                        SUM(s.input_qty) as input_qty,
+                        SUM(s.sales_qty) as sales_qty,
+                        SUM(s.sent_qty) as sent_qty,
+                        SUM(s.extra_pieces) as extra_pieces,
+                        SUM(s.closing_qty) as closing_qty
                     FROM stock s
                     JOIN products p ON p.id = s.product_id
                     WHERE s.user_type = 'company' AND s.user_id = '$user_id_Loginvl'
                       $nks_condition
+                    GROUP BY s.product_id
                     ORDER BY p.productName ASC";
 										$Fetch_OPStock = mysqli_query($db_conn, $select_OPStock);
 										$row_count = mysqli_num_rows($Fetch_OPStock);

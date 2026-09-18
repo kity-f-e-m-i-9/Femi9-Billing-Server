@@ -12,6 +12,9 @@ $tps = $tp_result ? $tp_result->fetch_all(MYSQLI_ASSOC) : [];
 $gd_result = $db_conn->query("SELECT id, gname FROM company_godown WHERE gname LIKE '%Femi%' AND " . godown_finance_filter_sql($db_conn) . " ORDER BY gname");
 $godowns_list = $gd_result ? $gd_result->fetch_all(MYSQLI_ASSOC) : [];
 
+$wh_result = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+$warehouses_list = $wh_result ? $wh_result->fetch_all(MYSQLI_ASSOC) : [];
+
 // ── Prefill from a TP purchase order (tp-today-orders.php "Invoice" button) ──
 // Accepts 'waiting' (the normal case) and 'cancelled' (re-invoicing a PO
 // that was cancelled by mistake — tp-invoice-action.php completes/relinks
@@ -317,6 +320,7 @@ if ($prefill_po_id > 0) {
                         <input type="hidden" name="source_location_id" id="sourceLocationId">
                         <input type="hidden" name="source_cp_id" id="sourceCpId">
                         <input type="hidden" name="source_godown_id" id="sourceGodownId">
+                        <input type="hidden" name="warehouse_id" id="sourceWarehouseId">
                         <!-- product arrays injected by JS before submit -->
                         <div id="hiddenProductInputs"></div>
 
@@ -344,12 +348,27 @@ if ($prefill_po_id > 0) {
                                 </div>
 
                                 <div class="col-lg-4 col-md-6" id="sourceSection" style="display:none;">
-                                    <label class="form-label" id="sourceLabel">Channel Partner</label>
+                                    <label class="form-label"><span id="sourceLabel">Channel Partner</span> <span class="required">*</span></label>
                                     <div id="sourceContent"></div>
                                     <div class="field-hint" id="sourceHint">Auto-resolved from territory assignment</div>
                                     <div id="sourceToggle" style="display:none;margin-top:4px;">
                                         <a href="#" id="sourceToggleLink" style="font-size:12px;font-weight:600;text-decoration:underline;">Use company godown instead</a>
                                     </div>
+                                </div>
+
+                                <!-- Godown (physical warehouse) — only shown when sourcing from a
+                                     company godown, never when CP-sourced (CP stock has no
+                                     warehouse concept). Toggled by showGodownSource()/showCpSource(). -->
+                                <div class="col-lg-3 col-md-4" id="warehouseSection" style="display:none;">
+                                    <label class="form-label">Godown (physical) <span class="required">*</span></label>
+                                    <select id="warehouseDrop" class="form-control" required>
+                                        <option value="" hidden>Select</option>
+                                        <?php foreach ($warehouses_list as $wh): ?>
+                                            <option value="<?php echo (int)$wh['id']; ?>">
+                                                <?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?><?php echo $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : ''; ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
 
                                 <div class="col-lg-3 col-md-4">
@@ -606,6 +625,16 @@ $(document).ready(function() {
     /* ── Godown list (pre-loaded from PHP) ── */
     var godownsList = <?php echo json_encode($godowns_list); ?>;
 
+    /* ── Godown (physical warehouse) picker — static select, syncs its
+       value into the hidden warehouse_id field submitted with the form.
+       Select2 is initialized lazily in showGodownSource() rather than here,
+       since its container starts hidden (display:none) and Select2 computes
+       a broken 0px width if built while hidden — same reason #godownDrop is
+       built dynamically only when the godown section becomes visible. ── */
+    $('#warehouseDrop').on('change', function () {
+        $('#sourceWarehouseId').val($(this).val());
+    });
+
     /* ── Prefill from a TP purchase order (tp-today-orders.php "Invoice" button) ── */
     var prefillTpId  = <?php echo (int)$prefill_tp_id; ?>;
     var prefillItems = <?php echo json_encode($prefill_items); ?>;
@@ -743,6 +772,10 @@ $(document).ready(function() {
         }
         $('#sourceToggleLink').text('Use company godown instead');
         $('#sourceToggle').show();
+        // CP stock has no warehouse concept — hide and clear the picker.
+        $('#warehouseSection').hide();
+        $('#warehouseDrop').val('');
+        $('#sourceWarehouseId').val('');
     }
 
     /* ── Locked CP source: this invoice is billing a PO the TP submitted
@@ -754,12 +787,15 @@ $(document).ready(function() {
         $('#sourceHint').text('Locked — this purchase order was submitted against this channel partner\'s stock');
         useSource(src);
         $('#sourceToggle').hide();
+        $('#warehouseSection').hide();
+        $('#warehouseDrop').val('');
+        $('#sourceWarehouseId').val('');
     }
 
     /* ── Show godown source, with option to switch back to CP (if resolved) ── */
     function showGodownSource() {
         sourceMode = 'godown';
-        $('#sourceLabel').text('Source Godown');
+        $('#sourceLabel').text('Company');
         currentLocationId = null;
         currentCpId = null;
         $('#sourceLocationId').val('');
@@ -773,6 +809,10 @@ $(document).ready(function() {
             $('#sourceToggle').hide();
         }
         renderGodownDropdown();
+        $('#warehouseSection').show();
+        if (!$('#warehouseDrop').hasClass('select2-hidden-accessible')) {
+            $('#warehouseDrop').select2({ placeholder: 'Select', allowClear: false });
+        }
     }
 
     $('#sourceToggleLink').on('click', function (e) {
@@ -857,7 +897,7 @@ $(document).ready(function() {
         $('#balancePanel').hide();
         advanceBalance = 0;
 
-        var $sel = $('<select class="form-control" id="godownDrop"></select>');
+        var $sel = $('<select class="form-control" id="godownDrop" required></select>');
         $sel.append('<option value=""></option>');
         $.each(godownsList, function (_, gd) {
             $sel.append($('<option>').val(gd.id).text(gd.gname));
@@ -1150,7 +1190,8 @@ $(document).ready(function() {
 
     /* ── Form submit validation ── */
     $('#invoiceForm').on('submit', function (e) {
-        if (!$('#sourceCpId').val() && !$('#sourceGodownId').val()) { e.preventDefault(); alert('Please select a channel partner or godown.'); return; }
+        if (!$('#sourceCpId').val() && !$('#sourceGodownId').val()) { e.preventDefault(); alert('Please select a channel partner or company.'); return; }
+        if (sourceMode === 'godown' && !$('#sourceWarehouseId').val()) { e.preventDefault(); alert('Please select a godown (physical).'); return; }
         if (!invoiceItems.length)          { e.preventDefault(); alert('Please add at least one product.'); return; }
         if ($('#productBody .row-edit-input.is-invalid').length) { e.preventDefault(); alert('Fix the highlighted Qty/Rate value(s) before submitting.'); return; }
         buildHiddenInputs();
@@ -1169,6 +1210,9 @@ $(document).ready(function() {
         $('#sourceLocationId').val('');
         $('#sourceCpId').val('');
         $('#sourceGodownId').val('');
+        $('#sourceWarehouseId').val('');
+        $('#warehouseDrop').val('');
+        $('#warehouseSection').hide();
         availableProducts = [];
         // destroy any Select2 on the source dropdown before clearing it
         if ($('#sourceDrop').length)   { try { $('#sourceDrop').select2('destroy');   } catch(e){} }

@@ -679,6 +679,8 @@ else{ $amount_received_fully="0";}
 <input type="hidden" name="invuser" value="<?=$getinvuser?>">
 <!-- ✅ For Super Stockist: Use their own ID as godown -->
 <input type="hidden" name="godownid" value="<?=$onboard_userID;?>">
+<?php $inv_warehouse_id = $result_InvoieDetails['warehouse_id'] ?? null; ?>
+<input type="hidden" name="warehouse_id" value="<?=$inv_warehouse_id !== null ? (int)$inv_warehouse_id : '';?>">
 
 <!-- Invoice Details Section -->
 <div class="form-section">
@@ -1275,6 +1277,21 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
 <input type="hidden" name="usertype" value="<?=$Result_Log_users_Dtails134['usertype'];?>">
 <!-- ✅ For Super Stockist: Use their own ID as godown -->
 <input type="hidden" name="godownid" value="<?=$onboard_userID;?>">
+
+<!-- Godown (physical warehouse) — SS's own account is always the stock
+     source, so this is a standalone selection with no preceding
+     company-profile picker step. -->
+<label class="form-label">Godown (physical)</label>
+<select name="warehouse_id" class="form-control">
+<option value="">— Not tracked —</option>
+<?php $select_Warehouse="select id, code, name from warehouses where is_active = 1 order by code asc";
+$fetch_Warehouse=mysqli_query($db_conn,$select_Warehouse);
+while($result_Warehouse=mysqli_fetch_array($fetch_Warehouse))
+{?>
+<option value="<?=(int)$result_Warehouse['id'];?>"><?=htmlspecialchars($result_Warehouse['code'], ENT_QUOTES, 'UTF-8');?><?=$result_Warehouse['name'] ? ' - ' . htmlspecialchars($result_Warehouse['name'], ENT_QUOTES, 'UTF-8') : '';?></option>
+<?php }?>
+</select>
+<br/>
 
 <!-- New Invoice Form Section -->
 <div class="form-section">

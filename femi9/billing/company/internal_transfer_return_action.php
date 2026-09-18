@@ -16,7 +16,9 @@ if ($rowid <= 0 || $returnQty <= 0) {
 }
 
 $stmt = $db_conn->prepare(
-    "SELECT product_id, qty, returned_qty, send_from, send_to FROM internal_transfer WHERE id = ?"
+    "SELECT product_id, qty, returned_qty, send_from, send_to,
+            price, gst_type, gst, taxable_value, gst_amount, total
+     FROM internal_transfer WHERE id = ?"
 );
 $stmt->bind_param('i', $rowid);
 $stmt->execute();
@@ -34,6 +36,9 @@ $qty         = (int)    $row['qty'];
 $returnedQty = (int)    $row['returned_qty'];
 $send_from   = (string) $row['send_from'];
 $send_to     = (string) $row['send_to'];
+$price       = (float)  $row['price'];
+$gstType     = (string) $row['gst_type'];
+$gst         = (float)  $row['gst'];
 
 $returnable = $qty - $returnedQty;
 if ($returnQty > $returnable) {
@@ -78,6 +83,27 @@ try {
     $stmtUpd->bind_param('ii', $newReturnedQty, $rowid);
     $stmtUpd->execute();
     $stmtUpd->close();
+
+    // Snapshot this return as its own credit note row — pro-rated off the
+    // parent line's per-unit price/GST — so it can be listed and deleted
+    // independently of any other return against the same line.
+    $returnTaxableValue = (float) $row['taxable_value'] * $returnQty / $qty;
+    $returnGstAmount     = (float) $row['gst_amount']    * $returnQty / $qty;
+    $returnTotal         = (float) $row['total']         * $returnQty / $qty;
+
+    $stmtNote = $db_conn->prepare(
+        "INSERT INTO internal_transfer_return
+            (transfer_id, tempid, product_id, qty, send_from, send_to,
+             price, gst_type, gst, taxable_value, gst_amount, total, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    $stmtNote->bind_param(
+        'isiissdsdddds',
+        $rowid, $tempid, $product_id, $returnQty, $send_from, $send_to,
+        $price, $gstType, $gst, $returnTaxableValue, $returnGstAmount, $returnTotal, $createdBy
+    );
+    $stmtNote->execute();
+    $stmtNote->close();
 
     $db_conn->commit();
 

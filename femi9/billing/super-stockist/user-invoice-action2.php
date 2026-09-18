@@ -40,6 +40,9 @@ if(isset($_REQUEST['addInvoice2']))
 	
 	$gst_type = $result_INVProductDetails['gst_type'];
 	$buyer_gsttype = $result_INVProductDetails['buyer_gsttype'];
+	// Warehouse was fixed at invoice creation (action.php) — read it back
+	// from the stored row rather than re-deriving from this step's POST.
+	$warehouseId = $result_INVProductDetails['warehouse_id'] !== null ? (int) $result_INVProductDetails['warehouse_id'] : null;
 		
 	$invuser = mysqli_real_escape_string($db_conn, $_REQUEST['invuser']);
 	$customer_id = mysqli_real_escape_string($db_conn, $_REQUEST['customer_id']);
@@ -135,7 +138,8 @@ if(isset($_REQUEST['addInvoice2']))
 	//--------------------------------------------------------------------------------
 	// CHECK AVAILABLE STOCK
 	//--------------------------------------------------------------------------------
-	$select_count_AVSTOCK = "select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
+	$select_count_AVSTOCK = "select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'
+		and warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ' . (int)$warehouseId);
 	$FETCH_count_AVSTOCK = mysqli_query($db_conn, $select_count_AVSTOCK);
 	$RESULT_count_AVSTOCK = mysqli_fetch_array($FETCH_count_AVSTOCK);
 	$AVMstock = $RESULT_count_AVSTOCK['closing_qty'] ?? 0;
