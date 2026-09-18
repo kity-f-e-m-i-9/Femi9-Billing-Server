@@ -6,6 +6,7 @@ include("config.php");
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/StockLots.php");
+require_once("include/NeksomoStockBridge.php");
 
 $__usertype = get_login_usertype($db_conn);
 if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
@@ -297,6 +298,31 @@ try {
                 $ratePerPack, $item['qty_packs'], $purchase_date,
                 'neksomo_purchase', (string) $purchase_id, $created_by
             );
+        }
+
+        // Proactively draw this purchase's pool contribution into every
+        // mapped sellable company product's real stock — otherwise the
+        // credited stock sits invisibly on the raw NKS-% placeholder
+        // product ($item['pid']) until someone happens to attempt a sale
+        // that exceeds what's already on a mapped product's own row
+        // (StockService::ensureNeksomoTopUp()'s lazy, reactive path).
+        // One Neksomo product can map to several sibling company SKUs
+        // sharing the same pool (e.g. 3pc/6pc/9pc packs of the same
+        // napkin roll) — each sibling is processed in a stable order
+        // (ascending company_product_id) and only draws what's still
+        // available after earlier siblings claimed their share, using
+        // the same "purchased - sold - already converted" pool math
+        // ensureNeksomoTopUp() already relies on.
+        $mappedCompanyProductIds = get_neksomo_product_mapping($db_conn, $item['pid']);
+        sort($mappedCompanyProductIds);
+        foreach ($mappedCompanyProductIds as $companyProductId) {
+            $availablePacks = get_neksomo_pool_available_packs($db_conn, $companyProductId);
+            if ($availablePacks <= 0) continue;
+            $stockService->credit(
+                $companyProductId, 'company', (string) $neksomoGodownId, $availablePacks,
+                'adjustment', 'neksomo_conversion_' . uniqid(), $created_by, true
+            );
+            record_neksomo_stock_conversion($db_conn, $companyProductId, $availablePacks, $created_by);
         }
     }
     $itemStmt->close();
