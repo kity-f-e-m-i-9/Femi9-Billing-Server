@@ -236,10 +236,12 @@ if (!empty($requirements)) {
             </div>
             <div class="modal-body" style="padding:14px 20px;">
                 <p class="text-muted small">
-                    Every order behind today's transfer, with all of its own products. Uncheck an
-                    order + Apply to leave every one of its products out of today's transfer — the
-                    order itself stays exactly as it is (still waiting/draft); this page reloads to
-                    reflect the change across every affected product row.
+                    Every order behind today's transfer, with all of its own products. Uncheck one
+                    product (e.g. if just that item has a stock problem) or the whole order's
+                    checkbox, then Apply — the order/its other products are untouched, only what's
+                    unchecked is left out of today's transfer. The order itself stays exactly as it
+                    is (still waiting/draft); this page reloads to reflect the change across every
+                    affected product row.
                 </p>
                 <ul class="nav nav-tabs" role="tablist">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ovTpPane" type="button">TP Purchase Orders</button></li>
@@ -381,19 +383,24 @@ if (!empty($requirements)) {
             return;
         }
         var html = '';
-        orders.forEach(function (order, idx) {
+        orders.forEach(function (order) {
             var productsHtml = order.products.map(function (p) {
-                return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12.5px;color:#4b5563;">' +
-                    '<span>' + escBd(p.product_name) + '</span><span style="font-weight:600;">' + p.qty + '</span>' +
+                return '<div class="ov-product-row" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
+                    '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:0;">' +
+                        '<input type="checkbox" class="ov-product-check" checked style="margin-right:8px;flex-shrink:0;">' +
+                        '<span style="overflow-wrap:anywhere;">' + escBd(p.product_name) + '</span>' +
+                    '</label>' +
+                    '<input type="number" min="0" max="' + p.qty + '" class="form-control form-control-sm ov-product-qty" ' +
+                        'value="' + p.qty + '" style="width:75px;flex-shrink:0;" title="Max ' + p.qty + '">' +
                 '</div>';
             }).join('');
             html += '<div class="ov-order" data-order-key="' + escBd(order.order_key) + '" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
                     '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:160px;font-weight:600;">' +
-                        '<input type="checkbox" class="ov-check" checked style="margin-right:8px;flex-shrink:0;">' +
+                        '<input type="checkbox" class="ov-check" checked style="margin-right:8px;flex-shrink:0;" title="Select/deselect every product in this order">' +
                         '<span style="overflow-wrap:anywhere;">' + escBd(order.label) + '</span>' +
                     '</label>' +
-                    '<button type="button" class="btn btn-sm btn-outline-danger ov-not-today" style="white-space:nowrap;font-size:11px;padding:2px 8px;">Not Today</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger ov-not-today" style="white-space:nowrap;font-size:11px;padding:2px 8px;">Not Today (whole order)</button>' +
                 '</div>' +
                 '<div style="margin-top:6px;padding-left:26px;border-top:1px solid #f1f5f9;padding-top:6px;">' + productsHtml + '</div>' +
             '</div>';
@@ -404,6 +411,15 @@ if (!empty($requirements)) {
         el.querySelectorAll('.ov-order').forEach(function (rowEl, idx) {
             rowEl._ovOrder = orders[idx];
             rowEl._ovSourceType = containerId === 'ovTpList' ? 'tp' : 'ot';
+        });
+        // Order checkbox is a select-all/deselect-all toggle for its own
+        // product checkboxes — the real, individually-actionable state
+        // lives on each .ov-product-check, not on this one.
+        el.querySelectorAll('.ov-check').forEach(function (orderCheck) {
+            orderCheck.addEventListener('change', function () {
+                var rowEl = orderCheck.closest('.ov-order');
+                rowEl.querySelectorAll('.ov-product-check').forEach(function (pc) { pc.checked = orderCheck.checked; });
+            });
         });
         el.querySelectorAll('.ov-not-today').forEach(function (btn) {
             btn.addEventListener('click', function () { ovSkipOrderNotToday(this); });
@@ -450,19 +466,25 @@ if (!empty($requirements)) {
         });
     }
 
-    // Any unchecked order's every product line gets marked skipped, same
-    // as "Not Today" — then reloads the page so every affected product
-    // row's Required Qty / Available / Qty to Transfer recomputes from
-    // the server, rather than trying to patch several rows client-side.
+    // Acts per PRODUCT LINE, not per order — a single PO/OT invoice can
+    // carry several products, and one of them alone might have a stock
+    // problem that shouldn't hold back the rest of the same order. Any
+    // unchecked product line gets marked skipped (its own qty box's
+    // edited value isn't sent anywhere — this is a full include/exclude
+    // per line here, not a partial-qty split); then reloads the page so
+    // every affected product row's Required Qty / Qty to Transfer
+    // recomputes from the server, rather than trying to patch several
+    // rows client-side.
     function applyOrdersOverview() {
         var calls = [];
         document.querySelectorAll('.ov-order').forEach(function (rowEl) {
-            var checkbox = rowEl.querySelector('.ov-check');
-            if (checkbox.checked) return; // left in — nothing to do
             var order = rowEl._ovOrder;
             var sourceType = rowEl._ovSourceType;
-            order.products.forEach(function (p) {
-                var sourceRef = order.order_key + ':' + p.product_id;
+            rowEl.querySelectorAll('.ov-product-row').forEach(function (prodRowEl) {
+                var checkbox = prodRowEl.querySelector('.ov-product-check');
+                if (checkbox.checked) return; // left in — nothing to do
+                var productId = prodRowEl.getAttribute('data-product-id');
+                var sourceRef = order.order_key + ':' + productId;
                 calls.push($.post('mark-auto-transfer-skip.php', { source_type: sourceType, source_ref: sourceRef }));
             });
         });
