@@ -120,6 +120,9 @@ if (!empty($requirements)) {
                                         <i class="material-icons" style="font-size:15px;vertical-align:middle;">list_alt</i> View All Orders
                                     </button>
                                     <?php endif; ?>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" style="margin-bottom:14px;margin-left:8px;" onclick="openTransferHistory()">
+                                        <i class="material-icons" style="font-size:15px;vertical-align:middle;">history</i> Transfer History
+                                    </button>
 
                                     <?php if (empty($rows)): ?>
                                         <div class="alert alert-info">Nothing to transfer today.</div>
@@ -255,6 +258,37 @@ if (!empty($requirements)) {
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="applyOrdersOverview()">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- "Transfer History" — per-product before-stock (Neksomo/Healthcare/LLP)
+     and qty transferred, for every auto-transfer run on a chosen date.
+     Read entirely from stock_ledger's own qty_before/created_at — nothing
+     new is tracked, this just surfaces what StockService already logged. -->
+<div class="modal fade" id="transferHistoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-xl">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                <h6 class="modal-title" style="font-weight:600;color:#1f2937;">
+                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#6b7280;">history</i>
+                    Auto Transfer History
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding:14px 20px;">
+                <div style="display:flex;align-items:end;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+                    <div>
+                        <label class="form-label" style="font-size:12.5px;font-weight:600;color:#6b7280;">Date</label>
+                        <input type="date" id="thDateInput" class="form-control form-control-sm" style="width:170px;">
+                    </div>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="loadTransferHistory()">Show</button>
+                </div>
+                <div id="thResult"></div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -500,6 +534,66 @@ if (!empty($requirements)) {
             window.location.reload();
         }).fail(function () {
             alert('Could not apply your changes. Please try again.');
+        });
+    }
+
+    // ── "Transfer History" ──
+    function openTransferHistory() {
+        var dateInput = document.getElementById('thDateInput');
+        if (!dateInput.value) {
+            var yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            dateInput.value = yesterday.toISOString().slice(0, 10);
+        }
+        document.getElementById('thResult').innerHTML = '';
+        var modal = new bootstrap.Modal(document.getElementById('transferHistoryModal'));
+        modal.show();
+        loadTransferHistory();
+    }
+
+    function thFmtStock(v) { return v === null ? '<span class="text-muted">&mdash;</span>' : v; }
+
+    function thFmtDateTime(v) {
+        if (!v) return '<span class="text-muted">&mdash;</span>';
+        var d = new Date(v.replace(' ', 'T'));
+        if (isNaN(d.getTime())) return escBd(v);
+        return d.toLocaleDateString('en-IN') + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function loadTransferHistory() {
+        var date = document.getElementById('thDateInput').value;
+        if (!date) return;
+        var resultEl = document.getElementById('thResult');
+        resultEl.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
+
+        $.getJSON('get-auto-transfer-history.php', { date: date }, function (data) {
+            if (data.error) {
+                resultEl.innerHTML = '<div class="text-danger small" style="padding:10px 4px;">' + escBd(data.error) + '</div>';
+                return;
+            }
+            if (!data.rows || !data.rows.length) {
+                resultEl.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">No auto-transfers found on this date.</div>';
+                return;
+            }
+            var html = '<div style="overflow-x:auto;"><table class="table table-bordered table-sm" style="min-width:760px;">' +
+                '<thead><tr style="background:#f8fafc;">' +
+                    '<th>Product</th><th>Closing Stock Before (Neksomo)</th><th>Closing Stock Before (Healthcare)</th>' +
+                    '<th>Closing Stock Before (LLP)</th><th>Qty Transferred</th><th>Date &amp; Time</th>' +
+                '</tr></thead><tbody>';
+            data.rows.forEach(function (r) {
+                html += '<tr>' +
+                    '<td>' + escBd(r.product_name) + '</td>' +
+                    '<td>' + thFmtStock(r.neksomo_before) + '</td>' +
+                    '<td>' + thFmtStock(r.healthcare_before) + '</td>' +
+                    '<td>' + thFmtStock(r.llp_before) + '</td>' +
+                    '<td style="font-weight:600;">' + r.qty_transferred + '</td>' +
+                    '<td>' + thFmtDateTime(r.transferred_at) + '</td>' +
+                '</tr>';
+            });
+            html += '</tbody></table></div>';
+            resultEl.innerHTML = html;
+        }).fail(function () {
+            resultEl.innerHTML = '<div class="text-danger small" style="padding:10px 4px;">Could not load history.</div>';
         });
     }
 </script>

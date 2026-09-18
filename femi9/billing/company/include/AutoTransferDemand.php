@@ -307,3 +307,71 @@ function cap_auto_transfer_qty(int $required, int $neksomoAvail, int $healthcare
     $capped = min($required, $neksomoAvail + $healthcareAvail);
     return max(0, $capped);
 }
+
+/**
+ * Per-product history of every auto-transfer run on one calendar date —
+ * powers the "Transfer History" button on internal_transfer_auto.php.
+ * Scoped to auto-transfers only via internal_transfer_auto_action.php's
+ * own tempid convention ("AUTO<timestamp><rand>-N1"/"-N2" — never
+ * collides with manual transfers' "<rand>INTTRNS/<date>/<time>" format),
+ * so this never picks up a manual transfer by mistake.
+ *
+ * Reads stock_ledger's own qty_before/qty_after + created_at for the
+ * exact before/after stock and real timestamp of each movement — no
+ * separate history table needed, since StockService already records
+ * this for every transfer_out/transfer_in it performs. "Before" for
+ * Healthcare specifically means before EITHER leg touched it that run
+ * (i.e. its qty_before as the destination of leg 1, not as the source
+ * of leg 2 — that would just be "after receiving from Neksomo").
+ *
+ * Returns a list of rows, each shaped:
+ * ['product_id' => int, 'product_name' => string, 'qty_transferred' => int,
+ *  'neksomo_before' => ?int, 'healthcare_before' => ?int, 'llp_before' => ?int,
+ *  'transferred_at' => ?string (Y-m-d H:i:s)]
+ * A null before/after value means the matching stock_ledger row wasn't
+ * found (e.g. a very old run predating this table, or a partial/failed
+ * leg) — the caller should render that as "—", not 0.
+ */
+function get_auto_transfer_history_for_date(mysqli $db_conn, string $date, int $neksomoId, int $healthcareId, int $llpId): array
+{
+    $stmt = $db_conn->prepare(
+        "SELECT it2.product_id, p.productName, it2.qty AS qty_transferred,
+                sl_out.qty_before AS neksomo_before,
+                sl_in1.qty_before AS healthcare_before,
+                sl_in2.qty_before AS llp_before,
+                COALESCE(sl_out.created_at, sl_in2.created_at) AS transferred_at
+         FROM internal_transfer it2
+         INNER JOIN products p ON p.id = it2.product_id
+         LEFT JOIN stock_ledger sl_out
+           ON sl_out.ref_id = REPLACE(it2.tempid, '-N2', '-N1') AND sl_out.action = 'transfer_out'
+              AND sl_out.user_id = ? AND sl_out.product_id = it2.product_id
+         LEFT JOIN stock_ledger sl_in1
+           ON sl_in1.ref_id = REPLACE(it2.tempid, '-N2', '-N1') AND sl_in1.action = 'transfer_in'
+              AND sl_in1.user_id = ? AND sl_in1.product_id = it2.product_id
+         LEFT JOIN stock_ledger sl_in2
+           ON sl_in2.ref_id = it2.tempid AND sl_in2.action = 'transfer_in'
+              AND sl_in2.user_id = ? AND sl_in2.product_id = it2.product_id
+         WHERE it2.tempid LIKE 'AUTO%-N2' AND it2.send_to = ? AND it2.date = ?
+         ORDER BY transferred_at ASC, p.productName ASC"
+    );
+    $neksomoStr = (string) $neksomoId;
+    $healthcareStr = (string) $healthcareId;
+    $llpStr = (string) $llpId;
+    $llpSendTo = (string) $llpId;
+    $stmt->bind_param('sssss', $neksomoStr, $healthcareStr, $llpStr, $llpSendTo, $date);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    return array_map(function ($row) {
+        return [
+            'product_id'        => (int) $row['product_id'],
+            'product_name'      => $row['productName'],
+            'qty_transferred'   => (int) $row['qty_transferred'],
+            'neksomo_before'    => $row['neksomo_before'] !== null ? (int) $row['neksomo_before'] : null,
+            'healthcare_before' => $row['healthcare_before'] !== null ? (int) $row['healthcare_before'] : null,
+            'llp_before'        => $row['llp_before'] !== null ? (int) $row['llp_before'] : null,
+            'transferred_at'    => $row['transferred_at'],
+        ];
+    }, $rows);
+}
