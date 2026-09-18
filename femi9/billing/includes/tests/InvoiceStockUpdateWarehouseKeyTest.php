@@ -61,7 +61,7 @@ $conn->query("CREATE TABLE stock_ledger (
 $conn->query("CREATE TABLE company_godown (id INT AUTO_INCREMENT PRIMARY KEY, gname VARCHAR(255) NOT NULL)");
 $conn->query("CREATE TABLE stock_lots (
     id INT AUTO_INCREMENT PRIMARY KEY, product_id INT NOT NULL, user_type VARCHAR(32) NOT NULL,
-    user_id VARCHAR(32) NOT NULL, rate DECIMAL(12,6) NOT NULL, qty_purchased INT NOT NULL,
+    user_id VARCHAR(32) NOT NULL, warehouse_id INT NULL, rate DECIMAL(12,6) NOT NULL, qty_purchased INT NOT NULL,
     qty_remaining INT NOT NULL, purchase_date DATE NOT NULL, ref_type VARCHAR(32) NOT NULL,
     ref_id VARCHAR(64) NULL, created_by VARCHAR(64) NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");

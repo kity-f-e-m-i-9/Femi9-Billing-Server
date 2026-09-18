@@ -86,7 +86,8 @@ class StockService
 
             $consumed = StockLots::consumeFifo(
                 $this->db, $productId, $userType, $userId, $qty,
-                fn() => $this->fallbackRate($productId)
+                fn() => $this->fallbackRate($productId),
+                $warehouseId
             );
             StockLots::writeConsumption($this->db, $ledgerId, $consumed);
 
@@ -717,7 +718,8 @@ class StockService
 
             $consumed = StockLots::consumeFifo(
                 $this->db, $productId, $userType, $userId, $qty,
-                fn() => $this->fallbackRate($productId)
+                fn() => $this->fallbackRate($productId),
+                $warehouseId
             );
             StockLots::writeConsumption($this->db, $ledgerId, $consumed);
 
@@ -783,7 +785,8 @@ class StockService
             if ($lotRate !== null) {
                 StockLots::recordLot(
                     $this->db, $productId, $userType, $userId, $lotRate, $qty,
-                    date('Y-m-d'), 'transfer_in', $refId, $createdBy
+                    date('Y-m-d'), 'transfer_in', $refId, $createdBy,
+                    $warehouseId
                 );
             }
 

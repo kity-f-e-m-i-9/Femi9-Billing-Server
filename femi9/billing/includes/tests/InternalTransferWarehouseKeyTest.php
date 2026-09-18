@@ -97,6 +97,7 @@ $conn->query("CREATE TABLE stock_lots (
     product_id INT NOT NULL,
     user_type VARCHAR(32) NOT NULL,
     user_id VARCHAR(32) NOT NULL,
+    warehouse_id INT NULL,
     rate DECIMAL(12,6) NOT NULL,
     qty_purchased INT NOT NULL,
     qty_remaining INT NOT NULL,
