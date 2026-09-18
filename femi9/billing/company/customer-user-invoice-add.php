@@ -196,6 +196,11 @@ else{ $amount_received_fully="0";}
 							   </select>
 							   <br/><br/>
 <!------------------------------------------------------------------------------>
+<!--------------------------GODOWN (PHYSICAL WAREHOUSE)-------------------------->
+<?php $inv_warehouse_id = $result_InvoieDetails['warehouse_id'] ?? null; ?>
+<input type="hidden" name="warehouse_id" value="<?=$inv_warehouse_id !== null ? (int)$inv_warehouse_id : '';?>">
+<!--------------------------GODOWN (PHYSICAL WAREHOUSE)-------------------------->
+<!------------------------------------------------------------------------------>
 <!------------------------------------------------------------------------------>
           
 <label class="form-label"><?=$lablenamedisplay;?>*</label>
@@ -648,6 +653,20 @@ xmlhttp.send();}
 							   </select>
 							   <br/><br/>
 							   <div id="opstock"></div>
+<!------------------------------------------------------------------------------>
+<!--------------------------GODOWN (PHYSICAL WAREHOUSE)-------------------------->
+<label class="form-label">Godown (physical)</label>
+<select name="warehouse_id" class="form-control">
+<option value="">— Not tracked —</option>
+<?php $select_Warehouse="select id, code, name from warehouses where is_active = 1 order by code asc";
+$fetch_Warehouse=mysqli_query($db_conn,$select_Warehouse);
+while($result_Warehouse=mysqli_fetch_array($fetch_Warehouse))
+{?>
+<option value="<?=(int)$result_Warehouse['id'];?>"><?=htmlspecialchars($result_Warehouse['code'], ENT_QUOTES, 'UTF-8');?><?=$result_Warehouse['name'] ? ' - ' . htmlspecialchars($result_Warehouse['name'], ENT_QUOTES, 'UTF-8') : '';?></option>
+<?php }?>
+</select>
+<br/><br/>
+<!--------------------------GODOWN (PHYSICAL WAREHOUSE)-------------------------->
 <!------------------------------------------------------------------------------>
 <!------------------------------------------------------------------------------>
 

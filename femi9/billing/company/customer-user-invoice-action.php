@@ -7,7 +7,9 @@ include("RemoveSpecialChar.php");
 	
 	$godownid=$_REQUEST['godownid'];
 	$Login_user_IDvl=$godownid;
-	
+	$warehouseId = filter_var($_REQUEST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
+	$warehouseIdSql = $warehouseId === null ? 'NULL' : (int) $warehouseId;
+
 	//invoice accept=0
 	if($_REQUEST['invoice_number_accept']==0)
 	{
@@ -113,11 +115,11 @@ $gst_type="inner";
 		
 		//2. insert invoice
 		$insert_Invoice="insert into invoice (inv_id,id_only,inv_number,customer_id,date,inv_year,
-		sub_total,discount,total,user_type,user_id,
+		sub_total,discount,total,user_type,user_id,warehouse_id,
 		gst_type,roundoff,courier_charges,buyer_gsttype)
-		values 
+		values
 		('$inv_id','$id_only','$inv_number','$customer_id','$date','$inv_year','0','0','0',
-		'$Login_user_TYPEvl','$Login_user_IDvl','$gst_type','0','0','$buyer_gsttype')";
+		'$Login_user_TYPEvl','$Login_user_IDvl',$warehouseIdSql,'$gst_type','0','0','$buyer_gsttype')";
 		mysqli_query($db_conn,$insert_Invoice);
 		
 	}
