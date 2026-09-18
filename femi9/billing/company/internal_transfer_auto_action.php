@@ -38,6 +38,8 @@ function next_internal_transfer_invoice_number(mysqli $db, string $prefix): stri
 
 $productIds = $_REQUEST['product_id'] ?? [];
 $qtyArr     = $_REQUEST['qty'] ?? [];
+$rate1Arr   = $_REQUEST['rate1'] ?? []; // Neksomo -> Healthcare rate, entered on this page
+$rate2Arr   = $_REQUEST['rate2'] ?? []; // Healthcare -> LLP rate, entered on this page
 
 if (!is_array($productIds) || count($productIds) === 0) {
     $_SESSION['errorMessage'] = "No products submitted.";
@@ -67,10 +69,12 @@ if (!is_godown_allowed($db_conn, (int)$neksomoId) || !is_godown_allowed($db_conn
 
 $rows = [];
 foreach ($productIds as $i => $rawPid) {
-    $pid = (int) $rawPid;
-    $qty = (int) RemoveSpecialChar($qtyArr[$i] ?? '0');
+    $pid   = (int) $rawPid;
+    $qty   = (int) RemoveSpecialChar($qtyArr[$i] ?? '0');
+    $rate1 = (float) ($rate1Arr[$i] ?? 0);
+    $rate2 = (float) ($rate2Arr[$i] ?? 0);
     if ($pid <= 0 || $qty <= 0) continue;
-    $rows[] = ['pid' => $pid, 'qty' => $qty];
+    $rows[] = ['pid' => $pid, 'qty' => $qty, 'rate1' => $rate1, 'rate2' => $rate2];
 }
 
 if (empty($rows)) {
@@ -121,7 +125,7 @@ try {
      * re-validated here, never trusting the popup's earlier snapshot).
      */
     $writeLeg = function (
-        string $tempid, string $invNumber, string $sendFrom, string $sendTo, int $pid, int $qty
+        string $tempid, string $invNumber, string $sendFrom, string $sendTo, int $pid, int $qty, float $rate
     ) use (
         $db_conn, $stockService, $createdBy, $username, $usertype, $date,
         $stmtInvChk, $stmtInvIns, $stmtProdIns, $stmtProd, $Login_user_TYPEvl
@@ -138,7 +142,7 @@ try {
         $gst      = (float) $prod['gst'];
         $gstType  = ($prod['gst_type'] === 'inclusive') ? 'inclusive' : 'exclusive';
         $hsn      = $prod['hsn'];
-        $subTotal = 0.0; // auto transfer carries no manual rate entry; billing rate stays 0, cost flows via consumed_rate
+        $subTotal = $rate * $actualQty;
 
         if ($gstType === 'inclusive') {
             $total         = $subTotal;
@@ -157,7 +161,6 @@ try {
             $stmtInvIns->execute();
         }
 
-        $rate = 0.0;
         $disc = 0.0;
         $stmtProdIns->bind_param(
             'ssssiiddddsssssss',
@@ -193,10 +196,10 @@ try {
         // Transfer Now click would re-count and re-move the same demand.
         $contributingOrders = get_auto_transfer_breakdown_for_product($db_conn, $pid, $llpId);
 
-        $legOneQty = $writeLeg($tempid1, $invNumber1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty);
+        $legOneQty = $writeLeg($tempid1, $invNumber1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty, $row['rate1']);
         if ($legOneQty <= 0) continue;
 
-        $legTwoQty = $writeLeg($tempid2, $invNumber2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty);
+        $legTwoQty = $writeLeg($tempid2, $invNumber2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty, $row['rate2']);
 
         if ($legTwoQty < $requestedQty) {
             $cappedRows[] = "Product #$pid: requested $requestedQty, transferred $legTwoQty";

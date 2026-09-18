@@ -133,7 +133,7 @@ if (!empty($requirements)) {
                                     <?php else: ?>
                                         <form method="post" action="internal_transfer_auto_action.php" onsubmit="return confirm('Transfer these quantities now?');">
                                             <div style="overflow-x:auto;">
-                                            <table class="table table-bordered" style="min-width:760px;">
+                                            <table class="table table-bordered" style="min-width:1000px;">
                                                 <thead>
                                                     <tr>
                                                         <th>Product</th>
@@ -141,6 +141,8 @@ if (!empty($requirements)) {
                                                         <th>Available (Neksomo)</th>
                                                         <th>Available (Healthcare)</th>
                                                         <th>Qty to Transfer</th>
+                                                        <th>Rate to Health Care (Rs.)</th>
+                                                        <th>Rate to LLP (Rs.)</th>
                                                         <th>Breakdown</th>
                                                     </tr>
                                                 </thead>
@@ -157,6 +159,12 @@ if (!empty($requirements)) {
                                                         <td>
                                                             <input type="number" min="0" name="qty[]" id="qty_<?php echo (int) $row['product_id']; ?>"
                                                                    value="<?php echo (int) $row['capped']; ?>" class="form-control">
+                                                        </td>
+                                                        <td>
+                                                            <input type="number" min="0" step="0.01" name="rate1[]" placeholder="Rate(Rs.)" class="form-control">
+                                                        </td>
+                                                        <td>
+                                                            <input type="number" min="0" step="0.01" name="rate2[]" placeholder="Rate(Rs.)" class="form-control">
                                                         </td>
                                                         <td>
                                                             <button type="button" class="btn btn-sm"
