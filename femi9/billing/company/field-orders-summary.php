@@ -15,9 +15,32 @@ $to_date   = $_REQUEST['todate'] ?? $today;
 
 $_isBdm = ($Login_user_TYPEvl ?? '') === 'salesbdm';
 $_scopedTpIds = null;
+$_scopedMs = [];
+$_selectedMsId = (int)($_REQUEST['ms_id'] ?? 0);
 if ($_isBdm) {
     require_once __DIR__ . '/../salesbdm/include/BdmTpScope.php';
+    require_once __DIR__ . '/../marketing/include/AssignedLocations.php';
     $_scopedTpIds = getBdmAssignedTpIds($db_conn, (int)$salesBdmID, true);
+
+    // Same district-match used by bdm-ms-shop-view.php: only the DMs
+    // (marketing staff) whose own assigned district falls inside this
+    // BDM's districts, so the selector only ever offers "your" DMs.
+    $_bdmDistricts = array_map(fn($n) => mb_strtolower(trim($n)), getBdmAssignedDistrictNames($db_conn, (int)$salesBdmID));
+    $_chkDel = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'deleted_at'");
+    if ($_chkDel && $_chkDel->num_rows === 0) {
+        $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL");
+    }
+    $_msRows = $db_conn->query("SELECT id, ms_name FROM marketing_staff WHERE deleted_at IS NULL ORDER BY ms_name ASC")->fetch_all(MYSQLI_ASSOC);
+    foreach ($_msRows as $_msRow) {
+        $districts = getMsAssignedDistricts($db_conn, (int)$_msRow['id']);
+        foreach ($districts as $d) {
+            if (in_array(mb_strtolower(trim($d['name'])), $_bdmDistricts, true)) { $_scopedMs[] = $_msRow; break; }
+        }
+    }
+    // Selected DM must be one of the scoped ones — otherwise ignore it.
+    if ($_selectedMsId > 0 && !in_array($_selectedMsId, array_map(fn($r) => (int)$r['id'], $_scopedMs), true)) {
+        $_selectedMsId = 0;
+    }
 }
 
 $tpWhereParts = [];
@@ -26,6 +49,11 @@ $types = '';
 if ($_scopedTpIds !== null) {
     if (empty($_scopedTpIds)) { $_scopedTpIds = [0]; }
     $tpWhereParts[] = 'o.tp_id IN (' . implode(',', array_map('intval', $_scopedTpIds)) . ')';
+}
+if ($_selectedMsId > 0) {
+    $tpWhereParts[] = 'o.assigned_by_ms_id = ?';
+    $params[] = $_selectedMsId;
+    $types .= 'i';
 }
 $tpWhereParts[] = 'o.order_date BETWEEN ? AND ?';
 $params[] = $from_date; $params[] = $to_date;
@@ -191,6 +219,17 @@ $pagedSummary = array_slice($tpSummary, ($page - 1) * $perPage, $perPage, true);
                         </div>
 
                         <form method="get" class="row g-2 align-items-end mb-3">
+                            <?php if ($_isBdm && !empty($_scopedMs)): ?>
+                            <div class="col-auto">
+                                <label class="form-label">DM</label>
+                                <select name="ms_id" class="form-control">
+                                    <option value="0">All DMs</option>
+                                    <?php foreach ($_scopedMs as $_ms): ?>
+                                    <option value="<?=(int)$_ms['id']?>" <?=($_selectedMsId === (int)$_ms['id']) ? 'selected' : ''?>><?=htmlspecialchars($_ms['ms_name'])?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <?php endif; ?>
                             <div class="col-auto">
                                 <label class="form-label">From Date</label>
                                 <input type="date" name="frdate" value="<?=htmlspecialchars($from_date)?>" class="form-control">
