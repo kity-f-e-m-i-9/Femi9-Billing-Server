@@ -73,10 +73,10 @@ function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, s
  *    WHERE ot_sales_invoice.status = 'draft'
  *      AND ot_sales.godownid = $llpGodownId
  *      AND ot_sales.date = CURDATE()
- *  - wa_po_purchase_order_items joined to wa_po_purchase_orders (the
- *    separate WhatsApp-bot ordering subsystem under api/wa-po/ — its own
- *    tables, not tp_purchase_orders)
- *    WHERE status = 'waiting' AND order_date = CURDATE()
+ *
+ * WhatsApp-bot orders (api/wa-po/, its own wa_po_purchase_orders tables)
+ * are deliberately NOT included as a third source here — confirmed
+ * 2026-09-18 that they're not wanted in this feature's demand calc.
  *
  * Returns [product_id => requiredQty], omitting products with a
  * combined qty of 0 or less.
@@ -125,75 +125,25 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     }
     $otStmt->close();
 
-    $waStmt = $db_conn->prepare(
-        "SELECT wpoi.product_id AS product_id, SUM(wpoi.qty) AS total_qty
-         FROM wa_po_purchase_order_items wpoi
-         INNER JOIN wa_po_purchase_orders wpo ON wpo.id = wpoi.po_id
-         WHERE wpo.status = 'waiting' AND wpo.order_date = CURDATE()
-           AND NOT EXISTS (
-               SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'wa' AND s.source_ref = wpo.id AND s.skip_date = CURDATE()
-           )
-         GROUP BY wpoi.product_id"
-    );
-    $waStmt->execute();
-    $waResult = $waStmt->get_result();
-    while ($row = $waResult->fetch_assoc()) {
-        $pid = (int) $row['product_id'];
-        $requirements[$pid] = ($requirements[$pid] ?? 0) + (int) $row['total_qty'];
-    }
-    $waStmt->close();
-
     return array_filter($requirements, fn($qty) => $qty > 0);
 }
 
 /**
- * Minimal local copy of api/wa-po/_bootstrap.php's wa_po_category_configs()
- * — deliberately NOT require_once'd from that file, since it sets
- * webhook-only response headers and API-key/HMAC expectations that have no
- * business running inside a company-admin page. Only the table/name_field
- * pairs this breakdown actually needs to resolve a WhatsApp PO's placer
- * into a human name.
- */
-function wa_po_display_name(mysqli $db_conn, string $category, int $userId): string
-{
-    $configs = [
-        'distributor'        => ['table' => 'distributor',        'id_field' => 'id', 'name_field' => 'name'],
-        'super_distributor'  => ['table' => 'super_distributor',  'id_field' => 'id', 'name_field' => 'name'],
-        'stockiest'          => ['table' => 'stockiest',          'id_field' => 'id', 'name_field' => 'name'],
-        'super_stockiest'    => ['table' => 'super_stockiest',    'id_field' => 'id', 'name_field' => 'name'],
-        'channel_partner'    => ['table' => 'channel_partners',   'id_field' => 'id', 'name_field' => 'name'],
-        'candf'              => ['table' => 'c_and_f',            'id_field' => 'id', 'name_field' => 'name'],
-        'marketing'          => ['table' => 'marketing_staff',    'id_field' => 'id', 'name_field' => 'ms_name'],
-        'territory_partner'  => ['table' => 'territory_partners', 'id_field' => 'id', 'name_field' => 'name'],
-    ];
-    $cfg = $configs[$category] ?? null;
-    if (!$cfg) return "$category #$userId";
-
-    $stmt = $db_conn->prepare("SELECT `{$cfg['name_field']}` AS name FROM `{$cfg['table']}` WHERE `{$cfg['id_field']}` = ?");
-    $stmt->bind_param('i', $userId);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    return $row['name'] ?? "$category #$userId";
-}
-
-/**
- * Per-order breakdown of today's requirement for one product, across all
- * three demand sources — powers the "View Breakdown" modal on
+ * Per-order breakdown of today's requirement for one product, across
+ * both demand sources — powers the "View Breakdown" modal on
  * internal_transfer_auto.php, which lets staff exclude one specific
  * order's qty from today's transfer (e.g. "process this one tomorrow
  * instead") without changing that order's own status anywhere.
  *
- * Returns ['tp' => [...], 'ot' => [...], 'wa' => [...]], each entry
- * shaped ['source_id' => string, 'label' => string, 'qty' => int].
- * source_id is stable and unique across all three arrays (prefixed by
- * source), so the client can track exclusions per exact order.
+ * Returns ['tp' => [...], 'ot' => [...]], each entry shaped
+ * ['source_id' => string, 'label' => string, 'qty' => int]. source_id is
+ * stable and unique across both arrays (prefixed by source), so the
+ * client can track exclusions per exact order.
  */
 function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId, int $llpGodownId): array
 {
     ensure_auto_transfer_skip_table($db_conn);
-    $breakdown = ['tp' => [], 'ot' => [], 'wa' => []];
+    $breakdown = ['tp' => [], 'ot' => []];
 
     $tpStmt = $db_conn->prepare(
         "SELECT poi.po_id, poi.qty, tp.name AS tp_name, tp.tp_id AS tp_code
@@ -241,30 +191,6 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
         ];
     }
     $otStmt->close();
-
-    $waStmt = $db_conn->prepare(
-        "SELECT wpo.id AS po_id, wpoi.qty, wpo.user_category, wpo.user_id
-         FROM wa_po_purchase_order_items wpoi
-         INNER JOIN wa_po_purchase_orders wpo ON wpo.id = wpoi.po_id
-         WHERE wpo.status = 'waiting' AND wpo.order_date = CURDATE() AND wpoi.product_id = ?
-           AND NOT EXISTS (
-               SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'wa' AND s.source_ref = wpo.id AND s.skip_date = CURDATE()
-           )
-         ORDER BY wpo.id"
-    );
-    $waStmt->bind_param('i', $productId);
-    $waStmt->execute();
-    $waRows = $waStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $waStmt->close();
-
-    foreach ($waRows as $row) {
-        $breakdown['wa'][] = [
-            'source_id' => 'wa:' . $row['po_id'],
-            'label'     => wa_po_display_name($db_conn, $row['user_category'], (int) $row['user_id']),
-            'qty'       => (int) $row['qty'],
-        ];
-    }
 
     return $breakdown;
 }

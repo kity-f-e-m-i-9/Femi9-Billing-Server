@@ -197,12 +197,10 @@ if (!empty($requirements)) {
                 <ul class="nav nav-tabs" role="tablist">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#bdTpPane" type="button">TP Purchase Orders</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#bdOtPane" type="button">OT Channel Orders</button></li>
-                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#bdWaPane" type="button">WhatsApp Orders</button></li>
                 </ul>
                 <div class="tab-content" style="padding-top:10px;">
                     <div class="tab-pane fade show active" id="bdTpPane"><div id="bdTpList"></div></div>
                     <div class="tab-pane fade" id="bdOtPane"><div id="bdOtList"></div></div>
-                    <div class="tab-pane fade" id="bdWaPane"><div id="bdWaList"></div></div>
                 </div>
             </div>
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
@@ -307,17 +305,14 @@ if (!empty($requirements)) {
         var loading = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
         document.getElementById('bdTpList').innerHTML = loading;
         document.getElementById('bdOtList').innerHTML = loading;
-        document.getElementById('bdWaList').innerHTML = loading;
 
         $.getJSON('get-auto-transfer-breakdown.php', { product_id: pid }, function (data) {
             renderBreakdownTab('bdTpList', data.tp, 'No Territory Partner orders for this product today.');
             renderBreakdownTab('bdOtList', data.ot, 'No OT channel draft orders for this product today.');
-            renderBreakdownTab('bdWaList', data.wa, 'No WhatsApp orders for this product today.');
         }).fail(function () {
             var failMsg = '<div class="text-danger small" style="padding:10px 4px;">Could not load breakdown.</div>';
             document.getElementById('bdTpList').innerHTML = failMsg;
             document.getElementById('bdOtList').innerHTML = failMsg;
-            document.getElementById('bdWaList').innerHTML = failMsg;
         });
 
         var modal = new bootstrap.Modal(document.getElementById('breakdownModal'));

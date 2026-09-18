@@ -202,7 +202,7 @@ try {
             $cappedRows[] = "Product #$pid: requested $requestedQty, transferred $legTwoQty";
         }
 
-        foreach (['tp', 'ot', 'wa'] as $sourceType) {
+        foreach (['tp', 'ot'] as $sourceType) {
             foreach ($contributingOrders[$sourceType] as $order) {
                 $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"ot:"/"wa:" prefix
                 mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy);
