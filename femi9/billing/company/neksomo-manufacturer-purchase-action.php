@@ -147,16 +147,18 @@ if (empty($rawItems)) {
 // tax breakdown can't be spoofed or drift from what's actually configured.
 $pids = array_column($rawItems, 'pid');
 $placeholders = implode(',', array_fill(0, count($pids), '?'));
-$ppStmt = $db_conn->prepare("SELECT id, pieces_per_pack, gst, gst_type FROM products WHERE id IN ($placeholders)");
+$ppStmt = $db_conn->prepare("SELECT id, pieces_per_pack, gst, gst_type, unit_type FROM products WHERE id IN ($placeholders)");
 $ppStmt->bind_param(str_repeat('i', count($pids)), ...$pids);
 $ppStmt->execute();
 $piecesPerPackByProduct = [];
 $gstRateByProduct = [];
 $gstTypeByProduct = [];
+$unitTypeByProduct = [];
 foreach ($ppStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
     $piecesPerPackByProduct[(int)$row['id']] = (int)$row['pieces_per_pack'];
     $gstRateByProduct[(int)$row['id']] = (float)$row['gst'];
     $gstTypeByProduct[(int)$row['id']] = $row['gst_type'] === 'inclusive' ? 'inclusive' : 'exclusive';
+    $unitTypeByProduct[(int)$row['id']] = $row['unit_type'];
 }
 $ppStmt->close();
 
@@ -189,6 +191,7 @@ foreach ($rawItems as $it) {
         'pid'             => $it['pid'],
         'qty_pieces'      => $it['qty_pieces'],
         'pieces_per_pack' => $pieces_per_pack,
+        'unit_type'       => $unitTypeByProduct[$it['pid']] ?? null,
         'cost'            => $it['cost'],
         'gst_rate'        => $gst_rate,
         'gst_type'        => $gst_type,
@@ -306,23 +309,33 @@ try {
         // product ($item['pid']) until someone happens to attempt a sale
         // that exceeds what's already on a mapped product's own row
         // (StockService::ensureNeksomoTopUp()'s lazy, reactive path).
-        // One Neksomo product can map to several sibling company SKUs
-        // sharing the same pool (e.g. 3pc/6pc/9pc packs of the same
-        // napkin roll) — each sibling is processed in a stable order
-        // (ascending company_product_id) and only draws what's still
-        // available after earlier siblings claimed their share, using
-        // the same "purchased - sold - already converted" pool math
-        // ensureNeksomoTopUp() already relies on.
-        $mappedCompanyProductIds = get_neksomo_product_mapping($db_conn, $item['pid']);
-        sort($mappedCompanyProductIds);
-        foreach ($mappedCompanyProductIds as $companyProductId) {
-            $availablePacks = get_neksomo_pool_available_packs($db_conn, $companyProductId);
-            if ($availablePacks <= 0) continue;
-            $stockService->credit(
-                $companyProductId, 'company', (string) $neksomoGodownId, $availablePacks,
-                'adjustment', 'neksomo_conversion_' . uniqid(), $created_by, true
-            );
-            record_neksomo_stock_conversion($db_conn, $companyProductId, $availablePacks, $created_by);
+        //
+        // Only for unit_type='pack' Neksomo products (e.g. diapers): those
+        // are 1:1 with the mapped company product's pack unit, so eager
+        // conversion is unambiguous. Pieces-type products (e.g. napkins)
+        // are deliberately excluded — assembling loose pieces into packs
+        // is a real-world action the Neksomo login performs explicitly via
+        // Convert Pieces <-> Packs, not something that should happen
+        // silently on every purchase; ensureNeksomoTopUp() still covers a
+        // pieces-type shortfall reactively at sale time.
+        if ($item['unit_type'] === 'pack') {
+            // One Neksomo product can map to several sibling company SKUs
+            // sharing the same pool — each sibling is processed in a stable
+            // order (ascending company_product_id) and only draws what's
+            // still available after earlier siblings claimed their share,
+            // using the same "purchased - sold - already converted" pool
+            // math ensureNeksomoTopUp() already relies on.
+            $mappedCompanyProductIds = get_neksomo_product_mapping($db_conn, $item['pid']);
+            sort($mappedCompanyProductIds);
+            foreach ($mappedCompanyProductIds as $companyProductId) {
+                $availablePacks = get_neksomo_pool_available_packs($db_conn, $companyProductId);
+                if ($availablePacks <= 0) continue;
+                $stockService->credit(
+                    $companyProductId, 'company', (string) $neksomoGodownId, $availablePacks,
+                    'adjustment', 'neksomo_conversion_' . uniqid(), $created_by, true
+                );
+                record_neksomo_stock_conversion($db_conn, $companyProductId, $availablePacks, $created_by);
+            }
         }
     }
     $itemStmt->close();

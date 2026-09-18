@@ -33,7 +33,17 @@ $stockService = new StockService($db_conn);
 $createdBy    = 'neksomo-pool-backfill';
 $totalDrawn   = 0;
 
+// Only unit_type='pack' Neksomo products (e.g. diapers) are eligible for
+// automatic pool-to-pack conversion — see neksomo-manufacturer-purchase-
+// action.php for why pieces-type products (e.g. napkins) are excluded.
+$unitTypeByNeksomoProduct = array_column(
+    $db_conn->query("SELECT id, unit_type FROM products WHERE id IN (" . implode(',', $neksomoProductIds ?: [0]) . ")")->fetch_all(MYSQLI_ASSOC),
+    'unit_type', 'id'
+);
+
 foreach ($neksomoProductIds as $neksomoProductId) {
+    if (($unitTypeByNeksomoProduct[$neksomoProductId] ?? null) !== 'pack') continue;
+
     $mappedCompanyProductIds = get_neksomo_product_mapping($db_conn, $neksomoProductId);
     sort($mappedCompanyProductIds);
 
