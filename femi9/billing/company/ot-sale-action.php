@@ -27,6 +27,7 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
 
     $tempid         = str_replace("'", "&#39;", $_REQUEST['tempid']);
     $godownid       = str_replace("'", "&#39;", $_REQUEST['godownid']);
+    $warehouseId    = filter_var($_REQUEST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 
     if (!is_godown_allowed($db_conn, (int)$godownid)) {
         echo "<script>alert('You are not authorized to use this company profile'); window.history.back();</script>";
@@ -147,7 +148,7 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
             $qty = (int) RemoveSpecialChar($qty_ex[$i] ?? 0);
             if (!$pid || $qty <= 0) continue;
 
-            $available = $stockService->getClosingQty($pid, $Login_user_TYPEvl, $godownid);
+            $available = $stockService->getClosingQty($pid, $Login_user_TYPEvl, $godownid, $warehouseId);
             if ($available === null || $available < $qty) {
                 $_SESSION['errorMessageOT'] = "Insufficient stock for product #$pid. Available: " . ($available ?? 0) . ", Requested: $qty";
                 echo "<script>window.location='ot-sale-add?InvalidStock&&AlertStockError';</script>";
@@ -227,17 +228,17 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
             // Insert ot_sales row
             $stmt = $db_conn->prepare(
                 "INSERT INTO ot_sales
-                    (godownid, cat, qty, date, tempid, prid, price, discount,
+                    (godownid, warehouse_id, cat, qty, date, tempid, prid, price, discount,
                      sub_total, total, gst, gst_amount, customer_name, customer_mobile,
                      customer_address, order_number, amount_received, amount_date,
                      shipping_address, gst_number, order_date, ship_date, hsn,
                      buyer_gsttype, state_id, gst_type, username, usertype)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0', '1991-01-01',
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0', '1991-01-01',
                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $stmt->bind_param(
-                'issssidddddsssssssssssssss',
-                $godownid, $catname, $qty_value, $date, $tempid, $product_id_value,
+                'iissssidddddsssssssssssssss',
+                $godownid, $warehouseId, $catname, $qty_value, $date, $tempid, $product_id_value,
                 $rate_value, $discount_value, $sub_total, $total, $gst, $gst_amount,
                 $customer_name, $customer_mobile, $customer_address, $order_number,
                 $shipping_address, $gst_number, $order_date, $ship_date, $hsn,
@@ -252,7 +253,8 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
                 $stockService->otDeduct(
                     $product_id_value, $Login_user_TYPEvl, (string)$godownid,
                     $qty_value, $tempid, $createdBy,
-                    true // externalTransaction — outer tx owns commit
+                    true, // externalTransaction — outer tx owns commit
+                    $warehouseId
                 );
             }
         }
@@ -456,7 +458,7 @@ if (isset($_REQUEST['updateRecord'])) {
                 $newDisc = (float) ($item_discs[$i] ?? 0);
                 if ($lineId <= 0 || $newQty <= 0) continue;
 
-                $stmtOld = $db_conn->prepare("SELECT prid, qty, godownid FROM ot_sales WHERE id = ? AND tempid = ?");
+                $stmtOld = $db_conn->prepare("SELECT prid, qty, godownid, warehouse_id FROM ot_sales WHERE id = ? AND tempid = ?");
                 $stmtOld->bind_param('is', $lineId, $tempid);
                 $stmtOld->execute();
                 $oldItem = $stmtOld->get_result()->fetch_assoc();
@@ -466,16 +468,17 @@ if (isset($_REQUEST['updateRecord'])) {
                 $lineProductId = (int) $oldItem['prid'];
                 $oldQty        = (int) $oldItem['qty'];
                 $lineGodownid  = (string) $oldItem['godownid'];
+                $lineWarehouseId = $oldItem['warehouse_id'] !== null ? (int) $oldItem['warehouse_id'] : null;
                 $delta         = $newQty - $oldQty;
 
                 if (!$isDraftInvoice && $delta > 0) {
-                    $available = $stockServiceUpd->getClosingQty($lineProductId, $Login_user_TYPEvl, $lineGodownid);
+                    $available = $stockServiceUpd->getClosingQty($lineProductId, $Login_user_TYPEvl, $lineGodownid, $lineWarehouseId);
                     if ($available === null || $available < $delta) {
                         throw new StockException("Insufficient stock for product #$lineProductId. Available: " . ($available ?? 0) . ", Extra needed: $delta");
                     }
-                    $stockServiceUpd->otDeduct($lineProductId, $Login_user_TYPEvl, $lineGodownid, $delta, $tempid, $createdByUpd, true);
+                    $stockServiceUpd->otDeduct($lineProductId, $Login_user_TYPEvl, $lineGodownid, $delta, $tempid, $createdByUpd, true, $lineWarehouseId);
                 } elseif (!$isDraftInvoice && $delta < 0) {
-                    $stockServiceUpd->otReverse($lineProductId, $Login_user_TYPEvl, $lineGodownid, -$delta, $tempid, $createdByUpd, true);
+                    $stockServiceUpd->otReverse($lineProductId, $Login_user_TYPEvl, $lineGodownid, -$delta, $tempid, $createdByUpd, true, $lineWarehouseId);
                 }
 
                 $stmtGst = $db_conn->prepare("SELECT gst, gst_type FROM products WHERE id = ?");
