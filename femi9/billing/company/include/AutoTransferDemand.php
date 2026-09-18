@@ -422,6 +422,7 @@ function cap_auto_transfer_qty(int $required, int $neksomoAvail, int $healthcare
  * Returns a list of rows, each shaped:
  * ['product_id' => int, 'product_name' => string, 'qty_transferred' => int,
  *  'neksomo_before' => ?int, 'healthcare_before' => ?int, 'llp_before' => ?int,
+ *  'neksomo_after' => ?int, 'healthcare_after' => ?int, 'llp_after' => ?int,
  *  'transferred_at' => ?string (Y-m-d H:i:s)]
  * A null before/after value means the matching stock_ledger row wasn't
  * found (e.g. a very old run predating this table, or a partial/failed
@@ -434,6 +435,9 @@ function get_auto_transfer_history_for_date(mysqli $db_conn, string $date, int $
                 sl_out.qty_before AS neksomo_before,
                 sl_in1.qty_before AS healthcare_before,
                 sl_in2.qty_before AS llp_before,
+                sl_out.qty_after AS neksomo_after,
+                sl_in1.qty_after AS healthcare_after,
+                sl_in2.qty_after AS llp_after,
                 COALESCE(sl_out.created_at, sl_in2.created_at) AS transferred_at
          FROM internal_transfer it2
          INNER JOIN products p ON p.id = it2.product_id
@@ -466,6 +470,9 @@ function get_auto_transfer_history_for_date(mysqli $db_conn, string $date, int $
             'neksomo_before'    => $row['neksomo_before'] !== null ? (int) $row['neksomo_before'] : null,
             'healthcare_before' => $row['healthcare_before'] !== null ? (int) $row['healthcare_before'] : null,
             'llp_before'        => $row['llp_before'] !== null ? (int) $row['llp_before'] : null,
+            'neksomo_after'     => $row['neksomo_after'] !== null ? (int) $row['neksomo_after'] : null,
+            'healthcare_after'  => $row['healthcare_after'] !== null ? (int) $row['healthcare_after'] : null,
+            'llp_after'         => $row['llp_after'] !== null ? (int) $row['llp_after'] : null,
             'transferred_at'    => $row['transferred_at'],
         ];
     }, $rows);

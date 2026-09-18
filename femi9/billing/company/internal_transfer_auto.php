@@ -260,11 +260,16 @@ if (!empty($requirements)) {
                     <div class="tab-pane fade" id="ovOtPane"><div id="ovOtList"></div></div>
                     <div class="tab-pane fade" id="ovExcludedPane">
                         <p class="text-muted small">
-                            Everything currently left out of today's transfer — either you unchecked
-                            it, or it was already transferred earlier today. Click Include Again to
-                            bring it back into Required Qty (won't undo stock already moved).
+                            Everything currently left out of today's transfer, grouped by order —
+                            either you unchecked it, or it was already transferred earlier today
+                            (that stock already moved, so it can't be brought back). Click an order's
+                            name to select/deselect all of its lines at once, or tick just the
+                            products you want, then Include Selected.
                         </p>
                         <div id="ovExcludedList"></div>
+                        <div style="text-align:right;margin-top:10px;">
+                            <button type="button" id="ovExcludedIncludeBtn" class="btn btn-sm btn-primary" onclick="ovIncludeSelected()">Include Selected</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -556,6 +561,11 @@ if (!empty($requirements)) {
     }
 
     // ── "Excluded Today" — undo any Not Today / already-transferred skip ──
+    // Grouped by order: clicking the order's name toggles every checkbox
+    // under it, but each product line keeps its own checkbox so a few
+    // specific products can be left out while the rest of the order is
+    // included again. Lines already transferred today have no checkbox —
+    // that stock already moved, so there's nothing to "include" back.
     function loadExcludedToday() {
         var el = document.getElementById('ovExcludedList');
         el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
@@ -567,45 +577,84 @@ if (!empty($requirements)) {
                 el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">Nothing excluded today.</div>';
                 return;
             }
-            var html = '';
+
+            // Group by order: source_id is "tp:<orderKey>:<productId>" /
+            // "ot:<orderKey>:<productId>" — group key is everything but the
+            // trailing productId segment.
+            var groups = [];
+            var groupsByKey = {};
             all.forEach(function (item) {
-                var reasonLabel = item.reason === 'transferred'
-                    ? '<span class="badge" style="background:#d1fae5;color:#065f46;">Already transferred</span>'
-                    : '<span class="badge" style="background:#fef3c7;color:#92400e;">Excluded</span>';
-                html += '<div class="ov-excluded-row" data-source-id="' + escBd(item.source_id) + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:8px;">' +
-                    '<div style="min-width:0;">' +
-                        '<div style="font-weight:600;overflow-wrap:anywhere;">' + escBd(item.label) + '</div>' +
-                        '<div style="font-size:12px;color:#6b7280;">' + escBd(item.product_name) + ' &nbsp; ' + reasonLabel + '</div>' +
-                    '</div>' +
-                    '<button type="button" class="btn btn-sm btn-outline-primary ov-include-again" style="white-space:nowrap;font-size:11px;padding:2px 8px;">Include Again</button>' +
-                '</div>';
+                var lastColon = item.source_id.lastIndexOf(':');
+                var groupKey = item.source_id.substring(0, lastColon);
+                if (!groupsByKey[groupKey]) {
+                    groupsByKey[groupKey] = { label: item.label, items: [] };
+                    groups.push(groupsByKey[groupKey]);
+                }
+                groupsByKey[groupKey].items.push(item);
+            });
+
+            var html = '';
+            groups.forEach(function (group, gIdx) {
+                html += '<div class="ov-excl-group" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
+                    '<div class="ov-excl-group-label" data-group-idx="' + gIdx + '" style="font-weight:600;cursor:pointer;color:#2563eb;overflow-wrap:anywhere;">' +
+                        escBd(group.label) +
+                        ' <span class="text-muted" style="font-weight:400;font-size:11px;">(click to select/deselect all)</span>' +
+                    '</div>';
+                group.items.forEach(function (item) {
+                    html += '<div class="ov-excl-line" data-group-idx="' + gIdx + '" style="display:flex;align-items:center;gap:8px;padding:5px 0 0 4px;">';
+                    if (item.reason === 'transferred') {
+                        html += '<input type="checkbox" disabled style="visibility:hidden;">' +
+                            '<span style="color:#9ca3af;">' + escBd(item.product_name) + '</span>' +
+                            '<span class="badge" style="background:#d1fae5;color:#065f46;">Already transferred</span>';
+                    } else {
+                        html += '<input type="checkbox" class="ov-excl-check" data-source-id="' + escBd(item.source_id) + '">' +
+                            '<span>' + escBd(item.product_name) + '</span>' +
+                            '<span class="badge" style="background:#fef3c7;color:#92400e;">Excluded</span>';
+                    }
+                    html += '</div>';
+                });
+                html += '</div>';
             });
             el.innerHTML = html;
-            el.querySelectorAll('.ov-include-again').forEach(function (btn) {
-                btn.addEventListener('click', function () { ovIncludeAgain(this); });
+
+            el.querySelectorAll('.ov-excl-group-label').forEach(function (labelEl) {
+                labelEl.addEventListener('click', function () {
+                    var gIdx = labelEl.getAttribute('data-group-idx');
+                    var boxes = el.querySelectorAll('.ov-excl-check[data-source-id]');
+                    var groupBoxes = Array.prototype.filter.call(boxes, function (b) {
+                        return b.closest('.ov-excl-line').getAttribute('data-group-idx') === gIdx;
+                    });
+                    if (!groupBoxes.length) return;
+                    var allChecked = groupBoxes.every(function (b) { return b.checked; });
+                    groupBoxes.forEach(function (b) { b.checked = !allChecked; });
+                });
             });
         }).fail(function () {
             el.innerHTML = '<div class="text-danger small" style="padding:10px 4px;">Could not load excluded orders.</div>';
         });
     }
 
-    function ovIncludeAgain(btn) {
-        var rowEl = btn.closest('.ov-excluded-row');
-        var sourceId = rowEl.getAttribute('data-source-id');
-        var colonIdx = sourceId.indexOf(':');
-        var sourceType = sourceId.substring(0, colonIdx);
-        var sourceRef = sourceId.substring(colonIdx + 1);
-
+    function ovIncludeSelected() {
+        var checked = document.querySelectorAll('#ovExcludedList .ov-excl-check:checked');
+        if (!checked.length) {
+            alert('Tick at least one product to include it back.');
+            return;
+        }
+        var btn = document.getElementById('ovExcludedIncludeBtn');
         btn.disabled = true;
-        $.post('unmark-auto-transfer-skip.php', { source_type: sourceType, source_ref: sourceRef }, function (res) {
-            if (!res || !res.success) {
-                alert('Could not include this back. Please try again.');
-                btn.disabled = false;
-                return;
-            }
+
+        var calls = Array.prototype.map.call(checked, function (box) {
+            var sourceId = box.getAttribute('data-source-id');
+            var colonIdx = sourceId.indexOf(':');
+            var sourceType = sourceId.substring(0, colonIdx);
+            var sourceRef = sourceId.substring(colonIdx + 1);
+            return $.post('unmark-auto-transfer-skip.php', { source_type: sourceType, source_ref: sourceRef }, null, 'json');
+        });
+
+        $.when.apply($, calls).done(function () {
             window.location.reload();
-        }, 'json').fail(function () {
-            alert('Request failed. Please try again.');
+        }).fail(function () {
+            alert('Some items could not be included back. Please try again.');
             btn.disabled = false;
         });
     }
@@ -648,17 +697,23 @@ if (!empty($requirements)) {
                 resultEl.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">No auto-transfers found on this date.</div>';
                 return;
             }
-            var html = '<div style="overflow-x:auto;"><table class="table table-bordered table-sm" style="min-width:760px;">' +
+            var html = '<div style="overflow-x:auto;"><table class="table table-bordered table-sm" style="min-width:1080px;">' +
                 '<thead><tr style="background:#f8fafc;">' +
-                    '<th>Product</th><th>Closing Stock Before (Neksomo)</th><th>Closing Stock Before (Healthcare)</th>' +
-                    '<th>Closing Stock Before (LLP)</th><th>Qty Transferred</th><th>Date &amp; Time</th>' +
+                    '<th>Product</th>' +
+                    '<th>Neksomo Before</th><th>Neksomo After</th>' +
+                    '<th>Healthcare Before</th><th>Healthcare After</th>' +
+                    '<th>LLP Before</th><th>LLP After</th>' +
+                    '<th>Qty Transferred</th><th>Date &amp; Time</th>' +
                 '</tr></thead><tbody>';
             data.rows.forEach(function (r) {
                 html += '<tr>' +
                     '<td>' + escBd(r.product_name) + '</td>' +
                     '<td>' + thFmtStock(r.neksomo_before) + '</td>' +
+                    '<td>' + thFmtStock(r.neksomo_after) + '</td>' +
                     '<td>' + thFmtStock(r.healthcare_before) + '</td>' +
+                    '<td>' + thFmtStock(r.healthcare_after) + '</td>' +
                     '<td>' + thFmtStock(r.llp_before) + '</td>' +
+                    '<td>' + thFmtStock(r.llp_after) + '</td>' +
                     '<td style="font-weight:600;">' + r.qty_transferred + '</td>' +
                     '<td>' + thFmtDateTime(r.transferred_at) + '</td>' +
                 '</tr>';
