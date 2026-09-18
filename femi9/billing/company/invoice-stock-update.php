@@ -32,6 +32,7 @@ if ($is_customer_invoice) {
 
     $company_type  = $inv['user_type'];
     $company_id    = $inv['user_id'];
+    $warehouseId   = $inv['warehouse_id'] !== null ? (int) $inv['warehouse_id'] : null;
     $customer_type = 'customer';
     $customer_id   = (string) $inv['customer_id'];
     $invoice_date  = $inv['date'];
@@ -51,6 +52,7 @@ if ($is_customer_invoice) {
 
     $company_type  = $inv['from_user_type'];
     $company_id    = $inv['from_user_id'];
+    $warehouseId   = $inv['warehouse_id'] !== null ? (int) $inv['warehouse_id'] : null;
     $customer_type = $inv['to_user_type'];
     $customer_id   = $inv['to_user_id'];
     $invoice_date  = $inv['date'];
@@ -102,7 +104,8 @@ try {
         $stockService->deduct(
             $prId, $company_type, $company_id, $qty,
             $refType, $invoice_id, $createdBy,
-            true // always tell StockService the tx is external
+            true, // always tell StockService the tx is external
+            $warehouseId
         );
 
         // Credit buyer only if they maintain their own stock ledger
