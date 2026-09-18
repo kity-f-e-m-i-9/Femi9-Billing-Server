@@ -4,9 +4,30 @@ $fetchusertypeGET=mysqli_query($db_conn,$selectusertypeGET);
 $resultusertypeGET=mysqli_fetch_array($fetchusertypeGET);
 $LoginusertypeGET=$resultusertypeGET['usertype'];
 ?>
+<?php if ($LoginusertypeGET === 'stockviewer'): ?>
 <div class="app-menu">
                 <ul class="accordion-menu">
-                    
+                    <li>
+                        <a href="stock-viewer-dashboard.php"><i class="material-icons-two-tone">dashboard</i>Dashboard</a>
+                    </li>
+                    <li>
+                        <a href="stock-viewer-by-profile.php"><i class="material-icons-two-tone">store</i>Stock by Company Profile</a>
+                    </li>
+                    <li>
+                        <a href="stock-viewer-by-product.php"><i class="material-icons-two-tone">inventory_2</i>Stock by Product</a>
+                    </li>
+                    <li>
+                        <a href="stock-viewer-by-warehouse.php"><i class="material-icons-two-tone">warehouse</i>Stock by Warehouse</a>
+                    </li>
+                    <li>
+                        <a href="logout" onclick="return confirm('You want to logout confirm?');"><i class="material-icons-two-tone">power_settings_new</i>Logout</a>
+                    </li>
+                </ul>
+            </div>
+<?php else: ?>
+<div class="app-menu">
+                <ul class="accordion-menu">
+
 					<?php /*?>
 					<li>
                         <a href="#"><i class="material-icons-two-tone">view_agenda</i>Report<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
@@ -1245,3 +1266,4 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 <?php }?>
                 </ul>
             </div>
+<?php endif; ?>

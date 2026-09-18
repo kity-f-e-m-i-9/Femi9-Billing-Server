@@ -62,7 +62,7 @@ function requirePermission(string $perm): void
         exit;
     }
 
-    if ($row['usertype'] === 'admin' || $row['usertype'] === 'finance' || $row['usertype'] === 'neksomo') {
+    if ($row['usertype'] === 'admin' || $row['usertype'] === 'finance' || $row['usertype'] === 'neksomo' || $row['usertype'] === 'stockviewer') {
         return;
     }
 

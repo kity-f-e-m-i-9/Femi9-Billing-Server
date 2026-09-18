@@ -1,7 +1,15 @@
-<?php 
+<?php
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('dash');
-include("config.php"); 
+require_once("include/GodownAccess.php");
+include("config.php");
+
+// Read-only stock insights login — never sees the normal company
+// dashboard, always lands on its own dedicated page instead.
+if (is_stockviewer_login($db_conn)) {
+    header("Location: stock-viewer-dashboard.php");
+    exit;
+}
 
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
