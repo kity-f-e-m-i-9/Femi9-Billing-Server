@@ -184,6 +184,15 @@ try {
         $pid = $row['pid'];
         $requestedQty = $row['qty'];
 
+        // Snapshot which orders are currently behind this product's demand
+        // BEFORE moving stock, so they can be marked covered afterward —
+        // tp_purchase_orders.status / ot_sales_invoice.status / wa_po_
+        // purchase_orders.status stay 'waiting'/'draft' even after a
+        // successful transfer (by design, per the spec — fulfilling a PO
+        // is still a separate manual step), so without this a second
+        // Transfer Now click would re-count and re-move the same demand.
+        $contributingOrders = get_auto_transfer_breakdown_for_product($db_conn, $pid, $llpId);
+
         $legOneQty = $writeLeg($tempid1, $invNumber1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty);
         if ($legOneQty <= 0) continue;
 
@@ -191,6 +200,13 @@ try {
 
         if ($legTwoQty < $requestedQty) {
             $cappedRows[] = "Product #$pid: requested $requestedQty, transferred $legTwoQty";
+        }
+
+        foreach (['tp', 'ot', 'wa'] as $sourceType) {
+            foreach ($contributingOrders[$sourceType] as $order) {
+                $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"ot:"/"wa:" prefix
+                mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy);
+            }
         }
     }
 

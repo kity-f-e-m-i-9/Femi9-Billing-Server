@@ -23,6 +23,48 @@ function resolve_godown_id_by_gname(mysqli $db_conn, string $gname): ?int
     return $row ? (int) $row['id'] : null;
 }
 
+// Self-migrating. One row per (source_type, source_ref, skip_date) means
+// "don't count this specific order's qty toward today's auto-transfer
+// requirement" — reason 'excluded' when staff explicitly chose not to
+// transfer it today via the breakdown modal's "Not Today" button, reason
+// 'transferred' when a previous Transfer Now click already moved its
+// stock today (see internal_transfer_auto_action.php). Either way the
+// order's OWN status (tp_purchase_orders.status / ot_sales_invoice.status
+// / wa_po_purchase_orders.status) is never touched — this table is purely
+// "don't ask again today," scoped by date so it naturally clears itself
+// tomorrow if the order is still genuinely outstanding.
+function ensure_auto_transfer_skip_table(mysqli $db_conn): void
+{
+    $db_conn->query("
+        CREATE TABLE IF NOT EXISTS auto_transfer_skip_today (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            source_type ENUM('tp','ot','wa') NOT NULL,
+            source_ref VARCHAR(64) NOT NULL,
+            skip_date DATE NOT NULL,
+            reason ENUM('excluded','transferred') NOT NULL DEFAULT 'excluded',
+            created_by VARCHAR(100) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_auto_transfer_skip (source_type, source_ref, skip_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+}
+
+/**
+ * Marks one order skipped for today — INSERT IGNORE so calling this twice
+ * for the same order/date (e.g. a double-click) is harmless.
+ */
+function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, string $sourceRef, string $reason, ?string $createdBy = null): void
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    $stmt = $db_conn->prepare(
+        "INSERT IGNORE INTO auto_transfer_skip_today (source_type, source_ref, skip_date, reason, created_by)
+         VALUES (?, ?, CURDATE(), ?, ?)"
+    );
+    $stmt->bind_param('ssss', $sourceType, $sourceRef, $reason, $createdBy);
+    $stmt->execute();
+    $stmt->close();
+}
+
 /**
  * Aggregates today's required quantity per product from:
  *  - tp_purchase_order_items joined to tp_purchase_orders
@@ -41,6 +83,7 @@ function resolve_godown_id_by_gname(mysqli $db_conn, string $gname): ?int
  */
 function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): array
 {
+    ensure_auto_transfer_skip_table($db_conn);
     $requirements = [];
 
     $tpStmt = $db_conn->prepare(
@@ -48,6 +91,10 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          WHERE po.status = 'waiting' AND po.order_date = CURDATE()
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'tp' AND s.source_ref = po.id AND s.skip_date = CURDATE()
+           )
          GROUP BY poi.product_id"
     );
     $tpStmt->execute();
@@ -63,6 +110,10 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
          FROM ot_sales os
          INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
          WHERE osi.status = 'draft' AND os.godownid = ? AND os.date = CURDATE()
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'ot' AND s.source_ref = os.tempid AND s.skip_date = CURDATE()
+           )
          GROUP BY os.prid"
     );
     $otStmt->bind_param('i', $llpGodownId);
@@ -79,6 +130,10 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
          FROM wa_po_purchase_order_items wpoi
          INNER JOIN wa_po_purchase_orders wpo ON wpo.id = wpoi.po_id
          WHERE wpo.status = 'waiting' AND wpo.order_date = CURDATE()
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'wa' AND s.source_ref = wpo.id AND s.skip_date = CURDATE()
+           )
          GROUP BY wpoi.product_id"
     );
     $waStmt->execute();
@@ -137,6 +192,7 @@ function wa_po_display_name(mysqli $db_conn, string $category, int $userId): str
  */
 function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId, int $llpGodownId): array
 {
+    ensure_auto_transfer_skip_table($db_conn);
     $breakdown = ['tp' => [], 'ot' => [], 'wa' => []];
 
     $tpStmt = $db_conn->prepare(
@@ -145,6 +201,10 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
          WHERE po.status = 'waiting' AND po.order_date = CURDATE() AND poi.product_id = ?
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'tp' AND s.source_ref = po.id AND s.skip_date = CURDATE()
+           )
          ORDER BY po.id"
     );
     $tpStmt->bind_param('i', $productId);
@@ -164,6 +224,10 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
          FROM ot_sales os
          INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
          WHERE osi.status = 'draft' AND os.godownid = ? AND os.date = CURDATE() AND os.prid = ?
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'ot' AND s.source_ref = os.tempid AND s.skip_date = CURDATE()
+           )
          ORDER BY os.id"
     );
     $otStmt->bind_param('ii', $llpGodownId, $productId);
@@ -183,6 +247,10 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
          FROM wa_po_purchase_order_items wpoi
          INNER JOIN wa_po_purchase_orders wpo ON wpo.id = wpoi.po_id
          WHERE wpo.status = 'waiting' AND wpo.order_date = CURDATE() AND wpoi.product_id = ?
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'wa' AND s.source_ref = wpo.id AND s.skip_date = CURDATE()
+           )
          ORDER BY wpo.id"
     );
     $waStmt->bind_param('i', $productId);

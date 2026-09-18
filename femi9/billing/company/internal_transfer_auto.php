@@ -59,6 +59,7 @@ if (!empty($requirements)) {
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Auto Transfer for Orders : <?php echo $business_name; ?></title>
+    <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
@@ -187,8 +188,10 @@ if (!empty($requirements)) {
             </div>
             <div class="modal-body" style="padding:14px 20px;">
                 <p class="text-muted small">
-                    Uncheck an order to leave it out of today's transfer — it stays exactly as it
-                    is (still waiting/draft), you're just choosing not to move its stock right now.
+                    Uncheck an order + Apply to leave it out of just this view (comes back if you
+                    reopen this page). Click <strong>Not Today</strong> to exclude it for the rest
+                    of today instead — either way the order itself stays exactly as it is
+                    (still waiting/draft), only its stock movement is postponed.
                 </p>
                 <ul class="nav nav-tabs" role="tablist">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#bdTpPane" type="button">TP Purchase Orders</button></li>
@@ -226,12 +229,65 @@ if (!empty($requirements)) {
         }
         var html = '';
         items.forEach(function (it) {
-            html += '<label style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f1f5f9;padding:8px 4px;cursor:pointer;margin:0;">' +
-                '<span><input type="checkbox" class="bd-check" data-qty="' + it.qty + '" data-source-id="' + it.source_id + '" checked style="margin-right:8px;">' + escBd(it.label) + '</span>' +
-                '<span style="font-weight:600;">' + it.qty + '</span>' +
-            '</label>';
+            html += '<div class="bd-row" data-source-id="' + it.source_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;padding:8px 4px;">' +
+                '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:0;">' +
+                    '<input type="checkbox" class="bd-check" data-qty="' + it.qty + '" data-source-id="' + it.source_id + '" checked style="margin-right:8px;flex-shrink:0;">' +
+                    '<span style="overflow-wrap:anywhere;">' + escBd(it.label) + '</span>' +
+                '</label>' +
+                '<span style="font-weight:600;white-space:nowrap;">' + it.qty + '</span>' +
+                '<button type="button" class="btn btn-sm btn-outline-danger bd-not-today" data-source-id="' + it.source_id + '" style="white-space:nowrap;font-size:11px;padding:2px 8px;">Not Today</button>' +
+            '</div>';
         });
         el.innerHTML = html;
+
+        el.querySelectorAll('.bd-not-today').forEach(function (btn) {
+            btn.addEventListener('click', function () { skipOrderNotToday(this); });
+        });
+    }
+
+    // Recomputes the currently-open product's Required Qty + Qty to
+    // Transfer from whatever's still checked across all three tabs —
+    // shared by the plain "Apply" button and by skipOrderNotToday() once
+    // an order's row is removed, so both paths end up consistent.
+    function recomputeCurrentRowFromCheckboxes() {
+        if (currentBreakdownPid === null) return;
+        var total = 0;
+        document.querySelectorAll('.bd-check:checked').forEach(function (chk) {
+            total += parseInt(chk.getAttribute('data-qty'), 10) || 0;
+        });
+
+        var pid = currentBreakdownPid;
+        document.getElementById('req_' + pid).textContent = total;
+
+        var capped = Math.min(total, currentNeksomoAvail + currentHealthcareAvail);
+        if (capped < 0) capped = 0;
+        document.getElementById('qty_' + pid).value = capped;
+    }
+
+    // "Not Today" — unlike the checkbox (a this-view-only recompute lost on
+    // reload), this persists: the order is recorded as skipped for today
+    // (its own PO/draft status is never touched) so it stays out of
+    // Required Qty even after closing and reopening this page.
+    function skipOrderNotToday(btn) {
+        var sourceId = btn.getAttribute('data-source-id');
+        var colonIdx = sourceId.indexOf(':');
+        var sourceType = sourceId.substring(0, colonIdx);
+        var sourceRef  = sourceId.substring(colonIdx + 1);
+
+        btn.disabled = true;
+        $.post('mark-auto-transfer-skip.php', { source_type: sourceType, source_ref: sourceRef }, function (res) {
+            if (!res || !res.success) {
+                alert('Could not exclude this order. Please try again.');
+                btn.disabled = false;
+                return;
+            }
+            var row = document.querySelector('.bd-row[data-source-id="' + sourceId.replace(/"/g, '') + '"]');
+            if (row) row.remove();
+            recomputeCurrentRowFromCheckboxes();
+        }, 'json').fail(function () {
+            alert('Request failed. Please try again.');
+            btn.disabled = false;
+        });
     }
 
     function openBreakdown(pid, neksomoAvail, healthcareAvail) {
@@ -260,19 +316,7 @@ if (!empty($requirements)) {
     }
 
     function applyBreakdown() {
-        if (currentBreakdownPid === null) return;
-        var total = 0;
-        document.querySelectorAll('.bd-check:checked').forEach(function (chk) {
-            total += parseInt(chk.getAttribute('data-qty'), 10) || 0;
-        });
-
-        var pid = currentBreakdownPid;
-        document.getElementById('req_' + pid).textContent = total;
-
-        var capped = Math.min(total, currentNeksomoAvail + currentHealthcareAvail);
-        if (capped < 0) capped = 0;
-        document.getElementById('qty_' + pid).value = capped;
-
+        recomputeCurrentRowFromCheckboxes();
         var modalEl = document.getElementById('breakdownModal');
         var modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
