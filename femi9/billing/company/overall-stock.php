@@ -181,8 +181,19 @@ $isNeksomoGodown=((int)$user_id_Loginvl === get_neksomo_godown_id($db_conn));
 // neksomo-manufacturer-purchase-action.php's neksomo_credit_pieces()), not
 // something any company-facing stock report should surface; the mapped
 // normal company product is what should show here (see NeksomoStockBridge.php).
-$select_OPStock="select * from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'
-    and product_id in (select id from products where temp_id not like 'NKS-%' or temp_id is null)";
+//
+// GROUP BY product_id, summing across any per-warehouse rows — a product's
+// stock can now be split across multiple physical godowns (H1/G1/G2), and
+// this report shows one aggregated line per product per company profile,
+// same as before physical warehouses existed. opening_date has no sum
+// equivalent, so MIN() picks the earliest one across a product's rows.
+$select_OPStock="select product_id, MIN(opening_date) as opening_date,
+        SUM(opening_qty) as opening_qty, SUM(input_qty) as input_qty,
+        SUM(sales_qty) as sales_qty, SUM(closing_qty) as closing_qty,
+        SUM(extra_pieces) as extra_pieces
+    from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'
+    and product_id in (select id from products where temp_id not like 'NKS-%' or temp_id is null)
+    group by product_id";
 										$Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
 										while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
 										{
