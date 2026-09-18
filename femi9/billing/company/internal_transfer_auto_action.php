@@ -9,6 +9,33 @@ include("RemoveSpecialChar.php");
 
 error_reporting(0);
 
+// Manual internal transfers use a free-typed inv_number following a fixed
+// per-leg convention observed in real data: "G/<FY>/<seq>" for Neksomo ->
+// Healthcare, "S/<FY>/<seq>" for Healthcare -> LLP, FY as "26-27" (Apr-Mar),
+// seq an increasing integer per prefix+FY (not reset mid-year). This
+// generates the next number in that same series instead of reusing the
+// internal AUTO... tempid as the invoice number.
+function next_internal_transfer_invoice_number(mysqli $db, string $prefix): string
+{
+    $month = (int) date('n');
+    $year  = (int) date('Y');
+    $fy = ($month >= 4)
+        ? substr((string) $year, -2) . '-' . substr((string) ($year + 1), -2)
+        : substr((string) ($year - 1), -2) . '-' . substr((string) $year, -2);
+
+    $pattern = $prefix . '/' . $fy . '/%';
+    $stmt = $db->prepare(
+        "SELECT MAX(CAST(SUBSTRING_INDEX(inv_number, '/', -1) AS UNSIGNED)) AS max_seq
+         FROM internal_transfer_invoice WHERE inv_number LIKE ?"
+    );
+    $stmt->bind_param('s', $pattern);
+    $stmt->execute();
+    $maxSeq = (int) ($stmt->get_result()->fetch_assoc()['max_seq'] ?? 0);
+    $stmt->close();
+
+    return $prefix . '/' . $fy . '/' . ($maxSeq + 1);
+}
+
 $productIds = $_REQUEST['product_id'] ?? [];
 $qtyArr     = $_REQUEST['qty'] ?? [];
 
@@ -67,6 +94,12 @@ $cappedRows = [];
 $db_conn->begin_transaction();
 
 try {
+    // Generated inside the same transaction as the inserts that consume
+    // them, so the MAX-based lookup sees any number this same batch has
+    // already claimed.
+    $invNumber1 = next_internal_transfer_invoice_number($db_conn, 'G'); // Neksomo -> Healthcare
+    $invNumber2 = next_internal_transfer_invoice_number($db_conn, 'S'); // Healthcare -> LLP
+
     $stmtInvChk = $db_conn->prepare("SELECT COUNT(*) AS n FROM internal_transfer_invoice WHERE tempid = ?");
     $stmtInvIns = $db_conn->prepare(
         "INSERT INTO internal_transfer_invoice (tempid, inv_id, inv_number, courier_charges)
@@ -88,7 +121,7 @@ try {
      * re-validated here, never trusting the popup's earlier snapshot).
      */
     $writeLeg = function (
-        string $tempid, string $sendFrom, string $sendTo, int $pid, int $qty
+        string $tempid, string $invNumber, string $sendFrom, string $sendTo, int $pid, int $qty
     ) use (
         $db_conn, $stockService, $createdBy, $username, $usertype, $date,
         $stmtInvChk, $stmtInvIns, $stmtProdIns, $stmtProd, $Login_user_TYPEvl
@@ -120,7 +153,6 @@ try {
         $stmtInvChk->bind_param('s', $tempid);
         $stmtInvChk->execute();
         if ((int) $stmtInvChk->get_result()->fetch_assoc()['n'] === 0) {
-            $invNumber = $tempid;
             $stmtInvIns->bind_param('ss', $tempid, $invNumber);
             $stmtInvIns->execute();
         }
@@ -152,10 +184,10 @@ try {
         $pid = $row['pid'];
         $requestedQty = $row['qty'];
 
-        $legOneQty = $writeLeg($tempid1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty);
+        $legOneQty = $writeLeg($tempid1, $invNumber1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty);
         if ($legOneQty <= 0) continue;
 
-        $legTwoQty = $writeLeg($tempid2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty);
+        $legTwoQty = $writeLeg($tempid2, $invNumber2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty);
 
         if ($legTwoQty < $requestedQty) {
             $cappedRows[] = "Product #$pid: requested $requestedQty, transferred $legTwoQty";
@@ -181,6 +213,6 @@ try {
     exit;
 }
 
-$_SESSION['sucMessage'] = "Auto transfer complete (Neksomo->Healthcare: $tempid1, Healthcare->LLP: $tempid2)."
+$_SESSION['sucMessage'] = "Auto transfer complete (Neksomo->Healthcare: $invNumber1, Healthcare->LLP: $invNumber2)."
     . (empty($cappedRows) ? "" : " Capped: " . implode('; ', $cappedRows));
 echo "<script>window.location='internal_transfer_manage';</script>";
