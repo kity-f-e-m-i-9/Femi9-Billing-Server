@@ -59,8 +59,12 @@ if (!empty($requirements)) {
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Auto Transfer for Orders : <?php echo $business_name; ?></title>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
+    <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
@@ -120,7 +124,7 @@ if (!empty($requirements)) {
                                         <i class="material-icons" style="font-size:15px;vertical-align:middle;">list_alt</i> View All Orders
                                     </button>
                                     <?php endif; ?>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" style="margin-bottom:14px;margin-left:8px;" onclick="openTransferHistory()">
+                                    <button type="button" class="btn btn-sm" style="background:linear-gradient(135deg, #0891b2 0%, #0e7490 100%);border:none;color:#fff;margin-bottom:14px;margin-left:8px;box-shadow:0 2px 6px rgba(8,145,178,.3);" onclick="openTransferHistory()">
                                         <i class="material-icons" style="font-size:15px;vertical-align:middle;">history</i> Transfer History
                                     </button>
 
@@ -249,10 +253,19 @@ if (!empty($requirements)) {
                 <ul class="nav nav-tabs" role="tablist">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ovTpPane" type="button">TP Purchase Orders</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovOtPane" type="button">OT Channel Orders</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovExcludedPane" type="button" onclick="loadExcludedToday()">Excluded Today</button></li>
                 </ul>
                 <div class="tab-content" style="padding-top:10px;">
                     <div class="tab-pane fade show active" id="ovTpPane"><div id="ovTpList"></div></div>
                     <div class="tab-pane fade" id="ovOtPane"><div id="ovOtList"></div></div>
+                    <div class="tab-pane fade" id="ovExcludedPane">
+                        <p class="text-muted small">
+                            Everything currently left out of today's transfer — either you unchecked
+                            it, or it was already transferred earlier today. Click Include Again to
+                            bring it back into Required Qty (won't undo stock already moved).
+                        </p>
+                        <div id="ovExcludedList"></div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
@@ -295,7 +308,12 @@ if (!empty($requirements)) {
 </div>
 
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
+<script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+<script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
+<script src="../../assets/plugins/pace/pace.min.js"></script>
+<script src="../../assets/js/main.min.js"></script>
+<script src="../../assets/js/custom.js"></script>
 <script>
     var currentBreakdownPid    = null;
     var currentNeksomoAvail    = 0;
@@ -534,6 +552,61 @@ if (!empty($requirements)) {
             window.location.reload();
         }).fail(function () {
             alert('Could not apply your changes. Please try again.');
+        });
+    }
+
+    // ── "Excluded Today" — undo any Not Today / already-transferred skip ──
+    function loadExcludedToday() {
+        var el = document.getElementById('ovExcludedList');
+        el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
+
+        $.getJSON('get-auto-transfer-skipped.php', {}, function (data) {
+            var all = (data.tp || []).map(function (r) { return Object.assign({ source_type: 'tp' }, r); })
+                .concat((data.ot || []).map(function (r) { return Object.assign({ source_type: 'ot' }, r); }));
+            if (!all.length) {
+                el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">Nothing excluded today.</div>';
+                return;
+            }
+            var html = '';
+            all.forEach(function (item) {
+                var reasonLabel = item.reason === 'transferred'
+                    ? '<span class="badge" style="background:#d1fae5;color:#065f46;">Already transferred</span>'
+                    : '<span class="badge" style="background:#fef3c7;color:#92400e;">Excluded</span>';
+                html += '<div class="ov-excluded-row" data-source-id="' + escBd(item.source_id) + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:8px;">' +
+                    '<div style="min-width:0;">' +
+                        '<div style="font-weight:600;overflow-wrap:anywhere;">' + escBd(item.label) + '</div>' +
+                        '<div style="font-size:12px;color:#6b7280;">' + escBd(item.product_name) + ' &nbsp; ' + reasonLabel + '</div>' +
+                    '</div>' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary ov-include-again" style="white-space:nowrap;font-size:11px;padding:2px 8px;">Include Again</button>' +
+                '</div>';
+            });
+            el.innerHTML = html;
+            el.querySelectorAll('.ov-include-again').forEach(function (btn) {
+                btn.addEventListener('click', function () { ovIncludeAgain(this); });
+            });
+        }).fail(function () {
+            el.innerHTML = '<div class="text-danger small" style="padding:10px 4px;">Could not load excluded orders.</div>';
+        });
+    }
+
+    function ovIncludeAgain(btn) {
+        var rowEl = btn.closest('.ov-excluded-row');
+        var sourceId = rowEl.getAttribute('data-source-id');
+        var colonIdx = sourceId.indexOf(':');
+        var sourceType = sourceId.substring(0, colonIdx);
+        var sourceRef = sourceId.substring(colonIdx + 1);
+
+        btn.disabled = true;
+        $.post('unmark-auto-transfer-skip.php', { source_type: sourceType, source_ref: sourceRef }, function (res) {
+            if (!res || !res.success) {
+                alert('Could not include this back. Please try again.');
+                btn.disabled = false;
+                return;
+            }
+            window.location.reload();
+        }, 'json').fail(function () {
+            alert('Request failed. Please try again.');
+            btn.disabled = false;
         });
     }
 

@@ -66,6 +66,101 @@ function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, s
 }
 
 /**
+ * Undoes one skip — deletes today's (source_type, source_ref) row, so
+ * that order/product line counts toward Required Qty again. Used by the
+ * "Excluded Today" tab's "Include Again" button; the underlying PO/OT
+ * status was never touched by the skip in the first place, so this is
+ * purely a delete, nothing to restore on the order itself.
+ */
+function unmark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, string $sourceRef): void
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    $stmt = $db_conn->prepare(
+        "DELETE FROM auto_transfer_skip_today WHERE source_type = ? AND source_ref = ? AND skip_date = CURDATE()"
+    );
+    $stmt->bind_param('ss', $sourceType, $sourceRef);
+    $stmt->execute();
+    $stmt->close();
+}
+
+/**
+ * Everything currently excluded from today's auto-transfer — the
+ * "Excluded Today" tab's data source, so a "Not Today" click (or an
+ * already-completed transfer) is never a dead end with no way to find
+ * or undo it again. Resolves each (order, product) skip row back to a
+ * human label the same way the other list functions do.
+ *
+ * Returns ['tp' => [...], 'ot' => [...]], each entry shaped
+ * ['source_id' => string, 'label' => string, 'product_name' => string,
+ * 'reason' => 'excluded'|'transferred']. A skip whose underlying order/
+ * product no longer resolves (rare — e.g. the PO was deleted after being
+ * skipped) still shows using the raw order_key/product_id so it stays
+ * visible and undoable rather than silently vanishing.
+ */
+function get_auto_transfer_skipped_today(mysqli $db_conn): array
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    $skipped = ['tp' => [], 'ot' => []];
+
+    $stmt = $db_conn->prepare(
+        "SELECT source_type, source_ref, reason FROM auto_transfer_skip_today
+         WHERE skip_date = CURDATE() AND source_type IN ('tp', 'ot') ORDER BY id"
+    );
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    foreach ($rows as $row) {
+        $sourceType = $row['source_type'];
+        $parts = explode(':', $row['source_ref'], 2);
+        if (count($parts) !== 2) continue;
+        [$orderKey, $productIdStr] = $parts;
+        $productId = (int) $productIdStr;
+
+        $prodStmt = $db_conn->prepare("SELECT productName FROM products WHERE id = ?");
+        $prodStmt->bind_param('i', $productId);
+        $prodStmt->execute();
+        $productName = $prodStmt->get_result()->fetch_assoc()['productName'] ?? "Product #$productId";
+        $prodStmt->close();
+
+        if ($sourceType === 'tp') {
+            $poId = (int) $orderKey;
+            $poStmt = $db_conn->prepare(
+                "SELECT tp.name AS tp_name, tp.tp_id AS tp_code
+                 FROM tp_purchase_orders po
+                 INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
+                 WHERE po.id = ?"
+            );
+            $poStmt->bind_param('i', $poId);
+            $poStmt->execute();
+            $poRow = $poStmt->get_result()->fetch_assoc();
+            $poStmt->close();
+            $label = $poRow ? ($poRow['tp_name'] . ' (' . $poRow['tp_code'] . ') — PO #' . $poId) : ('PO #' . $poId);
+        } else {
+            $otStmt = $db_conn->prepare(
+                "SELECT os.customer_name, osi.cat FROM ot_sales os
+                 INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
+                 WHERE os.tempid = ? LIMIT 1"
+            );
+            $otStmt->bind_param('s', $orderKey);
+            $otStmt->execute();
+            $otRow = $otStmt->get_result()->fetch_assoc();
+            $otStmt->close();
+            $label = $otRow ? (($otRow['customer_name'] ?: 'Draft Order') . ' (' . $otRow['cat'] . ')') : $orderKey;
+        }
+
+        $skipped[$sourceType][] = [
+            'source_id'    => $sourceType . ':' . $row['source_ref'],
+            'label'        => $label,
+            'product_name' => $productName,
+            'reason'       => $row['reason'],
+        ];
+    }
+
+    return $skipped;
+}
+
+/**
  * Aggregates today's required quantity per product from:
  *  - tp_purchase_order_items joined to tp_purchase_orders
  *    WHERE status = 'waiting' AND order_date = CURDATE()
