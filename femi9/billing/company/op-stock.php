@@ -32,6 +32,10 @@ if (isset($_REQUEST['update-opstock'])) {
     $opening_stock_date = date("Y-m-d");
     $user_type          = 'company';
     $createdBy          = $_SESSION['LOGIN_USER'] ?? 'system';
+    // Optional: which physical godown (warehouse) this opening stock
+    // belongs to. Blank/absent means "unassigned", same convention as
+    // Add Input Stock.
+    $warehouseId = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 
     $pr_ids   = $_POST['pr_id']  ?? [];
     $op_qtys  = $_POST['op_qty'] ?? [];
@@ -48,19 +52,20 @@ if (isset($_REQUEST['update-opstock'])) {
 
     $stmtChk = $db_conn->prepare(
         "SELECT COUNT(*) AS n FROM stock
-          WHERE product_id = ? AND user_type = ? AND user_id = ?"
+          WHERE product_id = ? AND user_type = ? AND user_id = ?
+            AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?')
     );
     $stmtIns = $db_conn->prepare(
         "INSERT INTO stock
              (product_id, opening_qty, opening_date, input_qty, sales_qty,
-              sent_qty, closing_qty, user_type, user_id, returnqty)
-         VALUES (?, ?, ?, 0, 0, 0, ?, ?, ?, 0)"
+              sent_qty, closing_qty, user_type, user_id, returnqty, warehouse_id)
+         VALUES (?, ?, ?, 0, 0, 0, ?, ?, ?, 0, ?)"
     );
     $stmtLed = $db_conn->prepare(
         "INSERT INTO stock_ledger
-             (product_id, user_type, user_id, action, qty,
+             (product_id, user_type, user_id, warehouse_id, action, qty,
               qty_before, qty_after, ref_type, ref_id, note, created_by)
-         VALUES (?, ?, ?, 'opening_stock', ?, 0, ?, 'opening_stock', ?, 'opening stock set', ?)"
+         VALUES (?, ?, ?, ?, 'opening_stock', ?, 0, ?, 'opening_stock', ?, 'opening stock set', ?)"
     );
 
     $inserted = 0;
@@ -69,17 +74,26 @@ if (isset($_REQUEST['update-opstock'])) {
         $qty = (int) RemoveSpecialChar($op_qtys[$i] ?? '0');
         if ($pid <= 0 || $qty < 0) continue;
 
-        // Skip if stock row already exists for this product + godown
-        $stmtChk->bind_param('iss', $pid, $user_type, $godownid);
+        // Skip if stock row already exists for this product + godown + warehouse
+        if ($warehouseId === null) {
+            $stmtChk->bind_param('iss', $pid, $user_type, $godownid);
+        } else {
+            $stmtChk->bind_param('issi', $pid, $user_type, $godownid, $warehouseId);
+        }
         $stmtChk->execute();
         if ((int) $stmtChk->get_result()->fetch_assoc()['n'] > 0) continue;
 
-        // Insert stock row
-        $stmtIns->bind_param('iiiss', $pid, $qty, $qty, $user_type, $godownid);
+        // Insert stock row. Pre-existing bug fixed as a byproduct of
+        // rewriting this line for warehouse support: opening_date's
+        // placeholder was previously being bound to $qty (an int) instead
+        // of a real date, which threw "Incorrect date value" whenever
+        // this INSERT branch actually ran (masked in practice by the
+        // idempotency check above almost always short-circuiting first).
+        $stmtIns->bind_param('iisissi', $pid, $qty, $opening_stock_date, $qty, $user_type, $godownid, $warehouseId);
         $stmtIns->execute();
 
         // Audit trail: opening stock entry in stock_ledger
-        $stmtLed->bind_param('issiiiss', $pid, $user_type, $godownid, $qty, $qty, $godownid, $createdBy);
+        $stmtLed->bind_param('issiiiss', $pid, $user_type, $godownid, $warehouseId, $qty, $qty, $godownid, $createdBy);
         $stmtLed->execute();
 
         $inserted++;
@@ -200,7 +214,19 @@ if ($gid > 0 && is_godown_allowed($db_conn, $gid)) {
 						   <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
 							   <?php }?>
 							   </select>
-											
+							   <br/>
+
+							   <label class="form-label">Godown (physical)</label>
+							   <select name="warehouse_id" class="form-control">
+							   <option value="">— Not tracked —</option>
+							   <?php $select_Warehouse="select id, code, name from warehouses where is_active = 1 order by code asc";
+							   $fetch_Warehouse=mysqli_query($db_conn,$select_Warehouse);
+							   while($result_Warehouse=mysqli_fetch_array($fetch_Warehouse))
+							   {?>
+						   <option value="<?=(int)$result_Warehouse['id'];?>"><?=htmlspecialchars($result_Warehouse['code'], ENT_QUOTES, 'UTF-8');?><?=$result_Warehouse['name'] ? ' - ' . htmlspecialchars($result_Warehouse['name'], ENT_QUOTES, 'UTF-8') : '';?></option>
+							   <?php }?>
+							   </select>
+
 											<table class="table">
 											<thead>
 											<tr>
