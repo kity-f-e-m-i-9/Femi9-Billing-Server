@@ -49,6 +49,70 @@ function ensure_auto_transfer_skip_table(mysqli $db_conn): void
     ");
 }
 
+// Self-migrating. One row per product_id holds the last-used rate for
+// each leg (Neksomo->Healthcare, Healthcare->LLP), so the Auto Transfer
+// page can pre-fill its rate inputs instead of starting blank every time
+// — staff can still edit/override before Transfer Now, this is only a
+// starting value. Upserted every time a transfer actually completes with
+// a non-zero rate, so it stays current with whatever was last charged.
+function ensure_auto_transfer_default_rates_table(mysqli $db_conn): void
+{
+    $db_conn->query("
+        CREATE TABLE IF NOT EXISTS auto_transfer_default_rates (
+            product_id INT NOT NULL PRIMARY KEY,
+            rate_healthcare DECIMAL(10,2) NOT NULL DEFAULT 0,
+            rate_llp DECIMAL(10,2) NOT NULL DEFAULT 0,
+            updated_by VARCHAR(100) NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+}
+
+/**
+ * Returns [product_id => ['healthcare' => float, 'llp' => float]] for
+ * every product with a known default rate — used to pre-fill the Auto
+ * Transfer page's rate inputs.
+ */
+function get_auto_transfer_default_rates(mysqli $db_conn): array
+{
+    ensure_auto_transfer_default_rates_table($db_conn);
+    $rates = [];
+    $res = $db_conn->query("SELECT product_id, rate_healthcare, rate_llp FROM auto_transfer_default_rates");
+    while ($row = $res->fetch_assoc()) {
+        $rates[(int) $row['product_id']] = [
+            'healthcare' => (float) $row['rate_healthcare'],
+            'llp'        => (float) $row['rate_llp'],
+        ];
+    }
+    return $rates;
+}
+
+/**
+ * Remembers the rate actually used for one product's transfer, so next
+ * time it's the pre-filled starting value. Only stores non-zero rates —
+ * a blank/zero entry shouldn't overwrite a previously known real rate.
+ */
+function save_auto_transfer_default_rate(mysqli $db_conn, int $productId, float $rateHealthcare, float $rateLlp, ?string $updatedBy = null): void
+{
+    if ($rateHealthcare <= 0 && $rateLlp <= 0) return;
+    ensure_auto_transfer_default_rates_table($db_conn);
+    $stmt = $db_conn->prepare(
+        "INSERT INTO auto_transfer_default_rates (product_id, rate_healthcare, rate_llp, updated_by)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+             rate_healthcare = IF(? > 0, ?, rate_healthcare),
+             rate_llp        = IF(? > 0, ?, rate_llp),
+             updated_by      = ?"
+    );
+    $stmt->bind_param(
+        'iddsdddds',
+        $productId, $rateHealthcare, $rateLlp, $updatedBy,
+        $rateHealthcare, $rateHealthcare, $rateLlp, $rateLlp, $updatedBy
+    );
+    $stmt->execute();
+    $stmt->close();
+}
+
 /**
  * Marks one order skipped for today — INSERT IGNORE so calling this twice
  * for the same order/date (e.g. a double-click) is harmless.

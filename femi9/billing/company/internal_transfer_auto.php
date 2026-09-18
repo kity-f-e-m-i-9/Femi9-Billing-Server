@@ -19,6 +19,7 @@ if (!$neksomoId || !$healthcareId || !$llpId) {
 
 $stockService = new StockService($db_conn);
 $requirements = get_auto_transfer_requirements($db_conn, $llpId);
+$defaultRates = get_auto_transfer_default_rates($db_conn);
 
 $rows = [];
 if (!empty($requirements)) {
@@ -48,6 +49,8 @@ if (!empty($requirements)) {
             'capped'          => $cappedQty,
             'neksomo_avail'   => $neksomoAvail,
             'healthcare_avail'=> $healthcareAvail,
+            'rate_healthcare' => $defaultRates[$pid]['healthcare'] ?? null,
+            'rate_llp'        => $defaultRates[$pid]['llp'] ?? null,
         ];
     }
 }
@@ -161,10 +164,12 @@ if (!empty($requirements)) {
                                                                    value="<?php echo (int) $row['capped']; ?>" class="form-control">
                                                         </td>
                                                         <td>
-                                                            <input type="number" min="0" step="0.01" name="rate1[]" placeholder="Rate(Rs.)" class="form-control">
+                                                            <input type="number" min="0" step="0.01" name="rate1[]" placeholder="Rate(Rs.)" class="form-control"
+                                                                   value="<?php echo $row['rate_healthcare'] !== null ? htmlspecialchars((string) $row['rate_healthcare'], ENT_QUOTES, 'UTF-8') : ''; ?>">
                                                         </td>
                                                         <td>
-                                                            <input type="number" min="0" step="0.01" name="rate2[]" placeholder="Rate(Rs.)" class="form-control">
+                                                            <input type="number" min="0" step="0.01" name="rate2[]" placeholder="Rate(Rs.)" class="form-control"
+                                                                   value="<?php echo $row['rate_llp'] !== null ? htmlspecialchars((string) $row['rate_llp'], ENT_QUOTES, 'UTF-8') : ''; ?>">
                                                         </td>
                                                         <td>
                                                             <button type="button" class="btn btn-sm"

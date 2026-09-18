@@ -205,6 +205,8 @@ try {
             $cappedRows[] = "Product #$pid: requested $requestedQty, transferred $legTwoQty";
         }
 
+        save_auto_transfer_default_rate($db_conn, $pid, $row['rate1'], $row['rate2'], $createdBy);
+
         foreach (['tp', 'ot'] as $sourceType) {
             foreach ($contributingOrders[$sourceType] as $order) {
                 $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"ot:"/"wa:" prefix
