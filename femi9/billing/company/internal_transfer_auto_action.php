@@ -9,6 +9,33 @@ include("RemoveSpecialChar.php");
 
 error_reporting(0);
 
+// Manual internal transfers use a free-typed inv_number following a fixed
+// per-leg convention observed in real data: "G/<FY>/<seq>" for Neksomo ->
+// Healthcare, "S/<FY>/<seq>" for Healthcare -> LLP, FY as "26-27" (Apr-Mar),
+// seq an increasing integer per prefix+FY (not reset mid-year). This
+// generates the next number in that same series instead of reusing the
+// internal AUTO... tempid as the invoice number.
+function next_internal_transfer_invoice_number(mysqli $db, string $prefix): string
+{
+    $month = (int) date('n');
+    $year  = (int) date('Y');
+    $fy = ($month >= 4)
+        ? substr((string) $year, -2) . '-' . substr((string) ($year + 1), -2)
+        : substr((string) ($year - 1), -2) . '-' . substr((string) $year, -2);
+
+    $pattern = $prefix . '/' . $fy . '/%';
+    $stmt = $db->prepare(
+        "SELECT MAX(CAST(SUBSTRING_INDEX(inv_number, '/', -1) AS UNSIGNED)) AS max_seq
+         FROM internal_transfer_invoice WHERE inv_number LIKE ?"
+    );
+    $stmt->bind_param('s', $pattern);
+    $stmt->execute();
+    $maxSeq = (int) ($stmt->get_result()->fetch_assoc()['max_seq'] ?? 0);
+    $stmt->close();
+
+    return $prefix . '/' . $fy . '/' . ($maxSeq + 1);
+}
+
 $productIds = $_REQUEST['product_id'] ?? [];
 $qtyArr     = $_REQUEST['qty'] ?? [];
 
@@ -25,6 +52,16 @@ $llpId        = resolve_godown_id_by_gname($db_conn, 'FEMI NAYAN LLP');
 if (!$neksomoId || !$healthcareId || !$llpId) {
     $_SESSION['errorMessage'] = "Required company profiles not found.";
     echo "<script>window.location='internal_transfer_auto?misconfigured';</script>";
+    exit;
+}
+
+// Same authorization gate internal_transfer_action.php applies to the two
+// godowns a manual transfer names — the three fixed godowns this feature
+// always moves through are no different, so a company user not allowed to
+// touch one of them can't use this shortcut to bypass that.
+if (!is_godown_allowed($db_conn, (int)$neksomoId) || !is_godown_allowed($db_conn, (int)$healthcareId) || !is_godown_allowed($db_conn, (int)$llpId)) {
+    $_SESSION['errorMessage'] = "You are not authorized to use this company profile.";
+    echo "<script>window.location='internal_transfer_auto?unauthorized';</script>";
     exit;
 }
 
@@ -57,6 +94,12 @@ $cappedRows = [];
 $db_conn->begin_transaction();
 
 try {
+    // Generated inside the same transaction as the inserts that consume
+    // them, so the MAX-based lookup sees any number this same batch has
+    // already claimed.
+    $invNumber1 = next_internal_transfer_invoice_number($db_conn, 'G'); // Neksomo -> Healthcare
+    $invNumber2 = next_internal_transfer_invoice_number($db_conn, 'S'); // Healthcare -> LLP
+
     $stmtInvChk = $db_conn->prepare("SELECT COUNT(*) AS n FROM internal_transfer_invoice WHERE tempid = ?");
     $stmtInvIns = $db_conn->prepare(
         "INSERT INTO internal_transfer_invoice (tempid, inv_id, inv_number, courier_charges)
@@ -74,10 +117,11 @@ try {
      * Writes one internal_transfer_invoice (once per tempid) + one
      * internal_transfer row, then performs the StockService
      * transferOut/transferIn pair. Returns the actual qty moved
-     * (may be less than $qty if stock is insufficient at commit time).
+     * (may be less than $qty if stock is insufficient at commit time —
+     * re-validated here, never trusting the popup's earlier snapshot).
      */
     $writeLeg = function (
-        string $tempid, string $sendFrom, string $sendTo, int $pid, int $qty
+        string $tempid, string $invNumber, string $sendFrom, string $sendTo, int $pid, int $qty
     ) use (
         $db_conn, $stockService, $createdBy, $username, $usertype, $date,
         $stmtInvChk, $stmtInvIns, $stmtProdIns, $stmtProd, $Login_user_TYPEvl
@@ -109,7 +153,6 @@ try {
         $stmtInvChk->bind_param('s', $tempid);
         $stmtInvChk->execute();
         if ((int) $stmtInvChk->get_result()->fetch_assoc()['n'] === 0) {
-            $invNumber = $tempid;
             $stmtInvIns->bind_param('ss', $tempid, $invNumber);
             $stmtInvIns->execute();
         }
@@ -141,13 +184,29 @@ try {
         $pid = $row['pid'];
         $requestedQty = $row['qty'];
 
-        $legOneQty = $writeLeg($tempid1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty);
+        // Snapshot which orders are currently behind this product's demand
+        // BEFORE moving stock, so they can be marked covered afterward —
+        // tp_purchase_orders.status / ot_sales_invoice.status / wa_po_
+        // purchase_orders.status stay 'waiting'/'draft' even after a
+        // successful transfer (by design, per the spec — fulfilling a PO
+        // is still a separate manual step), so without this a second
+        // Transfer Now click would re-count and re-move the same demand.
+        $contributingOrders = get_auto_transfer_breakdown_for_product($db_conn, $pid, $llpId);
+
+        $legOneQty = $writeLeg($tempid1, $invNumber1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty);
         if ($legOneQty <= 0) continue;
 
-        $legTwoQty = $writeLeg($tempid2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty);
+        $legTwoQty = $writeLeg($tempid2, $invNumber2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty);
 
         if ($legTwoQty < $requestedQty) {
             $cappedRows[] = "Product #$pid: requested $requestedQty, transferred $legTwoQty";
+        }
+
+        foreach (['tp', 'ot', 'wa'] as $sourceType) {
+            foreach ($contributingOrders[$sourceType] as $order) {
+                $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"ot:"/"wa:" prefix
+                mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy);
+            }
         }
     }
 
@@ -170,6 +229,6 @@ try {
     exit;
 }
 
-$_SESSION['sucMessage'] = "Auto transfer complete (Neksomo->Healthcare: $tempid1, Healthcare->LLP: $tempid2)."
+$_SESSION['sucMessage'] = "Auto transfer complete (Neksomo->Healthcare: $invNumber1, Healthcare->LLP: $invNumber2)."
     . (empty($cappedRows) ? "" : " Capped: " . implode('; ', $cappedRows));
 echo "<script>window.location='internal_transfer_manage';</script>";

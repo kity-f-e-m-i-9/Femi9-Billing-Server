@@ -1957,7 +1957,12 @@ if ($hasTps) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" style="padding:14px 20px;">
-                <input type="text" id="ufSearchBox" class="form-control form-control-sm" placeholder="Search District / Firka..." style="max-width:260px;margin-bottom:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+                    <input type="text" id="ufSearchBox" class="form-control form-control-sm" placeholder="Search District / Firka..." style="max-width:260px;">
+                    <a href="#" id="ufExportBtn" class="btn btn-sm btn-outline-danger" style="white-space:nowrap;">
+                        <i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">file_download</i> Export Excel
+                    </a>
+                </div>
                 <div id="ufListBody">
                     <div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>
                 </div>
@@ -2128,10 +2133,17 @@ document.querySelectorAll('.col-toggle-btn').forEach(function (btn) {
             '<button type="button" class="btn btn-sm btn-outline-secondary uf-page-btn" data-page="' + (data.page + 1) + '"' + (data.page >= totalPages ? ' disabled' : '') + '>Next</button>';
     }
 
+    function ufUpdateExportLink(search) {
+        var params = { q: search || '' };
+        if (viewBdmId) { params.view_bdm_id = viewBdmId; }
+        $('#ufExportBtn').attr('href', 'export-unassigned-firkas-xlsx.php?' + $.param(params));
+    }
+
     function ufLoad(page, search) {
         var key = page + '-' + search;
         $('#ufListBody').html('<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center;">Loading&hellip;</div>');
         $('#ufPagination').html('');
+        ufUpdateExportLink(search);
         if (ufCache[key]) {
             $('#ufListBody').html(ufRenderRows(ufCache[key]));
             $('#ufPagination').html(ufRenderPagination(ufCache[key]));

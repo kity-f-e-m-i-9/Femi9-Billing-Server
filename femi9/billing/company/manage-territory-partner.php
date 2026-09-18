@@ -368,7 +368,7 @@ $i = 0;
                                                 Napkin Pickup
                                                 <div class="pickup-bulk">
                                                     <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="all">All Orders</a> /
-                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="cp_only">CP Only</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="cp_only">CP/SS Only</a> /
                                                     <a href="#" class="pickup-bulk-link" data-type="napkin" data-mode="disabled">Disabled</a>
                                                 </div>
                                             </th>
@@ -376,7 +376,7 @@ $i = 0;
                                                 Lumi Pickup
                                                 <div class="pickup-bulk">
                                                     <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="all">All Orders</a> /
-                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="cp_only">CP Only</a> /
+                                                    <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="cp_only">CP/SS Only</a> /
                                                     <a href="#" class="pickup-bulk-link" data-type="diaper" data-mode="disabled">Disabled</a>
                                                 </div>
                                             </th>
@@ -501,7 +501,7 @@ $i = 0;
                                                             data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
                                                         <option value="disabled" <?php echo $pmNapkin === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
                                                         <option value="all" <?php echo $pmNapkin === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
-                                                        <option value="cp_only" <?php echo $pmNapkin === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                        <option value="cp_only" <?php echo $pmNapkin === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP/SS Orders Only</option>
                                                     </select>
                                                 </span>
                                             </td>
@@ -512,7 +512,7 @@ $i = 0;
                                                             data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
                                                         <option value="disabled" <?php echo $pmDiaper === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
                                                         <option value="all" <?php echo $pmDiaper === 'all' ? 'selected' : ''; ?>>Enabled — All Orders</option>
-                                                        <option value="cp_only" <?php echo $pmDiaper === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP Orders Only</option>
+                                                        <option value="cp_only" <?php echo $pmDiaper === 'cp_only' ? 'selected' : ''; ?>>Enabled — CP/SS Orders Only</option>
                                                     </select>
                                                 </span>
                                             </td>
@@ -641,7 +641,7 @@ $(document).on('click', '.pickup-bulk-link', function (e) {
     e.preventDefault();
     var type  = $(this).data('type');
     var mode  = $(this).data('mode');
-    var modeLabel = mode === 'all' ? 'Enabled — All Orders' : (mode === 'cp_only' ? 'Enabled — CP Orders Only' : 'Disabled');
+    var modeLabel = mode === 'all' ? 'Enabled — All Orders' : (mode === 'cp_only' ? 'Enabled — CP/SS Orders Only' : 'Disabled');
     if (!confirm('Set ' + (type === 'diaper' ? 'Lumi Diaper' : 'Napkin') + ' pickup to "' + modeLabel + '" for every Territory Partner shown here?')) return;
 
     $.post('toggle-tp-pickup-bulk.php', {

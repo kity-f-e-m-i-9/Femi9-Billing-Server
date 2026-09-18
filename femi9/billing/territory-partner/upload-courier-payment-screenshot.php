@@ -360,17 +360,6 @@ function classifyCourierVisionResult(array $v, float $remainingAmount, ?string $
             'reason' => 'The amount in this screenshot (₹' . number_format((float)$v['amount'], 2) . ') is more than what\'s still owed (₹' . number_format($remainingAmount, 2) . ').',
             'raw_text' => $raw];
     }
-    // The payment must have been made TODAY (the same day this order is
-    // being placed) — an old screenshot reused from a previous day's payment
-    // is not proof this order's fee was paid. A date Claude couldn't read at
-    // all is NOT treated as a mismatch (many UPI screens show no absolute
-    // date at all) — that just falls through to the checks below.
-    $today = date('Y-m-d');
-    if ($paymentDate !== null && $paymentDate !== $today) {
-        return ['status' => 'rejected', 'amount' => $v['amount'], 'reference' => $v['reference'], 'payment_date' => $paymentDate,
-            'reason' => 'This screenshot shows a payment made on ' . $paymentDate . ', not today (' . $today . ') — please upload today\'s payment screenshot.',
-            'raw_text' => $raw];
-    }
     if ($expectedUpi !== null && !$v['recipient_matches']) {
         return ['status' => 'pending_review', 'amount' => $v['amount'], 'reference' => $v['reference'], 'payment_date' => $paymentDate,
             'reason' => 'Could not confirm the payment was made to ' . $expectedUpi . ' — needs manual review.',
