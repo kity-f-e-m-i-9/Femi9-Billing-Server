@@ -427,11 +427,11 @@ $stmt_states->close();
                                                 <br>
 
                                                 <span id="opstock">
+                                                    <button type="submit" name="add-draft-record" class="btn" style="background:#f59e0b;border:none;color:#fff;" title="Save without affecting stock — come back and finish it later">
+                                                        <i class="material-icons">save</i> Save as Draft
+                                                    </button>
                                                     <button type="submit" name="add-record" class="btn btn-primary">
                                                         <i class="material-icons">add</i> Submit
-                                                    </button>
-                                                    <button type="submit" name="add-draft-record" class="btn btn-outline-secondary" title="Save without affecting stock — come back and finish it later">
-                                                        <i class="material-icons">save</i> Save as Draft
                                                     </button>
                                                 </span>
 

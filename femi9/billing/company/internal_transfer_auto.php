@@ -146,7 +146,8 @@ if (!empty($requirements)) {
                                                                    value="<?php echo (int) $row['capped']; ?>" class="form-control">
                                                         </td>
                                                         <td>
-                                                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                            <button type="button" class="btn btn-sm"
+                                                                    style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border:none;color:#fff;"
                                                                     onclick="openBreakdown(<?php echo (int) $row['product_id']; ?>, <?php echo (int) $row['neksomo_avail']; ?>, <?php echo (int) $row['healthcare_avail']; ?>)">
                                                                 <i class="material-icons" style="font-size:14px;vertical-align:middle;">list_alt</i> View
                                                             </button>
