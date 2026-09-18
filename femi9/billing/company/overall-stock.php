@@ -5,6 +5,14 @@ error_reporting(0);
 // Pulled from the Neksomo menu — a purpose-built stock view is coming for that login.
 if (is_neksomo_login($db_conn)) { header("Location: dashboard.php"); exit; }
 $user_type_Loginvl="company";
+
+// Warehouse code/name lookup, used to label per-warehouse breakdown rows —
+// unassigned stock (warehouse_id IS NULL) is labeled separately below.
+$warehouseNames = [];
+$whRes = $db_conn->query("SELECT id, code, name FROM warehouses ORDER BY code ASC");
+while ($whRes && ($whRow = $whRes->fetch_assoc())) {
+    $warehouseNames[(int)$whRow['id']] = $whRow['code'] . ($whRow['name'] ? ' - ' . $whRow['name'] : '');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -148,6 +156,7 @@ while($result_Godown=mysqli_fetch_array($fetch_Godowndetails))
                                             <thead>
                                                <tr>
 											<th>Product Name</th>
+											<th>Godown</th>
 											<th>Opening Stock Qty</th>
 											<th>Opening Stock Date</th>
 											<th style="text-align:right;">Input Stock Qty</th>
@@ -249,6 +258,7 @@ $select_OPStock="select product_id, MIN(opening_date) as opening_date,
 										?>
                                                 <tr>
                                                     <td><?php echo $Result_productDetils["productName"];?></td>
+													<td><b>Total</b></td>
 													<td><?php echo $Result_OPStock['opening_qty'];?></td>
 													<td><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
 
@@ -270,6 +280,46 @@ $select_OPStock="select product_id, MIN(opening_date) as opening_date,
 						<?php endif; ?>
 
                                                 </tr>
+
+						<?php
+						// Per-warehouse breakdown — a product's stock can now be split
+						// across physical godowns (H1/G1/G2); each sub-row shows that
+						// warehouse's own opening/input/sales/closing qty. Internal
+						// Transfer Qty and Movement to CP have no warehouse_id on their
+						// source tables (internal_transfer, pl_godown_transfer_items) and
+						// can't be split per warehouse, so those two columns stay blank
+						// here — only the Total row above carries them.
+						$select_whBreakdown="select warehouse_id, opening_qty, opening_date, input_qty, sales_qty, closing_qty, extra_pieces
+							from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl' and product_id='$StockProductID'
+							order by warehouse_id is null desc, warehouse_id asc";
+						$Fetch_whBreakdown=mysqli_query($db_conn,$select_whBreakdown);
+						$whRowCount=mysqli_num_rows($Fetch_whBreakdown);
+						if ($whRowCount > 1) {
+							while($Result_whRow=mysqli_fetch_array($Fetch_whBreakdown)) {
+								$whId = $Result_whRow['warehouse_id'];
+								$whLabel = $whId !== null ? ($warehouseNames[(int)$whId] ?? "Godown #$whId") : 'Unassigned';
+								$whClosing = (int)$Result_whRow['closing_qty'];
+								$whExtraPieces = (int)($Result_whRow['extra_pieces'] ?? 0);
+								$whClosingPieces = ($whClosing*$PiecesPerPack)+$whExtraPieces;
+						?>
+						<tr style="color:#6c757d;">
+							<td></td>
+							<td><?php echo htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8'); ?></td>
+							<td><?php echo $Result_whRow['opening_qty'];?></td>
+							<td><?php echo date("d/M/Y",strtotime($Result_whRow['opening_date']));?></td>
+							<td align="right"><?php echo $Result_whRow['input_qty'];?></td>
+							<td align="right"><?php echo $Result_whRow['sales_qty'];?></td>
+							<td align="right">&mdash;</td>
+							<td align="right">&mdash;</td>
+							<td align="right"><?php echo $whClosing;?></td>
+							<?php if (is_neksomo_login($db_conn)): ?>
+							<td align="right"><?php echo $whClosingPieces;?></td>
+							<?php endif; ?>
+						</tr>
+						<?php
+							}
+						}
+						?>
 
 										<?php }?>
 
@@ -298,6 +348,7 @@ $select_OPStock="select product_id, MIN(opening_date) as opening_date,
 												?>
                                                 <tr style="color:#78716c;">
                                                     <td><?php echo htmlspecialchars($prodRow['productName']); ?> <em style="font-size:11px;">(not yet converted)</em></td>
+													<td>&mdash;</td>
 													<td>0</td>
 													<td>&mdash;</td>
 													<td align="right">0</td>
@@ -318,7 +369,7 @@ $select_OPStock="select product_id, MIN(opening_date) as opening_date,
 
 										 <tfoot>
 										 <tr>
-										<td colspan="5" style="text-align:right;">Total</td>
+										<td colspan="6" style="text-align:right;">Total</td>
 										<td align="right"><b><?=$total_intrn_transfer;?></b></td>
 										<td align="right"><b><?=$total_sent_other;?></b></td>
 										<td align="right"><b><?=$total_closing_qty_shown;?></b></td>
