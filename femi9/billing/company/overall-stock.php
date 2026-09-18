@@ -6,10 +6,10 @@ error_reporting(0);
 if (is_neksomo_login($db_conn)) { header("Location: dashboard.php"); exit; }
 $user_type_Loginvl="company";
 
-// Warehouse code/name lookup, used to label per-warehouse breakdown rows —
-// unassigned stock (warehouse_id IS NULL) is labeled separately below.
+// Warehouse code/name lookup, used both to label per-warehouse cards below
+// and to build the warehouse filter checkboxes.
 $warehouseNames = [];
-$whRes = $db_conn->query("SELECT id, code, name FROM warehouses ORDER BY code ASC");
+$whRes = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
 while ($whRes && ($whRow = $whRes->fetch_assoc())) {
     $warehouseNames[(int)$whRow['id']] = $whRow['code'] . ($whRow['name'] ? ' - ' . $whRow['name'] : '');
 }
@@ -54,23 +54,23 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
 
 <body>
     <div class="app align-content-stretch d-flex flex-wrap">
-	
+
         <div class="app-sidebar">
             <?php include("logo.php");?>
             <?php include("femi_menu.php");?>
         </div>
-		
+
         <div class="app-container">
-            
+
           <?php include("app-header.php");?>
-			
+
             <div class="app-content">
                 <div class="content-wrapper">
                     <div class="container-fluid">
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
-								<?php 
+								<?php
 								$select_sumclosing12="select sum(closing_qty) from stock where user_type='$user_type_Loginvl'
 										and product_id in (select id from products where temp_id not like 'NKS-%' or temp_id is null)";
 										$Fetch_sumclosing12=mysqli_query($db_conn,$select_sumclosing12);
@@ -86,7 +86,7 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
                                 </div>
                             </div>
                         </div>
-						
+
 						<form method="post" enctype="multipart/form-data" action="overstock_datewise" id="datewiseFilterForm" onsubmit="return validateGodownChecks();">
 
 							<div class="overviewcontainar">
@@ -124,60 +124,57 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
 							</div>
 							<div style="clear:both;"></div>
 							<br/>
-							</form>	
-							
+							</form>
+
 <?php
 //----Continuos Serial Number In Next Page.......................
 $num_rec_per_page=30;
-if (isset($_GET["page"])) { $page  = $_GET["page"]; } else { $page=1; }; 
- $start_from = ($page-1) * $num_rec_per_page; 
+if (isset($_GET["page"])) { $page  = $_GET["page"]; } else { $page=1; };
+ $start_from = ($page-1) * $num_rec_per_page;
 $i= $start_from;
 //---------------------------------------------------------------
-//echo ++$i; 
+//echo ++$i;
 ?>
 
+						<!-- Product / Godown filters — client-side, applied across all cards below -->
+						<div class="row">
+							<div class="col">
+								<div class="card">
+									<div class="card-body">
+										<div class="row g-3 align-items-end">
+											<div class="col-md-5">
+												<label class="form-label">Filter by Product</label>
+												<input type="text" id="productFilterInput" class="form-control" placeholder="Type a product name…">
+											</div>
+											<div class="col-md-7">
+												<label class="form-label">Filter by Godown</label>
+												<div>
+													<label style="font-weight:normal;display:inline-flex;align-items:center;gap:4px;margin-right:14px;">
+														<input type="checkbox" class="warehouse-filter-check" value="all" checked> All
+													</label>
+													<?php foreach ($warehouseNames as $whId => $whLabel): ?>
+													<label style="font-weight:normal;display:inline-flex;align-items:center;gap:4px;margin-right:14px;">
+														<input type="checkbox" class="warehouse-filter-check" value="wh-<?=(int)$whId;?>" checked> <?=htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8');?>
+													</label>
+													<?php endforeach; ?>
+													<label style="font-weight:normal;display:inline-flex;align-items:center;gap:4px;">
+														<input type="checkbox" class="warehouse-filter-check" value="unassigned" checked> Unassigned
+													</label>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
 
-                        <div class="row">
-                            <div class="col">
-                                <div class="card">
-                                    <div class="card-body">
-									<div style="background:#fff;overflow:scroll;width:100%;">
-									
-									<?php
-									//get Godown Details
+						<?php
+						//get Godown Details
 $select_Godowndetails="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 $fetch_Godowndetails=mysqli_query($db_conn,$select_Godowndetails);
 while($result_Godown=mysqli_fetch_array($fetch_Godowndetails))
 {
-?>
-									<h1><?=$result_Godown['gname'];?></h1>
-									
-                                        <table class="table">
-                                            <thead>
-                                               <tr>
-											<th>Product Name</th>
-											<th>Godown</th>
-											<th>Opening Stock Qty</th>
-											<th>Opening Stock Date</th>
-											<th style="text-align:right;">Input Stock Qty</th>
-											<th style="text-align:right;">Sales Qty</th>
-											<th style="text-align:right;">Internal Transfer Qty</th>
-											<th style="text-align:right;">Movement to CP</th>
-											<th style="text-align:right;">Closing Qty</th>
-											<?php if (is_neksomo_login($db_conn)): ?>
-											<th style="text-align:right;">Closing Qty (Pieces)</th>
-											<?php endif; ?>
-											</tr>
-                                            </thead>
-											
-											<tbody>
-			<?php
 $user_id_Loginvl=$result_Godown['id'];
-$total_closing_pieces=0;
-$total_closing_qty_shown=0;
-$total_intrn_transfer=0;
-$total_sent_other=0;
-$renderedProductIds=[];
 // Whether this table is for Neksomo's own godown — the only place a mapped
 // company product's real `stock.closing_qty` alone understates what's truly
 // available (see NeksomoStockBridge.php: Neksomo's own purchases never
@@ -185,170 +182,169 @@ $renderedProductIds=[];
 // exact shortfall needed at that moment).
 $isNeksomoGodown=((int)$user_id_Loginvl === get_neksomo_godown_id($db_conn));
 
+// Pull every stock row for this godown (no GROUP BY — each warehouse's row
+// stays separate so it can render as its own card), keyed by warehouse
+// bucket. "" (empty string key) is the Unassigned bucket (warehouse_id IS NULL).
+$warehouseBuckets = [];   // bucketKey => ['label' => ..., 'rows' => [productId => row]]
+$warehouseBuckets[''] = ['label' => 'Unassigned', 'rows' => []];
+foreach ($warehouseNames as $whId => $whLabel) {
+    $warehouseBuckets[(string)$whId] = ['label' => $whLabel, 'rows' => []];
+}
+
 // Excludes Neksomo's raw piece-native placeholder products (temp_id LIKE
 // 'NKS-%') — these are internal purchase-tracking rows (see
 // neksomo-manufacturer-purchase-action.php's neksomo_credit_pieces()), not
 // something any company-facing stock report should surface; the mapped
 // normal company product is what should show here (see NeksomoStockBridge.php).
-//
-// GROUP BY product_id, summing across any per-warehouse rows — a product's
-// stock can now be split across multiple physical godowns (H1/G1/G2), and
-// this report shows one aggregated line per product per company profile,
-// same as before physical warehouses existed. opening_date has no sum
-// equivalent, so MIN() picks the earliest one across a product's rows.
-$select_OPStock="select product_id, MIN(opening_date) as opening_date,
-        SUM(opening_qty) as opening_qty, SUM(input_qty) as input_qty,
-        SUM(sales_qty) as sales_qty, SUM(closing_qty) as closing_qty,
-        SUM(extra_pieces) as extra_pieces
+$select_OPStock="select product_id, warehouse_id, opening_qty, opening_date, input_qty, sales_qty, closing_qty, extra_pieces
     from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'
-    and product_id in (select id from products where temp_id not like 'NKS-%' or temp_id is null)
-    group by product_id";
-										$Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
-										while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
-										{
-											//Get Product Details
-											$StockProductID=$Result_OPStock['product_id'];
+    and product_id in (select id from products where temp_id not like 'NKS-%' or temp_id is null)";
+$Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
+$renderedProductIds=[];
+while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
+{
+    $StockProductID=$Result_OPStock['product_id'];
+    $bucketKey = $Result_OPStock['warehouse_id'] !== null ? (string)$Result_OPStock['warehouse_id'] : '';
+    if (!isset($warehouseBuckets[$bucketKey])) {
+        // Row references a warehouse that's since been deactivated/removed —
+        // still show its stock rather than silently dropping it.
+        $warehouseBuckets[$bucketKey] = ['label' => "Godown #$bucketKey", 'rows' => []];
+    }
+    $warehouseBuckets[$bucketKey]['rows'][$StockProductID] = $Result_OPStock;
+    $renderedProductIds[$StockProductID]=true;
+}
 
-						$select_productDetils="select * from products where id='$StockProductID'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
-						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
+// Render the Unassigned bucket first (it's where every pre-warehouse row
+// already lives, and where Internal Transfer / Movement to CP still show —
+// see below), then each real warehouse in code order.
+foreach ($warehouseBuckets as $bucketKey => $bucket) {
+    if (empty($bucket['rows']) && $bucketKey !== '') continue; // skip empty warehouse cards entirely
+    $isUnassignedBucket = ($bucketKey === '');
+    $cardFilterClass = $isUnassignedBucket ? 'unassigned' : 'wh-' . (int)$bucketKey;
+?>
+						<div class="row wh-card" data-warehouse="<?=$cardFilterClass;?>">
+							<div class="col">
+								<div class="card">
+									<div class="card-body">
+										<h1><?=$result_Godown['gname'];?> &mdash; <?=htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8');?></h1>
+										<div style="background:#fff;overflow:scroll;width:100%;">
+										<table class="table">
+											<thead>
+												<tr>
+													<th>Product Name</th>
+													<th>Opening Stock Qty</th>
+													<th>Opening Stock Date</th>
+													<th style="text-align:right;">Input Stock Qty</th>
+													<th style="text-align:right;">Sales Qty</th>
+													<th style="text-align:right;">Internal Transfer Qty</th>
+													<th style="text-align:right;">Movement to CP</th>
+													<th style="text-align:right;">Closing Qty</th>
+													<?php if (is_neksomo_login($db_conn)): ?>
+													<th style="text-align:right;">Closing Qty (Pieces)</th>
+													<?php endif; ?>
+												</tr>
+											</thead>
+											<tbody>
+<?php
+$total_closing_pieces=0;
+$total_closing_qty_shown=0;
+$total_intrn_transfer=0;
+$total_sent_other=0;
+foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
+    $select_productDetils="select * from products where id='$StockProductID'";
+    $Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+    $Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
+    if ($Result_productDetils["productName"]==NULL) continue;
 
+    $ClosingStock=(int)$Result_OPStock['closing_qty'];
+    // Real stock alone — a mapped product could still have more sitting in
+    // Neksomo's shared pool, not yet drawn down into this row. Only applied
+    // on the Unassigned card, since the pool itself has no warehouse concept.
+    // Uses the display-only purchased-minus-sold figure (not
+    // get_neksomo_pool_available_packs(), which also subtracts
+    // already-converted stock — goods already sitting in this same
+    // closing_qty would otherwise be excluded from the pool AND counted in
+    // closing_qty, undercounting the true total).
+    if ($isNeksomoGodown && $isUnassignedBucket) {
+        $ClosingStock += get_neksomo_pool_purchased_minus_sold_packs($db_conn, $StockProductID);
+    }
+    $PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
+    $ExtraPieces=(int)($Result_OPStock['extra_pieces'] ?? 0);
+    $ClosingStockPieces=($ClosingStock*$PiecesPerPack)+$ExtraPieces;
+    $total_closing_pieces+=$ClosingStockPieces;
+    $total_closing_qty_shown+=$ClosingStock;
 
-										if($Result_productDetils["productName"]!=NULL){
+    // Internal Transfer Qty and Movement to CP are computed from tables
+    // (internal_transfer, pl_godown_transfer_items) that have no
+    // warehouse_id — they can't be attributed to a specific physical
+    // warehouse, so they only appear on the Unassigned card; real
+    // warehouse cards show a dash.
+    $IntrnTransferQty = 0;
+    $MovementToCP = 0;
+    $DfdQty = 0;
+    if ($isUnassignedBucket) {
+        // Internal transfer broken out from the internal_transfer table itself
+        // (send_from side, cumulative to date).
+        $select_intrnQty="select sum(qty) from internal_transfer where product_id='$StockProductID' and send_from='$user_id_Loginvl'";
+        $Fetch_intrnQty=mysqli_query($db_conn,$select_intrnQty);
+        $IntrnTransferQty=(int)(mysqli_fetch_row($Fetch_intrnQty)[0] ?? 0);
+        $total_intrn_transfer+=$IntrnTransferQty;
 
-						$renderedProductIds[$StockProductID]=true;
-						$ClosingStock=(int)$Result_OPStock['closing_qty'];
-						// Real stock alone — a mapped product could still have more sitting in
-						// Neksomo's shared pool, not yet drawn down into this row. Uses the
-						// display-only purchased-minus-sold figure (not
-						// get_neksomo_pool_available_packs(), which also subtracts
-						// already-converted stock — goods already sitting in this same
-						// closing_qty would otherwise be excluded from the pool AND
-						// counted in closing_qty, undercounting the true total).
-						if ($isNeksomoGodown) {
-							$ClosingStock += get_neksomo_pool_purchased_minus_sold_packs($db_conn, $StockProductID);
-						}
-						$PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
-						$ExtraPieces=(int)($Result_OPStock['extra_pieces'] ?? 0);
-						$ClosingStockPieces=($ClosingStock*$PiecesPerPack)+$ExtraPieces;
-						$total_closing_pieces+=$ClosingStockPieces;
-						$total_closing_qty_shown+=$ClosingStock;
-						// Internal transfer broken out from the internal_transfer table itself
-						// (send_from side, cumulative to date).
-						$select_intrnQty="select sum(qty) from internal_transfer where product_id='$StockProductID' and send_from='$user_id_Loginvl'";
-						$Fetch_intrnQty=mysqli_query($db_conn,$select_intrnQty);
-						$IntrnTransferQty=(int)(mysqli_fetch_row($Fetch_intrnQty)[0] ?? 0);
-						$total_intrn_transfer+=$IntrnTransferQty;
+        // Demo/Free/Damage folded into Sales Qty (goods that left as demo/
+        // free/damage grouped with sales rather than shown separately).
+        $select_dfdQty="select sum(qty) from demofreedamage where product_id='$StockProductID' and userid='$user_id_Loginvl'";
+        $Fetch_dfdQty=mysqli_query($db_conn,$select_dfdQty);
+        $DfdQty=(int)(mysqli_fetch_row($Fetch_dfdQty)[0] ?? 0);
 
-						// Demo/Free/Damage folded into Sales Qty (goods that left as demo/
-						// free/damage grouped with sales rather than shown separately).
-						$select_dfdQty="select sum(qty) from demofreedamage where product_id='$StockProductID' and userid='$user_id_Loginvl'";
-						$Fetch_dfdQty=mysqli_query($db_conn,$select_dfdQty);
-						$DfdQty=(int)(mysqli_fetch_row($Fetch_dfdQty)[0] ?? 0);
-						$SalesQtyShown=(int)$Result_OPStock['sales_qty']+$DfdQty;
-
-						// "Movement to CP" — stock physically transferred from this godown to
-						// a Channel Partner via add-godown-to-location.php (pl-godown-
-						// transfer-action.php, transfer_type='godown_to_location'), distinct
-						// from the invoiced CP sales already counted in Sales Qty above.
-						$select_plt2cpQty="select sum(i.quantity) from pl_godown_transfer_items i inner join pl_godown_transfers t on t.id=i.transfer_id where t.transfer_type='godown_to_location' and i.product_id='$StockProductID' and t.godown_id='$user_id_Loginvl'";
-						$Fetch_plt2cpQty=mysqli_query($db_conn,$select_plt2cpQty);
-						$MovementToCP=(int)(mysqli_fetch_row($Fetch_plt2cpQty)[0] ?? 0);
-						$total_sent_other+=$MovementToCP;
-										?>
-                                                <tr>
-                                                    <td><?php echo $Result_productDetils["productName"];?></td>
-													<td><b>Total</b></td>
+        // "Movement to CP" — stock physically transferred from this godown to
+        // a Channel Partner via add-godown-to-location.php (pl-godown-
+        // transfer-action.php, transfer_type='godown_to_location'), distinct
+        // from the invoiced CP sales already counted in Sales Qty above.
+        $select_plt2cpQty="select sum(i.quantity) from pl_godown_transfer_items i inner join pl_godown_transfers t on t.id=i.transfer_id where t.transfer_type='godown_to_location' and i.product_id='$StockProductID' and t.godown_id='$user_id_Loginvl'";
+        $Fetch_plt2cpQty=mysqli_query($db_conn,$select_plt2cpQty);
+        $MovementToCP=(int)(mysqli_fetch_row($Fetch_plt2cpQty)[0] ?? 0);
+        $total_sent_other+=$MovementToCP;
+    }
+    $SalesQtyShown=(int)$Result_OPStock['sales_qty']+$DfdQty;
+?>
+												<tr class="product-row" data-product-name="<?php echo htmlspecialchars(strtolower($Result_productDetils['productName']), ENT_QUOTES, 'UTF-8'); ?>">
+													<td><?php echo $Result_productDetils["productName"];?></td>
 													<td><?php echo $Result_OPStock['opening_qty'];?></td>
 													<td><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
+													<td align="right"><?php echo $Result_OPStock['input_qty'];?></td>
+													<td align="right"><?php echo $SalesQtyShown;?></td>
+													<td align="right"><?php echo $isUnassignedBucket ? $IntrnTransferQty : '&mdash;';?></td>
+													<td align="right"><?php echo $isUnassignedBucket ? $MovementToCP : '&mdash;';?></td>
+													<td align="right"><b><?php echo $ClosingStock;?></b></td>
+													<?php if (is_neksomo_login($db_conn)): ?>
+													<td align="right"><b><?php echo $ClosingStockPieces;?></b></td>
+													<?php endif; ?>
+												</tr>
+<?php
+}
 
-						<!-------PURCHASE QTY------------->
-						<td align="right"><?php echo $Result_OPStock['input_qty'];?></td>
+// A mapped company product may still have pool stock available (purchased
+// - LLP/Healthcare sold, see NeksomoStockBridge.php) even though it has no
+// real `stock` row at all yet (never transacted) — shown only on the
+// Unassigned card, since the pool itself has no warehouse concept.
+if ($isNeksomoGodown && $isUnassignedBucket) {
+    $mappedIdsRes = $db_conn->query("SELECT DISTINCT company_product_id FROM neksomo_product_mapping");
+    while ($mappedIdsRes && ($mapRow = $mappedIdsRes->fetch_assoc())) {
+        $mappedPid = (int)$mapRow['company_product_id'];
+        if (isset($renderedProductIds[$mappedPid])) continue;
+        $poolAvailable = get_neksomo_pool_purchased_minus_sold_packs($db_conn, $mappedPid);
+        if ($poolAvailable <= 0) continue;
 
-						<!-------SALES QTY (incl. Demo/Free/Damage)------------->
-						<td align="right"><?php echo $SalesQtyShown;?></td>
+        $prodRow = $db_conn->query("SELECT productName, pieces_per_pack FROM products WHERE id = $mappedPid")->fetch_assoc();
+        if (!$prodRow) continue;
 
-						<!-------INTERNAL TRANSFER------------->
-						<td align="right"><?php echo $IntrnTransferQty;?></td>
-
-						<!-------MOVEMENT TO CP------------->
-						<td align="right"><?php echo $MovementToCP;?></td>
-
-						<td align="right"><b><?php echo $ClosingStock;?></b></td>
-						<?php if (is_neksomo_login($db_conn)): ?>
-						<td align="right"><b><?php echo $ClosingStockPieces;?></b></td>
-						<?php endif; ?>
-
-                                                </tr>
-
-						<?php
-						// Per-warehouse breakdown — a product's stock can now be split
-						// across physical godowns (H1/G1/G2); each sub-row shows that
-						// warehouse's own opening/input/sales/closing qty. Internal
-						// Transfer Qty and Movement to CP have no warehouse_id on their
-						// source tables (internal_transfer, pl_godown_transfer_items) and
-						// can't be split per warehouse, so those two columns stay blank
-						// here — only the Total row above carries them.
-						$select_whBreakdown="select warehouse_id, opening_qty, opening_date, input_qty, sales_qty, closing_qty, extra_pieces
-							from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl' and product_id='$StockProductID'
-							order by warehouse_id is null desc, warehouse_id asc";
-						$Fetch_whBreakdown=mysqli_query($db_conn,$select_whBreakdown);
-						$whRowCount=mysqli_num_rows($Fetch_whBreakdown);
-						if ($whRowCount > 1) {
-							while($Result_whRow=mysqli_fetch_array($Fetch_whBreakdown)) {
-								$whId = $Result_whRow['warehouse_id'];
-								$whLabel = $whId !== null ? ($warehouseNames[(int)$whId] ?? "Godown #$whId") : 'Unassigned';
-								$whClosing = (int)$Result_whRow['closing_qty'];
-								$whExtraPieces = (int)($Result_whRow['extra_pieces'] ?? 0);
-								$whClosingPieces = ($whClosing*$PiecesPerPack)+$whExtraPieces;
-						?>
-						<tr style="color:#6c757d;">
-							<td></td>
-							<td><?php echo htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8'); ?></td>
-							<td><?php echo $Result_whRow['opening_qty'];?></td>
-							<td><?php echo date("d/M/Y",strtotime($Result_whRow['opening_date']));?></td>
-							<td align="right"><?php echo $Result_whRow['input_qty'];?></td>
-							<td align="right"><?php echo $Result_whRow['sales_qty'];?></td>
-							<td align="right">&mdash;</td>
-							<td align="right">&mdash;</td>
-							<td align="right"><?php echo $whClosing;?></td>
-							<?php if (is_neksomo_login($db_conn)): ?>
-							<td align="right"><?php echo $whClosingPieces;?></td>
-							<?php endif; ?>
-						</tr>
-						<?php
-							}
-						}
-						?>
-
-										<?php }?>
-
-										<?php }
-
-										// A mapped company product may still have pool stock available (purchased
-										// - LLP/Healthcare sold, see NeksomoStockBridge.php) even though it has no
-										// real `stock` row at all yet (never transacted) — the query above would
-										// otherwise never show it. Render it as a not-yet-converted virtual row so
-										// it isn't invisible on this report.
-										if ($isNeksomoGodown) {
-											$mappedIdsRes = $db_conn->query("SELECT DISTINCT company_product_id FROM neksomo_product_mapping");
-											while ($mappedIdsRes && ($mapRow = $mappedIdsRes->fetch_assoc())) {
-												$mappedPid = (int)$mapRow['company_product_id'];
-												if (isset($renderedProductIds[$mappedPid])) continue;
-												$poolAvailable = get_neksomo_pool_purchased_minus_sold_packs($db_conn, $mappedPid);
-												if ($poolAvailable <= 0) continue;
-
-												$prodRow = $db_conn->query("SELECT productName, pieces_per_pack FROM products WHERE id = $mappedPid")->fetch_assoc();
-												if (!$prodRow) continue;
-
-												$virtualPiecesPerPack = max((int)($prodRow['pieces_per_pack'] ?? 1), 1);
-												$virtualClosingPieces = $poolAvailable * $virtualPiecesPerPack;
-												$total_closing_pieces += $virtualClosingPieces;
-												$total_closing_qty_shown += $poolAvailable;
-												?>
-                                                <tr style="color:#78716c;">
-                                                    <td><?php echo htmlspecialchars($prodRow['productName']); ?> <em style="font-size:11px;">(not yet converted)</em></td>
-													<td>&mdash;</td>
+        $virtualPiecesPerPack = max((int)($prodRow['pieces_per_pack'] ?? 1), 1);
+        $virtualClosingPieces = $poolAvailable * $virtualPiecesPerPack;
+        $total_closing_pieces += $virtualClosingPieces;
+        $total_closing_qty_shown += $poolAvailable;
+        ?>
+												<tr class="product-row" style="color:#78716c;" data-product-name="<?php echo htmlspecialchars(strtolower($prodRow['productName']), ENT_QUOTES, 'UTF-8'); ?>">
+													<td><?php echo htmlspecialchars($prodRow['productName']); ?> <em style="font-size:11px;">(not yet converted)</em></td>
 													<td>0</td>
 													<td>&mdash;</td>
 													<td align="right">0</td>
@@ -359,36 +355,34 @@ $select_OPStock="select product_id, MIN(opening_date) as opening_date,
 													<?php if (is_neksomo_login($db_conn)): ?>
 													<td align="right"><b><?php echo $virtualClosingPieces; ?></b></td>
 													<?php endif; ?>
-                                                </tr>
+												</tr>
 												<?php
-											}
-										}
-										?>
-
-										 </tbody>
-
-										 <tfoot>
-										 <tr>
-										<td colspan="6" style="text-align:right;">Total</td>
-										<td align="right"><b><?=$total_intrn_transfer;?></b></td>
-										<td align="right"><b><?=$total_sent_other;?></b></td>
-										<td align="right"><b><?=$total_closing_qty_shown;?></b></td>
-										<?php if (is_neksomo_login($db_conn)): ?>
-										<td align="right"><b><?=$total_closing_pieces;?></b></td>
-										<?php endif; ?>
-										</tr>
-										 </tfoot>
-										 
-                                        </table>
-										
-<?php }?>
-
+    }
+}
+?>
+											</tbody>
+											<tfoot>
+												<tr>
+													<td colspan="5" style="text-align:right;">Total</td>
+													<td align="right"><b><?=$isUnassignedBucket ? $total_intrn_transfer : '&mdash;';?></b></td>
+													<td align="right"><b><?=$isUnassignedBucket ? $total_sent_other : '&mdash;';?></b></td>
+													<td align="right"><b><?=$total_closing_qty_shown;?></b></td>
+													<?php if (is_neksomo_login($db_conn)): ?>
+													<td align="right"><b><?=$total_closing_pieces;?></b></td>
+													<?php endif; ?>
+												</tr>
+											</tfoot>
+										</table>
 										</div>
-                                    </div>
-                                </div>
-                                
-                            </div>
-                        </div>
+									</div>
+								</div>
+							</div>
+						</div>
+<?php
+}
+}
+?>
+
                     </div>
                 </div>
             </div>
@@ -446,6 +440,53 @@ $select_OPStock="select product_id, MIN(opening_date) as opening_date,
 
     document.getElementById('godownDropdownPanel').addEventListener('click', function (e) {
         e.stopPropagation();
+    });
+
+    /* ── Product / Godown filters — purely client-side over the already-
+       rendered cards, no page reload. ── */
+    function applyStockFilters() {
+        var searchTerm = (document.getElementById('productFilterInput').value || '').trim().toLowerCase();
+        var checkedWarehouses = Array.prototype.slice.call(document.querySelectorAll('.warehouse-filter-check:checked')).map(function (cb) { return cb.value; });
+        var allChecked = checkedWarehouses.indexOf('all') !== -1;
+
+        document.querySelectorAll('.wh-card').forEach(function (card) {
+            var wh = card.getAttribute('data-warehouse');
+            var warehouseVisible = allChecked || checkedWarehouses.indexOf(wh) !== -1;
+            if (!warehouseVisible) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = '';
+
+            // Within a visible card, filter individual product rows by name;
+            // hide the whole card if the search term matches nothing in it.
+            var anyRowVisible = !searchTerm;
+            card.querySelectorAll('.product-row').forEach(function (row) {
+                var name = row.getAttribute('data-product-name') || '';
+                var matches = !searchTerm || name.indexOf(searchTerm) !== -1;
+                row.style.display = matches ? '' : 'none';
+                if (matches) anyRowVisible = true;
+            });
+            if (searchTerm) {
+                card.style.display = anyRowVisible ? '' : 'none';
+            }
+        });
+    }
+
+    document.getElementById('productFilterInput').addEventListener('input', applyStockFilters);
+    document.querySelectorAll('.warehouse-filter-check').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            if (this.value === 'all' && this.checked) {
+                // "All" overrides individual selections back to checked
+                document.querySelectorAll('.warehouse-filter-check').forEach(function (other) { other.checked = true; });
+            } else if (this.value !== 'all' && !this.checked) {
+                document.querySelector('.warehouse-filter-check[value="all"]').checked = false;
+            } else if (this.value !== 'all' && this.checked) {
+                var allOthersChecked = Array.prototype.every.call(document.querySelectorAll('.warehouse-filter-check:not([value="all"])'), function (other) { return other.checked; });
+                if (allOthersChecked) document.querySelector('.warehouse-filter-check[value="all"]').checked = true;
+            }
+            applyStockFilters();
+        });
     });
     </script>
 </body>
