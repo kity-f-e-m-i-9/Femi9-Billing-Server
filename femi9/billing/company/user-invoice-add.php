@@ -808,7 +808,24 @@ else{ $amount_received_fully="0";}
                 <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
             </select>
         </div>
-        
+
+        <?php $inv_warehouse_id = $result_InvoieDetails['warehouse_id'] ?? null; ?>
+        <?php if ($inv_warehouse_id !== null): ?>
+        <div class="col-md-6 mb-3">
+            <div class="info-block">
+                <div class="label">Godown (physical)</div>
+                <div class="value">
+                    <?php
+                    $whRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT code, name FROM warehouses WHERE id=" . (int)$inv_warehouse_id));
+                    if ($whRow) {
+                        echo htmlspecialchars($whRow['code'], ENT_QUOTES, 'UTF-8') . ($whRow['name'] ? ' - ' . htmlspecialchars($whRow['name'], ENT_QUOTES, 'UTF-8') : '');
+                    }
+                    ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="col-md-6 mb-3">
             <label class="form-label"><?=$lablenamedisplay;?> <span class="required">*</span></label>
             
@@ -1456,7 +1473,22 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
             </select>
             <div id="opstock"></div>
         </div>
-        
+
+        <!-- Godown (physical warehouse) -->
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Godown (physical)</label>
+            <select name="warehouse_id" class="form-control">
+                <option value="">— Not tracked —</option>
+                <?php
+                $select_Warehouse="select id, code, name from warehouses where is_active = 1 order by code asc";
+                $fetch_Warehouse=mysqli_query($db_conn,$select_Warehouse);
+                while($result_Warehouse=mysqli_fetch_array($fetch_Warehouse)) {
+                ?>
+                <option value="<?=(int)$result_Warehouse['id'];?>"><?=htmlspecialchars($result_Warehouse['code'], ENT_QUOTES, 'UTF-8');?><?=$result_Warehouse['name'] ? ' - ' . htmlspecialchars($result_Warehouse['name'], ENT_QUOTES, 'UTF-8') : '';?></option>
+                <?php }?>
+            </select>
+        </div>
+
         <script type="text/javascript">
         function checkopeningstock(str){
             if (str==""){document.getElementById("txtHint").innerHTML="";return;}

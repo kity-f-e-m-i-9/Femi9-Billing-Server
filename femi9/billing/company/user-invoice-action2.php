@@ -18,6 +18,9 @@ if(isset($_REQUEST['addInvoice2']))
 	$result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails);
 	$gst_type=$result_INVProductDetails['gst_type'];
 	$buyer_gsttype=$result_INVProductDetails['buyer_gsttype'];
+	// Warehouse was fixed at invoice creation (action.php) — read it back
+	// from the stored row rather than re-deriving from this step's POST.
+	$warehouseId = $result_INVProductDetails['warehouse_id'] !== null ? (int) $result_INVProductDetails['warehouse_id'] : null;
 		
 	$invuser=$_REQUEST['invuser'];
 	
@@ -92,7 +95,8 @@ if ($product_gst_type === 'inclusive' && $gst_percentage > 0) {
 	
 	
 	//count available stock
-	$select_count_AVSTOCK="select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
+	$select_count_AVSTOCK="select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'
+		and warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ' . (int)$warehouseId);
 	$FETCH_count_AVSTOCK=mysqli_query($db_conn,$select_count_AVSTOCK);
 	$RESULT_count_AVSTOCK=mysqli_fetch_array($FETCH_count_AVSTOCK);
 	$AVMstock=$RESULT_count_AVSTOCK['closing_qty'];

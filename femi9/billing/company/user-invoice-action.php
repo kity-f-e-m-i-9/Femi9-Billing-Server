@@ -54,6 +54,7 @@ if (isset($_REQUEST['invoice_number_accept']) && $_REQUEST['invoice_number_accep
 
 $inv_number = mysqli_real_escape_string($db_conn, str_replace("'", "", $_REQUEST['inv_number'] ?? ''));
 $id_only = "0";
+$warehouseId = filter_var($_REQUEST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 
 // ============================================================================
 // VALIDATE GODOWN/COMPANY
@@ -293,16 +294,16 @@ try {
         $stmt = $db_conn->prepare("
             INSERT INTO user_invoice (
                 inv_id, id_only, inv_number, date, inv_year, sub_total, discount, total,
-                to_user_type, to_user_id, from_user_type, from_user_id, gst_type,
+                to_user_type, to_user_id, from_user_type, from_user_id, warehouse_id, gst_type,
                 credit, roundoff, courier_charges, rwpoints_enable, buyer_gsttype,
                 username, usertype
-            ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, 0, 0, 0, 1, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, 0, 0, 0, 1, ?, ?, ?)
         ");
-        
-        // 13 placeholders: inv_id, id_only, inv_number, date, inv_year, to_user_type, to_user_id, 
-        //                  from_user_type, from_user_id, gst_type, buyer_gsttype, username, usertype
+
+        // 14 placeholders: inv_id, id_only, inv_number, date, inv_year, to_user_type, to_user_id,
+        //                  from_user_type, from_user_id, warehouse_id, gst_type, buyer_gsttype, username, usertype
         $stmt->bind_param(
-            "sssssssssssss",
+            "sssssssssissss",
             $inv_id,
             $id_only,
             $inv_number,
@@ -312,6 +313,7 @@ try {
             $customer_id,
             $stock_user_type,
             $stock_user_id,
+            $warehouseId,
             $gst_type,
             $buyer_gsttype,
             $username,
@@ -336,10 +338,15 @@ try {
     error_log("Query params - user_type: '$stock_user_type', user_id: '$stock_user_id'");
     
     $stmt = $db_conn->prepare("
-        SELECT * FROM stock 
+        SELECT * FROM stock
         WHERE product_id = ? AND user_type = ? AND user_id = ?
+          AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?') . "
     ");
-    $stmt->bind_param("sss", $pr_id, $stock_user_type, $stock_user_id);
+    if ($warehouseId === null) {
+        $stmt->bind_param("sss", $pr_id, $stock_user_type, $stock_user_id);
+    } else {
+        $stmt->bind_param("sssi", $pr_id, $stock_user_type, $stock_user_id, $warehouseId);
+    }
     $stmt->execute();
     $RESULT_count_AVSTOCK = $stmt->get_result()->fetch_assoc();
     $stmt->close();
