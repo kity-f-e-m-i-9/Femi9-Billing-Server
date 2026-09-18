@@ -114,6 +114,33 @@ function save_auto_transfer_default_rate(mysqli $db_conn, int $productId, float 
 }
 
 /**
+ * Explicitly sets a product's default rate — used by the "Transfer Price"
+ * management page, unlike save_auto_transfer_default_rate() (called after
+ * an actual transfer) this always overwrites both values, including down
+ * to 0, since here the staff member is deliberately setting the rate
+ * rather than a transfer incidentally recording what it used.
+ */
+function set_auto_transfer_default_rate(mysqli $db_conn, int $productId, float $rateHealthcare, float $rateLlp, ?string $updatedBy = null): void
+{
+    ensure_auto_transfer_default_rates_table($db_conn);
+    $stmt = $db_conn->prepare(
+        "INSERT INTO auto_transfer_default_rates (product_id, rate_healthcare, rate_llp, updated_by)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+             rate_healthcare = ?,
+             rate_llp        = ?,
+             updated_by      = ?"
+    );
+    $stmt->bind_param(
+        'iddsdds',
+        $productId, $rateHealthcare, $rateLlp, $updatedBy,
+        $rateHealthcare, $rateLlp, $updatedBy
+    );
+    $stmt->execute();
+    $stmt->close();
+}
+
+/**
  * Marks one order skipped for today — INSERT IGNORE so calling this twice
  * for the same order/date (e.g. a double-click) is harmless.
  */

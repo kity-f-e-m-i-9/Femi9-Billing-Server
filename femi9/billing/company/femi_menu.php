@@ -66,6 +66,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
 						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
 						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
+						<li><a href="transfer-price">Transfer Price</a></li>
 						<li><a href="purchase-bills-hc-to-llp">Purchase Bills (Health Care → LLP)</a></li>
                         </ul>
                     </li>
@@ -222,6 +223,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
 						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
 						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
+						<li><a href="transfer-price">Transfer Price</a></li>
                         </ul>
                     </li>
 
@@ -352,6 +354,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
 						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
 						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
+						<li><a href="transfer-price">Transfer Price</a></li>
                         </ul>
                     </li>
 					<li><span class="divider"></span></li>
@@ -879,6 +882,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
 						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
 						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
+						<li><a href="transfer-price">Transfer Price</a></li>
                         </ul>
                     </li>
 					<?php }?>
