@@ -57,6 +57,7 @@ if (isset($_REQUEST['invoice_number_accept']) && $_REQUEST['invoice_number_accep
 
 $inv_number = mysqli_real_escape_string($db_conn, str_replace("'", "", $_REQUEST['inv_number'] ?? ''));
 $id_only = "0";
+$warehouseId = filter_var($_REQUEST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 
 // ============================================================================
 // ✅ SUPER STOCKIST: USE OWN ID (NO GODOWN SELECTION)
@@ -293,14 +294,14 @@ try {
         $stmt = $db_conn->prepare("
             INSERT INTO user_invoice (
                 inv_id, id_only, inv_number, date, inv_year, sub_total, discount, total,
-                to_user_type, to_user_id, from_user_type, from_user_id, gst_type,
+                to_user_type, to_user_id, from_user_type, from_user_id, warehouse_id, gst_type,
                 credit, roundoff, courier_charges, rwpoints_enable, buyer_gsttype,
                 username, usertype
-            ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, 0, 0, 0, 1, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, 0, 0, 0, 1, ?, ?, ?)
         ");
-        
+
         $stmt->bind_param(
-            "sssssssssssss",
+            "sssssssssissss",
             $inv_id,
             $id_only,
             $inv_number,
@@ -310,6 +311,7 @@ try {
             $customer_id,
             $stock_user_type,
             $stock_user_id,
+            $warehouseId,
             $gst_type,
             $buyer_gsttype,
             $username,
