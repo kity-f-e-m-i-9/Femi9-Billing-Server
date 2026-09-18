@@ -166,19 +166,25 @@ if(!empty($stock_users)) {
     
     $user_filter = implode(" OR ", $user_conditions);
     
+    // GROUP BY user_type/user_id/product_id, summing across any
+    // per-warehouse rows — a product's stock can now be split across
+    // physical godowns (H1/G1/G2), and without this the PHP array below
+    // (keyed by product_id) would silently keep only whichever
+    // warehouse row the DB returned last.
     $stock_detail_query = "
-        SELECT 
+        SELECT
             user_type,
             user_id,
             product_id,
-            opening_qty,
-            input_qty,
-            sales_qty,
-            sent_qty,
-            returnqty,
-            closing_qty
+            SUM(opening_qty) as opening_qty,
+            SUM(input_qty) as input_qty,
+            SUM(sales_qty) as sales_qty,
+            SUM(sent_qty) as sent_qty,
+            SUM(returnqty) as returnqty,
+            SUM(closing_qty) as closing_qty
         FROM stock
         WHERE ($user_filter)
+        GROUP BY user_type, user_id, product_id
     ";
     
     $stock_detail_result = mysqli_query($db_conn, $stock_detail_query);
