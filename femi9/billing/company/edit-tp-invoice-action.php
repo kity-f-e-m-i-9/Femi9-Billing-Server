@@ -5,6 +5,7 @@ error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
 require_once __DIR__ . '/../shared/TpApproverContext.php';
 require_once __DIR__ . '/../shared/TpProductType.php';
+require_once __DIR__ . '/include/StockService.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
     header("Location: manage-tp-invoices?error=unauthorized"); exit;
@@ -32,6 +33,9 @@ $source_cp_id     = (int)($inv['source_cp_id'] ?? 0);
 $source_godown_id = (int)($inv['source_godown_id'] ?? 0);
 $use_godown       = ($source_godown_id > 0 && !$source_cp_id);
 $use_cp           = ($source_cp_id > 0);
+// Editing changes quantities/products only — the warehouse an invoice
+// draws from is fixed at creation, same as source_godown_id itself.
+$warehouseId      = (int)($inv['warehouse_id'] ?? 0) ?: null;
 $inv_num          = $inv['invoice_number'];
 $old_subtotal     = round((float)$inv['total_amount'] - (float)($inv['courier_charges'] ?? 0), 2);
 $created_by       = $_SESSION['LOGIN_USER'] ?? '';
@@ -124,38 +128,6 @@ function insertCpLedgerE(mysqli $db, int $cp_id, int $pid, string $action, int $
     $s->execute(); $s->close();
 }
 
-// ── Helpers: company godown stock ──────────────────────────────────────────────
-function getGodownQtyE(mysqli $db, int $godown_id, int $pid): int {
-    $uid = (string)$godown_id;
-    $s = $db->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=?");
-    $s->bind_param("si", $uid, $pid); $s->execute();
-    $r = $s->get_result()->fetch_assoc(); $s->close();
-    return $r ? (int)$r['closing_qty'] : 0;
-}
-function lockGodownQtyE(mysqli $db, int $godown_id, int $pid): int {
-    $uid = (string)$godown_id;
-    $s = $db->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=? FOR UPDATE");
-    $s->bind_param("si", $uid, $pid); $s->execute();
-    $r = $s->get_result()->fetch_assoc(); $s->close();
-    return $r ? (int)$r['closing_qty'] : 0;
-}
-function creditGodownForTpE(mysqli $db, int $godown_id, int $pid, int $qty): void {
-    $uid = (string)$godown_id;
-    $s = $db->prepare("UPDATE stock SET sales_qty=GREATEST(0,sales_qty-?), closing_qty=closing_qty+? WHERE user_type='company' AND user_id=? AND product_id=?");
-    $s->bind_param("iisi", $qty, $qty, $uid, $pid); $s->execute(); $s->close();
-}
-function debitGodownForTpE(mysqli $db, int $godown_id, int $pid, int $qty): void {
-    $uid = (string)$godown_id;
-    $s = $db->prepare("UPDATE stock SET sales_qty=sales_qty+?, closing_qty=closing_qty-? WHERE user_type='company' AND user_id=? AND product_id=?");
-    $s->bind_param("iisi", $qty, $qty, $uid, $pid); $s->execute(); $s->close();
-}
-function insertGodownLedgerE(mysqli $db, int $godown_id, int $pid, string $action, int $qty, int $before, int $after, string $inv_num, string $note, string $by): void {
-    $uid = (string)$godown_id; $utype = 'company'; $ref_type = 'transfer';
-    $s = $db->prepare("INSERT INTO stock_ledger (product_id,user_type,user_id,action,qty,qty_before,qty_after,ref_type,ref_id,note,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("isssiiissss", $pid, $utype, $uid, $action, $qty, $before, $after, $ref_type, $inv_num, $note, $by);
-    $s->execute(); $s->close();
-}
-
 // ── Helpers: territory_partner_stock ──────────────────────────────────────────
 function getTpQtyE(mysqli $db, int $tp_id, int $pid): int {
     $s = $db->prepare("SELECT closing_qty FROM territory_partner_stock WHERE territory_partner_id=? AND product_id=?");
@@ -165,6 +137,7 @@ function getTpQtyE(mysqli $db, int $tp_id, int $pid): int {
 }
 
 // ── Pre-validate new stock (accounting for old qty being restored first) ──────
+$stockService = new StockService($db_conn);
 $old_qty_map = [];
 foreach ($old_items as $oi) {
     $old_qty_map[(int)$oi['product_id']] = (int)$oi['quantity'];
@@ -173,7 +146,7 @@ foreach ($new_items as $item) {
     if ($use_cp) {
         $current = getCpQtyE($db_conn, $source_cp_id, $item['pid']);
     } elseif ($use_godown) {
-        $current = getGodownQtyE($db_conn, $source_godown_id, $item['pid']);
+        $current = $stockService->getClosingQty($item['pid'], 'company', (string) $source_godown_id, $warehouseId) ?? 0;
     } else {
         $current = $source_loc_id ? getLocQty($db_conn, $source_loc_id, $item['pid']) : 0;
     }
@@ -209,12 +182,16 @@ try {
             insertCpLedgerE($db_conn, $source_cp_id, $pid, 'transfer_in', $qty, $before, $after, 'tp_invoice', $inv_num, $note, $created_by);
 
         } elseif ($use_godown) {
-            // Restore company godown stock
-            $before = getGodownQtyE($db_conn, $source_godown_id, $pid);
-            $after  = $before + $qty;
-            creditGodownForTpE($db_conn, $source_godown_id, $pid, $qty);
-            $note = 'Edit reversal: ' . $inv_num;
-            insertGodownLedgerE($db_conn, $source_godown_id, $pid, 'transfer_in', $qty, $before, $after, $inv_num, $note, $created_by);
+            // Restore company godown stock. reverseDeduct() no-ops (returns
+            // success=false) rather than throwing when no stock row exists —
+            // equivalent to the old creditGodownForTpE()'s raw UPDATE
+            // matching zero rows, so no extra error handling is needed here.
+            $stockService->reverseDeduct(
+                $pid, 'company', (string) $source_godown_id, $qty,
+                'tp_invoice', $inv_num, $created_by,
+                true,
+                $warehouseId
+            );
 
         } else {
             // Legacy: restore partner_location_stock (only if location still exists)
@@ -275,12 +252,15 @@ try {
             insertCpLedgerE($db_conn, $source_cp_id, $pid, 'transfer_out', $qty, $before, $after, 'tp_invoice', $inv_num, $note, $created_by);
 
         } elseif ($use_godown) {
-            $before = lockGodownQtyE($db_conn, $source_godown_id, $pid);
-            if ($qty > $before) throw new \Exception("Insufficient godown stock for product $pid inside transaction.");
-            $after = $before - $qty;
-            debitGodownForTpE($db_conn, $source_godown_id, $pid, $qty);
-            $note = 'Edit: ' . $inv_num;
-            insertGodownLedgerE($db_conn, $source_godown_id, $pid, 'transfer_out', $qty, $before, $after, $inv_num, $note, $created_by);
+            // StockService::deduct() locks the row, checks sufficiency, and
+            // throws StockException (caught by the outer \Throwable catch)
+            // on insufficient stock.
+            $stockService->deduct(
+                $pid, 'company', (string) $source_godown_id, $qty,
+                'tp_invoice', $inv_num, $created_by,
+                true,
+                $warehouseId
+            );
 
         } else {
             // Legacy: apply partner_location_stock (only if location still exists)

@@ -20,7 +20,8 @@ $s = $db_conn->prepare("
            tp.name AS tp_name, tp.tp_id AS tp_code,
            COALESCE(cp_src.name, gd.gname, pln.name) AS location_name,
            COALESCE(cp_src.name, cp_old.name) AS cp_name,
-           COALESCE(cp_src.cp_id, cp_old.cp_id) AS cp_code
+           COALESCE(cp_src.cp_id, cp_old.cp_id) AS cp_code,
+           wh.code AS warehouse_code, wh.name AS warehouse_name
     FROM tp_invoices tpi
     JOIN territory_partners tp                   ON tp.id = tpi.territory_partner_id
     LEFT JOIN partner_location_nodes pln         ON pln.id = tpi.source_location_id
@@ -28,6 +29,7 @@ $s = $db_conn->prepare("
     LEFT JOIN channel_partners cp_old            ON cp_old.id = cpl.channel_partner_id
     LEFT JOIN channel_partners cp_src            ON cp_src.id = tpi.source_cp_id
     LEFT JOIN company_godown gd                  ON gd.id = tpi.source_godown_id AND (" . godown_finance_filter_sql($db_conn, 'gd') . ")
+    LEFT JOIN warehouses wh                      ON wh.id = tpi.warehouse_id
     WHERE tpi.id = ? LIMIT 1
 ");
 $s->bind_param("i", $inv_id); $s->execute();
@@ -51,6 +53,7 @@ $_src_godown_id = (int)($inv['source_godown_id'] ?? 0);
 $_src_loc_id    = (int)($inv['source_location_id'] ?? 0);
 $_use_cp        = $_src_cp_id > 0;
 $_use_godown    = ($_src_godown_id > 0 && !$_src_cp_id);
+$_warehouse_id  = (int)($inv['warehouse_id'] ?? 0) ?: null;
 
 $avail_map = [];
 foreach ($existing_items as $it) {
@@ -60,8 +63,15 @@ foreach ($existing_items as $it) {
         $sq->bind_param("ii", $_src_cp_id, $pid);
     } elseif ($_use_godown) {
         $uid = (string)$_src_godown_id;
-        $sq = $db_conn->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=?");
-        $sq->bind_param("si", $uid, $pid);
+        $sq = $db_conn->prepare(
+            "SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=?
+               AND warehouse_id " . ($_warehouse_id === null ? 'IS NULL' : '= ?')
+        );
+        if ($_warehouse_id === null) {
+            $sq->bind_param("si", $uid, $pid);
+        } else {
+            $sq->bind_param("sii", $uid, $pid, $_warehouse_id);
+        }
     } else {
         $sq = $db_conn->prepare("SELECT closing_qty FROM partner_location_stock WHERE partner_location_id=? AND product_id=?");
         $sq->bind_param("ii", $_src_loc_id, $pid);
@@ -265,6 +275,16 @@ foreach ($existing_items as $it) {
                                         <?php endif; ?>
                                     </div>
                                 </div>
+                                <?php if ($_use_godown && $inv['warehouse_code']): ?>
+                                <div class="col-lg-4 col-md-6">
+                                    <div class="info-block">
+                                        <div class="label">Godown (physical)</div>
+                                        <div class="value">
+                                            <?php echo htmlspecialchars($inv['warehouse_code']); ?><?php echo $inv['warehouse_name'] ? ' - ' . htmlspecialchars($inv['warehouse_name']) : ''; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
                                 <div class="col-lg-4 col-md-6">
                                     <label class="form-label">Invoice Date <span class="required">*</span></label>
                                     <input type="date" name="invoice_date" class="form-control"

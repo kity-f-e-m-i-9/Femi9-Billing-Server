@@ -7,6 +7,7 @@ require_once __DIR__ . '/../shared/TpInvoiceNumberService.php';
 require_once __DIR__ . '/../shared/TpApproverContext.php';
 require_once __DIR__ . '/../shared/TpProductType.php';
 require_once __DIR__ . '/include/GodownAccess.php';
+require_once __DIR__ . '/include/StockService.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
     header("Location: manage-tp-invoices?error=unauthorized"); exit;
@@ -43,38 +44,6 @@ function insertCpLedger(mysqli $db, int $cp_id, int $pid, int $qty, int $before,
     $action = 'transfer_out'; $ref_type = 'tp_invoice'; $note = '';
     $s = $db->prepare("INSERT INTO channel_partner_stock_ledger (channel_partner_id,product_id,action,qty,qty_before,qty_after,ref_type,ref_id,note,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)");
     $s->bind_param("iisiiissss", $cp_id, $pid, $action, $qty, $before, $after, $ref_type, $inv_num, $note, $by);
-    $s->execute(); $s->close();
-}
-
-function getGodownQtyForTp(mysqli $db, int $godown_id, int $pid): int {
-    $uid = (string)$godown_id;
-    $s = $db->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=?");
-    $s->bind_param("si", $uid, $pid); $s->execute();
-    $r = $s->get_result()->fetch_assoc(); $s->close();
-    return $r ? (int)$r['closing_qty'] : 0;
-}
-
-function lockAndGetGodownQtyForTp(mysqli $db, int $godown_id, int $pid): int {
-    $uid = (string)$godown_id;
-    $s = $db->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=? FOR UPDATE");
-    $s->bind_param("si", $uid, $pid); $s->execute();
-    $r = $s->get_result()->fetch_assoc(); $s->close();
-    return $r ? (int)$r['closing_qty'] : 0;
-}
-
-function debitGodownForTp(mysqli $db, int $godown_id, int $pid, int $qty): void {
-    $uid = (string)$godown_id;
-    // Counted as a sale (not an internal transfer) — an "Add TP Invoice" is a
-    // billed transaction to the TP, so it belongs in sales_qty alongside the
-    // company's other channel-partner invoices, matching overstock_datewise.php.
-    $s = $db->prepare("UPDATE stock SET sales_qty=sales_qty+?, closing_qty=closing_qty-? WHERE user_type='company' AND user_id=? AND product_id=?");
-    $s->bind_param("iisi", $qty, $qty, $uid, $pid); $s->execute(); $s->close();
-}
-
-function insertGodownLedgerForTp(mysqli $db, int $godown_id, int $pid, int $qty, int $before, int $after, string $inv_num, string $by): void {
-    $uid = (string)$godown_id; $utype = 'company'; $action = 'transfer_out'; $ref_type = 'transfer'; $note = '';
-    $s = $db->prepare("INSERT INTO stock_ledger (product_id,user_type,user_id,action,qty,qty_before,qty_after,ref_type,ref_id,note,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("isssiiissss", $pid, $utype, $uid, $action, $qty, $before, $after, $ref_type, $inv_num, $note, $by);
     $s->execute(); $s->close();
 }
 
@@ -190,6 +159,11 @@ $source_loc_id    = (int)($_POST['source_location_id'] ?? 0) ?: null;
 $source_cp_id     = (int)($_POST['source_cp_id'] ?? 0);
 $source_godown_id = (int)($_POST['source_godown_id'] ?? 0);
 
+// Optional: which physical godown (warehouse) this invoice's stock is
+// drawn from — only relevant when sourcing from a company godown, never
+// when CP-sourced (CP stock has no warehouse concept).
+$warehouseId = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
+
 // A PO the TP submitted against a specific CP's stock must be invoiced from
 // that same CP — never trust the posted source over this, since the "Use
 // company godown instead" toggle is only hidden client-side.
@@ -293,9 +267,10 @@ if ($avail_balance < $net_amount) {
 }
 
 // Pre-validate stock (fast fail before transaction)
+$stockService = new StockService($db_conn);
 foreach ($items as $item) {
     $avail = $use_godown
-        ? getGodownQtyForTp($db_conn, $source_godown_id, $item['pid'])
+        ? ($stockService->getClosingQty($item['pid'], 'company', (string) $source_godown_id, $warehouseId) ?? 0)
         : getCpQty($db_conn, $source_cp_id, $item['pid']);
     if ($item['qty'] > $avail) {
         header("Location: add-tp-invoice?error=insufficient&pid={$item['pid']}"); exit;
@@ -348,14 +323,14 @@ try {
     $created_by_user_type = 'company';
     $s = $db_conn->prepare(
         "INSERT INTO tp_invoices
-            (invoice_number,territory_partner_id,product_type,source_location_id,source_cp_id,source_godown_id,invoice_date,
+            (invoice_number,territory_partner_id,product_type,source_location_id,source_cp_id,source_godown_id,warehouse_id,invoice_date,
              courier_charges,discount_amount,total_amount,created_by,created_by_user_type,
              use_default_delivery_address,custom_delivery_line1,custom_delivery_line2,custom_delivery_city,
              custom_delivery_district,custom_delivery_state,custom_delivery_country,custom_delivery_pincode)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
     );
     $s->bind_param(
-        "sisiiisdddssisssssss", $inv_num, $tp_id, $productType, $source_loc_id, $source_cp_id, $source_godown_id, $invoice_date,
+        "sisiiiisdddssisssssss", $inv_num, $tp_id, $productType, $source_loc_id, $source_cp_id, $source_godown_id, $warehouseId, $invoice_date,
         $courier_charges, $discount_amount, $invoice_total, $created_by, $created_by_user_type,
         $useDefaultDelivery, $customDeliveryLine1, $customDeliveryLine2, $customDeliveryCity,
         $customDeliveryDistrict, $customDeliveryState, $customDeliveryCountry, $customDeliveryPincode
@@ -369,11 +344,20 @@ try {
     foreach ($items as $item) {
         // Re-check inside transaction with row lock to prevent race condition
         if ($use_godown) {
-            $src_before = lockAndGetGodownQtyForTp($db_conn, $source_godown_id, $item['pid']);
-            if ($item['qty'] > $src_before) throw new Exception("Insufficient godown stock for product {$item['pid']}");
-            $src_after = $src_before - $item['qty'];
-            debitGodownForTp($db_conn, $source_godown_id, $item['pid'], $item['qty']);
-            insertGodownLedgerForTp($db_conn, $source_godown_id, $item['pid'], $item['qty'], $src_before, $src_after, $inv_num, $created_by);
+            // StockService::deduct() locks the row, checks sufficiency, and
+            // throws StockException on insufficient stock — replacing the
+            // former hand-rolled lockAndGetGodownQtyForTp/debitGodownForTp/
+            // insertGodownLedgerForTp helpers. This changes the recorded
+            // stock_ledger action from 'transfer_out'/ref_type 'transfer' to
+            // 'deduct'/'tp_invoice' — a TP invoice is a sale, not an internal
+            // transfer, and no report reads stock_ledger.action for these
+            // rows today (see docs/superpowers/specs/2026-09-18-invoice-warehouse-selection-design.md).
+            $stockService->deduct(
+                $item['pid'], 'company', (string) $source_godown_id, $item['qty'],
+                'tp_invoice', $inv_num, $created_by,
+                true, // outer transaction owns commit
+                $warehouseId
+            );
         } else {
             $src_before = lockAndGetCpQty($db_conn, $source_cp_id, $item['pid']);
             if ($item['qty'] > $src_before) throw new Exception("Insufficient CP stock for product {$item['pid']}");
