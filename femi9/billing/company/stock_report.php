@@ -182,16 +182,17 @@ $i= $start_from;
 					$prid_header=$result_prdetails_header['id'];
 					$tempid=$resultRcd_VLSS1['temp_id'];
 					
-					//SALES QTY
-					$select_SUM_QTY="select closing_qty from stock where user_id='$tempid' and user_type='$usertype_stock' and product_id='$prid_header'";
+					//SALES QTY — SUM across any per-warehouse rows (a product's stock
+					// can now be split across physical godowns H1/G1/G2)
+					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id='$tempid' and user_type='$usertype_stock' and product_id='$prid_header'";
 					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
 					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
 					if($result_SUM_QTY['closing_qty']!=NULL){ $clqty=$result_SUM_QTY['closing_qty']; }else{$clqty="0";}
-						
+
 				?>
 				<td><b><?=$clqty;?></b></td>
 				<?php }?>
-				
+
                                         </tr>
 										<?php }?>
                                         </table>
@@ -262,16 +263,17 @@ $taluk_name_VLSS2=$taluk_id_VLSS2;
 					$prid_header=$result_prdetails_header['id'];
 					$tempid=$resultRcd_VLSS2['temp_id'];
 					
-					//SALES QTY
-					$select_SUM_QTY="select closing_qty from stock where user_id='$tempid' and user_type='$usertype_stock' and product_id='$prid_header'";
+					//SALES QTY — SUM across any per-warehouse rows (a product's stock
+					// can now be split across physical godowns H1/G1/G2)
+					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id='$tempid' and user_type='$usertype_stock' and product_id='$prid_header'";
 					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
 					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
 					if($result_SUM_QTY['closing_qty']!=NULL){ $clqty=$result_SUM_QTY['closing_qty']; }else{$clqty="0";}
-						
+
 				?>
 				<td><b><?=$clqty;?></b></td>
 				<?php }?>
-				<!-------------------------------------------------------------------->
+<!-------------------------------------------------------------------->
 				
                                         </tr>
                                            <?php }?>
