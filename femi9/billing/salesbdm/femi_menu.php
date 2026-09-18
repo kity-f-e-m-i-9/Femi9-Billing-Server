@@ -75,10 +75,6 @@ if (!empty($salesBdmID)) {
     </li>
 
     <li>
-        <a href="<?php echo $_bdmBase; ?>tp-invoices"><i class="material-icons-two-tone">receipt_long</i>TP Invoices</a>
-    </li>
-
-    <li>
         <a href="<?php echo $_bdmBase; ?>dashboard-crm"><i class="material-icons-two-tone">insights</i>CRM Dashboard</a>
     </li>
 
@@ -101,6 +97,7 @@ if (!empty($salesBdmID)) {
             <li><a href="<?php echo $_companyBase; ?>manage-territory-partner">Manage Territory Partner</a></li>
             <li><a href="<?php echo $_companyBase; ?>manage-field-orders">Field Orders</a></li>
             <li><a href="<?php echo $_companyBase; ?>field-orders-summary">Field Orders Summary</a></li>
+            <li><a href="<?php echo $_bdmBase; ?>tp-invoices">TP Invoices</a></li>
         </ul>
     </li>
 
