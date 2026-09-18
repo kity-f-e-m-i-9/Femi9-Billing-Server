@@ -36,9 +36,17 @@ $warehouses = $db_conn->query(
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Convert Pieces &harr; Packs : <?php echo $business_name; ?></title>
+
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
+    <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 </head>
 <body>
@@ -136,7 +144,12 @@ $warehouses = $db_conn->query(
     </div>
 </div>
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
+<script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+<script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
+<script src="../../assets/plugins/pace/pace.min.js"></script>
+<script src="../../assets/js/main.min.js"></script>
+<script src="../../assets/js/custom.js"></script>
 <script>
 function refreshCurrentStock() {
     var productId = document.getElementById('productSelect').value;
