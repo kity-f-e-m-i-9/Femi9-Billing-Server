@@ -916,6 +916,128 @@ class StockService
         }
     }
 
+    /**
+     * Assemble packCount whole packs out of loose pieces (Pieces -> Pack).
+     * Decrements extra_pieces by (piecesPerPack * packCount), increments
+     * closing_qty by packCount. Throws StockException if extra_pieces is
+     * insufficient, or if no stock row exists for this key.
+     * Writes a single 'pieces_to_pack' ledger entry per call — qty/
+     * qty_before/qty_after track closing_qty (the pack-based figure),
+     * matching every other ledger entry's convention.
+     */
+    public function convertPiecesToPack(
+        int    $productId,
+        string $userType,
+        string $userId,
+        int    $piecesPerPack,
+        int    $packCount,
+        string $refId,
+        string $createdBy,
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
+    ): array {
+        if (!$externalTransaction) $this->db->begin_transaction();
+        try {
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
+            if ($row === null) {
+                throw new StockException(
+                    "No stock record for product=$productId user_type=$userType user_id=$userId"
+                );
+            }
+            $piecesNeeded = $piecesPerPack * $packCount;
+            $currentPieces = (int) $row['extra_pieces'];
+            if ($currentPieces < $piecesNeeded) {
+                throw new StockException(
+                    "Insufficient pieces to assemble $packCount pack(s) of product=$productId. Available=$currentPieces, Needed=$piecesNeeded"
+                );
+            }
+
+            $before = (int) $row['closing_qty'];
+            $after  = $before + $packCount;
+            $this->updateStockSnapshot($productId, $userType, $userId, [
+                'closing_qty'  => $after,
+                'extra_pieces' => $currentPieces - $piecesNeeded,
+            ], $warehouseId);
+
+            $ledgerId = $this->writeLedger(
+                $productId, $userType, $userId,
+                'pieces_to_pack', $packCount, $before, $after,
+                'conversion', $refId, '', $createdBy, $warehouseId
+            );
+
+            if (!$externalTransaction) $this->db->commit();
+            return [
+                'success' => true,
+                'ledger_id' => $ledgerId,
+                'closing_qty_after' => $after,
+                'extra_pieces_after' => $currentPieces - $piecesNeeded,
+            ];
+        } catch (\Throwable $e) {
+            if (!$externalTransaction) $this->db->rollback();
+            throw $e;
+        }
+    }
+
+    /**
+     * Break packCount whole packs into loose pieces (Pack -> Pieces).
+     * Decrements closing_qty by packCount, increments extra_pieces by
+     * (piecesPerPack * packCount). Throws StockException if closing_qty
+     * is insufficient, or if no stock row exists for this key.
+     * Writes a single 'pack_to_pieces' ledger entry per call.
+     */
+    public function convertPackToPieces(
+        int    $productId,
+        string $userType,
+        string $userId,
+        int    $piecesPerPack,
+        int    $packCount,
+        string $refId,
+        string $createdBy,
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
+    ): array {
+        if (!$externalTransaction) $this->db->begin_transaction();
+        try {
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
+            if ($row === null) {
+                throw new StockException(
+                    "No stock record for product=$productId user_type=$userType user_id=$userId"
+                );
+            }
+            $before = (int) $row['closing_qty'];
+            if ($before < $packCount) {
+                throw new StockException(
+                    "Insufficient packs to break open for product=$productId. Available=$before, Requested=$packCount"
+                );
+            }
+            $after = $before - $packCount;
+            $piecesGained = $piecesPerPack * $packCount;
+            $newPieces = (int) $row['extra_pieces'] + $piecesGained;
+
+            $this->updateStockSnapshot($productId, $userType, $userId, [
+                'closing_qty'  => $after,
+                'extra_pieces' => $newPieces,
+            ], $warehouseId);
+
+            $ledgerId = $this->writeLedger(
+                $productId, $userType, $userId,
+                'pack_to_pieces', $packCount, $before, $after,
+                'conversion', $refId, '', $createdBy, $warehouseId
+            );
+
+            if (!$externalTransaction) $this->db->commit();
+            return [
+                'success' => true,
+                'ledger_id' => $ledgerId,
+                'closing_qty_after' => $after,
+                'extra_pieces_after' => $newPieces,
+            ];
+        } catch (\Throwable $e) {
+            if (!$externalTransaction) $this->db->rollback();
+            throw $e;
+        }
+    }
+
     // -------------------------------------------------------------------------
     // PRIVATE HELPERS
     // -------------------------------------------------------------------------
