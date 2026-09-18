@@ -205,6 +205,99 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
 }
 
 /**
+ * Every order (TP PO / OT draft) contributing to TODAY's auto-transfer,
+ * across ALL products at once — powers the page-level "View All Orders"
+ * overview, as opposed to get_auto_transfer_breakdown_for_product()'s
+ * single-product view. Each order lists every one of its own product
+ * lines (not just one), so unchecking a whole order in that overview can
+ * correctly reduce several different product rows in the main table at
+ * once — one order can, and often does, carry more than one product.
+ *
+ * Returns ['tp' => [...], 'ot' => [...]], each entry shaped
+ * ['order_key' => string, 'label' => string, 'products' => [['product_id'
+ * => int, 'product_name' => string, 'qty' => int], ...]]. order_key is
+ * the PO id / OT tempid alone (no product suffix — that's per-line,
+ * inside 'products') and is what "Not Today" for the whole order marks
+ * skipped for every one of its still-outstanding product lines.
+ */
+function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): array
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    $overview = ['tp' => [], 'ot' => []];
+
+    $tpStmt = $db_conn->prepare(
+        "SELECT po.id AS po_id, tp.name AS tp_name, tp.tp_id AS tp_code,
+                poi.product_id, poi.qty, p.productName
+         FROM tp_purchase_order_items poi
+         INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
+         INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
+         INNER JOIN products p ON p.id = poi.product_id
+         WHERE po.status = 'waiting' AND po.order_date = CURDATE()
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
+           )
+         ORDER BY po.id, poi.product_id"
+    );
+    $tpStmt->execute();
+    $res = $tpStmt->get_result();
+    $tpByPo = [];
+    while ($row = $res->fetch_assoc()) {
+        $poId = (int) $row['po_id'];
+        if (!isset($tpByPo[$poId])) {
+            $tpByPo[$poId] = [
+                'order_key' => (string) $poId,
+                'label'     => $row['tp_name'] . ' (' . $row['tp_code'] . ') — PO #' . $poId,
+                'products'  => [],
+            ];
+        }
+        $tpByPo[$poId]['products'][] = [
+            'product_id'   => (int) $row['product_id'],
+            'product_name' => $row['productName'],
+            'qty'          => (int) $row['qty'],
+        ];
+    }
+    $tpStmt->close();
+    $overview['tp'] = array_values($tpByPo);
+
+    $otStmt = $db_conn->prepare(
+        "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id, os.qty, p.productName
+         FROM ot_sales os
+         INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
+         INNER JOIN products p ON p.id = os.prid
+         WHERE osi.status = 'draft' AND os.godownid = ? AND os.date = CURDATE()
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'ot' AND s.source_ref = CONCAT(os.tempid, ':', os.prid) AND s.skip_date = CURDATE()
+           )
+         ORDER BY os.tempid, os.prid"
+    );
+    $otStmt->bind_param('i', $llpGodownId);
+    $otStmt->execute();
+    $res = $otStmt->get_result();
+    $otByTempid = [];
+    while ($row = $res->fetch_assoc()) {
+        $tempid = $row['tempid'];
+        if (!isset($otByTempid[$tempid])) {
+            $otByTempid[$tempid] = [
+                'order_key' => $tempid,
+                'label'     => (($row['customer_name'] ?: 'Draft Order')) . ' (' . $row['cat'] . ')',
+                'products'  => [],
+            ];
+        }
+        $otByTempid[$tempid]['products'][] = [
+            'product_id'   => (int) $row['product_id'],
+            'product_name' => $row['productName'],
+            'qty'          => (int) $row['qty'],
+        ];
+    }
+    $otStmt->close();
+    $overview['ot'] = array_values($otByTempid);
+
+    return $overview;
+}
+
+/**
  * Caps a required qty to what's actually movable through the
  * Neksomo -> Healthcare -> LLP pass-through: never more than Neksomo's
  * and Healthcare's combined available stock. Never negative.

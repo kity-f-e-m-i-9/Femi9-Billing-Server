@@ -115,6 +115,12 @@ if (!empty($requirements)) {
                                         move in one click.
                                     </p>
 
+                                    <?php if (!empty($rows)): ?>
+                                    <button type="button" class="btn btn-sm" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border:none;color:#fff;margin-bottom:14px;" onclick="openOrdersOverview()">
+                                        <i class="material-icons" style="font-size:15px;vertical-align:middle;">list_alt</i> View All Orders
+                                    </button>
+                                    <?php endif; ?>
+
                                     <?php if (empty($rows)): ?>
                                         <div class="alert alert-info">Nothing to transfer today.</div>
                                     <?php else: ?>
@@ -178,7 +184,7 @@ if (!empty($requirements)) {
      own status/record is never touched — only what this popup sums and
      submits changes). -->
 <div class="modal fade" id="breakdownModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-dialog modal-dialog-scrollable modal-xl">
         <div class="modal-content">
             <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
                 <h6 class="modal-title" style="font-weight:600;color:#1f2937;">
@@ -206,6 +212,47 @@ if (!empty($requirements)) {
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="applyBreakdown()">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- "View All Orders" — every order contributing to today's transfer, one
+     row per PO/OT-invoice with ALL of its own products listed underneath
+     (not scoped to a single product, unlike the modal above). Unchecking
+     an order + Apply excludes every one of that order's product lines at
+     once — since one order can carry several different products, this can
+     reduce several rows in the main table in a single action, unlike the
+     per-product breakdown modal's checkbox. -->
+<div class="modal fade" id="ordersOverviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
+                <h6 class="modal-title" style="font-weight:600;color:#1f2937;">
+                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#2563eb;">list_alt</i>
+                    View All Orders
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding:14px 20px;">
+                <p class="text-muted small">
+                    Every order behind today's transfer, with all of its own products. Uncheck an
+                    order + Apply to leave every one of its products out of today's transfer — the
+                    order itself stays exactly as it is (still waiting/draft); this page reloads to
+                    reflect the change across every affected product row.
+                </p>
+                <ul class="nav nav-tabs" role="tablist">
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ovTpPane" type="button">TP Purchase Orders</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovOtPane" type="button">OT Channel Orders</button></li>
+                </ul>
+                <div class="tab-content" style="padding-top:10px;">
+                    <div class="tab-pane fade show active" id="ovTpPane"><div id="ovTpList"></div></div>
+                    <div class="tab-pane fade" id="ovOtPane"><div id="ovOtList"></div></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="applyOrdersOverview()">Apply</button>
             </div>
         </div>
     </div>
@@ -324,6 +371,114 @@ if (!empty($requirements)) {
         var modalEl = document.getElementById('breakdownModal');
         var modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
+    }
+
+    // ── "View All Orders" — order-level overview, all products per order ──
+    function ovRenderOrderList(containerId, orders, emptyMsg) {
+        var el = document.getElementById(containerId);
+        if (!orders || !orders.length) {
+            el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">' + emptyMsg + '</div>';
+            return;
+        }
+        var html = '';
+        orders.forEach(function (order, idx) {
+            var productsHtml = order.products.map(function (p) {
+                return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12.5px;color:#4b5563;">' +
+                    '<span>' + escBd(p.product_name) + '</span><span style="font-weight:600;">' + p.qty + '</span>' +
+                '</div>';
+            }).join('');
+            html += '<div class="ov-order" data-order-key="' + escBd(order.order_key) + '" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
+                    '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:160px;font-weight:600;">' +
+                        '<input type="checkbox" class="ov-check" checked style="margin-right:8px;flex-shrink:0;">' +
+                        '<span style="overflow-wrap:anywhere;">' + escBd(order.label) + '</span>' +
+                    '</label>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger ov-not-today" style="white-space:nowrap;font-size:11px;padding:2px 8px;">Not Today</button>' +
+                '</div>' +
+                '<div style="margin-top:6px;padding-left:26px;border-top:1px solid #f1f5f9;padding-top:6px;">' + productsHtml + '</div>' +
+            '</div>';
+        });
+        el.innerHTML = html;
+        // Store the raw data on each row so Apply/Not Today can read the
+        // per-product qtys back out without re-parsing the DOM.
+        el.querySelectorAll('.ov-order').forEach(function (rowEl, idx) {
+            rowEl._ovOrder = orders[idx];
+            rowEl._ovSourceType = containerId === 'ovTpList' ? 'tp' : 'ot';
+        });
+        el.querySelectorAll('.ov-not-today').forEach(function (btn) {
+            btn.addEventListener('click', function () { ovSkipOrderNotToday(this); });
+        });
+    }
+
+    function openOrdersOverview() {
+        var loading = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
+        document.getElementById('ovTpList').innerHTML = loading;
+        document.getElementById('ovOtList').innerHTML = loading;
+
+        $.getJSON('get-auto-transfer-orders-overview.php', {}, function (data) {
+            ovRenderOrderList('ovTpList', data.tp, 'No Territory Partner orders contributing today.');
+            ovRenderOrderList('ovOtList', data.ot, 'No OT channel draft orders contributing today.');
+        }).fail(function () {
+            var failMsg = '<div class="text-danger small" style="padding:10px 4px;">Could not load orders.</div>';
+            document.getElementById('ovTpList').innerHTML = failMsg;
+            document.getElementById('ovOtList').innerHTML = failMsg;
+        });
+
+        var modal = new bootstrap.Modal(document.getElementById('ordersOverviewModal'));
+        modal.show();
+    }
+
+    // Marks every product line of one order skipped for today, then
+    // removes that order's row from the list — same underlying
+    // mark-auto-transfer-skip.php endpoint as the per-product breakdown
+    // modal's "Not Today", just called once per product line here.
+    function ovSkipOrderNotToday(btn) {
+        var rowEl = btn.closest('.ov-order');
+        var order = rowEl._ovOrder;
+        var sourceType = rowEl._ovSourceType;
+        btn.disabled = true;
+
+        var calls = order.products.map(function (p) {
+            var sourceRef = order.order_key + ':' + p.product_id;
+            return $.post('mark-auto-transfer-skip.php', { source_type: sourceType, source_ref: sourceRef });
+        });
+        $.when.apply($, calls).done(function () {
+            rowEl.remove();
+        }).fail(function () {
+            alert('Could not exclude this order. Please try again.');
+            btn.disabled = false;
+        });
+    }
+
+    // Any unchecked order's every product line gets marked skipped, same
+    // as "Not Today" — then reloads the page so every affected product
+    // row's Required Qty / Available / Qty to Transfer recomputes from
+    // the server, rather than trying to patch several rows client-side.
+    function applyOrdersOverview() {
+        var calls = [];
+        document.querySelectorAll('.ov-order').forEach(function (rowEl) {
+            var checkbox = rowEl.querySelector('.ov-check');
+            if (checkbox.checked) return; // left in — nothing to do
+            var order = rowEl._ovOrder;
+            var sourceType = rowEl._ovSourceType;
+            order.products.forEach(function (p) {
+                var sourceRef = order.order_key + ':' + p.product_id;
+                calls.push($.post('mark-auto-transfer-skip.php', { source_type: sourceType, source_ref: sourceRef }));
+            });
+        });
+
+        if (calls.length === 0) {
+            var modalEl = document.getElementById('ordersOverviewModal');
+            var modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+            return;
+        }
+
+        $.when.apply($, calls).done(function () {
+            window.location.reload();
+        }).fail(function () {
+            alert('Could not apply your changes. Please try again.');
+        });
     }
 </script>
 </body>
