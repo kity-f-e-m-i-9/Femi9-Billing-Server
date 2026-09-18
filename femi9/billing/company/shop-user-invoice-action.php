@@ -9,6 +9,8 @@ require_once("include/GodownAccess.php");
 
 	$godownid=$_REQUEST['godownid'];
 	$Login_user_IDvl=$godownid;
+	$warehouseId = filter_var($_REQUEST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
+	$warehouseIdSql = $warehouseId === null ? 'NULL' : (int) $warehouseId;
 
 	if (!is_godown_allowed($db_conn, (int)$godownid)) {
 		echo "<script>alert('You are not authorized to use this company profile'); window.history.back();</script>";
@@ -139,10 +141,10 @@ else{$gst_type="outer";}
 	    $usertype=$_REQUEST['usertype'];
 	
 		//2. insert invoice
-		$insert_Invoice="insert into user_invoice (inv_id,id_only,inv_number,date,inv_year,sub_total,discount,total,to_user_type,to_user_id,from_user_type,from_user_id,gst_type,credit,roundoff,courier_charges,rwpoints_enable,buyer_gsttype,username,usertype)
-		values 
+		$insert_Invoice="insert into user_invoice (inv_id,id_only,inv_number,date,inv_year,sub_total,discount,total,to_user_type,to_user_id,from_user_type,from_user_id,warehouse_id,gst_type,credit,roundoff,courier_charges,rwpoints_enable,buyer_gsttype,username,usertype)
+		values
 		('$inv_id','$id_only','$inv_number','$date','$inv_year','0','0','0',
-		'$invuser','$customer_id','$Login_user_TYPEvl','$Login_user_IDvl','$gst_type','0','0','0','1',
+		'$invuser','$customer_id','$Login_user_TYPEvl','$Login_user_IDvl',$warehouseIdSql,'$gst_type','0','0','0','1',
 		'$buyer_gsttype','$username','$usertype')";
 		mysqli_query($db_conn,$insert_Invoice);
 		
