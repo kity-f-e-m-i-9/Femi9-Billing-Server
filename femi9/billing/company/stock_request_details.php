@@ -283,10 +283,37 @@ $result_countadditems=mysqli_fetch_array($fetch_countadditems);
 						   <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
 							   <?php }?>
 							   </select>
+							   <br/>
+							   <label class="form-label">Godown (physical)</label>
+							   <select name="warehouse_id" class="form-control">
+							   <option value="">— Not tracked —</option>
+							   <?php $select_Warehouse="select id, code, name from warehouses where is_active = 1 order by code asc";
+							   $fetch_Warehouse=mysqli_query($db_conn,$select_Warehouse);
+							   while($result_Warehouse=mysqli_fetch_array($fetch_Warehouse))
+							   {?>
+						   <option value="<?=(int)$result_Warehouse['id'];?>"><?=htmlspecialchars($result_Warehouse['code'], ENT_QUOTES, 'UTF-8');?><?=$result_Warehouse['name'] ? ' - ' . htmlspecialchars($result_Warehouse['name'], ENT_QUOTES, 'UTF-8') : '';?></option>
+							   <?php }?>
+							   </select>
 				<?php }else{?>
 				<select required="" name="godownid" class="form-control">
 							   <option value="<?=$_REQUEST['gid'];?>"><?=$result_Godown['gname'];?></option>
 							   </select>
+							   <?php
+							   $reqWarehouseId = null;
+							   $reqInvRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT warehouse_id FROM user_invoice WHERE inv_id='" . mysqli_real_escape_string($db_conn, $get_req_id_DECODE) . "' LIMIT 1"));
+							   if ($reqInvRow && $reqInvRow['warehouse_id'] !== null) {
+							       $reqWarehouseId = (int) $reqInvRow['warehouse_id'];
+							       $reqWhRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT code, name FROM warehouses WHERE id=" . $reqWarehouseId));
+							   }
+							   ?>
+							   <input type="hidden" name="warehouse_id" value="<?=$reqWarehouseId !== null ? $reqWarehouseId : '';?>">
+							   <?php if ($reqWarehouseId !== null && $reqWhRow): ?>
+							   <br/>
+							   <div class="info-block">
+							       <div class="label">Godown (physical)</div>
+							       <div class="value"><?=htmlspecialchars($reqWhRow['code'], ENT_QUOTES, 'UTF-8');?><?=$reqWhRow['name'] ? ' - ' . htmlspecialchars($reqWhRow['name'], ENT_QUOTES, 'UTF-8') : '';?></div>
+							   </div>
+							   <?php endif; ?>
 				<?php }?>
 							   <br/>
 							   <div id="opstock"></div>
