@@ -626,7 +626,11 @@ $(document).ready(function() {
     var godownsList = <?php echo json_encode($godowns_list); ?>;
 
     /* ── Godown (physical warehouse) picker — static select, syncs its
-       value into the hidden warehouse_id field submitted with the form. ── */
+       value into the hidden warehouse_id field submitted with the form.
+       Select2 is initialized lazily in showGodownSource() rather than here,
+       since its container starts hidden (display:none) and Select2 computes
+       a broken 0px width if built while hidden — same reason #godownDrop is
+       built dynamically only when the godown section becomes visible. ── */
     $('#warehouseDrop').on('change', function () {
         $('#sourceWarehouseId').val($(this).val());
     });
@@ -806,6 +810,9 @@ $(document).ready(function() {
         }
         renderGodownDropdown();
         $('#warehouseSection').show();
+        if (!$('#warehouseDrop').hasClass('select2-hidden-accessible')) {
+            $('#warehouseDrop').select2({ placeholder: 'Select', allowClear: false });
+        }
     }
 
     $('#sourceToggleLink').on('click', function (e) {
