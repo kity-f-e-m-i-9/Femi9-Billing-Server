@@ -20,20 +20,21 @@ class StockLots
         string $purchaseDate,
         string $refType,
         ?string $refId,
-        ?string $createdBy
+        ?string $createdBy,
+        ?int $warehouseId = null
     ): int {
         if ($qty <= 0) {
             return 0;
         }
         $stmt = $db->prepare(
             "INSERT INTO stock_lots
-                (product_id, user_type, user_id, rate, qty_purchased,
+                (product_id, user_type, user_id, warehouse_id, rate, qty_purchased,
                  qty_remaining, purchase_date, ref_type, ref_id, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $stmt->bind_param(
-            'issdiissss',
-            $productId, $userType, $userId, $rate, $qty,
+            'issidiissss',
+            $productId, $userType, $userId, $warehouseId, $rate, $qty,
             $qty, $purchaseDate, $refType, $refId, $createdBy
         );
         $stmt->execute();
@@ -51,18 +52,24 @@ class StockLots
         string $userType,
         string $userId,
         int $qtyNeeded,
-        callable $fallbackRateFn
+        callable $fallbackRateFn,
+        ?int $warehouseId = null
     ): array {
         $consumed = [];
         $remaining = $qtyNeeded;
 
-        $stmt = $db->prepare(
-            "SELECT id, qty_remaining, rate FROM stock_lots
-             WHERE product_id = ? AND user_type = ? AND user_id = ? AND qty_remaining > 0
-             ORDER BY purchase_date ASC, id ASC
-             FOR UPDATE"
-        );
-        $stmt->bind_param('iss', $productId, $userType, $userId);
+        $sql = "SELECT id, qty_remaining, rate FROM stock_lots
+                WHERE product_id = ? AND user_type = ? AND user_id = ?
+                  AND warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ?') . "
+                  AND qty_remaining > 0
+                ORDER BY purchase_date ASC, id ASC
+                FOR UPDATE";
+        $stmt = $db->prepare($sql);
+        if ($warehouseId === null) {
+            $stmt->bind_param('iss', $productId, $userType, $userId);
+        } else {
+            $stmt->bind_param('issi', $productId, $userType, $userId, $warehouseId);
+        }
         $stmt->execute();
         $lots = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
