@@ -182,6 +182,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <a href="#"><i class="material-icons-two-tone">inventory_2</i>Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="neksomo-purchase-stock.php">Purchase Stock</a></li>
+						<li><a href="neksomo-piece-pack-convert.php">Convert Pieces &harr; Packs</a></li>
 						<li><a href="neksomo-company-stock.php">Company Stock</a></li>
                         </ul>
                     </li>
