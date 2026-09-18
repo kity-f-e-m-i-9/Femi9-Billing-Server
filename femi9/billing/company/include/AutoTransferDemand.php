@@ -86,6 +86,10 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     ensure_auto_transfer_skip_table($db_conn);
     $requirements = [];
 
+    // Skip-matching is per (PO, product) — CONCAT'd since a single PO can
+    // carry multiple products, and excluding one product from it must
+    // never also exclude the PO's other products (see the matching
+    // comment on get_auto_transfer_breakdown_for_product()).
     $tpStmt = $db_conn->prepare(
         "SELECT poi.product_id AS product_id, SUM(poi.qty) AS total_qty
          FROM tp_purchase_order_items poi
@@ -93,7 +97,7 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
          WHERE po.status = 'waiting' AND po.order_date = CURDATE()
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'tp' AND s.source_ref = po.id AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
            )
          GROUP BY poi.product_id"
     );
@@ -112,7 +116,7 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
          WHERE osi.status = 'draft' AND os.godownid = ? AND os.date = CURDATE()
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'ot' AND s.source_ref = os.tempid AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'ot' AND s.source_ref = CONCAT(os.tempid, ':', os.prid) AND s.skip_date = CURDATE()
            )
          GROUP BY os.prid"
     );
@@ -145,6 +149,11 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     ensure_auto_transfer_skip_table($db_conn);
     $breakdown = ['tp' => [], 'ot' => []];
 
+    // source_id/source_ref carry the product too ("tp:<po_id>:<product_id>",
+    // "ot:<tempid>:<product_id>") — a single PO or OT invoice can carry
+    // several different products, and excluding one product's line via
+    // "Not Today" must never also exclude that same PO/invoice's OTHER
+    // products. Matches CONCAT(...) the same way in get_auto_transfer_requirements().
     $tpStmt = $db_conn->prepare(
         "SELECT poi.po_id, poi.qty, tp.name AS tp_name, tp.tp_id AS tp_code
          FROM tp_purchase_order_items poi
@@ -153,7 +162,7 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
          WHERE po.status = 'waiting' AND po.order_date = CURDATE() AND poi.product_id = ?
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'tp' AND s.source_ref = po.id AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
            )
          ORDER BY po.id"
     );
@@ -162,8 +171,8 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     $res = $tpStmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $breakdown['tp'][] = [
-            'source_id' => 'tp:' . $row['po_id'],
-            'label'     => $row['tp_name'] . ' (' . $row['tp_code'] . ')',
+            'source_id' => 'tp:' . $row['po_id'] . ':' . $productId,
+            'label'     => $row['tp_name'] . ' (' . $row['tp_code'] . ') — PO #' . $row['po_id'],
             'qty'       => (int) $row['qty'],
         ];
     }
@@ -176,7 +185,7 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
          WHERE osi.status = 'draft' AND os.godownid = ? AND os.date = CURDATE() AND os.prid = ?
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'ot' AND s.source_ref = os.tempid AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'ot' AND s.source_ref = CONCAT(os.tempid, ':', os.prid) AND s.skip_date = CURDATE()
            )
          ORDER BY os.id"
     );
@@ -185,7 +194,7 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     $res = $otStmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $breakdown['ot'][] = [
-            'source_id' => 'ot:' . $row['tempid'],
+            'source_id' => 'ot:' . $row['tempid'] . ':' . $productId,
             'label'     => (($row['customer_name'] ?: 'Draft Order')) . ' (' . $row['cat'] . ')',
             'qty'       => (int) $row['qty'],
         ];
