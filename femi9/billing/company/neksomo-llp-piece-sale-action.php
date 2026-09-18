@@ -4,6 +4,7 @@ declare(strict_types=1);
 include("checksession.php");
 include("config.php");
 require_once("include/GodownAccess.php");
+require_once("include/StockLots.php");
 
 $__usertype = get_login_usertype($db_conn);
 if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
@@ -26,6 +27,7 @@ if (isset($_POST['add-record'])) {
     $effective_date = $_POST['effective_date'] ?? '';
     $raw_pids       = $_POST['product_id'] ?? [];
     $raw_rates      = $_POST['rate_per_piece'] ?? [];
+    $raw_qtys       = $_POST['qty_purchased'] ?? [];
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $effective_date) || empty($raw_pids)) {
         redirectWithMessage('neksomo-llp-piece-sale.php', 'error');
@@ -36,10 +38,12 @@ if (isset($_POST['add-record'])) {
     foreach ($raw_pids as $i => $rpid) {
         $product_id     = filter_var($rpid, FILTER_VALIDATE_INT);
         $rate_per_piece = filter_var($raw_rates[$i] ?? null, FILTER_VALIDATE_FLOAT);
+        $qty_purchased  = filter_var($raw_qtys[$i] ?? null, FILTER_VALIDATE_INT);
         if (!$product_id || $rate_per_piece === false || $rate_per_piece < 0) continue;
+        if (!$qty_purchased || $qty_purchased <= 0) continue;
         if (isset($seen[$product_id])) continue;
         $seen[$product_id] = true;
-        $rows[] = ['product_id' => $product_id, 'rate' => $rate_per_piece];
+        $rows[] = ['product_id' => $product_id, 'rate' => $rate_per_piece, 'qty' => $qty_purchased];
     }
 
     if (empty($rows)) {
@@ -74,6 +78,16 @@ if (isset($_POST['add-record'])) {
         try {
             $stmt->execute();
             $added++;
+
+            // Same synthetic cost-pool holder as llp-purchase-rate-action.php —
+            // both rate tables feed the same Gross Profit cost basis per the
+            // fallback-chain design (neksomo_llp_piece_rates checked first,
+            // femi9_llp_sale_rates as fallback), so they share one FIFO pool.
+            StockLots::recordLot(
+                $db_conn, $row['product_id'], 'company', 'llp',
+                $row['rate'], $row['qty'], $effective_date,
+                'llp_rate_entry', (string) $db_conn->insert_id, $created_by
+            );
         } catch (\mysqli_sql_exception $e) {
             // uniq_product_date — a rate already exists for this product+date; skip, don't abort the batch
             if ($e->getCode() !== 1062) {

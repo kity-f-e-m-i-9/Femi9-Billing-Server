@@ -189,17 +189,21 @@ try {
         $stmtProdIns->execute();
 
         // Deduct from source godown (sent_qty ↑, closing_qty ↓) — FOR UPDATE + ledger
-        $stockService->transferOut(
+        $outResult = $stockService->transferOut(
             $pid, $Login_user_TYPEvl, $send_from, $qty,
             'transfer', $tempid, $createdBy,
             true // outer transaction owns commit
         );
 
-        // Credit to destination godown (input_qty ↑, closing_qty ↑) — FOR UPDATE + ledger
+        // Credit to destination godown (input_qty ↑, closing_qty ↑) — FOR UPDATE + ledger.
+        // The new lot at the destination carries the SOURCE lot's real cost
+        // forward (consumed_rate), not this transfer's manually-entered
+        // $rate, which may be a different inter-godown billing rate.
         $stockService->transferIn(
             $pid, $Login_user_TYPEvl, $send_to, $qty,
             'transfer', $tempid, $createdBy,
-            true
+            true,
+            $outResult['consumed_rate'] ?? null
         );
     }
 

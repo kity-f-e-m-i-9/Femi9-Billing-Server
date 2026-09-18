@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/NeksomoStockBridge.php';
+require_once __DIR__ . '/StockLots.php';
 
 /**
  * StockService — centralized, transactional stock management.
@@ -81,6 +82,12 @@ class StockService
                 'deduct', $qty, $before, $after,
                 $refType, $refId, '', $createdBy
             );
+
+            $consumed = StockLots::consumeFifo(
+                $this->db, $productId, $userType, $userId, $qty,
+                fn() => $this->fallbackRate($productId)
+            );
+            StockLots::writeConsumption($this->db, $ledgerId, $consumed);
 
             if (!$externalTransaction) {
                 $this->db->commit();
@@ -200,6 +207,21 @@ class StockService
                 'reverse_deduct', $qty, $before, $after,
                 $refType, $refId, '', $createdBy
             );
+
+            // Restock the exact lot(s) the original deduct drew from, found
+            // via the original ledger row for this same (refType, refId, product).
+            $origStmt = $this->db->prepare(
+                "SELECT id FROM stock_ledger
+                 WHERE ref_type = ? AND ref_id = ? AND product_id = ? AND action = 'deduct'
+                 ORDER BY id DESC LIMIT 1"
+            );
+            $origStmt->bind_param('ssi', $refType, $refId, $productId);
+            $origStmt->execute();
+            $origLedgerId = $origStmt->get_result()->fetch_assoc()['id'] ?? null;
+            $origStmt->close();
+            if ($origLedgerId !== null) {
+                StockLots::restoreConsumption($this->db, (int) $origLedgerId);
+            }
 
             if (!$externalTransaction) {
                 $this->db->commit();
@@ -674,8 +696,20 @@ class StockService
                 'transfer_out', $qty, $before, $after,
                 $refType, $refId, '', $createdBy
             );
+
+            $consumed = StockLots::consumeFifo(
+                $this->db, $productId, $userType, $userId, $qty,
+                fn() => $this->fallbackRate($productId)
+            );
+            StockLots::writeConsumption($this->db, $ledgerId, $consumed);
+
+            $totalTaken = array_sum(array_column($consumed, 'qty_taken'));
+            $weightedRate = $totalTaken > 0
+                ? array_sum(array_map(fn($c) => $c['qty_taken'] * $c['rate'], $consumed)) / $totalTaken
+                : 0.0;
+
             if (!$externalTransaction) $this->db->commit();
-            return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
+            return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after, 'consumed_rate' => $weightedRate];
         } catch (\Throwable $e) {
             if (!$externalTransaction) $this->db->rollback();
             throw $e;
@@ -695,7 +729,8 @@ class StockService
         string $refType,
         string $refId,
         string $createdBy,
-        bool   $externalTransaction = false
+        bool   $externalTransaction = false,
+        ?float $lotRate = null   // weighted-avg cost carried from the source transferOut; null = skip lot creation
     ): array {
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
@@ -725,6 +760,14 @@ class StockService
                 'transfer_in', $qty, $before, $after,
                 $refType, $refId, '', $createdBy
             );
+
+            if ($lotRate !== null) {
+                StockLots::recordLot(
+                    $this->db, $productId, $userType, $userId, $lotRate, $qty,
+                    date('Y-m-d'), 'transfer_in', $refId, $createdBy
+                );
+            }
+
             if (!$externalTransaction) $this->db->commit();
             return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
         } catch (\Throwable $e) {
@@ -767,6 +810,21 @@ class StockService
                 'transfer_out_reverse', $qty, $before, $after,
                 $refType, $refId, '', $createdBy
             );
+
+            // Restock the exact lot(s) the original transferOut drew from.
+            $origStmt = $this->db->prepare(
+                "SELECT id FROM stock_ledger
+                 WHERE ref_type = ? AND ref_id = ? AND product_id = ? AND action = 'transfer_out'
+                 ORDER BY id DESC LIMIT 1"
+            );
+            $origStmt->bind_param('ssi', $refType, $refId, $productId);
+            $origStmt->execute();
+            $origLedgerId = $origStmt->get_result()->fetch_assoc()['id'] ?? null;
+            $origStmt->close();
+            if ($origLedgerId !== null) {
+                StockLots::restoreConsumption($this->db, (int) $origLedgerId);
+            }
+
             if (!$externalTransaction) $this->db->commit();
             return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
         } catch (\Throwable $e) {
@@ -977,6 +1035,39 @@ class StockService
         $id = (int) $this->db->insert_id;
         $stmt->close();
         return $id;
+    }
+
+    /**
+     * Today's pre-FIFO cost lookup ("latest effective_date <= now"), used
+     * only when stock_lots has no remaining qty to cover a deduct — keeps
+     * every sale costed even for products/periods with no lot data yet
+     * (pre-migration stock, or sale sources that never call StockService,
+     * e.g. TP invoices).
+     */
+    private function fallbackRate(int $productId): float
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COALESCE(
+                (SELECT CASE WHEN r.gst_type = 'inclusive' THEN r.rate_per_piece / (1 + r.gst_rate/100) ELSE r.rate_per_piece END
+                     * COALESCE(NULLIF(p.pieces_per_pack,0),1)
+                 FROM neksomo_llp_piece_rates r
+                 JOIN products p ON p.id = ?
+                 WHERE r.product_id = ? AND r.effective_date <= CURDATE()
+                 ORDER BY r.effective_date DESC LIMIT 1),
+                (SELECT CASE WHEN fr.gst_type = 'inclusive' THEN fr.rate_per_piece / (1 + fr.gst_rate/100) ELSE fr.rate_per_piece END
+                     * COALESCE(NULLIF(p.pieces_per_pack,0),1)
+                 FROM femi9_llp_sale_rates fr
+                 JOIN products p ON p.id = ?
+                 WHERE fr.product_id = ? AND fr.effective_date <= CURDATE()
+                 ORDER BY fr.effective_date DESC LIMIT 1),
+                0
+            ) AS rate"
+        );
+        $stmt->bind_param('iiii', $productId, $productId, $productId, $productId);
+        $stmt->execute();
+        $rate = (float) ($stmt->get_result()->fetch_assoc()['rate'] ?? 0.0);
+        $stmt->close();
+        return $rate;
     }
 }
 
