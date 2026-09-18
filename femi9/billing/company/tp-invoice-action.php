@@ -193,12 +193,11 @@ if ($use_godown && !is_godown_allowed($db_conn, $source_godown_id)) {
     header("Location: add-tp-invoice?error=unauthorized"); exit;
 }
 
-// TEMPORARY: godown (physical warehouse) requirement disabled on request —
-// restore by uncommenting below. Was: required whenever sourcing from a
-// company godown, never trusting the client-side `required` attribute alone.
-// if ($use_godown && !$warehouseId) {
-//     header("Location: add-tp-invoice?error=missing_warehouse"); exit;
-// }
+// Godown (physical warehouse) is required whenever sourcing from a company
+// godown — never trust the client-side `required` attribute alone.
+if ($use_godown && !$warehouseId) {
+    header("Location: add-tp-invoice?error=missing_warehouse"); exit;
+}
 
 // If a source_location_id was submitted, verify it still exists — clear to NULL if deleted
 if ($source_loc_id) {
