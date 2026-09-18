@@ -170,7 +170,32 @@ xmlhttp.send();}
 							   <?php }?>
 							   </select>
 							   <br/>
-<!------------------------------------GODOWN------------------------------>	
+<!------------------------------------GODOWN------------------------------>
+
+<!----------------------------PHYSICAL GODOWN (WAREHOUSE)-------------------->
+<?php $warehouses = [];
+$resWh = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+while ($rowWh = $resWh->fetch_assoc()) { $warehouses[] = $rowWh; }
+?>
+								   <label class="form-label">From Godown (physical)</label>
+								   <select name="warehouse_from_id" class="form-control">
+								   <option value="">— Not tracked —</option>
+								   <?php foreach ($warehouses as $wh): ?>
+								   <option value="<?=(int)$wh['id'];?>"><?=htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8');?><?=$wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '';?></option>
+								   <?php endforeach; ?>
+								   </select>
+								   <br/>
+
+								   <label class="form-label">To Godown (physical)</label>
+								   <select name="warehouse_to_id" class="form-control">
+								   <option value="">— Not tracked —</option>
+								   <?php foreach ($warehouses as $wh): ?>
+								   <option value="<?=(int)$wh['id'];?>"><?=htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8');?><?=$wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '';?></option>
+								   <?php endforeach; ?>
+								   </select>
+								   <br/>
+<!----------------------------PHYSICAL GODOWN (WAREHOUSE)-------------------->
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <!--id="bookingDate"-->
 <label class="form-label">Date*</label>

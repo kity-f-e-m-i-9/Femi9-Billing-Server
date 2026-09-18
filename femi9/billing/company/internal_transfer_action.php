@@ -28,6 +28,12 @@ $courier_charges = RemoveSpecialChar($_REQUEST['courier_charges'] ?? '0');
 $username        = htmlspecialchars(strip_tags(trim($_REQUEST['username'] ?? '')), ENT_QUOTES, 'UTF-8');
 $usertype        = htmlspecialchars(strip_tags(trim($_REQUEST['usertype'] ?? '')), ENT_QUOTES, 'UTF-8');
 
+// Optional: which physical godown (warehouse) this transfer moves stock
+// out of / into. Blank/absent means "unassigned", matching every other
+// warehouse-aware workflow so far.
+$warehouseFromId = filter_var($_REQUEST['warehouse_from_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
+$warehouseToId   = filter_var($_REQUEST['warehouse_to_id']   ?? '', FILTER_VALIDATE_INT) ?: null;
+
 if ($send_from === '0' || $to = $send_to === '0') {
     $_SESSION['errorMessage'] = "Invalid godown selection.";
     echo "<script>window.location='internal_transfer?invalid';</script>";
@@ -92,7 +98,7 @@ $stockService = new StockService($db_conn);
 $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
 foreach ($rows as $row) {
-    $available = $stockService->getClosingQty($row['pid'], $Login_user_TYPEvl, $send_from);
+    $available = $stockService->getClosingQty($row['pid'], $Login_user_TYPEvl, $send_from, $warehouseFromId);
     if ($available === null || $available < $row['qty']) {
         $_SESSION['errorMessage'] =
             "Insufficient stock for product #{$row['pid']}. " .
@@ -192,7 +198,8 @@ try {
         $outResult = $stockService->transferOut(
             $pid, $Login_user_TYPEvl, $send_from, $qty,
             'transfer', $tempid, $createdBy,
-            true // outer transaction owns commit
+            true, // outer transaction owns commit
+            $warehouseFromId
         );
 
         // Credit to destination godown (input_qty ↑, closing_qty ↑) — FOR UPDATE + ledger.
@@ -203,7 +210,8 @@ try {
             $pid, $Login_user_TYPEvl, $send_to, $qty,
             'transfer', $tempid, $createdBy,
             true,
-            $outResult['consumed_rate'] ?? null
+            $outResult['consumed_rate'] ?? null,
+            $warehouseToId
         );
     }
 
