@@ -1,5 +1,4 @@
 <?php include("checksession.php"); require_once("include/GodownAccess.php");
-require_once("include/NeksomoStockBridge.php");
 require_once("include/PermissionCheck.php"); requirePermission('products');
 error_reporting(0);
 // Pulled from the Neksomo menu — a purpose-built stock view is coming for that login.
@@ -175,12 +174,6 @@ $fetch_Godowndetails=mysqli_query($db_conn,$select_Godowndetails);
 while($result_Godown=mysqli_fetch_array($fetch_Godowndetails))
 {
 $user_id_Loginvl=$result_Godown['id'];
-// Whether this table is for Neksomo's own godown — the only place a mapped
-// company product's real `stock.closing_qty` alone understates what's truly
-// available (see NeksomoStockBridge.php: Neksomo's own purchases never
-// credit that row directly, only a StockService draw does, and only for the
-// exact shortfall needed at that moment).
-$isNeksomoGodown=((int)$user_id_Loginvl === get_neksomo_godown_id($db_conn));
 
 // Pull every stock row for this godown (no GROUP BY — each warehouse's row
 // stays separate so it can render as its own card), keyed by warehouse
@@ -200,7 +193,6 @@ $select_OPStock="select product_id, warehouse_id, opening_qty, opening_date, inp
     from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'
     and product_id in (select id from products where temp_id not like 'NKS-%' or temp_id is null)";
 $Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
-$renderedProductIds=[];
 while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
 {
     $StockProductID=$Result_OPStock['product_id'];
@@ -211,7 +203,6 @@ while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
         $warehouseBuckets[$bucketKey] = ['label' => "Godown #$bucketKey", 'rows' => []];
     }
     $warehouseBuckets[$bucketKey]['rows'][$StockProductID] = $Result_OPStock;
-    $renderedProductIds[$StockProductID]=true;
 }
 
 // Render the Unassigned bucket first (it's where every pre-warehouse row
@@ -256,18 +247,10 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
     $Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
     if ($Result_productDetils["productName"]==NULL) continue;
 
+    // Always the godown's own real stock.closing_qty — no addition from
+    // Neksomo's pending pool. Tracked per godown by its own pack quantity,
+    // same as every other company profile on this page.
     $ClosingStock=(int)$Result_OPStock['closing_qty'];
-    // Real stock alone — a mapped product could still have more sitting in
-    // Neksomo's shared pool, not yet drawn down into this row. Only applied
-    // on the Unassigned card, since the pool itself has no warehouse concept.
-    // Uses the display-only purchased-minus-sold figure (not
-    // get_neksomo_pool_available_packs(), which also subtracts
-    // already-converted stock — goods already sitting in this same
-    // closing_qty would otherwise be excluded from the pool AND counted in
-    // closing_qty, undercounting the true total).
-    if ($isNeksomoGodown && $isUnassignedBucket) {
-        $ClosingStock += get_neksomo_pool_purchased_minus_sold_packs($db_conn, $StockProductID);
-    }
     $PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
     $ExtraPieces=(int)($Result_OPStock['extra_pieces'] ?? 0);
     $ClosingStockPieces=($ClosingStock*$PiecesPerPack)+$ExtraPieces;
@@ -323,42 +306,6 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
 <?php
 }
 
-// A mapped company product may still have pool stock available (purchased
-// - LLP/Healthcare sold, see NeksomoStockBridge.php) even though it has no
-// real `stock` row at all yet (never transacted) — shown only on the
-// Unassigned card, since the pool itself has no warehouse concept.
-if ($isNeksomoGodown && $isUnassignedBucket) {
-    $mappedIdsRes = $db_conn->query("SELECT DISTINCT company_product_id FROM neksomo_product_mapping");
-    while ($mappedIdsRes && ($mapRow = $mappedIdsRes->fetch_assoc())) {
-        $mappedPid = (int)$mapRow['company_product_id'];
-        if (isset($renderedProductIds[$mappedPid])) continue;
-        $poolAvailable = get_neksomo_pool_purchased_minus_sold_packs($db_conn, $mappedPid);
-        if ($poolAvailable <= 0) continue;
-
-        $prodRow = $db_conn->query("SELECT productName, pieces_per_pack FROM products WHERE id = $mappedPid")->fetch_assoc();
-        if (!$prodRow) continue;
-
-        $virtualPiecesPerPack = max((int)($prodRow['pieces_per_pack'] ?? 1), 1);
-        $virtualClosingPieces = $poolAvailable * $virtualPiecesPerPack;
-        $total_closing_pieces += $virtualClosingPieces;
-        $total_closing_qty_shown += $poolAvailable;
-        ?>
-												<tr class="product-row" style="color:#78716c;" data-product-name="<?php echo htmlspecialchars(strtolower($prodRow['productName']), ENT_QUOTES, 'UTF-8'); ?>">
-													<td><?php echo htmlspecialchars($prodRow['productName']); ?> <em style="font-size:11px;">(not yet converted)</em></td>
-													<td>0</td>
-													<td>&mdash;</td>
-													<td align="right">0</td>
-													<td align="right">0</td>
-													<td align="right">0</td>
-													<td align="right">0</td>
-													<td align="right"><b><?php echo $poolAvailable; ?></b></td>
-													<?php if (is_neksomo_login($db_conn)): ?>
-													<td align="right"><b><?php echo $virtualClosingPieces; ?></b></td>
-													<?php endif; ?>
-												</tr>
-												<?php
-    }
-}
 ?>
 											</tbody>
 											<tfoot>
