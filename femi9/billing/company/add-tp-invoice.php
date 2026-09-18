@@ -360,8 +360,9 @@ if ($prefill_po_id > 0) {
                                      company godown, never when CP-sourced (CP stock has no
                                      warehouse concept). Toggled by showGodownSource()/showCpSource(). -->
                                 <div class="col-lg-3 col-md-4" id="warehouseSection" style="display:none;">
-                                    <label class="form-label">Godown (physical) <span class="required">*</span></label>
-                                    <select id="warehouseDrop" class="form-control" required>
+                                    <!-- TEMPORARY: required marker/attribute disabled on request — restore both by uncommenting. -->
+                                    <label class="form-label">Godown (physical) <?php /* <span class="required">*</span> */ ?></label>
+                                    <select id="warehouseDrop" class="form-control" <?php /* required */ ?>>
                                         <option value="" hidden>Select</option>
                                         <?php foreach ($warehouses_list as $wh): ?>
                                             <option value="<?php echo (int)$wh['id']; ?>">
@@ -1191,7 +1192,8 @@ $(document).ready(function() {
     /* ── Form submit validation ── */
     $('#invoiceForm').on('submit', function (e) {
         if (!$('#sourceCpId').val() && !$('#sourceGodownId').val()) { e.preventDefault(); alert('Please select a channel partner or company.'); return; }
-        if (sourceMode === 'godown' && !$('#sourceWarehouseId').val()) { e.preventDefault(); alert('Please select a godown (physical).'); return; }
+        // TEMPORARY: godown (physical) requirement disabled on request — restore by uncommenting below.
+        // if (sourceMode === 'godown' && !$('#sourceWarehouseId').val()) { e.preventDefault(); alert('Please select a godown (physical).'); return; }
         if (!invoiceItems.length)          { e.preventDefault(); alert('Please add at least one product.'); return; }
         if ($('#productBody .row-edit-input.is-invalid').length) { e.preventDefault(); alert('Fix the highlighted Qty/Rate value(s) before submitting.'); return; }
         buildHiddenInputs();
