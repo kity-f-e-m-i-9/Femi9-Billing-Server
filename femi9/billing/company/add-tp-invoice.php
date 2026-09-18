@@ -348,7 +348,7 @@ if ($prefill_po_id > 0) {
                                 </div>
 
                                 <div class="col-lg-4 col-md-6" id="sourceSection" style="display:none;">
-                                    <label class="form-label" id="sourceLabel">Channel Partner</label>
+                                    <label class="form-label"><span id="sourceLabel">Channel Partner</span> <span class="required">*</span></label>
                                     <div id="sourceContent"></div>
                                     <div class="field-hint" id="sourceHint">Auto-resolved from territory assignment</div>
                                     <div id="sourceToggle" style="display:none;margin-top:4px;">
@@ -360,9 +360,9 @@ if ($prefill_po_id > 0) {
                                      company godown, never when CP-sourced (CP stock has no
                                      warehouse concept). Toggled by showGodownSource()/showCpSource(). -->
                                 <div class="col-lg-3 col-md-4" id="warehouseSection" style="display:none;">
-                                    <label class="form-label">Godown (physical)</label>
-                                    <select id="warehouseDrop" class="form-control">
-                                        <option value="">— Not tracked —</option>
+                                    <label class="form-label">Godown (physical) <span class="required">*</span></label>
+                                    <select id="warehouseDrop" class="form-control" required>
+                                        <option value="" hidden>Select</option>
                                         <?php foreach ($warehouses_list as $wh): ?>
                                             <option value="<?php echo (int)$wh['id']; ?>">
                                                 <?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?><?php echo $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : ''; ?>
@@ -791,7 +791,7 @@ $(document).ready(function() {
     /* ── Show godown source, with option to switch back to CP (if resolved) ── */
     function showGodownSource() {
         sourceMode = 'godown';
-        $('#sourceLabel').text('Source Godown');
+        $('#sourceLabel').text('Company');
         currentLocationId = null;
         currentCpId = null;
         $('#sourceLocationId').val('');
@@ -890,7 +890,7 @@ $(document).ready(function() {
         $('#balancePanel').hide();
         advanceBalance = 0;
 
-        var $sel = $('<select class="form-control" id="godownDrop"></select>');
+        var $sel = $('<select class="form-control" id="godownDrop" required></select>');
         $sel.append('<option value=""></option>');
         $.each(godownsList, function (_, gd) {
             $sel.append($('<option>').val(gd.id).text(gd.gname));
@@ -1183,7 +1183,8 @@ $(document).ready(function() {
 
     /* ── Form submit validation ── */
     $('#invoiceForm').on('submit', function (e) {
-        if (!$('#sourceCpId').val() && !$('#sourceGodownId').val()) { e.preventDefault(); alert('Please select a channel partner or godown.'); return; }
+        if (!$('#sourceCpId').val() && !$('#sourceGodownId').val()) { e.preventDefault(); alert('Please select a channel partner or company.'); return; }
+        if (sourceMode === 'godown' && !$('#sourceWarehouseId').val()) { e.preventDefault(); alert('Please select a godown (physical).'); return; }
         if (!invoiceItems.length)          { e.preventDefault(); alert('Please add at least one product.'); return; }
         if ($('#productBody .row-edit-input.is-invalid').length) { e.preventDefault(); alert('Fix the highlighted Qty/Rate value(s) before submitting.'); return; }
         buildHiddenInputs();
