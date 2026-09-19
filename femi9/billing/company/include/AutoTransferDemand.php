@@ -65,6 +65,24 @@ function ensure_ot_sales_invoice_status_column(mysqli $db_conn): void
     }
 }
 
+// Self-migrating — same guard as territory-partner/purchase-order-action.php's
+// own (must stay in sync with it; see also db_migrations/2026_09_18_tp_
+// purchase_orders_preferred_cp_id.sql, written for the same reason). This
+// column is only ever created lazily by that file's first PO submission
+// after the Channel-Partner-preference feature shipped — any environment
+// where that code path hasn't run yet (e.g. production, if no PO has been
+// submitted there since) is missing it entirely. Every demand query here
+// that filters on preferred_cp_id calls this first so it can't hit
+// "Unknown column 'preferred_cp_id'" regardless of whether that other
+// file's guard has ever fired.
+function ensure_tp_purchase_orders_preferred_cp_id_column(mysqli $db_conn): void
+{
+    $col = $db_conn->query("SHOW COLUMNS FROM tp_purchase_orders LIKE 'preferred_cp_id'");
+    if ($col && $col->num_rows === 0) {
+        $db_conn->query("ALTER TABLE tp_purchase_orders ADD COLUMN preferred_cp_id INT NULL AFTER approver_ss_id");
+    }
+}
+
 // Self-migrating. One row per product_id holds the last-used rate for
 // each leg (Neksomo->Healthcare, Healthcare->LLP), so the Auto Transfer
 // page can pre-fill its rate inputs instead of starting blank every time
@@ -281,6 +299,7 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
 {
     ensure_auto_transfer_skip_table($db_conn);
     ensure_ot_sales_invoice_status_column($db_conn);
+    ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
     $requirements = [];
 
     // Skip-matching is per (PO, product) — CONCAT'd since a single PO can
@@ -345,6 +364,7 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
 {
     ensure_auto_transfer_skip_table($db_conn);
     ensure_ot_sales_invoice_status_column($db_conn);
+    ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
     $breakdown = ['tp' => [], 'ot' => []];
 
     // source_id/source_ref carry the product too ("tp:<po_id>:<product_id>",
@@ -422,6 +442,7 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
 {
     ensure_auto_transfer_skip_table($db_conn);
     ensure_ot_sales_invoice_status_column($db_conn);
+    ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
     $overview = ['tp' => [], 'ot' => []];
 
     $tpStmt = $db_conn->prepare(
