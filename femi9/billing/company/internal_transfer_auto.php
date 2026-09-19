@@ -151,7 +151,7 @@ if (!empty($requirements)) {
                                                 </thead>
                                                 <tbody>
                                                     <?php foreach ($rows as $row): ?>
-                                                    <tr class="auto-transfer-row" data-product-name="<?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>" data-neksomo-avail="<?php echo (int) $row['neksomo_avail']; ?>">
+                                                    <tr class="auto-transfer-row" data-product-id="<?php echo (int) $row['product_id']; ?>" data-product-name="<?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>" data-neksomo-avail="<?php echo (int) $row['neksomo_avail']; ?>" data-healthcare-avail="<?php echo (int) $row['healthcare_avail']; ?>">
                                                         <td>
                                                             <?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>
                                                             <input type="hidden" name="product_id[]" value="<?php echo (int) $row['product_id']; ?>">
@@ -238,8 +238,11 @@ if (!empty($requirements)) {
 
 <!-- "View All Orders" — every order contributing to today's transfer, one
      row per PO/OT-invoice with ALL of its own products listed underneath
-     (not scoped to a single product, unlike the modal above). Read-only —
-     a plain list of what's contributing to today's requirement. -->
+     (not scoped to a single product, unlike the modal above). Uncheck an
+     order/product + Apply recomputes each affected product row's Required
+     Qty / Qty to Transfer for this view only (same as the per-product
+     breakdown modal's own checkbox+Apply) — nothing is persisted, so it
+     resets on reload. -->
 <div class="modal fade" id="ordersOverviewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-lg">
         <div class="modal-content">
@@ -252,7 +255,10 @@ if (!empty($requirements)) {
             </div>
             <div class="modal-body" style="padding:14px 20px;">
                 <p class="text-muted small">
-                    Every order behind today's transfer, with all of its own products.
+                    Every order behind today's transfer, with all of its own products. Uncheck one
+                    product (e.g. if just that item has a stock problem) or the whole order's
+                    checkbox, then Apply — this only recomputes the current view (nothing is saved),
+                    so it resets if you close and reopen this page.
                 </p>
                 <ul class="nav nav-tabs" role="tablist">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ovTpPane" type="button">TP Purchase Orders</button></li>
@@ -272,7 +278,8 @@ if (!empty($requirements)) {
                 </div>
             </div>
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="applyOrdersOverview()">Apply</button>
             </div>
         </div>
     </div>
@@ -427,8 +434,9 @@ if (!empty($requirements)) {
         if (modal) modal.hide();
     }
 
-    // ── "View All Orders" — order-level overview, all products per order,
-    // read-only ──
+    // ── "View All Orders" — order-level overview, all products per order.
+    // Uncheck an order/product + Apply recomputes each affected product
+    // row in the main table for this view only — nothing is persisted. ──
     function ovRenderOrderList(containerId, orders, emptyMsg) {
         var el = document.getElementById(containerId);
         if (!orders || !orders.length) {
@@ -438,17 +446,76 @@ if (!empty($requirements)) {
         var html = '';
         orders.forEach(function (order) {
             var productsHtml = order.products.map(function (p) {
-                return '<div class="ov-product-row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
-                    '<span style="overflow-wrap:anywhere;flex:1;">' + escBd(p.product_name) + '</span>' +
-                    '<span style="flex-shrink:0;">' + p.qty + '</span>' +
+                return '<div class="ov-product-row" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
+                    '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:0;">' +
+                        '<input type="checkbox" class="ov-product-check" checked style="margin-right:8px;flex-shrink:0;">' +
+                        '<span style="overflow-wrap:anywhere;">' + escBd(p.product_name) + '</span>' +
+                    '</label>' +
+                    '<input type="number" min="0" max="' + p.qty + '" class="form-control form-control-sm ov-product-qty" ' +
+                        'value="' + p.qty + '" style="width:75px;flex-shrink:0;" title="Max ' + p.qty + '">' +
                 '</div>';
             }).join('');
             html += '<div class="ov-order" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
-                '<div style="font-weight:600;overflow-wrap:anywhere;">' + escBd(order.label) + '</div>' +
-                '<div style="margin-top:6px;padding-left:2px;border-top:1px solid #f1f5f9;padding-top:6px;">' + productsHtml + '</div>' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
+                    '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:160px;font-weight:600;">' +
+                        '<input type="checkbox" class="ov-check" checked style="margin-right:8px;flex-shrink:0;" title="Select/deselect every product in this order">' +
+                        '<span style="overflow-wrap:anywhere;">' + escBd(order.label) + '</span>' +
+                    '</label>' +
+                '</div>' +
+                '<div style="margin-top:6px;padding-left:26px;border-top:1px solid #f1f5f9;padding-top:6px;">' + productsHtml + '</div>' +
             '</div>';
         });
         el.innerHTML = html;
+        // Order checkbox is a select-all/deselect-all toggle for its own
+        // product checkboxes — the real, individually-actionable state
+        // lives on each .ov-product-check, not on this one.
+        el.querySelectorAll('.ov-check').forEach(function (orderCheck) {
+            orderCheck.addEventListener('change', function () {
+                var rowEl = orderCheck.closest('.ov-order');
+                rowEl.querySelectorAll('.ov-product-check').forEach(function (pc) { pc.checked = orderCheck.checked; });
+            });
+        });
+    }
+
+    // Recomputes every affected product row in the main table from
+    // whatever's currently checked across both View All Orders tabs — a
+    // product can be checked/unchecked from more than one order, so this
+    // sums across every .ov-product-row for the same product_id rather
+    // than acting on a single row at a time. View-only: nothing is sent
+    // to the server, so this resets on reload just like the per-product
+    // breakdown modal's own checkbox+Apply.
+    function applyOrdersOverview() {
+        var totalsByProduct = {};
+        document.querySelectorAll('#ovTpList .ov-product-row, #ovOtList .ov-product-row').forEach(function (rowEl) {
+            var pid = rowEl.getAttribute('data-product-id');
+            var checkbox = rowEl.querySelector('.ov-product-check');
+            var qtyInput = rowEl.querySelector('.ov-product-qty');
+            if (!checkbox.checked) return;
+            var maxQty = parseInt(qtyInput.getAttribute('max'), 10) || 0;
+            var val = parseInt(qtyInput.value, 10);
+            if (isNaN(val) || val < 0) val = 0;
+            if (val > maxQty) val = maxQty;
+            qtyInput.value = val;
+            totalsByProduct[pid] = (totalsByProduct[pid] || 0) + val;
+        });
+
+        document.querySelectorAll('.auto-transfer-row').forEach(function (row) {
+            var pid = row.getAttribute('data-product-id');
+            if (!(pid in totalsByProduct)) return; // this product has no overview rows — leave untouched
+            var total = totalsByProduct[pid];
+            var reqEl = document.getElementById('req_' + pid);
+            if (reqEl) reqEl.textContent = total;
+            var neksomoAvail = parseInt(row.getAttribute('data-neksomo-avail'), 10) || 0;
+            var healthcareAvail = parseInt(row.getAttribute('data-healthcare-avail'), 10) || 0;
+            var capped = Math.min(total, neksomoAvail + healthcareAvail);
+            if (capped < 0) capped = 0;
+            var qtyEl = document.getElementById('qty_' + pid);
+            if (qtyEl) qtyEl.value = capped;
+        });
+
+        var modalEl = document.getElementById('ordersOverviewModal');
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
     }
 
     function openOrdersOverview() {
