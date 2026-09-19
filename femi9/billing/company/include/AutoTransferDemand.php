@@ -25,12 +25,14 @@ function resolve_godown_id_by_gname(mysqli $db_conn, string $gname): ?int
 
 // Self-migrating. One row per (source_type, source_ref, skip_date) means
 // "don't count this specific order's qty toward today's auto-transfer
-// requirement" — reason 'excluded' when staff explicitly chose not to
-// transfer it today via the breakdown modal's "Not Today" button, reason
-// 'transferred' when a previous Transfer Now click already moved its
-// stock today (see internal_transfer_auto_action.php). Either way the
-// order's OWN status (tp_purchase_orders.status / ot_sales_invoice.status
-// / wa_po_purchase_orders.status) is never touched — this table is purely
+// requirement" — reason 'transferred' when a previous Transfer Now click
+// already moved its stock today (see internal_transfer_auto_action.php),
+// so a completed transfer is never double-counted. (Reason 'excluded' —
+// staff explicitly opting an order out via a "Not Today" button — existed
+// previously and the ENUM/column still allows it for any old rows, but
+// nothing creates new 'excluded' rows any more.) Either way the order's
+// OWN status (tp_purchase_orders.status / ot_sales_invoice.status /
+// wa_po_purchase_orders.status) is never touched — this table is purely
 // "don't ask again today," scoped by date so it naturally clears itself
 // tomorrow if the order is still genuinely outstanding.
 function ensure_auto_transfer_skip_table(mysqli $db_conn): void
@@ -171,35 +173,21 @@ function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, s
 }
 
 /**
- * Undoes one skip — deletes today's (source_type, source_ref) row, so
- * that order/product line counts toward Required Qty again. Used by the
- * "Excluded Today" tab's "Include Again" button; the underlying PO/OT
- * status was never touched by the skip in the first place, so this is
- * purely a delete, nothing to restore on the order itself.
- */
-function unmark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, string $sourceRef): void
-{
-    ensure_auto_transfer_skip_table($db_conn);
-    $stmt = $db_conn->prepare(
-        "DELETE FROM auto_transfer_skip_today WHERE source_type = ? AND source_ref = ? AND skip_date = CURDATE()"
-    );
-    $stmt->bind_param('ss', $sourceType, $sourceRef);
-    $stmt->execute();
-    $stmt->close();
-}
-
-/**
- * Everything currently excluded from today's auto-transfer — the
- * "Excluded Today" tab's data source, so a "Not Today" click (or an
- * already-completed transfer) is never a dead end with no way to find
- * or undo it again. Resolves each (order, product) skip row back to a
- * human label the same way the other list functions do.
+ * Everything already transferred today — the "Excluded Today" tab's data
+ * source, so a completed transfer's orders are visible and explainable
+ * (why a product no longer shows up in Required Qty) even though there's
+ * nothing to undo there (that stock already moved). Resolves each
+ * (order, product) skip row back to a human label the same way the other
+ * list functions do.
  *
  * Returns ['tp' => [...], 'ot' => [...]], each entry shaped
- * ['source_id' => string, 'label' => string, 'product_name' => string,
- * 'reason' => 'excluded'|'transferred']. A skip whose underlying order/
- * product no longer resolves (rare — e.g. the PO was deleted after being
- * skipped) still shows using the raw order_key/product_id so it stays
+ * ['source_id' => string, 'label' => string, 'product_name' => string].
+ * Only reason='transferred' rows are returned — 'excluded' rows (the
+ * retired "Not Today" feature) are never created any more, but any old
+ * ones are simply not shown here rather than being auto-deleted. A skip
+ * whose underlying order/product no longer resolves (rare — e.g. the PO
+ * was deleted after being skipped) still shows using the raw order_key/
+ * product_id so it stays
  * visible and undoable rather than silently vanishing.
  */
 function get_auto_transfer_skipped_today(mysqli $db_conn): array
@@ -208,8 +196,8 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
     $skipped = ['tp' => [], 'ot' => []];
 
     $stmt = $db_conn->prepare(
-        "SELECT source_type, source_ref, reason FROM auto_transfer_skip_today
-         WHERE skip_date = CURDATE() AND source_type IN ('tp', 'ot') ORDER BY id"
+        "SELECT source_type, source_ref FROM auto_transfer_skip_today
+         WHERE skip_date = CURDATE() AND source_type IN ('tp', 'ot') AND reason = 'transferred' ORDER BY id"
     );
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -258,7 +246,6 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
             'source_id'    => $sourceType . ':' . $row['source_ref'],
             'label'        => $label,
             'product_name' => $productName,
-            'reason'       => $row['reason'],
         ];
     }
 
