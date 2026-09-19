@@ -50,11 +50,28 @@ $warehouses = $db_conn->query(
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
-        .select2-container--default .select2-selection--single { border: 1px solid #ced4da; border-radius: 6px; height: calc(1.5em + .75rem + 2px); padding: 6px 12px; }
-        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 1.6; padding: 0; }
-        .select2-container--default .select2-selection--single .select2-selection__arrow { height: calc(1.5em + .75rem); }
+        .select2-container--default .select2-selection--single { border: 1px solid #dde1ea; border-radius: 8px; height: 42px; padding: 6px 12px; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 1.85; padding: 0; color: #344054; }
+        .select2-container--default .select2-selection--single .select2-selection__arrow { height: 40px; }
         .select2-container--default.select2-container--open .select2-selection--single { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.15); }
-        .select2-dropdown { border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+        .select2-dropdown { border-radius: 8px; border-color: #dde1ea; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+        .select2-search--dropdown .select2-search__field { border-radius: 6px; border: 1px solid #dde1ea; padding: 6px 10px; }
+
+        #convertForm .form-control,
+        #convertForm select.form-control { border: 1px solid #dde1ea; border-radius: 8px; height: 42px; font-size: 14px; }
+        #convertForm .form-control:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.15); }
+        #convertForm .direction-select { padding-top: 8px; padding-bottom: 8px; }
+
+        .remove-row-btn {
+            width: 42px; height: 42px; border-radius: 50%; border: 1px solid #fecdd3;
+            background: #fff; color: #e11d48; display: inline-flex;
+            align-items: center; justify-content: center; padding: 0;
+            transition: background .15s, color .15s, transform .1s;
+        }
+        .remove-row-btn:hover { background: #e11d48; color: #fff; border-color: #e11d48; }
+        .remove-row-btn:active { transform: scale(0.94); }
+        .remove-row-btn:disabled { opacity: .35; cursor: not-allowed; }
+        .remove-row-btn:disabled:hover { background: #fff; color: #e11d48; }
     </style>
 </head>
 <body>
@@ -85,60 +102,56 @@ $warehouses = $db_conn->query(
                     <form action="neksomo-piece-pack-convert-action.php" method="post" id="convertForm">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
 
-                        <div class="row">
-                            <div class="col-lg-10">
-                                <div class="card mb-3" style="border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);border-radius:14px;overflow:hidden;">
-                                    <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);padding:16px 22px;">
-                                        <span style="color:#fff;font-weight:600;font-size:15px;">
-                                            <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">store</i>
-                                            Where is this conversion happening?
-                                        </span>
+                        <div class="card mb-3" style="border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);border-radius:14px;overflow:hidden;">
+                            <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);padding:16px 22px;">
+                                <span style="color:#fff;font-weight:600;font-size:15px;">
+                                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">store</i>
+                                    Where is this conversion happening?
+                                </span>
+                            </div>
+                            <div class="card-body" style="padding:20px 22px;">
+                                <div class="row g-3">
+                                    <div class="col-md-6 col-lg-4">
+                                        <label class="form-label">Company Profile <span class="required">*</span></label>
+                                        <select required name="godownid" id="godownSelect" class="form-control">
+                                            <option value="" hidden>Select</option>
+                                            <?php foreach ($godowns as $g): ?>
+                                            <option value="<?= (int)$g['id'] ?>"><?= htmlspecialchars($g['gname'], ENT_QUOTES, 'UTF-8') ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
-                                    <div class="card-body" style="padding:20px 22px;">
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">Company Profile <span class="required">*</span></label>
-                                                <select required name="godownid" id="godownSelect" class="form-control">
-                                                    <option value="" hidden>Select</option>
-                                                    <?php foreach ($godowns as $g): ?>
-                                                    <option value="<?= (int)$g['id'] ?>"><?= htmlspecialchars($g['gname'], ENT_QUOTES, 'UTF-8') ?></option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Godown (physical) <span class="required">*</span></label>
-                                                <select required name="warehouse_id" id="warehouseSelect" class="form-control">
-                                                    <option value="" hidden>Select</option>
-                                                    <?php foreach ($warehouses as $wh): ?>
-                                                    <option value="<?= (int)$wh['id'] ?>"><?= htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8') ?><?= $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '' ?></option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                        </div>
+                                    <div class="col-md-6 col-lg-4">
+                                        <label class="form-label">Godown (physical) <span class="required">*</span></label>
+                                        <select required name="warehouse_id" id="warehouseSelect" class="form-control">
+                                            <option value="" hidden>Select</option>
+                                            <?php foreach ($warehouses as $wh): ?>
+                                            <option value="<?= (int)$wh['id'] ?>"><?= htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8') ?><?= $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '' ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
-                                </div>
-
-                                <div class="card" style="border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);border-radius:14px;overflow:hidden;">
-                                    <div style="background:linear-gradient(135deg, #0891b2 0%, #0e7490 100%);padding:16px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                                        <span style="color:#fff;font-weight:600;font-size:15px;">
-                                            <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">inventory_2</i>
-                                            Products to Convert
-                                        </span>
-                                        <button type="button" class="btn btn-sm" id="addProductRowBtn" style="background:#fff;color:#0e7490;font-weight:600;border:none;">
-                                            <i class="material-icons" style="font-size:15px;vertical-align:middle;">add</i> Add Another Product
-                                        </button>
-                                    </div>
-                                    <div class="card-body" style="padding:20px 22px;">
-                                        <div id="productRows"></div>
-                                    </div>
-                                </div>
-
-                                <div class="d-flex justify-content-end mt-3 mb-4">
-                                    <button type="submit" class="btn btn-lg" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border:none;color:#fff;font-weight:600;padding:10px 32px;border-radius:10px;box-shadow:0 4px 12px rgba(102,126,234,.35);">
-                                        <i class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:4px;">sync_alt</i> Convert All
-                                    </button>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="card" style="border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);border-radius:14px;overflow:hidden;">
+                            <div style="background:linear-gradient(135deg, #0891b2 0%, #0e7490 100%);padding:16px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                                <span style="color:#fff;font-weight:600;font-size:15px;">
+                                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">inventory_2</i>
+                                    Products to Convert
+                                </span>
+                                <button type="button" class="btn btn-sm" id="addProductRowBtn" style="background:#fff;color:#0e7490;font-weight:600;border:none;">
+                                    <i class="material-icons" style="font-size:15px;vertical-align:middle;">add</i> Add Another Product
+                                </button>
+                            </div>
+                            <div class="card-body" style="padding:20px 22px;">
+                                <div id="productRows"></div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end mt-3 mb-4">
+                            <button type="submit" class="btn btn-lg" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border:none;color:#fff;font-weight:600;padding:10px 32px;border-radius:10px;box-shadow:0 4px 12px rgba(102,126,234,.35);">
+                                <i class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:4px;">sync_alt</i> Convert All
+                            </button>
                         </div>
                     </form>
 
@@ -172,11 +185,11 @@ $warehouses = $db_conn->query(
                                 </div>
                                 <div class="col-lg-2 col-md-5">
                                     <label class="form-label small text-muted mb-1 d-block">Current Stock</label>
-                                    <span class="current-stock-panel badge" style="background:#eef2ff;color:#4338ca;font-weight:600;font-size:12px;padding:7px 10px;white-space:normal;">&mdash;</span>
+                                    <span class="current-stock-panel badge" style="background:#eef2ff;color:#4338ca;font-weight:600;font-size:12px;padding:8px 10px;white-space:normal;display:inline-block;line-height:1.4;">&mdash;</span>
                                 </div>
-                                <div class="col-lg-1 col-md-3 text-md-end">
-                                    <button type="button" class="btn btn-outline-danger btn-sm remove-row-btn" title="Remove this product" style="border-radius:8px;">
-                                        <i class="material-icons" style="font-size:16px;vertical-align:middle;">delete_outline</i>
+                                <div class="col-lg-1 col-md-3 d-flex justify-content-md-end">
+                                    <button type="button" class="remove-row-btn" title="Remove this product">
+                                        <i class="material-icons-outlined" style="font-size:19px;">delete</i>
                                     </button>
                                 </div>
                             </div>
@@ -222,17 +235,24 @@ function refreshAllRowsStock() {
     rowsContainer.querySelectorAll('.product-row').forEach(refreshRowStock);
 }
 
+// Always keep at least one row — disable every row's delete button while
+// only one remains, rather than letting a click silently do nothing.
+function updateRemoveButtonsState() {
+    var rows = rowsContainer.querySelectorAll('.product-row');
+    var onlyOneLeft = rows.length <= 1;
+    rows.forEach(function (row) {
+        row.querySelector('.remove-row-btn').disabled = onlyOneLeft;
+    });
+}
+
 function addProductRow() {
     var fragment = rowTemplate.content.cloneNode(true);
     var rowEl = fragment.querySelector('.product-row');
     var productSelect = rowEl.querySelector('.product-select');
     rowEl.querySelector('.remove-row-btn').addEventListener('click', function () {
-        // Always keep at least one row — removing the last one would let
-        // the form submit with no products[] entries at all.
-        if (rowsContainer.querySelectorAll('.product-row').length > 1) {
-            $(productSelect).select2('destroy');
-            rowEl.remove();
-        }
+        $(productSelect).select2('destroy');
+        rowEl.remove();
+        updateRemoveButtonsState();
     });
     rowsContainer.appendChild(fragment);
 
@@ -240,6 +260,7 @@ function addProductRow() {
     // while it's still inside the detached template fragment.
     $(productSelect).select2({ placeholder: 'Search a product…', width: '100%' });
     $(productSelect).on('change', function () { refreshRowStock(rowEl); });
+    updateRemoveButtonsState();
 }
 
 document.getElementById('addProductRowBtn').addEventListener('click', addProductRow);
