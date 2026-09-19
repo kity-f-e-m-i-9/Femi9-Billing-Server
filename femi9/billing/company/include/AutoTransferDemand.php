@@ -49,6 +49,20 @@ function ensure_auto_transfer_skip_table(mysqli $db_conn): void
     ");
 }
 
+// Self-migrating — same guard as ot-sale-action.php's own (must stay in
+// sync with it). Every function here that reads ot_sales_invoice.status
+// calls this first: a fresh/never-touched ot_sales_invoice table has no
+// such column until either that file or this one creates it, and this
+// module can run first (e.g. Auto Transfer opened before any OT sale was
+// ever drafted), so it can't assume the other file already migrated it.
+function ensure_ot_sales_invoice_status_column(mysqli $db_conn): void
+{
+    $col = $db_conn->query("SHOW COLUMNS FROM ot_sales_invoice LIKE 'status'");
+    if ($col && $col->num_rows === 0) {
+        $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
+    }
+}
+
 // Self-migrating. One row per product_id holds the last-used rate for
 // each leg (Neksomo->Healthcare, Healthcare->LLP), so the Auto Transfer
 // page can pre-fill its rate inputs instead of starting blank every time
@@ -270,6 +284,7 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
 function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): array
 {
     ensure_auto_transfer_skip_table($db_conn);
+    ensure_ot_sales_invoice_status_column($db_conn);
     $requirements = [];
 
     // Skip-matching is per (PO, product) — CONCAT'd since a single PO can
@@ -333,6 +348,7 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
 function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId, int $llpGodownId): array
 {
     ensure_auto_transfer_skip_table($db_conn);
+    ensure_ot_sales_invoice_status_column($db_conn);
     $breakdown = ['tp' => [], 'ot' => []];
 
     // source_id/source_ref carry the product too ("tp:<po_id>:<product_id>",
@@ -409,6 +425,7 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
 function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): array
 {
     ensure_auto_transfer_skip_table($db_conn);
+    ensure_ot_sales_invoice_status_column($db_conn);
     $overview = ['tp' => [], 'ot' => []];
 
     $tpStmt = $db_conn->prepare(

@@ -14,7 +14,13 @@ $conn = $db_conn;
 const TEST_SCHEMA = 'auto_transfer_demand_test';
 
 $conn->query("DROP DATABASE IF EXISTS `" . TEST_SCHEMA . "`");
-if (!$conn->query("CREATE DATABASE IF NOT EXISTS `" . TEST_SCHEMA . "`")) {
+// Explicit collation: the real app database uses utf8mb4_general_ci
+// throughout (see AutoTransferDemand.php's own self-migrating tables).
+// Without this, the schema instead inherits the MySQL server's own
+// default (utf8mb4_0900_ai_ci on MySQL 8), and joining a table created
+// here against one of AutoTransferDemand.php's tables throws "Illegal
+// mix of collations".
+if (!$conn->query("CREATE DATABASE IF NOT EXISTS `" . TEST_SCHEMA . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci")) {
     fwrite(STDERR, "FATAL: could not CREATE DATABASE `" . TEST_SCHEMA . "` — " . $conn->error . "\n");
     exit(1);
 }
