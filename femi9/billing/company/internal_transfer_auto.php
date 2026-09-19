@@ -115,11 +115,11 @@ if (!empty($requirements)) {
                             <div class="card">
                                 <div class="card-body">
                                     <p class="text-muted">
-                                        Quantities required today for waiting Territory Partner purchase
-                                        orders and drafted OT channel orders (LLP), auto-capped to
-                                        available Neksomo + Healthcare stock. Adjust any row before
-                                        transferring — Neksomo &rarr; Healthcare &rarr; LLP, both legs
-                                        move in one click.
+                                        Quantities required for every still-waiting Territory Partner purchase
+                                        order and drafted OT channel order (LLP) — regardless of when it was
+                                        raised — auto-capped to available Neksomo + Healthcare stock. Adjust
+                                        any row before transferring — Neksomo &rarr; Healthcare &rarr; LLP,
+                                        both legs move in one click.
                                     </p>
 
                                     <?php if (!empty($rows)): ?>

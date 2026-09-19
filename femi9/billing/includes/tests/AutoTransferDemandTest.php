@@ -98,17 +98,26 @@ $yesterday = date('Y-m-d', strtotime('-1 day'));
 $conn->query("INSERT INTO tp_purchase_orders (id, territory_partner_id, order_date, status) VALUES (1, 9, '$today', 'waiting')");
 $conn->query("INSERT INTO tp_purchase_order_items (po_id, product_id, qty) VALUES (1, 101, 40)");
 
-// TP PO: product 101 qty 999, but completed (must be excluded)
+// TP PO: product 101 qty 999, but completed (must be excluded regardless
+// of order_date — a fulfilled PO never counts again)
 $conn->query("INSERT INTO tp_purchase_orders (id, territory_partner_id, order_date, status) VALUES (2, 9, '$today', 'completed')");
 $conn->query("INSERT INTO tp_purchase_order_items (po_id, product_id, qty) VALUES (2, 101, 999)");
 
-// TP PO: product 101 qty 999, waiting but yesterday (must be excluded)
+// TP PO: product 101 qty 15, still waiting from yesterday — must now
+// COUNT (order_date is no longer part of the filter: a PO raised
+// yesterday that's still genuinely outstanding is just as much
+// "required" as one raised today).
 $conn->query("INSERT INTO tp_purchase_orders (id, territory_partner_id, order_date, status) VALUES (3, 9, '$yesterday', 'waiting')");
-$conn->query("INSERT INTO tp_purchase_order_items (po_id, product_id, qty) VALUES (3, 101, 999)");
+$conn->query("INSERT INTO tp_purchase_order_items (po_id, product_id, qty) VALUES (3, 101, 15)");
 
 // OT draft for LLP (godownid=3), product 101 qty 15, today
 $conn->query("INSERT INTO ot_sales_invoice (tempid, status) VALUES ('OTD1', 'draft')");
 $conn->query("INSERT INTO ot_sales (godownid, prid, qty, date, tempid) VALUES (3, 101, 15, '$today', 'OTD1')");
+
+// OT draft for LLP, product 101 qty 5, dated yesterday — must now COUNT
+// (same date-independence as the TP side above).
+$conn->query("INSERT INTO ot_sales_invoice (tempid, status) VALUES ('OTD4', 'draft')");
+$conn->query("INSERT INTO ot_sales (godownid, prid, qty, date, tempid) VALUES (3, 101, 5, '$yesterday', 'OTD4')");
 
 // OT confirmed (not draft) for LLP, product 101 qty 999 (must be excluded)
 $conn->query("INSERT INTO ot_sales_invoice (tempid, status) VALUES ('OTC1', 'confirmed')");
@@ -129,7 +138,7 @@ assertEqual(resolve_godown_id_by_gname($conn, 'DOES NOT EXIST'), null, 'returns 
 
 // ========== TESTS: get_auto_transfer_requirements ==========
 $requirements = get_auto_transfer_requirements($conn, 3);
-assertEqual($requirements[101] ?? null, 55, 'product 101: 40 (waiting TP today) + 15 (LLP draft OT today) = 55, excludes completed/yesterday/confirmed/wrong-godown');
+assertEqual($requirements[101] ?? null, 75, 'product 101: 40 (waiting TP today) + 15 (waiting TP yesterday) + 15 (LLP draft OT today) + 5 (LLP draft OT yesterday) = 75, excludes completed/confirmed/wrong-godown');
 assertEqual($requirements[202] ?? null, 7, 'product 202: only the LLP draft OT counts');
 assertEqual(count($requirements), 2, 'no extraneous product keys');
 
