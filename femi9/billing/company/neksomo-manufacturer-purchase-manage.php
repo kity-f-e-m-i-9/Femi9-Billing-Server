@@ -69,7 +69,12 @@ foreach ($entries as $e) {
                             <div class="col">
                                 <div class="page-description">
                                     <?php if (isset($_REQUEST['deletedDone'])) { ?><div class="alert alert-warning">Purchase deleted and stock reversed.</div><?php } ?>
-                                    <?php if (isset($_REQUEST['error'])) { ?><div class="alert alert-danger">Something went wrong. Please try again.</div><?php } ?>
+                                    <?php if (isset($_REQUEST['editDone'])) { ?><div class="alert alert-success">Purchase updated and stock adjusted.</div><?php } ?>
+                                    <?php if (isset($_REQUEST['error']) && $_REQUEST['error'] === 'already_consumed'): ?>
+                                        <div class="alert alert-danger">Cannot delete — some of this purchase's stock has already been sold or moved on. Please reconcile manually instead.</div>
+                                    <?php elseif (isset($_REQUEST['error'])): ?>
+                                        <div class="alert alert-danger">Something went wrong. Please try again.</div>
+                                    <?php endif; ?>
 
                                     <h1>
                                         <table class="headertble">
@@ -113,6 +118,7 @@ foreach ($entries as $e) {
                                                     <td>
                                                         <div class="actions-group">
                                                             <a href="view-neksomo-manufacturer-purchase.php?id=<?php echo $eid; ?>" class="action-link" title="View Details"><i class="material-icons-outlined" style="font-size:17px;color:#2563eb;">visibility</i></a>
+                                                            <a href="edit-neksomo-manufacturer-purchase.php?id=<?php echo $eid; ?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#0891b2;">edit</i></a>
                                                             <a href="neksomo-manufacturer-purchase-print.php?id=<?php echo $eid; ?>" class="action-link" title="Print"><i class="material-icons-outlined" style="font-size:17px;color:#475569;">print</i></a>
                                                             <a href="delete-neksomo-manufacturer-purchase.php?id=<?php echo $eid; ?>" class="action-link delete" title="Delete (reverses stock)" onclick="return confirm('Delete this purchase and reverse the stock for every product in it?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
                                                         </div>

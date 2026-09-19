@@ -2,6 +2,7 @@
 require_once("include/GodownAccess.php");
 include("config.php");
 require_once("include/StockService.php");
+require_once("include/NeksomoPurchaseSchema.php");
 
 $__usertype = get_login_usertype($db_conn);
 if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
@@ -9,45 +10,7 @@ if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
     exit;
 }
 
-/**
- * Reverse a piece-wise purchase quantity from a pack-based stock row —
- * the mirror image of neksomo_credit_pieces() in
- * neksomo-manufacturer-purchase-action.php. Subtracts $qtyPieces from the
- * running loose-piece remainder (stock.extra_pieces); if that would go
- * negative, borrows back whole packs via StockService::reverseCredit() so
- * the remainder lands back in [0, piecesPerPack). Must run inside the
- * caller's transaction.
- */
-function neksomo_reverse_pieces(
-    mysqli $db, StockService $stockService,
-    int $productId, string $godownId, int $piecesPerPack, int $qtyPieces,
-    string $refId, string $createdBy
-): void {
-    $lock = $db->prepare("SELECT extra_pieces FROM stock WHERE product_id = ? AND user_type = 'company' AND user_id = ? FOR UPDATE");
-    $lock->bind_param('is', $productId, $godownId);
-    $lock->execute();
-    $row = $lock->get_result()->fetch_assoc();
-    $lock->close();
-
-    if ($row === null) {
-        return; // nothing to reverse — no stock row exists for this product
-    }
-
-    $net = (int) $row['extra_pieces'] - $qtyPieces;
-
-    if ($net >= 0) {
-        $newExtra = $net;
-    } else {
-        $packsToReverse = (int) ceil(abs($net) / $piecesPerPack);
-        $stockService->reverseCredit($productId, 'company', $godownId, $packsToReverse, 'adjustment', $refId, $createdBy, true);
-        $newExtra = $net + ($packsToReverse * $piecesPerPack);
-    }
-
-    $upd = $db->prepare("UPDATE stock SET extra_pieces = ?, updated_at = NOW() WHERE product_id = ? AND user_type = 'company' AND user_id = ?");
-    $upd->bind_param('iis', $newExtra, $productId, $godownId);
-    $upd->execute();
-    $upd->close();
-}
+ensure_neksomo_manufacturer_purchases_warehouse_column($db_conn);
 
 $id = (int) base64_decode($_REQUEST['id'] ?? '');
 $created_by = $_SESSION['LOGIN_USER'] ?? 'system';
@@ -78,6 +41,28 @@ $neksomoGodownId = (int) ($db_conn->query(
     "SELECT id FROM company_godown WHERE gname = 'NEKSOMO HYGIENE INDUSTRIES' LIMIT 1"
 )->fetch_row()[0] ?? 0);
 
+$warehouseId = $purchase['warehouse_id'] !== null ? (int) $purchase['warehouse_id'] : null;
+
+// Refuse outright if this purchase's own lot has already been partially
+// (or fully) drawn from by a later sale — deleting it would corrupt that
+// sale's FIFO cost-basis history. Checked before the transaction starts
+// so nothing partially applies.
+$lotCheckStmt = $db_conn->prepare(
+    "SELECT qty_purchased, qty_remaining FROM stock_lots WHERE ref_type = 'neksomo_purchase' AND ref_id = ? AND product_id = ?"
+);
+$purchaseIdStr = (string) $id;
+foreach ($items as $item) {
+    $lotCheckStmt->bind_param('si', $purchaseIdStr, $item['product_id']);
+    $lotCheckStmt->execute();
+    $lotRow = $lotCheckStmt->get_result()->fetch_assoc();
+    if ($lotRow !== null && (int) $lotRow['qty_remaining'] < (int) $lotRow['qty_purchased']) {
+        $lotCheckStmt->close();
+        header("Location: neksomo-manufacturer-purchase-manage.php?error=already_consumed");
+        exit;
+    }
+}
+$lotCheckStmt->close();
+
 $db_conn->begin_transaction();
 try {
     if ($neksomoGodownId) {
@@ -88,8 +73,22 @@ try {
                 (int) $item['product_id'], (string) $neksomoGodownId,
                 max((int) $item['pieces_per_pack'], 1), (int) $item['quantity_pieces'],
                 'manuf_purchase_delete_' . $id . '_' . $item['product_id'],
-                $created_by
+                $created_by, $warehouseId
             );
+
+            // Removes the lot this purchase recorded (if any — a purchase
+            // that only topped up loose pieces never created one). Safe:
+            // already confirmed above that nothing has drawn from it yet.
+            // Does NOT reverse any pool-conversion this purchase may have
+            // triggered for a mapped company product (see neksomo-
+            // manufacturer-purchase-action.php's pool-conversion block) —
+            // that's a pre-existing gap, not introduced or fixed here.
+            $delLot = $db_conn->prepare(
+                "DELETE FROM stock_lots WHERE ref_type = 'neksomo_purchase' AND ref_id = ? AND product_id = ?"
+            );
+            $delLot->bind_param('si', $purchaseIdStr, $item['product_id']);
+            $delLot->execute();
+            $delLot->close();
         }
     }
 

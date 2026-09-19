@@ -1,6 +1,7 @@
 <?php include("checksession.php");
 require_once("include/GodownAccess.php");
 include("config.php");
+require_once("include/NeksomoPurchaseSchema.php");
 
 // Dedicated to the neksomo login (admin retained for oversight/support).
 $__usertype = get_login_usertype($db_conn);
@@ -9,13 +10,62 @@ if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
     exit;
 }
 
+ensure_neksomo_manufacturer_purchases_warehouse_column($db_conn);
+
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+$id = (int) base64_decode($_REQUEST['id'] ?? '');
+
+$stmt = $db_conn->prepare("SELECT * FROM neksomo_manufacturer_purchases WHERE id = ?");
+$stmt->bind_param('i', $id);
+$stmt->execute();
+$purchase = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$purchase) {
+    header("Location: neksomo-manufacturer-purchase-manage.php?error");
+    exit;
+}
+
+$itemStmt = $db_conn->prepare(
+    "SELECT npi.product_id, npi.quantity_pieces, npi.cost_per_piece, p.productName, p.pieces_per_pack, p.unit_type, p.gst, p.gst_type
+     FROM neksomo_purchase_items npi
+     JOIN products p ON p.id = npi.product_id
+     WHERE npi.purchase_id = ?
+     ORDER BY npi.id ASC"
+);
+$itemStmt->bind_param('i', $id);
+$itemStmt->execute();
+$existingItems = $itemStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$itemStmt->close();
+
 $products   = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type, gst, gst_type FROM products WHERE deleted_at IS NULL AND temp_id LIKE 'NKS-%' ORDER BY productName ASC")->fetch_all(MYSQLI_ASSOC);
 $vendors    = $db_conn->query("SELECT id, vendor_name FROM neksomo_vendors WHERE is_active = 1 ORDER BY vendor_name ASC")->fetch_all(MYSQLI_ASSOC);
 $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC")->fetch_all(MYSQLI_ASSOC);
+
+// Data handed to JS to pre-populate the same purchaseItems[] shape
+// neksomo-manufacturer-purchase.php's own addProduct() builds — so the
+// rest of that page's rendering/summary code can be reused as-is.
+$prefillItems = array_map(function ($it) {
+    $pph = max((int) $it['pieces_per_pack'], 1);
+    $isPack = $it['unit_type'] === 'pack' && $pph > 0;
+    $qtyPieces = (int) $it['quantity_pieces'];
+    $costPerPiece = (float) $it['cost_per_piece'];
+    return [
+        'product_id'   => (int) $it['product_id'],
+        'name'         => $it['productName'],
+        'qty'          => $qtyPieces,
+        'cost'         => $costPerPiece,
+        'isPack'       => $isPack,
+        'pph'          => $pph,
+        'enteredQty'   => $isPack ? intdiv($qtyPieces, $pph) : $qtyPieces,
+        'enteredCost'  => $isPack ? round($costPerPiece * $pph, 6) : $costPerPiece,
+        'gstRate'      => (float) $it['gst'],
+        'gstType'      => $it['gst_type'] === 'inclusive' ? 'inclusive' : 'exclusive',
+    ];
+}, $existingItems);
 ?>
 
 <!DOCTYPE html>
@@ -25,7 +75,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Purchase from Manufacturer : <?php echo $business_name; ?></title>
+    <title>Edit Purchase : <?php echo $business_name; ?></title>
 
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -92,7 +142,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                                     <h1>
                                         <table class="headertble">
                                         <tr>
-                                        <td>Purchase from Manufacturer</td>
+                                        <td>Edit Purchase — <?php echo htmlspecialchars($purchase['invoice_number']); ?></td>
                                         <td><a href="neksomo-manufacturer-purchase-manage" title="Manage Purchases">&#9776;</a></td>
                                         </tr>
                                         </table>
@@ -101,7 +151,13 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                             </div>
                         </div>
 
-                        <?php if (isset($_REQUEST['addesuccess'])) { ?><div class="alert alert-success">Purchase recorded and stock updated.</div><?php } ?>
+                        <div class="alert alert-info" style="font-size:13px;">
+                            <i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">info</i>
+                            Changes here are applied as an adjustment on top of what's already on hand — stock that's
+                            already been sold or moved on is never touched, only what's still sitting in this
+                            purchase's own balance.
+                        </div>
+
                         <?php if (isset($_REQUEST['error'])): $err = $_REQUEST['error']; ?>
                             <div class="alert alert-danger">
                                 <?php if ($err === 'duplicate'): ?>
@@ -110,22 +166,25 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                                     Please fill in all required fields.
                                 <?php elseif ($err === 'noproducts'): ?>
                                     Please add at least one product with a valid quantity and cost.
+                                <?php elseif ($err === 'already_consumed'): ?>
+                                    Cannot apply this edit — reducing a product's quantity below what's already been sold
+                                    or moved on isn't possible. Increase the quantity instead, or leave it unchanged.
                                 <?php else: ?>
                                     Something went wrong. Please try again.
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>
 
-                        <form action="neksomo-manufacturer-purchase-action.php" method="post" id="purchaseForm">
+                        <form action="edit-neksomo-manufacturer-purchase-action.php" method="post" id="purchaseForm">
                         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                        <input type="hidden" name="add-record" value="1">
+                        <input type="hidden" name="purchase_id" value="<?php echo (int) $id; ?>">
                         <div id="hiddenProductInputs"></div>
 
                         <div class="form-section">
                             <div class="section-header"><i class="material-icons">edit_document</i>Purchase Details</div>
                             <p class="text-muted" style="font-size:13px;">
-                                This records a real purchase and adds directly to Neksomo's on-hand stock
-                                (same effect as Add Input Stock) — quantity is in packs.
+                                Editing applies only the DIFFERENCE between the old and new values to stock — nothing
+                                already sold or moved on is disturbed.
                             </p>
                             <div class="row g-4 align-items-start">
 
@@ -134,17 +193,17 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                                     <select required name="vendor_id" id="vendorSelect" class="form-control">
                                         <option value="" hidden>Select Vendor</option>
                                         <?php foreach ($vendors as $v): ?>
-                                        <option value="<?php echo (int)$v['id']; ?>"><?php echo htmlspecialchars($v['vendor_name']); ?></option>
+                                        <option value="<?php echo (int)$v['id']; ?>" <?php echo ((int)$v['id'] === (int)$purchase['vendor_id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($v['vendor_name']); ?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="field-hint"><a href="neksomo-vendor-add.php" target="_blank">+ Add New Vendor</a> (opens in a new tab)</div>
                                 </div>
 
                                 <div class="col-lg-4 col-md-6">
                                     <label class="form-label">Invoice Number <span class="required text-danger">*</span></label>
                                     <input type="text" name="inv_number" id="invNumberInput" class="form-control"
                                            autocomplete="off" required onkeypress="restrictSpecialChars(event)"
-                                           value="<?php echo (isset($_GET['error']) && $_GET['error'] === 'duplicate') ? htmlspecialchars($_GET['inv'] ?? '') : ''; ?>"
+                                           value="<?php echo htmlspecialchars($purchase['invoice_number']); ?>"
+                                           data-original-value="<?php echo htmlspecialchars($purchase['invoice_number']); ?>"
                                            placeholder="Enter invoice number">
                                     <div id="invNumberHint" style="margin-top:6px;font-size:12.5px;"></div>
                                 </div>
@@ -152,7 +211,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                                 <div class="col-lg-4 col-md-6">
                                     <label class="form-label">Purchase Date <span class="required text-danger">*</span></label>
                                     <input type="date" required name="purchase_date" id="purchaseDate" class="form-control"
-                                           value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>">
+                                           value="<?php echo htmlspecialchars($purchase['purchase_date']); ?>" max="<?php echo date('Y-m-d'); ?>">
                                     <div class="field-hint">Cannot be a future date</div>
                                 </div>
 
@@ -161,17 +220,17 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                                     <select required name="warehouse_id" id="warehouseSelect" class="form-control">
                                         <option value="" hidden>Select Godown</option>
                                         <?php foreach ($warehouses as $wh): ?>
-                                        <option value="<?php echo (int)$wh['id']; ?>"><?php echo htmlspecialchars($wh['code']); ?><?php echo $wh['name'] ? ' - ' . htmlspecialchars($wh['name']) : ''; ?></option>
+                                        <option value="<?php echo (int)$wh['id']; ?>" <?php echo ((int)$wh['id'] === (int)($purchase['warehouse_id'] ?? 0)) ? 'selected' : ''; ?>><?php echo htmlspecialchars($wh['code']); ?><?php echo $wh['name'] ? ' - ' . htmlspecialchars($wh['name']) : ''; ?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="field-hint">Where this purchase is physically received</div>
+                                    <div class="field-hint">Moving this to a different godown only shifts what's still on hand</div>
                                 </div>
 
                             </div>
                         </div>
 
                         <div class="form-section">
-                            <div class="section-header" style="border:none;padding-bottom:0;margin-bottom:15px;"><i class="material-icons">add_shopping_cart</i>Add Products</div>
+                            <div class="section-header" style="border:none;padding-bottom:0;margin-bottom:15px;"><i class="material-icons">add_shopping_cart</i>Products</div>
                             <div class="product-add-section">
                                 <div class="product-add-grid">
                                     <div class="input-group-modern">
@@ -245,7 +304,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                                         </div>
                                         <div style="margin-top:20px;">
                                             <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
-                                                <i class="material-icons">check_circle</i> Submit Purchase
+                                                <i class="material-icons">check_circle</i> Save Changes
                                             </button>
                                             <a href="neksomo-manufacturer-purchase-manage" class="btn btn-secondary ms-2">Cancel</a>
                                         </div>
@@ -271,12 +330,22 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
     <script src="../../assets/js/custom.js"></script>
     <script>
     (function ($) {
-        var purchaseItems  = [];
-        var invNumberOk    = false;
+        // Pre-filled from the existing purchase — same shape addProduct()
+        // itself builds, so the rest of this page's rendering/summary code
+        // is identical to the Add form.
+        var purchaseItems  = <?php echo json_encode($prefillItems); ?>;
+        var invNumberOk    = true; // starts true: the current value is this purchase's own, already-valid number
         var invNumberTimer = null;
+        var originalInvNumber = $('#invNumberInput').data('original-value');
 
         $('#invNumberInput').on('input', function () {
             var val = $(this).val().trim();
+            if (val === originalInvNumber) {
+                invNumberOk = true;
+                $('#invNumberHint').html('<span style="color:#94a3b8;">Unchanged</span>');
+                updateSummary();
+                return;
+            }
             invNumberOk = false;
             clearTimeout(invNumberTimer);
             if (!val) { $('#invNumberHint').html(''); updateSummary(); return; }
@@ -297,7 +366,6 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                 });
             }, 400);
         });
-        if ($('#invNumberInput').val().trim()) { $('#invNumberInput').trigger('input'); }
 
         function fmtAmt(n) {
             return parseFloat(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -339,7 +407,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
             }
         });
 
-        // Mirrors the server-side calc in neksomo-manufacturer-purchase-action.php:
+        // Mirrors the server-side calc in edit-neksomo-manufacturer-purchase-action.php:
         // exclusive products add GST on top of the entered cost; inclusive products
         // already have GST baked into it, so the taxable value is backed out of it.
         // This is a preview only — the server always recomputes from the product's
@@ -359,6 +427,16 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
             return { taxable: taxable, gstAmount: gstAmount, total: total };
         }
 
+        // Every prefilled item already has taxable/gstAmount/amount computed
+        // server-side (round-tripped exactly) — only recompute here for
+        // items added/edited fresh in this session.
+        purchaseItems.forEach(function (item) {
+            var breakdown = computeGstBreakdown(item.qty, item.cost, item.gstRate, item.gstType);
+            item.taxable = breakdown.taxable;
+            item.gstAmount = breakdown.gstAmount;
+            item.amount = breakdown.total;
+        });
+
         window.addProduct = function () {
             hideAddError();
             var $opt        = $('#productSelect').find('option:selected');
@@ -377,13 +455,9 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                 showAddError('Please enter a valid cost per ' + (isPack ? 'pack.' : 'piece.')); return;
             }
             if (purchaseItems.find(function (i) { return i.product_id === product_id; })) {
-                showAddError('This product is already added.'); return;
+                showAddError('This product is already in the list — remove it first to re-add with different values.'); return;
             }
 
-            // Purchases are always tracked piece-wise internally (matches
-            // quantity_pieces/cost_per_piece on the server) — pack-mode entry
-            // is converted here so a pack purchase always lands on a whole
-            // number of packs with zero leftover.
             var qty  = isPack ? (enteredQty * pph) : enteredQty;
             var cost = isPack ? parseFloat((enteredCost / pph).toFixed(6)) : enteredCost;
 
@@ -470,7 +544,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
             if (!$('#invNumberInput').val().trim()) { e.preventDefault(); alert('Please enter an invoice number.'); return; }
             if (!invNumberOk) { e.preventDefault(); alert('This invoice number already exists. Please enter a different one.'); return; }
             buildHiddenInputs();
-            $('#submitBtn').prop('disabled', true).html('<i class="material-icons" style="animation:spin 1s linear infinite;font-size:18px;">refresh</i> Submitting…');
+            $('#submitBtn').prop('disabled', true).html('<i class="material-icons" style="animation:spin 1s linear infinite;font-size:18px;">refresh</i> Saving…');
         });
 
         function resetAddForm() {
@@ -490,7 +564,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
         function hideAddError() { $('#addError').hide().empty(); }
         function escHtml(str) { return $('<div>').text(str).html(); }
 
-        updateSummary();
+        renderTable();
     }(jQuery));
     </script>
 </body>

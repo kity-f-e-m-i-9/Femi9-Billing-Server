@@ -7,6 +7,7 @@ require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/StockLots.php");
 require_once("include/NeksomoStockBridge.php");
+require_once("include/NeksomoPurchaseSchema.php");
 
 $__usertype = get_login_usertype($db_conn);
 if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
@@ -20,61 +21,7 @@ function redirectWithMessage(string $location, string $message = ''): void {
     exit();
 }
 
-/**
- * Credit a piece-wise purchase quantity onto a pack-based stock row.
- *
- * stock.extra_pieces holds loose pieces that haven't yet accumulated into a
- * whole pack. This adds $qtyPieces to that running remainder; whenever the
- * remainder reaches (or exceeds) one pack, the whole-pack portion is credited
- * to stock.closing_qty via StockService (so every other flow in the app keeps
- * seeing pack-based stock), and only the leftover sub-pack amount stays in
- * extra_pieces. Must run inside the caller's transaction.
- *
- * @return array{packs:int, ledger_id:?int}
- */
-function neksomo_credit_pieces(
-    mysqli $db, StockService $stockService,
-    int $productId, string $godownId, int $piecesPerPack, int $qtyPieces,
-    string $refId, string $createdBy
-): array {
-    $lock = $db->prepare("SELECT extra_pieces FROM stock WHERE product_id = ? AND user_type = 'company' AND user_id = ? FOR UPDATE");
-    $lock->bind_param('is', $productId, $godownId);
-    $lock->execute();
-    $row = $lock->get_result()->fetch_assoc();
-    $lock->close();
-
-    if ($row === null) {
-        $ins = $db->prepare(
-            "INSERT INTO stock
-                (product_id, opening_qty, opening_date, input_qty, sales_qty,
-                 sent_qty, returnqty, closing_qty, extra_pieces, user_type, user_id, updated_at)
-             VALUES (?, 0, CURDATE(), 0, 0, 0, 0, 0, 0, 'company', ?, NOW())"
-        );
-        $ins->bind_param('is', $productId, $godownId);
-        $ins->execute();
-        $ins->close();
-        $currentExtra = 0;
-    } else {
-        $currentExtra = (int) $row['extra_pieces'];
-    }
-
-    $total       = $currentExtra + $qtyPieces;
-    $packs       = intdiv($total, $piecesPerPack);
-    $newExtra    = $total % $piecesPerPack;
-    $ledgerId    = null;
-
-    if ($packs > 0) {
-        $result   = $stockService->credit($productId, 'company', $godownId, $packs, 'adjustment', $refId, $createdBy, true);
-        $ledgerId = $result['ledger_id'];
-    }
-
-    $upd = $db->prepare("UPDATE stock SET extra_pieces = ?, updated_at = NOW() WHERE product_id = ? AND user_type = 'company' AND user_id = ?");
-    $upd->bind_param('iis', $newExtra, $productId, $godownId);
-    $upd->execute();
-    $upd->close();
-
-    return ['packs' => $packs, 'ledger_id' => $ledgerId];
-}
+ensure_neksomo_manufacturer_purchases_warehouse_column($db_conn);
 
 if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
     redirectWithMessage('neksomo-manufacturer-purchase.php', 'error');
@@ -87,6 +34,7 @@ if (!isset($_POST['add-record'])) {
 $vendor_id     = filter_var($_POST['vendor_id'] ?? 0, FILTER_VALIDATE_INT);
 $inv_number    = trim(str_replace("'", "", $_POST['inv_number'] ?? ''));
 $purchase_date = $_POST['purchase_date'] ?? '';
+$warehouse_id  = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 $created_by    = $_SESSION['LOGIN_USER'] ?? 'system';
 
 $raw_pids  = $_POST['product_id'] ?? [];
@@ -96,6 +44,7 @@ $raw_costs = $_POST['cost_per_piece'] ?? [];
 if (
     !$vendor_id || $inv_number === '' ||
     !preg_match('/^\d{4}-\d{2}-\d{2}$/', $purchase_date) ||
+    $warehouse_id === null ||
     empty($raw_pids)
 ) {
     redirectWithMessage('neksomo-manufacturer-purchase.php', 'error=missing');
@@ -251,7 +200,7 @@ try {
         $credit = neksomo_credit_pieces(
             $db_conn, $stockService,
             $item['pid'], (string) $neksomoGodownId, $item['pieces_per_pack'], $item['qty_pieces'],
-            $refId, $created_by
+            $refId, $created_by, $warehouse_id
         );
         $item['qty_packs']  = $credit['packs'];
         $item['ledger_id']  = $credit['ledger_id'];
@@ -261,12 +210,12 @@ try {
     $first = $items[0];
     $headerStmt = $db_conn->prepare(
         "INSERT INTO neksomo_manufacturer_purchases
-            (vendor_id, invoice_number, product_id, manufacturer_name, purchase_date, total_amount, total_taxable_value, total_gst_amount, quantity_packs, cost_per_piece, total_cost, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            (vendor_id, invoice_number, product_id, manufacturer_name, purchase_date, warehouse_id, total_amount, total_taxable_value, total_gst_amount, quantity_packs, cost_per_piece, total_cost, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $headerStmt->bind_param(
-        'isissdddidds',
-        $vendor_id, $inv_number, $first['pid'], $vendor_name, $purchase_date,
+        'isissidddidds',
+        $vendor_id, $inv_number, $first['pid'], $vendor_name, $purchase_date, $warehouse_id,
         $grand_total, $grand_taxable, $grand_gst, $first['qty_packs'], $first['cost'], $first['total_cost'], $created_by
     );
     $headerStmt->execute();
@@ -299,7 +248,7 @@ try {
             StockLots::recordLot(
                 $db_conn, $item['pid'], 'company', (string) $neksomoGodownId,
                 $ratePerPack, $item['qty_packs'], $purchase_date,
-                'neksomo_purchase', (string) $purchase_id, $created_by
+                'neksomo_purchase', (string) $purchase_id, $created_by, $warehouse_id
             );
         }
 
@@ -332,7 +281,7 @@ try {
                 if ($availablePacks <= 0) continue;
                 $stockService->credit(
                     $companyProductId, 'company', (string) $neksomoGodownId, $availablePacks,
-                    'adjustment', 'neksomo_conversion_' . uniqid(), $created_by, true
+                    'adjustment', 'neksomo_conversion_' . uniqid(), $created_by, true, $warehouse_id
                 );
                 record_neksomo_stock_conversion($db_conn, $companyProductId, $availablePacks, $created_by);
             }
