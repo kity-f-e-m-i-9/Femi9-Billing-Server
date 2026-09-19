@@ -169,8 +169,11 @@ $conn->query("CREATE TABLE femi9_llp_sale_rates (
 
 $conn->query("CREATE TABLE products (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    productName VARCHAR(255) NOT NULL DEFAULT '',
     pieces_per_pack INT NULL
 )");
+$conn->query("INSERT INTO products (id, productName) VALUES
+    (100, 'Product A'), (200, 'Product B'), (300, 'Product C')");
 
 $stockService = new StockService($conn);
 
@@ -279,6 +282,31 @@ assertEqual((int) $stillPresent, 2, 'internal_transfer rows untouched after refu
 $resultMalformed = undo_auto_transfer($conn, 'AUTOTEST1-N1', PRODUCT_A, 'company', NEKSOMO_ID, HEALTHCARE_ID, LLP_ID, 'tester');
 assertEqual($resultMalformed['success'], false, 'undo refuses a tempid that is not the -N2 leg');
 assertEqual($resultMalformed['reason'] ?? null, 'not_found', 'malformed tempid refusal reason is not_found');
+
+// ---- get_auto_transfer_history_grouped_for_date(): groups a
+// multi-product run into one row, invoice-wise (matching Manage Internal
+// Stock Transfer's own layout) ----
+$conn->query("INSERT INTO stock (product_id, closing_qty, user_type, user_id) VALUES (300, 400, 'company', '" . NEKSOMO_ID . "')");
+$conn->query("INSERT INTO stock (product_id, closing_qty, user_type, user_id) VALUES (300, 0, 'company', '" . HEALTHCARE_ID . "')");
+$conn->query("INSERT INTO stock (product_id, closing_qty, user_type, user_id) VALUES (300, 0, 'company', '" . LLP_ID . "')");
+seedAutoTransferRun($conn, $stockService, 'AUTOTEST3', 300, 25);
+seedAutoTransferRun($conn, $stockService, 'AUTOTEST3', PRODUCT_B, 10);
+
+$today = date('Y-m-d');
+$runs = get_auto_transfer_history_grouped_for_date($conn, $today, NEKSOMO_ID, HEALTHCARE_ID, LLP_ID);
+$run3 = null;
+foreach ($runs as $r) { if ($r['tempid'] === 'AUTOTEST3-N2') { $run3 = $r; break; } }
+
+assertEqual($run3 !== null, true, 'grouped history finds the AUTOTEST3 run');
+assertEqual(count($run3['products'] ?? []), 2, 'AUTOTEST3 run groups both its products (300 and PRODUCT_B) into one row');
+assertEqual($run3['inv_number_leg1'], 'G/1', 'grouped run resolves leg 1 invoice number');
+assertEqual($run3['inv_number_leg2'], 'S/1', 'grouped run resolves leg 2 invoice number');
+
+$productIdsInRun = array_column($run3['products'], 'product_id');
+sort($productIdsInRun);
+$expectedIds = [300, PRODUCT_B];
+sort($expectedIds);
+assertEqual($productIdsInRun, $expectedIds, 'grouped run lists exactly the 2 products moved in that run');
 
 // ========== TEARDOWN ==========
 $conn->select_db('information_schema');

@@ -23,4 +23,4 @@ if (!$neksomoId || !$healthcareId || !$llpId) {
     echo json_encode(['rows' => [], 'error' => 'Required company profiles not found']); exit;
 }
 
-echo json_encode(['rows' => get_auto_transfer_history_for_date($db_conn, $date, $neksomoId, $healthcareId, $llpId)]);
+echo json_encode(['runs' => get_auto_transfer_history_grouped_for_date($db_conn, $date, $neksomoId, $healthcareId, $llpId)]);

@@ -602,6 +602,12 @@ if (!empty($requirements)) {
         return d.toLocaleDateString('en-IN') + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     }
 
+    // Invoice-wise layout, matching Manage Internal Stock Transfer: one
+    // row per Auto Transfer run (one "Transfer Now" click, identified by
+    // its shared tempid pair), one column per product that appears in
+    // ANY run on this date (union across runs, same convention the
+    // manage page uses for its per-product columns) — 0/blank for a run
+    // that didn't move that product.
     function loadTransferHistory() {
         var date = document.getElementById('thDateInput').value;
         if (!date) return;
@@ -613,36 +619,52 @@ if (!empty($requirements)) {
                 resultEl.innerHTML = '<div class="text-danger small" style="padding:10px 4px;">' + escBd(data.error) + '</div>';
                 return;
             }
-            if (!data.rows || !data.rows.length) {
+            if (!data.runs || !data.runs.length) {
                 resultEl.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">No auto-transfers found on this date.</div>';
                 return;
             }
-            var html = '<div style="overflow-x:auto;"><table class="table table-bordered table-sm" style="min-width:1160px;">' +
+
+            // Union of every product across every run, in first-seen order.
+            var productColumns = [];
+            var seenProductIds = {};
+            data.runs.forEach(function (run) {
+                run.products.forEach(function (p) {
+                    if (!seenProductIds[p.product_id]) {
+                        seenProductIds[p.product_id] = true;
+                        productColumns.push({ id: p.product_id, name: p.product_name });
+                    }
+                });
+            });
+
+            var html = '<div style="overflow-x:auto;"><table class="table table-bordered table-sm" style="min-width:' + (700 + productColumns.length * 90) + 'px;">' +
                 '<thead><tr style="background:#f8fafc;">' +
-                    '<th>Product</th>' +
-                    '<th>Neksomo Before</th><th>Neksomo After</th>' +
-                    '<th>Healthcare Before</th><th>Healthcare After</th>' +
-                    '<th>LLP Before</th><th>LLP After</th>' +
-                    '<th>Qty Transferred</th><th>Date &amp; Time</th><th>Undo</th>' +
-                '</tr></thead><tbody>';
-            data.rows.forEach(function (r) {
-                html += '<tr>' +
-                    '<td>' + escBd(r.product_name) + '</td>' +
-                    '<td>' + thFmtStock(r.neksomo_before) + '</td>' +
-                    '<td>' + thFmtStock(r.neksomo_after) + '</td>' +
-                    '<td>' + thFmtStock(r.healthcare_before) + '</td>' +
-                    '<td>' + thFmtStock(r.healthcare_after) + '</td>' +
-                    '<td>' + thFmtStock(r.llp_before) + '</td>' +
-                    '<td>' + thFmtStock(r.llp_after) + '</td>' +
-                    '<td style="font-weight:600;">' + r.qty_transferred + '</td>' +
-                    '<td>' + thFmtDateTime(r.transferred_at) + '</td>' +
-                    '<td>' +
+                    '<th>Date &amp; Time</th>' +
+                    '<th>Invoice (Neksomo&rarr;Healthcare)</th>' +
+                    '<th>Invoice (Healthcare&rarr;LLP)</th>';
+            productColumns.forEach(function (col) { html += '<th>' + escBd(col.name) + '</th>'; });
+            html += '<th>Undo</th></tr></thead><tbody>';
+
+            data.runs.forEach(function (run) {
+                var qtyByProductId = {};
+                run.products.forEach(function (p) { qtyByProductId[p.product_id] = p.qty_transferred; });
+                var runProductIds = run.products.map(function (p) { return p.product_id; });
+
+                html += '<tr data-product-ids="' + escBd(JSON.stringify(runProductIds)) + '">' +
+                    '<td>' + thFmtDateTime(run.transferred_at) + '</td>' +
+                    '<td>' + (run.inv_number_leg1 ? escBd(run.inv_number_leg1) : '<span class="text-muted">&mdash;</span>') + '</td>' +
+                    '<td>' + (run.inv_number_leg2 ? escBd(run.inv_number_leg2) : '<span class="text-muted">&mdash;</span>') + '</td>';
+                productColumns.forEach(function (col) {
+                    var qty = qtyByProductId[col.id];
+                    html += '<td' + (qty ? ' style="font-weight:600;"' : '') + '>' + (qty || '<span class="text-muted">&mdash;</span>') + '</td>';
+                });
+                html += '<td>' +
                         '<button type="button" class="btn btn-sm btn-outline-danger th-undo" ' +
-                            'data-tempid="' + escBd(r.tempid) + '" data-product-id="' + r.product_id + '" ' +
+                            'data-tempid="' + escBd(run.tempid) + '" ' +
                             'style="white-space:nowrap;font-size:11px;padding:2px 8px;">Undo</button>' +
                     '</td>' +
                 '</tr>';
             });
+
             html += '</tbody></table></div>';
             resultEl.innerHTML = html;
 
@@ -654,29 +676,43 @@ if (!empty($requirements)) {
         });
     }
 
-    // Reverses one product's already-completed auto-transfer (both legs)
-    // via undo-auto-transfer.php, then reloads the whole page so the main
+    // Reverses every product moved in one Auto Transfer run (both legs:
+    // Neksomo -> Healthcare -> LLP, for every product in that run) via
+    // undo-auto-transfer.php, then reloads the whole page so the main
     // table's Required Qty / Available (Neksomo/Healthcare) columns pick
-    // up the restored stock — not just re-fetching the history list.
+    // up the restored stock. If any single product in the run can't be
+    // undone (its stock already moved on further down the chain), the
+    // ones that succeeded stay undone — reported so the user can
+    // reconcile the rest manually rather than silently losing partial
+    // progress.
     function undoAutoTransfer(btn) {
-        if (!confirm('Undo this transfer? This reverses both legs (Neksomo -> Healthcare -> LLP) for this product.')) return;
         var tempid = btn.getAttribute('data-tempid');
-        var productId = btn.getAttribute('data-product-id');
+        var row = btn.closest('tr');
+        var runProductIds = JSON.parse(row.getAttribute('data-product-ids') || '[]');
+
+        if (!confirm('Undo this transfer run? This reverses both legs (Neksomo -> Healthcare -> LLP) for every product moved in this run (' + runProductIds.length + ' product(s)).')) return;
         btn.disabled = true;
 
-        $.post('undo-auto-transfer.php', { tempid: tempid, product_id: productId }, function (res) {
-            if (!res || !res.success) {
-                var reason = res && res.reason === 'insufficient_stock_to_reverse'
-                    ? 'Cannot undo — only ' + res.available + ' of the ' + res.requested + ' transferred units are still in stock further down the chain (some has already been sold or moved on). Please reconcile manually.'
-                    : 'Could not undo this transfer. Please try again.';
-                alert(reason);
-                btn.disabled = false;
-                return;
+        // Each call resolves to its parsed JSON response directly (never
+        // jQuery's raw [data, textStatus, jqXHR] triple), avoiding
+        // $.when's varargs quirk where a single deferred's .done() callback
+        // receives different argument shapes than two or more.
+        var calls = runProductIds.map(function (pid) {
+            return $.post('undo-auto-transfer.php', { tempid: tempid, product_id: pid }, null, 'json')
+                .then(function (res) { return res; }, function () { return { success: false, reason: 'request_failed' }; });
+        });
+
+        $.when.apply($, calls).done(function () {
+            var results = Array.prototype.slice.call(arguments);
+            var failures = results.filter(function (res) { return !res || !res.success; });
+            if (failures.length > 0) {
+                var insufficientMsgs = failures
+                    .filter(function (f) { return f && f.reason === 'insufficient_stock_to_reverse'; })
+                    .map(function (f) { return 'only ' + f.available + ' of ' + f.requested + ' still in stock'; });
+                alert('Some products in this run could not be undone (already moved on further down the chain: '
+                    + (insufficientMsgs.join('; ') || 'unknown reason') + '). Products that could be undone were reversed; reconcile the rest manually.');
             }
             window.location.reload();
-        }, 'json').fail(function () {
-            alert('Request failed. Please try again.');
-            btn.disabled = false;
         });
     }
 </script>

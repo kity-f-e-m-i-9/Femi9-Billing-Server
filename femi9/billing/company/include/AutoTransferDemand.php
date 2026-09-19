@@ -578,6 +578,67 @@ function get_auto_transfer_history_for_date(mysqli $db_conn, string $date, int $
 }
 
 /**
+ * Same underlying data as get_auto_transfer_history_for_date(), grouped
+ * into one row per Auto Transfer RUN (one "Transfer Now" click) instead
+ * of one row per product — matching Manage Internal Stock Transfer's own
+ * invoice-wise layout (one row per tempid, one column per product).
+ *
+ * A single click can move several different products through the same
+ * -N1/-N2 tempid pair, so the run's identity is the shared "AUTO<ts><rand>"
+ * base (tempid with "-N1"/"-N2" stripped) — grouping by the full -N2
+ * tempid the underlying rows already carry.
+ *
+ * Returns a list of runs, each shaped:
+ * ['tempid' => string (the -N2 leg's tempid — pass to undo_auto_transfer()
+ *   per product), 'inv_number_leg1' => ?string, 'inv_number_leg2' => ?string,
+ *  'transferred_at' => ?string (Y-m-d H:i:s, earliest product in the run),
+ *  'products' => [['product_id' => int, 'product_name' => string,
+ *   'qty_transferred' => int, 'neksomo_before' => ?int, ... same per-product
+ *   shape get_auto_transfer_history_for_date() returns, minus 'tempid'
+ *   and 'transferred_at' — identical across every product in one run]]]
+ */
+function get_auto_transfer_history_grouped_for_date(mysqli $db_conn, string $date, int $neksomoId, int $healthcareId, int $llpId): array
+{
+    $flatRows = get_auto_transfer_history_for_date($db_conn, $date, $neksomoId, $healthcareId, $llpId);
+
+    $runs = [];
+    foreach ($flatRows as $row) {
+        $tempid = $row['tempid'];
+        if (!isset($runs[$tempid])) {
+            $tempid1 = substr($tempid, 0, -3) . '-N1';
+            $invStmt = $db_conn->prepare("SELECT tempid, inv_number FROM internal_transfer_invoice WHERE tempid IN (?, ?)");
+            $invStmt->bind_param('ss', $tempid1, $tempid);
+            $invStmt->execute();
+            $invByTempid = [];
+            foreach ($invStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $invRow) {
+                $invByTempid[$invRow['tempid']] = $invRow['inv_number'];
+            }
+            $invStmt->close();
+
+            $runs[$tempid] = [
+                'tempid'          => $tempid,
+                'inv_number_leg1' => $invByTempid[$tempid1] ?? null,
+                'inv_number_leg2' => $invByTempid[$tempid] ?? null,
+                'transferred_at'  => $row['transferred_at'],
+                'products'        => [],
+            ];
+        }
+
+        $productRow = $row;
+        unset($productRow['tempid'], $productRow['transferred_at']);
+        $runs[$tempid]['products'][] = $productRow;
+
+        // Earliest product in the run represents when it actually started.
+        if ($row['transferred_at'] !== null
+            && ($runs[$tempid]['transferred_at'] === null || $row['transferred_at'] < $runs[$tempid]['transferred_at'])) {
+            $runs[$tempid]['transferred_at'] = $row['transferred_at'];
+        }
+    }
+
+    return array_values($runs);
+}
+
+/**
  * Undoes one product's auto-transfer run: reverses leg 2 (Healthcare ->
  * LLP) then leg 1 (Neksomo -> Healthcare), in that order (opposite of how
  * the stock moved — same convention internal_transfer_delete.php uses for
