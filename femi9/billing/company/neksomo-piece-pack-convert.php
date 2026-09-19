@@ -74,23 +74,11 @@ $warehouses = $db_conn->query(
                     <?php endif; ?>
 
                     <div class="row">
-                        <div class="col-md-8">
+                        <div class="col-md-10">
                             <div class="card">
                                 <div class="card-body">
-                                    <form action="neksomo-piece-pack-convert-action.php" method="post">
+                                    <form action="neksomo-piece-pack-convert-action.php" method="post" id="convertForm">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
-
-                                        <div class="mb-3">
-                                            <label class="form-label">Product <span class="required">*</span></label>
-                                            <select required name="product_id" id="productSelect" class="form-control">
-                                                <option value="" hidden>Select</option>
-                                                <?php foreach ($products as $p): ?>
-                                                <option value="<?= (int)$p['id'] ?>" data-pieces-per-pack="<?= (int)$p['pieces_per_pack'] ?>">
-                                                    <?= htmlspecialchars($p['productName'], ENT_QUOTES, 'UTF-8') ?> (<?= (int)$p['pieces_per_pack'] ?>/pack)
-                                                </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
 
                                         <div class="mb-3">
                                             <label class="form-label">Company Profile <span class="required">*</span></label>
@@ -112,32 +100,60 @@ $warehouses = $db_conn->query(
                                             </select>
                                         </div>
 
-                                        <div id="currentStockPanel" class="alert alert-info" style="display:none;"></div>
+                                        <hr>
 
-                                        <div class="mb-3">
-                                            <label class="form-label">Direction <span class="required">*</span></label><br>
-                                            <div class="form-check form-check-inline">
-                                                <input class="form-check-input" type="radio" name="direction" id="dirP2P" value="pieces_to_pack" checked>
-                                                <label class="form-check-label" for="dirP2P">Pieces &rarr; Pack (assemble)</label>
-                                            </div>
-                                            <div class="form-check form-check-inline">
-                                                <input class="form-check-input" type="radio" name="direction" id="dirPack2P" value="pack_to_pieces">
-                                                <label class="form-check-label" for="dirPack2P">Pack &rarr; Pieces (break open)</label>
-                                            </div>
+                                        <label class="form-label">Products to Convert <span class="required">*</span></label>
+                                        <div id="productRows"></div>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm mb-3" id="addProductRowBtn">
+                                            <i class="material-icons" style="font-size:16px;vertical-align:middle;">add</i> Add Another Product
+                                        </button>
+
+                                        <div>
+                                            <button type="submit" class="btn btn-primary">Convert All</button>
                                         </div>
-
-                                        <div class="mb-3">
-                                            <label class="form-label">Number of Packs <span class="required">*</span></label>
-                                            <input type="number" min="1" required name="pack_count" class="form-control">
-                                            <div class="form-text">How many whole packs to assemble or break open.</div>
-                                        </div>
-
-                                        <button type="submit" class="btn btn-primary">Convert</button>
                                     </form>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- One row's markup, cloned by JS for each product added.
+                         Kept as an inert <template> so its inputs are never
+                         part of the actual form until cloned in. -->
+                    <template id="productRowTemplate">
+                        <div class="row g-2 align-items-end product-row mb-2 pb-2" style="border-bottom:1px solid #eee;">
+                            <div class="col-md-4">
+                                <label class="form-label small">Product</label>
+                                <select required name="product_id[]" class="form-control product-select">
+                                    <option value="" hidden>Select</option>
+                                    <?php foreach ($products as $p): ?>
+                                    <option value="<?= (int)$p['id'] ?>" data-pieces-per-pack="<?= (int)$p['pieces_per_pack'] ?>">
+                                        <?= htmlspecialchars($p['productName'], ENT_QUOTES, 'UTF-8') ?> (<?= (int)$p['pieces_per_pack'] ?>/pack)
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Direction</label>
+                                <select required name="direction[]" class="form-control direction-select">
+                                    <option value="pieces_to_pack">Pieces &rarr; Pack (assemble)</option>
+                                    <option value="pack_to_pieces">Pack &rarr; Pieces (break open)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">Number of Packs</label>
+                                <input type="number" min="1" required name="pack_count[]" class="form-control pack-count-input">
+                            </div>
+                            <div class="col-md-2">
+                                <div class="current-stock-panel small text-muted"></div>
+                            </div>
+                            <div class="col-md-1">
+                                <button type="button" class="btn btn-outline-danger btn-sm remove-row-btn" title="Remove this product">
+                                    <i class="material-icons" style="font-size:16px;">delete_outline</i>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -151,27 +167,52 @@ $warehouses = $db_conn->query(
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script>
-function refreshCurrentStock() {
-    var productId = document.getElementById('productSelect').value;
+var rowTemplate = document.getElementById('productRowTemplate');
+var rowsContainer = document.getElementById('productRows');
+
+function refreshRowStock(rowEl) {
+    var productId = rowEl.querySelector('.product-select').value;
     var godownId = document.getElementById('godownSelect').value;
     var warehouseId = document.getElementById('warehouseSelect').value;
-    var panel = document.getElementById('currentStockPanel');
+    var panel = rowEl.querySelector('.current-stock-panel');
     if (!productId || !godownId || !warehouseId) {
-        panel.style.display = 'none';
+        panel.textContent = '';
         return;
     }
     fetch('get-piece-pack-stock.php?product_id=' + encodeURIComponent(productId) + '&godown_id=' + encodeURIComponent(godownId) + '&warehouse_id=' + encodeURIComponent(warehouseId))
         .then(function (r) { return r.json(); })
         .then(function (data) {
-            if (data.error) { panel.style.display = 'none'; return; }
-            panel.style.display = '';
-            panel.textContent = 'Current stock: ' + data.closing_qty + ' pack(s), ' + data.extra_pieces + ' loose piece(s) — ' + data.pieces_per_pack + ' pieces per pack.';
+            if (data.error) { panel.textContent = ''; return; }
+            panel.textContent = data.closing_qty + ' pack(s), ' + data.extra_pieces + ' pc(s)';
         })
-        .catch(function () { panel.style.display = 'none'; });
+        .catch(function () { panel.textContent = ''; });
 }
-['productSelect', 'godownSelect', 'warehouseSelect'].forEach(function (id) {
-    document.getElementById(id).addEventListener('change', refreshCurrentStock);
+
+function refreshAllRowsStock() {
+    rowsContainer.querySelectorAll('.product-row').forEach(refreshRowStock);
+}
+
+function addProductRow() {
+    var fragment = rowTemplate.content.cloneNode(true);
+    var rowEl = fragment.querySelector('.product-row');
+    rowEl.querySelector('.product-select').addEventListener('change', function () { refreshRowStock(rowEl); });
+    rowEl.querySelector('.remove-row-btn').addEventListener('click', function () {
+        // Always keep at least one row — removing the last one would let
+        // the form submit with no products[] entries at all.
+        if (rowsContainer.querySelectorAll('.product-row').length > 1) {
+            rowEl.remove();
+        }
+    });
+    rowsContainer.appendChild(fragment);
+}
+
+document.getElementById('addProductRowBtn').addEventListener('click', addProductRow);
+['godownSelect', 'warehouseSelect'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', refreshAllRowsStock);
 });
+
+// Start with one row so the form is usable immediately.
+addProductRow();
 </script>
 </body>
 </html>
