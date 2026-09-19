@@ -134,7 +134,7 @@ if (!empty($requirements)) {
                                     <?php if (empty($rows)): ?>
                                         <div class="alert alert-info">Nothing to transfer today.</div>
                                     <?php else: ?>
-                                        <form method="post" action="internal_transfer_auto_action.php" onsubmit="return confirm('Transfer these quantities now?');">
+                                        <form method="post" action="internal_transfer_auto_action.php" id="autoTransferForm" onsubmit="return confirmAutoTransferSubmit(event);">
                                             <div style="overflow-x:auto;">
                                             <table class="table table-bordered" style="min-width:1000px;">
                                                 <thead>
@@ -151,7 +151,7 @@ if (!empty($requirements)) {
                                                 </thead>
                                                 <tbody>
                                                     <?php foreach ($rows as $row): ?>
-                                                    <tr>
+                                                    <tr class="auto-transfer-row" data-product-name="<?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>" data-neksomo-avail="<?php echo (int) $row['neksomo_avail']; ?>">
                                                         <td>
                                                             <?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>
                                                             <input type="hidden" name="product_id[]" value="<?php echo (int) $row['product_id']; ?>">
@@ -322,6 +322,36 @@ if (!empty($requirements)) {
     var currentHealthcareAvail = 0;
 
     function escBd(str) { return $('<div>').text(str == null ? '' : str).html(); }
+
+    // Warns before submitting if any product has zero stock at the first
+    // leg's source (Neksomo) — the backend already silently caps/skips a
+    // product with insufficient Neksomo stock (see
+    // internal_transfer_auto_action.php's $writeLeg(), which computes
+    // actualQty = min(requested, available) and continues past a product
+    // whose first leg moves 0), so without this warning that skip happens
+    // invisibly. This only flags products with NO stock at all
+    // (neksomo_avail <= 0) — a partial shortfall still transfers what's
+    // available and is left to the existing "Capped: ..." success message.
+    function confirmAutoTransferSubmit(e) {
+        var zeroStockNames = [];
+        document.querySelectorAll('.auto-transfer-row').forEach(function (row) {
+            var avail = parseInt(row.getAttribute('data-neksomo-avail'), 10) || 0;
+            if (avail <= 0) zeroStockNames.push(row.getAttribute('data-product-name'));
+        });
+
+        if (zeroStockNames.length > 0) {
+            var msg = 'These product(s) have no stock in Neksomo and will be skipped:\n\n'
+                + zeroStockNames.map(function (n) { return '- ' + n; }).join('\n')
+                + '\n\nProceed with transferring the remaining products?';
+            if (!confirm(msg)) {
+                e.preventDefault();
+                return false;
+            }
+            return true;
+        }
+
+        return confirm('Transfer these quantities now?');
+    }
 
     function renderBreakdownTab(containerId, items, emptyMsg) {
         var el = document.getElementById(containerId);
