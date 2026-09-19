@@ -360,6 +360,13 @@ if (!empty($requirements)) {
         return confirm('Transfer these quantities now?');
     }
 
+    // Remembers each breakdown line's checked/qty state across reopens of
+    // this modal (and across switching between products) within this page
+    // load — same rationale/pattern as ovLineState for View All Orders.
+    // Keyed by source_id itself ("tp:<po_id>:<product_id>" /
+    // "ot:<tempid>:<product_id>"), which is already unique per order+product.
+    var bdLineState = {};
+
     function renderBreakdownTab(containerId, items, emptyMsg) {
         var el = document.getElementById(containerId);
         if (!items || !items.length) {
@@ -368,16 +375,37 @@ if (!empty($requirements)) {
         }
         var html = '';
         items.forEach(function (it) {
+            var remembered = bdLineState[it.source_id];
+            var isChecked = remembered ? remembered.checked : true;
+            var qtyVal = remembered ? remembered.qty : it.qty;
             html += '<div class="bd-row" data-source-id="' + it.source_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;padding:8px 4px;flex-wrap:wrap;">' +
                 '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:160px;">' +
-                    '<input type="checkbox" class="bd-check" data-source-id="' + it.source_id + '" checked style="margin-right:8px;flex-shrink:0;">' +
+                    '<input type="checkbox" class="bd-check" data-source-id="' + it.source_id + '"' + (isChecked ? ' checked' : '') + ' style="margin-right:8px;flex-shrink:0;">' +
                     '<span style="overflow-wrap:anywhere;">' + escBd(it.label) + '</span>' +
                 '</label>' +
                 '<input type="number" min="0" max="' + it.qty + '" class="form-control form-control-sm bd-qty-input" data-source-id="' + it.source_id + '" ' +
-                    'value="' + it.qty + '" style="width:80px;flex-shrink:0;" title="Max ' + it.qty + ' — this order\'s own qty">' +
+                    'value="' + qtyVal + '" style="width:80px;flex-shrink:0;" title="Max ' + it.qty + ' — this order\'s own qty">' +
             '</div>';
         });
         el.innerHTML = html;
+        // Persist every line's state as soon as it changes, not just on
+        // Apply — so reopening the modal without ever clicking Apply
+        // still shows what the user last set.
+        el.querySelectorAll('.bd-row').forEach(function (rowEl) {
+            var checkbox = rowEl.querySelector('.bd-check');
+            var qtyInput = rowEl.querySelector('.bd-qty-input');
+            checkbox.addEventListener('change', function () { bdSaveLineState(rowEl); });
+            qtyInput.addEventListener('input', function () { bdSaveLineState(rowEl); });
+        });
+    }
+
+    function bdSaveLineState(rowEl) {
+        var sourceId = rowEl.getAttribute('data-source-id');
+        var checkbox = rowEl.querySelector('.bd-check');
+        var qtyInput = rowEl.querySelector('.bd-qty-input');
+        var qty = parseInt(qtyInput.value, 10);
+        if (isNaN(qty) || qty < 0) qty = 0;
+        bdLineState[sourceId] = { checked: checkbox.checked, qty: qty };
     }
 
     // Recomputes the currently-open product's Required Qty + Qty to
