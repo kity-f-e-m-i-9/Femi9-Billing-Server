@@ -485,9 +485,17 @@ if (!empty($requirements)) {
     // to the server, so this resets on reload just like the per-product
     // breakdown modal's own checkbox+Apply.
     function applyOrdersOverview() {
+        // seenProductIds tracks every product that appears anywhere in the
+        // overview, checked or not — totalsByProduct alone can't tell "this
+        // product had 0 checked" apart from "this product never appeared
+        // here at all," since an unchecked row contributes nothing to
+        // either. Without this distinction, unchecking every row for a
+        // product looked like a no-op instead of zeroing it out.
         var totalsByProduct = {};
+        var seenProductIds = {};
         document.querySelectorAll('#ovTpList .ov-product-row, #ovOtList .ov-product-row').forEach(function (rowEl) {
             var pid = rowEl.getAttribute('data-product-id');
+            seenProductIds[pid] = true;
             var checkbox = rowEl.querySelector('.ov-product-check');
             var qtyInput = rowEl.querySelector('.ov-product-qty');
             if (!checkbox.checked) return;
@@ -501,8 +509,8 @@ if (!empty($requirements)) {
 
         document.querySelectorAll('.auto-transfer-row').forEach(function (row) {
             var pid = row.getAttribute('data-product-id');
-            if (!(pid in totalsByProduct)) return; // this product has no overview rows — leave untouched
-            var total = totalsByProduct[pid];
+            if (!(pid in seenProductIds)) return; // this product has no overview rows at all — leave untouched
+            var total = totalsByProduct[pid] || 0; // 0 when every row for this product was unchecked
             var reqEl = document.getElementById('req_' + pid);
             if (reqEl) reqEl.textContent = total;
             var neksomoAvail = parseInt(row.getAttribute('data-neksomo-avail'), 10) || 0;
