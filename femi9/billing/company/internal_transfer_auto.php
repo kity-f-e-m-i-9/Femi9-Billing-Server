@@ -585,9 +585,7 @@ if (!empty($requirements)) {
     function openTransferHistory() {
         var dateInput = document.getElementById('thDateInput');
         if (!dateInput.value) {
-            var yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            dateInput.value = yesterday.toISOString().slice(0, 10);
+            dateInput.value = new Date().toISOString().slice(0, 10);
         }
         document.getElementById('thResult').innerHTML = '';
         var modal = new bootstrap.Modal(document.getElementById('transferHistoryModal'));
