@@ -360,12 +360,15 @@ if (!empty($requirements)) {
         return confirm('Transfer these quantities now?');
     }
 
-    // Remembers each breakdown line's checked/qty state across reopens of
-    // this modal (and across switching between products) within this page
-    // load — same rationale/pattern as ovLineState for View All Orders.
-    // Keyed by source_id itself ("tp:<po_id>:<product_id>" /
-    // "ot:<tempid>:<product_id>"), which is already unique per order+product.
-    var bdLineState = {};
+    // Shared checked/qty state for one (order, product) line, used by BOTH
+    // the Order Breakdown modal and View All Orders — selecting/unchecking
+    // a line in either one is reflected in the other, since re-doing the
+    // same selection by hand in both places isn't practical. Keyed by the
+    // same source_id shape breakdown items already carry
+    // ("tp:<po_id>:<product_id>" / "ot:<tempid>:<product_id>"), which
+    // View All Orders' own order_key + product_id combination is
+    // normalized into (see ovRenderOrderList below).
+    var lineState = {};
 
     function renderBreakdownTab(containerId, items, emptyMsg) {
         var el = document.getElementById(containerId);
@@ -375,7 +378,7 @@ if (!empty($requirements)) {
         }
         var html = '';
         items.forEach(function (it) {
-            var remembered = bdLineState[it.source_id];
+            var remembered = lineState[it.source_id];
             var isChecked = remembered ? remembered.checked : true;
             var qtyVal = remembered ? remembered.qty : it.qty;
             html += '<div class="bd-row" data-source-id="' + it.source_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;padding:8px 4px;flex-wrap:wrap;">' +
@@ -390,7 +393,7 @@ if (!empty($requirements)) {
         el.innerHTML = html;
         // Persist every line's state as soon as it changes, not just on
         // Apply — so reopening the modal without ever clicking Apply
-        // still shows what the user last set.
+        // still shows what the user last set (here or in View All Orders).
         el.querySelectorAll('.bd-row').forEach(function (rowEl) {
             var checkbox = rowEl.querySelector('.bd-check');
             var qtyInput = rowEl.querySelector('.bd-qty-input');
@@ -405,7 +408,7 @@ if (!empty($requirements)) {
         var qtyInput = rowEl.querySelector('.bd-qty-input');
         var qty = parseInt(qtyInput.value, 10);
         if (isNaN(qty) || qty < 0) qty = 0;
-        bdLineState[sourceId] = { checked: checkbox.checked, qty: qty };
+        lineState[sourceId] = { checked: checkbox.checked, qty: qty };
     }
 
     // Recomputes the currently-open product's Required Qty + Qty to
@@ -465,30 +468,28 @@ if (!empty($requirements)) {
     // ── "View All Orders" — order-level overview, all products per order.
     // Uncheck an order/product + Apply recomputes each affected product
     // row in the main table for this view only — nothing is persisted. ──
-    // Remembers each product-in-order line's checked/qty state across
-    // reopens of the modal within this page load — without this, every
-    // openOrdersOverview() call re-fetches fresh data and rebuilds every
-    // checkbox back to "checked" / every qty back to its max, silently
-    // discarding whatever the user had unchecked/edited on a previous
-    // Apply. Keyed by "<order_key>:<product_id>" since the same product
-    // can appear in more than one order, each independently
-    // checked/unchecked.
-    var ovLineState = {};
-
+    // Shares the same `lineState` map the Order Breakdown modal uses (see
+    // above) — checking/unchecking a line here shows up there too, and
+    // vice versa, since re-doing the same selection by hand in both
+    // places isn't practical. order_key + product_id is normalized into
+    // the same "tp:<order_key>:<product_id>" / "ot:<order_key>:<product_id>"
+    // shape breakdown's source_id already uses, derived from which list
+    // (TP or OT) this render call is for.
     function ovRenderOrderList(containerId, orders, emptyMsg) {
         var el = document.getElementById(containerId);
         if (!orders || !orders.length) {
             el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">' + emptyMsg + '</div>';
             return;
         }
+        var sourceType = containerId === 'ovTpList' ? 'tp' : 'ot';
         var html = '';
         orders.forEach(function (order) {
             var productsHtml = order.products.map(function (p) {
-                var lineKey = order.order_key + ':' + p.product_id;
-                var remembered = ovLineState[lineKey];
+                var sourceId = sourceType + ':' + order.order_key + ':' + p.product_id;
+                var remembered = lineState[sourceId];
                 var isChecked = remembered ? remembered.checked : true;
                 var qtyVal = remembered ? remembered.qty : p.qty;
-                return '<div class="ov-product-row" data-line-key="' + escBd(lineKey) + '" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
+                return '<div class="ov-product-row" data-source-id="' + sourceId + '" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
                     '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:0;">' +
                         '<input type="checkbox" class="ov-product-check"' + (isChecked ? ' checked' : '') + ' style="margin-right:8px;flex-shrink:0;">' +
                         '<span style="overflow-wrap:anywhere;">' + escBd(p.product_name) + '</span>' +
@@ -500,7 +501,7 @@ if (!empty($requirements)) {
             // Whole-order checkbox reflects the current state too — checked
             // only when every one of its own product lines is checked.
             var allChecked = order.products.every(function (p) {
-                var remembered = ovLineState[order.order_key + ':' + p.product_id];
+                var remembered = lineState[sourceType + ':' + order.order_key + ':' + p.product_id];
                 return remembered ? remembered.checked : true;
             });
             html += '<div class="ov-order" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
@@ -527,8 +528,8 @@ if (!empty($requirements)) {
             });
         });
         // Persist every product line's state as soon as it changes, not
-        // just on Apply — so reopening the modal without ever clicking
-        // Apply still shows what the user last set.
+        // just on Apply — so reopening either modal without ever clicking
+        // Apply still shows what the user last set, in the other one too.
         el.querySelectorAll('.ov-product-row').forEach(function (rowEl) {
             var checkbox = rowEl.querySelector('.ov-product-check');
             var qtyInput = rowEl.querySelector('.ov-product-qty');
@@ -538,12 +539,12 @@ if (!empty($requirements)) {
     }
 
     function ovSaveLineState(rowEl) {
-        var lineKey = rowEl.getAttribute('data-line-key');
+        var sourceId = rowEl.getAttribute('data-source-id');
         var checkbox = rowEl.querySelector('.ov-product-check');
         var qtyInput = rowEl.querySelector('.ov-product-qty');
         var qty = parseInt(qtyInput.value, 10);
         if (isNaN(qty) || qty < 0) qty = 0;
-        ovLineState[lineKey] = { checked: checkbox.checked, qty: qty };
+        lineState[sourceId] = { checked: checkbox.checked, qty: qty };
     }
 
     // Recomputes every affected product row in the main table from
