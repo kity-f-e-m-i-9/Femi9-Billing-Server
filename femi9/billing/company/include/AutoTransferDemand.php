@@ -516,6 +516,7 @@ function cap_auto_transfer_qty(int $required, int $neksomoAvail, int $healthcare
  *
  * Returns a list of rows, each shaped:
  * ['product_id' => int, 'product_name' => string, 'qty_transferred' => int,
+ *  'tempid' => string (the -N2 leg's tempid — pass to undo_auto_transfer()),
  *  'neksomo_before' => ?int, 'healthcare_before' => ?int, 'llp_before' => ?int,
  *  'neksomo_after' => ?int, 'healthcare_after' => ?int, 'llp_after' => ?int,
  *  'transferred_at' => ?string (Y-m-d H:i:s)]
@@ -526,7 +527,7 @@ function cap_auto_transfer_qty(int $required, int $neksomoAvail, int $healthcare
 function get_auto_transfer_history_for_date(mysqli $db_conn, string $date, int $neksomoId, int $healthcareId, int $llpId): array
 {
     $stmt = $db_conn->prepare(
-        "SELECT it2.product_id, p.productName, it2.qty AS qty_transferred,
+        "SELECT it2.tempid, it2.product_id, p.productName, it2.qty AS qty_transferred,
                 sl_out.qty_before AS neksomo_before,
                 sl_in1.qty_before AS healthcare_before,
                 sl_in2.qty_before AS llp_before,
@@ -559,6 +560,7 @@ function get_auto_transfer_history_for_date(mysqli $db_conn, string $date, int $
 
     return array_map(function ($row) {
         return [
+            'tempid'            => $row['tempid'],
             'product_id'        => (int) $row['product_id'],
             'product_name'      => $row['productName'],
             'qty_transferred'   => (int) $row['qty_transferred'],
@@ -571,4 +573,102 @@ function get_auto_transfer_history_for_date(mysqli $db_conn, string $date, int $
             'transferred_at'    => $row['transferred_at'],
         ];
     }, $rows);
+}
+
+/**
+ * Undoes one product's auto-transfer run: reverses leg 2 (Healthcare ->
+ * LLP) then leg 1 (Neksomo -> Healthcare), in that order (opposite of how
+ * the stock moved — same convention internal_transfer_delete.php uses for
+ * a single leg), then deletes both internal_transfer rows. Refuses if
+ * either leg's stock has already moved on (same
+ * insufficient_stock_to_reverse guard StockService::reverseTransferIn()
+ * already enforces) — the caller must surface that rather than silently
+ * flooring stock at 0.
+ *
+ * $tempidN2 must be the -N2 leg's tempid, as returned by
+ * get_auto_transfer_history_for_date(). Only the ONE internal_transfer
+ * row matching ($tempidN2, $productId) and its -N1 sibling are touched —
+ * a single auto-transfer run can move several different products under
+ * the same tempid pair, and undoing one must never affect the others.
+ *
+ * Returns ['success' => true] or
+ * ['success' => false, 'reason' => 'not_found'|'insufficient_stock_to_reverse', ...].
+ */
+function undo_auto_transfer(mysqli $db_conn, string $tempidN2, int $productId, string $userType, int $neksomoId, int $healthcareId, int $llpId, string $createdBy): array
+{
+    if (!str_ends_with($tempidN2, '-N2')) {
+        return ['success' => false, 'reason' => 'not_found'];
+    }
+    $tempidN1 = substr($tempidN2, 0, -3) . '-N1';
+
+    $stmt = $db_conn->prepare(
+        "SELECT id, tempid, qty, returned_qty FROM internal_transfer WHERE tempid IN (?, ?) AND product_id = ?"
+    );
+    $stmt->bind_param('ssi', $tempidN1, $tempidN2, $productId);
+    $stmt->execute();
+    $legs = [];
+    foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $legs[$row['tempid']] = $row;
+    }
+    $stmt->close();
+
+    if (!isset($legs[$tempidN1]) || !isset($legs[$tempidN2])) {
+        return ['success' => false, 'reason' => 'not_found'];
+    }
+
+    $qtyLeg1 = (int) $legs[$tempidN1]['qty'] - (int) $legs[$tempidN1]['returned_qty'];
+    $qtyLeg2 = (int) $legs[$tempidN2]['qty'] - (int) $legs[$tempidN2]['returned_qty'];
+
+    $stockService = new StockService($db_conn);
+    $neksomoStr    = (string) $neksomoId;
+    $healthcareStr = (string) $healthcareId;
+    $llpStr        = (string) $llpId;
+
+    $db_conn->begin_transaction();
+    try {
+        if ($qtyLeg2 > 0) {
+            $reverseIn2 = $stockService->reverseTransferIn($productId, $userType, $llpStr, $qtyLeg2, 'transfer', $tempidN2, $createdBy, true);
+            if (($reverseIn2['success'] ?? false) === false) {
+                $db_conn->rollback();
+                return $reverseIn2;
+            }
+            $stockService->reverseTransferOut($productId, $userType, $healthcareStr, $qtyLeg2, 'transfer', $tempidN2, $createdBy, true);
+        }
+
+        if ($qtyLeg1 > 0) {
+            $reverseIn1 = $stockService->reverseTransferIn($productId, $userType, $healthcareStr, $qtyLeg1, 'transfer', $tempidN1, $createdBy, true);
+            if (($reverseIn1['success'] ?? false) === false) {
+                $db_conn->rollback();
+                return $reverseIn1;
+            }
+            $stockService->reverseTransferOut($productId, $userType, $neksomoStr, $qtyLeg1, 'transfer', $tempidN1, $createdBy, true);
+        }
+
+        foreach ([$tempidN1, $tempidN2] as $t) {
+            $del = $db_conn->prepare("DELETE FROM internal_transfer WHERE id = ?");
+            $del->bind_param('i', $legs[$t]['id']);
+            $del->execute();
+            $del->close();
+
+            // Clean up the shared invoice header once no line items for
+            // this tempid remain — same convention
+            // internal_transfer_details.php's own delete flow uses.
+            $countStmt = $db_conn->prepare("SELECT COUNT(*) AS n FROM internal_transfer WHERE tempid = ?");
+            $countStmt->bind_param('s', $t);
+            $countStmt->execute();
+            if ((int) $countStmt->get_result()->fetch_assoc()['n'] === 0) {
+                $delInv = $db_conn->prepare("DELETE FROM internal_transfer_invoice WHERE tempid = ?");
+                $delInv->bind_param('s', $t);
+                $delInv->execute();
+                $delInv->close();
+            }
+            $countStmt->close();
+        }
+
+        $db_conn->commit();
+        return ['success' => true];
+    } catch (\Throwable $e) {
+        $db_conn->rollback();
+        throw $e;
+    }
 }

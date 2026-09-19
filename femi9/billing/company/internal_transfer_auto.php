@@ -619,13 +619,13 @@ if (!empty($requirements)) {
                 resultEl.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">No auto-transfers found on this date.</div>';
                 return;
             }
-            var html = '<div style="overflow-x:auto;"><table class="table table-bordered table-sm" style="min-width:1080px;">' +
+            var html = '<div style="overflow-x:auto;"><table class="table table-bordered table-sm" style="min-width:1160px;">' +
                 '<thead><tr style="background:#f8fafc;">' +
                     '<th>Product</th>' +
                     '<th>Neksomo Before</th><th>Neksomo After</th>' +
                     '<th>Healthcare Before</th><th>Healthcare After</th>' +
                     '<th>LLP Before</th><th>LLP After</th>' +
-                    '<th>Qty Transferred</th><th>Date &amp; Time</th>' +
+                    '<th>Qty Transferred</th><th>Date &amp; Time</th><th>Undo</th>' +
                 '</tr></thead><tbody>';
             data.rows.forEach(function (r) {
                 html += '<tr>' +
@@ -638,12 +638,47 @@ if (!empty($requirements)) {
                     '<td>' + thFmtStock(r.llp_after) + '</td>' +
                     '<td style="font-weight:600;">' + r.qty_transferred + '</td>' +
                     '<td>' + thFmtDateTime(r.transferred_at) + '</td>' +
+                    '<td>' +
+                        '<button type="button" class="btn btn-sm btn-outline-danger th-undo" ' +
+                            'data-tempid="' + escBd(r.tempid) + '" data-product-id="' + r.product_id + '" ' +
+                            'style="white-space:nowrap;font-size:11px;padding:2px 8px;">Undo</button>' +
+                    '</td>' +
                 '</tr>';
             });
             html += '</tbody></table></div>';
             resultEl.innerHTML = html;
+
+            resultEl.querySelectorAll('.th-undo').forEach(function (btn) {
+                btn.addEventListener('click', function () { undoAutoTransfer(this); });
+            });
         }).fail(function () {
             resultEl.innerHTML = '<div class="text-danger small" style="padding:10px 4px;">Could not load history.</div>';
+        });
+    }
+
+    // Reverses one product's already-completed auto-transfer (both legs)
+    // via undo-auto-transfer.php, then reloads the whole page so the main
+    // table's Required Qty / Available (Neksomo/Healthcare) columns pick
+    // up the restored stock — not just re-fetching the history list.
+    function undoAutoTransfer(btn) {
+        if (!confirm('Undo this transfer? This reverses both legs (Neksomo -> Healthcare -> LLP) for this product.')) return;
+        var tempid = btn.getAttribute('data-tempid');
+        var productId = btn.getAttribute('data-product-id');
+        btn.disabled = true;
+
+        $.post('undo-auto-transfer.php', { tempid: tempid, product_id: productId }, function (res) {
+            if (!res || !res.success) {
+                var reason = res && res.reason === 'insufficient_stock_to_reverse'
+                    ? 'Cannot undo — only ' + res.available + ' of the ' + res.requested + ' transferred units are still in stock further down the chain (some has already been sold or moved on). Please reconcile manually.'
+                    : 'Could not undo this transfer. Please try again.';
+                alert(reason);
+                btn.disabled = false;
+                return;
+            }
+            window.location.reload();
+        }, 'json').fail(function () {
+            alert('Request failed. Please try again.');
+            btn.disabled = false;
         });
     }
 </script>
