@@ -55,7 +55,9 @@ $conn->query("CREATE TABLE tp_purchase_orders (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     territory_partner_id INT UNSIGNED NOT NULL,
     order_date DATE NOT NULL,
-    status ENUM('waiting','completed') NOT NULL DEFAULT 'waiting',
+    status ENUM('waiting','completed','cancelled') NOT NULL DEFAULT 'waiting',
+    approver_type ENUM('company','ss') NOT NULL DEFAULT 'company',
+    preferred_cp_id INT NULL,
     tp_invoice_id INT UNSIGNED NULL,
     notes VARCHAR(500) NOT NULL DEFAULT ''
 )");
@@ -110,6 +112,22 @@ $conn->query("INSERT INTO tp_purchase_order_items (po_id, product_id, qty) VALUE
 $conn->query("INSERT INTO tp_purchase_orders (id, territory_partner_id, order_date, status) VALUES (3, 9, '$yesterday', 'waiting')");
 $conn->query("INSERT INTO tp_purchase_order_items (po_id, product_id, qty) VALUES (3, 101, 15)");
 
+// TP PO: product 101 qty 999, waiting, but approver_type='ss' (must be
+// excluded — fulfilled through the Super Stockist's own stock, not this
+// company's Neksomo/Healthcare/LLP chain).
+$conn->query("INSERT INTO tp_purchase_orders (id, territory_partner_id, order_date, status, approver_type) VALUES (4, 9, '$today', 'waiting', 'ss')");
+$conn->query("INSERT INTO tp_purchase_order_items (po_id, product_id, qty) VALUES (4, 101, 999)");
+
+// TP PO: product 101 qty 999, waiting, approver_type='company', but has a
+// preferred_cp_id (must be excluded — the TP wants this sourced via a
+// Channel Partner, not moved through company godowns).
+$conn->query("INSERT INTO tp_purchase_orders (id, territory_partner_id, order_date, status, approver_type, preferred_cp_id) VALUES (5, 9, '$today', 'waiting', 'company', 77)");
+$conn->query("INSERT INTO tp_purchase_order_items (po_id, product_id, qty) VALUES (5, 101, 999)");
+
+// TP PO: product 101 qty 999, but status='cancelled' (must be excluded).
+$conn->query("INSERT INTO tp_purchase_orders (id, territory_partner_id, order_date, status) VALUES (6, 9, '$today', 'cancelled')");
+$conn->query("INSERT INTO tp_purchase_order_items (po_id, product_id, qty) VALUES (6, 101, 999)");
+
 // OT draft for LLP (godownid=3), product 101 qty 15, today
 $conn->query("INSERT INTO ot_sales_invoice (tempid, status) VALUES ('OTD1', 'draft')");
 $conn->query("INSERT INTO ot_sales (godownid, prid, qty, date, tempid) VALUES (3, 101, 15, '$today', 'OTD1')");
@@ -138,7 +156,7 @@ assertEqual(resolve_godown_id_by_gname($conn, 'DOES NOT EXIST'), null, 'returns 
 
 // ========== TESTS: get_auto_transfer_requirements ==========
 $requirements = get_auto_transfer_requirements($conn, 3);
-assertEqual($requirements[101] ?? null, 75, 'product 101: 40 (waiting TP today) + 15 (waiting TP yesterday) + 15 (LLP draft OT today) + 5 (LLP draft OT yesterday) = 75, excludes completed/confirmed/wrong-godown');
+assertEqual($requirements[101] ?? null, 75, 'product 101: 40 (waiting TP today) + 15 (waiting TP yesterday) + 15 (LLP draft OT today) + 5 (LLP draft OT yesterday) = 75, excludes completed/confirmed/wrong-godown/ss-approved/cp-preferred/cancelled');
 assertEqual($requirements[202] ?? null, 7, 'product 202: only the LLP draft OT counts');
 assertEqual(count($requirements), 2, 'no extraneous product keys');
 

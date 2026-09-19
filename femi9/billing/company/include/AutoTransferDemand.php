@@ -258,7 +258,14 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
  * created:
  *  - tp_purchase_order_items joined to tp_purchase_orders
  *    WHERE status = 'waiting' (any order_date — a PO raised yesterday
- *    and still waiting is just as much "required" as one raised today)
+ *    and still waiting is just as much "required" as one raised today;
+ *    'cancelled'/'completed' POs never match this)
+ *      AND approver_type = 'company' (excludes SS-approved orders —
+ *        those are fulfilled through the Super Stockist's own stock,
+ *        not this company's Neksomo/Healthcare/LLP chain)
+ *      AND preferred_cp_id IS NULL (excludes orders the TP wants
+ *        sourced via a Channel Partner instead — Auto Transfer only
+ *        ever moves stock between company godowns, never CP stock)
  *  - ot_sales joined to ot_sales_invoice (on tempid)
  *    WHERE ot_sales_invoice.status = 'draft'
  *      AND ot_sales.godownid = $llpGodownId (any date — same reasoning)
@@ -284,7 +291,7 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
         "SELECT poi.product_id AS product_id, SUM(poi.qty) AS total_qty
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
-         WHERE po.status = 'waiting'
+         WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
                WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
@@ -350,7 +357,7 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
-         WHERE po.status = 'waiting' AND poi.product_id = ?
+         WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL AND poi.product_id = ?
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
                WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
@@ -424,7 +431,7 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
          INNER JOIN products p ON p.id = poi.product_id
-         WHERE po.status = 'waiting'
+         WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
                WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
