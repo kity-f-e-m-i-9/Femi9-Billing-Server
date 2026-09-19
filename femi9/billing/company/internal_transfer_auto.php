@@ -437,6 +437,16 @@ if (!empty($requirements)) {
     // ── "View All Orders" — order-level overview, all products per order.
     // Uncheck an order/product + Apply recomputes each affected product
     // row in the main table for this view only — nothing is persisted. ──
+    // Remembers each product-in-order line's checked/qty state across
+    // reopens of the modal within this page load — without this, every
+    // openOrdersOverview() call re-fetches fresh data and rebuilds every
+    // checkbox back to "checked" / every qty back to its max, silently
+    // discarding whatever the user had unchecked/edited on a previous
+    // Apply. Keyed by "<order_key>:<product_id>" since the same product
+    // can appear in more than one order, each independently
+    // checked/unchecked.
+    var ovLineState = {};
+
     function ovRenderOrderList(containerId, orders, emptyMsg) {
         var el = document.getElementById(containerId);
         if (!orders || !orders.length) {
@@ -446,19 +456,29 @@ if (!empty($requirements)) {
         var html = '';
         orders.forEach(function (order) {
             var productsHtml = order.products.map(function (p) {
-                return '<div class="ov-product-row" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
+                var lineKey = order.order_key + ':' + p.product_id;
+                var remembered = ovLineState[lineKey];
+                var isChecked = remembered ? remembered.checked : true;
+                var qtyVal = remembered ? remembered.qty : p.qty;
+                return '<div class="ov-product-row" data-line-key="' + escBd(lineKey) + '" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
                     '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:0;">' +
-                        '<input type="checkbox" class="ov-product-check" checked style="margin-right:8px;flex-shrink:0;">' +
+                        '<input type="checkbox" class="ov-product-check"' + (isChecked ? ' checked' : '') + ' style="margin-right:8px;flex-shrink:0;">' +
                         '<span style="overflow-wrap:anywhere;">' + escBd(p.product_name) + '</span>' +
                     '</label>' +
                     '<input type="number" min="0" max="' + p.qty + '" class="form-control form-control-sm ov-product-qty" ' +
-                        'value="' + p.qty + '" style="width:75px;flex-shrink:0;" title="Max ' + p.qty + '">' +
+                        'value="' + qtyVal + '" style="width:75px;flex-shrink:0;" title="Max ' + p.qty + '">' +
                 '</div>';
             }).join('');
+            // Whole-order checkbox reflects the current state too — checked
+            // only when every one of its own product lines is checked.
+            var allChecked = order.products.every(function (p) {
+                var remembered = ovLineState[order.order_key + ':' + p.product_id];
+                return remembered ? remembered.checked : true;
+            });
             html += '<div class="ov-order" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
                     '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:160px;font-weight:600;">' +
-                        '<input type="checkbox" class="ov-check" checked style="margin-right:8px;flex-shrink:0;" title="Select/deselect every product in this order">' +
+                        '<input type="checkbox" class="ov-check"' + (allChecked ? ' checked' : '') + ' style="margin-right:8px;flex-shrink:0;" title="Select/deselect every product in this order">' +
                         '<span style="overflow-wrap:anywhere;">' + escBd(order.label) + '</span>' +
                     '</label>' +
                 '</div>' +
@@ -472,9 +492,30 @@ if (!empty($requirements)) {
         el.querySelectorAll('.ov-check').forEach(function (orderCheck) {
             orderCheck.addEventListener('change', function () {
                 var rowEl = orderCheck.closest('.ov-order');
-                rowEl.querySelectorAll('.ov-product-check').forEach(function (pc) { pc.checked = orderCheck.checked; });
+                rowEl.querySelectorAll('.ov-product-check').forEach(function (pc) {
+                    pc.checked = orderCheck.checked;
+                    ovSaveLineState(pc.closest('.ov-product-row'));
+                });
             });
         });
+        // Persist every product line's state as soon as it changes, not
+        // just on Apply — so reopening the modal without ever clicking
+        // Apply still shows what the user last set.
+        el.querySelectorAll('.ov-product-row').forEach(function (rowEl) {
+            var checkbox = rowEl.querySelector('.ov-product-check');
+            var qtyInput = rowEl.querySelector('.ov-product-qty');
+            checkbox.addEventListener('change', function () { ovSaveLineState(rowEl); });
+            qtyInput.addEventListener('input', function () { ovSaveLineState(rowEl); });
+        });
+    }
+
+    function ovSaveLineState(rowEl) {
+        var lineKey = rowEl.getAttribute('data-line-key');
+        var checkbox = rowEl.querySelector('.ov-product-check');
+        var qtyInput = rowEl.querySelector('.ov-product-qty');
+        var qty = parseInt(qtyInput.value, 10);
+        if (isNaN(qty) || qty < 0) qty = 0;
+        ovLineState[lineKey] = { checked: checkbox.checked, qty: qty };
     }
 
     // Recomputes every affected product row in the main table from
@@ -498,12 +539,13 @@ if (!empty($requirements)) {
             seenProductIds[pid] = true;
             var checkbox = rowEl.querySelector('.ov-product-check');
             var qtyInput = rowEl.querySelector('.ov-product-qty');
-            if (!checkbox.checked) return;
+            if (!checkbox.checked) { ovSaveLineState(rowEl); return; }
             var maxQty = parseInt(qtyInput.getAttribute('max'), 10) || 0;
             var val = parseInt(qtyInput.value, 10);
             if (isNaN(val) || val < 0) val = 0;
             if (val > maxQty) val = maxQty;
             qtyInput.value = val;
+            ovSaveLineState(rowEl);
             totalsByProduct[pid] = (totalsByProduct[pid] || 0) + val;
         });
 
