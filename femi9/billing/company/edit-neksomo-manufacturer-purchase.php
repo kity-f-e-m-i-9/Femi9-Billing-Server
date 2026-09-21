@@ -169,6 +169,10 @@ $prefillItems = array_map(function ($it) {
                                 <?php elseif ($err === 'already_consumed'): ?>
                                     Cannot apply this edit — reducing a product's quantity below what's already been sold
                                     or moved on isn't possible. Increase the quantity instead, or leave it unchanged.
+                                <?php elseif ($err === 'warehouse_change_blocked'): ?>
+                                    Cannot move this purchase to a different godown — some of its stock has already been
+                                    sold or transferred elsewhere. Only quantity and cost can still be edited; leave the
+                                    godown unchanged to save those.
                                 <?php else: ?>
                                     Something went wrong. Please try again.
                                 <?php endif; ?>

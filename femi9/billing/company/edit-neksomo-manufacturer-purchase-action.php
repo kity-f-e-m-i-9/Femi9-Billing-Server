@@ -207,7 +207,7 @@ foreach ($allProductIds as $pid) {
 // about which specific units are "the ones that moved", which FIFO
 // consumption already made ambiguous).
 if ($warehouseChanged && $anyProductTouched) {
-    redirectWithMessage($editUrl, 'error=already_consumed');
+    redirectWithMessage($editUrl, 'error=warehouse_change_blocked');
 }
 
 $db_conn->begin_transaction();

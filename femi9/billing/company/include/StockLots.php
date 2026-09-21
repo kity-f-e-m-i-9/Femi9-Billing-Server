@@ -10,6 +10,26 @@ declare(strict_types=1);
  */
 class StockLots
 {
+    // Self-migrating — see db_migrations/2026_09_18_stock_lots_warehouse_key.sql,
+    // written for the same reason: recordLot()/consumeFifo() reference
+    // stock_lots.warehouse_id unconditionally, but any environment where
+    // that migration hasn't been manually run (production, at least once
+    // in practice) still lacks the column and fails with "Unknown column
+    // 'warehouse_id'" on every purchase/edit/consumption. Called before
+    // every query that touches the column so it can't assume the .sql
+    // file ever ran.
+    private static function ensureWarehouseColumn(mysqli $db): void
+    {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+
+        $col = $db->query("SHOW COLUMNS FROM stock_lots LIKE 'warehouse_id'");
+        if ($col && $col->num_rows === 0) {
+            $db->query("ALTER TABLE stock_lots ADD COLUMN warehouse_id INT NULL AFTER user_id");
+        }
+    }
+
     public static function recordLot(
         mysqli $db,
         int $productId,
@@ -26,6 +46,7 @@ class StockLots
         if ($qty <= 0) {
             return 0;
         }
+        self::ensureWarehouseColumn($db);
         $stmt = $db->prepare(
             "INSERT INTO stock_lots
                 (product_id, user_type, user_id, warehouse_id, rate, qty_purchased,
@@ -55,6 +76,7 @@ class StockLots
         callable $fallbackRateFn,
         ?int $warehouseId = null
     ): array {
+        self::ensureWarehouseColumn($db);
         $consumed = [];
         $remaining = $qtyNeeded;
 
