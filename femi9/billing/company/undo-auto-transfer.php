@@ -6,6 +6,15 @@ include("checksession.php");
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/AutoTransferDemand.php");
+
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header('Content-Type: application/json');
+    http_response_code(403);
+    echo json_encode(['error' => 'unauthorized']);
+    exit;
+}
 include("config.php");
 header('Content-Type: application/json');
 error_reporting(0);

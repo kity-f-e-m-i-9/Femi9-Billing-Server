@@ -1,9 +1,17 @@
 <?php
 include("checksession.php");
+require_once("include/GodownAccess.php");
 require_once("include/AutoTransferDemand.php");
 include("config.php");
 
 error_reporting(0);
+
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
 
 $productIds  = $_POST['product_id']     ?? [];
 $ratesHc     = $_POST['rate_healthcare'] ?? [];

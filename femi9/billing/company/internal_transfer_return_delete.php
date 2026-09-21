@@ -2,8 +2,16 @@
 include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
+require_once("include/GodownAccess.php");
 
 error_reporting(0);
+
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
 
 $noteId = (int) base64_decode($_REQUEST['returnid'] ?? '');
 

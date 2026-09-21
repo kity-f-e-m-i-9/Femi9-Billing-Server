@@ -2,6 +2,13 @@
 include("config.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
+
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

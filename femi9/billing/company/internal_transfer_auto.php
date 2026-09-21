@@ -4,8 +4,16 @@ require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/NeksomoStockBridge.php");
 require_once("include/AutoTransferDemand.php");
+require_once("include/GodownWarehouseMapping.php");
 include("config.php");
 date_default_timezone_set("Asia/Kolkata");
+
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
 
 $neksomoId    = get_neksomo_godown_id($db_conn);
 $healthcareId = resolve_godown_id_by_gname($db_conn, 'FEMI HEALTH CARE');
@@ -16,6 +24,39 @@ if (!$neksomoId || !$healthcareId || !$llpId) {
         . "(Neksomo / FEMI HEALTH CARE / FEMI NAYAN LLP) could not be found "
         . "in company_godown.");
 }
+
+$allWarehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC")->fetch_all(MYSQLI_ASSOC);
+
+// Each leg's endpoint has its own independently-scoped warehouse list —
+// Source = Neksomo's linked warehouses, Intermediate = Healthcare's,
+// Destination = LLP's — falling back to every active warehouse if
+// nothing's mapped yet, so no picker is ever a dead end. Defaults to G1
+// (by code) when present, on every one of the three pickers.
+$sourceWarehouseOptions = get_warehouses_for_godown($db_conn, $neksomoId);
+if (empty($sourceWarehouseOptions)) {
+    $sourceWarehouseOptions = $allWarehouses;
+}
+
+$intermediateWarehouseOptions = get_warehouses_for_godown($db_conn, $healthcareId);
+if (empty($intermediateWarehouseOptions)) {
+    $intermediateWarehouseOptions = $allWarehouses;
+}
+
+$destWarehouseOptions = get_warehouses_for_godown($db_conn, $llpId);
+if (empty($destWarehouseOptions)) {
+    $destWarehouseOptions = $allWarehouses;
+}
+
+function default_warehouse_id(array $options): ?int
+{
+    foreach ($options as $wh) {
+        if ($wh['code'] === 'G1') return (int) $wh['id'];
+    }
+    return null;
+}
+$defaultSourceWarehouseId       = default_warehouse_id($sourceWarehouseOptions);
+$defaultIntermediateWarehouseId = default_warehouse_id($intermediateWarehouseOptions);
+$defaultDestWarehouseId         = default_warehouse_id($destWarehouseOptions);
 
 $stockService = new StockService($db_conn);
 $requirements = get_auto_transfer_requirements($db_conn, $llpId);
@@ -40,8 +81,8 @@ if (!empty($requirements)) {
     foreach ($requirements as $pid => $required) {
         $tpRequired      = (int) $required['tp'];
         $otRequired      = (int) $required['ot'];
-        $neksomoAvail    = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $neksomoId) ?? 0);
-        $healthcareAvail = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $healthcareId) ?? 0);
+        $neksomoAvail    = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $neksomoId, $defaultSourceWarehouseId) ?? 0);
+        $healthcareAvail = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $healthcareId, $defaultIntermediateWarehouseId) ?? 0);
         $available       = $neksomoAvail + $healthcareAvail;
         $split           = cap_auto_transfer_qty_by_source($tpRequired, $otRequired, $available);
         $cappedQty       = $split['tp'] + $split['ot'];
@@ -137,6 +178,12 @@ if (!empty($requirements)) {
         .ata-avail-chip b { color:#1f2937; }
         .ata-row-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; align-items:end; }
         .ata-field label { display:block; font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:.02em; margin-bottom:4px; }
+
+        .ata-route-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+        .ata-route-field { display:flex; flex-direction:column; gap:3px; }
+        .ata-route-field label { font-size:10px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:.02em; }
+        .ata-route-field select { height:34px; padding:2px 24px 2px 8px; font-size:12.5px; border-radius:7px; border:1px solid #dde1ea; min-width:108px; background-position:right 6px center; }
+        .ata-route-arrow { color:#c7cbd4; font-size:16px; margin:0 2px; align-self:center; margin-top:14px; }
         .ata-view-btn { width:38px; height:38px; border-radius:9px; border:none; background:linear-gradient(135deg, var(--ata-tp-1) 0%, var(--ata-tp-2) 100%); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(102,126,234,.3); }
         .ata-view-btn:hover { filter:brightness(1.06); }
 
@@ -285,6 +332,30 @@ if (!empty($requirements)) {
                                         <div class="alert alert-info">Nothing to transfer today.</div>
                                     <?php else: ?>
                                         <form method="post" action="internal_transfer_auto_action.php" id="autoTransferForm" onsubmit="return confirmAutoTransferSubmit(event);">
+                                            <div class="ata-common-warehouse-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #eef0f3;border-radius:12px;padding:12px 16px;margin-bottom:14px;background:#fafbfc;">
+                                                <span style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.02em;">Set route for all:</span>
+                                                <select id="commonSourceWarehouse" class="form-control" style="width:auto;min-width:90px;height:34px;font-size:12.5px;padding:2px 22px 2px 8px;">
+                                                    <option value="">Source</option>
+                                                    <?php foreach ($sourceWarehouseOptions as $wh): ?>
+                                                    <option value="<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <span class="ata-route-arrow" style="margin-top:0;">&rarr;</span>
+                                                <select id="commonIntermediateWarehouse" class="form-control" style="width:auto;min-width:90px;height:34px;font-size:12.5px;padding:2px 22px 2px 8px;">
+                                                    <option value="">Via</option>
+                                                    <?php foreach ($intermediateWarehouseOptions as $wh): ?>
+                                                    <option value="<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <span class="ata-route-arrow" style="margin-top:0;">&rarr;</span>
+                                                <select id="commonDestWarehouse" class="form-control" style="width:auto;min-width:90px;height:34px;font-size:12.5px;padding:2px 22px 2px 8px;">
+                                                    <option value="">Destination</option>
+                                                    <?php foreach ($destWarehouseOptions as $wh): ?>
+                                                    <option value="<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <span class="ata-bulk-hint" style="margin-left:4px;">Applies to every row below — each row stays individually editable.</span>
+                                            </div>
                                             <div class="ata-rows">
                                                 <?php foreach ($rows as $row): $blocked = (int) $row['capped'] <= 0; ?>
                                                 <div class="ata-row-card auto-transfer-row<?php echo $blocked ? ' blocked' : ''; ?>" data-product-id="<?php echo (int) $row['product_id']; ?>" data-product-name="<?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>" data-neksomo-avail="<?php echo (int) $row['neksomo_avail']; ?>" data-healthcare-avail="<?php echo (int) $row['healthcare_avail']; ?>">
@@ -297,14 +368,45 @@ if (!empty($requirements)) {
                                                             <?php endif; ?>
                                                             <div class="ata-split-row">
                                                                 <span style="font-size:12px;color:#6b7280;">Required: <b id="req_<?php echo (int) $row['product_id']; ?>_num" style="color:#1f2937;"><?php echo (int) $row['required']; ?></b></span>
-                                                                <span class="ata-tag ata-tag-tp" title="TP purchase order demand, capped by available stock"><span class="ata-tag-dot"></span>TP <?php echo (int) $row['capped_tp']; ?>/<?php echo (int) $row['required_tp']; ?></span>
-                                                                <span class="ata-tag ata-tag-ot" title="OT channel draft demand, capped by available stock"><span class="ata-tag-dot"></span>OT <?php echo (int) $row['capped_ot']; ?>/<?php echo (int) $row['required_ot']; ?></span>
+                                                                <span class="ata-tag ata-tag-tp" title="TP purchase order demand, capped by available stock"><span class="ata-tag-dot"></span>TP <b id="capped_tp_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['capped_tp']; ?></b>/<?php echo (int) $row['required_tp']; ?></span>
+                                                                <span class="ata-tag ata-tag-ot" title="OT channel draft demand, capped by available stock"><span class="ata-tag-dot"></span>OT <b id="capped_ot_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['capped_ot']; ?></b>/<?php echo (int) $row['required_ot']; ?></span>
                                                                 <span id="req_<?php echo (int) $row['product_id']; ?>" style="display:none;"><?php echo (int) $row['required']; ?></span>
                                                             </div>
                                                         </div>
                                                         <div class="ata-avail-chips">
-                                                            <div class="ata-avail-chip">Neksomo: <b><?php echo (int) $row['neksomo_avail']; ?></b></div>
-                                                            <div class="ata-avail-chip">Healthcare: <b><?php echo (int) $row['healthcare_avail']; ?></b></div>
+                                                            <div class="ata-avail-chip">Neksomo: <b id="avail_neksomo_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['neksomo_avail']; ?></b></div>
+                                                            <div class="ata-avail-chip">Healthcare: <b id="avail_healthcare_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['healthcare_avail']; ?></b></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="ata-route-row">
+                                                        <div class="ata-route-field">
+                                                            <label>Source</label>
+                                                            <select class="form-control ata-source-warehouse" name="warehouse_source[]" data-product-id="<?php echo (int) $row['product_id']; ?>" data-required-tp="<?php echo (int) $row['required_tp']; ?>" data-required-ot="<?php echo (int) $row['required_ot']; ?>">
+                                                                <option value="">—</option>
+                                                                <?php foreach ($sourceWarehouseOptions as $wh): ?>
+                                                                <option value="<?php echo (int) $wh['id']; ?>" <?php echo ((int) $wh['id'] === $defaultSourceWarehouseId) ? 'selected' : ''; ?>><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        </div>
+                                                        <span class="ata-route-arrow">&rarr;</span>
+                                                        <div class="ata-route-field">
+                                                            <label>Via</label>
+                                                            <select class="form-control ata-intermediate-warehouse" name="warehouse_intermediate[]">
+                                                                <option value="">—</option>
+                                                                <?php foreach ($intermediateWarehouseOptions as $wh): ?>
+                                                                <option value="<?php echo (int) $wh['id']; ?>" <?php echo ((int) $wh['id'] === $defaultIntermediateWarehouseId) ? 'selected' : ''; ?>><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        </div>
+                                                        <span class="ata-route-arrow">&rarr;</span>
+                                                        <div class="ata-route-field">
+                                                            <label>Destination</label>
+                                                            <select class="form-control ata-dest-warehouse" name="warehouse_dest[]">
+                                                                <option value="">—</option>
+                                                                <?php foreach ($destWarehouseOptions as $wh): ?>
+                                                                <option value="<?php echo (int) $wh['id']; ?>" <?php echo ((int) $wh['id'] === $defaultDestWarehouseId) ? 'selected' : ''; ?>><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
                                                         </div>
                                                     </div>
                                                     <div class="ata-row-grid">
@@ -491,6 +593,102 @@ if (!empty($requirements)) {
     var currentHealthcareAvail = 0;
 
     function escBd(str) { return $('<div>').text(str == null ? '' : str).html(); }
+
+    // Mirrors AutoTransferDemand.php's cap_auto_transfer_qty_by_source():
+    // TP demand is capped/prioritized first, OT gets whatever's left.
+    function capQtyBySource(tpRequired, otRequired, available) {
+        available = Math.max(0, available);
+        var tpCapped = Math.max(0, Math.min(tpRequired, available));
+        var otCapped = Math.max(0, Math.min(otRequired, available - tpCapped));
+        return { tp: tpCapped, ot: otCapped };
+    }
+
+    // Recomputes one row's Neksomo/Healthcare availability + capped
+    // qty-to-transfer whenever its Source or Intermediate Godown picker
+    // changes — Neksomo's figure scopes to the Source (Neksomo) godown,
+    // Healthcare's figure scopes to the Intermediate (Healthcare) godown,
+    // since each leg's endpoint is now independently selectable (see
+    // docs/superpowers/specs/2026-09-21-warehouse-aware-auto-transfer-
+    // design.md).
+    function refreshRowAvailability(rowEl) {
+        var sourceSelect = rowEl.querySelector('.ata-source-warehouse');
+        var intermediateSelect = rowEl.querySelector('.ata-intermediate-warehouse');
+        var productId = sourceSelect.getAttribute('data-product-id');
+        var requiredTp = parseInt(sourceSelect.getAttribute('data-required-tp'), 10) || 0;
+        var requiredOt = parseInt(sourceSelect.getAttribute('data-required-ot'), 10) || 0;
+        var sourceWarehouseId = sourceSelect.value;
+        var intermediateWarehouseId = intermediateSelect.value;
+
+        var url = 'get-auto-transfer-row-availability.php?product_id=' + encodeURIComponent(productId)
+            + (sourceWarehouseId ? '&source_warehouse_id=' + encodeURIComponent(sourceWarehouseId) : '')
+            + (intermediateWarehouseId ? '&intermediate_warehouse_id=' + encodeURIComponent(intermediateWarehouseId) : '');
+
+        fetch(url)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) return;
+                var neksomoAvail = data.neksomo_avail;
+                var healthcareAvail = data.healthcare_avail;
+
+                rowEl.setAttribute('data-neksomo-avail', neksomoAvail);
+                rowEl.setAttribute('data-healthcare-avail', healthcareAvail);
+
+                var neksomoChip = document.getElementById('avail_neksomo_' + productId);
+                var healthcareChip = document.getElementById('avail_healthcare_' + productId);
+                if (neksomoChip) neksomoChip.textContent = neksomoAvail;
+                if (healthcareChip) healthcareChip.textContent = healthcareAvail;
+
+                var available = neksomoAvail + healthcareAvail;
+                var split = capQtyBySource(requiredTp, requiredOt, available);
+                var cappedTotal = split.tp + split.ot;
+
+                var cappedTpEl = document.getElementById('capped_tp_' + productId);
+                var cappedOtEl = document.getElementById('capped_ot_' + productId);
+                if (cappedTpEl) cappedTpEl.textContent = split.tp;
+                if (cappedOtEl) cappedOtEl.textContent = split.ot;
+
+                var qtyInput = document.getElementById('qty_' + productId);
+                if (qtyInput) qtyInput.value = cappedTotal;
+
+                var badge = rowEl.querySelector('.ata-badge-nostock');
+                if (cappedTotal <= 0) {
+                    rowEl.classList.add('blocked');
+                } else {
+                    rowEl.classList.remove('blocked');
+                }
+            })
+            .catch(function () { /* leave current values on fetch failure */ });
+    }
+
+    document.querySelectorAll('.ata-source-warehouse, .ata-intermediate-warehouse').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            refreshRowAvailability(sel.closest('.ata-row-card'));
+        });
+    });
+
+    // "Set ... for all" bar — applies the chosen warehouse to every row's
+    // matching picker at once. Each row's own picker stays independently
+    // editable afterward (this is a bulk pre-fill, not a lock).
+    function wireCommonWarehouseSelect(commonSelectId, rowSelector, triggersRecompute) {
+        var commonSelect = document.getElementById(commonSelectId);
+        if (!commonSelect) return;
+        commonSelect.addEventListener('change', function () {
+            var value = commonSelect.value;
+            document.querySelectorAll(rowSelector).forEach(function (rowSelect) {
+                // Only set it if the option exists in this row's list (its
+                // options may differ from the common list in rare cases);
+                // otherwise leave that row's own selection untouched.
+                var hasOption = Array.from(rowSelect.options).some(function (o) { return o.value === value; });
+                if (!hasOption) return;
+                rowSelect.value = value;
+                if (triggersRecompute) refreshRowAvailability(rowSelect.closest('.ata-row-card'));
+            });
+        });
+    }
+
+    wireCommonWarehouseSelect('commonSourceWarehouse', '.ata-source-warehouse', true);
+    wireCommonWarehouseSelect('commonIntermediateWarehouse', '.ata-intermediate-warehouse', true);
+    wireCommonWarehouseSelect('commonDestWarehouse', '.ata-dest-warehouse', false);
 
     // Warns before submitting if any product has zero stock at the first
     // leg's source (Neksomo) — the backend already silently caps/skips a

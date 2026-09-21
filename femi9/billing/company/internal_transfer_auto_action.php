@@ -9,6 +9,13 @@ include("RemoveSpecialChar.php");
 
 error_reporting(0);
 
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
+
 // Manual internal transfers use a free-typed inv_number following a fixed
 // per-leg convention observed in real data: "G/<FY>/<seq>" for Neksomo ->
 // Healthcare, "S/<FY>/<seq>" for Healthcare -> LLP, FY as "26-27" (Apr-Mar),
@@ -40,6 +47,12 @@ $productIds = $_REQUEST['product_id'] ?? [];
 $qtyArr     = $_REQUEST['qty'] ?? [];
 $rate1Arr   = $_REQUEST['rate1'] ?? []; // Neksomo -> Healthcare rate, entered on this page
 $rate2Arr   = $_REQUEST['rate2'] ?? []; // Healthcare -> LLP rate, entered on this page
+// Physical godown per leg endpoint, per row — independently selectable:
+// Source = where Neksomo's stock starts, Intermediate = where Healthcare
+// receives/re-sends from, Destination = where LLP's stock ends up.
+$warehouseSourceArr       = $_REQUEST['warehouse_source'] ?? [];
+$warehouseIntermediateArr = $_REQUEST['warehouse_intermediate'] ?? [];
+$warehouseDestArr         = $_REQUEST['warehouse_dest'] ?? [];
 
 if (!is_array($productIds) || count($productIds) === 0) {
     $_SESSION['errorMessage'] = "No products submitted.";
@@ -73,8 +86,16 @@ foreach ($productIds as $i => $rawPid) {
     $qty   = (int) RemoveSpecialChar($qtyArr[$i] ?? '0');
     $rate1 = (float) ($rate1Arr[$i] ?? 0);
     $rate2 = (float) ($rate2Arr[$i] ?? 0);
+    $sourceWarehouseId       = filter_var($warehouseSourceArr[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
+    $intermediateWarehouseId = filter_var($warehouseIntermediateArr[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
+    $destWarehouseId         = filter_var($warehouseDestArr[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
     if ($pid <= 0 || $qty <= 0) continue;
-    $rows[] = ['pid' => $pid, 'qty' => $qty, 'rate1' => $rate1, 'rate2' => $rate2];
+    $rows[] = [
+        'pid' => $pid, 'qty' => $qty, 'rate1' => $rate1, 'rate2' => $rate2,
+        'source_warehouse_id' => $sourceWarehouseId,
+        'intermediate_warehouse_id' => $intermediateWarehouseId,
+        'dest_warehouse_id' => $destWarehouseId,
+    ];
 }
 
 if (empty($rows)) {
@@ -125,12 +146,13 @@ try {
      * re-validated here, never trusting the popup's earlier snapshot).
      */
     $writeLeg = function (
-        string $tempid, string $invNumber, string $sendFrom, string $sendTo, int $pid, int $qty, float $rate
+        string $tempid, string $invNumber, string $sendFrom, string $sendTo, int $pid, int $qty, float $rate,
+        ?int $sourceWarehouseId, ?int $destWarehouseId
     ) use (
         $db_conn, $stockService, $createdBy, $username, $usertype, $date,
         $stmtInvChk, $stmtInvIns, $stmtProdIns, $stmtProd, $Login_user_TYPEvl
     ): int {
-        $available = $stockService->getClosingQty($pid, $Login_user_TYPEvl, $sendFrom);
+        $available = $stockService->getClosingQty($pid, $Login_user_TYPEvl, $sendFrom, $sourceWarehouseId);
         $actualQty = min($qty, (int) ($available ?? 0));
         if ($actualQty <= 0) return 0;
 
@@ -172,12 +194,12 @@ try {
 
         $outResult = $stockService->transferOut(
             $pid, $Login_user_TYPEvl, $sendFrom, $actualQty,
-            'transfer', $tempid, $createdBy, true
+            'transfer', $tempid, $createdBy, true, $sourceWarehouseId
         );
         $stockService->transferIn(
             $pid, $Login_user_TYPEvl, $sendTo, $actualQty,
             'transfer', $tempid, $createdBy, true,
-            $outResult['consumed_rate'] ?? null
+            $outResult['consumed_rate'] ?? null, $destWarehouseId
         );
 
         return $actualQty;
@@ -196,10 +218,17 @@ try {
         // Transfer Now click would re-count and re-move the same demand.
         $contributingOrders = get_auto_transfer_breakdown_for_product($db_conn, $pid, $llpId);
 
-        $legOneQty = $writeLeg($tempid1, $invNumber1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty, $row['rate1']);
+        // Each leg's endpoint warehouse is independently user-selected:
+        // Leg 1 moves Neksomo's Source Godown stock into Healthcare's
+        // Intermediate Godown; Leg 2 moves that same Intermediate Godown
+        // stock into LLP's Destination Godown. Healthcare's own warehouse
+        // (Intermediate) is Leg 1's destination AND Leg 2's source — it's
+        // one picker, not two, since it's the single physical place that
+        // leg's stock actually sits between the two hops.
+        $legOneQty = $writeLeg($tempid1, $invNumber1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty, $row['rate1'], $row['source_warehouse_id'], $row['intermediate_warehouse_id']);
         if ($legOneQty <= 0) continue;
 
-        $legTwoQty = $writeLeg($tempid2, $invNumber2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty, $row['rate2']);
+        $legTwoQty = $writeLeg($tempid2, $invNumber2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty, $row['rate2'], $row['intermediate_warehouse_id'], $row['dest_warehouse_id']);
 
         if ($legTwoQty < $requestedQty) {
             $cappedRows[] = "Product #$pid: requested $requestedQty, transferred $legTwoQty";

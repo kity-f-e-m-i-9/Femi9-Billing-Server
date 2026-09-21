@@ -91,7 +91,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="purchase-bills-hc-to-llp">Purchase Bills (Health Care → LLP)</a></li>
                         </ul>
                     </li>
-					
+
+					<li>
+                        <a href="manage-warehouses"><i class="material-icons-two-tone">warehouse</i>Manage Godowns</a>
+                    </li>
+
 					<!-----<li>
                         <a href="#"><i class="material-icons-two-tone">done</i>Stock Return<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
@@ -367,17 +371,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="purchase-bills-hc-to-llp">Purchase Bills (Health Care → LLP)</a></li>
                         </ul>
                     </li>
-					<!----------------------Internal Stock Transfer--------------------------->
-					<li>
-                        <a href="#"><i class="material-icons-two-tone">done</i>Internal Stock Transfer<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
-                        <ul class="sub-menu">
-						<li><a href="internal_transfer">Add Internal Stock Transfer</a></li>
-						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
-						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
-						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
-						<li><a href="transfer-price">Transfer Price</a></li>
-                        </ul>
-                    </li>
+					<!----------------------Internal Stock Transfer (finance login only, see femi_menu.php's FINANCE branch above)--------------------------->
 					<li><span class="divider"></span></li>
 
                     <li>
@@ -566,10 +560,6 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							 <li><a href="upload-taluk">Upload Bulk Taluk</a></li>
 							 <li><a href="upload-pincode">Upload Bulk Pincode</a></li>--->
                         </ul>
-                    </li>
-
-					<li>
-                        <a href="manage-warehouses"><i class="material-icons-two-tone">warehouse</i>Manage Godowns</a>
                     </li>
 
 					<!-----<li class="active-page">
@@ -894,19 +884,8 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         </ul>
                     </li>
 					<?php }?>
-					<!----------------------Internal Stock Transfer--------------------------->
-					<?php if(($resultusertypeGET['internal_transfer']??0)==1){?>
-					<li>
-                        <a href="#"><i class="material-icons-two-tone">done</i>Internal Stock Transfer<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
-                        <ul class="sub-menu">
-						<li><a href="internal_transfer">Add Internal Stock Transfer</a></li>
-						<li><a href="internal_transfer_manage">Manage Internal Stock Transfer</a></li>
-						<li><a href="internal_transfer_return_manage">Credit Notes (Transfer Returns)</a></li>
-						<li><a href="internal_transfer_auto">Auto Transfer for Orders</a></li>
-						<li><a href="transfer-price">Transfer Price</a></li>
-                        </ul>
-                    </li>
-					<?php }?>
+					<!----------------------Internal Stock Transfer (finance login only, see femi_menu.php's FINANCE branch above)--------------------------->
+
 					<li><span class="divider"></span></li>
 
 					<?php if($resultusertypeGET['report']==1){?>

@@ -1,7 +1,15 @@
 <?php
 include("checksession.php");
+require_once("include/GodownAccess.php");
 require_once("include/AutoTransferDemand.php");
 include("config.php");
+
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
 
 // Same product scope internal_transfer.php's manual form uses (excludes
 // Neksomo-internal temp_id-tagged rows) — this page manages the default

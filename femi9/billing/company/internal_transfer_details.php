@@ -2,6 +2,13 @@
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
+
 $tempid=$_REQUEST['tempid'];
 
 $select_Invoice="select * from internal_transfer_invoice where tempid='$tempid'";

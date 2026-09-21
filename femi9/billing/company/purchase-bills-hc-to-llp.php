@@ -3,10 +3,9 @@ include("config.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
-// This page names Femi Health Care directly, so it's restricted to the
-// finance and admin usertypes only, same spirit as the rest of the Femi
-// Health Care / Neksomo access-control sweep (other usertypes stay blocked).
-if (!is_finance_login($db_conn) && get_login_usertype($db_conn) !== 'admin') {
+// This page names Femi Health Care directly, and Internal Stock Transfer
+// is a finance-only area — restricted to the finance usertype only.
+if (!is_finance_login($db_conn)) {
     header("Location: dashboard.php");
     exit;
 }

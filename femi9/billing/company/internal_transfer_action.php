@@ -5,6 +5,13 @@ require_once("include/StockService.php");
 require_once("include/GodownAccess.php");
 include("RemoveSpecialChar.php");
 
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
+
 error_reporting(0);
 
 if (!isset($_REQUEST['add-record'])) {

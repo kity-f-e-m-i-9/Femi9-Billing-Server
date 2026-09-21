@@ -632,6 +632,8 @@ function get_auto_transfer_history_for_date(mysqli $db_conn, string $date, int $
                 sl_out.qty_after AS neksomo_after,
                 sl_in1.qty_after AS healthcare_after,
                 sl_in2.qty_after AS llp_after,
+                sl_out.warehouse_id AS neksomo_warehouse_id,
+                sl_in2.warehouse_id AS llp_warehouse_id,
                 COALESCE(sl_out.created_at, sl_in2.created_at) AS transferred_at
          FROM internal_transfer it2
          INNER JOIN products p ON p.id = it2.product_id
@@ -658,17 +660,19 @@ function get_auto_transfer_history_for_date(mysqli $db_conn, string $date, int $
 
     return array_map(function ($row) {
         return [
-            'tempid'            => $row['tempid'],
-            'product_id'        => (int) $row['product_id'],
-            'product_name'      => $row['productName'],
-            'qty_transferred'   => (int) $row['qty_transferred'],
-            'neksomo_before'    => $row['neksomo_before'] !== null ? (int) $row['neksomo_before'] : null,
-            'healthcare_before' => $row['healthcare_before'] !== null ? (int) $row['healthcare_before'] : null,
-            'llp_before'        => $row['llp_before'] !== null ? (int) $row['llp_before'] : null,
-            'neksomo_after'     => $row['neksomo_after'] !== null ? (int) $row['neksomo_after'] : null,
-            'healthcare_after'  => $row['healthcare_after'] !== null ? (int) $row['healthcare_after'] : null,
-            'llp_after'         => $row['llp_after'] !== null ? (int) $row['llp_after'] : null,
-            'transferred_at'    => $row['transferred_at'],
+            'tempid'               => $row['tempid'],
+            'product_id'           => (int) $row['product_id'],
+            'product_name'         => $row['productName'],
+            'qty_transferred'      => (int) $row['qty_transferred'],
+            'neksomo_before'       => $row['neksomo_before'] !== null ? (int) $row['neksomo_before'] : null,
+            'healthcare_before'    => $row['healthcare_before'] !== null ? (int) $row['healthcare_before'] : null,
+            'llp_before'           => $row['llp_before'] !== null ? (int) $row['llp_before'] : null,
+            'neksomo_after'        => $row['neksomo_after'] !== null ? (int) $row['neksomo_after'] : null,
+            'healthcare_after'     => $row['healthcare_after'] !== null ? (int) $row['healthcare_after'] : null,
+            'llp_after'            => $row['llp_after'] !== null ? (int) $row['llp_after'] : null,
+            'neksomo_warehouse_id' => $row['neksomo_warehouse_id'] !== null ? (int) $row['neksomo_warehouse_id'] : null,
+            'llp_warehouse_id'     => $row['llp_warehouse_id'] !== null ? (int) $row['llp_warehouse_id'] : null,
+            'transferred_at'       => $row['transferred_at'],
         ];
     }, $rows);
 }
@@ -753,6 +757,26 @@ function get_auto_transfer_history_grouped_for_date(mysqli $db_conn, string $dat
  * Returns ['success' => true] or
  * ['success' => false, 'reason' => 'not_found'|'insufficient_stock_to_reverse', ...].
  */
+// Reads back the exact warehouse one leg's stock_ledger entry actually
+// used — never trust a UI-supplied value, since the picker on screen
+// when Undo is clicked may not reflect what the original transfer used.
+// NULL for any pre-feature run (both legs always NULL back then), which
+// reverseTransferIn()/reverseTransferOut() already treat identically to
+// "no warehouse" — no special-casing needed by the caller.
+function auto_transfer_leg_warehouse(mysqli $db, string $tempid, int $productId, string $action): ?int
+{
+    $stmt = $db->prepare(
+        "SELECT warehouse_id FROM stock_ledger
+         WHERE ref_type = 'transfer' AND ref_id = ? AND product_id = ? AND action = ?
+         ORDER BY id DESC LIMIT 1"
+    );
+    $stmt->bind_param('sis', $tempid, $productId, $action);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return ($row && $row['warehouse_id'] !== null) ? (int) $row['warehouse_id'] : null;
+}
+
 function undo_auto_transfer(mysqli $db_conn, string $tempidN2, int $productId, string $userType, int $neksomoId, int $healthcareId, int $llpId, string $createdBy): array
 {
     if (!str_ends_with($tempidN2, '-N2')) {
@@ -778,6 +802,16 @@ function undo_auto_transfer(mysqli $db_conn, string $tempidN2, int $productId, s
     $qtyLeg1 = (int) $legs[$tempidN1]['qty'] - (int) $legs[$tempidN1]['returned_qty'];
     $qtyLeg2 = (int) $legs[$tempidN2]['qty'] - (int) $legs[$tempidN2]['returned_qty'];
 
+    // Leg 2: Healthcare -> LLP. sourceWarehouse = where it left Healthcare
+    // (the transfer_out row); destWarehouse = where it landed at LLP (the
+    // transfer_in row) — these can legitimately differ (see
+    // docs/superpowers/specs/2026-09-21-warehouse-aware-auto-transfer-
+    // design.md). Leg 1: Neksomo -> Healthcare, same idea.
+    $leg2SourceWarehouse = auto_transfer_leg_warehouse($db_conn, $tempidN2, $productId, 'transfer_out');
+    $leg2DestWarehouse   = auto_transfer_leg_warehouse($db_conn, $tempidN2, $productId, 'transfer_in');
+    $leg1SourceWarehouse = auto_transfer_leg_warehouse($db_conn, $tempidN1, $productId, 'transfer_out');
+    $leg1DestWarehouse   = auto_transfer_leg_warehouse($db_conn, $tempidN1, $productId, 'transfer_in');
+
     $stockService = new StockService($db_conn);
     $neksomoStr    = (string) $neksomoId;
     $healthcareStr = (string) $healthcareId;
@@ -786,21 +820,21 @@ function undo_auto_transfer(mysqli $db_conn, string $tempidN2, int $productId, s
     $db_conn->begin_transaction();
     try {
         if ($qtyLeg2 > 0) {
-            $reverseIn2 = $stockService->reverseTransferIn($productId, $userType, $llpStr, $qtyLeg2, 'transfer', $tempidN2, $createdBy, true);
+            $reverseIn2 = $stockService->reverseTransferIn($productId, $userType, $llpStr, $qtyLeg2, 'transfer', $tempidN2, $createdBy, true, $leg2DestWarehouse);
             if (($reverseIn2['success'] ?? false) === false) {
                 $db_conn->rollback();
                 return $reverseIn2;
             }
-            $stockService->reverseTransferOut($productId, $userType, $healthcareStr, $qtyLeg2, 'transfer', $tempidN2, $createdBy, true);
+            $stockService->reverseTransferOut($productId, $userType, $healthcareStr, $qtyLeg2, 'transfer', $tempidN2, $createdBy, true, $leg2SourceWarehouse);
         }
 
         if ($qtyLeg1 > 0) {
-            $reverseIn1 = $stockService->reverseTransferIn($productId, $userType, $healthcareStr, $qtyLeg1, 'transfer', $tempidN1, $createdBy, true);
+            $reverseIn1 = $stockService->reverseTransferIn($productId, $userType, $healthcareStr, $qtyLeg1, 'transfer', $tempidN1, $createdBy, true, $leg1DestWarehouse);
             if (($reverseIn1['success'] ?? false) === false) {
                 $db_conn->rollback();
                 return $reverseIn1;
             }
-            $stockService->reverseTransferOut($productId, $userType, $neksomoStr, $qtyLeg1, 'transfer', $tempidN1, $createdBy, true);
+            $stockService->reverseTransferOut($productId, $userType, $neksomoStr, $qtyLeg1, 'transfer', $tempidN1, $createdBy, true, $leg1SourceWarehouse);
         }
 
         foreach ([$tempidN1, $tempidN2] as $t) {

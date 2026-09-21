@@ -1,5 +1,14 @@
 <?php include("checksession.php");
-require_once("include/PermissionCheck.php"); requireAdminOnly();
+require_once("include/GodownAccess.php");
+require_once("include/GodownWarehouseMapping.php");
+
+// Dedicated to the finance login (godown/company-profile assignment is a
+// finance-level concern, matching every other finance-only page's gate).
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -39,6 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = mysqli_prepare($db_conn, "UPDATE warehouses SET code = ?, name = ? WHERE id = ?");
                 mysqli_stmt_bind_param($stmt, "ssi", $code, $name, $id);
                 if (mysqli_stmt_execute($stmt)) {
+                    $linkedGodownIds = array_map('intval', $_POST['linked_godowns'] ?? []);
+                    set_godowns_for_warehouse($db_conn, $id, $linkedGodownIds);
                     header('Location: manage-warehouses.php?updatedSuccess');
                     exit;
                 } else {
@@ -64,6 +75,20 @@ $warehouses = [];
 $res = mysqli_query($db_conn, "SELECT id, code, name, is_active FROM warehouses ORDER BY code ASC");
 while ($row = mysqli_fetch_assoc($res)) {
     $warehouses[] = $row;
+}
+
+$eligibleGodowns = [];
+$res2 = mysqli_query($db_conn, "SELECT id, gname FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY gname ASC");
+while ($row = mysqli_fetch_assoc($res2)) {
+    $eligibleGodowns[] = $row;
+}
+
+// Pre-load each warehouse's currently-linked company profile ids, so the
+// checkbox list below can mark them checked.
+$linkedByWarehouse = [];
+foreach ($warehouses as $wh) {
+    $linked = get_godowns_for_warehouse($db_conn, (int) $wh['id']);
+    $linkedByWarehouse[(int) $wh['id']] = array_column($linked, 'id');
 }
 ?>
 <!DOCTYPE html>
@@ -150,6 +175,7 @@ while ($row = mysqli_fetch_assoc($res)) {
                                                         <th>Code</th>
                                                         <th>Name</th>
                                                         <th>Status</th>
+                                                        <th>Linked Company Profiles</th>
                                                         <th>Actions</th>
                                                     </tr>
                                                 </thead>
@@ -166,6 +192,41 @@ while ($row = mysqli_fetch_assoc($res)) {
                                                             <span class="<?php echo $wh['is_active'] ? 'badge-active' : 'badge-inactive'; ?>">
                                                                 <?php echo $wh['is_active'] ? 'Active' : 'Inactive'; ?>
                                                             </span>
+                                                        </td>
+                                                        <td style="min-width:260px;">
+                                                            <?php
+                                                            $linkedIds = $linkedByWarehouse[$rid] ?? [];
+                                                            $linkedNames = array_map(
+                                                                fn($cg) => $cg['gname'],
+                                                                array_filter($eligibleGodowns, fn($cg) => in_array((int) $cg['id'], $linkedIds, true))
+                                                            );
+                                                            ?>
+                                                            <div style="margin-bottom:8px;">
+                                                                <?php if (empty($linkedNames)): ?>
+                                                                    <span class="text-muted small">Not linked to any company profile yet.</span>
+                                                                <?php else: ?>
+                                                                    <?php foreach ($linkedNames as $ln): ?>
+                                                                    <span class="badge-active" style="margin-right:4px;margin-bottom:4px;display:inline-block;"><?php echo htmlspecialchars($ln); ?></span>
+                                                                    <?php endforeach; ?>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                            <?php if (empty($eligibleGodowns)): ?>
+                                                                <span class="text-muted small">No company profiles available.</span>
+                                                            <?php else: ?>
+                                                                <?php foreach ($eligibleGodowns as $cg): $cgId = (int) $cg['id']; ?>
+                                                                <div class="form-check form-check-inline" style="margin-bottom:4px;">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                           form="<?php echo $editFormId; ?>"
+                                                                           name="linked_godowns[]"
+                                                                           value="<?php echo $cgId; ?>"
+                                                                           id="linked_<?php echo $rid; ?>_<?php echo $cgId; ?>"
+                                                                           <?php echo in_array($cgId, $linkedByWarehouse[$rid] ?? [], true) ? 'checked' : ''; ?>>
+                                                                    <label class="form-check-label small" for="linked_<?php echo $rid; ?>_<?php echo $cgId; ?>">
+                                                                        <?php echo htmlspecialchars($cg['gname']); ?>
+                                                                    </label>
+                                                                </div>
+                                                                <?php endforeach; ?>
+                                                            <?php endif; ?>
                                                         </td>
                                                         <td>
                                                             <div class="actions-group">

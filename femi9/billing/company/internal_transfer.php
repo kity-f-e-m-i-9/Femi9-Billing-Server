@@ -1,6 +1,13 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
-include("config.php"); 
+<?php include("checksession.php"); require_once("include/GodownAccess.php");
+include("config.php");
 date_default_timezone_set("Asia/Kolkata");
+
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -147,7 +154,7 @@ xmlhttp.open("GET","loadopeningstock2.php?q="+str,true);
 xmlhttp.send();}
 </script>
 							   <label for="exampleInputEmail1" class="form-label">Send From</label>
-                               <select required="" name="send_from" class="form-control" onchange="checkopeningstock(this.value);">
+                               <select id="sendFromSelect" required="" name="send_from" class="form-control" onchange="checkopeningstock(this.value);">
 							   <option value="" hidden="">Select</option>
 							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
@@ -157,10 +164,10 @@ xmlhttp.send();}
 							   <?php }?>
 							   </select>
 							   <br/>
-							   
-							   
+
+
 							   <label for="exampleInputEmail1" class="form-label">Send To</label>
-                               <select required="" name="send_to" class="form-control">
+                               <select id="sendToSelect" required="" name="send_to" class="form-control">
 							   <option value="" hidden="">Select</option>
 							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
@@ -178,7 +185,7 @@ $resWh = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active 
 while ($rowWh = $resWh->fetch_assoc()) { $warehouses[] = $rowWh; }
 ?>
 								   <label class="form-label">From Godown (physical)</label>
-								   <select name="warehouse_from_id" class="form-control">
+								   <select id="warehouseFromSelect" name="warehouse_from_id" class="form-control">
 								   <option value="">— Not tracked —</option>
 								   <?php foreach ($warehouses as $wh): ?>
 								   <option value="<?=(int)$wh['id'];?>"><?=htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8');?><?=$wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '';?></option>
@@ -187,7 +194,7 @@ while ($rowWh = $resWh->fetch_assoc()) { $warehouses[] = $rowWh; }
 								   <br/>
 
 								   <label class="form-label">To Godown (physical)</label>
-								   <select name="warehouse_to_id" class="form-control">
+								   <select id="warehouseToSelect" name="warehouse_to_id" class="form-control">
 								   <option value="">— Not tracked —</option>
 								   <?php foreach ($warehouses as $wh): ?>
 								   <option value="<?=(int)$wh['id'];?>"><?=htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8');?><?=$wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '';?></option>
@@ -195,6 +202,52 @@ while ($rowWh = $resWh->fetch_assoc()) { $warehouses[] = $rowWh; }
 								   </select>
 								   <br/>
 <!----------------------------PHYSICAL GODOWN (WAREHOUSE)-------------------->
+<script>
+function renderWarehouseOptions(selectEl, warehouses) {
+    var currentVal = selectEl.value;
+    var html = '<option value="">— Not tracked —</option>';
+    warehouses.forEach(function (wh) {
+        var label = wh.code + (wh.name ? ' - ' + wh.name : '');
+        html += '<option value="' + wh.id + '">' + label.replace(/</g, '&lt;') + '</option>';
+    });
+    selectEl.innerHTML = html;
+    // Keep the previous selection if it's still a valid option after refiltering.
+    if (currentVal && Array.from(selectEl.options).some(function (o) { return o.value === currentVal; })) {
+        selectEl.value = currentVal;
+    }
+}
+
+function refilterWarehouseSelect(companyGodownSelectId, warehouseSelectId) {
+    var companySelect = document.getElementById(companyGodownSelectId);
+    var warehouseSelect = document.getElementById(warehouseSelectId);
+    if (!companySelect || !warehouseSelect) return;
+    var godownId = companySelect.value;
+    if (!godownId) return;
+
+    fetch('get-godown-warehouses.php?company_godown_id=' + encodeURIComponent(godownId))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.error) return;
+            renderWarehouseOptions(warehouseSelect, data.warehouses);
+        })
+        .catch(function () { /* leave current options on fetch failure */ });
+}
+
+(function () {
+    var sendFromSelect = document.getElementById('sendFromSelect');
+    var sendToSelect = document.getElementById('sendToSelect');
+    if (sendFromSelect) {
+        sendFromSelect.addEventListener('change', function () {
+            refilterWarehouseSelect('sendFromSelect', 'warehouseFromSelect');
+        });
+    }
+    if (sendToSelect) {
+        sendToSelect.addEventListener('change', function () {
+            refilterWarehouseSelect('sendToSelect', 'warehouseToSelect');
+        });
+    }
+})();
+</script>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <!--id="bookingDate"-->

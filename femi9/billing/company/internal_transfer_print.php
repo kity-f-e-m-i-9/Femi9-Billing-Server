@@ -1,6 +1,14 @@
 <?php include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
+
+// Internal Stock Transfer is a finance-only area.
+$__usertype = get_login_usertype($db_conn);
+if ($__usertype !== 'finance') {
+    header("Location: dashboard.php");
+    exit;
+}
+
 $tempid=$_REQUEST['tempid'];
 
 // Carries the Manage Internal Stock Transfer list's active date/bill-type
