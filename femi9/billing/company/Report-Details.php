@@ -1390,6 +1390,7 @@ $qparam = urlencode($search ?? '');
                                                     LEFT JOIN customers         c2 ON rs.from_usertype='customer'           AND c2.id=rs.from_userid
                                                     WHERE rs.invnumber IN ($inv_list)
                                                       AND rs.total > 0
+                                                      AND rs.deleted_at IS NULL
                                                       AND rs.date BETWEEN '$from_date' AND '$to_date'
                                                 ");
                                             

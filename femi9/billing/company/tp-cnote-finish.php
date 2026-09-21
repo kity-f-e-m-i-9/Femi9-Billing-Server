@@ -15,7 +15,7 @@ $created_by = $_SESSION['LOGIN_USER'] ?? 'system';
 if (!$returnid) { header("Location: tp-cnote-manage"); exit; }
 
 // Fetch CN master
-$s = $db_conn->prepare("SELECT * FROM user_return_stock WHERE returnid=? AND from_usertype='territory_partner' AND to_usertype='company' LIMIT 1");
+$s = $db_conn->prepare("SELECT * FROM user_return_stock WHERE returnid=? AND from_usertype='territory_partner' AND to_usertype='company' AND deleted_at IS NULL LIMIT 1");
 $s->bind_param('s', $returnid);
 $s->execute();
 $cn = $s->get_result()->fetch_assoc();
@@ -48,7 +48,7 @@ $use_godown       = ($source_godown_id > 0 && !$source_cp_id);
 $use_legacy_loc   = (!$source_cp_id && !$source_godown_id && $source_loc_id > 0);
 
 // Fetch CN items
-$s = $db_conn->prepare("SELECT * FROM user_return_stock_items WHERE returnid=?");
+$s = $db_conn->prepare("SELECT * FROM user_return_stock_items WHERE returnid=? AND deleted_at IS NULL");
 $s->bind_param('s', $returnid);
 $s->execute();
 $items = $s->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -72,7 +72,7 @@ try {
     $s->execute(); $s->close();
 
     // 2. Finalise CN items
-    $s = $db_conn->prepare("UPDATE user_return_stock_items SET status='accept' WHERE returnid=?");
+    $s = $db_conn->prepare("UPDATE user_return_stock_items SET status='accept' WHERE returnid=? AND deleted_at IS NULL");
     $s->bind_param('s', $returnid);
     $s->execute(); $s->close();
 

@@ -113,6 +113,8 @@ function tp_credit_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) 
         JOIN products p ON p.id = ursi.prid
         WHERE urs.from_usertype = 'territory_partner'
           AND urs.status = 'accept'
+          AND urs.deleted_at IS NULL
+          AND ursi.deleted_at IS NULL
           AND ursi.date BETWEEN '$from_date' AND '$to_date'
           AND tpi.source_godown_id > 0
           AND ($godown_where_sql)

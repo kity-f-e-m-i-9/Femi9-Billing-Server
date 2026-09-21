@@ -17,7 +17,7 @@ $enc     = base64_encode($returnid);
 $redir   = "tp-cnote-new?inv_id={$inv_id}&returnid={$enc}";
 
 // Load CN master
-$s = $db_conn->prepare("SELECT status, from_userid, invnumber FROM user_return_stock WHERE returnid=? AND from_usertype='territory_partner' AND to_usertype='company' LIMIT 1");
+$s = $db_conn->prepare("SELECT status, from_userid, invnumber FROM user_return_stock WHERE returnid=? AND from_usertype='territory_partner' AND to_usertype='company' AND deleted_at IS NULL LIMIT 1");
 $s->bind_param('s', $returnid);
 $s->execute();
 $cn = $s->get_result()->fetch_assoc(); $s->close();
@@ -25,7 +25,7 @@ $cn = $s->get_result()->fetch_assoc(); $s->close();
 if (!$cn) { header("Location: tp-cnote-manage"); exit; }
 
 // Load item before deleting
-$s = $db_conn->prepare("SELECT prid, qty, total FROM user_return_stock_items WHERE id=? AND returnid=? LIMIT 1");
+$s = $db_conn->prepare("SELECT prid, qty, total FROM user_return_stock_items WHERE id=? AND returnid=? AND deleted_at IS NULL LIMIT 1");
 $s->bind_param('is', $itemid, $returnid);
 $s->execute();
 $item = $s->get_result()->fetch_assoc(); $s->close();
@@ -121,9 +121,11 @@ if ($cn['status'] === 'accept') {
             $s->execute(); $s->close();
         }
 
-        // 4. Delete the item
-        $s = $db_conn->prepare("DELETE FROM user_return_stock_items WHERE id=? AND returnid=?");
-        $s->bind_param('is', $itemid, $returnid);
+        // 4. Soft-delete the item — see cnote_delete.php for why this table
+        // never hard-deletes.
+        $deletedBy = $_SESSION['LOGIN_USER'] ?? ($Login_user_TYPEvl ?? 'system');
+        $s = $db_conn->prepare("UPDATE user_return_stock_items SET deleted_at = NOW(), deleted_by = ? WHERE id=? AND returnid=?");
+        $s->bind_param('sis', $deletedBy, $itemid, $returnid);
         $s->execute(); $s->close();
 
         $db_conn->commit();
@@ -137,8 +139,9 @@ if ($cn['status'] === 'accept') {
 
 } else {
     // Pending CN — just remove the item, no stock was moved yet
-    $s = $db_conn->prepare("DELETE FROM user_return_stock_items WHERE id=? AND returnid=?");
-    $s->bind_param('is', $itemid, $returnid);
+    $deletedBy = $_SESSION['LOGIN_USER'] ?? ($Login_user_TYPEvl ?? 'system');
+    $s = $db_conn->prepare("UPDATE user_return_stock_items SET deleted_at = NOW(), deleted_by = ? WHERE id=? AND returnid=?");
+    $s->bind_param('sis', $deletedBy, $itemid, $returnid);
     $s->execute(); $s->close();
 }
 

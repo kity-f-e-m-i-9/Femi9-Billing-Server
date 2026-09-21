@@ -303,7 +303,7 @@ if ($scope === 'company') {
 $returns_row = crow($db_conn,
     "SELECT COUNT(*) cnt, COALESCE(SUM(total),0) amount FROM (
         SELECT returnid, MAX(total) total FROM user_return_stock
-        WHERE to_usertype=?".($filter_tp > 0 ? " AND to_userid={$filter_tp}" : "")." AND `date` BETWEEN ? AND ?
+        WHERE deleted_at IS NULL AND to_usertype=?".($filter_tp > 0 ? " AND to_userid={$filter_tp}" : "")." AND `date` BETWEEN ? AND ?
         GROUP BY returnid
      ) x",
     'sss', [$utype, $from, $to]);
@@ -329,7 +329,7 @@ $total_revenue -= $total_return_amt;
 $prev_return_amt = (float)cval($db_conn,
     "SELECT COALESCE(SUM(total),0) FROM (
         SELECT returnid, MAX(total) total FROM user_return_stock
-        WHERE to_usertype=?".($filter_tp > 0 ? " AND to_userid={$filter_tp}" : "")." AND `date` BETWEEN ? AND ?
+        WHERE deleted_at IS NULL AND to_usertype=?".($filter_tp > 0 ? " AND to_userid={$filter_tp}" : "")." AND `date` BETWEEN ? AND ?
         GROUP BY returnid
      ) x",
     'sss', [$utype, $prev_from, $prev_to]);
@@ -539,7 +539,7 @@ $gross_profit = (float)cval($db_conn,
          FROM (
              SELECT ri.prid pr_id, ri.qty
              FROM user_return_stock_items ri
-             WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+             WHERE ri.to_usertype=? AND ri.deleted_at IS NULL".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
              {$gp_ot_ret_union}
          ) r
          GROUP BY r.pr_id
@@ -653,7 +653,7 @@ if ($scope === 'company' && !$is_neksomo_view) {
              FROM (
                  SELECT ri.prid pr_id, ri.qty
                  FROM user_return_stock_items ri
-                 WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                 WHERE ri.to_usertype=? AND ri.deleted_at IS NULL".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
                  {$gp_ot_ret_union}
              ) r
              GROUP BY r.pr_id
@@ -685,7 +685,7 @@ if ($scope === 'company' && !$is_neksomo_view) {
              FROM (
                  SELECT ri.prid pr_id, ri.qty
                  FROM user_return_stock_items ri
-                 WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                 WHERE ri.to_usertype=? AND ri.deleted_at IS NULL".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
                  {$gp_ot_ret_union}
              ) r
              GROUP BY r.pr_id
@@ -761,7 +761,7 @@ if ($scope === 'company' && !$is_neksomo_view) {
             UNION
             SELECT r.pr_id FROM (
                 SELECT ri.prid pr_id FROM user_return_stock_items ri
-                WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                WHERE ri.to_usertype=? AND ri.deleted_at IS NULL".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
                 {$gp_srt_pop_ot_ret_union}
             ) r
         ) pop
@@ -787,7 +787,7 @@ if ($scope === 'company' && !$is_neksomo_view) {
             FROM (
                 SELECT ri.prid pr_id, ri.qty, ri.total amt
                 FROM user_return_stock_items ri
-                WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+                WHERE ri.to_usertype=? AND ri.deleted_at IS NULL".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
                 {$gp_srt_ot_ret_union}
             ) r
             GROUP BY r.pr_id
@@ -883,7 +883,7 @@ if ($scope === 'company') {
     $ch_returns = call_rows($db_conn,
         "SELECT from_usertype ch, COALESCE(SUM(total),0) amount FROM (
             SELECT returnid, from_usertype, MAX(total) total FROM user_return_stock
-            WHERE to_usertype='company' AND `date` BETWEEN ? AND ?
+            WHERE to_usertype='company' AND deleted_at IS NULL AND `date` BETWEEN ? AND ?
             GROUP BY returnid, from_usertype
          ) x GROUP BY from_usertype",
         'ss', [$from, $to]);
@@ -953,7 +953,7 @@ if ($scope === 'company') {
     $dret = call_rows($db_conn,
         "SELECT `date` d, from_usertype ch, COALESCE(SUM(total),0) amount FROM (
             SELECT returnid, `date`, from_usertype, MAX(total) total FROM user_return_stock
-            WHERE to_usertype='company' AND `date` BETWEEN ? AND ?
+            WHERE to_usertype='company' AND deleted_at IS NULL AND `date` BETWEEN ? AND ?
             GROUP BY returnid, `date`, from_usertype
          ) x GROUP BY `date`, from_usertype",
         'ss', [$from, $to]);
@@ -1044,7 +1044,7 @@ function company_period($db, $utype, $from, $to, $tc_inv, $tc_ui, $gfmt, $lfmt, 
         $ret = call_rows($db,
             "SELECT DATE_FORMAT(`date`,'$gfmt') g, DATE_FORMAT(MIN(`date`),'$lfmt') lbl, from_usertype ch, COALESCE(SUM(total),0) amount FROM (
                 SELECT returnid, `date`, from_usertype, MAX(total) total FROM user_return_stock
-                WHERE to_usertype='company' AND `date` BETWEEN ? AND ?
+                WHERE to_usertype='company' AND deleted_at IS NULL AND `date` BETWEEN ? AND ?
                 GROUP BY returnid, `date`, from_usertype
              ) x GROUP BY g, from_usertype",
             'ss', [$from, $to]);
@@ -1497,7 +1497,7 @@ if ($is_neksomo_view) {
              FROM (
                  SELECT ri.prid pr_id, ri.qty, ri.date
                  FROM user_return_stock_items ri
-                 WHERE ri.to_usertype=? AND ri.date BETWEEN ? AND ?{$pcs_uret_cond}
+                 WHERE ri.to_usertype=? AND ri.deleted_at IS NULL AND ri.date BETWEEN ? AND ?{$pcs_uret_cond}
                  UNION ALL
                  SELECT osr.prid pr_id, osr.qty, osr.return_date date
                  FROM ot_sales_return osr
@@ -1721,7 +1721,7 @@ if ($is_neksomo_view) {
              FROM (
                  SELECT ri.prid pr_id, ri.qty, ri.total AS line_total, ri.date
                  FROM user_return_stock_items ri
-                 WHERE ri.to_usertype=? AND ri.date BETWEEN ? AND ?{$pcs_uret_cond}
+                 WHERE ri.to_usertype=? AND ri.deleted_at IS NULL AND ri.date BETWEEN ? AND ?{$pcs_uret_cond}
                  UNION ALL
                  SELECT osr.prid pr_id, osr.qty, osr.total AS line_total, osr.return_date date
                  FROM ot_sales_return osr
@@ -1816,7 +1816,7 @@ $product_returns = call_rows($db_conn,
     "SELECT pid, COALESCE(SUM(ret_qty),0) ret_qty, COALESCE(SUM(ret_amt),0) ret_amt FROM (
         SELECT ri.prid pid, ri.qty ret_qty, ri.total ret_amt
         FROM user_return_stock_items ri
-        WHERE ri.to_usertype=?".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
+        WHERE ri.to_usertype=? AND ri.deleted_at IS NULL".($filter_tp > 0 ? " AND ri.to_userid={$filter_tp}" : "")." AND ri.date BETWEEN ? AND ?
         {$pr_ot_union}
      ) x GROUP BY pid",
     str_repeat('s', count($pr_params)), $pr_params);
@@ -2176,7 +2176,7 @@ if ($scope === 'company') {
     $sm_ret_union = "UNION ALL
          SELECT `date` d, -SUM(total) rev, 0 cnt FROM (
              SELECT returnid, `date`, MAX(total) total FROM user_return_stock
-             WHERE to_usertype='company' AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH)
+             WHERE to_usertype='company' AND deleted_at IS NULL AND `date`>=DATE_SUB(CURDATE(),INTERVAL 6 MONTH)
              GROUP BY returnid, `date`
          ) x GROUP BY `date`";
 }
@@ -2228,7 +2228,7 @@ $returns_list_db = call_rows($db_conn,
      FROM user_return_stock urs
      LEFT JOIN (SELECT inv_id, inv_number FROM invoice UNION ALL SELECT inv_id, inv_number FROM user_invoice) inv_num ON inv_num.inv_id=urs.invnumber
      LEFT JOIN territory_partners tp ON tp.id=urs.to_userid AND urs.to_usertype='territory_partner'
-     WHERE urs.to_usertype=?".($filter_tp>0?" AND urs.to_userid={$filter_tp}":"")." AND urs.date BETWEEN ? AND ?
+     WHERE urs.to_usertype=? AND urs.deleted_at IS NULL".($filter_tp>0?" AND urs.to_userid={$filter_tp}":"")." AND urs.date BETWEEN ? AND ?
      ORDER BY urs.date DESC",
     'sss', [$utype, $from, $to]);
 $returns_list = array_map(fn($r) => [

@@ -28,9 +28,9 @@ if (empty($returnid_decode)) {
 
 // Get return details before deletion
 $stmt = $db_conn->prepare("
-    SELECT from_usertype, invnumber, status 
-    FROM user_return_stock 
-    WHERE returnid = ?
+    SELECT from_usertype, invnumber, status
+    FROM user_return_stock
+    WHERE returnid = ? AND deleted_at IS NULL
     LIMIT 1
 ");
 $stmt->bind_param("s", $returnid_decode);
@@ -101,23 +101,27 @@ if (in_array($from_usertype, ['super_stockiest', 'stockiest'])) {
 
 /*
 |--------------------------------------------------------------------------
-| DELETE RETURN ITEMS AND RECORD
+| SOFT-DELETE RETURN ITEMS AND RECORD
+| Never hard-DELETE — these rows are the only record of what was returned.
+| A raw DELETE here previously destroyed that trail entirely and, combined
+| with an un-logged stock reversal, made a deletion mistake unrecoverable.
 |--------------------------------------------------------------------------
 */
 // Start transaction for data integrity
 mysqli_begin_transaction($db_conn);
+$deletedBy = $_SESSION['LOGIN_USER'] ?? ($Login_user_TYPEvl ?? 'system');
 
 try {
-    // Delete return items
-    $stmt = $db_conn->prepare("DELETE FROM user_return_stock_items WHERE returnid = ?");
-    $stmt->bind_param("s", $returnid_decode);
+    // Soft-delete return items
+    $stmt = $db_conn->prepare("UPDATE user_return_stock_items SET deleted_at = NOW(), deleted_by = ? WHERE returnid = ? AND deleted_at IS NULL");
+    $stmt->bind_param("ss", $deletedBy, $returnid_decode);
     $stmt->execute();
     $items_deleted = $stmt->affected_rows;
     $stmt->close();
 
-    // Delete return record
-    $stmt = $db_conn->prepare("DELETE FROM user_return_stock WHERE returnid = ?");
-    $stmt->bind_param("s", $returnid_decode);
+    // Soft-delete return record
+    $stmt = $db_conn->prepare("UPDATE user_return_stock SET deleted_at = NOW(), deleted_by = ? WHERE returnid = ?");
+    $stmt->bind_param("ss", $deletedBy, $returnid_decode);
     $stmt->execute();
     $stmt->close();
 

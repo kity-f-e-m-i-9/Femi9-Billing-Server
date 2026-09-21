@@ -34,7 +34,7 @@ if (empty($returnid)) {
 // total drift out of sync with the real items whenever anything changed
 // between page render and submit (e.g. an item removed via cnote_delete.php
 // in another tab).
-$stmt = $db_conn->prepare("SELECT COALESCE(SUM(total),0) AS computed_subtotal FROM user_return_stock_items WHERE returnid = ?");
+$stmt = $db_conn->prepare("SELECT COALESCE(SUM(total),0) AS computed_subtotal FROM user_return_stock_items WHERE returnid = ? AND deleted_at IS NULL");
 $stmt->bind_param("s", $returnid);
 $stmt->execute();
 $SubTotal = (float)($stmt->get_result()->fetch_assoc()['computed_subtotal'] ?? 0);
@@ -57,8 +57,8 @@ if ($SubTotal < 0 || $discount < 0 || $total_amount < 0) {
 */
 $stmt = $db_conn->prepare("
     SELECT invnumber, from_usertype, from_userid, to_usertype, to_userid, status
-    FROM user_return_stock 
-    WHERE returnid = ?
+    FROM user_return_stock
+    WHERE returnid = ? AND deleted_at IS NULL
     LIMIT 1
 ");
 $stmt->bind_param("s", $returnid);
@@ -159,7 +159,7 @@ if ($current_status === 'pending') {
 |--------------------------------------------------------------------------
 */
 $stmt = $db_conn->prepare(
-    "SELECT prid, qty FROM user_return_stock_items WHERE returnid = ?"
+    "SELECT prid, qty FROM user_return_stock_items WHERE returnid = ? AND deleted_at IS NULL"
 );
 $stmt->bind_param("s", $returnid);
 $stmt->execute();
@@ -187,7 +187,7 @@ try {
 
     // Update all return items to 'accept'
     $stmt = $db_conn->prepare(
-        "UPDATE user_return_stock_items SET status = 'accept' WHERE returnid = ?"
+        "UPDATE user_return_stock_items SET status = 'accept' WHERE returnid = ? AND deleted_at IS NULL"
     );
     $stmt->bind_param("s", $returnid);
     $stmt->execute();

@@ -131,7 +131,11 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-		$select_product_list="select * from user_return_stock where to_usertype='$Login_user_TYPEvl' order by id desc";
+		// territory_partner returns have their own dedicated page
+		// (tp-cnote-manage.php) with the correct territory_partners/
+		// tp_invoices joins — excluded here to avoid the blank name/
+		// invoice cells this page's generic lookup produced for them.
+		$select_product_list="select * from user_return_stock where to_usertype='$Login_user_TYPEvl' and from_usertype!='territory_partner' and deleted_at is null order by id desc";
 		$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 		while($result_product_list=mysqli_fetch_array($fetch_product_list))
 		{
@@ -179,8 +183,8 @@ else if($getinvuser=="shop")
 	else{
 		$lablenamedisplay="Customer";
 	}
-	
-	
+
+
 	if($getinvuser=="customer")
 	{
 		$CuSTID=$result_product_list['from_userid'];
@@ -195,7 +199,7 @@ else if($getinvuser=="shop")
 			$Cust_Name="Walking Customer";
 			$Cust_Mbile="---";
 		}
-										
+
 	}
 	else
 	{
@@ -203,10 +207,10 @@ else if($getinvuser=="shop")
 		$select_Customers="select * from ".$tablename." where temp_id='$CuSTID'";
 		$fetch_Customers=mysqli_query($db_conn,$select_Customers);
 		$result_Customers=mysqli_fetch_array($fetch_Customers);
-		$Cust_Name=$result_Customers['name'];
-		$Cust_Mbile=$result_Customers['mobile_number'];
+		$Cust_Name=$result_Customers['name'] ?? '—';
+		$Cust_Mbile=$result_Customers['mobile_number'] ?? '—';
 	}
-										
+
 										//INVOICE Number
 										$invid=$result_product_list['invnumber'];
 										if($getinvuser=="customer")

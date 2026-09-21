@@ -593,6 +593,7 @@ if (!empty($all_inv_ids)) {
         LEFT JOIN outlet            ot ON rs.from_usertype='outlet'             AND ot.temp_id=rs.from_userid
         LEFT JOIN customers         c2 ON rs.from_usertype='customer'           AND c2.id=rs.from_userid
         WHERE rs.total > 0
+          AND rs.deleted_at IS NULL
           AND rs.date BETWEEN '$from_date' AND '$to_date'
     ");
     
@@ -604,7 +605,7 @@ if (!empty($all_inv_ids)) {
     
     if (!empty($return_ids)) {
         $rid_list = implode(',', array_map('intval', $return_ids));
-        $rpq = mysqli_query($db_conn, "SELECT returnid, prid, qty, amount FROM user_return_stock_items WHERE returnid IN ($rid_list)");
+        $rpq = mysqli_query($db_conn, "SELECT returnid, prid, qty, amount FROM user_return_stock_items WHERE returnid IN ($rid_list) AND deleted_at IS NULL");
         if ($rpq) while ($rp = mysqli_fetch_assoc($rpq))
             $return_product_data[$rp['returnid']][$rp['prid']] = ['qty' => $rp['qty'], 'price' => $rp['amount']];
     }

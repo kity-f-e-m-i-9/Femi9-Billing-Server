@@ -135,7 +135,8 @@ function getCpSales(mysqli $dbConn, string $cpId, string $from, string $to): arr
         WHERE tpi.source_cp_id = ?
           AND urs.from_usertype = 'territory_partner'
           AND urs.date BETWEEN ? AND ?
-          AND urs.status = 'accept'");
+          AND urs.status = 'accept'
+          AND urs.deleted_at IS NULL");
     $stmt->bind_param("sss", $cpId, $from, $to);
     $stmt->execute();
     $returns = (float)($stmt->get_result()->fetch_assoc()['total'] ?? 0);

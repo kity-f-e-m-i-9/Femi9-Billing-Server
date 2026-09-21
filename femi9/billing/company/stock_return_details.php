@@ -5,7 +5,7 @@ include("config.php");
  $returnid=$_REQUEST['returnid'];
  $returnid_decode=base64_decode($returnid);
  //
- $select_details123="select * from user_return_stock where returnid='$returnid_decode'";
+ $select_details123="select * from user_return_stock where returnid='$returnid_decode' and deleted_at is null";
 				$fetch_details123=mysqli_query($db_conn,$select_details123);
 				$result_details123=mysqli_fetch_array($fetch_details123);
 				
@@ -131,7 +131,7 @@ $i= $start_from;
 											<tbody>
 											
 													<?php
-	$select_INVProductDetails="select * from user_return_stock_items where returnid='$returnid_decode' order by id asc";
+	$select_INVProductDetails="select * from user_return_stock_items where returnid='$returnid_decode' and deleted_at is null order by id asc";
 	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{

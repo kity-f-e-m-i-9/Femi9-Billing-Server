@@ -393,7 +393,7 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                 <?php if ($_REQUEST['returnid'] != NULL) { ?>
                                                 <!-- RETURN ITEMS TABLE -->
                                                 <?php 
-                                                $select_InvoieDetails234 = "SELECT * FROM user_return_stock WHERE returnid='$get_returnid' LIMIT 1";
+                                                $select_InvoieDetails234 = "SELECT * FROM user_return_stock WHERE returnid='$get_returnid' AND deleted_at IS NULL LIMIT 1";
                                                 $fetch_InvoieDetails234 = mysqli_query($db_conn, $select_InvoieDetails234);
                                                 $resultReturnDtails = mysqli_fetch_array($fetch_InvoieDetails234);
                                                 ?>
@@ -418,7 +418,7 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                             </thead>
                                                             <tbody>
                                                                 <?php
-                                                                $select_INVProductDetails = "SELECT * FROM user_return_stock_items WHERE returnid='$get_returnid' ORDER BY id DESC";
+                                                                $select_INVProductDetails = "SELECT * FROM user_return_stock_items WHERE returnid='$get_returnid' AND deleted_at IS NULL ORDER BY id DESC";
                                                                 $fetch_INVProductDetails = mysqli_query($db_conn, $select_INVProductDetails);
                                                                 $count_products_return = mysqli_num_rows($fetch_INVProductDetails);
                                                                 $rd = 0;

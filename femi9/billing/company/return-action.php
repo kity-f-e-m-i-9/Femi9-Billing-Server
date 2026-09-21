@@ -32,7 +32,7 @@ if ($updatestatus === 'accept' && !empty($_REQUEST['rtnid'])) {
 
 // ── Load return header ────────────────────────────────────────────────────────
 $stmt = $db_conn->prepare(
-    "SELECT * FROM user_return_stock WHERE returnid = ?"
+    "SELECT * FROM user_return_stock WHERE returnid = ? AND deleted_at IS NULL"
 );
 $stmt->bind_param('s', $returnid);
 $stmt->execute();
@@ -57,7 +57,7 @@ $total_amount = (int)$returnHeader['total'];
 
 // ── Load return items ─────────────────────────────────────────────────────────
 $stmt = $db_conn->prepare(
-    "SELECT * FROM user_return_stock_items WHERE returnid = ? AND status = 'pending'"
+    "SELECT * FROM user_return_stock_items WHERE returnid = ? AND status = 'pending' AND deleted_at IS NULL"
 );
 $stmt->bind_param('s', $returnid);
 $stmt->execute();

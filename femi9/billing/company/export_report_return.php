@@ -40,7 +40,7 @@ $csv_content .= "Inv Num,Date of return,Qty of return,User ID,Name, District\n";
 
 // Fetching data and formatting into CSV rows
 
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and date between '$start_date' and '$endDate'";
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
 $fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
@@ -49,7 +49,7 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid'";
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
 	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	
@@ -97,7 +97,7 @@ $csv_content .= "Inv Num,Date of return,Qty of return,User ID,Name, District, Ta
 
 // Fetching data and formatting into CSV rows
 
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and date between '$start_date' and '$endDate'";
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
 $fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
@@ -106,7 +106,7 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid'";
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
 	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	
@@ -161,7 +161,7 @@ $csv_content .= "Inv Num,Date of return,Qty of return,User ID,Name, District, Ta
 
 // Fetching data and formatting into CSV rows
 
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and date between '$start_date' and '$endDate'";
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
 $fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
@@ -170,7 +170,7 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid'";
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
 	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	

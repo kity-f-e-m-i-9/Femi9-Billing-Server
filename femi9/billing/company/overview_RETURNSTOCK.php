@@ -189,7 +189,7 @@ $i= $start_from;
 											
 											<tbody>
 										<?php
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and date between '$start_date' and '$endDate'";
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
 $fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
@@ -198,14 +198,14 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid'";
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
 	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	if($result_sumqty[0]!=NULL){$TotalReturnQTY=$result_sumqty[0];}
 	else{$TotalReturnQTY="0";}
 	
 	//Total stock return (Rs.)
-	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid'";
+	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
 	$Fetch_sumreturnamount=mysqli_query($db_conn,$Select_sumreturnamount);
 	$Result_sumreturnamount=mysqli_fetch_array($Fetch_sumreturnamount);
 	if($Result_sumreturnamount[0]!=NULL){$TotalReturnAmount=$Result_sumreturnamount[0];}
@@ -272,7 +272,7 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											
 											<tbody>
 										<?php
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and date between '$start_date' and '$endDate'";
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
 $fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
@@ -281,14 +281,14 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid'";
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
 	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	if($result_sumqty[0]!=NULL){$TotalReturnQTY=$result_sumqty[0];}
 	else{$TotalReturnQTY="0";}
 	
 	//Total stock return (Rs.)
-	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid'";
+	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
 	$Fetch_sumreturnamount=mysqli_query($db_conn,$Select_sumreturnamount);
 	$Result_sumreturnamount=mysqli_fetch_array($Fetch_sumreturnamount);
 	if($Result_sumreturnamount[0]!=NULL){$TotalReturnAmount=$Result_sumreturnamount[0];}
@@ -360,7 +360,7 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 											
 											<tbody>
 										<?php
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and date between '$start_date' and '$endDate'";
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
 $fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
@@ -369,14 +369,14 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid'";
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
 	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	if($result_sumqty[0]!=NULL){$TotalReturnQTY=$result_sumqty[0];}
 	else{$TotalReturnQTY="0";}
 	
 	//Total stock return (Rs.)
-	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid'";
+	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
 	$Fetch_sumreturnamount=mysqli_query($db_conn,$Select_sumreturnamount);
 	$Result_sumreturnamount=mysqli_fetch_array($Fetch_sumreturnamount);
 	if($Result_sumreturnamount[0]!=NULL){$TotalReturnAmount=$Result_sumreturnamount[0];}

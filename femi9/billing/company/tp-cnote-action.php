@@ -55,7 +55,7 @@ if (empty($items)) {
 
 // Validate max returnable per product
 $alreadyReturned = [];
-$s = $db_conn->prepare("SELECT ursi.prid, SUM(ursi.qty) AS rqty FROM user_return_stock_items ursi JOIN user_return_stock urs ON urs.returnid=ursi.returnid WHERE urs.invnumber=? AND urs.from_usertype='territory_partner' AND urs.status='accept' GROUP BY ursi.prid");
+$s = $db_conn->prepare("SELECT ursi.prid, SUM(ursi.qty) AS rqty FROM user_return_stock_items ursi JOIN user_return_stock urs ON urs.returnid=ursi.returnid WHERE urs.invnumber=? AND urs.from_usertype='territory_partner' AND urs.status='accept' AND ursi.deleted_at IS NULL GROUP BY ursi.prid");
 $s->bind_param('s', $inv_number);
 $s->execute();
 foreach ($s->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
@@ -95,7 +95,7 @@ if (!$returnid) {
     $s->execute(); $s->close();
 } else {
     // Verify it exists and is still pending
-    $s = $db_conn->prepare("SELECT id FROM user_return_stock WHERE returnid=? AND status='pending' LIMIT 1");
+    $s = $db_conn->prepare("SELECT id FROM user_return_stock WHERE returnid=? AND status='pending' AND deleted_at IS NULL LIMIT 1");
     $s->bind_param('s', $returnid);
     $s->execute();
     if (!$s->get_result()->fetch_assoc()) {

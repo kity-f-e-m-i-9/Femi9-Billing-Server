@@ -171,7 +171,7 @@ function getTpNetPurchase(mysqli $dbConn, string $internalId, string $from, stri
     $stmt = $dbConn->prepare("SELECT COALESCE(SUM(urs.total),0) AS total FROM user_return_stock urs
         JOIN tp_invoices ti ON ti.invoice_number = urs.invnumber COLLATE utf8mb4_unicode_ci
         WHERE urs.from_usertype = 'territory_partner' AND urs.from_userid = ? AND urs.date BETWEEN ? AND ?
-        AND ti.product_type = 'napkin'");
+        AND ti.product_type = 'napkin' AND urs.deleted_at IS NULL");
     $stmt->bind_param("sss", $internalId, $from, $to);
     $stmt->execute();
     $returns = (float)($stmt->get_result()->fetch_assoc()['total'] ?? 0);

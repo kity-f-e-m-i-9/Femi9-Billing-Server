@@ -67,9 +67,9 @@ $invnumber = $return_details['invnumber'];
 |--------------------------------------------------------------------------
 */
 $stmt = $db_conn->prepare("
-    SELECT prid, qty, total 
-    FROM user_return_stock_items 
-    WHERE id = ?
+    SELECT prid, qty, total, status
+    FROM user_return_stock_items
+    WHERE id = ? AND deleted_at IS NULL
     LIMIT 1
 ");
 $stmt->bind_param("s", $rowid_decode);
@@ -79,7 +79,7 @@ $stmt->close();
 
 if (!$item_details || empty($item_details['prid'])) {
     error_log("DELETE ITEM ERROR: Item $rowid_decode not found or invalid");
-    
+
     if ($redirurl == "cnote_details") {
         echo "<script>window.location='cnote_details.php?returnid=$returnid&&error=item_not_found';</script>";
     } else {
@@ -92,6 +92,15 @@ $prid = $item_details['prid'];
 $returnqty = (int)$item_details['qty'];
 $return_amount = (float)$item_details['total'];
 
+// Stock is only ever moved for an item once cnote_finish.php has run and
+// flipped its status to 'accept' (see cnote_finish.php's StockService
+// calls, gated the same way on the header's status='pending' check). A
+// 'pending' item never touched stock, so reversing it here would subtract
+// stock that was never credited — the exact bug that drove company stock
+// negative when never-finished returns were deleted.
+$item_status = $item_details['status'] ?? 'pending';
+$stockWasApplied = ($item_status === 'accept');
+
 /*
 |--------------------------------------------------------------------------
 | START TRANSACTION
@@ -103,9 +112,12 @@ try {
     /*
     |----------------------------------------------------------------------
     | STOCK REVERSAL - RECEIVER (TO USER)
-    | Reverse the stock adjustment made during return item creation
+    | Reverse the stock adjustment made when this item was finished/accepted.
+    | Skipped entirely for a 'pending' item — cnote_finish.php never ran for
+    | it, so no stock was ever moved to reverse.
     |----------------------------------------------------------------------
     */
+    if ($stockWasApplied) {
     $stmt = $db_conn->prepare("
         UPDATE stock
         SET sales_qty = sales_qty + ?,
@@ -131,7 +143,7 @@ try {
     |----------------------------------------------------------------------
     */
     if (in_array($from_usertype, ['super_stockiest', 'stockiest', 'super_distributor', 'distributor', 'candf'])) {
-        
+
         $stmt = $db_conn->prepare("
             UPDATE stock
             SET input_qty = input_qty + ?,
@@ -150,6 +162,9 @@ try {
             error_log("STOCK REVERSAL WARNING: No stock record found for sender - Product: $prid, User: $from_usertype/$from_userid");
         }
     }
+    } else {
+        error_log("STOCK REVERSAL SKIPPED: Item $rowid_decode was still 'pending' (never finished) - no stock movement to reverse");
+    }
 
     /*
     |----------------------------------------------------------------------
@@ -158,9 +173,9 @@ try {
     |----------------------------------------------------------------------
     */
     $stmt = $db_conn->prepare("
-        SELECT COUNT(*) AS remaining_items 
-        FROM user_return_stock_items 
-        WHERE returnid = ? AND id != ?
+        SELECT COUNT(*) AS remaining_items
+        FROM user_return_stock_items
+        WHERE returnid = ? AND id != ? AND deleted_at IS NULL
     ");
     $stmt->bind_param("ss", $returnid_decode, $rowid_decode);
     $stmt->execute();
@@ -219,11 +234,16 @@ try {
 
     /*
     |----------------------------------------------------------------------
-    | DELETE THE RETURN ITEM
+    | SOFT-DELETE THE RETURN ITEM
+    | Never hard-DELETE — this row is the only record of what was returned
+    | and what stock adjustment (if any) was reversed above. A raw DELETE
+    | here previously destroyed that trail entirely, making an incident
+    | like the one this soft-delete closes unrecoverable after the fact.
     |----------------------------------------------------------------------
     */
-    $stmt = $db_conn->prepare("DELETE FROM user_return_stock_items WHERE id = ?");
-    $stmt->bind_param("s", $rowid_decode);
+    $stmt = $db_conn->prepare("UPDATE user_return_stock_items SET deleted_at = NOW(), deleted_by = ? WHERE id = ?");
+    $deletedBy = $_SESSION['LOGIN_USER'] ?? ($Login_user_TYPEvl ?? 'system');
+    $stmt->bind_param("ss", $deletedBy, $rowid_decode);
     $stmt->execute();
     $stmt->close();
 
@@ -235,7 +255,7 @@ try {
     | that actually remain — the bug this fix closes.
     |----------------------------------------------------------------------
     */
-    $stmt = $db_conn->prepare("SELECT COALESCE(SUM(total),0) AS remaining_total FROM user_return_stock_items WHERE returnid = ?");
+    $stmt = $db_conn->prepare("SELECT COALESCE(SUM(total),0) AS remaining_total FROM user_return_stock_items WHERE returnid = ? AND deleted_at IS NULL");
     $stmt->bind_param("s", $returnid_decode);
     $stmt->execute();
     $remaining_total = (float)$stmt->get_result()->fetch_assoc()['remaining_total'];

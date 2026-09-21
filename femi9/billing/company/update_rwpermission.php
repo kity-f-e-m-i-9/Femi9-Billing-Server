@@ -33,17 +33,17 @@ $updaterwMULTI="update user_invoice_items set rwpoints='$rwpoints' where inv_id=
 mysqli_query($db_conn,$updaterwMULTI);		
 		}
 		
-		$selectcount="select rwpoints_enable from user_return_stock where invnumber='$invoiceid'";
+		$selectcount="select rwpoints_enable from user_return_stock where invnumber='$invoiceid' and deleted_at is null";
 		$fetchcount=mysqli_query($db_conn,$selectcount);
 		$resultrows=mysqli_num_rows($fetchcount);
 		if($resultrows>0)
 		{
-		$updaterw_rtn="update user_return_stock set rwpoints_enable='1' where invnumber='$invoiceid'";
+		$updaterw_rtn="update user_return_stock set rwpoints_enable='1' where invnumber='$invoiceid' and deleted_at is null";
 		mysqli_query($db_conn,$updaterw_rtn);
-		
-		
+
+
 		//UPDATE POINTS
-		$selectmultiproduct12="select * from user_return_stock_items where invnumber='$invoiceid'";
+		$selectmultiproduct12="select * from user_return_stock_items where invnumber='$invoiceid' and deleted_at is null";
 		$fetchmulti12=mysqli_query($db_conn,$selectmultiproduct12);
 		while($resultmulti12=mysqli_fetch_array($fetchmulti12))
 		{
@@ -73,15 +73,15 @@ echo "<script>window.location='user-manage-invoice?invuser=$invuser';</script>";
 		$updaterw2="update user_invoice_items set rwpoints='0' where inv_id='$invoiceid'";
 		mysqli_query($db_conn,$updaterw2);
 		
-		$selectcount="select rwpoints_enable from user_return_stock where invnumber='$invoiceid'";
+		$selectcount="select rwpoints_enable from user_return_stock where invnumber='$invoiceid' and deleted_at is null";
 		$fetchcount=mysqli_query($db_conn,$selectcount);
 		$resultrows=mysqli_num_rows($fetchcount);
 		if($resultrows>0)
 		{
-		$updaterw_rtn="update user_return_stock set rwpoints_enable='0' where invnumber='$invoiceid'";
+		$updaterw_rtn="update user_return_stock set rwpoints_enable='0' where invnumber='$invoiceid' and deleted_at is null";
 		mysqli_query($db_conn,$updaterw_rtn);
-		
-		$updaterw_rtn2="update user_return_stock_items set rwpoints='0' where invnumber='$invoiceid'";
+
+		$updaterw_rtn2="update user_return_stock_items set rwpoints='0' where invnumber='$invoiceid' and deleted_at is null";
 		mysqli_query($db_conn,$updaterw_rtn2);
 		}
 		

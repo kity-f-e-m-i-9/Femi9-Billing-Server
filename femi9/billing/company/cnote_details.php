@@ -7,7 +7,7 @@ include("config.php");
 	$returnid=base64_decode($_REQUEST['returnid']);
 	$invnum=base64_decode($_REQUEST['invnum']);
 	
-	$select_invoicedetails="select * from user_return_stock where returnid='$returnid'";
+	$select_invoicedetails="select * from user_return_stock where returnid='$returnid' and deleted_at is null";
 	$fetch_invoicedetails=mysqli_query($db_conn,$select_invoicedetails);
 	$result_invoicedtails=mysqli_fetch_array($fetch_invoicedetails);
 	$invid=$result_invoicedtails['invnumber'];
@@ -126,7 +126,7 @@ include("config.php");
                                                     </thead>
                                                     <tbody>
 													<?php
-	$select_INVProductDetails="select * from user_return_stock_items where returnid='$returnid' order by id desc";
+	$select_INVProductDetails="select * from user_return_stock_items where returnid='$returnid' and deleted_at is null order by id desc";
 	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
 	$count_products_return=mysqli_num_rows($fetch_INVProductDetails);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))

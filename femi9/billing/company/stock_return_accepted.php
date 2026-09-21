@@ -100,7 +100,7 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from user_return_stock where to_usertype='$Login_user_TYPEvl' and status='accept' order by id desc";
+					<?php $select_product_list="select * from user_return_stock where to_usertype='$Login_user_TYPEvl' and status='accept' and deleted_at is null order by id desc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{

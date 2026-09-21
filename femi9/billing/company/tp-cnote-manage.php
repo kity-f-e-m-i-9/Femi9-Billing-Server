@@ -15,7 +15,7 @@ $cns = $db_conn->query("
            tp.name AS tp_name, tp.tp_id AS tp_code, tp.id AS tp_db_id
     FROM user_return_stock urs
     JOIN territory_partners tp ON tp.id = CAST(urs.from_userid AS UNSIGNED)
-    WHERE urs.from_usertype = 'territory_partner' AND urs.to_usertype = 'company'
+    WHERE urs.from_usertype = 'territory_partner' AND urs.to_usertype = 'company' AND urs.deleted_at IS NULL
     ORDER BY urs.id DESC
 ")->fetch_all(MYSQLI_ASSOC);
 ?>

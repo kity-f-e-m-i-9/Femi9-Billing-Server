@@ -14,7 +14,7 @@ $created_by = $_SESSION['LOGIN_USER'] ?? 'system';
 
 // Resolve: if returnid given, get inv from return master
 if ($returnid) {
-    $s = $db_conn->prepare("SELECT urs.*, tpi.id AS tpi_id, tpi.territory_partner_id, tpi.source_godown_id, tpi.source_cp_id, tp.name AS tp_name, tp.tp_id AS tp_code FROM user_return_stock urs JOIN tp_invoices tpi ON tpi.invoice_number = urs.invnumber COLLATE utf8mb4_unicode_ci JOIN territory_partners tp ON tp.id = tpi.territory_partner_id WHERE urs.returnid=? AND urs.from_usertype='territory_partner' AND urs.to_usertype='company' LIMIT 1");
+    $s = $db_conn->prepare("SELECT urs.*, tpi.id AS tpi_id, tpi.territory_partner_id, tpi.source_godown_id, tpi.source_cp_id, tp.name AS tp_name, tp.tp_id AS tp_code FROM user_return_stock urs JOIN tp_invoices tpi ON tpi.invoice_number = urs.invnumber COLLATE utf8mb4_unicode_ci JOIN territory_partners tp ON tp.id = tpi.territory_partner_id WHERE urs.returnid=? AND urs.from_usertype='territory_partner' AND urs.to_usertype='company' AND urs.deleted_at IS NULL LIMIT 1");
     $s->bind_param('s', $returnid);
     $s->execute();
     $returnMaster = $s->get_result()->fetch_assoc();
@@ -45,7 +45,7 @@ $s->close();
 
 // Already-returned qty per product (all finalized CNs)
 $returnedQty = [];
-$s = $db_conn->prepare("SELECT ursi.prid, SUM(ursi.qty) AS rqty FROM user_return_stock_items ursi JOIN user_return_stock urs ON urs.returnid=ursi.returnid WHERE urs.invnumber=? AND urs.from_usertype='territory_partner' AND urs.status='accept' GROUP BY ursi.prid");
+$s = $db_conn->prepare("SELECT ursi.prid, SUM(ursi.qty) AS rqty FROM user_return_stock_items ursi JOIN user_return_stock urs ON urs.returnid=ursi.returnid WHERE urs.invnumber=? AND urs.from_usertype='territory_partner' AND urs.status='accept' AND ursi.deleted_at IS NULL GROUP BY ursi.prid");
 $s->bind_param('s', $inv_number);
 $s->execute();
 foreach ($s->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
@@ -56,7 +56,7 @@ $s->close();
 // Load CN items for both draft (editing) and accepted (read-only) views
 $draftItems = [];
 if ($returnid) {
-    $s = $db_conn->prepare("SELECT * FROM user_return_stock_items WHERE returnid=?");
+    $s = $db_conn->prepare("SELECT * FROM user_return_stock_items WHERE returnid=? AND deleted_at IS NULL");
     $s->bind_param('s', $returnid);
     $s->execute();
     foreach ($s->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
