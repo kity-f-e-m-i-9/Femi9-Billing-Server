@@ -79,6 +79,83 @@ if (!empty($requirements)) {
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <style>
+        :root {
+            --ata-tp-1: #667eea;
+            --ata-tp-2: #764ba2;
+            --ata-ot-1: #0891b2;
+            --ata-ot-2: #0e7490;
+        }
+        .ata-page-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+        .ata-page-head h1 { font-size:20px; font-weight:600; color:#1f2937; margin:0; }
+        .ata-manage-link { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:9px; background:#f3f4f6; color:#4b5563; text-decoration:none; transition:background .15s; }
+        .ata-manage-link:hover { background:#e5e7eb; color:#1f2937; }
+
+        .ata-warn-card { border:1px solid #fde68a; background:#fffbeb; border-left:4px solid #f59e0b; border-radius:10px; padding:14px 16px; margin-bottom:16px; }
+        .ata-warn-card strong { color:#92400e; font-size:14px; }
+        .ata-warn-card table th { font-size:11.5px; text-transform:uppercase; letter-spacing:.02em; color:#92400e; background:#fef3c7; }
+        .ata-warn-card table td { font-size:12.5px; }
+
+        .ata-card { border:1px solid #eef0f3; border-radius:14px; box-shadow:0 1px 3px rgba(16,24,40,.04); }
+        .ata-intro { color:#6b7280; font-size:13.5px; line-height:1.55; margin-bottom:16px; }
+
+        .ata-btn { display:inline-flex; align-items:center; gap:6px; border:none; border-radius:9px; color:#fff; font-size:13px; font-weight:500; padding:8px 14px; cursor:pointer; transition:filter .15s, transform .1s; }
+        .ata-btn:active { transform:translateY(1px); }
+        .ata-btn:hover { filter:brightness(1.06); color:#fff; }
+        .ata-btn-tp { background:linear-gradient(135deg, var(--ata-tp-1) 0%, var(--ata-tp-2) 100%); box-shadow:0 2px 6px rgba(102,126,234,.3); }
+        .ata-btn-ot { background:linear-gradient(135deg, var(--ata-ot-1) 0%, var(--ata-ot-2) 100%); box-shadow:0 2px 6px rgba(8,145,178,.3); }
+        .ata-btn-ghost { background:#f3f4f6; color:#374151; }
+        .ata-btn-ghost:hover { background:#e5e7eb; color:#1f2937; }
+        .ata-btn-submit { background:linear-gradient(135deg,#22c55e 0%,#15803d 100%); box-shadow:0 2px 8px rgba(21,128,61,.3); font-size:14px; padding:10px 20px; }
+        .ata-actionbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+
+        .ata-summary { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+        .ata-stat { flex:1 1 150px; border:1px solid #eef0f3; border-radius:12px; padding:10px 14px; background:#fafbfc; }
+        .ata-stat .num { font-size:19px; font-weight:700; color:#1f2937; line-height:1.2; }
+        .ata-stat .lbl { font-size:11px; color:#9ca3af; text-transform:uppercase; letter-spacing:.03em; margin-top:2px; }
+        .ata-stat.warn .num { color:#b45309; }
+        .ata-stat.tp .num { color:var(--ata-tp-2); }
+        .ata-stat.ot .num { color:var(--ata-ot-2); }
+
+        .ata-tag { display:inline-flex; align-items:center; gap:4px; border-radius:6px; font-size:11px; font-weight:600; padding:2px 7px; white-space:nowrap; }
+        .ata-tag-tp { background:#eef0ff; color:#4c3f9e; }
+        .ata-tag-ot { background:#e0f7fa; color:#0c5c6e; }
+        .ata-tag-dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+        .ata-tag-tp .ata-tag-dot { background:var(--ata-tp-1); }
+        .ata-tag-ot .ata-tag-dot { background:var(--ata-ot-1); }
+
+        .ata-rows { display:flex; flex-direction:column; gap:10px; }
+        .ata-row-card { border:1px solid #eef0f3; border-radius:12px; padding:14px 16px; background:#fff; transition:box-shadow .15s; }
+        .ata-row-card:hover { box-shadow:0 2px 8px rgba(16,24,40,.06); }
+        .ata-row-card.blocked { border-color:#fecaca; background:#fff9f9; }
+        .ata-row-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+        .ata-row-name { font-size:14.5px; font-weight:600; color:#1f2937; }
+        .ata-badge-nostock { background:#fee2e2; color:#991b1b; font-weight:600; font-size:10.5px; padding:2px 8px; border-radius:6px; margin-left:6px; vertical-align:middle; }
+        .ata-split-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:4px; }
+        .ata-avail-chips { display:flex; gap:8px; flex-wrap:wrap; }
+        .ata-avail-chip { border:1px solid #eef0f3; border-radius:8px; padding:4px 10px; font-size:12px; color:#4b5563; background:#fafbfc; }
+        .ata-avail-chip b { color:#1f2937; }
+        .ata-row-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; align-items:end; }
+        .ata-field label { display:block; font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:.02em; margin-bottom:4px; }
+        .ata-view-btn { width:38px; height:38px; border-radius:9px; border:none; background:linear-gradient(135deg, var(--ata-tp-1) 0%, var(--ata-tp-2) 100%); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(102,126,234,.3); }
+        .ata-view-btn:hover { filter:brightness(1.06); }
+
+        .ata-modal-tag-tp, .ata-modal-tag-ot { display:inline-block; width:4px; align-self:stretch; border-radius:3px; margin-right:8px; flex-shrink:0; }
+        .ata-modal-tag-tp { background:var(--ata-tp-1); }
+        .ata-modal-tag-ot { background:var(--ata-ot-1); }
+
+        .ata-nav-tabs .nav-link { font-size:13px; font-weight:500; color:#6b7280; }
+        .ata-nav-tabs .nav-link.active { color:#1f2937; font-weight:600; }
+        .ata-bulk-row { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
+        .ata-bulk-btn { display:inline-flex; align-items:center; gap:5px; border:1px solid #e5e7eb; background:#fafbfc; color:#374151; font-size:12px; font-weight:500; border-radius:8px; padding:5px 10px; cursor:pointer; transition:background .15s; }
+        .ata-bulk-btn:hover { background:#eef0f3; }
+        .ata-bulk-btn i { font-size:15px; }
+        .ata-bulk-hint { font-size:11px; color:#9ca3af; }
+
+        .bd-row.ata-line-off, .ov-product-row.ata-line-off { opacity:.5; }
+        .bd-row, .ov-product-row { border-radius:8px; }
+        .bd-row:hover, .ov-product-row:hover { background:#fafbfc; }
+    </style>
 </head>
 <body>
 <div class="app align-content-stretch d-flex flex-wrap">
@@ -107,21 +184,17 @@ if (!empty($requirements)) {
                     }
                     ?>
 
-                    <div class="page-description">
-                        <h1>
-                            <table class="headertble">
-                                <tr>
-                                    <td>Auto Transfer for Orders</td>
-                                    <td><a href="internal_transfer_manage" title="Manage Internal Stock Transfer">&#9776;</a></td>
-                                </tr>
-                            </table>
-                        </h1>
+                    <div class="ata-page-head">
+                        <h1>Auto Transfer for Orders</h1>
+                        <a class="ata-manage-link" href="internal_transfer_manage" title="Manage Internal Stock Transfer">
+                            <i class="material-icons-outlined" style="font-size:19px;">menu</i>
+                        </a>
                     </div>
 
                     <?php if (!empty($otDraftsOutsideLlp)): ?>
                     <div class="row">
                         <div class="col-md-12">
-                            <div class="alert alert-warning" style="border-left:4px solid #f59e0b;">
+                            <div class="ata-warn-card">
                                 <strong><i class="material-icons-outlined" style="font-size:17px;vertical-align:middle;">warning</i>
                                     <?php echo count($otDraftsOutsideLlp); ?> OT channel draft line(s) booked against a godown other than FEMI NAYAN LLP</strong>
                                 <p class="text-muted small" style="margin:6px 0 8px;">
@@ -150,87 +223,120 @@ if (!empty($requirements)) {
 
                     <div class="row">
                         <div class="col-md-12">
-                            <div class="card">
+                            <div class="ata-card card">
                                 <div class="card-body">
-                                    <p class="text-muted">
-                                        Quantities required for every still-waiting Territory Partner purchase
-                                        order and drafted OT channel order (LLP) — regardless of when it was
+                                    <p class="ata-intro">
+                                        Quantities required for every still-waiting <span class="ata-tag ata-tag-tp"><span class="ata-tag-dot"></span>TP Purchase Order</span>
+                                        and drafted <span class="ata-tag ata-tag-ot"><span class="ata-tag-dot"></span>OT Channel Order</span> (LLP) — regardless of when it was
                                         raised — auto-capped to available Neksomo + Healthcare stock. Adjust
                                         any row before transferring — Neksomo &rarr; Healthcare &rarr; LLP,
                                         both legs move in one click.
                                     </p>
 
-                                    <?php if (!empty($rows)): ?>
-                                    <button type="button" class="btn btn-sm" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border:none;color:#fff;margin-bottom:14px;" onclick="openOrdersOverview()">
-                                        <i class="material-icons" style="font-size:15px;vertical-align:middle;">list_alt</i> View All Orders
-                                    </button>
+                                    <?php if (!empty($rows)):
+                                        $totalProducts = count($rows);
+                                        $blockedCount  = 0;
+                                        $totalTp       = 0;
+                                        $totalOt       = 0;
+                                        foreach ($rows as $r) {
+                                            if ((int) $r['capped'] <= 0) { $blockedCount++; }
+                                            $totalTp += (int) $r['capped_tp'];
+                                            $totalOt += (int) $r['capped_ot'];
+                                        }
+                                    ?>
+                                    <div class="ata-summary">
+                                        <div class="ata-stat">
+                                            <div class="num"><?php echo $totalProducts; ?></div>
+                                            <div class="lbl">Products</div>
+                                        </div>
+                                        <div class="ata-stat tp">
+                                            <div class="num"><?php echo $totalTp; ?></div>
+                                            <div class="lbl">TP Qty to Transfer</div>
+                                        </div>
+                                        <div class="ata-stat ot">
+                                            <div class="num"><?php echo $totalOt; ?></div>
+                                            <div class="lbl">OT Qty to Transfer</div>
+                                        </div>
+                                        <?php if ($blockedCount > 0): ?>
+                                        <div class="ata-stat warn">
+                                            <div class="num"><?php echo $blockedCount; ?></div>
+                                            <div class="lbl">Need Attention</div>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <div class="ata-actionbar">
+                                        <button type="button" class="ata-btn ata-btn-tp" onclick="openOrdersOverview()">
+                                            <i class="material-icons" style="font-size:15px;">list_alt</i> View All Orders
+                                        </button>
+                                        <button type="button" class="ata-btn ata-btn-ot" onclick="openTransferHistory()">
+                                            <i class="material-icons" style="font-size:15px;">history</i> Transfer History
+                                        </button>
+                                    </div>
+                                    <?php else: ?>
+                                    <div class="ata-actionbar">
+                                        <button type="button" class="ata-btn ata-btn-ot" onclick="openTransferHistory()">
+                                            <i class="material-icons" style="font-size:15px;">history</i> Transfer History
+                                        </button>
+                                    </div>
                                     <?php endif; ?>
-                                    <button type="button" class="btn btn-sm" style="background:linear-gradient(135deg, #0891b2 0%, #0e7490 100%);border:none;color:#fff;margin-bottom:14px;margin-left:8px;box-shadow:0 2px 6px rgba(8,145,178,.3);" onclick="openTransferHistory()">
-                                        <i class="material-icons" style="font-size:15px;vertical-align:middle;">history</i> Transfer History
-                                    </button>
 
                                     <?php if (empty($rows)): ?>
                                         <div class="alert alert-info">Nothing to transfer today.</div>
                                     <?php else: ?>
                                         <form method="post" action="internal_transfer_auto_action.php" id="autoTransferForm" onsubmit="return confirmAutoTransferSubmit(event);">
-                                            <div style="overflow-x:auto;">
-                                            <table class="table table-bordered" style="min-width:1000px;">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Product</th>
-                                                        <th>Required Qty</th>
-                                                        <th>Available (Neksomo)</th>
-                                                        <th>Available (Healthcare)</th>
-                                                        <th>Qty to Transfer</th>
-                                                        <th>Rate to Health Care (Rs.)</th>
-                                                        <th>Rate to LLP (Rs.)</th>
-                                                        <th>Breakdown</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php foreach ($rows as $row): $blocked = (int) $row['capped'] <= 0; ?>
-                                                    <tr class="auto-transfer-row<?php echo $blocked ? ' table-warning' : ''; ?>" data-product-id="<?php echo (int) $row['product_id']; ?>" data-product-name="<?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>" data-neksomo-avail="<?php echo (int) $row['neksomo_avail']; ?>" data-healthcare-avail="<?php echo (int) $row['healthcare_avail']; ?>">
-                                                        <td>
-                                                            <?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>
+                                            <div class="ata-rows">
+                                                <?php foreach ($rows as $row): $blocked = (int) $row['capped'] <= 0; ?>
+                                                <div class="ata-row-card auto-transfer-row<?php echo $blocked ? ' blocked' : ''; ?>" data-product-id="<?php echo (int) $row['product_id']; ?>" data-product-name="<?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>" data-neksomo-avail="<?php echo (int) $row['neksomo_avail']; ?>" data-healthcare-avail="<?php echo (int) $row['healthcare_avail']; ?>">
+                                                    <input type="hidden" name="product_id[]" value="<?php echo (int) $row['product_id']; ?>">
+                                                    <div class="ata-row-top">
+                                                        <div>
+                                                            <span class="ata-row-name"><?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?></span>
                                                             <?php if ($blocked): ?>
-                                                                <span class="badge" style="background:#fee2e2;color:#991b1b;font-weight:600;font-size:10.5px;margin-left:4px;" title="No stock available in Neksomo or Healthcare to fulfill this yet">No stock</span>
+                                                                <span class="ata-badge-nostock" title="No stock available in Neksomo or Healthcare to fulfill this yet">No stock</span>
                                                             <?php endif; ?>
-                                                            <input type="hidden" name="product_id[]" value="<?php echo (int) $row['product_id']; ?>">
-                                                        </td>
-                                                        <td id="req_<?php echo (int) $row['product_id']; ?>">
-                                                            <?php echo (int) $row['required']; ?>
-                                                            <?php if ($row['required_ot'] > $row['capped_ot']): ?>
-                                                                <br><span class="badge" style="background:#fef3c7;color:#92400e;font-weight:600;font-size:10px;" title="OT draft demand could not be fully covered by available stock — TP purchase orders are prioritized">TP <?php echo (int) $row['capped_tp']; ?>/<?php echo (int) $row['required_tp']; ?> · OT <?php echo (int) $row['capped_ot']; ?>/<?php echo (int) $row['required_ot']; ?></span>
-                                                            <?php endif; ?>
-                                                        </td>
-                                                        <td><?php echo (int) $row['neksomo_avail']; ?></td>
-                                                        <td><?php echo (int) $row['healthcare_avail']; ?></td>
-                                                        <td>
+                                                            <div class="ata-split-row">
+                                                                <span style="font-size:12px;color:#6b7280;">Required: <b id="req_<?php echo (int) $row['product_id']; ?>_num" style="color:#1f2937;"><?php echo (int) $row['required']; ?></b></span>
+                                                                <span class="ata-tag ata-tag-tp" title="TP purchase order demand, capped by available stock"><span class="ata-tag-dot"></span>TP <?php echo (int) $row['capped_tp']; ?>/<?php echo (int) $row['required_tp']; ?></span>
+                                                                <span class="ata-tag ata-tag-ot" title="OT channel draft demand, capped by available stock"><span class="ata-tag-dot"></span>OT <?php echo (int) $row['capped_ot']; ?>/<?php echo (int) $row['required_ot']; ?></span>
+                                                                <span id="req_<?php echo (int) $row['product_id']; ?>" style="display:none;"><?php echo (int) $row['required']; ?></span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="ata-avail-chips">
+                                                            <div class="ata-avail-chip">Neksomo: <b><?php echo (int) $row['neksomo_avail']; ?></b></div>
+                                                            <div class="ata-avail-chip">Healthcare: <b><?php echo (int) $row['healthcare_avail']; ?></b></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="ata-row-grid">
+                                                        <div class="ata-field">
+                                                            <label>Qty to Transfer</label>
                                                             <input type="number" min="0" name="qty[]" id="qty_<?php echo (int) $row['product_id']; ?>"
                                                                    value="<?php echo (int) $row['capped']; ?>" class="form-control">
-                                                        </td>
-                                                        <td>
+                                                        </div>
+                                                        <div class="ata-field">
+                                                            <label>Rate to Health Care (Rs.)</label>
                                                             <input type="number" min="0" step="0.01" name="rate1[]" placeholder="Rate(Rs.)" class="form-control"
                                                                    value="<?php echo $row['rate_healthcare'] !== null ? htmlspecialchars((string) $row['rate_healthcare'], ENT_QUOTES, 'UTF-8') : ''; ?>">
-                                                        </td>
-                                                        <td>
+                                                        </div>
+                                                        <div class="ata-field">
+                                                            <label>Rate to LLP (Rs.)</label>
                                                             <input type="number" min="0" step="0.01" name="rate2[]" placeholder="Rate(Rs.)" class="form-control"
                                                                    value="<?php echo $row['rate_llp'] !== null ? htmlspecialchars((string) $row['rate_llp'], ENT_QUOTES, 'UTF-8') : ''; ?>">
-                                                        </td>
-                                                        <td>
-                                                            <button type="button" class="btn btn-sm"
-                                                                    style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border:none;color:#fff;"
+                                                        </div>
+                                                        <div class="ata-field" style="flex:0 0 auto;">
+                                                            <label>&nbsp;</label>
+                                                            <button type="button" class="ata-view-btn"
+                                                                    title="View order breakdown"
                                                                     onclick="openBreakdown(<?php echo (int) $row['product_id']; ?>, <?php echo (int) $row['neksomo_avail']; ?>, <?php echo (int) $row['healthcare_avail']; ?>)">
-                                                                <i class="material-icons" style="font-size:14px;vertical-align:middle;">list_alt</i> View
+                                                                <i class="material-icons" style="font-size:18px;">list_alt</i>
                                                             </button>
-                                                        </td>
-                                                    </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <?php endforeach; ?>
                                             </div>
-                                            <button type="submit" class="btn btn-primary">
-                                                <i class="material-icons" style="font-size:16px;vertical-align:middle;">sync_alt</i> Transfer Now
+                                            <button type="submit" class="ata-btn ata-btn-submit" style="margin-top:16px;">
+                                                <i class="material-icons" style="font-size:16px;">sync_alt</i> Transfer Now
                                             </button>
                                         </form>
                                     <?php endif; ?>
@@ -265,18 +371,23 @@ if (!empty($requirements)) {
                     reopen this page). The order itself stays exactly as it is
                     (still waiting/draft), only its stock movement is postponed.
                 </p>
-                <ul class="nav nav-tabs" role="tablist">
-                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#bdTpPane" type="button">TP Purchase Orders</button></li>
-                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#bdOtPane" type="button">OT Channel Orders</button></li>
+                <ul class="nav nav-tabs ata-nav-tabs" role="tablist">
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#bdTpPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-tp-1);margin-right:6px;"></span>TP Purchase Orders</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#bdOtPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-ot-1);margin-right:6px;"></span>OT Channel Orders</button></li>
                 </ul>
+                <div class="ata-bulk-row">
+                    <button type="button" class="ata-bulk-btn" onclick="bdBulkSet(true)"><i class="material-icons-outlined">done_all</i>Select all</button>
+                    <button type="button" class="ata-bulk-btn" onclick="bdBulkSet(false)"><i class="material-icons-outlined">remove_done</i>Omit all</button>
+                    <span class="ata-bulk-hint">(applies to the currently open tab)</span>
+                </div>
                 <div class="tab-content" style="padding-top:10px;">
                     <div class="tab-pane fade show active" id="bdTpPane"><div id="bdTpList"></div></div>
                     <div class="tab-pane fade" id="bdOtPane"><div id="bdOtList"></div></div>
                 </div>
             </div>
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="applyBreakdown()">Apply</button>
+                <button type="button" class="ata-btn ata-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="ata-btn ata-btn-tp" onclick="applyBreakdown()">Apply</button>
             </div>
         </div>
     </div>
@@ -306,11 +417,16 @@ if (!empty($requirements)) {
                     checkbox, then Apply — this only recomputes the current view (nothing is saved),
                     so it resets if you close and reopen this page.
                 </p>
-                <ul class="nav nav-tabs" role="tablist">
-                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ovTpPane" type="button">TP Purchase Orders</button></li>
-                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovOtPane" type="button">OT Channel Orders</button></li>
+                <ul class="nav nav-tabs ata-nav-tabs" role="tablist">
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ovTpPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-tp-1);margin-right:6px;"></span>TP Purchase Orders</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovOtPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-ot-1);margin-right:6px;"></span>OT Channel Orders</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovExcludedPane" type="button" onclick="loadExcludedToday()">Already Transferred Today</button></li>
                 </ul>
+                <div class="ata-bulk-row">
+                    <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(true)"><i class="material-icons-outlined">done_all</i>Select all</button>
+                    <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(false)"><i class="material-icons-outlined">remove_done</i>Omit all</button>
+                    <span class="ata-bulk-hint">(applies to the currently open tab)</span>
+                </div>
                 <div class="tab-content" style="padding-top:10px;">
                     <div class="tab-pane fade show active" id="ovTpPane"><div id="ovTpList"></div></div>
                     <div class="tab-pane fade" id="ovOtPane"><div id="ovOtList"></div></div>
@@ -324,8 +440,8 @@ if (!empty($requirements)) {
                 </div>
             </div>
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="applyOrdersOverview()">Apply</button>
+                <button type="button" class="ata-btn ata-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="ata-btn ata-btn-tp" onclick="applyOrdersOverview()">Apply</button>
             </div>
         </div>
     </div>
@@ -351,12 +467,12 @@ if (!empty($requirements)) {
                         <label class="form-label" style="font-size:12.5px;font-weight:600;color:#6b7280;">Date</label>
                         <input type="date" id="thDateInput" class="form-control form-control-sm" style="width:170px;">
                     </div>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="loadTransferHistory()">Show</button>
+                    <button type="button" class="ata-btn ata-btn-ot" onclick="loadTransferHistory()">Show</button>
                 </div>
                 <div id="thResult"></div>
             </div>
             <div class="modal-footer" style="border-top:1px solid #e9ecef;">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="ata-btn ata-btn-ghost" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -427,7 +543,7 @@ if (!empty($requirements)) {
             var remembered = lineState[it.source_id];
             var isChecked = remembered ? remembered.checked : true;
             var qtyVal = remembered ? remembered.qty : it.qty;
-            html += '<div class="bd-row" data-source-id="' + it.source_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;padding:8px 4px;flex-wrap:wrap;">' +
+            html += '<div class="bd-row' + (isChecked ? '' : ' ata-line-off') + '" data-source-id="' + it.source_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;padding:8px 4px;flex-wrap:wrap;">' +
                 '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:160px;">' +
                     '<input type="checkbox" class="bd-check" data-source-id="' + it.source_id + '"' + (isChecked ? ' checked' : '') + ' style="margin-right:8px;flex-shrink:0;">' +
                     '<span style="overflow-wrap:anywhere;">' + escBd(it.label) + '</span>' +
@@ -443,7 +559,7 @@ if (!empty($requirements)) {
         el.querySelectorAll('.bd-row').forEach(function (rowEl) {
             var checkbox = rowEl.querySelector('.bd-check');
             var qtyInput = rowEl.querySelector('.bd-qty-input');
-            checkbox.addEventListener('change', function () { bdSaveLineState(rowEl); });
+            checkbox.addEventListener('change', function () { rowEl.classList.toggle('ata-line-off', !checkbox.checked); bdSaveLineState(rowEl); });
             qtyInput.addEventListener('input', function () { bdSaveLineState(rowEl); });
         });
     }
@@ -455,6 +571,46 @@ if (!empty($requirements)) {
         var qty = parseInt(qtyInput.value, 10);
         if (isNaN(qty) || qty < 0) qty = 0;
         lineState[sourceId] = { checked: checkbox.checked, qty: qty };
+    }
+
+    // Select all / Omit all for the currently-visible Order Breakdown tab
+    // only (mirrors the existing single-line checkbox behavior — does not
+    // touch the other tab, and does not Apply by itself).
+    function bdBulkSet(checked) {
+        var activePane = document.querySelector('#breakdownModal .tab-pane.active');
+        if (!activePane) return;
+        activePane.querySelectorAll('.bd-row').forEach(function (rowEl) {
+            var checkbox = rowEl.querySelector('.bd-check');
+            checkbox.checked = checked;
+            rowEl.classList.toggle('ata-line-off', !checked);
+            bdSaveLineState(rowEl);
+        });
+    }
+
+    // Updates every on-row Required Qty display for one product: the
+    // hidden total span (#req_<pid>, still read by the recompute logic
+    // above/below), the visible bold total (#req_<pid>_num), and the
+    // TP/OT tag pair's own "x/y" counts — all three must move together
+    // whenever a breakdown/overview Apply changes what's checked.
+    function updateRequiredDisplay(pid, tpCapped, otCapped) {
+        var total = tpCapped + otCapped;
+        var hidden = document.getElementById('req_' + pid);
+        if (hidden) hidden.textContent = total;
+        var num = document.getElementById('req_' + pid + '_num');
+        if (num) num.textContent = total;
+        var rowEl = document.querySelector('.auto-transfer-row[data-product-id="' + pid + '"]');
+        if (rowEl) {
+            var tpTag = rowEl.querySelector('.ata-tag-tp');
+            var otTag = rowEl.querySelector('.ata-tag-ot');
+            if (tpTag) {
+                var tpMax = (tpTag.textContent.split('/')[1] || '').trim();
+                tpTag.innerHTML = '<span class="ata-tag-dot"></span>TP ' + tpCapped + '/' + tpMax;
+            }
+            if (otTag) {
+                var otMax = (otTag.textContent.split('/')[1] || '').trim();
+                otTag.innerHTML = '<span class="ata-tag-dot"></span>OT ' + otCapped + '/' + otMax;
+            }
+        }
     }
 
     // Recomputes the currently-open product's Required Qty + Qty to
@@ -475,15 +631,13 @@ if (!empty($requirements)) {
             // this stays consistent with the server-side TP-first cap.
             if (sourceId.indexOf('tp:') === 0) { tpTotal += val; } else { otTotal += val; }
         });
-        var total = tpTotal + otTotal;
-
         var pid = currentBreakdownPid;
-        document.getElementById('req_' + pid).textContent = total;
 
         var available = currentNeksomoAvail + currentHealthcareAvail;
         if (available < 0) available = 0;
         var tpCapped = Math.max(0, Math.min(tpTotal, available));
         var otCapped = Math.max(0, Math.min(otTotal, available - tpCapped));
+        updateRequiredDisplay(pid, tpCapped, otCapped);
         document.getElementById('qty_' + pid).value = tpCapped + otCapped;
     }
 
@@ -540,7 +694,7 @@ if (!empty($requirements)) {
                 var remembered = lineState[sourceId];
                 var isChecked = remembered ? remembered.checked : true;
                 var qtyVal = remembered ? remembered.qty : p.qty;
-                return '<div class="ov-product-row" data-source-id="' + sourceId + '" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
+                return '<div class="ov-product-row' + (isChecked ? '' : ' ata-line-off') + '" data-source-id="' + sourceId + '" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
                     '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:0;">' +
                         '<input type="checkbox" class="ov-product-check"' + (isChecked ? ' checked' : '') + ' style="margin-right:8px;flex-shrink:0;">' +
                         '<span style="overflow-wrap:anywhere;">' + escBd(p.product_name) + '</span>' +
@@ -574,7 +728,9 @@ if (!empty($requirements)) {
                 var rowEl = orderCheck.closest('.ov-order');
                 rowEl.querySelectorAll('.ov-product-check').forEach(function (pc) {
                     pc.checked = orderCheck.checked;
-                    ovSaveLineState(pc.closest('.ov-product-row'));
+                    var productRow = pc.closest('.ov-product-row');
+                    productRow.classList.toggle('ata-line-off', !pc.checked);
+                    ovSaveLineState(productRow);
                 });
             });
         });
@@ -584,8 +740,25 @@ if (!empty($requirements)) {
         el.querySelectorAll('.ov-product-row').forEach(function (rowEl) {
             var checkbox = rowEl.querySelector('.ov-product-check');
             var qtyInput = rowEl.querySelector('.ov-product-qty');
-            checkbox.addEventListener('change', function () { ovSaveLineState(rowEl); });
+            checkbox.addEventListener('change', function () { rowEl.classList.toggle('ata-line-off', !checkbox.checked); ovSaveLineState(rowEl); });
             qtyInput.addEventListener('input', function () { ovSaveLineState(rowEl); });
+        });
+    }
+
+    // Select all / Omit all for the currently-visible View All Orders tab
+    // only (TP or OT pane) — updates every product row and each order's
+    // own select-all checkbox to match, same as ticking every box by hand.
+    function ovBulkSet(checked) {
+        var activePane = document.querySelector('#ordersOverviewModal .tab-pane.active');
+        if (!activePane) return;
+        activePane.querySelectorAll('.ov-product-row').forEach(function (rowEl) {
+            var checkbox = rowEl.querySelector('.ov-product-check');
+            checkbox.checked = checked;
+            rowEl.classList.toggle('ata-line-off', !checked);
+            ovSaveLineState(rowEl);
+        });
+        activePane.querySelectorAll('.ov-check').forEach(function (orderCheck) {
+            orderCheck.checked = checked;
         });
     }
 
@@ -643,15 +816,13 @@ if (!empty($requirements)) {
             if (!(pid in seenProductIds)) return; // this product has no overview rows at all — leave untouched
             var tpTotal = tpTotalsByProduct[pid] || 0;
             var otTotal = otTotalsByProduct[pid] || 0;
-            var total = tpTotal + otTotal; // 0 when every row for this product was unchecked
-            var reqEl = document.getElementById('req_' + pid);
-            if (reqEl) reqEl.textContent = total;
             var neksomoAvail = parseInt(row.getAttribute('data-neksomo-avail'), 10) || 0;
             var healthcareAvail = parseInt(row.getAttribute('data-healthcare-avail'), 10) || 0;
             var available = neksomoAvail + healthcareAvail;
             if (available < 0) available = 0;
             var tpCapped = Math.max(0, Math.min(tpTotal, available));
             var otCapped = Math.max(0, Math.min(otTotal, available - tpCapped));
+            updateRequiredDisplay(pid, tpCapped, otCapped);
             var qtyEl = document.getElementById('qty_' + pid);
             if (qtyEl) qtyEl.value = tpCapped + otCapped;
         });
