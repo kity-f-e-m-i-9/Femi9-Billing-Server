@@ -212,6 +212,20 @@ $warehouses = $db_conn->query(
 var rowTemplate = document.getElementById('productRowTemplate');
 var rowsContainer = document.getElementById('productRows');
 
+// Products mapped to a raw Neksomo product only ever assemble FROM that
+// raw pool — there's no meaningful "break this finished pack back into
+// raw pieces" operation, so Pack -> Pieces is hidden for them (see
+// neksomo-piece-pack-convert-action.php's mapped-product path).
+function updateDirectionOptions(rowEl, mapped) {
+    var directionSelect = rowEl.querySelector('.direction-select');
+    var packToPiecesOpt = directionSelect.querySelector('option[value="pack_to_pieces"]');
+    packToPiecesOpt.disabled = !!mapped;
+    packToPiecesOpt.hidden = !!mapped;
+    if (mapped && directionSelect.value === 'pack_to_pieces') {
+        directionSelect.value = 'pieces_to_pack';
+    }
+}
+
 function refreshRowStock(rowEl) {
     var productId = rowEl.querySelector('.product-select').value;
     var godownId = document.getElementById('godownSelect').value;
@@ -226,7 +240,12 @@ function refreshRowStock(rowEl) {
         .then(function (r) { return r.json(); })
         .then(function (data) {
             if (data.error) { panel.textContent = '—'; return; }
-            panel.textContent = data.closing_qty + ' pack(s) · ' + data.extra_pieces + ' pc';
+            updateDirectionOptions(rowEl, data.mapped);
+            if (data.mapped) {
+                panel.textContent = data.raw_pieces + ' raw pc available';
+            } else {
+                panel.textContent = data.closing_qty + ' pack(s) · ' + data.extra_pieces + ' pc';
+            }
         })
         .catch(function () { panel.textContent = '—'; });
 }

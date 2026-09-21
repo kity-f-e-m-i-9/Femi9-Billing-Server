@@ -2,6 +2,7 @@
 include("checksession.php");
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
+require_once("include/NeksomoStockBridge.php");
 include("config.php");
 
 // Dedicated to the neksomo login (admin retained for oversight/support).
@@ -93,6 +94,19 @@ foreach ($rows as $row) {
     }
 }
 
+// A mapped product only ever assembles FROM its raw pool — "break open"
+// has no meaningful raw pool to return pieces to (see updateDirectionOptions()
+// in neksomo-piece-pack-convert.php, which hides this option client-side;
+// re-validated here since the client-side hide alone is never trusted).
+foreach ($rows as $row) {
+    $rawSource = get_neksomo_source_for_company_product($db_conn, $row['product_id']);
+    if ($rawSource && $row['direction'] === 'pack_to_pieces') {
+        $_SESSION['errorMessage'] = "This product draws from a raw material pool — breaking a finished pack back open isn't supported for it.";
+        header("Location: neksomo-piece-pack-convert.php");
+        exit;
+    }
+}
+
 $stockService = new StockService($db_conn);
 $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
@@ -107,7 +121,29 @@ try {
         $productName   = $productsById[$row['product_id']]['productName'];
         $refId         = 'CONV-' . date('YmdHis') . '-' . random_int(100, 999);
 
-        if ($row['direction'] === 'pieces_to_pack') {
+        $rawSource = get_neksomo_source_for_company_product($db_conn, $row['product_id']);
+
+        if ($rawSource && $row['direction'] === 'pieces_to_pack') {
+            // Draws raw pieces from the mapped Neksomo product's own stock
+            // row at this same (godown, warehouse) and credits the finished
+            // product's packs — a cross-product operation, so it can't use
+            // StockService::convertPiecesToPack() (single-product only).
+            // deduct()/credit() throw StockException on insufficient stock,
+            // same as convertPiecesToPack() would, keeping the all-or-
+            // nothing batch behavior intact.
+            $rawProductId  = (int) $rawSource['neksomo_product_id'];
+            $piecesNeeded  = $piecesPerPack * $row['pack_count'];
+
+            $stockService->deduct(
+                $rawProductId, 'company', $godownId, $piecesNeeded,
+                'conversion', $refId, $createdBy, true, $warehouseId
+            );
+            $creditResult = $stockService->credit(
+                $row['product_id'], 'company', $godownId, $row['pack_count'],
+                'conversion', $refId, $createdBy, true, $warehouseId
+            );
+            $summaries[] = "$productName: assembled {$row['pack_count']} pack(s) from raw stock — now {$creditResult['qty_after']} pack(s) on hand";
+        } elseif ($row['direction'] === 'pieces_to_pack') {
             $result = $stockService->convertPiecesToPack(
                 $row['product_id'], 'company', $godownId, $piecesPerPack, $row['pack_count'],
                 $refId, $createdBy, true, $warehouseId
