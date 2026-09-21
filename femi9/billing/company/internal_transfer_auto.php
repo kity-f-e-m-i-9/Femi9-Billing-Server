@@ -20,6 +20,7 @@ if (!$neksomoId || !$healthcareId || !$llpId) {
 $stockService = new StockService($db_conn);
 $requirements = get_auto_transfer_requirements($db_conn, $llpId);
 $defaultRates = get_auto_transfer_default_rates($db_conn);
+$otDraftsOutsideLlp = get_ot_drafts_outside_llp_godown($db_conn, $llpId);
 
 $rows = [];
 if (!empty($requirements)) {
@@ -37,16 +38,23 @@ if (!empty($requirements)) {
     $stmt->close();
 
     foreach ($requirements as $pid => $required) {
+        $tpRequired      = (int) $required['tp'];
+        $otRequired      = (int) $required['ot'];
         $neksomoAvail    = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $neksomoId) ?? 0);
         $healthcareAvail = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $healthcareId) ?? 0);
-        $cappedQty       = cap_auto_transfer_qty($required, $neksomoAvail, $healthcareAvail);
-        if ($cappedQty <= 0) continue;
+        $available       = $neksomoAvail + $healthcareAvail;
+        $split           = cap_auto_transfer_qty_by_source($tpRequired, $otRequired, $available);
+        $cappedQty       = $split['tp'] + $split['ot'];
 
         $rows[] = [
             'product_id'      => $pid,
             'product_name'    => $productNames[$pid] ?? "Product #$pid",
-            'required'        => $required,
+            'required'        => $tpRequired + $otRequired,
+            'required_tp'     => $tpRequired,
+            'required_ot'     => $otRequired,
             'capped'          => $cappedQty,
+            'capped_tp'       => $split['tp'],
+            'capped_ot'       => $split['ot'],
             'neksomo_avail'   => $neksomoAvail,
             'healthcare_avail'=> $healthcareAvail,
             'rate_healthcare' => $defaultRates[$pid]['healthcare'] ?? null,
@@ -110,6 +118,36 @@ if (!empty($requirements)) {
                         </h1>
                     </div>
 
+                    <?php if (!empty($otDraftsOutsideLlp)): ?>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="alert alert-warning" style="border-left:4px solid #f59e0b;">
+                                <strong><i class="material-icons-outlined" style="font-size:17px;vertical-align:middle;">warning</i>
+                                    <?php echo count($otDraftsOutsideLlp); ?> OT channel draft line(s) booked against a godown other than FEMI NAYAN LLP</strong>
+                                <p class="text-muted small" style="margin:6px 0 8px;">
+                                    Auto Transfer only replenishes LLP, so these drafts are NOT counted in Required Qty below.
+                                    Check the godown selected when these were created — it may have been picked by mistake.
+                                </p>
+                                <div style="max-height:180px;overflow-y:auto;">
+                                <table class="table table-sm table-bordered mb-0" style="font-size:12.5px;">
+                                    <thead><tr><th>Order</th><th>Product</th><th>Qty</th><th>Booked Godown</th></tr></thead>
+                                    <tbody>
+                                    <?php foreach ($otDraftsOutsideLlp as $d): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars(($d['customer_name'] ?: 'Draft Order') . ' (' . $d['cat'] . ')', ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td><?php echo htmlspecialchars($d['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td><?php echo (int) $d['qty']; ?></td>
+                                            <td><?php echo htmlspecialchars($d['godown_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="row">
                         <div class="col-md-12">
                             <div class="card">
@@ -150,13 +188,21 @@ if (!empty($requirements)) {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <?php foreach ($rows as $row): ?>
-                                                    <tr class="auto-transfer-row" data-product-id="<?php echo (int) $row['product_id']; ?>" data-product-name="<?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>" data-neksomo-avail="<?php echo (int) $row['neksomo_avail']; ?>" data-healthcare-avail="<?php echo (int) $row['healthcare_avail']; ?>">
+                                                    <?php foreach ($rows as $row): $blocked = (int) $row['capped'] <= 0; ?>
+                                                    <tr class="auto-transfer-row<?php echo $blocked ? ' table-warning' : ''; ?>" data-product-id="<?php echo (int) $row['product_id']; ?>" data-product-name="<?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>" data-neksomo-avail="<?php echo (int) $row['neksomo_avail']; ?>" data-healthcare-avail="<?php echo (int) $row['healthcare_avail']; ?>">
                                                         <td>
                                                             <?php echo htmlspecialchars($row['product_name'], ENT_QUOTES, 'UTF-8'); ?>
+                                                            <?php if ($blocked): ?>
+                                                                <span class="badge" style="background:#fee2e2;color:#991b1b;font-weight:600;font-size:10.5px;margin-left:4px;" title="No stock available in Neksomo or Healthcare to fulfill this yet">No stock</span>
+                                                            <?php endif; ?>
                                                             <input type="hidden" name="product_id[]" value="<?php echo (int) $row['product_id']; ?>">
                                                         </td>
-                                                        <td id="req_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['required']; ?></td>
+                                                        <td id="req_<?php echo (int) $row['product_id']; ?>">
+                                                            <?php echo (int) $row['required']; ?>
+                                                            <?php if ($row['required_ot'] > $row['capped_ot']): ?>
+                                                                <br><span class="badge" style="background:#fef3c7;color:#92400e;font-weight:600;font-size:10px;" title="OT draft demand could not be fully covered by available stock — TP purchase orders are prioritized">TP <?php echo (int) $row['capped_tp']; ?>/<?php echo (int) $row['required_tp']; ?> · OT <?php echo (int) $row['capped_ot']; ?>/<?php echo (int) $row['required_ot']; ?></span>
+                                                            <?php endif; ?>
+                                                        </td>
                                                         <td><?php echo (int) $row['neksomo_avail']; ?></td>
                                                         <td><?php echo (int) $row['healthcare_avail']; ?></td>
                                                         <td>
@@ -416,7 +462,7 @@ if (!empty($requirements)) {
     // shared by the plain "Apply" button.
     function recomputeCurrentRowFromCheckboxes() {
         if (currentBreakdownPid === null) return;
-        var total = 0;
+        var tpTotal = 0, otTotal = 0;
         document.querySelectorAll('.bd-check:checked').forEach(function (chk) {
             var sourceId = chk.getAttribute('data-source-id');
             var qtyInput = document.querySelector('.bd-qty-input[data-source-id="' + sourceId.replace(/"/g, '') + '"]');
@@ -425,15 +471,20 @@ if (!empty($requirements)) {
             if (isNaN(val) || val < 0) val = 0;
             if (val > maxQty) val = maxQty; // never more than that order actually needs
             if (qtyInput) qtyInput.value = val;
-            total += val;
+            // source_id is "tp:..." or "ot:..." — classify by that prefix so
+            // this stays consistent with the server-side TP-first cap.
+            if (sourceId.indexOf('tp:') === 0) { tpTotal += val; } else { otTotal += val; }
         });
+        var total = tpTotal + otTotal;
 
         var pid = currentBreakdownPid;
         document.getElementById('req_' + pid).textContent = total;
 
-        var capped = Math.min(total, currentNeksomoAvail + currentHealthcareAvail);
-        if (capped < 0) capped = 0;
-        document.getElementById('qty_' + pid).value = capped;
+        var available = currentNeksomoAvail + currentHealthcareAvail;
+        if (available < 0) available = 0;
+        var tpCapped = Math.max(0, Math.min(tpTotal, available));
+        var otCapped = Math.max(0, Math.min(otTotal, available - tpCapped));
+        document.getElementById('qty_' + pid).value = tpCapped + otCapped;
     }
 
     function openBreakdown(pid, neksomoAvail, healthcareAvail) {
@@ -561,7 +612,8 @@ if (!empty($requirements)) {
         // here at all," since an unchecked row contributes nothing to
         // either. Without this distinction, unchecking every row for a
         // product looked like a no-op instead of zeroing it out.
-        var totalsByProduct = {};
+        var tpTotalsByProduct = {};
+        var otTotalsByProduct = {};
         var seenProductIds = {};
         document.querySelectorAll('#ovTpList .ov-product-row, #ovOtList .ov-product-row').forEach(function (rowEl) {
             var pid = rowEl.getAttribute('data-product-id');
@@ -575,21 +627,33 @@ if (!empty($requirements)) {
             if (val > maxQty) val = maxQty;
             qtyInput.value = val;
             ovSaveLineState(rowEl);
-            totalsByProduct[pid] = (totalsByProduct[pid] || 0) + val;
+            // "tp:..." / "ot:..." prefix on data-source-id tells which list
+            // this row came from, same convention as the per-product
+            // breakdown modal — kept separate so TP is capped first.
+            var sourceId = rowEl.getAttribute('data-source-id') || '';
+            if (sourceId.indexOf('tp:') === 0) {
+                tpTotalsByProduct[pid] = (tpTotalsByProduct[pid] || 0) + val;
+            } else {
+                otTotalsByProduct[pid] = (otTotalsByProduct[pid] || 0) + val;
+            }
         });
 
         document.querySelectorAll('.auto-transfer-row').forEach(function (row) {
             var pid = row.getAttribute('data-product-id');
             if (!(pid in seenProductIds)) return; // this product has no overview rows at all — leave untouched
-            var total = totalsByProduct[pid] || 0; // 0 when every row for this product was unchecked
+            var tpTotal = tpTotalsByProduct[pid] || 0;
+            var otTotal = otTotalsByProduct[pid] || 0;
+            var total = tpTotal + otTotal; // 0 when every row for this product was unchecked
             var reqEl = document.getElementById('req_' + pid);
             if (reqEl) reqEl.textContent = total;
             var neksomoAvail = parseInt(row.getAttribute('data-neksomo-avail'), 10) || 0;
             var healthcareAvail = parseInt(row.getAttribute('data-healthcare-avail'), 10) || 0;
-            var capped = Math.min(total, neksomoAvail + healthcareAvail);
-            if (capped < 0) capped = 0;
+            var available = neksomoAvail + healthcareAvail;
+            if (available < 0) available = 0;
+            var tpCapped = Math.max(0, Math.min(tpTotal, available));
+            var otCapped = Math.max(0, Math.min(otTotal, available - tpCapped));
             var qtyEl = document.getElementById('qty_' + pid);
-            if (qtyEl) qtyEl.value = capped;
+            if (qtyEl) qtyEl.value = tpCapped + otCapped;
         });
 
         var modalEl = document.getElementById('ordersOverviewModal');

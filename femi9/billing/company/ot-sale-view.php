@@ -208,10 +208,38 @@ $i= $start_from;
                             <div class="col">
                                 <div class="card">
                                     <div class="card-body">
+<form method="post" action="ot-sale-confirm-action.php" id="ot-bulk-confirm-form">
+<div style="margin-bottom:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+<button type="submit" class="btn btn-success" id="ot-bulk-confirm-btn" disabled
+    onclick="return confirm('Confirm the selected draft order(s)? Stock will be deducted from each order\'s godown.');">
+    <i class="material-icons" style="font-size:16px;vertical-align:middle;">check_circle</i> Confirm Selected
+</button>
+<a href="javascript:void(0);" onclick="otSetAllDraftCheckboxes(true);">Select All</a>
+<a href="javascript:void(0);" onclick="otSetAllDraftCheckboxes(false);">Deselect All</a>
+</div>
+<script>
+function otUpdateBulkConfirmButton() {
+    var boxes = document.querySelectorAll('.ot-draft-checkbox');
+    var checked = document.querySelectorAll('.ot-draft-checkbox:checked').length;
+    var btn = document.getElementById('ot-bulk-confirm-btn');
+    btn.disabled = (checked === 0);
+    btn.innerText = checked > 0 ? ('Confirm Selected (' + checked + ')') : 'Confirm Selected';
+    var headerCb = document.getElementById('ot-select-all-checkbox');
+    if (headerCb) {
+        headerCb.checked = (boxes.length > 0 && checked === boxes.length);
+        headerCb.indeterminate = (checked > 0 && checked < boxes.length);
+    }
+}
+function otSetAllDraftCheckboxes(checked) {
+    document.querySelectorAll('.ot-draft-checkbox').forEach(function (cb) { cb.checked = checked; });
+    otUpdateBulkConfirmButton();
+}
+</script>
                                         <div style="overflow-x:scroll;">
                                          <table id="datatable1" style="width:100%;">
                                             <thead>
                                                 <tr>
+                                                    <th><input type="checkbox" id="ot-select-all-checkbox" title="Select/Deselect all draft orders" onclick="otSetAllDraftCheckboxes(this.checked);"></th>
                                                     <th>S.No</th>
 													<th>Company Profile</th>
 													<th>Category</th>
@@ -323,10 +351,11 @@ foreach ($tempidList as $tempid) {
 	?>
 
                                                 <tr>
+                                                    <?php $ot_row_status = $Result_productDetils122["status"] ?? 'confirmed'; ?>
+                                                    <td><?php if ($ot_row_status === 'draft'): ?><input type="checkbox" name="tempids[]" value="<?=htmlspecialchars($tempid, ENT_QUOTES)?>" class="ot-draft-checkbox" onclick="otUpdateBulkConfirmButton()"><?php endif; ?></td>
                                                     <td><?php echo ++$i; ?></td>
 				<td><?php echo $result_godowndetails["gname"] ?? '';?></td>
 													<td><?php echo $Result_productDetils["cat"];?></td>
-													<?php $ot_row_status = $Result_productDetils122["status"] ?? 'confirmed'; ?>
 													<td><?php if ($ot_row_status === 'draft'): ?><span class="badge badge-warning">Draft</span><?php else: ?><span class="badge badge-success">Confirmed</span><?php endif; ?></td>
 
 													<td><?php echo $Result_productDetils122["coupon_code"] ?? '';?></td>
@@ -384,6 +413,12 @@ function newPopup(url) {
 																										<td>
 													    <div class="actions-group">
 													        <a href="ot-sale-edit?tempid=<?php echo base64_encode($tempid);?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+													        <?php if ($ot_row_status === 'draft'): ?>
+													        <a href="ot-sale-confirm-action.php?tempid=<?=urlencode($tempid)?>" class="action-link" title="Confirm — deducts stock and finalizes this order"
+													           onclick="return confirm('Confirm this draft order? Stock will be deducted from its godown.');">
+													            <i class="material-icons-outlined" style="font-size:17px;color:#2f9e44;">check_circle</i>
+													        </a>
+													        <?php endif; ?>
 													    </div>
 													</td>
 													
@@ -409,6 +444,7 @@ function newPopup(url) {
 										 </tbody>
                                         </table>
                                     </div>
+</form>
 									</div>
                                 </div>
                                 

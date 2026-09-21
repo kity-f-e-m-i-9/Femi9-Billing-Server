@@ -292,8 +292,14 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
  * are deliberately NOT included as a third source here — confirmed
  * 2026-09-18 that they're not wanted in this feature's demand calc.
  *
- * Returns [product_id => requiredQty], omitting products with a
- * combined qty of 0 or less.
+ * Returns [product_id => ['tp' => qty, 'ot' => qty]], omitting products
+ * where both sources are 0. Kept separate (not summed into one number)
+ * because TP demand is real, completable purchase orders, while OT
+ * demand is draft channel orders that — until they're confirmed via
+ * ot-sale-confirm-action.php — can sit indefinitely and must never be
+ * allowed to starve real TP demand of limited stock when the two
+ * compete for the same availability cap. See
+ * cap_auto_transfer_qty_by_source() for how callers should apply this.
  */
 function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): array
 {
@@ -321,7 +327,8 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     $tpResult = $tpStmt->get_result();
     while ($row = $tpResult->fetch_assoc()) {
         $pid = (int) $row['product_id'];
-        $requirements[$pid] = ($requirements[$pid] ?? 0) + (int) $row['total_qty'];
+        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0];
+        $requirements[$pid]['tp'] += (int) $row['total_qty'];
     }
     $tpStmt->close();
 
@@ -341,11 +348,27 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     $otResult = $otStmt->get_result();
     while ($row = $otResult->fetch_assoc()) {
         $pid = (int) $row['product_id'];
-        $requirements[$pid] = ($requirements[$pid] ?? 0) + (int) $row['total_qty'];
+        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0];
+        $requirements[$pid]['ot'] += (int) $row['total_qty'];
     }
     $otStmt->close();
 
-    return array_filter($requirements, fn($qty) => $qty > 0);
+    return array_filter($requirements, fn($r) => ($r['tp'] + $r['ot']) > 0);
+}
+
+/**
+ * Splits one product's available stock between TP and OT-draft demand,
+ * TP first — real, completable purchase orders are never starved by
+ * OT drafts that (until confirmed) can sit indefinitely. Returns
+ * ['tp' => qtyForTp, 'ot' => qtyForOt], each capped so tp+ot never
+ * exceeds $available and neither source gets a negative share.
+ */
+function cap_auto_transfer_qty_by_source(int $tpRequired, int $otRequired, int $available): array
+{
+    $available = max(0, $available);
+    $tpCapped  = max(0, min($tpRequired, $available));
+    $otCapped  = max(0, min($otRequired, $available - $tpCapped));
+    return ['tp' => $tpCapped, 'ot' => $otCapped];
 }
 
 /**
@@ -515,6 +538,51 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     $overview['ot'] = array_values($otByTempid);
 
     return $overview;
+}
+
+/**
+ * Every currently-draft OT sale line booked against a godown OTHER than
+ * LLP — Auto Transfer only ever replenishes LLP (see
+ * get_auto_transfer_requirements()), so a draft booked against any other
+ * company_godown (e.g. picked by mistake in ot-sale-add.php, which lets
+ * any non-finance-only godown be chosen) silently never appears as
+ * demand there. This surfaces those drafts instead of leaving them
+ * invisible, so staff can notice and correct the godown by hand.
+ *
+ * Returns a list of ['tempid' => string, 'customer_name' => ?string,
+ * 'cat' => string, 'godown_name' => string, 'product_id' => int,
+ * 'product_name' => string, 'qty' => int], one row per OT sale line.
+ */
+function get_ot_drafts_outside_llp_godown(mysqli $db_conn, int $llpGodownId): array
+{
+    ensure_ot_sales_invoice_status_column($db_conn);
+
+    $stmt = $db_conn->prepare(
+        "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id,
+                os.qty, p.productName, cg.gname AS godown_name
+         FROM ot_sales os
+         INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
+         INNER JOIN products p ON p.id = os.prid
+         LEFT JOIN company_godown cg ON cg.id = os.godownid
+         WHERE osi.status = 'draft' AND (os.godownid IS NULL OR os.godownid != ?)
+         ORDER BY os.tempid, os.prid"
+    );
+    $stmt->bind_param('i', $llpGodownId);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    return array_map(function ($row) {
+        return [
+            'tempid'        => $row['tempid'],
+            'customer_name' => $row['customer_name'],
+            'cat'           => $row['cat'],
+            'godown_name'   => $row['godown_name'] ?? 'Unknown/Unassigned',
+            'product_id'    => (int) $row['product_id'],
+            'product_name'  => $row['productName'],
+            'qty'           => (int) $row['qty'],
+        ];
+    }, $rows);
 }
 
 /**

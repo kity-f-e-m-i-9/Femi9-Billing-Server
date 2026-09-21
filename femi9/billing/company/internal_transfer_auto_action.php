@@ -207,8 +207,22 @@ try {
 
         save_auto_transfer_default_rate($db_conn, $pid, $row['rate1'], $row['rate2'], $createdBy);
 
+        // Only mark an order 'transferred' once its own qty actually fit
+        // within what was really moved ($legTwoQty) — TP orders claim their
+        // share first (real, completable purchase orders), OT drafts only
+        // get whatever's left over. Walking each source's own list
+        // cumulatively means an order past the point stock ran out is left
+        // unmarked, so it correctly reappears as outstanding demand next
+        // time instead of being silently marked done with nothing moved
+        // for it (previously every contributing order was marked
+        // regardless of whether the cap actually covered it).
+        $remaining = $legTwoQty;
         foreach (['tp', 'ot'] as $sourceType) {
             foreach ($contributingOrders[$sourceType] as $order) {
+                $orderQty = (int) $order['qty'];
+                if ($orderQty <= 0) continue;
+                if ($remaining < $orderQty) break; // this and every later order in this source's list stay unmarked
+                $remaining -= $orderQty;
                 $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"ot:"/"wa:" prefix
                 mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy);
             }

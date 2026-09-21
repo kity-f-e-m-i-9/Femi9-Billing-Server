@@ -28,6 +28,32 @@ class StockService
         $this->db = $db;
     }
 
+    // Self-migrating — see db_migrations/2026_09_19_stock_ledger_conversion_ref_type.sql,
+    // written for the same reason: convertPiecesToPack()/convertPackToPieces()
+    // (and neksomo-piece-pack-convert-action.php's mapped-product deduct/
+    // credit path) pass ref_type='conversion', but any environment where
+    // that migration hasn't been manually run is still on the older ENUM
+    // and fails with "Data truncated for column 'ref_type'" on every
+    // Convert Pieces <-> Packs submission. Called before every write that
+    // uses 'conversion' so it can't assume the .sql file ever ran.
+    private function ensureConversionRefType(): void
+    {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+
+        $col = $this->db->query("SHOW COLUMNS FROM stock_ledger LIKE 'ref_type'");
+        $row = $col ? $col->fetch_assoc() : null;
+        if ($row && strpos((string) $row['Type'], "'conversion'") === false) {
+            $this->db->query(
+                "ALTER TABLE stock_ledger MODIFY COLUMN ref_type ENUM(
+                    'invoice','user_invoice','return','transfer','ot_sale',
+                    'adjustment','demofree','tp_invoice','conversion'
+                ) NOT NULL"
+            );
+        }
+    }
+
     // -------------------------------------------------------------------------
     // PUBLIC API
     // -------------------------------------------------------------------------
@@ -49,6 +75,7 @@ class StockService
         bool   $externalTransaction = false,
         ?int   $warehouseId = null
     ): array {
+        if ($refType === 'conversion') $this->ensureConversionRefType();
         if (!$externalTransaction) {
             $this->db->begin_transaction();
         }
@@ -119,6 +146,7 @@ class StockService
         bool   $externalTransaction = false,
         ?int   $warehouseId = null
     ): array {
+        if ($refType === 'conversion') $this->ensureConversionRefType();
         if (!$externalTransaction) {
             $this->db->begin_transaction();
         }
@@ -933,6 +961,7 @@ class StockService
         bool   $externalTransaction = false,
         ?int   $warehouseId = null
     ): array {
+        $this->ensureConversionRefType();
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
             $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
@@ -993,6 +1022,7 @@ class StockService
         bool   $externalTransaction = false,
         ?int   $warehouseId = null
     ): array {
+        $this->ensureConversionRefType();
         if (!$externalTransaction) $this->db->begin_transaction();
         try {
             $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
