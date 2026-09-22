@@ -96,6 +96,10 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <a href="manage-warehouses"><i class="material-icons-two-tone">warehouse</i>Manage Godowns</a>
                     </li>
 
+					<li>
+                        <a href="godown-stock-move"><i class="material-icons-two-tone">swap_horiz</i>Move Stock Between Godowns</a>
+                    </li>
+
 					<!-----<li>
                         <a href="#"><i class="material-icons-two-tone">done</i>Stock Return<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
@@ -208,6 +212,8 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <a href="#"><i class="material-icons-two-tone">inventory_2</i>Stock<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
 						<li><a href="neksomo-purchase-stock.php">Purchase Stock</a></li>
+						<li><a href="input-stock-bundles.php">Input Stock — Raw Bundles</a></li>
+						<li><a href="raw-material-bundles-manage.php">Manage Bundles</a></li>
 						<li><a href="neksomo-piece-pack-convert.php">Convert Pieces &harr; Packs</a></li>
 						<li><a href="neksomo-company-stock.php">Company Stock</a></li>
                         </ul>

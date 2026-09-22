@@ -3,6 +3,7 @@ include("checksession.php");
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/NeksomoStockBridge.php");
+require_once("include/RawMaterialBundles.php");
 include("config.php");
 
 // Dedicated to the neksomo login (admin retained for oversight/support).
@@ -25,6 +26,7 @@ $warehouseId = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: 
 $rawProductIds = $_POST['product_id'] ?? [];
 $rawDirections = $_POST['direction'] ?? [];
 $rawPackCounts = $_POST['pack_count'] ?? [];
+$rawBundleIds  = $_POST['bundle_id'] ?? [];
 
 if (!$godownId || !is_array($rawProductIds) || empty($rawProductIds)) {
     $_SESSION['errorMessage'] = "Invalid submission — please fill in every field.";
@@ -55,6 +57,7 @@ foreach ($rawProductIds as $i => $rawProductId) {
     $productId = (int) $rawProductId;
     $direction = $rawDirections[$i] ?? '';
     $packCount = (int) ($rawPackCounts[$i] ?? 0);
+    $bundleId  = filter_var($rawBundleIds[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
 
     if (!$productId || $packCount < 1 || !in_array($direction, ['pieces_to_pack', 'pack_to_pieces'], true)) {
         $_SESSION['errorMessage'] = "Invalid submission — please fill in every field for every product.";
@@ -62,7 +65,7 @@ foreach ($rawProductIds as $i => $rawProductId) {
         exit;
     }
 
-    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount];
+    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId];
 }
 
 // A product appearing twice in one batch is never a legitimate
@@ -107,6 +110,21 @@ foreach ($rows as $row) {
     }
 }
 
+// A mapped product's Pieces -> Pack conversion requires a specific open
+// raw material bundle to be selected — no fallback to the old pooled
+// deduction (see docs/superpowers/specs/2026-09-22-raw-material-bundle-
+// tracking-design.md's confirmed "block until bundle exists" decision).
+// Re-validated here since the client-side `required` attribute on a
+// hidden field is never trusted.
+foreach ($rows as $row) {
+    $rawSource = get_neksomo_source_for_company_product($db_conn, $row['product_id']);
+    if ($rawSource && $row['direction'] === 'pieces_to_pack' && !$row['bundle_id']) {
+        $_SESSION['errorMessage'] = "Please select a raw material bundle for every mapped product — add one via Input Stock → Raw Bundles if none exist yet.";
+        header("Location: neksomo-piece-pack-convert.php");
+        exit;
+    }
+}
+
 $stockService = new StockService($db_conn);
 $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
@@ -124,25 +142,25 @@ try {
         $rawSource = get_neksomo_source_for_company_product($db_conn, $row['product_id']);
 
         if ($rawSource && $row['direction'] === 'pieces_to_pack') {
-            // Draws raw pieces from the mapped Neksomo product's own stock
-            // row at this same (godown, warehouse) and credits the finished
-            // product's packs — a cross-product operation, so it can't use
-            // StockService::convertPiecesToPack() (single-product only).
-            // deduct()/credit() throw StockException on insufficient stock,
-            // same as convertPiecesToPack() would, keeping the all-or-
-            // nothing batch behavior intact.
-            $rawProductId  = (int) $rawSource['neksomo_product_id'];
-            $piecesNeeded  = $piecesPerPack * $row['pack_count'];
+            // The selected bundle's own remaining_pieces IS the hard limit
+            // for this conversion — no pooled stock.closing_qty deduction
+            // is involved at all. Caps at however many FULL packs the
+            // bundle can actually support; if that's less than requested,
+            // converts only that many and reports the shortfall (see
+            // docs/superpowers/specs/2026-09-22-raw-material-bundle-
+            // tracking-design.md).
+            $bundleResult = convert_from_raw_material_bundle($db_conn, $row['bundle_id'], $piecesPerPack, $row['pack_count']);
 
-            $stockService->deduct(
-                $rawProductId, 'company', $godownId, $piecesNeeded,
-                'conversion', $refId, $createdBy, true, $warehouseId
-            );
             $creditResult = $stockService->credit(
-                $row['product_id'], 'company', $godownId, $row['pack_count'],
+                $row['product_id'], 'company', $godownId, $bundleResult['packs_made'],
                 'conversion', $refId, $createdBy, true, $warehouseId
             );
-            $summaries[] = "$productName: assembled {$row['pack_count']} pack(s) from raw stock — now {$creditResult['qty_after']} pack(s) on hand";
+
+            if ($bundleResult['packs_made'] < $bundleResult['requested_packs']) {
+                $summaries[] = "$productName: only {$bundleResult['packs_made']} of {$bundleResult['requested_packs']} pack(s) could be made — selected bundle ran short ({$bundleResult['remaining_after']} pc left). Now {$creditResult['qty_after']} pack(s) on hand";
+            } else {
+                $summaries[] = "$productName: assembled {$bundleResult['packs_made']} pack(s) from the selected bundle — now {$creditResult['qty_after']} pack(s) on hand";
+            }
         } elseif ($row['direction'] === 'pieces_to_pack') {
             $result = $stockService->convertPiecesToPack(
                 $row['product_id'], 'company', $godownId, $piecesPerPack, $row['pack_count'],

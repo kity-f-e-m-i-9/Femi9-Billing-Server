@@ -2,6 +2,7 @@
 include("checksession.php");
 require_once("include/GodownAccess.php");
 require_once("include/NeksomoStockBridge.php");
+require_once("include/RawMaterialBundles.php");
 header('Content-Type: application/json');
 error_reporting(0);
 
@@ -53,21 +54,25 @@ function fetch_stock_row(mysqli $db_conn, int $productId, string $godownId, ?int
     return $row ?: null;
 }
 
-// If this finished product is mapped to a raw Neksomo product, "Current
-// Stock" for the Pieces -> Pack direction means the RAW product's own
-// piece stock at this same (godown, warehouse) — not this finished
-// product's own extra_pieces — since assembling now draws from the raw
-// pool, not from a loose-piece remainder sitting on the finished SKU
-// itself. See neksomo-piece-pack-convert-action.php's mapped-product path.
+// If this finished product is mapped to a raw Neksomo product, Pieces ->
+// Pack conversion draws SOLELY from a specific open bundle — the pooled
+// stock.closing_qty row is not involved at all (see docs/superpowers/
+// specs/2026-09-22-raw-material-bundle-tracking-design.md). "Current
+// Stock" for a mapped product is therefore the sum of its open bundles'
+// remaining pieces at this (godown, warehouse), not the pooled figure.
 $rawSource = get_neksomo_source_for_company_product($db_conn, $productId);
 
 if ($rawSource) {
     $rawProductId = (int) $rawSource['neksomo_product_id'];
-    $rawRow = fetch_stock_row($db_conn, $rawProductId, $godownId, $warehouseId);
+
+    $openBundles = get_open_raw_material_bundles($db_conn, $rawProductId, (int) $godownId, $warehouseId);
+    $totalBundlePieces = array_sum(array_column($openBundles, 'remaining_pieces'));
+
     echo json_encode([
         'mapped'          => true,
         'raw_product_id'  => $rawProductId,
-        'raw_pieces'      => (int) ($rawRow['closing_qty'] ?? 0),
+        'raw_pieces'      => $totalBundlePieces,
+        'open_bundles'    => $openBundles,
         'closing_qty'     => 0,
         'extra_pieces'    => 0,
         'pieces_per_pack' => $piecesPerPack,

@@ -62,6 +62,18 @@ $warehouses = $db_conn->query(
         #convertForm .form-control:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.15); }
         #convertForm .direction-select { padding-top: 8px; padding-bottom: 8px; }
 
+        .bundle-picker-wrap .select2-container--default .select2-selection--single { border-color: #ddd6fe; background: #fbfaff; }
+        .bundle-picker-wrap .select2-container--default.select2-container--open .select2-selection--single { border-color: #764ba2; box-shadow: 0 0 0 3px rgba(118,75,162,.15); }
+        .bundle-option-remaining { display: inline-block; font-size: 11.5px; font-weight: 600; color: #6d28d9; background: #ede9fe; border-radius: 6px; padding: 1px 7px; margin-left: 8px; white-space: nowrap; }
+        .select2-results__option .bundle-option-remaining { float: right; margin-top: 2px; }
+
+        .rmb-tabs { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+        .rmb-tab { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:9px; font-size:13.5px; font-weight:500; text-decoration:none; transition:filter .15s, background .15s; }
+        .rmb-tab i { font-size:17px; }
+        .rmb-tab.active { background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:#fff; box-shadow:0 2px 8px rgba(102,126,234,.3); }
+        .rmb-tab:not(.active) { background:#f3f4f6; color:#4b5563; }
+        .rmb-tab:not(.active):hover { background:#e5e7eb; color:#1f2937; }
+
         .remove-row-btn {
             width: 42px; height: 42px; border-radius: 50%; border: 1px solid #fecdd3;
             background: #fff; color: #e11d48; display: inline-flex;
@@ -88,6 +100,12 @@ $warehouses = $db_conn->query(
                     <div class="page-description">
                         <h1><i class="material-icons-outlined" style="font-size:26px;vertical-align:middle;margin-right:6px;color:#667eea;">sync_alt</i>Convert Pieces &harr; Packs</h1>
                         <p class="text-muted mb-0">Assemble loose pieces into whole packs, or break a pack back open — for one product or several at once.</p>
+                    </div>
+
+                    <div class="rmb-tabs">
+                        <a href="input-stock-bundles.php" class="rmb-tab"><i class="material-icons-outlined">add_box</i> Input Stock</a>
+                        <a href="raw-material-bundles-manage.php" class="rmb-tab"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
+                        <a href="neksomo-piece-pack-convert.php" class="rmb-tab active"><i class="material-icons-outlined">sync_alt</i> Convert Pieces &harr; Packs</a>
                     </div>
 
                     <?php if (isset($_SESSION['errorMessage'])): $flashErr = htmlspecialchars($_SESSION['errorMessage'], ENT_QUOTES, 'UTF-8'); unset($_SESSION['errorMessage']); ?>
@@ -192,6 +210,24 @@ $warehouses = $db_conn->query(
                                         <i class="material-icons-outlined" style="font-size:19px;">delete</i>
                                     </button>
                                 </div>
+                                <div class="col-12 bundle-picker-wrap" style="display:none;">
+                                    <div style="height:1px;background:#eaecf5;margin:14px 0 14px;"></div>
+                                    <div class="row g-3 align-items-center">
+                                        <div class="col-md-8">
+                                            <label class="form-label small text-muted mb-1">
+                                                <i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px;color:#764ba2;">inventory_2</i>Raw Material Bundle <span style="color:#ef4444;">*</span>
+                                            </label>
+                                            <select class="form-control bundle-select" name="bundle_id[]">
+                                                <option value="">— Select bundle —</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="bundle-empty-hint" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:9px 12px;font-size:12px;color:#b91c1c;line-height:1.4;">
+                                                <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:3px;">error_outline</i>No open bundle yet — add one via Input Stock &rarr; Raw Bundles.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </template>
@@ -212,6 +248,8 @@ $warehouses = $db_conn->query(
 var rowTemplate = document.getElementById('productRowTemplate');
 var rowsContainer = document.getElementById('productRows');
 
+function escBd(str) { return $('<div>').text(str == null ? '' : str).html(); }
+
 // Products mapped to a raw Neksomo product only ever assemble FROM that
 // raw pool — there's no meaningful "break this finished pack back into
 // raw pieces" operation, so Pack -> Pieces is hidden for them (see
@@ -223,6 +261,66 @@ function updateDirectionOptions(rowEl, mapped) {
     packToPiecesOpt.hidden = !!mapped;
     if (mapped && directionSelect.value === 'pack_to_pieces') {
         directionSelect.value = 'pieces_to_pack';
+    }
+}
+
+// Populates/hides the row's Raw Material Bundle picker — required for a
+// mapped product's Pieces -> Pack conversion (see docs/superpowers/specs/
+// 2026-09-22-raw-material-bundle-tracking-design.md). Conversion is
+// blocked with no fallback when no open bundle exists yet.
+// Renders each Select2 option as the bundle's label plus a small purple
+// "N pc left" badge on the right, so the remaining count is scannable at
+// a glance both in the closed selection and the open dropdown list.
+function renderBundleOption(state) {
+    if (!state.id) return state.text;
+    var remaining = $(state.element).data('remaining');
+    var $result = $('<span></span>').text(state.text);
+    if (remaining !== undefined) {
+        $('<span class="bundle-option-remaining"></span>').text(Number(remaining).toLocaleString('en-IN') + ' pc left').appendTo($result);
+    }
+    return $result;
+}
+
+function updateBundlePicker(rowEl, mapped, openBundles) {
+    var wrap = rowEl.querySelector('.bundle-picker-wrap');
+    var select = rowEl.querySelector('.bundle-select');
+    var emptyHint = rowEl.querySelector('.bundle-empty-hint');
+
+    if ($(select).data('select2')) {
+        $(select).select2('destroy');
+    }
+
+    if (!mapped) {
+        wrap.style.display = 'none';
+        select.removeAttribute('required');
+        select.value = '';
+        return;
+    }
+
+    wrap.style.display = '';
+    select.setAttribute('required', 'required');
+
+    var currentVal = select.value;
+    var html = '<option value="">— Select bundle —</option>';
+    (openBundles || []).forEach(function (b) {
+        html += '<option value="' + b.id + '" data-remaining="' + b.remaining_pieces + '">' + escBd(b.label) + '</option>';
+    });
+    select.innerHTML = html;
+    if (currentVal && Array.from(select.options).some(function (o) { return o.value === currentVal; })) {
+        select.value = currentVal;
+    }
+
+    var hasBundles = (openBundles || []).length > 0;
+    emptyHint.style.display = hasBundles ? 'none' : '';
+    select.disabled = !hasBundles;
+
+    if (hasBundles) {
+        $(select).select2({
+            placeholder: 'Search a bundle…',
+            width: '100%',
+            templateResult: renderBundleOption,
+            templateSelection: renderBundleOption
+        });
     }
 }
 
@@ -241,6 +339,7 @@ function refreshRowStock(rowEl) {
         .then(function (data) {
             if (data.error) { panel.textContent = '—'; return; }
             updateDirectionOptions(rowEl, data.mapped);
+            updateBundlePicker(rowEl, data.mapped, data.open_bundles);
             if (data.mapped) {
                 panel.textContent = data.raw_pieces + ' raw pc available';
             } else {
@@ -268,8 +367,10 @@ function addProductRow() {
     var fragment = rowTemplate.content.cloneNode(true);
     var rowEl = fragment.querySelector('.product-row');
     var productSelect = rowEl.querySelector('.product-select');
+    var bundleSelect = rowEl.querySelector('.bundle-select');
     rowEl.querySelector('.remove-row-btn').addEventListener('click', function () {
         $(productSelect).select2('destroy');
+        if ($(bundleSelect).data('select2')) $(bundleSelect).select2('destroy');
         rowEl.remove();
         updateRemoveButtonsState();
     });
@@ -289,6 +390,23 @@ document.getElementById('addProductRowBtn').addEventListener('click', addProduct
 
 // Start with one row so the form is usable immediately.
 addProductRow();
+
+// Blocks submission if any mapped-product row is missing its required
+// bundle selection — native `required` on a `display:none` field isn't
+// reliably enforced by browsers, so this is re-checked explicitly.
+document.getElementById('convertForm').addEventListener('submit', function (e) {
+    var blocked = false;
+    rowsContainer.querySelectorAll('.product-row').forEach(function (rowEl) {
+        var wrap = rowEl.querySelector('.bundle-picker-wrap');
+        if (wrap.style.display === 'none') return; // not a mapped row
+        var select = rowEl.querySelector('.bundle-select');
+        if (!select.value) blocked = true;
+    });
+    if (blocked) {
+        e.preventDefault();
+        alert('Please select a raw material bundle for every mapped product row before converting.');
+    }
+});
 </script>
 </body>
 </html>
