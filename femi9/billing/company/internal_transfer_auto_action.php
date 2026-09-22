@@ -274,7 +274,7 @@ try {
                 if ($remaining < $orderQty) break; // this and every later order in this source's list stay unmarked
                 $remaining -= $orderQty;
                 $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"ot:"/"wa:" prefix
-                mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy);
+                mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy, $tempid2);
             }
         }
     }

@@ -49,6 +49,15 @@ function ensure_auto_transfer_skip_table(mysqli $db_conn): void
             UNIQUE KEY uq_auto_transfer_skip (source_type, source_ref, skip_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+    // Added after the table's original release — the -N2 tempid of the
+    // transfer run that marked this row 'transferred', so undo_auto_
+    // transfer() can find and delete exactly the rows one specific run
+    // created instead of leaving every order it covered permanently
+    // hidden from Required Qty after the stock moved back.
+    $col = $db_conn->query("SHOW COLUMNS FROM auto_transfer_skip_today LIKE 'transfer_tempid'");
+    if ($col && $col->num_rows === 0) {
+        $db_conn->query("ALTER TABLE auto_transfer_skip_today ADD COLUMN transfer_tempid VARCHAR(64) NULL AFTER reason");
+    }
 }
 
 // Self-migrating — same guard as ot-sale-action.php's own (must stay in
@@ -176,16 +185,21 @@ function set_auto_transfer_default_rate(mysqli $db_conn, int $productId, float $
 
 /**
  * Marks one order skipped for today — INSERT IGNORE so calling this twice
- * for the same order/date (e.g. a double-click) is harmless.
+ * for the same order/date (e.g. a double-click) is harmless. $transferTempid
+ * (the -N2 leg's tempid) is only meaningful for reason='transferred' — it's
+ * how undo_auto_transfer() later finds exactly the rows one specific
+ * transfer run created, so undoing that run can un-skip only its own
+ * orders instead of leaving them permanently hidden or clearing rows
+ * created by other runs.
  */
-function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, string $sourceRef, string $reason, ?string $createdBy = null): void
+function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, string $sourceRef, string $reason, ?string $createdBy = null, ?string $transferTempid = null): void
 {
     ensure_auto_transfer_skip_table($db_conn);
     $stmt = $db_conn->prepare(
-        "INSERT IGNORE INTO auto_transfer_skip_today (source_type, source_ref, skip_date, reason, created_by)
-         VALUES (?, ?, CURDATE(), ?, ?)"
+        "INSERT IGNORE INTO auto_transfer_skip_today (source_type, source_ref, skip_date, reason, transfer_tempid, created_by)
+         VALUES (?, ?, CURDATE(), ?, ?, ?)"
     );
-    $stmt->bind_param('ssss', $sourceType, $sourceRef, $reason, $createdBy);
+    $stmt->bind_param('sssss', $sourceType, $sourceRef, $reason, $transferTempid, $createdBy);
     $stmt->execute();
     $stmt->close();
 }
@@ -857,6 +871,23 @@ function undo_auto_transfer(mysqli $db_conn, string $tempidN2, int $productId, s
             }
             $countStmt->close();
         }
+
+        // Un-skip every order this run's product line marked 'transferred'
+        // (see internal_transfer_auto_action.php) — otherwise those orders
+        // stay invisibly excluded from Required Qty forever even though
+        // their stock just moved back, undercounting every later run today.
+        // Scoped to (transfer_tempid, product) so undoing one product from
+        // a multi-product run never touches another product's own rows.
+        ensure_auto_transfer_skip_table($db_conn);
+        $unskip = $db_conn->prepare(
+            "DELETE FROM auto_transfer_skip_today
+             WHERE transfer_tempid = ? AND reason = 'transferred'
+               AND source_ref LIKE CONCAT('%:', ?)"
+        );
+        $productIdStr = (string) $productId;
+        $unskip->bind_param('ss', $tempidN2, $productIdStr);
+        $unskip->execute();
+        $unskip->close();
 
         $db_conn->commit();
         return ['success' => true];
