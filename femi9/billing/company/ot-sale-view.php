@@ -97,6 +97,28 @@ $errorMessage = $_SESSION['sucMessage'];
 					</script>
 <?php  unset($_SESSION['sucMessage']); } ?>
 
+<?php
+// A bulk "Confirm Selected" where EVERY selected order failed (e.g. all of
+// them need the same out-of-stock product) sets errorMessage instead of
+// sucMessage (see ot-sale-confirm-action.php) — without this block that
+// message was never shown here at all, silently lingering in the session
+// until some unrelated later page (ot-sale-add.php) happened to display it,
+// making the confirm action look like it hung with no feedback. Confirmed
+// 2026-09-22.
+if (isset($_SESSION['errorMessage'])) {
+    $errorMessageOt = htmlspecialchars($_SESSION['errorMessage'], ENT_QUOTES, 'UTF-8');
+?>
+                      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                      <script>
+                        Swal.fire({
+                          icon: 'error',
+                          title: 'Warning',
+                          text: '<?php echo $errorMessageOt; ?>',
+                          confirmButtonText: 'OK'
+                        });
+					</script>
+<?php  unset($_SESSION['errorMessage']); } ?>
+
 
 								<?php /* if(isset($_REQUEST['addesuccess'])){?><div class="alert alert-success">OT Sales details added success.</div><?php }?>
 								

@@ -121,11 +121,13 @@ if ($po_id > 0) {
     }
 }
 
-// Whatever UPI ID is currently configured on the settings page — the
-// recipient check below verifies the screenshot's payee against THIS exact
-// ID (never a hardcoded name), since it can change any time the company
-// updates it.
-$expectedUpi = tpCourierGetUpiDetails($db_conn)['upi_id'];
+// Whatever UPI ID/payee name is currently configured on the settings page —
+// the recipient check below verifies the screenshot's payee against THIS
+// exact ID or name (never a hardcoded name), since it can change any time
+// the company updates it.
+$courierUpiDetails = tpCourierGetUpiDetails($db_conn);
+$expectedUpi = $courierUpiDetails['upi_id'];
+$expectedPayeeName = $courierUpiDetails['payee_name'];
 
 if ($po_id > 0) {
     $countStmt = $db_conn->prepare("SELECT COUNT(*) AS cnt FROM tp_courier_payments WHERE po_id = ?");
@@ -216,9 +218,9 @@ if ($isUnconvertedHeic) {
 $classification = null;
 try {
     $vision = new ClaudeVisionService();
-    $visionResult = $vision->analyzeScreenshot($file['tmp_name'], [], $expectedUpi);
+    $visionResult = $vision->analyzeScreenshot($file['tmp_name'], [], $expectedUpi, $expectedPayeeName);
     if ($visionResult['success']) {
-        $classification = classifyCourierVisionResult($visionResult, $remainingAmount, $expectedUpi);
+        $classification = classifyCourierVisionResult($visionResult, $remainingAmount, $expectedUpi, $expectedPayeeName);
     }
 } catch (\Throwable $e) {
     // Falls through to OCR fallback.
@@ -237,7 +239,7 @@ if ($classification === null) {
     }
 
     if ($ocrAvailable) {
-        $classification = courierClassifyFromOcr(PaymentScreenshotParser::classify($ocrText), $remainingAmount, $expectedUpi);
+        $classification = courierClassifyFromOcr(PaymentScreenshotParser::classify($ocrText), $remainingAmount, $expectedUpi, $expectedPayeeName);
     } else {
         $classification = [
             'status' => 'pending_review',
@@ -271,7 +273,7 @@ function courierTextLooksLikeFailure(string $text): bool {
     return false;
 }
 
-function courierClassifyFromOcr(array $ocrResult, float $remainingAmount, ?string $expectedUpi): array {
+function courierClassifyFromOcr(array $ocrResult, float $remainingAmount, ?string $expectedUpi, ?string $expectedPayeeName = null): array {
     if ($ocrResult['status'] === 'rejected'
         && strpos($ocrResult['reason'] ?? '', "doesn't look like a payment screenshot") !== false) {
         return $ocrResult + ['payment_date' => null];
@@ -294,7 +296,21 @@ function courierClassifyFromOcr(array $ocrResult, float $remainingAmount, ?strin
             'reason' => 'The amount in this screenshot (₹' . number_format((float)$ocrResult['amount'], 2) . ') is more than what\'s still owed (₹' . number_format($remainingAmount, 2) . ').',
             'raw_text' => $ocrResult['raw_text']];
     }
-    if ($expectedUpi !== null && stripos($ocrResult['raw_text'], $expectedUpi) === false) {
+    // OCR text has no structured recipient field, so plain-text search is the
+    // only tool here — matched against EITHER the UPI ID or the configured
+    // payee name (a short first-name fragment is enough, e.g. "Uma"), unlike
+    // the Claude Vision path this never escalates to an outright reject on
+    // its own: raw OCR text is noisy enough that "the ID/name text isn't
+    // found" doesn't reliably mean "paid to someone else" — it commonly just
+    // means OCR failed to isolate that line. Always pending_review here.
+    $recipientTextMatches = $expectedUpi !== null && stripos($ocrResult['raw_text'], $expectedUpi) !== false;
+    if (!$recipientTextMatches && $expectedPayeeName !== null) {
+        $firstName = trim(explode(' ', $expectedPayeeName)[0] ?? '');
+        if ($firstName !== '' && stripos($ocrResult['raw_text'], $firstName) !== false) {
+            $recipientTextMatches = true;
+        }
+    }
+    if ($expectedUpi !== null && !$recipientTextMatches) {
         return ['status' => 'pending_review', 'amount' => $ocrResult['amount'], 'reference' => $ocrResult['reference'], 'payment_date' => null,
             'reason' => 'Could not confirm the payment was made to ' . $expectedUpi . ' — needs manual review.',
             'raw_text' => $ocrResult['raw_text']];
@@ -315,15 +331,18 @@ function courierClassifyFromOcr(array $ocrResult, float $remainingAmount, ?strin
     return ['status' => 'accepted', 'amount' => $ocrResult['amount'], 'reference' => $ocrResult['reference'], 'payment_date' => null, 'reason' => null, 'raw_text' => $ocrResult['raw_text']];
 }
 
-// Requires BOTH the amount to match AND (when a UPI ID is configured) the
-// recipient to match that exact ID — a mismatch on either downgrades to
-// pending_review rather than an outright reject, since a wrong auto-reject
-// blocks a TP from submitting their order over a misread, while a wrong
-// auto-accept would let an unpaid/misdirected order through; pending_review
-// is the safe middle ground either way, reviewed on the company's Courier
-// Payment column (tp-today-orders.php), same Approve/Reject pattern as the
-// advance-payment submission queue.
-function classifyCourierVisionResult(array $v, float $remainingAmount, ?string $expectedUpi): array {
+// Requires the amount to match AND (when a UPI ID is configured) the
+// recipient to match that exact UPI ID or the configured payee name. A
+// mismatch is split into two cases: if the screenshot clearly shows SOME
+// other identifiable recipient (a readable name/UPI text that just isn't
+// the expected one — e.g. paid to a random friend), it's an outright
+// reject, since a pending_review here would still count toward the
+// courier-payment pool and let the PO submit as if it had been paid,
+// before any human ever looks at it. Only a genuinely illegible/unclear
+// recipient (nothing readable to compare at all) downgrades to
+// pending_review, reviewed on the company's Courier Payment column
+// (tp-today-orders.php). Confirmed 2026-09-22.
+function classifyCourierVisionResult(array $v, float $remainingAmount, ?string $expectedUpi, ?string $expectedPayeeName = null): array {
     $raw = 'Claude vision: amount=' . ($v['amount'] ?? 'null') . ' reference=' . ($v['reference'] ?? 'null')
         . ' payment_date=' . ($v['payment_date'] ?? 'null') . ' confidence=' . $v['confidence']
         . ' looks_like_payment_screenshot=' . ($v['looks_like_payment_screenshot'] ? 'true' : 'false')
@@ -361,6 +380,18 @@ function classifyCourierVisionResult(array $v, float $remainingAmount, ?string $
             'raw_text' => $raw];
     }
     if ($expectedUpi !== null && !$v['recipient_matches']) {
+        $identified = trim((string)($v['recipient_identified_as'] ?? ''));
+        if ($identified !== '') {
+            // A clearly different, identifiable recipient — not the courier
+            // collection account. Outright reject: a pending_review here
+            // would still count toward the payment pool and let the order
+            // go through unpaid until a human eventually catches it.
+            return ['status' => 'rejected', 'amount' => $v['amount'], 'reference' => $v['reference'], 'payment_date' => $paymentDate,
+                'reason' => 'This payment was made to "' . $identified . '", not the courier collection account'
+                    . ($expectedPayeeName ? ' (' . $expectedPayeeName . ')' : '') . '. Please pay to '
+                    . ($expectedPayeeName ?: $expectedUpi) . ' (' . $expectedUpi . ') and upload that screenshot.',
+                'raw_text' => $raw];
+        }
         return ['status' => 'pending_review', 'amount' => $v['amount'], 'reference' => $v['reference'], 'payment_date' => $paymentDate,
             'reason' => 'Could not confirm the payment was made to ' . $expectedUpi . ' — needs manual review.',
             'raw_text' => $raw];

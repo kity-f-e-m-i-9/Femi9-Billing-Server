@@ -29,18 +29,25 @@ class ClaudeVisionService {
      *        payment, where the actual receiving account is whatever the company has
      *        currently configured (a personal name, not literally "Femi9"), so the
      *        generic name check would wrongly reject a genuinely correct payment.
+     * @param ?string $expectedPayeeName When given alongside $expectedRecipient, the
+     *        recipient also matches if the screenshot's payee NAME (not just UPI ID)
+     *        matches this — many UPI success screens show the bank-verified payee
+     *        name clearly (e.g. "To: Uma Karthick") even when the VPA itself is
+     *        partially masked, so requiring an exact VPA match alone under-accepts
+     *        genuinely correct payments.
      * @return array{
      *   success: bool,
      *   amount: ?float,
      *   reference: ?string,
      *   recipient_matches: bool,
+     *   recipient_identified_as: ?string,
      *   confidence: string,   // 'high' | 'low'
      *   looks_like_payment_screenshot: bool,
      *   reasoning: string,
      *   message: string
      * }
      */
-    public function analyzeScreenshot($imagePath, array $priorCorrections = [], ?string $expectedRecipient = null) {
+    public function analyzeScreenshot($imagePath, array $priorCorrections = [], ?string $expectedRecipient = null, ?string $expectedPayeeName = null) {
         try {
             $imageData = @file_get_contents($imagePath);
             if ($imageData === false) {
@@ -52,7 +59,7 @@ class ClaudeVisionService {
                 return $this->failure('Unsupported image type');
             }
 
-            $prompt = $this->buildPrompt($priorCorrections, $expectedRecipient);
+            $prompt = $this->buildPrompt($priorCorrections, $expectedRecipient, $expectedPayeeName);
 
             $payload = [
                 'model' => $this->model,
@@ -93,6 +100,7 @@ class ClaudeVisionService {
                 'amount' => $parsed['amount'],
                 'reference' => $parsed['reference'],
                 'recipient_matches' => (bool)($parsed['recipient_matches'] ?? false),
+                'recipient_identified_as' => $parsed['recipient_identified_as'] ?? null,
                 'payment_date' => $parsed['payment_date'] ?? null,
                 'payment_succeeded' => $parsed['payment_succeeded'] ?? true,
                 'confidence' => $parsed['confidence'] ?? 'low',
@@ -106,17 +114,31 @@ class ClaudeVisionService {
         }
     }
 
-    private function buildPrompt(array $priorCorrections, ?string $expectedRecipient = null) {
-        $recipientInstruction = $expectedRecipient !== null
-            ? "Whether the payment recipient shown in the screenshot (their UPI ID/VPA, "
-              . "e.g. \"name@bank\") is exactly \"{$expectedRecipient}\" (recipient_matches: "
-              . "true) or a different UPI ID/account entirely (recipient_matches: false). "
-              . "Match on the UPI ID itself, not the display name next to it (the display "
-              . "name shown by the paying app is the payer's own saved contact name and may "
-              . "not match)."
-            : "Whether the payment recipient shown in the screenshot is Femi9 / Femi "
+    private function buildPrompt(array $priorCorrections, ?string $expectedRecipient = null, ?string $expectedPayeeName = null) {
+        if ($expectedRecipient !== null) {
+            $nameClause = $expectedPayeeName !== null
+                ? " OR the bank-verified payee NAME shown on screen (not the payer's own "
+                  . "saved contact nickname, but the actual account-holder name the UPI app "
+                  . "displays after a successful payment, e.g. \"To: {$expectedPayeeName}\") "
+                  . "clearly matches \"{$expectedPayeeName}\" (a close match is fine — e.g. "
+                  . "\"Uma\", \"UMA KARTHICK\", minor spacing/case differences)"
+                : "";
+            $recipientInstruction = "Whether the payment recipient shown in the screenshot "
+                . "matches the expected courier-collection account: either their UPI ID/VPA "
+                . "(e.g. \"name@bank\") is exactly \"{$expectedRecipient}\"{$nameClause}. "
+                . "Set recipient_matches: true if EITHER condition holds, false if the "
+                . "screenshot clearly shows a different UPI ID and a different person/name "
+                . "entirely. Also report recipient_identified_as: the exact recipient "
+                . "name/UPI ID text you actually read off the screen (whatever is visible), "
+                . "or null if no recipient name/ID is legible at all anywhere on screen — "
+                . "this is reported even when recipient_matches is true.";
+        } else {
+            $recipientInstruction = "Whether the payment recipient shown in the screenshot is Femi9 / Femi "
               . "Nayan LLP / Femi Health Care / Anand Praveen (recipient_matches: true) "
-              . "or someone else entirely (recipient_matches: false).";
+              . "or someone else entirely (recipient_matches: false). Also report "
+              . "recipient_identified_as: the recipient name/UPI ID text you read, or null "
+              . "if illegible.";
+        }
 
         $prompt = <<<PROMPT
 You are verifying a payment proof screenshot uploaded by a distributor as
@@ -184,6 +206,7 @@ Respond with ONLY a JSON object, no other text, in exactly this shape:
   "amount": <number or null>,
   "reference": "<string or null>",
   "recipient_matches": <true or false>,
+  "recipient_identified_as": "<string or null>",
   "payment_date": "<YYYY-MM-DD or null>",
   "payment_succeeded": <true or false>,
   "confidence": "high" or "low",
@@ -208,6 +231,7 @@ PROMPT;
             'amount' => is_numeric($decoded['amount'] ?? null) ? (float)$decoded['amount'] : null,
             'reference' => !empty($decoded['reference']) ? trim((string)$decoded['reference']) : null,
             'recipient_matches' => $decoded['recipient_matches'] ?? false,
+            'recipient_identified_as' => !empty($decoded['recipient_identified_as']) ? trim((string)$decoded['recipient_identified_as']) : null,
             // Defaults to true (assume success) when the model omits this
             // field entirely, same "don't invent a negative the model never
             // actually said" posture as looks_like_payment_screenshot above
@@ -278,6 +302,7 @@ PROMPT;
             'amount' => null,
             'reference' => null,
             'recipient_matches' => false,
+            'recipient_identified_as' => null,
             'payment_date' => null,
             'payment_succeeded' => true,
             'confidence' => 'low',

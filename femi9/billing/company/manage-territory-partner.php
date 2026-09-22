@@ -521,6 +521,11 @@ $i = 0;
                                                     <a href="edit-territory-partner?tpid=<?php echo $enc_id; ?>" class="action-link" title="Edit">
                                                         <i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i>
                                                     </a>
+                                                    <?php if ($tp['is_active']): ?>
+                                                    <a href="login-as-tp?tpid=<?php echo $enc_id; ?>" class="action-link" title="Login as this Territory Partner" target="_blank">
+                                                        <i class="material-icons-outlined" style="font-size:17px;color:#059669;">login</i>
+                                                    </a>
+                                                    <?php endif; ?>
                                                     <button type="button" class="action-link toggle-status-btn"
                                                             title="<?php echo $tp['is_active'] ? 'Deactivate' : 'Activate'; ?>"
                                                             data-id="<?php echo $enc_id; ?>"

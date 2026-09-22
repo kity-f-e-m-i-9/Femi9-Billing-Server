@@ -214,6 +214,31 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                     }
                 </style>
                 <ul class="navbar-nav">
+                    <?php if (!empty($_SESSION['LOGGED_IN_VIA_COMPANY'])): ?>
+                    <style>
+                        .tp-back-to-company {
+                            display: inline-flex; align-items: center; gap: 6px;
+                            background: linear-gradient(135deg,#f59e0b,#d97706);
+                            color: #fff; font-size: 13px; font-weight: 600;
+                            padding: 8px 16px; border-radius: 30px;
+                            text-decoration: none; white-space: nowrap;
+                            box-shadow: 0 2px 6px rgba(217,119,6,0.35);
+                            transition: filter .15s, transform .1s;
+                        }
+                        .tp-back-to-company:hover { filter: brightness(1.08); color: #fff; }
+                        .tp-back-to-company:active { transform: scale(0.97); }
+                        .tp-back-to-company .material-icons-outlined { font-size: 18px; }
+                        @media (max-width: 1100px) {
+                            .tp-back-to-company span.tp-back-label { display: none; }
+                            .tp-back-to-company { padding: 8px 10px; }
+                        }
+                    </style>
+                    <li class="nav-item" style="margin-top:8px;margin-right:4px;">
+                        <a class="tp-back-to-company" href="../company/dashboard.php" title="Back to Company Login">
+                            <i class="material-icons-outlined" style="transform:scaleX(-1);">logout</i><span class="tp-back-label">Back to Company</span>
+                        </a>
+                    </li>
+                    <?php endif; ?>
                     <li class="nav-item tp-wallet-toggle">
                         <a class="nav-link" href="wallet-history.php" style="margin-top:12px;">
                             <i class="material-icons-outlined">wallet</i>&nbsp;<b>₹<?php echo inr_format($walletBalance, 2); ?></b>

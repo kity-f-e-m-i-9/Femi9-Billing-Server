@@ -4,6 +4,7 @@ ini_set('display_errors', 1);
 
 require_once __DIR__ . '/../../shared/env-loader.php'; //abhinesh correction
 require_once __DIR__ . '/../../shared/number-format-helpers.php';
+require_once __DIR__ . '/../../shared/EnsurePerformanceIndexes.php';
 
 $servername = $_ENV['DB_HOST'] ?? 'localhost';
 $db_port    = (int)($_ENV['DB_PORT'] ?? 3306);
@@ -15,6 +16,7 @@ $db_conn = mysqli_connect($servername, $username, $password, $dbname, $db_port);
 if (!$db_conn) {
   die("Connection failed: " . mysqli_connect_error());
 }
+ensurePerformanceIndexes($db_conn);
 
 $business_name="Femi9 - Happy day Everyday";
 
