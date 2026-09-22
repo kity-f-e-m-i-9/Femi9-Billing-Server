@@ -245,9 +245,14 @@ document.getElementById('addProductRowBtn').addEventListener('click', addProduct
 document.getElementById('moveForm').addEventListener('submit', function (e) {
     var fromGodown = document.getElementById('fromGodownSelect').value;
     var toGodown = document.getElementById('toGodownSelect').value;
-    if (fromGodown && toGodown && fromGodown === toGodown) {
+    var fromWarehouse = document.querySelector('[name="from_warehouse_id"]').value;
+    var toWarehouse = document.querySelector('[name="to_warehouse_id"]').value;
+    // Same company profile is fine as long as the physical warehouse differs
+    // (e.g. G1 -> G2 within the same LLP) — only a true no-op (same profile
+    // and same warehouse, or same profile with neither warehouse tracked) is blocked.
+    if (fromGodown && toGodown && fromGodown === toGodown && fromWarehouse === toWarehouse) {
         e.preventDefault();
-        alert('From and To company profile must be different.');
+        alert('From and To must be different (same company profile and same godown).');
         return;
     }
 

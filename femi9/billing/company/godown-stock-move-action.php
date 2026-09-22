@@ -39,8 +39,11 @@ if (!$fromCompanyGodownId || !$toCompanyGodownId || !is_array($rawProductIds) ||
     exit;
 }
 
-if ($fromCompanyGodownId === $toCompanyGodownId) {
-    $_SESSION['errorMessage'] = "From and To company profile must be different.";
+// A move only counts as a genuine no-op when company profile AND physical
+// warehouse are identical on both sides — same profile with different
+// warehouses (e.g. G1 -> G2 within the same LLP) is a legitimate move.
+if ($fromCompanyGodownId === $toCompanyGodownId && $fromWarehouseId === $toWarehouseId) {
+    $_SESSION['errorMessage'] = "From and To must be different (same company profile and same godown).";
     header("Location: godown-stock-move.php");
     exit;
 }
