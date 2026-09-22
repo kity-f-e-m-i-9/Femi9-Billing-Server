@@ -56,7 +56,6 @@ function default_warehouse_id(array $options): ?int
 }
 $defaultSourceWarehouseId       = default_warehouse_id($sourceWarehouseOptions);
 $defaultIntermediateWarehouseId = default_warehouse_id($intermediateWarehouseOptions);
-$defaultDestWarehouseId         = default_warehouse_id($destWarehouseOptions);
 
 $stockService = new StockService($db_conn);
 $requirements = get_auto_transfer_requirements($db_conn, $llpId);
@@ -337,24 +336,10 @@ if (!empty($requirements)) {
                                     <?php else: ?>
                                         <form method="post" action="internal_transfer_auto_action.php" id="autoTransferForm" onsubmit="return confirmAutoTransferSubmit(event);">
                                             <div class="ata-common-warehouse-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #eef0f3;border-radius:12px;padding:12px 16px;margin-bottom:14px;background:#fafbfc;">
-                                                <span style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.02em;">Set route for all:</span>
+                                                <span style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.02em;">Set warehouse for all:</span>
                                                 <select id="commonSourceWarehouse" class="form-control" style="width:auto;min-width:90px;height:34px;font-size:12.5px;padding:2px 22px 2px 8px;">
-                                                    <option value="">Source</option>
+                                                    <option value="">Warehouse</option>
                                                     <?php foreach ($sourceWarehouseOptions as $wh): ?>
-                                                    <option value="<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                                <span class="ata-route-arrow" style="margin-top:0;">&rarr;</span>
-                                                <select id="commonIntermediateWarehouse" class="form-control" style="width:auto;min-width:90px;height:34px;font-size:12.5px;padding:2px 22px 2px 8px;">
-                                                    <option value="">Via</option>
-                                                    <?php foreach ($intermediateWarehouseOptions as $wh): ?>
-                                                    <option value="<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                                <span class="ata-route-arrow" style="margin-top:0;">&rarr;</span>
-                                                <select id="commonDestWarehouse" class="form-control" style="width:auto;min-width:90px;height:34px;font-size:12.5px;padding:2px 22px 2px 8px;">
-                                                    <option value="">Destination</option>
-                                                    <?php foreach ($destWarehouseOptions as $wh): ?>
                                                     <option value="<?php echo (int) $wh['id']; ?>"><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
                                                     <?php endforeach; ?>
                                                 </select>
@@ -394,21 +379,21 @@ if (!empty($requirements)) {
                                                         </div>
                                                         <span class="ata-route-arrow">&rarr;</span>
                                                         <div class="ata-route-field">
-                                                            <label>Via</label>
-                                                            <select class="form-control ata-intermediate-warehouse" name="warehouse_intermediate[]">
+                                                            <label>Via <span class="ata-route-locked-hint" title="Same physical godown as Source — company profile changes, the building doesn't">(same godown)</span></label>
+                                                            <select class="form-control ata-intermediate-warehouse" name="warehouse_intermediate[]" style="pointer-events:none;background:#f3f4f6;color:#6b7280;" tabindex="-1" aria-disabled="true">
                                                                 <option value="">—</option>
                                                                 <?php foreach ($intermediateWarehouseOptions as $wh): ?>
-                                                                <option value="<?php echo (int) $wh['id']; ?>" <?php echo ((int) $wh['id'] === $defaultIntermediateWarehouseId) ? 'selected' : ''; ?>><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
+                                                                <option value="<?php echo (int) $wh['id']; ?>" <?php echo ((int) $wh['id'] === $defaultSourceWarehouseId) ? 'selected' : ''; ?>><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
                                                                 <?php endforeach; ?>
                                                             </select>
                                                         </div>
                                                         <span class="ata-route-arrow">&rarr;</span>
                                                         <div class="ata-route-field">
-                                                            <label>Destination</label>
-                                                            <select class="form-control ata-dest-warehouse" name="warehouse_dest[]">
+                                                            <label>Destination <span class="ata-route-locked-hint" title="Same physical godown as Source — company profile changes, the building doesn't">(same godown)</span></label>
+                                                            <select class="form-control ata-dest-warehouse" name="warehouse_dest[]" style="pointer-events:none;background:#f3f4f6;color:#6b7280;" tabindex="-1" aria-disabled="true">
                                                                 <option value="">—</option>
                                                                 <?php foreach ($destWarehouseOptions as $wh): ?>
-                                                                <option value="<?php echo (int) $wh['id']; ?>" <?php echo ((int) $wh['id'] === $defaultDestWarehouseId) ? 'selected' : ''; ?>><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
+                                                                <option value="<?php echo (int) $wh['id']; ?>" <?php echo ((int) $wh['id'] === $defaultSourceWarehouseId) ? 'selected' : ''; ?>><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
                                                                 <?php endforeach; ?>
                                                             </select>
                                                         </div>
@@ -596,6 +581,17 @@ if (!empty($requirements)) {
     var currentNeksomoAvail    = 0;
     var currentHealthcareAvail = 0;
 
+    // Shared checked/qty state for one (order, product) line, used by BOTH
+    // the Order Breakdown modal and View All Orders — selecting/unchecking
+    // a line in either one is reflected in the other, and by
+    // effectiveRequiredForProduct() below, since re-doing the same
+    // selection by hand in more than one place isn't practical. Keyed by
+    // "tp:<po_id>:<product_id>" / "ot:<tempid>:<product_id>", the same
+    // source_id shape the breakdown/overview endpoints emit. Declared here
+    // (not where it's rendered further down) so every reader — including
+    // refreshRowAvailability(), wired at page load — sees it defined.
+    var lineState = {};
+
     function escBd(str) { return $('<div>').text(str == null ? '' : str).html(); }
 
     // Mirrors AutoTransferDemand.php's cap_auto_transfer_qty_by_source():
@@ -614,12 +610,38 @@ if (!empty($requirements)) {
     // since each leg's endpoint is now independently selectable (see
     // docs/superpowers/specs/2026-09-21-warehouse-aware-auto-transfer-
     // design.md).
+    // Required-tp/ot for one product, honoring any exclusions already made
+    // in the Order Breakdown / View All Orders modals (lineState) instead
+    // of the row's original server-rendered totals. lineState only has
+    // entries for source_ids that were actually rendered into one of those
+    // modals, so a product the user never opened either modal for falls
+    // back to its raw data-required-tp/ot untouched. Without this,
+    // refreshRowAvailability() silently wiped out an exclusion the moment
+    // the Source warehouse picker changed afterward (qty_<pid> reset back
+    // to the full unfiltered requirement).
+    function effectiveRequiredForProduct(productId, rawRequiredTp, rawRequiredOt) {
+        var suffix = ':' + productId;
+        var touched = false;
+        var tp = 0, ot = 0;
+        Object.keys(lineState).forEach(function (sourceId) {
+            if (sourceId.slice(-suffix.length) !== suffix) return;
+            touched = true;
+            var line = lineState[sourceId];
+            if (!line.checked) return;
+            if (sourceId.indexOf('tp:') === 0) { tp += line.qty; } else { ot += line.qty; }
+        });
+        return touched ? { tp: tp, ot: ot } : { tp: rawRequiredTp, ot: rawRequiredOt };
+    }
+
     function refreshRowAvailability(rowEl) {
         var sourceSelect = rowEl.querySelector('.ata-source-warehouse');
         var intermediateSelect = rowEl.querySelector('.ata-intermediate-warehouse');
         var productId = sourceSelect.getAttribute('data-product-id');
-        var requiredTp = parseInt(sourceSelect.getAttribute('data-required-tp'), 10) || 0;
-        var requiredOt = parseInt(sourceSelect.getAttribute('data-required-ot'), 10) || 0;
+        var rawRequiredTp = parseInt(sourceSelect.getAttribute('data-required-tp'), 10) || 0;
+        var rawRequiredOt = parseInt(sourceSelect.getAttribute('data-required-ot'), 10) || 0;
+        var effectiveRequired = effectiveRequiredForProduct(productId, rawRequiredTp, rawRequiredOt);
+        var requiredTp = effectiveRequired.tp;
+        var requiredOt = effectiveRequired.ot;
         var sourceWarehouseId = sourceSelect.value;
         var intermediateWarehouseId = intermediateSelect.value;
 
@@ -667,35 +689,56 @@ if (!empty($requirements)) {
             .catch(function () { /* leave current values on fetch failure */ });
     }
 
-    document.querySelectorAll('.ata-source-warehouse, .ata-intermediate-warehouse').forEach(function (sel) {
+    // Via/Destination are locked to always mirror Source — all three legs
+    // move through the SAME physical godown for one transfer (Neksomo /
+    // Healthcare / LLP are different company profiles sharing one
+    // building), so letting them diverge just let staff pick a
+    // combination that didn't reflect reality. Only Source is a real
+    // choice; Via/Dest are display-only copies of it, still submitted
+    // via their own <select> (not disabled) so the server gets a value.
+    function syncRouteWarehouse(rowEl) {
+        var sourceSel = rowEl.querySelector('.ata-source-warehouse');
+        var viaSel    = rowEl.querySelector('.ata-intermediate-warehouse');
+        var destSel   = rowEl.querySelector('.ata-dest-warehouse');
+        if (!sourceSel) return;
+        [viaSel, destSel].forEach(function (sel) {
+            if (!sel) return;
+            var hasOption = Array.from(sel.options).some(function (o) { return o.value === sourceSel.value; });
+            sel.value = hasOption ? sourceSel.value : '';
+        });
+    }
+
+    document.querySelectorAll('.ata-row-card').forEach(function (rowEl) { syncRouteWarehouse(rowEl); });
+
+    document.querySelectorAll('.ata-source-warehouse').forEach(function (sel) {
         sel.addEventListener('change', function () {
-            refreshRowAvailability(sel.closest('.ata-row-card'));
+            var rowEl = sel.closest('.ata-row-card');
+            syncRouteWarehouse(rowEl);
+            refreshRowAvailability(rowEl);
         });
     });
 
-    // "Set ... for all" bar — applies the chosen warehouse to every row's
-    // matching picker at once. Each row's own picker stays independently
-    // editable afterward (this is a bulk pre-fill, not a lock).
-    function wireCommonWarehouseSelect(commonSelectId, rowSelector, triggersRecompute) {
-        var commonSelect = document.getElementById(commonSelectId);
-        if (!commonSelect) return;
+    // "Set warehouse for all" bar — applies the chosen warehouse to every
+    // row's Source picker (which in turn syncs that row's Via/Dest). Each
+    // row's own picker stays independently editable afterward (this is a
+    // bulk pre-fill, not a lock).
+    var commonSelect = document.getElementById('commonSourceWarehouse');
+    if (commonSelect) {
         commonSelect.addEventListener('change', function () {
             var value = commonSelect.value;
-            document.querySelectorAll(rowSelector).forEach(function (rowSelect) {
+            document.querySelectorAll('.ata-source-warehouse').forEach(function (rowSelect) {
                 // Only set it if the option exists in this row's list (its
                 // options may differ from the common list in rare cases);
                 // otherwise leave that row's own selection untouched.
                 var hasOption = Array.from(rowSelect.options).some(function (o) { return o.value === value; });
                 if (!hasOption) return;
                 rowSelect.value = value;
-                if (triggersRecompute) refreshRowAvailability(rowSelect.closest('.ata-row-card'));
+                var rowEl = rowSelect.closest('.ata-row-card');
+                syncRouteWarehouse(rowEl);
+                refreshRowAvailability(rowEl);
             });
         });
     }
-
-    wireCommonWarehouseSelect('commonSourceWarehouse', '.ata-source-warehouse', true);
-    wireCommonWarehouseSelect('commonIntermediateWarehouse', '.ata-intermediate-warehouse', true);
-    wireCommonWarehouseSelect('commonDestWarehouse', '.ata-dest-warehouse', false);
 
     // Warns before submitting if any product has zero stock at the first
     // leg's source (Neksomo) — the backend already silently caps/skips a
@@ -748,16 +791,6 @@ if (!empty($requirements)) {
 
         return confirm('Transfer these quantities now?');
     }
-
-    // Shared checked/qty state for one (order, product) line, used by BOTH
-    // the Order Breakdown modal and View All Orders — selecting/unchecking
-    // a line in either one is reflected in the other, since re-doing the
-    // same selection by hand in both places isn't practical. Keyed by the
-    // same source_id shape breakdown items already carry
-    // ("tp:<po_id>:<product_id>" / "ot:<tempid>:<product_id>"), which
-    // View All Orders' own order_key + product_id combination is
-    // normalized into (see ovRenderOrderList below).
-    var lineState = {};
 
     function renderBreakdownTab(containerId, items, emptyMsg) {
         var el = document.getElementById(containerId);
