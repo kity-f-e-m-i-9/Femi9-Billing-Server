@@ -3,6 +3,7 @@ include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
 require_once("include/GodownAccess.php");
+require_once("include/AutoTransferDemand.php"); // auto_transfer_leg_warehouse()
 
 error_reporting(0);
 
@@ -55,18 +56,26 @@ if ($row) {
         // nothing left applied to stock to reverse — just drop the record.
         $reverseInResult = ['success' => true];
         if ($qty > 0) {
+            // Recover the leg's physical godown from stock_ledger (same
+            // lookup undo_auto_transfer() uses) — internal_transfer itself
+            // doesn't carry warehouse_id, so without this the reversal
+            // lands in the unassigned (warehouse_id NULL) bucket instead of
+            // the godown the stock actually moved through.
+            $sourceWarehouseId = auto_transfer_leg_warehouse($db_conn, $tempid, $product_id, 'transfer_out');
+            $destWarehouseId   = auto_transfer_leg_warehouse($db_conn, $tempid, $product_id, 'transfer_in');
+
             // Restore source godown stock (sent_qty ↓, closing_qty ↑) — FOR UPDATE + ledger
             $stockService->reverseTransferOut(
                 $product_id, $Login_user_TYPEvl, $send_from, $qty,
                 'transfer', $tempid, $createdBy,
-                true
+                true, $sourceWarehouseId
             );
 
             // Remove destination godown stock (input_qty ↓, closing_qty ↓) — FOR UPDATE + ledger
             $reverseInResult = $stockService->reverseTransferIn(
                 $product_id, $Login_user_TYPEvl, $send_to, $qty,
                 'transfer', $tempid, $createdBy,
-                true
+                true, $destWarehouseId
             );
         }
 

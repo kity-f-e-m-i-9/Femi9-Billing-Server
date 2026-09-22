@@ -3,6 +3,7 @@ include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
 require_once("include/GodownAccess.php");
+require_once("include/AutoTransferDemand.php"); // auto_transfer_leg_warehouse()
 
 error_reporting(0);
 
@@ -59,20 +60,28 @@ if ($returnQty > $returnable) {
 $stockService = new StockService($db_conn);
 $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
+// The original transfer's per-leg physical godown lives on its stock_ledger
+// rows, not on internal_transfer itself — recover it the same way
+// undo_auto_transfer() does, so returned stock lands back in the warehouse
+// it actually came from/went to instead of the unassigned (warehouse_id
+// NULL) bucket.
+$sourceWarehouseId = auto_transfer_leg_warehouse($db_conn, $tempid, $product_id, 'transfer_out');
+$destWarehouseId   = auto_transfer_leg_warehouse($db_conn, $tempid, $product_id, 'transfer_in');
+
 $db_conn->begin_transaction();
 try {
     // Restore source godown stock (sent_qty ↓, closing_qty ↑)
     $stockService->reverseTransferOut(
         $product_id, $Login_user_TYPEvl, $send_from, $returnQty,
         'transfer', $tempid, $createdBy,
-        true
+        true, $sourceWarehouseId
     );
 
     // Remove destination godown stock (input_qty ↓, closing_qty ↓)
     $reverseInResult = $stockService->reverseTransferIn(
         $product_id, $Login_user_TYPEvl, $send_to, $returnQty,
         'transfer', $tempid, $createdBy,
-        true
+        true, $destWarehouseId
     );
 
     if (($reverseInResult['success'] ?? false) === false

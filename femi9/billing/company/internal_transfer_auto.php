@@ -83,7 +83,11 @@ if (!empty($requirements)) {
         $otRequired      = (int) $required['ot'];
         $neksomoAvail    = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $neksomoId, $defaultSourceWarehouseId) ?? 0);
         $healthcareAvail = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $healthcareId, $defaultIntermediateWarehouseId) ?? 0);
-        $available       = $neksomoAvail + $healthcareAvail;
+        // Capped by Neksomo (leg 1 source) alone — Healthcare's own balance
+        // is leftover from a prior run and irrelevant to how much leg 1 can
+        // newly move today; adding it in was inflating the capped qty past
+        // what Neksomo actually has to send.
+        $available       = $neksomoAvail;
         $split           = cap_auto_transfer_qty_by_source($tpRequired, $otRequired, $available);
         $cappedQty       = $split['tp'] + $split['ot'];
 
@@ -638,7 +642,10 @@ if (!empty($requirements)) {
                 if (neksomoChip) neksomoChip.textContent = neksomoAvail;
                 if (healthcareChip) healthcareChip.textContent = healthcareAvail;
 
-                var available = neksomoAvail + healthcareAvail;
+                // Capped by Neksomo (leg 1 source) alone — see the matching
+                // PHP-side comment above; Healthcare's own balance no longer
+                // inflates how much leg 1 can newly move.
+                var available = neksomoAvail;
                 var split = capQtyBySource(requiredTp, requiredOt, available);
                 var cappedTotal = split.tp + split.ot;
 
@@ -853,7 +860,8 @@ if (!empty($requirements)) {
         });
         var pid = currentBreakdownPid;
 
-        var available = currentNeksomoAvail + currentHealthcareAvail;
+        // Capped by Neksomo (leg 1 source) alone — see refreshRowAvailability().
+        var available = currentNeksomoAvail;
         if (available < 0) available = 0;
         var tpCapped = Math.max(0, Math.min(tpTotal, available));
         var otCapped = Math.max(0, Math.min(otTotal, available - tpCapped));
@@ -1037,8 +1045,8 @@ if (!empty($requirements)) {
             var tpTotal = tpTotalsByProduct[pid] || 0;
             var otTotal = otTotalsByProduct[pid] || 0;
             var neksomoAvail = parseInt(row.getAttribute('data-neksomo-avail'), 10) || 0;
-            var healthcareAvail = parseInt(row.getAttribute('data-healthcare-avail'), 10) || 0;
-            var available = neksomoAvail + healthcareAvail;
+            // Capped by Neksomo (leg 1 source) alone — see refreshRowAvailability().
+            var available = neksomoAvail;
             if (available < 0) available = 0;
             var tpCapped = Math.max(0, Math.min(tpTotal, available));
             var otCapped = Math.max(0, Math.min(otTotal, available - tpCapped));
