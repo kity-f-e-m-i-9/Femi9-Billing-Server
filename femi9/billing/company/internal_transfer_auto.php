@@ -699,7 +699,29 @@ if (!empty($requirements)) {
     // invisibly. This only flags products with NO stock at all
     // (neksomo_avail <= 0) — a partial shortfall still transfers what's
     // available and is left to the existing "Capped: ..." success message.
+    // Injects one hidden excluded_source_id[] input per line the user
+    // unchecked in either modal (lineState is shared between both — see
+    // its declaration below) — so the backend can actually honor those
+    // exclusions (mark_auto_transfer_order_skipped) instead of silently
+    // re-including them when it re-derives contributing orders fresh from
+    // the DB. Rebuilt fresh on every submit attempt so a re-submit after a
+    // failed confirm() doesn't duplicate stale inputs.
+    function injectExcludedSourceIds() {
+        var form = document.getElementById('autoTransferForm');
+        form.querySelectorAll('input[name="excluded_source_id[]"]').forEach(function (el) { el.remove(); });
+        Object.keys(lineState).forEach(function (sourceId) {
+            if (lineState[sourceId].checked) return;
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'excluded_source_id[]';
+            input.value = sourceId;
+            form.appendChild(input);
+        });
+    }
+
     function confirmAutoTransferSubmit(e) {
+        injectExcludedSourceIds();
+
         var zeroStockNames = [];
         document.querySelectorAll('.auto-transfer-row').forEach(function (row) {
             var avail = parseInt(row.getAttribute('data-neksomo-avail'), 10) || 0;

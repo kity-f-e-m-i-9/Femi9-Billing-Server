@@ -106,6 +106,27 @@ if (empty($rows)) {
 
 $stockService = new StockService($db_conn);
 $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
+
+// Lines the user unchecked in the Order Breakdown / View All Orders modals
+// (see internal_transfer_auto.php's injectExcludedSourceIds()) — recorded
+// as 'excluded' skip rows BEFORE the per-product loop below runs, so
+// get_auto_transfer_breakdown_for_product()'s own re-query (which already
+// filters on auto_transfer_skip_today) never re-includes them when
+// deciding which orders to mark 'transferred'. Without this, unchecking a
+// line in the UI only ever adjusted the qty number shown — it never
+// reached the server, so the excluded order was marked transferred anyway.
+$excludedSourceIds = $_REQUEST['excluded_source_id'] ?? [];
+if (is_array($excludedSourceIds)) {
+    foreach ($excludedSourceIds as $sourceId) {
+        // Shape is "tp:<po_id>:<product_id>" / "ot:<tempid>:<product_id>" —
+        // same convention get_auto_transfer_breakdown_for_product() emits.
+        $parts = explode(':', (string) $sourceId, 2);
+        if (count($parts) !== 2) continue;
+        [$sourceType, $sourceRef] = $parts;
+        if (!in_array($sourceType, ['tp', 'ot'], true) || $sourceRef === '') continue;
+        mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'excluded', $createdBy);
+    }
+}
 $username     = htmlspecialchars(strip_tags(trim($_SESSION['LOGIN_USER'] ?? '')), ENT_QUOTES, 'UTF-8');
 $usertype     = htmlspecialchars(strip_tags(trim($Login_user_TYPEvl ?? '')), ENT_QUOTES, 'UTF-8');
 $date         = date('Y-m-d');
