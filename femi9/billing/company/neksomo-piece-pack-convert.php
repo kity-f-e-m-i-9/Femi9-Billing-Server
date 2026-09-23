@@ -232,6 +232,10 @@ $machineCodes = get_active_machine_codes($db_conn);
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <div class="ata-field">
+                                    <label>Conversion Date <span class="required">*</span></label>
+                                    <input type="date" required name="conversion_date" id="conversionDateInput" max="<?= htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
                             </div>
                         </div>
 

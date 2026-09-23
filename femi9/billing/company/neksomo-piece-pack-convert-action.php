@@ -23,6 +23,24 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 $godownId    = (string)(int)($_POST['godownid'] ?? 0);
 $warehouseId = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 
+// Lets the operator backdate a conversion (e.g. entering it the next day)
+// instead of every conversion always being timestamped "now". Applies to
+// the whole batch, not per-row — re-validated server-side since the date
+// input's client-side `max` alone is never trusted.
+$rawConversionDate = trim($_POST['conversion_date'] ?? '');
+$conversionDateObj  = \DateTime::createFromFormat('Y-m-d', $rawConversionDate);
+if (!$conversionDateObj || $conversionDateObj->format('Y-m-d') !== $rawConversionDate) {
+    $_SESSION['errorMessage'] = "Please select a valid conversion date.";
+    header("Location: neksomo-piece-pack-convert.php");
+    exit;
+}
+if ($rawConversionDate > date('Y-m-d')) {
+    $_SESSION['errorMessage'] = "Conversion date cannot be in the future.";
+    header("Location: neksomo-piece-pack-convert.php");
+    exit;
+}
+$conversionDate = $rawConversionDate;
+
 $rawProductIds    = $_POST['product_id'] ?? [];
 $rawDirections    = $_POST['direction'] ?? [];
 $rawPackCounts    = $_POST['pack_count'] ?? [];
@@ -155,7 +173,7 @@ try {
 
             $creditResult = $stockService->credit(
                 $row['product_id'], 'company', $godownId, $bundleResult['packs_made'],
-                'conversion', $refId, $createdBy, true, $warehouseId, $row['machine_code_id']
+                'conversion', $refId, $createdBy, true, $warehouseId, $row['machine_code_id'], $conversionDate
             );
 
             if ($bundleResult['packs_made'] < $bundleResult['requested_packs']) {
@@ -166,13 +184,13 @@ try {
         } elseif ($row['direction'] === 'pieces_to_pack') {
             $result = $stockService->convertPiecesToPack(
                 $row['product_id'], 'company', $godownId, $piecesPerPack, $row['pack_count'],
-                $refId, $createdBy, true, $warehouseId, $row['machine_code_id']
+                $refId, $createdBy, true, $warehouseId, $row['machine_code_id'], $conversionDate
             );
             $summaries[] = "$productName: assembled {$row['pack_count']} pack(s) — now {$result['closing_qty_after']} pack(s), {$result['extra_pieces_after']} loose piece(s)";
         } else {
             $result = $stockService->convertPackToPieces(
                 $row['product_id'], 'company', $godownId, $piecesPerPack, $row['pack_count'],
-                $refId, $createdBy, true, $warehouseId, $row['machine_code_id']
+                $refId, $createdBy, true, $warehouseId, $row['machine_code_id'], $conversionDate
             );
             $summaries[] = "$productName: broke open {$row['pack_count']} pack(s) — now {$result['closing_qty_after']} pack(s), {$result['extra_pieces_after']} loose piece(s)";
         }
