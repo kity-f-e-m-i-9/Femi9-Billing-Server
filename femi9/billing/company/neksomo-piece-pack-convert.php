@@ -1,5 +1,6 @@
 <?php include("checksession.php");
 require_once("include/GodownAccess.php");
+require_once("include/MachineCodes.php");
 include("config.php");
 
 // Dedicated to the neksomo login (admin retained for oversight/support).
@@ -28,6 +29,8 @@ $godowns = $db_conn->query(
 $warehouses = $db_conn->query(
     "SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC"
 )->fetch_all(MYSQLI_ASSOC);
+
+$machineCodes = get_active_machine_codes($db_conn);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -235,9 +238,14 @@ $warehouses = $db_conn->query(
                         <div class="ata-card card">
                             <div class="ata-section-head">
                                 <div class="ata-section-title"><i class="material-icons-outlined">inventory_2</i> Products to Convert</div>
-                                <button type="button" class="ata-btn ata-btn-ot" id="addProductRowBtn">
-                                    <i class="material-icons" style="font-size:15px;">add</i> Add Another Product
-                                </button>
+                                <div style="display:flex; gap:8px;">
+                                    <button type="button" class="ata-btn ata-btn-tp" id="manageMachineCodesBtn">
+                                        <i class="material-icons-outlined" style="font-size:15px;">settings</i> Manage Machine Codes
+                                    </button>
+                                    <button type="button" class="ata-btn ata-btn-ot" id="addProductRowBtn">
+                                        <i class="material-icons" style="font-size:15px;">add</i> Add Another Product
+                                    </button>
+                                </div>
                             </div>
                             <div class="ata-rows" id="productRows"></div>
                         </div>
@@ -278,6 +286,15 @@ $warehouses = $db_conn->query(
                                     <input type="number" min="1" required name="pack_count[]" class="pack-count-input" placeholder="e.g. 5">
                                 </div>
                                 <div class="ata-field">
+                                    <label>Machine Code</label>
+                                    <select name="machine_code_id[]" class="machine-code-select">
+                                        <option value="">— None —</option>
+                                        <?php foreach ($machineCodes as $mc): ?>
+                                        <option value="<?= (int)$mc['id'] ?>"><?= htmlspecialchars($mc['code'], ENT_QUOTES, 'UTF-8') ?><?= $mc['name'] ? ' - ' . htmlspecialchars($mc['name'], ENT_QUOTES, 'UTF-8') : '' ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="ata-field">
                                     <label>Current Stock</label>
                                     <span class="current-stock-panel ata-stock-chip is-empty"><i class="material-icons-outlined">inventory</i>&mdash;</span>
                                 </div>
@@ -306,6 +323,29 @@ $warehouses = $db_conn->query(
                             </div>
                         </div>
                     </template>
+
+                    <!-- Manage Machine Codes modal: bootstrap-style overlay, kept
+                         simple (no bootstrap JS dependency) since it's just a
+                         small add/edit/delete list. -->
+                    <div id="machineCodeModalBackdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:1050; align-items:center; justify-content:center; padding:20px;">
+                        <div style="background:#fff; border-radius:14px; width:100%; max-width:480px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.25);">
+                            <div class="ata-section-head" style="border-radius:14px 14px 0 0;">
+                                <div class="ata-section-title"><i class="material-icons-outlined">precision_manufacturing</i> Manage Machine Codes</div>
+                                <button type="button" id="machineCodeModalClose" style="border:none; background:none; cursor:pointer; color:#6b7280;"><i class="material-icons">close</i></button>
+                            </div>
+                            <div style="padding:16px 20px; overflow-y:auto; flex:1 1 auto;">
+                                <div style="display:flex; gap:8px; margin-bottom:14px;">
+                                    <input type="text" id="mcFormCode" placeholder="Code (e.g. M-01)" style="flex:1 1 120px; border:1px solid #dde1ea; border-radius:8px; height:40px; padding:0 12px; font-size:13.5px;">
+                                    <input type="text" id="mcFormName" placeholder="Name (optional)" style="flex:2 1 160px; border:1px solid #dde1ea; border-radius:8px; height:40px; padding:0 12px; font-size:13.5px;">
+                                    <input type="hidden" id="mcFormId" value="">
+                                    <button type="button" id="mcFormSubmit" class="ata-btn ata-btn-tp" style="height:40px;">Add</button>
+                                    <button type="button" id="mcFormCancelEdit" style="display:none; height:40px; padding:0 12px; border:1px solid #dde1ea; border-radius:8px; background:#fff; cursor:pointer;">Cancel</button>
+                                </div>
+                                <div id="mcFormError" style="display:none; color:#b91c1c; font-size:12.5px; margin-bottom:10px;"></div>
+                                <div id="machineCodeList" style="display:flex; flex-direction:column; gap:6px;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -543,6 +583,130 @@ function addProductRow() {
     updateRowDirectionAccent(rowEl);
     updateRemoveButtonsState();
 }
+
+// Manage Machine Codes modal: list/add/edit/delete against
+// machine-code-manage.php, then refresh every row's dropdown so newly
+// added/renamed/removed codes show up immediately without a page reload.
+var mcModalBackdrop = document.getElementById('machineCodeModalBackdrop');
+var mcList = document.getElementById('machineCodeList');
+var mcFormCode = document.getElementById('mcFormCode');
+var mcFormName = document.getElementById('mcFormName');
+var mcFormId = document.getElementById('mcFormId');
+var mcFormSubmit = document.getElementById('mcFormSubmit');
+var mcFormCancelEdit = document.getElementById('mcFormCancelEdit');
+var mcFormError = document.getElementById('mcFormError');
+var csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+function mcPostAction(action, extraFields) {
+    var formData = new URLSearchParams();
+    formData.set('action', action);
+    formData.set('csrf_token', csrfToken);
+    Object.keys(extraFields || {}).forEach(function (k) { formData.set(k, extraFields[k]); });
+    return fetch('machine-code-manage.php', { method: 'POST', body: formData }).then(function (r) { return r.json(); });
+}
+
+function resetMcForm() {
+    mcFormId.value = '';
+    mcFormCode.value = '';
+    mcFormName.value = '';
+    mcFormSubmit.textContent = 'Add';
+    mcFormCancelEdit.style.display = 'none';
+    mcFormError.style.display = 'none';
+}
+
+function renderMachineCodeRow(mc) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #eef0f3; border-radius:8px;';
+    var label = document.createElement('div');
+    label.style.cssText = 'flex:1 1 auto; font-size:13.5px; color:#344054;';
+    label.textContent = mc.code + (mc.name ? ' - ' + mc.name : '');
+    var editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.title = 'Edit';
+    editBtn.style.cssText = 'border:none; background:none; cursor:pointer; color:#6b7280;';
+    editBtn.innerHTML = '<i class="material-icons-outlined" style="font-size:18px;">edit</i>';
+    editBtn.addEventListener('click', function () {
+        mcFormId.value = mc.id;
+        mcFormCode.value = mc.code;
+        mcFormName.value = mc.name || '';
+        mcFormSubmit.textContent = 'Save';
+        mcFormCancelEdit.style.display = '';
+        mcFormError.style.display = 'none';
+    });
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.title = 'Delete';
+    delBtn.style.cssText = 'border:none; background:none; cursor:pointer; color:#e11d48;';
+    delBtn.innerHTML = '<i class="material-icons-outlined" style="font-size:18px;">delete</i>';
+    delBtn.addEventListener('click', function () {
+        if (!confirm('Delete machine code "' + mc.code + '"? Rows already using it keep their history.')) return;
+        mcPostAction('delete', { id: mc.id }).then(function (data) {
+            if (data.success) { loadMachineCodeList(); refreshMachineCodeDropdowns(); }
+            else alert(data.error || 'Could not delete.');
+        });
+    });
+    row.appendChild(label);
+    row.appendChild(editBtn);
+    row.appendChild(delBtn);
+    return row;
+}
+
+function loadMachineCodeList() {
+    mcPostAction('list', {}).then(function (data) {
+        mcList.innerHTML = '';
+        (data.machine_codes || []).forEach(function (mc) {
+            if (!mc.is_active) return;
+            mcList.appendChild(renderMachineCodeRow(mc));
+        });
+        if (!mcList.children.length) {
+            mcList.innerHTML = '<div style="color:#9ca3af; font-size:12.5px;">No machine codes yet — add one above.</div>';
+        }
+    });
+}
+
+// Rebuilds every product row's Machine Code <select> from the current
+// active list, preserving each row's existing selection where it still exists.
+function refreshMachineCodeDropdowns() {
+    mcPostAction('list', {}).then(function (data) {
+        var active = (data.machine_codes || []).filter(function (mc) { return mc.is_active; });
+        rowsContainer.querySelectorAll('.machine-code-select').forEach(function (select) {
+            var currentVal = select.value;
+            var html = '<option value="">— None —</option>';
+            active.forEach(function (mc) {
+                html += '<option value="' + mc.id + '">' + escBd(mc.code) + (mc.name ? ' - ' + escBd(mc.name) : '') + '</option>';
+            });
+            select.innerHTML = html;
+            if (currentVal && Array.from(select.options).some(function (o) { return o.value === currentVal; })) {
+                select.value = currentVal;
+            }
+        });
+    });
+}
+
+document.getElementById('manageMachineCodesBtn').addEventListener('click', function () {
+    resetMcForm();
+    loadMachineCodeList();
+    mcModalBackdrop.style.display = 'flex';
+});
+document.getElementById('machineCodeModalClose').addEventListener('click', function () { mcModalBackdrop.style.display = 'none'; });
+mcModalBackdrop.addEventListener('click', function (e) { if (e.target === mcModalBackdrop) mcModalBackdrop.style.display = 'none'; });
+mcFormCancelEdit.addEventListener('click', resetMcForm);
+
+mcFormSubmit.addEventListener('click', function () {
+    var code = mcFormCode.value.trim();
+    if (!code) { mcFormError.textContent = 'Machine code is required.'; mcFormError.style.display = ''; return; }
+    var isEdit = !!mcFormId.value;
+    mcPostAction(isEdit ? 'edit' : 'add', { id: mcFormId.value, code: code, name: mcFormName.value.trim() }).then(function (data) {
+        if (data.success) {
+            resetMcForm();
+            loadMachineCodeList();
+            refreshMachineCodeDropdowns();
+        } else {
+            mcFormError.textContent = data.error || 'Could not save.';
+            mcFormError.style.display = '';
+        }
+    });
+});
 
 document.getElementById('addProductRowBtn').addEventListener('click', addProductRow);
 ['godownSelect', 'warehouseSelect'].forEach(function (id) {

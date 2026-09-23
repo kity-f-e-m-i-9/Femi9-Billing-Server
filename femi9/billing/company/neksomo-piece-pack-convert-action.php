@@ -23,10 +23,11 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 $godownId    = (string)(int)($_POST['godownid'] ?? 0);
 $warehouseId = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 
-$rawProductIds = $_POST['product_id'] ?? [];
-$rawDirections = $_POST['direction'] ?? [];
-$rawPackCounts = $_POST['pack_count'] ?? [];
-$rawBundleIds  = $_POST['bundle_id'] ?? [];
+$rawProductIds    = $_POST['product_id'] ?? [];
+$rawDirections    = $_POST['direction'] ?? [];
+$rawPackCounts    = $_POST['pack_count'] ?? [];
+$rawBundleIds     = $_POST['bundle_id'] ?? [];
+$rawMachineCodeIds = $_POST['machine_code_id'] ?? [];
 
 if (!$godownId || !is_array($rawProductIds) || empty($rawProductIds)) {
     $_SESSION['errorMessage'] = "Invalid submission — please fill in every field.";
@@ -58,6 +59,7 @@ foreach ($rawProductIds as $i => $rawProductId) {
     $direction = $rawDirections[$i] ?? '';
     $packCount = (int) ($rawPackCounts[$i] ?? 0);
     $bundleId  = filter_var($rawBundleIds[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
+    $machineCodeId = filter_var($rawMachineCodeIds[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
 
     if (!$productId || $packCount < 1 || !in_array($direction, ['pieces_to_pack', 'pack_to_pieces'], true)) {
         $_SESSION['errorMessage'] = "Invalid submission — please fill in every field for every product.";
@@ -65,7 +67,7 @@ foreach ($rawProductIds as $i => $rawProductId) {
         exit;
     }
 
-    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId];
+    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId, 'machine_code_id' => $machineCodeId];
 }
 
 // A product appearing twice in one batch is never a legitimate
@@ -153,7 +155,7 @@ try {
 
             $creditResult = $stockService->credit(
                 $row['product_id'], 'company', $godownId, $bundleResult['packs_made'],
-                'conversion', $refId, $createdBy, true, $warehouseId
+                'conversion', $refId, $createdBy, true, $warehouseId, $row['machine_code_id']
             );
 
             if ($bundleResult['packs_made'] < $bundleResult['requested_packs']) {
@@ -164,13 +166,13 @@ try {
         } elseif ($row['direction'] === 'pieces_to_pack') {
             $result = $stockService->convertPiecesToPack(
                 $row['product_id'], 'company', $godownId, $piecesPerPack, $row['pack_count'],
-                $refId, $createdBy, true, $warehouseId
+                $refId, $createdBy, true, $warehouseId, $row['machine_code_id']
             );
             $summaries[] = "$productName: assembled {$row['pack_count']} pack(s) — now {$result['closing_qty_after']} pack(s), {$result['extra_pieces_after']} loose piece(s)";
         } else {
             $result = $stockService->convertPackToPieces(
                 $row['product_id'], 'company', $godownId, $piecesPerPack, $row['pack_count'],
-                $refId, $createdBy, true, $warehouseId
+                $refId, $createdBy, true, $warehouseId, $row['machine_code_id']
             );
             $summaries[] = "$productName: broke open {$row['pack_count']} pack(s) — now {$result['closing_qty_after']} pack(s), {$result['extra_pieces_after']} loose piece(s)";
         }
