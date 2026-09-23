@@ -54,6 +54,23 @@ class StockService
         }
     }
 
+    // Self-migrating — same reasoning as ensureConversionRefType(): adds
+    // stock_ledger.machine_code_id (nullable, optional per-conversion
+    // packing-machine tag) if it hasn't been added yet on this environment.
+    private function ensureMachineCodeColumn(): void
+    {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+
+        $col = $this->db->query("SHOW COLUMNS FROM stock_ledger LIKE 'machine_code_id'");
+        if ($col && $col->num_rows === 0) {
+            $this->db->query(
+                "ALTER TABLE stock_ledger ADD COLUMN machine_code_id INT NULL DEFAULT NULL AFTER ref_id"
+            );
+        }
+    }
+
     // -------------------------------------------------------------------------
     // PUBLIC API
     // -------------------------------------------------------------------------
@@ -144,7 +161,9 @@ class StockService
         string $refId,
         string $createdBy,
         bool   $externalTransaction = false,
-        ?int   $warehouseId = null
+        ?int   $warehouseId = null,
+        ?int   $machineCodeId = null,
+        ?string $conversionDate = null
     ): array {
         if ($refType === 'conversion') $this->ensureConversionRefType();
         if (!$externalTransaction) {
@@ -181,7 +200,7 @@ class StockService
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'credit', $qty, $before, $after,
-                $refType, $refId, '', $createdBy, $warehouseId
+                $refType, $refId, '', $createdBy, $warehouseId, $machineCodeId, $conversionDate
             );
 
             if (!$externalTransaction) {
@@ -959,7 +978,9 @@ class StockService
         string $refId,
         string $createdBy,
         bool   $externalTransaction = false,
-        ?int   $warehouseId = null
+        ?int   $warehouseId = null,
+        ?int   $machineCodeId = null,
+        ?string $conversionDate = null
     ): array {
         $this->ensureConversionRefType();
         if (!$externalTransaction) $this->db->begin_transaction();
@@ -988,7 +1009,7 @@ class StockService
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'pieces_to_pack', $packCount, $before, $after,
-                'conversion', $refId, '', $createdBy, $warehouseId
+                'conversion', $refId, '', $createdBy, $warehouseId, $machineCodeId, $conversionDate
             );
 
             if (!$externalTransaction) $this->db->commit();
@@ -1020,7 +1041,9 @@ class StockService
         string $refId,
         string $createdBy,
         bool   $externalTransaction = false,
-        ?int   $warehouseId = null
+        ?int   $warehouseId = null,
+        ?int   $machineCodeId = null,
+        ?string $conversionDate = null
     ): array {
         $this->ensureConversionRefType();
         if (!$externalTransaction) $this->db->begin_transaction();
@@ -1049,7 +1072,7 @@ class StockService
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'pack_to_pieces', $packCount, $before, $after,
-                'conversion', $refId, '', $createdBy, $warehouseId
+                'conversion', $refId, '', $createdBy, $warehouseId, $machineCodeId, $conversionDate
             );
 
             if (!$externalTransaction) $this->db->commit();
@@ -1185,19 +1208,41 @@ class StockService
         string $refId,
         string $note,
         string $createdBy,
-        ?int   $warehouseId = null
+        ?int   $warehouseId = null,
+        ?int   $machineCodeId = null,
+        ?string $conversionDate = null
     ): int {
-        $stmt = $this->db->prepare(
-            "INSERT INTO stock_ledger
-                (product_id, user_type, user_id, warehouse_id, action, qty,
-                 qty_before, qty_after, ref_type, ref_id, note, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
-        $stmt->bind_param(
-            'issisiiissss',
-            $productId, $userType, $userId, $warehouseId, $action, $qty,
-            $qtyBefore, $qtyAfter, $refType, $refId, $note, $createdBy
-        );
+        $this->ensureMachineCodeColumn();
+
+        // conversionDate (Y-m-d) lets a conversion be backdated instead of
+        // always landing at NOW() — only Convert Pieces<->Packs passes this;
+        // every other caller leaves it null and created_at keeps its normal
+        // DEFAULT CURRENT_TIMESTAMP behavior.
+        if ($conversionDate !== null) {
+            $stmt = $this->db->prepare(
+                "INSERT INTO stock_ledger
+                    (product_id, user_type, user_id, warehouse_id, action, qty,
+                     qty_before, qty_after, ref_type, ref_id, machine_code_id, note, created_by, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmt->bind_param(
+                'issisiiississs',
+                $productId, $userType, $userId, $warehouseId, $action, $qty,
+                $qtyBefore, $qtyAfter, $refType, $refId, $machineCodeId, $note, $createdBy, $conversionDate
+            );
+        } else {
+            $stmt = $this->db->prepare(
+                "INSERT INTO stock_ledger
+                    (product_id, user_type, user_id, warehouse_id, action, qty,
+                     qty_before, qty_after, ref_type, ref_id, machine_code_id, note, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmt->bind_param(
+                'issisiiississ',
+                $productId, $userType, $userId, $warehouseId, $action, $qty,
+                $qtyBefore, $qtyAfter, $refType, $refId, $machineCodeId, $note, $createdBy
+            );
+        }
         $stmt->execute();
         $id = (int) $this->db->insert_id;
         $stmt->close();
