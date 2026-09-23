@@ -9,6 +9,7 @@
 include("checksession.php");
 include("config.php");
 include("advance-payment-functions.php");
+require_once("include/StockService.php");
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -60,6 +61,28 @@ $from_userid = $return_details['from_userid'];
 $to_usertype = $return_details['to_usertype'];
 $to_userid = $return_details['to_userid'];
 $invnumber = $return_details['invnumber'];
+
+// Which physical warehouse the original sale drew from, if recorded — see
+// cnote_finish.php for why this is always NULL today (invoice creation
+// isn't wired to populate it yet) and why it defaults to G1 (warehouse id
+// 2) rather than the unassigned bucket. Must match cnote_finish.php's
+// default exactly — this file undoes exactly what that one credited.
+$warehouseId = null;
+if ($to_usertype === 'company') {
+    $warehouseId = 2; // Default: G1
+    if ($from_usertype === 'customer') {
+        $stmt = $db_conn->prepare("SELECT warehouse_id FROM invoice WHERE inv_id = ? LIMIT 1");
+    } else {
+        $stmt = $db_conn->prepare("SELECT warehouse_id FROM user_invoice WHERE inv_id = ? LIMIT 1");
+    }
+    $stmt->bind_param("s", $invnumber);
+    $stmt->execute();
+    $whRow = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ($whRow && $whRow['warehouse_id'] !== null) {
+        $warehouseId = (int) $whRow['warehouse_id'];
+    }
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -118,22 +141,27 @@ try {
     |----------------------------------------------------------------------
     */
     if ($stockWasApplied) {
-    $stmt = $db_conn->prepare("
-        UPDATE stock
-        SET sales_qty = sales_qty + ?,
-            closing_qty = closing_qty - ?
-        WHERE product_id = ?
-          AND user_type = ?
-          AND user_id = ?
-        LIMIT 1
-    ");
-    $stmt->bind_param("iisss", $returnqty, $returnqty, $prid, $to_usertype, $to_userid);
-    $stmt->execute();
-    $affected = $stmt->affected_rows;
-    $stmt->close();
-
-    if ($affected === 0) {
-        error_log("STOCK REVERSAL WARNING: No stock record found for receiver - Product: $prid, User: $to_usertype/$to_userid");
+    // Scoped to the exact warehouse row cnote_finish.php credited (G1 by
+    // default for a company receiver, NULL/unassigned for any other — see
+    // warehouseId note above). Uses StockService::reverseDeduct(), falling
+    // back to credit() (which creates the row via INSERT ... ON DUPLICATE
+    // KEY) if no stock row exists yet for this exact (product, warehouse) —
+    // e.g. G1 never had this product before — so the qty is never silently
+    // lost the way the old raw UPDATE (0 affected_rows, only logged) could.
+    $stockService = new StockService($db_conn);
+    $reverseResult = $stockService->reverseDeduct(
+        $prid, $to_usertype, $to_userid, $returnqty,
+        'return', $returnid_decode, $Login_user_TYPEvl ?? 'system',
+        true, // externalTransaction
+        $warehouseId
+    );
+    if (empty($reverseResult['success'])) {
+        $stockService->credit(
+            $prid, $to_usertype, $to_userid, $returnqty,
+            'return', $returnid_decode, $Login_user_TYPEvl ?? 'system',
+            true, // externalTransaction
+            $warehouseId
+        );
     }
 
     /*

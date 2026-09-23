@@ -16,7 +16,13 @@ require_once("include/GodownAccess.php");
 		echo "<script>alert('You are not authorized to use this company profile'); window.history.back();</script>";
 		exit;
 	}
-	
+
+	if (!$warehouseId) {
+		$_SESSION['errorMessage'] = "Please select a warehouse (physical).";
+		echo "<script>window.location='shop-user-invoice-add?invuser=$invuser&missing_warehouse=1';</script>";
+		exit;
+	}
+
 	//invoice accept=0
 	if($_REQUEST['invoice_number_accept']==0)
 	{

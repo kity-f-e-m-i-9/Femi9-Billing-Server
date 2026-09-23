@@ -167,6 +167,10 @@ ob_end_flush();
                         <div class="alert alert-danger">Invalid input. Please check all fields and try again.</div>
                     <?php endif; ?>
 
+                    <?php if (isset($_GET['missing_warehouse'])): ?>
+                        <div class="alert alert-danger">Please select a warehouse (physical).</div>
+                    <?php endif; ?>
+
                     <!-- Form Card -->
                     <div class="row">
                         <div class="col-md-12">
@@ -208,18 +212,18 @@ ob_end_flush();
                                                            class="form-control">
                                                 </div>
 
-                                                <!-- Godown (physical warehouse) -->
+                                                <!-- Warehouse (physical) -->
                                                 <div class="mb-3">
-                                                    <label class="form-label">Godown</label>
-                                                    <select name="warehouse_id" class="form-control">
-                                                        <option value="">— Not assigned —</option>
+                                                    <label class="form-label">Warehouse (physical) *</label>
+                                                    <select required name="warehouse_id" class="form-control">
+                                                        <option value="" hidden>Select</option>
                                                         <?php foreach ($warehouses as $wh): ?>
                                                             <option value="<?= (int) $wh['id'] ?>">
                                                                 <?= htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8') ?><?= $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '' ?>
                                                             </option>
                                                         <?php endforeach; ?>
                                                     </select>
-                                                    <div class="form-text">Physical storage location this stock is being received into. Leave blank if not tracked by godown.</div>
+                                                    <div class="form-text">Physical storage location this stock is being received into.</div>
                                                 </div>
 
                                                 <!-- ── Multi-product rows ─────────────────── -->

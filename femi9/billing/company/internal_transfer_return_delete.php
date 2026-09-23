@@ -3,6 +3,7 @@ include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
 require_once("include/GodownAccess.php");
+require_once("include/AutoTransferDemand.php"); // auto_transfer_leg_warehouse()
 
 error_reporting(0);
 
@@ -46,6 +47,15 @@ $send_to    = (string) $note['send_to'];
 $stockService = new StockService($db_conn);
 $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
+// The original transfer's per-leg physical godown lives on its stock_ledger
+// rows, not on internal_transfer itself — recover it the same way
+// internal_transfer_return_action.php and internal_transfer_delete.php do,
+// so undoing a return re-applies the transfer into the warehouse it
+// actually came from/went to instead of the unassigned (warehouse_id NULL)
+// bucket.
+$sourceWarehouseId = auto_transfer_leg_warehouse($db_conn, $tempid, $product_id, 'transfer_out');
+$destWarehouseId   = auto_transfer_leg_warehouse($db_conn, $tempid, $product_id, 'transfer_in');
+
 $db_conn->begin_transaction();
 try {
     // Undo the return: re-apply the original transfer for this qty
@@ -58,13 +68,13 @@ try {
     $stockService->transferOut(
         $product_id, $Login_user_TYPEvl, $send_from, $qty,
         'transfer', $tempid, $createdBy,
-        true
+        true, $sourceWarehouseId
     );
 
     $stockService->transferIn(
         $product_id, $Login_user_TYPEvl, $send_to, $qty,
         'transfer', $tempid, $createdBy,
-        true
+        true, null, $destWarehouseId
     );
 
     $stmtUpd = $db_conn->prepare(

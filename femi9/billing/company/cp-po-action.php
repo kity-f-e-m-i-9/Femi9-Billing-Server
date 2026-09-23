@@ -7,6 +7,7 @@ require_once("include/GodownAccess.php");
 require_once __DIR__ . '/../shared/CpPurchaseOrderBalance.php';
 require_once __DIR__ . '/../shared/CpInvoiceNumberService.php';
 require_once __DIR__ . '/../shared/CpInvoiceSchema.php';
+require_once("include/StockService.php");
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
@@ -53,9 +54,13 @@ if ($action === 'reject') {
 }
 
 // ── Approve ──────────────────────────────────────────────────────────────
-$godown_id = (int)($_POST['godown_id'] ?? 0);
+$godown_id   = (int)($_POST['godown_id'] ?? 0);
+$warehouseId = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 if ($godown_id < 1 || !is_godown_allowed($db_conn, $godown_id)) {
     header("Location: cp-today-orders.php?error=unauthorized"); exit;
+}
+if (!$warehouseId) {
+    header("Location: cp-today-orders.php?error=missing_warehouse"); exit;
 }
 
 $items = $db_conn->prepare("SELECT product_id, qty, price, amount FROM channel_partner_purchase_order_items WHERE po_id = ?");
@@ -81,30 +86,10 @@ if ($grandTotal > $headroom + 0.001) {
 
 $created_by = $_SESSION['LOGIN_USER'] ?? '';
 
-// ── Stock helpers (duplicated from company/pl-godown-transfer-action.php —
-// see this task's brief Step 1 note for why: that file's helpers are
-// declared at file scope, not in a reusable header, so a require here would
-// fatal on redeclaration. This codebase already has 3+ independent copies
-// of the identical CP-stock helper functions.) ─────────────────────────────
-function cpPoLockAndGetGodownQty(mysqli $db, int $godown_id, int $pid): int {
-    $s = $db->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=? FOR UPDATE");
-    $uid = (string)$godown_id;
-    $s->bind_param("si", $uid, $pid); $s->execute();
-    $r = $s->get_result()->fetch_assoc(); $s->close();
-    return $r ? (int)$r['closing_qty'] : 0;
-}
-function cpPoDebitGodown(mysqli $db, int $godown_id, int $pid, int $qty): void {
-    $s = $db->prepare("UPDATE stock SET sent_qty=sent_qty+?, closing_qty=closing_qty-? WHERE user_type='company' AND user_id=? AND product_id=?");
-    $uid = (string)$godown_id;
-    $s->bind_param("iisi", $qty, $qty, $uid, $pid); $s->execute(); $s->close();
-}
-function cpPoInsertStockLedger(mysqli $db, int $godown_id, int $pid, string $action, int $qty, int $before, int $after, string $ref_id, string $by): void {
-    $user_type = 'company'; $ref_type = 'transfer'; $note = '';
-    $uid = (string)$godown_id;
-    $s = $db->prepare("INSERT INTO stock_ledger (product_id,user_type,user_id,action,qty,qty_before,qty_after,ref_type,ref_id,note,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    $s->bind_param("isssiiissss", $pid, $user_type, $uid, $action, $qty, $before, $after, $ref_type, $ref_id, $note, $by);
-    $s->execute(); $s->close();
-}
+// ── Stock helpers ────────────────────────────────────────────────────────────
+// Godown-side stock goes through StockService (warehouse-aware, shared with
+// pl-godown-transfer-action.php). CP-side stock has no warehouse concept, so
+// it stays as local raw-SQL helpers, same as the other CP-stock call sites.
 function cpPoLockAndGetCpQty(mysqli $db, int $cp_id, int $pid): int {
     $s = $db->prepare("SELECT closing_qty FROM channel_partner_stock WHERE channel_partner_id=? AND product_id=? FOR UPDATE");
     $s->bind_param("ii", $cp_id, $pid); $s->execute();
@@ -121,6 +106,8 @@ function cpPoInsertCpLedger(mysqli $db, int $cp_id, int $pid, string $action, in
     $s->bind_param("iisiiissss", $cp_id, $pid, $action, $qty, $before, $after, $ref_type, $ref_id, $note, $by);
     $s->execute(); $s->close();
 }
+
+$stockService = new StockService($db_conn);
 
 $db_conn->begin_transaction();
 try {
@@ -139,13 +126,15 @@ try {
         $pid = (int)$item['product_id'];
         $qty = (int)$item['qty'];
 
-        // Lock + re-check godown stock inside the transaction — the
-        // authoritative gate, not whatever the queue page showed.
-        $gd_before = cpPoLockAndGetGodownQty($db_conn, $godown_id, $pid);
-        if ($qty > $gd_before) throw new Exception("Insufficient godown stock for product {$pid}");
-        $gd_after = $gd_before - $qty;
-        cpPoDebitGodown($db_conn, $godown_id, $pid, $qty);
-        cpPoInsertStockLedger($db_conn, $godown_id, $pid, 'transfer_out', $qty, $gd_before, $gd_after, $ref_id, $created_by);
+        // StockService::transferOut() locks the row inside the transaction —
+        // the authoritative gate, not whatever the queue page showed — and
+        // throws StockException on insufficient stock.
+        $stockService->transferOut(
+            $pid, 'company', (string) $godown_id, $qty,
+            'transfer', $ref_id, $created_by,
+            true, // outer transaction owns commit
+            $warehouseId
+        );
 
         $cp_before = cpPoLockAndGetCpQty($db_conn, $cp_id, $pid);
         $cp_after  = $cp_before + $qty;

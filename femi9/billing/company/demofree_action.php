@@ -15,6 +15,16 @@ if (isset($_REQUEST['add-record'])) {
     $date     = date("Y-m-d", strtotime($_REQUEST['date'] ?? 'now'));
     $remarks  = RemoveSpecialChar($_REQUEST['remarks']  ?? '');
     $category = htmlspecialchars(strip_tags(trim($_REQUEST['category'] ?? '')), ENT_QUOTES, 'UTF-8');
+    // Only relevant for usertype='company' — a company godown's stock can be
+    // split across physical warehouses; every other usertype has no
+    // warehouse concept and this stays null for them.
+    $warehouseId = filter_var($_REQUEST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
+
+    if ($usertype === 'company' && !$warehouseId) {
+        $_SESSION['errorMessage'] = "Please select a warehouse (physical).";
+        echo "<script>window.location='demofree_new?missing_warehouse';</script>";
+        exit;
+    }
 
     $product_ids = $_REQUEST['product_id'] ?? [];
     $qty_arr     = $_REQUEST['qty']        ?? [];
@@ -45,7 +55,7 @@ if (isset($_REQUEST['add-record'])) {
     $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
     foreach ($rows as $row) {
-        $available = $stockService->getClosingQty($row['pid'], $usertype, $userid);
+        $available = $stockService->getClosingQty($row['pid'], $usertype, $userid, $warehouseId);
         if ($available === null || $available < $row['qty']) {
             $_SESSION['errorMessage'] =
                 "Insufficient stock for product #{$row['pid']}. " .
@@ -64,8 +74,8 @@ if (isset($_REQUEST['add-record'])) {
         );
         $stmtIns = $db_conn->prepare(
             "INSERT INTO demofreedamage
-                 (tempid, date, remarks, product_id, qty, category, usertype, userid)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                 (tempid, date, remarks, product_id, qty, category, usertype, userid, warehouse_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
 
         foreach ($rows as $row) {
@@ -78,14 +88,15 @@ if (isset($_REQUEST['add-record'])) {
             if ((int) $stmtChk->get_result()->fetch_assoc()['n'] > 0) continue;
 
             // Insert demo/free/damage record
-            $stmtIns->bind_param('sssissss', $tempid, $date, $remarks, $pid, $qty, $category, $usertype, $userid);
+            $stmtIns->bind_param('sssissssi', $tempid, $date, $remarks, $pid, $qty, $category, $usertype, $userid, $warehouseId);
             $stmtIns->execute();
 
             // Deduct stock: sent_qty ↑, closing_qty ↓ — FOR UPDATE + ledger entry
             $stockService->transferOut(
                 $pid, $usertype, $userid, $qty,
                 'demofree', $tempid, $createdBy,
-                true // externalTransaction
+                true, // externalTransaction
+                $warehouseId
             );
         }
 

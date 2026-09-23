@@ -7,7 +7,13 @@ if (!isset($_REQUEST['add-record'])) {
     exit;
 }
 
-$godownid = mysqli_real_escape_string($db_conn, trim($_REQUEST['godownid'] ?? ''));
+$godownid    = mysqli_real_escape_string($db_conn, trim($_REQUEST['godownid'] ?? ''));
+$warehouseId = filter_var($_REQUEST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
+
+if (!$warehouseId) {
+    echo "<script>window.location='add-return?missing_warehouse&&gid=$godownid';</script>";
+    exit;
+}
 
 // Verify opening stock exists for this godown
 $stmt = $db_conn->prepare(
@@ -52,31 +58,31 @@ $db_conn->begin_transaction();
 try {
     // Insert return record
     $stmt = $db_conn->prepare(
-        "INSERT INTO company_return_stock (tempid, prid, returnqty, date, remarks, godownid)
-         VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO company_return_stock (tempid, prid, returnqty, date, remarks, godownid, warehouse_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
     );
-    $stmt->bind_param('siisss', $tempid, $prid, $returnqty, $date, $remarks, $godownid);
+    $stmt->bind_param('siissi', $tempid, $prid, $returnqty, $date, $remarks, $godownid, $warehouseId);
     $stmt->execute();
     $stmt->close();
 
-    // Update stock: returnqty ↑, closing_qty ↓
+    // Update stock: returnqty ↑, closing_qty ↓ — scoped to the selected
+    // physical warehouse, not the unassigned bucket.
     // Company returns reduce closing_qty (goods leaving) and increment returnqty column
     $stockService = new StockService($db_conn);
-    $row = null;
 
     // Lock the stock row
     $s = $db_conn->prepare(
         "SELECT returnqty, closing_qty FROM stock
-          WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL
+          WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id = ?
           FOR UPDATE"
     );
-    $s->bind_param('iss', $prid, $Login_user_TYPEvl, $godownid);
+    $s->bind_param('issi', $prid, $Login_user_TYPEvl, $godownid, $warehouseId);
     $s->execute();
     $row = $s->get_result()->fetch_assoc();
     $s->close();
 
     if (!$row) {
-        throw new \RuntimeException("Stock row not found for product=$prid godown=$godownid");
+        throw new \RuntimeException("Stock row not found for product=$prid godown=$godownid warehouse=$warehouseId");
     }
 
     $newReturnQty   = (int)$row['returnqty']   + $returnqty;
@@ -90,22 +96,22 @@ try {
 
     $s = $db_conn->prepare(
         "UPDATE stock SET returnqty = ?, closing_qty = ?, updated_at = NOW()
-          WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id IS NULL"
+          WHERE product_id = ? AND user_type = ? AND user_id = ? AND warehouse_id = ?"
     );
-    $s->bind_param('iiiss', $newReturnQty, $newClosingQty, $prid, $Login_user_TYPEvl, $godownid);
+    $s->bind_param('iiissi', $newReturnQty, $newClosingQty, $prid, $Login_user_TYPEvl, $godownid, $warehouseId);
     $s->execute();
     $s->close();
 
     // Write ledger entry
     $stmt = $db_conn->prepare(
         "INSERT INTO stock_ledger
-            (product_id, user_type, user_id, action, qty, qty_before, qty_after,
+            (product_id, user_type, user_id, warehouse_id, action, qty, qty_before, qty_after,
              ref_type, ref_id, note, created_by)
-         VALUES (?, ?, ?, 'return_reject', ?, ?, ?, 'return', ?, 'company return stock', ?)"
+         VALUES (?, ?, ?, ?, 'return_reject', ?, ?, ?, 'return', ?, 'company return stock', ?)"
     );
     $stmt->bind_param(
         'issiiiiss',
-        $prid, $Login_user_TYPEvl, $godownid,
+        $prid, $Login_user_TYPEvl, $godownid, $warehouseId,
         $returnqty, $row['closing_qty'], $newClosingQty,
         $tempid, $_SESSION['LOGIN_USER'] ?? 'system'
     );

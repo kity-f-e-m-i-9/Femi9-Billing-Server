@@ -9,6 +9,8 @@ $select_Godowndetails="select * from company_godown where id='".$_REQUEST['gid']
 $fetch_Godowndetails=mysqli_query($db_conn,$select_Godowndetails);
 $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 
+$wh_result = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+$warehouses_list = $wh_result ? $wh_result->fetch_all(MYSQLI_ASSOC) : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -120,6 +122,17 @@ $tempID="".$randum_number."RTST/".$temp_date."/".$temp_time."";?>
 							   {?>
 						   <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
 							   <?php }?>
+							   </select>
+							   <br/>
+
+<label class="form-label">Warehouse (physical)*</label>
+                               <select required="" name="warehouse_id" class="form-control">
+							   <option value="" hidden="">Select</option>
+							   <?php foreach ($warehouses_list as $wh): ?>
+							   <option value="<?php echo (int)$wh['id']; ?>">
+							       <?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?><?php echo $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : ''; ?>
+							   </option>
+							   <?php endforeach; ?>
 							   </select>
 							   <br/>
 							   

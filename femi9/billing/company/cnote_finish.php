@@ -80,6 +80,29 @@ $to_usertype = $return['to_usertype'];
 $to_userid = $return['to_userid'];
 $current_status = $return['status'];
 
+// Which physical warehouse the original sale drew from, if recorded —
+// invoice/user_invoice both have this column (see docs/superpowers/specs/
+// 2026-09-18-invoice-warehouse-selection-design.md) but neither invoice
+// creation path is wired to populate it yet, so this is NULL for every row
+// today. Falls back to G1 (warehouse id 2) rather than the unassigned
+// bucket — same default applied to the TP-invoice and demo/free/damage
+// backfills, since that's where this company's stock actually lives in
+// practice. Once invoice creation is wired to record the real warehouse,
+// this fallback simply stops being hit.
+$warehouseId = 2; // Default: G1
+if ($from_usertype === 'customer') {
+    $stmt = $db_conn->prepare("SELECT warehouse_id FROM invoice WHERE inv_id = ? LIMIT 1");
+} else {
+    $stmt = $db_conn->prepare("SELECT warehouse_id FROM user_invoice WHERE inv_id = ? LIMIT 1");
+}
+$stmt->bind_param("s", $invid);
+$stmt->execute();
+$whRow = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+if ($whRow && $whRow['warehouse_id'] !== null) {
+    $warehouseId = (int) $whRow['warehouse_id'];
+}
+
 /*
 |--------------------------------------------------------------------------
 | ONLY PROCESS IF STILL PENDING
@@ -202,12 +225,30 @@ try {
         $returnqty = (int) $item['qty'];
 
         // Receiver (to_user, typically company): reverse the original sale
-        // closing_qty ↑, sales_qty ↓  →  stock comes back
+        // closing_qty ↑, sales_qty ↓  →  stock comes back. $warehouseId
+        // defaults to G1 (see note above) when the invoice never recorded
+        // one — only applied for a company receiver, since other usertypes
+        // have no warehouse concept.
+        $effectiveWarehouseId = $to_usertype === 'company' ? $warehouseId : null;
         $deductResult = $stockService->reverseDeduct(
             $prid, $to_usertype, $to_userid, $returnqty,
             'return', $returnid, $createdBy,
-            true // externalTransaction
+            true, // externalTransaction
+            $effectiveWarehouseId
         );
+        if (empty($deductResult['success']) && ($deductResult['reason'] ?? null) === 'no_stock_row') {
+            // No stock row exists yet for this exact (product, warehouse) —
+            // e.g. G1 never had this product before. Fall back to credit(),
+            // which creates the row via INSERT ... ON DUPLICATE KEY, so the
+            // returned qty is never silently lost or a legitimate return
+            // blocked just because the warehouse row hasn't been created yet.
+            $deductResult = $stockService->credit(
+                $prid, $to_usertype, $to_userid, $returnqty,
+                'return', $returnid, $createdBy,
+                true, // externalTransaction
+                $effectiveWarehouseId
+            );
+        }
         if (empty($deductResult['success'])) {
             throw new \RuntimeException(
                 "Stock credit failed for product {$prid} (to {$to_usertype}/{$to_userid}): "

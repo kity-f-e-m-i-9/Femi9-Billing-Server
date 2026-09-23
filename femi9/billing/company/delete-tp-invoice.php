@@ -3,6 +3,7 @@ ob_start();
 include("checksession.php");
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
+require_once __DIR__ . '/include/StockService.php';
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
     header("Location: manage-tp-invoices?error=unauthorized"); exit;
@@ -29,6 +30,7 @@ if (!$inv) { header("Location: manage-tp-invoices?error=notfound"); exit; }
 $tp_id            = (int)$inv['territory_partner_id'];
 $source_cp_id     = (int)$inv['source_cp_id'];
 $source_godown_id = (int)$inv['source_godown_id'];
+$warehouseId      = $inv['warehouse_id'] !== null ? (int)$inv['warehouse_id'] : null;
 $inv_num          = $inv['invoice_number'];
 $subtotal      = round((float)$inv['total_amount'] - (float)($inv['courier_charges'] ?? 0), 2);
 $created_by    = $_SESSION['LOGIN_USER'] ?? '';
@@ -60,19 +62,13 @@ try {
         // label on the invoice, it was never itself an inventory table).
         if ($source_godown_id > 0) {
             $uid = (string)$source_godown_id;
-            $u = $db_conn->prepare("UPDATE stock SET sales_qty=GREATEST(0,sales_qty-?), closing_qty=closing_qty+? WHERE user_type='company' AND user_id=? AND product_id=?");
-            $u->bind_param("iisi", $qty, $qty, $uid, $pid); $u->execute(); $u->close();
-
-            $r = $db_conn->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=?");
-            $r->bind_param("si", $uid, $pid); $r->execute();
-            $row = $r->get_result()->fetch_assoc(); $r->close();
-            $after_gd  = $row ? (int)$row['closing_qty'] : 0;
-            $before_gd = $after_gd - $qty;
-            $utype_c = 'company'; $action_gd = 'transfer_in'; $ref_gd = 'transfer';
-            $ins = $db_conn->prepare("INSERT INTO stock_ledger (product_id,user_type,user_id,action,qty,qty_before,qty_after,ref_type,ref_id,note,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-            $note_gd = 'Reversal: ' . $inv_num;
-            $ins->bind_param("isssiiissss", $pid, $utype_c, $uid, $action_gd, $qty, $before_gd, $after_gd, $ref_gd, $inv_num, $note_gd, $created_by);
-            $ins->execute(); $ins->close();
+            $stockService = $stockService ?? new StockService($db_conn);
+            $stockService->reverseDeduct(
+                $pid, 'company', $uid, $qty,
+                'tp_invoice', $inv_num, $created_by,
+                true, // outer transaction owns commit
+                $warehouseId
+            );
         } elseif ($source_cp_id > 0) {
             $u = $db_conn->prepare("UPDATE channel_partner_stock SET closing_qty=closing_qty+? WHERE channel_partner_id=? AND product_id=?");
             $u->bind_param("iii", $qty, $source_cp_id, $pid); $u->execute(); $u->close();

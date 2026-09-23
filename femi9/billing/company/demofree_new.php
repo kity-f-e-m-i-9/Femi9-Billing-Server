@@ -1,7 +1,9 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
+<?php include("checksession.php"); require_once("include/GodownAccess.php");
 require_once("include/PermissionCheck.php"); requirePermission('demo_free');
-include("config.php"); 
+include("config.php");
 date_default_timezone_set("Asia/Kolkata");
+$wh_result = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+$warehouses_list = $wh_result ? $wh_result->fetch_all(MYSQLI_ASSOC) : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -113,7 +115,7 @@ $tempid="".$randum_number."DFD/".$temp_date."/".$temp_time."";?>
                                         <div class="example-container">
                                         <div class="example-content">
 										
-<!----------------------------------GODOWN------------------------------>										
+<!----------------------------------GODOWN------------------------------>
 <script type="text/javascript">
 function checkopeningstock(str){
     if (str == "") { document.getElementById("txtHint").innerHTML = ""; return; }
@@ -122,7 +124,12 @@ function checkopeningstock(str){
     x.onreadystatechange = function(){ if(x.readyState==4 && x.status==200){ document.getElementById("opstock").innerHTML = x.responseText; } };
     x.open("GET", "loadopeningstock2.php?q=" + str, true);
     x.send();
-    // Load products with stock for selected godown
+    loadProductsForGodown();
+}
+function loadProductsForGodown(){
+    var gid = document.getElementsByName("userid")[0].value;
+    var wid = document.getElementsByName("warehouse_id")[0].value;
+    if (gid == "") { return; }
     var y = new XMLHttpRequest();
     y.onreadystatechange = function(){
         if (y.readyState == 4 && y.status == 200) {
@@ -132,7 +139,9 @@ function checkopeningstock(str){
             }
         }
     };
-    y.open("GET", "load_products_by_godown.php?godown_id=" + str, true);
+    var url = "load_products_by_godown.php?godown_id=" + gid;
+    if (wid != "") { url += "&warehouse_id=" + wid; }
+    y.open("GET", url, true);
     y.send();
 }
 </script>
@@ -145,6 +154,17 @@ function checkopeningstock(str){
 							   {?>
 						       <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
 							   <?php }?>
+							   </select>
+							   <br/>
+
+							   <label for="exampleInputEmail1" class="form-label">Warehouse (physical)*</label>
+                               <select required="" name="warehouse_id" class="form-control" onchange="loadProductsForGodown();">
+							   <option value="" hidden="">Select</option>
+							   <?php foreach ($warehouses_list as $wh): ?>
+							   <option value="<?php echo (int)$wh['id']; ?>">
+							       <?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?><?php echo $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : ''; ?>
+							   </option>
+							   <?php endforeach; ?>
 							   </select>
 							   <br/>
 <!------------------------------------GODOWN------------------------------>

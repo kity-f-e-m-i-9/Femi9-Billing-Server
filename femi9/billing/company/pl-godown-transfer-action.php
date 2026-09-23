@@ -2,6 +2,7 @@
 ob_start();
 include("checksession.php");
 require_once("include/GodownAccess.php");
+require_once("include/StockService.php");
 error_reporting(0);
 
 if (empty($_POST['csrf_token']) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
@@ -15,6 +16,7 @@ if (!in_array($transfer_type, ['godown_to_location', 'location_to_godown'])) {
 
 $godown_id     = (int)($_POST['godown_id']   ?? 0);
 $cp_id         = (int)($_POST['cp_id']       ?? 0);
+$warehouseId   = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 $transfer_date = trim($_POST['transfer_date'] ?? date('Y-m-d'));
 $note          = trim($_POST['note'] ?? '');
 $ref_input     = trim($_POST['ref_number'] ?? '');
@@ -23,12 +25,18 @@ $created_by    = $_SESSION['LOGIN_USER'] ?? '';
 $raw_pids = $_POST['product_id'] ?? [];
 $raw_qtys = $_POST['qty']        ?? [];
 
+$redirect_form = ($transfer_type === 'godown_to_location') ? 'add-godown-to-location' : 'add-location-to-godown';
+
 if (!$godown_id || !$cp_id || empty($raw_pids)) {
-    header("Location: add-godown-to-location?error=missing"); exit;
+    header("Location: {$redirect_form}?error=missing"); exit;
+}
+
+if (!$warehouseId) {
+    header("Location: {$redirect_form}?error=missing_warehouse"); exit;
 }
 
 if (!is_godown_allowed($db_conn, $godown_id)) {
-    header("Location: add-godown-to-location?error=unauthorized"); exit;
+    header("Location: {$redirect_form}?error=unauthorized"); exit;
 }
 
 // Build validated line items
@@ -45,31 +53,8 @@ if (empty($items)) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function getGodownQty(mysqli $db, int $godown_id, int $pid): int {
-    $s = $db->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=?");
-    $s->bind_param("si", $godown_id, $pid); $s->execute();
-    $r = $s->get_result()->fetch_assoc(); $s->close();
-    return $r ? (int)$r['closing_qty'] : 0;
-}
-
-function debitGodown(mysqli $db, int $godown_id, int $pid, int $qty): void {
-    $s = $db->prepare("UPDATE stock SET sent_qty=sent_qty+?, closing_qty=closing_qty-? WHERE user_type='company' AND user_id=? AND product_id=?");
-    $s->bind_param("iisi", $qty, $qty, $godown_id, $pid); $s->execute(); $s->close();
-}
-
-function creditGodown(mysqli $db, int $godown_id, int $pid, int $qty): void {
-    $s = $db->prepare("UPDATE stock SET returnqty=returnqty+?, closing_qty=closing_qty+? WHERE user_type='company' AND user_id=? AND product_id=?");
-    $s->bind_param("iisi", $qty, $qty, $godown_id, $pid); $s->execute(); $s->close();
-}
-
-function insertStockLedger(mysqli $db, int $godown_id, int $pid, string $action, int $qty, int $before, int $after, string $ref_id, string $by): void {
-    $user_type = 'company'; $ref_type = 'transfer'; $note = '';
-    $s = $db->prepare("INSERT INTO stock_ledger (product_id,user_type,user_id,action,qty,qty_before,qty_after,ref_type,ref_id,note,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    $uid = (string)$godown_id;
-    $s->bind_param("isssiiissss", $pid, $user_type, $uid, $action, $qty, $before, $after, $ref_type, $ref_id, $note, $by);
-    $s->execute(); $s->close();
-}
+// Godown-side stock now goes through StockService (warehouse-aware) instead of
+// raw SQL — see docs/superpowers/specs/2026-09-17-per-godown-split-stock-design.md.
 
 function getCpQty(mysqli $db, int $cp_id, int $pid): int {
     $s = $db->prepare("SELECT closing_qty FROM channel_partner_stock WHERE channel_partner_id=? AND product_id=?");
@@ -86,14 +71,6 @@ function creditCp(mysqli $db, int $cp_id, int $pid, int $qty): void {
 function debitCp(mysqli $db, int $cp_id, int $pid, int $qty): void {
     $s = $db->prepare("UPDATE channel_partner_stock SET closing_qty=closing_qty-? WHERE channel_partner_id=? AND product_id=?");
     $s->bind_param("iii", $qty, $cp_id, $pid); $s->execute(); $s->close();
-}
-
-function lockAndGetQty(mysqli $db, string $table, string $col1, string $val1, string $col2, string $val2, int $pid): int {
-    $v1 = mysqli_real_escape_string($db, $val1);
-    $v2 = mysqli_real_escape_string($db, $val2);
-    $r  = mysqli_fetch_assoc(mysqli_query($db,
-        "SELECT closing_qty FROM `$table` WHERE `$col1`='$v1' AND `$col2`='$v2' AND product_id=$pid FOR UPDATE"));
-    return $r ? (int)$r['closing_qty'] : 0;
 }
 
 function lockAndGetCpQty(mysqli $db, int $cp_id, int $pid): int {
@@ -113,9 +90,11 @@ function insertCpLedger(mysqli $db, int $cp_id, int $pid, string $action, int $q
 // ── Pre-validate stock ─────────────────────────────────────────────────────────
 $redirect_base = ($transfer_type === 'godown_to_location') ? 'add-godown-to-location' : 'add-location-to-godown';
 
+$stockService = new StockService($db_conn);
+
 foreach ($items as $item) {
     if ($transfer_type === 'godown_to_location') {
-        $avail = getGodownQty($db_conn, $godown_id, $item['pid']);
+        $avail = $stockService->getClosingQty($item['pid'], 'company', (string) $godown_id, $warehouseId) ?? 0;
     } else {
         $avail = getCpQty($db_conn, $cp_id, $item['pid']);
     }
@@ -144,12 +123,14 @@ try {
     $s_item = $db_conn->prepare("INSERT INTO pl_godown_transfer_items (transfer_id,product_id,quantity) VALUES (?,?,?)");
     foreach ($items as $item) {
         if ($transfer_type === 'godown_to_location') {
-            // Godown → CP (lock godown row before debit to prevent concurrent oversell)
-            $gd_before = lockAndGetQty($db_conn, 'stock', 'user_type', 'company', 'user_id', (string)$godown_id, $item['pid']);
-            if ($item['qty'] > $gd_before) throw new Exception("Insufficient godown stock for product {$item['pid']}");
-            $gd_after  = $gd_before - $item['qty'];
-            debitGodown($db_conn, $godown_id, $item['pid'], $item['qty']);
-            insertStockLedger($db_conn, $godown_id, $item['pid'], 'transfer_out', $item['qty'], $gd_before, $gd_after, $ref_id, $created_by);
+            // Godown → CP. StockService::transferOut() locks the row, checks
+            // sufficiency, and throws StockException on insufficient stock.
+            $stockService->transferOut(
+                $item['pid'], 'company', (string) $godown_id, $item['qty'],
+                'transfer', $ref_id, $created_by,
+                true, // outer transaction owns commit
+                $warehouseId
+            );
 
             $cp_before = getCpQty($db_conn, $cp_id, $item['pid']);
             $cp_after  = $cp_before + $item['qty'];
@@ -164,10 +145,13 @@ try {
             debitCp($db_conn, $cp_id, $item['pid'], $item['qty']);
             insertCpLedger($db_conn, $cp_id, $item['pid'], 'transfer_out', $item['qty'], $cp_before, $cp_after, $ref_id, $created_by);
 
-            $gd_before = getGodownQty($db_conn, $godown_id, $item['pid']);
-            $gd_after  = $gd_before + $item['qty'];
-            creditGodown($db_conn, $godown_id, $item['pid'], $item['qty']);
-            insertStockLedger($db_conn, $godown_id, $item['pid'], 'transfer_in', $item['qty'], $gd_before, $gd_after, $ref_id, $created_by);
+            $stockService->transferIn(
+                $item['pid'], 'company', (string) $godown_id, $item['qty'],
+                'transfer', $ref_id, $created_by,
+                true, // outer transaction owns commit
+                null, // lotRate — no source-leg weighted rate available here
+                $warehouseId
+            );
         }
 
         $s_item->bind_param("iii", $transfer_id, $item['pid'], $item['qty']);

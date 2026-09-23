@@ -55,6 +55,16 @@ $from_user_id = $item_data['from_user_id'];
 $to_user_type = $item_data['to_user_type'];
 $to_user_id = $item_data['to_user_id'];
 
+// Which physical warehouse the seller-side deduction came from — same
+// column invoice-stock-update.php reads at creation time. Reading it here
+// keeps this reversal scoped to the exact row that was actually deducted.
+$stmt_wh = $db_conn->prepare("SELECT warehouse_id FROM user_invoice WHERE inv_id = ? LIMIT 1");
+$stmt_wh->bind_param("s", $inv_id);
+$stmt_wh->execute();
+$whRow = $stmt_wh->get_result()->fetch_assoc();
+$stmt_wh->close();
+$warehouseId = ($whRow && $whRow['warehouse_id'] !== null) ? (int) $whRow['warehouse_id'] : null;
+
 // Begin transaction
 $db_conn->begin_transaction();
 
@@ -70,11 +80,14 @@ try {
     $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
     if ($stockService->hasLedgerEntry('user_invoice', $inv_id)) {
-        // Restore seller stock: closing_qty ↑, sales_qty ↓
+        // Restore seller stock: closing_qty ↑, sales_qty ↓ — scoped to the
+        // same warehouse the original deduction targeted (only applies when
+        // the seller is company; other seller types have no warehouse concept).
         $stockService->reverseDeduct(
             $pr_id, $from_user_type, $from_user_id, $qty,
             'user_invoice', $inv_id, $createdBy,
-            true // externalTransaction
+            true, // externalTransaction
+            $from_user_type === 'company' ? $warehouseId : null
         );
 
         // Remove buyer stock if buyer maintains inventory: closing_qty ↓, input_qty ↓
