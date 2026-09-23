@@ -3,6 +3,22 @@
 // (company/login-as-tp.php). Consumes a single-use token and starts a real
 // Territory Partner session here — same session shape territory-partner/
 // checksession.php expects, mirroring salesbdm/switch-login.php's pattern.
+//
+// Whether a PHPSESSID cookie already existed BEFORE this request's
+// session_start() — determines whether session_regenerate_id() below is
+// needed at all. Calling it unconditionally is a real bug (confirmed
+// 2026-09-23): on the common case (no prior TP session in this browser),
+// session_start() already issues a fresh, unguessable id and its own
+// Set-Cookie; calling session_regenerate_id() right after then sends a
+// SECOND, different Set-Cookie for the SAME cookie name in the same
+// response. Whichever one a browser keeps is not guaranteed — if it keeps
+// the first (pre-regenerate) one, this session's own data (written below,
+// after the regenerate) lives under the id the browser never kept, so the
+// very next request finds no session at all and gets bounced straight to
+// "session failed" — a login that looks like it logs you right back out.
+// Same root cause and fix as company/switch-login.php's own documented
+// history of this exact bug.
+$_hadExistingTpSession = isset($_COOKIE[session_name() ?: 'PHPSESSID']);
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -50,7 +66,9 @@ if (!$tp || !$tp['is_active']) {
     exit;
 }
 
-session_regenerate_id(true);
+if ($_hadExistingTpSession) {
+    session_regenerate_id(true);
+}
 $_SESSION['LOGIN_USER']      = $tp['mobile'];
 $_SESSION['LOGIN_USER_ID']   = $tp['id'];
 $_SESSION['LOGIN_USER_NAME'] = $tp['name'];
