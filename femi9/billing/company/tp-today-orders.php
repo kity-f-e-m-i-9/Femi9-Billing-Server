@@ -84,7 +84,7 @@ tpEnsurePickupColumn($db_conn);
 
 $stmt = $db_conn->prepare(
     "SELECT o.id, o.order_date, o.created_at, o.status, o.tp_invoice_id, o.excess_amount, o.product_type,
-            o.cancelled_at, o.cancelled_by, o.cancel_reason,
+            o.cancelled_at, o.cancelled_by, o.cancel_reason, o.preferred_cp_id,
             o.use_default_delivery_address, o.custom_delivery_line1, o.custom_delivery_line2,
             o.custom_delivery_city, o.custom_delivery_district, o.custom_delivery_state,
             o.custom_delivery_country, o.custom_delivery_pincode,
@@ -93,9 +93,11 @@ $stmt = $db_conn->prepare(
             tp.delivery_city AS tp_delivery_city, tp.delivery_district AS tp_delivery_district,
             tp.delivery_state AS tp_delivery_state, tp.delivery_country AS tp_delivery_country,
             tp.delivery_pincode AS tp_delivery_pincode,
+            cp.name AS source_cp_name,
             i.product_id, i.qty, i.price, i.amount, i.delivery_method, p.productName
      FROM tp_purchase_orders o
      JOIN territory_partners tp ON tp.id = o.territory_partner_id
+     LEFT JOIN channel_partners cp ON cp.id = o.preferred_cp_id
      LEFT JOIN tp_purchase_order_items i ON i.po_id = o.id
      LEFT JOIN products p ON p.id = i.product_id
      $whereSql
@@ -150,6 +152,9 @@ foreach ($rows as $r) {
             'cancelled_at'  => $r['cancelled_at'],
             'cancelled_by'  => $r['cancelled_by'],
             'cancel_reason' => $r['cancel_reason'],
+            // The TP's own "Submit To" choice on add-purchase-order.php —
+            // preferred_cp_id empty means they chose Company directly.
+            'source_label'  => $r['preferred_cp_id'] ? ($r['source_cp_name'] ?: 'Channel Partner') : 'Company',
             'delivery'      => $deliveryParts,
             'lines'         => [],
             'total'         => 0,
@@ -615,6 +620,7 @@ $companyProfiles = $db_conn->query(
                                             <th>TP ID</th>
                                             <th>TP Name</th>
                                             <th>Type</th>
+                                            <th>Source</th>
                                             <th>Invoice</th>
                                             <th>Products</th>
                                             <th>Total</th>
@@ -637,6 +643,10 @@ $companyProfiles = $db_conn->query(
                                             <td>
                                                 <?php $_poType = tpResolveProductType($o['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_poType); ?>
                                                 <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?=$_tBg?>;color:<?=$_tFg?>;"><?=htmlspecialchars(tpProductTypeLabel($_poType))?></span>
+                                            </td>
+                                            <td>
+                                                <?php $_isCpSource = ($o['source_label'] !== 'Company'); ?>
+                                                <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?= $_isCpSource ? '#ede9fe' : '#e0f2fe' ?>;color:<?= $_isCpSource ? '#5b21b6' : '#0369a1' ?>;"><?=htmlspecialchars($o['source_label'])?></span>
                                             </td>
                                             <td>
                                                 <?php if ($o['status'] === 'completed'): ?>
