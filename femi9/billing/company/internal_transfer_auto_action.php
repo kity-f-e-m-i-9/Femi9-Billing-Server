@@ -47,12 +47,11 @@ $productIds = $_REQUEST['product_id'] ?? [];
 $qtyArr     = $_REQUEST['qty'] ?? [];
 $rate1Arr   = $_REQUEST['rate1'] ?? []; // Neksomo -> Healthcare rate, entered on this page
 $rate2Arr   = $_REQUEST['rate2'] ?? []; // Healthcare -> LLP rate, entered on this page
-// Physical godown per leg endpoint, per row — independently selectable:
-// Source = where Neksomo's stock starts, Intermediate = where Healthcare
-// receives/re-sends from, Destination = where LLP's stock ends up.
-$warehouseSourceArr       = $_REQUEST['warehouse_source'] ?? [];
-$warehouseIntermediateArr = $_REQUEST['warehouse_intermediate'] ?? [];
-$warehouseDestArr         = $_REQUEST['warehouse_dest'] ?? [];
+// Physical godown for this row's whole transfer, per row — one value only.
+// Neksomo/Healthcare/LLP are different company profiles that share the
+// SAME physical building for any one transfer, so Intermediate/Destination
+// always equal Source (forced below, never taken from the request).
+$warehouseSourceArr = $_REQUEST['warehouse_source'] ?? [];
 
 if (!is_array($productIds) || count($productIds) === 0) {
     $_SESSION['errorMessage'] = "No products submitted.";
@@ -86,9 +85,15 @@ foreach ($productIds as $i => $rawPid) {
     $qty   = (int) RemoveSpecialChar($qtyArr[$i] ?? '0');
     $rate1 = (float) ($rate1Arr[$i] ?? 0);
     $rate2 = (float) ($rate2Arr[$i] ?? 0);
+    // Intermediate/Destination are always forced to match Source, never
+    // trusted from the submitted values — Neksomo/Healthcare/LLP are
+    // different company profiles sharing the SAME physical godown for any
+    // one transfer, so there is no legitimate case where these three
+    // differ. The page's own Via/Dest pickers are locked to mirror Source
+    // in JS; this is the server-side guarantee of the same rule.
     $sourceWarehouseId       = filter_var($warehouseSourceArr[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
-    $intermediateWarehouseId = filter_var($warehouseIntermediateArr[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
-    $destWarehouseId         = filter_var($warehouseDestArr[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
+    $intermediateWarehouseId = $sourceWarehouseId;
+    $destWarehouseId         = $sourceWarehouseId;
     if ($pid <= 0 || $qty <= 0) continue;
     $rows[] = [
         'pid' => $pid, 'qty' => $qty, 'rate1' => $rate1, 'rate2' => $rate2,
@@ -107,26 +112,14 @@ if (empty($rows)) {
 $stockService = new StockService($db_conn);
 $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
-// Lines the user unchecked in the Order Breakdown / View All Orders modals
-// (see internal_transfer_auto.php's injectExcludedSourceIds()) — recorded
-// as 'excluded' skip rows BEFORE the per-product loop below runs, so
-// get_auto_transfer_breakdown_for_product()'s own re-query (which already
-// filters on auto_transfer_skip_today) never re-includes them when
-// deciding which orders to mark 'transferred'. Without this, unchecking a
-// line in the UI only ever adjusted the qty number shown — it never
-// reached the server, so the excluded order was marked transferred anyway.
-$excludedSourceIds = $_REQUEST['excluded_source_id'] ?? [];
-if (is_array($excludedSourceIds)) {
-    foreach ($excludedSourceIds as $sourceId) {
-        // Shape is "tp:<po_id>:<product_id>" / "ot:<tempid>:<product_id>" —
-        // same convention get_auto_transfer_breakdown_for_product() emits.
-        $parts = explode(':', (string) $sourceId, 2);
-        if (count($parts) !== 2) continue;
-        [$sourceType, $sourceRef] = $parts;
-        if (!in_array($sourceType, ['tp', 'ot'], true) || $sourceRef === '') continue;
-        mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'excluded', $createdBy);
-    }
-}
+// Unchecking a line in the Order Breakdown / View All Orders modals only
+// ever adjusts the qty number for THIS transfer run — it's a same-run
+// adjustment, not a "skip this order today" decision. An order left out
+// this way simply isn't part of $legTwoQty below, so it's never marked
+// 'transferred' and naturally reappears as outstanding demand the very
+// next time Auto Transfer runs, same day or not. No skip-table row is
+// written for it (contrast with reason='transferred' below, which really
+// must persist — that one reflects stock that has actually moved).
 $username     = htmlspecialchars(strip_tags(trim($_SESSION['LOGIN_USER'] ?? '')), ENT_QUOTES, 'UTF-8');
 $usertype     = htmlspecialchars(strip_tags(trim($Login_user_TYPEvl ?? '')), ENT_QUOTES, 'UTF-8');
 $date         = date('Y-m-d');
@@ -274,7 +267,7 @@ try {
                 if ($remaining < $orderQty) break; // this and every later order in this source's list stay unmarked
                 $remaining -= $orderQty;
                 $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"ot:"/"wa:" prefix
-                mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy);
+                mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy, $tempid2);
             }
         }
     }
