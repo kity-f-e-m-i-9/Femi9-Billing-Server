@@ -7,6 +7,7 @@
 // modal and every row's dropdown can refresh after a change.
 
 include("checksession.php");
+require_once("include/GodownAccess.php");
 require_once("include/MachineCodes.php");
 include("config.php");
 header('Content-Type: application/json');
