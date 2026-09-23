@@ -362,7 +362,7 @@ if ($prefill_po_id > 0) {
                                      warehouse concept). Toggled by showGodownSource()/showCpSource(). -->
                                 <div class="col-lg-3 col-md-4" id="warehouseSection" style="display:none;">
                                     <label class="form-label">Godown (physical) <span class="required">*</span></label>
-                                    <select id="warehouseDrop" class="form-control" required>
+                                    <select id="warehouseDrop" class="form-control">
                                         <option value="" hidden>Select</option>
                                         <?php foreach ($warehouses_list as $wh): ?>
                                             <option value="<?php echo (int)$wh['id']; ?>">
