@@ -47,11 +47,12 @@ $productIds = $_REQUEST['product_id'] ?? [];
 $qtyArr     = $_REQUEST['qty'] ?? [];
 $rate1Arr   = $_REQUEST['rate1'] ?? []; // Neksomo -> Healthcare rate, entered on this page
 $rate2Arr   = $_REQUEST['rate2'] ?? []; // Healthcare -> LLP rate, entered on this page
-// Physical godown for this row's whole transfer, per row — one value only.
-// Neksomo/Healthcare/LLP are different company profiles that share the
-// SAME physical building for any one transfer, so Intermediate/Destination
-// always equal Source (forced below, never taken from the request).
-$warehouseSourceArr = $_REQUEST['warehouse_source'] ?? [];
+// Each leg's physical warehouse, per row — Neksomo, Healthcare, and LLP can
+// each hold stock across more than one warehouse, so Source/Intermediate/
+// Destination are independently submitted and trusted per row.
+$warehouseSourceArr       = $_REQUEST['warehouse_source'] ?? [];
+$warehouseIntermediateArr = $_REQUEST['warehouse_intermediate'] ?? [];
+$warehouseDestArr         = $_REQUEST['warehouse_dest'] ?? [];
 
 if (!is_array($productIds) || count($productIds) === 0) {
     $_SESSION['errorMessage'] = "No products submitted.";
@@ -85,15 +86,9 @@ foreach ($productIds as $i => $rawPid) {
     $qty   = (int) RemoveSpecialChar($qtyArr[$i] ?? '0');
     $rate1 = (float) ($rate1Arr[$i] ?? 0);
     $rate2 = (float) ($rate2Arr[$i] ?? 0);
-    // Intermediate/Destination are always forced to match Source, never
-    // trusted from the submitted values — Neksomo/Healthcare/LLP are
-    // different company profiles sharing the SAME physical godown for any
-    // one transfer, so there is no legitimate case where these three
-    // differ. The page's own Via/Dest pickers are locked to mirror Source
-    // in JS; this is the server-side guarantee of the same rule.
     $sourceWarehouseId       = filter_var($warehouseSourceArr[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
-    $intermediateWarehouseId = $sourceWarehouseId;
-    $destWarehouseId         = $sourceWarehouseId;
+    $intermediateWarehouseId = filter_var($warehouseIntermediateArr[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
+    $destWarehouseId         = filter_var($warehouseDestArr[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
     if ($pid <= 0 || $qty <= 0) continue;
     $rows[] = [
         'pid' => $pid, 'qty' => $qty, 'rate1' => $rate1, 'rate2' => $rate2,
