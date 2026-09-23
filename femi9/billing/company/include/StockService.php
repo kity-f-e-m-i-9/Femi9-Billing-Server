@@ -1208,7 +1208,7 @@ class StockService
         ?int   $warehouseId = null,
         ?int   $machineCodeId = null
     ): int {
-        if ($machineCodeId !== null) $this->ensureMachineCodeColumn();
+        $this->ensureMachineCodeColumn();
         $stmt = $this->db->prepare(
             "INSERT INTO stock_ledger
                 (product_id, user_type, user_id, warehouse_id, action, qty,
