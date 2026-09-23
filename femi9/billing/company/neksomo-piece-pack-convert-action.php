@@ -149,7 +149,7 @@ try {
             // converts only that many and reports the shortfall (see
             // docs/superpowers/specs/2026-09-22-raw-material-bundle-
             // tracking-design.md).
-            $bundleResult = convert_from_raw_material_bundle($db_conn, $row['bundle_id'], $piecesPerPack, $row['pack_count']);
+            $bundleResult = convert_from_raw_material_bundle($db_conn, $row['bundle_id'], $row['product_id'], $piecesPerPack, $row['pack_count'], $refId, $createdBy);
 
             $creditResult = $stockService->credit(
                 $row['product_id'], 'company', $godownId, $bundleResult['packs_made'],

@@ -215,6 +215,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="input-stock-bundles.php">Input Stock — Raw Bundles</a></li>
 						<li><a href="raw-material-bundles-manage.php">Manage Bundles</a></li>
 						<li><a href="neksomo-piece-pack-convert.php">Convert Pieces &harr; Packs</a></li>
+						<li><a href="manage-piece-pack-conversions.php">Manage Conversions</a></li>
 						<li><a href="neksomo-company-stock.php">Company Stock</a></li>
                         </ul>
                     </li>

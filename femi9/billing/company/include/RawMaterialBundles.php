@@ -34,11 +34,19 @@ require_once __DIR__ . '/StockService.php'; // for StockException
  *    an EXCESS bundle (see get_raw_material_bundles()'s variance logic),
  *    not just an exact match.
  *
- * Closing a bundle (close_raw_material_bundle()) freezes its final
- * remaining_pieces as the shortage signal (positive = short) — a
- * bundle only ever shows as "excess" via added_extra_pieces having been
- * used at least once, since remaining_pieces itself can no longer go
- * negative under this model.
+ * Closing a bundle (close_raw_material_bundle()) with leftover
+ * remaining_pieces does NOT record it as a lost shortage — the leftover
+ * automatically CARRIES FORWARD into another bundle for the same
+ * (raw_product_id, company_godown_id, warehouse_id): merged onto an
+ * existing open bundle if one exists, otherwise a brand-new bundle is
+ * created (nominal_pieces=0, since it's carried-over material, not a
+ * fresh nominal intake) to hold it. The closed bundle's own record then
+ * shows "Carried forward: N" (carried_to_bundle_id points at where it
+ * went) instead of "Short by N" — a genuine, permanent shortage only
+ * ever happens via record_damaged_pieces() explicitly writing it off
+ * before close. Excess (added_extra_pieces having been used at least
+ * once) still shows independently, since that's a real physical-count
+ * discovery, not a leftover-routing concern.
  */
 
 // Self-migrating — same convention as every other table in this project.
@@ -56,6 +64,8 @@ function ensure_raw_material_bundles_table(mysqli $db_conn): void
             added_extra_pieces INT NOT NULL DEFAULT 0,
             status ENUM('open','closed') NOT NULL DEFAULT 'open',
             input_ref_id VARCHAR(64) NULL,
+            carried_to_bundle_id INT NULL,
+            carried_from_bundle_id INT NULL,
             closed_by VARCHAR(100) NULL,
             closed_at TIMESTAMP NULL,
             created_by VARCHAR(100) NULL,
@@ -64,17 +74,47 @@ function ensure_raw_material_bundles_table(mysqli $db_conn): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
     );
 
-    // Column guard for environments where the table already existed
-    // before damaged_pieces/added_extra_pieces were added — same
-    // convention as every other self-migrating ALTER in this project.
-    $col = $db_conn->query("SHOW COLUMNS FROM raw_material_bundles LIKE 'damaged_pieces'");
-    if ($col && $col->num_rows === 0) {
-        $db_conn->query("ALTER TABLE raw_material_bundles ADD COLUMN damaged_pieces INT NOT NULL DEFAULT 0 AFTER remaining_pieces");
+    // Column guards for environments where the table already existed
+    // before these columns were added — same convention as every other
+    // self-migrating ALTER in this project.
+    foreach ([
+        'damaged_pieces'         => "INT NOT NULL DEFAULT 0 AFTER remaining_pieces",
+        'added_extra_pieces'     => "INT NOT NULL DEFAULT 0 AFTER damaged_pieces",
+        'carried_to_bundle_id'   => "INT NULL AFTER input_ref_id",
+        'carried_from_bundle_id' => "INT NULL AFTER carried_to_bundle_id",
+    ] as $columnName => $definition) {
+        $col = $db_conn->query("SHOW COLUMNS FROM raw_material_bundles LIKE '$columnName'");
+        if ($col && $col->num_rows === 0) {
+            $db_conn->query("ALTER TABLE raw_material_bundles ADD COLUMN $columnName $definition");
+        }
     }
-    $col2 = $db_conn->query("SHOW COLUMNS FROM raw_material_bundles LIKE 'added_extra_pieces'");
-    if ($col2 && $col2->num_rows === 0) {
-        $db_conn->query("ALTER TABLE raw_material_bundles ADD COLUMN added_extra_pieces INT NOT NULL DEFAULT 0 AFTER damaged_pieces");
-    }
+}
+
+/**
+ * One row per bundle-sourced Pieces->Pack conversion draw — the only link
+ * from a stock_ledger 'conversion' entry (identified by ref_id) back to
+ * which raw_material_bundles row it drew pieces from. Needed so a
+ * conversion can be found and undone later (see
+ * manage-piece-pack-conversions.php): convert_from_raw_material_bundle()
+ * itself only mutates the bundle row in place and returns a result array,
+ * it never used to persist which bundle a given conversion came from.
+ */
+function ensure_raw_material_bundle_draws_table(mysqli $db_conn): void
+{
+    $db_conn->query(
+        "CREATE TABLE IF NOT EXISTS raw_material_bundle_draws (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            bundle_id INT NOT NULL,
+            ref_id VARCHAR(64) NOT NULL,
+            product_id INT NOT NULL,
+            pieces_used INT NOT NULL,
+            packs_made INT NOT NULL,
+            created_by VARCHAR(100) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_rmbd_bundle (bundle_id),
+            KEY idx_rmbd_ref (ref_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
 }
 
 /**
@@ -191,9 +231,10 @@ function draw_from_raw_material_bundle(mysqli $db_conn, int $bundleId, int $qtyP
  *   already has 0 (or negative) pieces remaining — nothing to convert.
  * @return array{packs_made:int, pieces_used:int, remaining_after:int, requested_packs:int}
  */
-function convert_from_raw_material_bundle(mysqli $db_conn, int $bundleId, int $piecesPerPack, int $requestedPacks): array
+function convert_from_raw_material_bundle(mysqli $db_conn, int $bundleId, int $productId, int $piecesPerPack, int $requestedPacks, string $refId, ?string $createdBy = null): array
 {
     ensure_raw_material_bundles_table($db_conn);
+    ensure_raw_material_bundle_draws_table($db_conn);
 
     $lockStmt = $db_conn->prepare(
         "SELECT remaining_pieces, status FROM raw_material_bundles WHERE id = ? FOR UPDATE"
@@ -225,6 +266,17 @@ function convert_from_raw_material_bundle(mysqli $db_conn, int $bundleId, int $p
     $updStmt->bind_param('ii', $piecesUsed, $bundleId);
     $updStmt->execute();
     $updStmt->close();
+
+    // Record the draw so this conversion can be found and undone later by
+    // ref_id (see manage-piece-pack-conversions.php) — the bundle row
+    // itself only ever holds current totals, not per-conversion history.
+    $drawStmt = $db_conn->prepare(
+        "INSERT INTO raw_material_bundle_draws (bundle_id, ref_id, product_id, pieces_used, packs_made, created_by)
+         VALUES (?, ?, ?, ?, ?, ?)"
+    );
+    $drawStmt->bind_param('isiiis', $bundleId, $refId, $productId, $piecesUsed, $packsMade, $createdBy);
+    $drawStmt->execute();
+    $drawStmt->close();
 
     return [
         'packs_made'       => $packsMade,
@@ -325,25 +377,171 @@ function add_extra_pieces_to_bundle(mysqli $db_conn, int $bundleId, int $qtyPiec
 }
 
 /**
- * Marks one bundle closed — its remaining_pieces at this moment becomes
- * the permanent shortage signal (positive = short by that amount);
- * excess is instead signaled by a non-zero added_extra_pieces total
- * (see add_extra_pieces_to_bundle()). No further draws or adjustments
- * can target this bundle afterward (get_open_raw_material_bundles()
- * filters status='open').
+ * Marks one bundle closed. If it still has remaining_pieces > 0, that
+ * leftover is NEVER recorded as a lost shortage — it automatically
+ * carries forward into another bundle for the same (raw_product_id,
+ * company_godown_id, warehouse_id): merged onto the oldest other open
+ * bundle if one exists, otherwise a brand-new bundle is created
+ * (nominal_pieces=0, since it's carried-over material rather than a
+ * fresh nominal intake) to hold it. carried_to_bundle_id/
+ * carried_from_bundle_id link the two records for traceability. A
+ * genuine permanent shortage only ever happens via
+ * record_damaged_pieces() writing it off explicitly before close — see
+ * file header and get_raw_material_bundles()'s variance logic, which
+ * reads carried_to_bundle_id to show "Carried forward: N" instead of
+ * "Short by N" whenever this path was taken.
+ *
+ * Runs the leftover-routing + close as one transaction — either both
+ * happen or neither does, so a bundle is never left half-closed with
+ * its leftover unaccounted for.
+ *
+ * @throws StockException if the bundle doesn't exist or is already closed.
  */
 function close_raw_material_bundle(mysqli $db_conn, int $bundleId, ?string $closedBy): bool
 {
     ensure_raw_material_bundles_table($db_conn);
+
+    $lockStmt = $db_conn->prepare(
+        "SELECT raw_product_id, company_godown_id, warehouse_id, remaining_pieces, status
+         FROM raw_material_bundles WHERE id = ? FOR UPDATE"
+    );
+    $lockStmt->bind_param('i', $bundleId);
+    $lockStmt->execute();
+    $bundle = $lockStmt->get_result()->fetch_assoc();
+    $lockStmt->close();
+
+    if (!$bundle || $bundle['status'] !== 'open') {
+        return false;
+    }
+
+    $leftover = (int) $bundle['remaining_pieces'];
+    $carriedToBundleId = null;
+
+    if ($leftover > 0) {
+        $rawProductId    = (int) $bundle['raw_product_id'];
+        $companyGodownId = (int) $bundle['company_godown_id'];
+        $warehouseId     = $bundle['warehouse_id'] !== null ? (int) $bundle['warehouse_id'] : null;
+
+        // Oldest other OPEN bundle for the same (raw product, company
+        // profile, warehouse) — locked so a concurrent close/convert
+        // against it can't race with this merge.
+        $targetStmt = $db_conn->prepare(
+            "SELECT id FROM raw_material_bundles
+             WHERE raw_product_id = ? AND company_godown_id = ? AND warehouse_id <=> ?
+               AND status = 'open' AND id != ?
+             ORDER BY created_at ASC, id ASC LIMIT 1 FOR UPDATE"
+        );
+        $targetStmt->bind_param('iiii', $rawProductId, $companyGodownId, $warehouseId, $bundleId);
+        $targetStmt->execute();
+        $targetRow = $targetStmt->get_result()->fetch_assoc();
+        $targetStmt->close();
+
+        if ($targetRow) {
+            $carriedToBundleId = (int) $targetRow['id'];
+            $mergeStmt = $db_conn->prepare(
+                "UPDATE raw_material_bundles SET remaining_pieces = remaining_pieces + ?, carried_from_bundle_id = ?
+                 WHERE id = ?"
+            );
+            $mergeStmt->bind_param('iii', $leftover, $bundleId, $carriedToBundleId);
+            $mergeStmt->execute();
+            $mergeStmt->close();
+        } else {
+            // No other open bundle to merge into — create a fresh one
+            // to hold the carried-forward leftover. nominal_pieces = 0
+            // since this isn't a new nominal intake, just relocated
+            // material; its own remaining_pieces starts at $leftover.
+            $createStmt = $db_conn->prepare(
+                "INSERT INTO raw_material_bundles
+                    (raw_product_id, company_godown_id, warehouse_id, nominal_pieces, remaining_pieces, carried_from_bundle_id, created_by)
+                 VALUES (?, ?, ?, 0, ?, ?, ?)"
+            );
+            $createStmt->bind_param('iiiiis', $rawProductId, $companyGodownId, $warehouseId, $leftover, $bundleId, $closedBy);
+            $createStmt->execute();
+            $carriedToBundleId = (int) $db_conn->insert_id;
+            $createStmt->close();
+        }
+    }
+
     $stmt = $db_conn->prepare(
-        "UPDATE raw_material_bundles SET status = 'closed', closed_by = ?, closed_at = NOW()
+        "UPDATE raw_material_bundles SET status = 'closed', closed_by = ?, closed_at = NOW(), carried_to_bundle_id = ?
          WHERE id = ? AND status = 'open'"
     );
-    $stmt->bind_param('si', $closedBy, $bundleId);
+    $stmt->bind_param('sii', $closedBy, $carriedToBundleId, $bundleId);
     $stmt->execute();
     $affected = $stmt->affected_rows;
     $stmt->close();
     return $affected > 0;
+}
+
+/**
+ * Undo a single bundle-sourced Pieces->Pack conversion, identified by the
+ * stock_ledger ref_id it was recorded under. Restores remaining_pieces on
+ * the bundle it drew from and deletes the draw record — does NOT touch
+ * `stock` or `stock_ledger` itself, the caller is responsible for
+ * reversing the StockService credit() that accompanied this draw (see
+ * manage-piece-pack-conversions.php, which calls both inside one
+ * transaction).
+ *
+ * Refuses (throws StockException) if the bundle has since been closed —
+ * undoing into a closed bundle would silently resurrect a deliberately
+ * finished bundle, so the operator must reconcile manually instead.
+ *
+ * @throws StockException if no draw exists for this ref_id, or its bundle is closed.
+ * @return array{bundle_id:int, product_id:int, pieces_used:int, packs_made:int}
+ */
+function restore_bundle_draw(mysqli $db_conn, string $refId): array
+{
+    ensure_raw_material_bundles_table($db_conn);
+    ensure_raw_material_bundle_draws_table($db_conn);
+
+    $stmt = $db_conn->prepare(
+        "SELECT id, bundle_id, product_id, pieces_used, packs_made FROM raw_material_bundle_draws WHERE ref_id = ? LIMIT 1 FOR UPDATE"
+    );
+    $stmt->bind_param('s', $refId);
+    $stmt->execute();
+    $draw = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$draw) {
+        throw new StockException("No raw material bundle draw found for this conversion — it may not be bundle-sourced.");
+    }
+
+    $bundleId   = (int) $draw['bundle_id'];
+    $piecesUsed = (int) $draw['pieces_used'];
+
+    $lockStmt = $db_conn->prepare(
+        "SELECT status FROM raw_material_bundles WHERE id = ? FOR UPDATE"
+    );
+    $lockStmt->bind_param('i', $bundleId);
+    $lockStmt->execute();
+    $bundleRow = $lockStmt->get_result()->fetch_assoc();
+    $lockStmt->close();
+
+    if (!$bundleRow) {
+        throw new StockException("The bundle this conversion drew from no longer exists.");
+    }
+    if ($bundleRow['status'] !== 'open') {
+        throw new StockException("Cannot undo — the bundle this conversion drew from has already been closed. Please reconcile manually.");
+    }
+
+    $updStmt = $db_conn->prepare(
+        "UPDATE raw_material_bundles SET remaining_pieces = remaining_pieces + ? WHERE id = ?"
+    );
+    $updStmt->bind_param('ii', $piecesUsed, $bundleId);
+    $updStmt->execute();
+    $updStmt->close();
+
+    $delStmt = $db_conn->prepare("DELETE FROM raw_material_bundle_draws WHERE id = ?");
+    $delStmt->bind_param('i', $draw['id']);
+    $delStmt->execute();
+    $delStmt->close();
+
+    return [
+        'bundle_id'   => $bundleId,
+        'product_id'  => (int) $draw['product_id'],
+        'pieces_used' => $piecesUsed,
+        'packs_made'  => (int) $draw['packs_made'],
+    ];
 }
 
 /**
@@ -381,13 +579,14 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
         "SELECT b.id, b.raw_product_id, p.productName, b.company_godown_id, cg.gname,
                 w.code AS warehouse_code, b.nominal_pieces, b.remaining_pieces,
                 b.damaged_pieces, b.added_extra_pieces, b.status,
+                b.carried_to_bundle_id, b.carried_from_bundle_id,
                 b.created_by, b.created_at, b.closed_by, b.closed_at
          FROM raw_material_bundles b
          INNER JOIN products p ON p.id = b.raw_product_id
          INNER JOIN company_godown cg ON cg.id = b.company_godown_id
          LEFT JOIN warehouses w ON w.id = b.warehouse_id
          $whereSql
-         ORDER BY b.created_at DESC, b.id DESC"
+         ORDER BY b.created_at ASC, b.id ASC"
     );
     if ($types !== '') {
         $stmt->bind_param($types, ...$params);
@@ -401,41 +600,97 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
         $remaining = (int) $row['remaining_pieces'];
         $damaged = (int) $row['damaged_pieces'];
         $addedExtra = (int) $row['added_extra_pieces'];
+        $carriedToBundleId = $row['carried_to_bundle_id'] !== null ? (int) $row['carried_to_bundle_id'] : null;
 
-        // Excess is signaled by having ever added extra pieces (the only
-        // way a bundle exceeding nominal gets discovered under the
-        // "bundle is the hard conversion limit, never goes negative"
-        // model) — remaining_pieces itself can no longer go negative, so
-        // it's never used as the excess signal anymore. Shortage is
-        // still remaining_pieces > 0 at close time. Both can theoretically
-        // apply to the same bundle (added extra, then still ran short
-        // afterward) — shown together when that happens.
+        // A closed bundle with leftover ALWAYS carried it forward (see
+        // close_raw_material_bundle()) — remaining_pieces > 0 at close
+        // is never a real loss under this model, only damaged_pieces
+        // (explicitly written off before close) represents actual lost
+        // material. Excess is independently signaled by added_extra_pieces
+        // having been used at least once. Both can apply to the same
+        // bundle — shown together when that happens.
         $varianceLabel = null;
         if ($row['status'] === 'closed') {
             $parts = [];
-            if ($remaining > 0) $parts[] = "Short by $remaining";
+            if ($remaining > 0 && $carriedToBundleId !== null) $parts[] = "Carried forward: $remaining";
+            elseif ($remaining > 0) $parts[] = "Short by $remaining"; // defensive fallback — shouldn't happen under current close logic
             if ($addedExtra > 0) $parts[] = "Excess $addedExtra";
             $varianceLabel = $parts ? implode(', ', $parts) : 'Exact';
         }
 
         return [
-            'id'                 => (int) $row['id'],
-            'label'              => "Bundle #{$row['id']} ($date)",
-            'raw_product_id'     => (int) $row['raw_product_id'],
+            'id'                     => (int) $row['id'],
+            'label'                  => "Bundle #{$row['id']} ($date)",
+            'raw_product_id'         => (int) $row['raw_product_id'],
+            'product_name'           => $row['productName'],
+            'company_godown_id'      => (int) $row['company_godown_id'],
+            'gname'                  => $row['gname'],
+            'warehouse_code'         => $row['warehouse_code'],
+            'nominal_pieces'         => (int) $row['nominal_pieces'],
+            'remaining_pieces'       => $remaining,
+            'damaged_pieces'         => $damaged,
+            'added_extra_pieces'     => $addedExtra,
+            'status'                 => $row['status'],
+            'variance_label'         => $varianceLabel,
+            'carried_to_bundle_id'   => $carriedToBundleId,
+            'carried_from_bundle_id' => $row['carried_from_bundle_id'] !== null ? (int) $row['carried_from_bundle_id'] : null,
+            'created_by'             => $row['created_by'],
+            'created_at'             => $row['created_at'],
+            'closed_by'              => $row['closed_by'],
+            'closed_at'              => $row['closed_at'],
+        ];
+    }, $rows);
+}
+
+/**
+ * Every bundle-sourced Pieces->Pack conversion, most recent first, joined
+ * to its stock_ledger entry (qty/warehouse/who/when) and the bundle it
+ * drew from — powers manage-piece-pack-conversions.php. Pooled (non-
+ * bundle) conversions never appear here, since only convert_from_raw_
+ * material_bundle() writes a raw_material_bundle_draws row.
+ *
+ * @return array<int, array{
+ *   draw_id:int, ref_id:string, bundle_id:int, bundle_label:string,
+ *   bundle_status:string, product_id:int, product_name:string,
+ *   company_godown_id:int, gname:string, warehouse_code:?string,
+ *   pieces_used:int, packs_made:int, created_by:?string, created_at:string
+ * }>
+ */
+function get_bundle_conversions(mysqli $db_conn): array
+{
+    ensure_raw_material_bundle_draws_table($db_conn);
+
+    $rows = $db_conn->query(
+        "SELECT d.id AS draw_id, d.ref_id, d.bundle_id, d.pieces_used, d.packs_made,
+                d.created_by, d.created_at,
+                b.status AS bundle_status, b.company_godown_id,
+                cg.gname, w.code AS warehouse_code,
+                p.id AS product_id, p.productName
+         FROM raw_material_bundle_draws d
+         INNER JOIN raw_material_bundles b ON b.id = d.bundle_id
+         INNER JOIN company_godown cg ON cg.id = b.company_godown_id
+         LEFT JOIN warehouses w ON w.id = b.warehouse_id
+         INNER JOIN products p ON p.id = d.product_id
+         ORDER BY d.created_at DESC, d.id DESC"
+    )->fetch_all(MYSQLI_ASSOC);
+
+    return array_map(function ($row) {
+        $bundleDate = date('d-M-Y', strtotime($row['created_at']));
+        return [
+            'draw_id'            => (int) $row['draw_id'],
+            'ref_id'             => $row['ref_id'],
+            'bundle_id'          => (int) $row['bundle_id'],
+            'bundle_label'       => "Bundle #{$row['bundle_id']}",
+            'bundle_status'      => $row['bundle_status'],
+            'product_id'         => (int) $row['product_id'],
             'product_name'       => $row['productName'],
             'company_godown_id'  => (int) $row['company_godown_id'],
             'gname'              => $row['gname'],
             'warehouse_code'     => $row['warehouse_code'],
-            'nominal_pieces'     => (int) $row['nominal_pieces'],
-            'remaining_pieces'   => $remaining,
-            'damaged_pieces'     => $damaged,
-            'added_extra_pieces' => $addedExtra,
-            'status'             => $row['status'],
-            'variance_label'     => $varianceLabel,
+            'pieces_used'        => (int) $row['pieces_used'],
+            'packs_made'         => (int) $row['packs_made'],
             'created_by'         => $row['created_by'],
             'created_at'         => $row['created_at'],
-            'closed_by'          => $row['closed_by'],
-            'closed_at'          => $row['closed_at'],
         ];
     }, $rows);
 }

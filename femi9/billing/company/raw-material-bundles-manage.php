@@ -26,7 +26,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['
 
     try {
         if ($_POST['action'] === 'close') {
-            if ($bundleId > 0 && close_raw_material_bundle($db_conn, $bundleId, $actingUser)) {
+            // close_raw_material_bundle() locks the bundle row (and
+            // possibly a merge-target row) with FOR UPDATE, then may
+            // INSERT a new carry-forward bundle before marking this one
+            // closed — wrapped in a transaction so a failure partway
+            // through never leaves a bundle half-closed with its
+            // leftover unaccounted for.
+            $db_conn->begin_transaction();
+            try {
+                $closed = $bundleId > 0 && close_raw_material_bundle($db_conn, $bundleId, $actingUser);
+                $db_conn->commit();
+            } catch (\Throwable $e) {
+                $db_conn->rollback();
+                throw $e;
+            }
+            if ($closed) {
                 $_SESSION['sucMessage'] = "Bundle closed.";
             } else {
                 $_SESSION['errorMessage'] = "Could not close that bundle — it may already be closed.";
@@ -62,11 +76,11 @@ $bundles = get_raw_material_bundles($db_conn);
 
 $totalBundles  = count($bundles);
 $openCount     = 0;
-$shortCount    = 0;
+$carriedCount  = 0;
 $excessCount   = 0;
 foreach ($bundles as $b) {
     if ($b['status'] === 'open') $openCount++;
-    if ($b['variance_label'] !== null && strpos($b['variance_label'], 'Short') !== false) $shortCount++;
+    if ($b['carried_to_bundle_id'] !== null) $carriedCount++;
     if ($b['variance_label'] !== null && strpos($b['variance_label'], 'Excess') !== false) $excessCount++;
 }
 ?>
@@ -89,20 +103,28 @@ foreach ($bundles as $b) {
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
-        .rmb-tabs { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
-        .rmb-tab { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:9px; font-size:13.5px; font-weight:500; text-decoration:none; transition:filter .15s, background .15s; }
-        .rmb-tab i { font-size:17px; }
-        .rmb-tab.active { background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:#fff; box-shadow:0 2px 8px rgba(102,126,234,.3); }
-        .rmb-tab:not(.active) { background:#f3f4f6; color:#4b5563; }
-        .rmb-tab:not(.active):hover { background:#e5e7eb; color:#1f2937; }
+        :root {
+            --ata-tp-1: #667eea;
+            --ata-tp-2: #764ba2;
+        }
+        .ata-page-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+        .ata-page-head h1 { font-size:20px; font-weight:600; color:#1f2937; margin:0; display:flex; align-items:center; }
+        .ata-intro { color:#6b7280; font-size:13.5px; line-height:1.55; margin-bottom:16px; }
 
-        .rmb-summary { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
-        .rmb-stat { flex:1 1 140px; border:1px solid #eef0f3; border-radius:12px; padding:12px 16px; background:#fafbfc; }
-        .rmb-stat .num { font-size:20px; font-weight:700; color:#1f2937; line-height:1.2; }
-        .rmb-stat .lbl { font-size:11px; color:#9ca3af; text-transform:uppercase; letter-spacing:.03em; margin-top:2px; }
-        .rmb-stat.open .num { color:#1e40af; }
-        .rmb-stat.short .num { color:#991b1b; }
-        .rmb-stat.excess .num { color:#92400e; }
+        .ata-nav-tabs { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+        .ata-nav-tab { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:9px; font-size:13.5px; font-weight:500; text-decoration:none; transition:filter .15s, background .15s; }
+        .ata-nav-tab i { font-size:17px; }
+        .ata-nav-tab.active { background:linear-gradient(135deg, var(--ata-tp-1) 0%, var(--ata-tp-2) 100%); color:#fff; box-shadow:0 2px 8px rgba(102,126,234,.3); }
+        .ata-nav-tab:not(.active) { background:#f3f4f6; color:#4b5563; }
+        .ata-nav-tab:not(.active):hover { background:#e5e7eb; color:#1f2937; }
+
+        .ata-summary { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+        .ata-stat { flex:1 1 140px; border:1px solid #eef0f3; border-radius:12px; padding:12px 16px; background:#fafbfc; }
+        .ata-stat .num { font-size:20px; font-weight:700; color:#1f2937; line-height:1.2; }
+        .ata-stat .lbl { font-size:11px; color:#9ca3af; text-transform:uppercase; letter-spacing:.03em; margin-top:2px; }
+        .ata-stat.open .num { color:#1e40af; }
+        .ata-stat.short .num { color:#991b1b; }
+        .ata-stat.excess .num { color:#92400e; }
 
         .badge-open { background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600; }
         .badge-closed { background:#f3f4f6;color:#6b7280;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600; }
@@ -110,27 +132,26 @@ foreach ($bundles as $b) {
         .badge-excess { background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600; }
         .badge-exact { background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600; }
 
-        .rmb-filters { display:flex; gap:8px; margin-bottom:16px; }
-        .rmb-filter-btn { border:1px solid #e5e7eb; background:#fff; color:#4b5563; font-size:13px; font-weight:500; padding:6px 14px; border-radius:8px; cursor:pointer; transition:background .15s; }
-        .rmb-filter-btn:hover { background:#f3f4f6; }
-        .rmb-filter-btn.active { background:#1f2937; color:#fff; border-color:#1f2937; }
+        .ata-filters { display:flex; gap:8px; margin-bottom:16px; }
+        .ata-filter-btn { border:1px solid #e5e7eb; background:#fff; color:#4b5563; font-size:13px; font-weight:500; padding:6px 14px; border-radius:8px; cursor:pointer; transition:background .15s; }
+        .ata-filter-btn:hover { background:#f3f4f6; }
+        .ata-filter-btn.active { background:#1f2937; color:#fff; border-color:#1f2937; }
 
-        .rmb-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:14px; }
-        .rmb-bundle-card { border:1px solid #eef0f3; border-radius:14px; padding:16px 18px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.04); transition:box-shadow .15s; }
-        .rmb-bundle-card:hover { box-shadow:0 4px 14px rgba(0,0,0,.07); }
-        .rmb-bundle-card.is-short { border-color:#fecaca; }
-        .rmb-bundle-card.is-excess { border-color:#fde68a; }
-        .rmb-bc-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; }
-        .rmb-bc-title { font-weight:600; font-size:14px; color:#1f2937; }
-        .rmb-bc-product { font-size:12.5px; color:#6b7280; margin-bottom:12px; }
-        .rmb-bc-meta { font-size:12px; color:#9ca3af; margin-bottom:10px; }
-        .rmb-bc-bar-wrap { background:#f1f5f9; border-radius:6px; height:8px; overflow:hidden; margin-bottom:6px; }
-        .rmb-bc-bar { height:100%; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:6px; }
-        .rmb-bc-bar.is-short { background:#f87171; }
-        .rmb-bc-bar.is-excess { background:#fbbf24; }
-        .rmb-bc-qty { font-size:12.5px; color:#4b5563; margin-bottom:12px; display:flex; justify-content:space-between; }
-        .rmb-bc-footer { display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
-
+        .ata-bundle-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:14px; }
+        .ata-bundle-card { border:1px solid #eef0f3; border-radius:14px; padding:16px 18px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.04); transition:box-shadow .15s; }
+        .ata-bundle-card:hover { box-shadow:0 4px 14px rgba(0,0,0,.07); }
+        .ata-bundle-card.is-short { border-color:#fecaca; }
+        .ata-bundle-card.is-excess { border-color:#fde68a; }
+        .ata-bc-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; }
+        .ata-bc-title { font-weight:600; font-size:14px; color:#1f2937; }
+        .ata-bc-product { font-size:12.5px; color:#6b7280; margin-bottom:12px; }
+        .ata-bc-meta { font-size:12px; color:#9ca3af; margin-bottom:10px; }
+        .ata-bc-bar-wrap { background:#f1f5f9; border-radius:6px; height:8px; overflow:hidden; margin-bottom:6px; }
+        .ata-bc-bar { height:100%; background:linear-gradient(135deg, var(--ata-tp-1) 0%, var(--ata-tp-2) 100%); border-radius:6px; }
+        .ata-bc-bar.is-short { background:#f87171; }
+        .ata-bc-bar.is-excess { background:#fbbf24; }
+        .ata-bc-qty { font-size:12.5px; color:#4b5563; margin-bottom:12px; display:flex; justify-content:space-between; }
+        .ata-bc-footer { display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
     </style>
 </head>
 <body>
@@ -144,15 +165,16 @@ foreach ($bundles as $b) {
         <div class="app-content">
             <div class="content-wrapper">
                 <div class="container-fluid">
-                    <div class="page-description">
-                        <h1><i class="material-icons-outlined" style="font-size:26px;vertical-align:middle;margin-right:6px;color:#667eea;">list_alt</i>Manage Raw Bundles</h1>
-                        <p class="text-muted mb-0">Every raw material bundle, its remaining pieces, and variance once closed.</p>
+                    <div class="ata-page-head">
+                        <h1><i class="material-icons-outlined" style="font-size:22px;vertical-align:middle;margin-right:8px;color:var(--ata-tp-1);">list_alt</i>Manage Raw Bundles</h1>
                     </div>
+                    <p class="ata-intro">Every raw material bundle, its remaining pieces, and variance once closed.</p>
 
-                    <div class="rmb-tabs">
-                        <a href="input-stock-bundles.php" class="rmb-tab"><i class="material-icons-outlined">add_box</i> Input Stock</a>
-                        <a href="raw-material-bundles-manage.php" class="rmb-tab active"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
-                        <a href="neksomo-piece-pack-convert.php" class="rmb-tab"><i class="material-icons-outlined">sync_alt</i> Convert Pieces &harr; Packs</a>
+                    <div class="ata-nav-tabs">
+                        <a href="input-stock-bundles.php" class="ata-nav-tab"><i class="material-icons-outlined">add_box</i> Input Stock</a>
+                        <a href="raw-material-bundles-manage.php" class="ata-nav-tab active"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
+                        <a href="neksomo-piece-pack-convert.php" class="ata-nav-tab"><i class="material-icons-outlined">sync_alt</i> Convert Pieces &harr; Packs</a>
+                        <a href="manage-piece-pack-conversions.php" class="ata-nav-tab"><i class="material-icons-outlined">history</i> Manage Conversions</a>
                     </div>
 
                     <?php if (isset($_SESSION['errorMessage'])): $flashErr = htmlspecialchars($_SESSION['errorMessage'], ENT_QUOTES, 'UTF-8'); unset($_SESSION['errorMessage']); ?>
@@ -165,20 +187,20 @@ foreach ($bundles as $b) {
                     <?php endif; ?>
 
                     <?php if ($totalBundles > 0): ?>
-                    <div class="rmb-summary">
-                        <div class="rmb-stat">
+                    <div class="ata-summary">
+                        <div class="ata-stat">
                             <div class="num"><?php echo $totalBundles; ?></div>
                             <div class="lbl">Total Bundles</div>
                         </div>
-                        <div class="rmb-stat open">
+                        <div class="ata-stat open">
                             <div class="num"><?php echo $openCount; ?></div>
                             <div class="lbl">Open</div>
                         </div>
-                        <div class="rmb-stat short">
-                            <div class="num"><?php echo $shortCount; ?></div>
-                            <div class="lbl">Closed Short</div>
+                        <div class="ata-stat short">
+                            <div class="num"><?php echo $carriedCount; ?></div>
+                            <div class="lbl">Carried Forward</div>
                         </div>
-                        <div class="rmb-stat excess">
+                        <div class="ata-stat excess">
                             <div class="num"><?php echo $excessCount; ?></div>
                             <div class="lbl">Closed Excess</div>
                         </div>
@@ -188,35 +210,35 @@ foreach ($bundles as $b) {
                     <?php if (empty($bundles)): ?>
                         <div class="alert alert-info">No bundles recorded yet.</div>
                     <?php else: ?>
-                    <div class="rmb-filters">
-                        <button type="button" class="rmb-filter-btn active" data-filter="all">All (<?php echo $totalBundles; ?>)</button>
-                        <button type="button" class="rmb-filter-btn" data-filter="open">Open (<?php echo $openCount; ?>)</button>
-                        <button type="button" class="rmb-filter-btn" data-filter="closed">Closed (<?php echo $totalBundles - $openCount; ?>)</button>
+                    <div class="ata-filters">
+                        <button type="button" class="ata-filter-btn active" data-filter="all">All (<?php echo $totalBundles; ?>)</button>
+                        <button type="button" class="ata-filter-btn" data-filter="open">Open (<?php echo $openCount; ?>)</button>
+                        <button type="button" class="ata-filter-btn" data-filter="closed">Closed (<?php echo $totalBundles - $openCount; ?>)</button>
                     </div>
 
-                    <div class="rmb-grid" id="bundleGrid">
+                    <div class="ata-bundle-grid" id="bundleGrid">
                         <?php foreach ($bundles as $b):
-                            $isShort = $b['variance_label'] !== null && strpos($b['variance_label'], 'Short') !== false;
+                            $isCarried = $b['carried_to_bundle_id'] !== null;
                             $isExcess = $b['variance_label'] !== null && strpos($b['variance_label'], 'Excess') !== false;
-                            $cardExtraClass = $isShort ? ' is-short' : ($isExcess ? ' is-excess' : '');
+                            $cardExtraClass = $isCarried ? ' is-short' : ($isExcess ? ' is-excess' : '');
                             $pct = $b['nominal_pieces'] > 0 ? max(0, min(100, round((($b['nominal_pieces'] - max($b['remaining_pieces'], 0)) / $b['nominal_pieces']) * 100))) : 0;
                             $barExtraClass = $cardExtraClass;
                         ?>
-                        <div class="rmb-bundle-card<?php echo $cardExtraClass; ?>" data-status="<?php echo $b['status']; ?>">
-                            <div class="rmb-bc-top">
+                        <div class="ata-bundle-card<?php echo $cardExtraClass; ?>" data-status="<?php echo $b['status']; ?>">
+                            <div class="ata-bc-top">
                                 <div>
-                                    <div class="rmb-bc-title"><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></div>
-                                    <div class="rmb-bc-product"><?php echo htmlspecialchars($b['product_name'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                    <div class="ata-bc-title"><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                    <div class="ata-bc-product"><?php echo htmlspecialchars($b['product_name'], ENT_QUOTES, 'UTF-8'); ?></div>
                                 </div>
                                 <span class="<?php echo $b['status'] === 'open' ? 'badge-open' : 'badge-closed'; ?>"><?php echo ucfirst($b['status']); ?></span>
                             </div>
 
-                            <div class="rmb-bc-meta">
+                            <div class="ata-bc-meta">
                                 <?php echo htmlspecialchars($b['gname'], ENT_QUOTES, 'UTF-8'); ?><?php echo $b['warehouse_code'] ? ' · ' . htmlspecialchars($b['warehouse_code'], ENT_QUOTES, 'UTF-8') : ''; ?>
                             </div>
 
-                            <div class="rmb-bc-bar-wrap"><div class="rmb-bc-bar<?php echo $barExtraClass; ?>" style="width:<?php echo $pct; ?>%;"></div></div>
-                            <div class="rmb-bc-qty">
+                            <div class="ata-bc-bar-wrap"><div class="ata-bc-bar<?php echo $barExtraClass; ?>" style="width:<?php echo $pct; ?>%;"></div></div>
+                            <div class="ata-bc-qty">
                                 <span><?php echo number_format(max($b['remaining_pieces'], 0)); ?> left</span>
                                 <span>of <?php echo number_format($b['nominal_pieces']); ?> nominal</span>
                             </div>
@@ -229,9 +251,20 @@ foreach ($bundles as $b) {
                             </div>
                             <?php endif; ?>
 
-                            <div class="rmb-bc-footer">
+                            <?php if ($isCarried): ?>
+                            <div style="font-size:11.5px;color:#6b7280;margin-bottom:8px;">
+                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</i> Carried into Bundle #<?php echo (int) $b['carried_to_bundle_id']; ?>
+                            </div>
+                            <?php endif; ?>
+                            <?php if ($b['carried_from_bundle_id'] !== null): ?>
+                            <div style="font-size:11.5px;color:#6b7280;margin-bottom:8px;">
+                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</i> Carried from Bundle #<?php echo (int) $b['carried_from_bundle_id']; ?>
+                            </div>
+                            <?php endif; ?>
+
+                            <div class="ata-bc-footer">
                                 <?php if ($b['variance_label'] !== null): ?>
-                                    <span class="<?php echo $isShort ? 'badge-short' : ($isExcess ? 'badge-excess' : 'badge-exact'); ?>"><?php echo htmlspecialchars($b['variance_label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <span class="<?php echo $isCarried ? 'badge-short' : ($isExcess ? 'badge-excess' : 'badge-exact'); ?>"><?php echo htmlspecialchars($b['variance_label'], ENT_QUOTES, 'UTF-8'); ?></span>
                                 <?php else: ?>
                                     <span class="text-muted small"><?php echo date('d M Y', strtotime($b['created_at'])); ?></span>
                                 <?php endif; ?>
@@ -244,7 +277,7 @@ foreach ($bundles as $b) {
                                     <button type="button" class="btn btn-sm btn-outline-secondary" title="Add extra pieces found in this bundle" onclick="openBundleActionModal(<?php echo (int) $b['id']; ?>, '<?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>', 'add_extra')">
                                         <i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">add_circle_outline</i>
                                     </button>
-                                    <form method="post" style="display:inline;" onsubmit="return confirm('Close <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>? Remaining: <?php echo $b['remaining_pieces']; ?> piece(s) — this will be recorded as <?php echo $b['remaining_pieces'] > 0 ? 'a shortage' : 'exact'; ?>. This cannot be undone.');">
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('Close <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>? Remaining: <?php echo $b['remaining_pieces']; ?> piece(s)<?php echo $b['remaining_pieces'] > 0 ? ' — this will automatically carry forward into another open bundle (or a new one)' : ''; ?>. This cannot be undone.');">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
                                         <input type="hidden" name="action" value="close">
                                         <input type="hidden" name="bundle_id" value="<?php echo (int) $b['id']; ?>">
@@ -308,12 +341,12 @@ foreach ($bundles as $b) {
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script>
-document.querySelectorAll('.rmb-filter-btn').forEach(function (btn) {
+document.querySelectorAll('.ata-filter-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-        document.querySelectorAll('.rmb-filter-btn').forEach(function (b) { b.classList.remove('active'); });
+        document.querySelectorAll('.ata-filter-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         var filter = btn.getAttribute('data-filter');
-        document.querySelectorAll('.rmb-bundle-card').forEach(function (card) {
+        document.querySelectorAll('.ata-bundle-card').forEach(function (card) {
             var status = card.getAttribute('data-status');
             var show = filter === 'all' || filter === status;
             card.style.display = show ? '' : 'none';
