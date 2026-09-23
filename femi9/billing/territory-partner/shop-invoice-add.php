@@ -709,6 +709,9 @@ function GeraHashInv($qtd) {
 $inv_randum_number = GeraHashInv(10);
 $randum_number     = GeraHashInv(3);
 $inv_id = $inv_randum_number . $invidprefix . date("dmygis");
+
+require_once __DIR__ . '/include/InvoiceNumberSuggest.php';
+$suggested_inv_number = tp_suggest_next_invoice_number($db_conn, $Login_user_TYPEvl, $Login_user_IDvl, 'user_invoice', 'from_user_type', 'from_user_id', $invidprefix);
 ?>
 <input type="hidden" name="randum_number" value="<?php echo $randum_number; ?>">
 <input type="hidden" name="inv_id" value="<?php echo $inv_id; ?>">
@@ -735,8 +738,11 @@ function showInvoiceDuplicate(str) {
 <div class="row g-3">
 <div class="col-md-4">
 <label class="form-label">Invoice Number *</label>
-<input type="text" id="inv_number" onkeyup="showInvoiceDuplicate(this.value)" name="inv_number" autofocus required onkeypress="restrictSpecialChars(event)" class="form-control">
+<input type="text" id="inv_number" onkeyup="showInvoiceDuplicate(this.value)" name="inv_number" value="<?php echo htmlspecialchars($suggested_inv_number, ENT_QUOTES, 'UTF-8'); ?>" autofocus required onkeypress="restrictSpecialChars(event)" class="form-control">
 <span id="txtHintInvoice"></span>
+<?php if ($suggested_inv_number !== ''): ?>
+<script>showInvoiceDuplicate(<?php echo json_encode($suggested_inv_number); ?>);</script>
+<?php endif; ?>
 </div>
 <div class="col-md-4">
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>

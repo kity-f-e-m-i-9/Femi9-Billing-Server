@@ -28,6 +28,13 @@ $prefill_items = [];
 // stock (add-purchase-order.php's "Submit To: [CP]" option) — locks the
 // invoice source to that same CP so Company can't re-route it to a godown.
 $prefill_cp_id = 0;
+// True when the TP explicitly chose "Submit To: Company" (not a specific CP)
+// on their own add-purchase-order.php — approver_type is 'company' either
+// way (see that file's JS), so preferred_cp_id being empty is the only
+// signal. Forces the invoice straight to the company godown source instead
+// of falling back to "auto-resolve CP from territory assignment", which is
+// only correct when there's no PO context at all (a direct/manual invoice).
+$prefill_force_godown = false;
 // Read-only, inherited from the PO — an invoice billed from a PO always
 // carries that PO's type; a direct/manual invoice (no po_id) gets an
 // explicit selector further down instead. Defaults to napkin only for the
@@ -42,6 +49,7 @@ if ($prefill_po_id > 0) {
     if ($poRow) {
         $prefill_tp_id = (int)$poRow['territory_partner_id'];
         $prefill_cp_id = (int)($poRow['preferred_cp_id'] ?? 0);
+        $prefill_force_godown = ($prefill_cp_id === 0);
         $prefill_product_type = tpResolveProductType($poRow['product_type'] ?? null);
         $itStmt = $db_conn->prepare("SELECT product_id, qty FROM tp_purchase_order_items WHERE po_id=?");
         $itStmt->bind_param("i", $prefill_po_id);
@@ -640,6 +648,7 @@ $(document).ready(function() {
     var prefillTpId  = <?php echo (int)$prefill_tp_id; ?>;
     var prefillItems = <?php echo json_encode($prefill_items); ?>;
     var prefillCpId  = <?php echo (int)$prefill_cp_id; ?>;
+    var prefillForceGodown = <?php echo $prefill_force_godown ? 'true' : 'false'; ?>;
     var prefillDone  = false;
 
     function tryAutoAddPrefill() {
@@ -747,6 +756,13 @@ $(document).ready(function() {
                 }
                 if (lockedSrc) {
                     showLockedCpSource(lockedSrc);
+                } else if (prefillForceGodown) {
+                    // TP explicitly chose "Submit To: Company" on their own
+                    // purchase order (not a specific CP) — go straight to the
+                    // company godown source instead of auto-resolving a CP
+                    // from territory assignment, which would silently
+                    // override what the TP actually asked for.
+                    showGodownSource();
                 } else {
                     showCpSource();
                 }
@@ -893,6 +909,22 @@ $(document).ready(function() {
     }
 
     /* ── Godown fallback: render dropdown ── */
+    function selectGodown(gd_id) {
+        resetProducts();
+        if (!gd_id) {
+            currentGodownId = null;
+            $('#sourceGodownId').val('');
+            $('#balancePanel').hide();
+            advanceBalance = 0;
+            $('#productAddWrapper').hide();
+            return;
+        }
+        currentGodownId = gd_id;
+        $('#sourceGodownId').val(gd_id);
+        fetchBalance(currentTpId, gd_id);
+        loadGodownProducts(gd_id);
+    }
+
     function renderGodownDropdown() {
         // Hide balance panel until a specific godown is selected
         $('#balancePanel').hide();
@@ -908,21 +940,19 @@ $(document).ready(function() {
         $sel.select2({ placeholder: '— Select godown —', allowClear: false });
 
         $sel.on('change', function () {
-            var gd_id = parseInt($(this).val());
-            resetProducts();
-            if (!gd_id) {
-                currentGodownId = null;
-                $('#sourceGodownId').val('');
-                $('#balancePanel').hide();
-                advanceBalance = 0;
-                $('#productAddWrapper').hide();
-                return;
-            }
-            currentGodownId = gd_id;
-            $('#sourceGodownId').val(gd_id);
-            fetchBalance(currentTpId, gd_id);
-            loadGodownProducts(gd_id);
+            selectGodown(parseInt($(this).val()) || 0);
         });
+
+        // Only one eligible company godown — auto-select it instead of
+        // leaving the product list empty until the user makes a redundant
+        // manual pick (the CP side already auto-resolves the same way when
+        // there's exactly one source — see showCpSource()). Without this,
+        // switching from CP to Company looked like the product list had
+        // silently stopped loading. Confirmed 2026-09-23.
+        if (godownsList.length === 1) {
+            $sel.val(godownsList[0].id).trigger('change.select2');
+            selectGodown(godownsList[0].id);
+        }
     }
 
     /* ── Load products from godown stock ── */
