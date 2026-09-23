@@ -56,6 +56,12 @@ $inv_number = mysqli_real_escape_string($db_conn, str_replace("'", "", $_REQUEST
 $id_only = "0";
 $warehouseId = filter_var($_REQUEST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 
+if (!$warehouseId) {
+    $_SESSION['errorMessage'] = "Please select a warehouse (physical).";
+    echo "<script>window.location='user-invoice-add.php?invuser=$invuser&missing_warehouse=1';</script>";
+    exit;
+}
+
 // ============================================================================
 // VALIDATE GODOWN/COMPANY
 // ============================================================================

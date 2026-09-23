@@ -10,6 +10,12 @@ include("RemoveSpecialChar.php");
 	$warehouseId = filter_var($_REQUEST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 	$warehouseIdSql = $warehouseId === null ? 'NULL' : (int) $warehouseId;
 
+	if (!$warehouseId) {
+		$_SESSION['errorMessage'] = "Please select a warehouse (physical).";
+		echo "<script>window.location='customer-user-invoice-add?missing_warehouse=1';</script>";
+		exit;
+	}
+
 	//invoice accept=0
 	if($_REQUEST['invoice_number_accept']==0)
 	{

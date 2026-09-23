@@ -2,6 +2,7 @@
 include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
+require_once __DIR__ . '/include/StockService.php';
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -31,7 +32,7 @@ $inv_number = $cn['invnumber'];
 $tp_db_id   = (int)$cn['from_userid'];
 
 // Fetch original TP invoice (need source godown/CP info)
-$s = $db_conn->prepare("SELECT id, source_godown_id, source_cp_id, source_location_id FROM tp_invoices WHERE invoice_number=? LIMIT 1");
+$s = $db_conn->prepare("SELECT id, source_godown_id, source_cp_id, source_location_id, warehouse_id FROM tp_invoices WHERE invoice_number=? LIMIT 1");
 $s->bind_param('s', $inv_number);
 $s->execute();
 $tpInv = $s->get_result()->fetch_assoc();
@@ -44,6 +45,7 @@ $tp_invoice_id    = (int)$tpInv['id'];
 $source_godown_id = (int)($tpInv['source_godown_id'] ?? 0);
 $source_cp_id     = (int)($tpInv['source_cp_id'] ?? 0);
 $source_loc_id    = (int)($tpInv['source_location_id'] ?? 0);
+$warehouseId      = $tpInv['warehouse_id'] !== null ? (int)$tpInv['warehouse_id'] : null;
 $use_godown       = ($source_godown_id > 0 && !$source_cp_id);
 $use_legacy_loc   = (!$source_cp_id && !$source_godown_id && $source_loc_id > 0);
 
@@ -103,31 +105,13 @@ try {
         // ── 3b. Increase source stock (godown or CP) ─────────────────────────
         if ($use_godown) {
             $gid = (string)$source_godown_id;
-            $s = $db_conn->prepare("SELECT closing_qty, sent_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=? FOR UPDATE");
-            $s->bind_param('si', $gid, $prid);
-            $s->execute();
-            $src_row = $s->get_result()->fetch_assoc(); $s->close();
-
-            $src_before  = (int)($src_row['closing_qty'] ?? 0);
-            $src_after   = $src_before + $returnqty;
-            $new_sent    = max(0, (int)($src_row['sent_qty'] ?? 0) - $returnqty);
-
-            if ($src_row) {
-                $s = $db_conn->prepare("UPDATE stock SET sent_qty=?, returnqty=returnqty+?, closing_qty=? WHERE user_type='company' AND user_id=? AND product_id=?");
-                $s->bind_param('iiisi', $new_sent, $returnqty, $src_after, $gid, $prid);
-                $s->execute(); $s->close();
-            } else {
-                // Create row if somehow missing
-                $s = $db_conn->prepare("INSERT INTO stock (product_id, opening_qty, opening_date, input_qty, sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id) VALUES (?,0,CURDATE(),0,0,0,?,?,'company',?)");
-                $s->bind_param('iiis', $prid, $returnqty, $returnqty, $gid);
-                $s->execute(); $s->close();
-                $src_before = 0; $src_after = $returnqty;
-            }
-
-            // Godown stock ledger
-            $s = $db_conn->prepare("INSERT INTO stock_ledger (product_id, user_type, user_id, action, qty, qty_before, qty_after, ref_type, ref_id, note, created_by) VALUES (?,'company',?,'transfer_in',?,?,?,'return',?,?,?)");
-            $s->bind_param('isiiisss', $prid, $gid, $returnqty, $src_before, $src_after, $returnid, $note, $created_by);
-            $s->execute(); $s->close();
+            $stockService = $stockService ?? new StockService($db_conn);
+            $stockService->credit(
+                $prid, 'company', $gid, $returnqty,
+                'return', $returnid, $created_by,
+                true, // outer transaction owns commit
+                $warehouseId
+            );
 
         } elseif ($use_legacy_loc) {
             // Legacy: return to partner_location_stock

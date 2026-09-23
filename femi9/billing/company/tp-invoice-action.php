@@ -159,9 +159,9 @@ $source_loc_id    = (int)($_POST['source_location_id'] ?? 0) ?: null;
 $source_cp_id     = (int)($_POST['source_cp_id'] ?? 0);
 $source_godown_id = (int)($_POST['source_godown_id'] ?? 0);
 
-// Optional: which physical godown (warehouse) this invoice's stock is
-// drawn from — only relevant when sourcing from a company godown, never
-// when CP-sourced (CP stock has no warehouse concept).
+// Which physical godown (warehouse) this invoice's stock is drawn from —
+// required whenever sourcing from a company godown, never relevant when
+// CP-sourced (CP stock has no warehouse concept).
 $warehouseId = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 
 // A PO the TP submitted against a specific CP's stock must be invoiced from
@@ -193,12 +193,10 @@ if ($use_godown && !is_godown_allowed($db_conn, $source_godown_id)) {
     header("Location: add-tp-invoice?error=unauthorized"); exit;
 }
 
-// TEMPORARY: godown (physical warehouse) requirement disabled on request —
-// restore by uncommenting below. Was: required whenever sourcing from a
-// company godown, never trusting the client-side `required` attribute alone.
-// if ($use_godown && !$warehouseId) {
-//     header("Location: add-tp-invoice?error=missing_warehouse"); exit;
-// }
+// Never trust the client-side `required` attribute alone.
+if ($use_godown && !$warehouseId) {
+    header("Location: add-tp-invoice?error=missing_warehouse"); exit;
+}
 
 // If a source_location_id was submitted, verify it still exists — clear to NULL if deleted
 if ($source_loc_id) {

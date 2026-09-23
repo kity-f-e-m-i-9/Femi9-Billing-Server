@@ -712,6 +712,13 @@ $is_advance_mandatory = isAdvancePaymentMandatory($getinvuser);
 								    Invoice number already exists!
 								</div>
 								<?php }?>
+
+								<?php if(isset($_REQUEST['missing_warehouse'])){?>
+								<div class="alert alert-danger">
+								    <i class="material-icons" style="vertical-align: middle; margin-right: 8px;">error</i>
+								    Please select a warehouse (physical).
+								</div>
+								<?php }?>
 									
 								<?php if(isset($_REQUEST['InvoiceUpdatedSuccess'])){?>
 								<div class="alert alert-success">
@@ -1474,11 +1481,11 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
             <div id="opstock"></div>
         </div>
 
-        <!-- Godown (physical warehouse) -->
+        <!-- Warehouse (physical) -->
         <div class="col-md-6 mb-3">
-            <label class="form-label">Godown (physical)</label>
-            <select name="warehouse_id" class="form-control">
-                <option value="">— Not tracked —</option>
+            <label class="form-label">Warehouse (physical) <span class="required">*</span></label>
+            <select required name="warehouse_id" class="form-control">
+                <option value="" hidden>Select</option>
                 <?php
                 $select_Warehouse="select id, code, name from warehouses where is_active = 1 order by code asc";
                 $fetch_Warehouse=mysqli_query($db_conn,$select_Warehouse);

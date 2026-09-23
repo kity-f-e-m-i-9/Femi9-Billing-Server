@@ -8,6 +8,8 @@ if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_byt
 
 $godowns   = $db_conn->query("SELECT id, gname, contact FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY gname")->fetch_all(MYSQLI_ASSOC);
 $cp_list = $db_conn->query("SELECT id, cp_id, name FROM channel_partners WHERE is_active=1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+$wh_result = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+$warehouses_list = $wh_result ? $wh_result->fetch_all(MYSQLI_ASSOC) : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -15,7 +17,7 @@ $cp_list = $db_conn->query("SELECT id, cp_id, name FROM channel_partners WHERE i
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Location to Godown Return : <?php echo $business_name; ?></title>
+    <title>Channel Partner to Company Profile Return : <?php echo $business_name; ?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -263,7 +265,7 @@ $cp_list = $db_conn->query("SELECT id, cp_id, name FROM channel_partners WHERE i
                             <div class="page-description">
                                 <h1>
                                     <table class="headertble"><tr>
-                                        <td>Partner Location → Godown</td>
+                                        <td>Channel Partner → Company Profile</td>
                                         <td><a href="manage-pl-godown-transfers" title="All Transfers">&#9776;</a></td>
                                     </tr></table>
                                 </h1>
@@ -276,10 +278,11 @@ $cp_list = $db_conn->query("SELECT id, cp_id, name FROM channel_partners WHERE i
                         <div class="alert alert-danger">
                             <i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;">error_outline</i>
                             <?php $e=$_GET['error'];
-                            echo $e==='insufficient' ? 'Insufficient stock at the partner location for one or more products.'
-                               : ($e==='missing'     ? 'Please fill in all required fields.'
-                               : ($e==='noproducts'  ? 'Please add at least one product with a valid quantity.'
-                               : 'An error occurred. Please try again.')); ?>
+                            echo $e==='insufficient'      ? 'Insufficient stock at the partner location for one or more products.'
+                               : ($e==='missing'          ? 'Please fill in all required fields.'
+                               : ($e==='missing_warehouse' ? 'Please select a warehouse (physical).'
+                               : ($e==='noproducts'       ? 'Please add at least one product with a valid quantity.'
+                               : 'An error occurred. Please try again.'))); ?>
                         </div>
                     </div></div>
                     <?php endif; ?>
@@ -298,13 +301,13 @@ $cp_list = $db_conn->query("SELECT id, cp_id, name FROM channel_partners WHERE i
                                 </span>
                                 <span class="transfer-badge">
                                     <i class="material-icons" style="font-size:14px;">location_on</i>
-                                    Location → Godown
+                                    Channel Partner → Company Profile
                                 </span>
                             </div>
                             <div class="card-body">
                                 <div class="row g-3">
 
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <label class="form-label">Source Channel Partner <span class="req">*</span></label>
                                         <select name="cp_id" id="locationSelect" class="form-control" required>
                                             <option value=""></option>
@@ -318,8 +321,8 @@ $cp_list = $db_conn->query("SELECT id, cp_id, name FROM channel_partners WHERE i
                                         <div class="field-hint">Search by name or CP ID</div>
                                     </div>
 
-                                    <div class="col-md-4">
-                                        <label class="form-label">Destination Godown <span class="req">*</span></label>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Destination Company Profile <span class="req">*</span></label>
                                         <select name="godown_id" id="godownSelect" class="form-control" required>
                                             <option value=""></option>
                                             <?php foreach ($godowns as $g): ?>
@@ -330,6 +333,18 @@ $cp_list = $db_conn->query("SELECT id, cp_id, name FROM channel_partners WHERE i
                                             <?php endforeach; ?>
                                         </select>
                                         <div class="field-hint">Search by godown name or phone number</div>
+                                    </div>
+
+                                    <div class="col-md-2">
+                                        <label class="form-label">Warehouse (physical) <span class="req">*</span></label>
+                                        <select name="warehouse_id" id="warehouseSelect" class="form-control" required>
+                                            <option value="" hidden>Select</option>
+                                            <?php foreach ($warehouses_list as $wh): ?>
+                                            <option value="<?php echo (int)$wh['id']; ?>">
+                                                <?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?><?php echo $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : ''; ?>
+                                            </option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
 
                                     <div class="col-md-2">
@@ -382,7 +397,7 @@ $cp_list = $db_conn->query("SELECT id, cp_id, name FROM channel_partners WHERE i
 
                                 <div id="productPlaceholder" class="empty-state">
                                     <i class="material-icons-outlined">inventory</i>
-                                    <p>Select a source location to load available stock</p>
+                                    <p>Select a source channel partner to load available stock</p>
                                 </div>
 
                             </div>
@@ -434,7 +449,8 @@ $(document).ready(function() {
         return (text.indexOf(q) > -1 || contact.indexOf(q) > -1) ? data : null;
     }
     $('#locationSelect').select2({ placeholder: 'Search channel partner…', allowClear: true, matcher: locationMatcher });
-    $('#godownSelect').select2({ placeholder: 'Search godown…', allowClear: true, matcher: godownMatcher });
+    $('#godownSelect').select2({ placeholder: 'Search company profile…', allowClear: true, matcher: godownMatcher });
+    $('#warehouseSelect').select2({ placeholder: 'Select', allowClear: false });
 });
 </script>
 <script>
@@ -449,7 +465,7 @@ $(document).ready(function() {
         if (!lid) {
             $('#productSection').hide();
             $('#addRowBtn').hide();
-            $('#productPlaceholder').show().html('<i class="material-icons-outlined" style="font-size:52px;display:block;margin-bottom:12px;opacity:.5;">inventory</i><p style="font-size:13.5px;color:#9ca3af;margin:0;">Select a source location to load available stock</p>');
+            $('#productPlaceholder').show().html('<i class="material-icons-outlined" style="font-size:52px;display:block;margin-bottom:12px;opacity:.5;">inventory</i><p style="font-size:13.5px;color:#9ca3af;margin:0;">Select a source channel partner to load available stock</p>');
             $('#submitBtn').prop('disabled', true);
             return;
         }
@@ -520,6 +536,11 @@ $(document).ready(function() {
 
     $('#transferForm').on('submit', function (e) {
         var ok = true;
+        if (!$('#warehouseSelect').val()) {
+            alert('Please select a warehouse (physical).');
+            e.preventDefault();
+            return;
+        }
         $('#productBody .product-row').each(function () {
             var pid = $(this).find('.prod-sel').val();
             var qty = parseInt($(this).find('input[name="qty[]"]').val());

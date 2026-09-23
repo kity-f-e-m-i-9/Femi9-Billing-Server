@@ -181,7 +181,7 @@ if ($selected_location_id > 0) {
 $active_filters = [];
 if ($selected_location_id > 0 && $selected_location_name !== '') $active_filters[] = "Location: " . htmlspecialchars($selected_location_name);
 if (!empty($selected_cp_id)) $active_filters[] = "CP: " . htmlspecialchars($selected_cp_id);
-if ($selected_type !== '') $active_filters[] = "Type: " . ($selected_type === 'godown_to_location' ? 'Godown → Location' : 'Location → Godown');
+if ($selected_type !== '') $active_filters[] = "Type: " . ($selected_type === 'godown_to_location' ? 'Company Profile → Location' : 'Location → Company Profile');
 if ($date_from !== '')     $active_filters[] = "From: " . htmlspecialchars($date_from);
 if ($date_to !== '')       $active_filters[] = "To: " . htmlspecialchars($date_to);
 if ($search !== '')        $active_filters[] = "Search: &ldquo;" . htmlspecialchars($search) . "&rdquo;";
@@ -334,10 +334,10 @@ $i = 0;
                             <div class="page-description">
                                 <h1>
                                     <table class="headertble"><tr>
-                                        <td>Godown ↔ Location Transfers</td>
+                                        <td>Company Profile ↔ Location Transfers</td>
                                         <td>
-                                            <a href="add-godown-to-location" title="Godown → Location" style="margin-right:8px;">&#8594;</a>
-                                            <a href="add-location-to-godown" title="Location → Godown">&#8592;</a>
+                                            <a href="add-godown-to-location" title="Company Profile → Location" style="margin-right:8px;">&#8594;</a>
+                                            <a href="add-location-to-godown" title="Location → Company Profile">&#8592;</a>
                                         </td>
                                     </tr></table>
                                 </h1>
@@ -362,13 +362,13 @@ $i = 0;
                         </div>
                         <div class="col-lg-3 col-sm-6">
                             <div class="stat-card blue">
-                                <div><h3><?php echo $to_loc; ?></h3><p>Godown → Location</p></div>
+                                <div><h3><?php echo $to_loc; ?></h3><p>Company Profile → Location</p></div>
                                 <i class="material-icons-outlined stat-icon">arrow_forward</i>
                             </div>
                         </div>
                         <div class="col-lg-3 col-sm-6">
                             <div class="stat-card amber">
-                                <div><h3><?php echo $to_godown; ?></h3><p>Location → Godown</p></div>
+                                <div><h3><?php echo $to_godown; ?></h3><p>Location → Company Profile</p></div>
                                 <i class="material-icons-outlined stat-icon">arrow_back</i>
                             </div>
                         </div>
@@ -383,10 +383,10 @@ $i = 0;
                     <!-- Quick Actions -->
                     <div class="d-flex gap-2 mb-3">
                         <a href="add-godown-to-location" class="btn-action purple">
-                            <i class="material-icons" style="font-size:16px;">arrow_forward</i> Godown → Location
+                            <i class="material-icons" style="font-size:16px;">arrow_forward</i> Company Profile → Location
                         </a>
                         <a href="add-location-to-godown" class="btn-action amber">
-                            <i class="material-icons" style="font-size:16px;">arrow_back</i> Location → Godown
+                            <i class="material-icons" style="font-size:16px;">arrow_back</i> Location → Company Profile
                         </a>
                     </div>
 
@@ -462,8 +462,8 @@ $i = 0;
                                         <label class="form-label" style="font-weight:600;font-size:13px;">Transfer Type</label>
                                         <select name="transfer_type" class="form-control" style="font-size:13px;">
                                             <option value="">All Types</option>
-                                            <option value="godown_to_location" <?= $selected_type === 'godown_to_location' ? 'selected' : ''; ?>>Godown → Location</option>
-                                            <option value="location_to_godown" <?= $selected_type === 'location_to_godown' ? 'selected' : ''; ?>>Location → Godown</option>
+                                            <option value="godown_to_location" <?= $selected_type === 'godown_to_location' ? 'selected' : ''; ?>>Company Profile → Location</option>
+                                            <option value="location_to_godown" <?= $selected_type === 'location_to_godown' ? 'selected' : ''; ?>>Location → Company Profile</option>
                                         </select>
                                     </div>
 
@@ -539,7 +539,7 @@ $i = 0;
                                         <input type="text" name="q"
                                                value="<?= htmlspecialchars($search, ENT_QUOTES); ?>"
                                                class="form-control form-control-sm"
-                                               placeholder="Search ref, godown, location, user…"
+                                               placeholder="Search ref, company profile, location, user…"
                                                style="min-width:280px;font-size:13px;">
                                     </form>
                                     <div class="text-muted small">
@@ -562,7 +562,7 @@ $i = 0;
                                             <th>#</th>
                                             <th>Ref #</th>
                                             <th>Type</th>
-                                            <th>Godown</th>
+                                            <th>Company Profile</th>
                                             <th>Partner Location</th>
                                             <th>Date</th>
                                             <th style="text-align:center;">Products</th>
@@ -583,9 +583,9 @@ $i = 0;
                                             </td>
                                             <td>
                                                 <?php if ($t['transfer_type'] === 'godown_to_location'): ?>
-                                                    <span class="type-badge-in">Godown → Location</span>
+                                                    <span class="type-badge-in">Company Profile → Location</span>
                                                 <?php else: ?>
-                                                    <span class="type-badge-out">Location → Godown</span>
+                                                    <span class="type-badge-out">Location → Company Profile</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td><?php echo htmlspecialchars($t['godown_name']); ?></td>
@@ -723,8 +723,8 @@ $(function () {
                     .html('<i class="material-icons" style="font-size:16px;vertical-align:middle;">print</i> Print Receipt');
             }
             var typeLabel = t.transfer_type === 'godown_to_location'
-                ? '<span class="type-badge-in">Godown → Location</span>'
-                : '<span class="type-badge-out">Location → Godown</span>';
+                ? '<span class="type-badge-in">Company Profile → Location</span>'
+                : '<span class="type-badge-out">Location → Company Profile</span>';
 
             $('#transferModalTitle').html(
                 '<i class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:6px;">swap_horiz</i>'
@@ -733,7 +733,7 @@ $(function () {
 
             var metaHtml = '<div class="transfer-meta">'
                 + '<div class="meta-pill"><strong>Type</strong><br>' + typeLabel + '</div>'
-                + '<div class="meta-pill"><strong>Godown</strong><br><span>' + t.godown_name + '</span></div>'
+                + '<div class="meta-pill"><strong>Company Profile</strong><br><span>' + t.godown_name + '</span></div>'
                 + '<div class="meta-pill"><strong>Location</strong><br><span>' + t.location_name + '</span></div>'
                 + '<div class="meta-pill"><strong>Date</strong><br><span>' + t.transfer_date + '</span></div>'
                 + '<div class="meta-pill"><strong>Created By</strong><br><span>' + t.created_by + '</span></div>'

@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/include/StockService.php';
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {
@@ -42,7 +43,7 @@ if ($cn['status'] === 'accept') {
     $created_by = $_SESSION['LOGIN_USER'] ?? 'system';
 
     // Determine original source (godown or CP)
-    $s = $db_conn->prepare("SELECT id, source_godown_id, source_cp_id FROM tp_invoices WHERE invoice_number=? LIMIT 1");
+    $s = $db_conn->prepare("SELECT id, source_godown_id, source_cp_id, warehouse_id FROM tp_invoices WHERE invoice_number=? LIMIT 1");
     $s->bind_param('s', $inv_number);
     $s->execute();
     $tpInv = $s->get_result()->fetch_assoc(); $s->close();
@@ -55,6 +56,7 @@ if ($cn['status'] === 'accept') {
     $tp_invoice_id    = (int)$tpInv['id'];
     $source_godown_id = (int)($tpInv['source_godown_id'] ?? 0);
     $source_cp_id     = (int)($tpInv['source_cp_id'] ?? 0);
+    $warehouseId      = $tpInv['warehouse_id'] !== null ? (int)$tpInv['warehouse_id'] : null;
     $use_godown       = ($source_godown_id > 0 && !$source_cp_id);
 
     $db_conn->begin_transaction();
@@ -82,20 +84,13 @@ if ($cn['status'] === 'accept') {
         // 2. Reverse source stock
         if ($use_godown) {
             $gid = (string)$source_godown_id;
-            $s = $db_conn->prepare("SELECT closing_qty FROM stock WHERE user_type='company' AND user_id=? AND product_id=? FOR UPDATE");
-            $s->bind_param('si', $gid, $prid);
-            $s->execute();
-            $src_before = (int)($s->get_result()->fetch_assoc()['closing_qty'] ?? 0);
-            $s->close();
-            $src_after = max(0, $src_before - $qty);
-
-            $s = $db_conn->prepare("UPDATE stock SET sent_qty=sent_qty+?, returnqty=GREATEST(0,returnqty-?), closing_qty=closing_qty-? WHERE user_type='company' AND user_id=? AND product_id=?");
-            $s->bind_param('iiisi', $qty, $qty, $qty, $gid, $prid);
-            $s->execute(); $s->close();
-
-            $s = $db_conn->prepare("INSERT INTO stock_ledger (product_id, user_type, user_id, action, qty, qty_before, qty_after, ref_type, ref_id, note, created_by) VALUES (?,'company',?,'transfer_out',?,?,?,'return',?,?,?)");
-            $s->bind_param('isiiisss', $prid, $gid, $qty, $src_before, $src_after, $returnid, $note, $created_by);
-            $s->execute(); $s->close();
+            $stockService = $stockService ?? new StockService($db_conn);
+            $stockService->reverseCredit(
+                $prid, 'company', $gid, $qty,
+                'return', $returnid, $created_by,
+                true, // outer transaction owns commit
+                $warehouseId
+            );
         } else {
             $s = $db_conn->prepare("UPDATE channel_partner_stock SET closing_qty=GREATEST(0,closing_qty-?) WHERE channel_partner_id=? AND product_id=?");
             $s->bind_param('iii', $qty, $source_cp_id, $prid);

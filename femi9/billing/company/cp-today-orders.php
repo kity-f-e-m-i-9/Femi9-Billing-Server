@@ -104,6 +104,8 @@ foreach ($orders as $key => $o) {
 }
 
 $godowns = $db_conn->query("SELECT id, gname FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY gname")->fetch_all(MYSQLI_ASSOC);
+$wh_result = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+$warehouses_list = $wh_result ? $wh_result->fetch_all(MYSQLI_ASSOC) : [];
 
 uasort($orders, fn($a, $b) => strtotime($b['display_date']) <=> strtotime($a['display_date']) ?: $b['po_id'] <=> $a['po_id']);
 $waitingCount   = count(array_filter($orders, fn($o) => $o['status'] === 'waiting'));
@@ -358,9 +360,15 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
                                                         <input type="hidden" name="po_id" value="<?=(int)$o['po_id']?>">
                                                         <input type="hidden" name="action" value="approve">
                                                         <select name="godown_id" class="form-control form-control-sm" required style="width:140px;">
-                                                            <option value="">Godown…</option>
+                                                            <option value="">Company Profile…</option>
                                                             <?php foreach ($godowns as $g): ?>
                                                             <option value="<?=$g['id']?>"><?=htmlspecialchars($g['gname'])?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                        <select name="warehouse_id" class="form-control form-control-sm" required style="width:110px;">
+                                                            <option value="">Warehouse…</option>
+                                                            <?php foreach ($warehouses_list as $wh): ?>
+                                                            <option value="<?=(int)$wh['id']?>"><?=htmlspecialchars($wh['code'])?></option>
                                                             <?php endforeach; ?>
                                                         </select>
                                                         <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Approve this order and transfer stock now?');">Approve</button>

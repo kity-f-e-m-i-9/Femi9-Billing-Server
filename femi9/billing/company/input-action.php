@@ -51,10 +51,7 @@ $godownId   = filter_var($_POST['godownid']    ?? 0, FILTER_VALIDATE_INT);
 $inputDate  = $_POST['input_date'] ?? '';
 $tempId     = preg_replace('/[^A-Z0-9\/]/', '', strtoupper($_POST['tempid'] ?? ''));
 
-// Optional: which physical godown (warehouse) this stock is being received
-// into. Blank/absent means "unassigned" — the same behavior this workflow
-// has always had. FILTER_VALIDATE_INT returns false for an empty string,
-// so the `?: null` coalesces both "absent" and "blank selected" to null.
+// Which physical warehouse this stock is being received into.
 $warehouseId = filter_var($_POST['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
 
 if (!$godownId || $godownId <= 0) {
@@ -62,6 +59,9 @@ if (!$godownId || $godownId <= 0) {
 }
 if (!is_godown_allowed($db_conn, $godownId)) {
     redirectTo('add-input?unauthorized');
+}
+if (!$warehouseId) {
+    redirectTo('add-input?missing_warehouse');
 }
 
 // Validate & normalise date
@@ -151,8 +151,8 @@ try {
 
     // Prepared statements reused inside the loop
     $stmtInsertInput = $db_conn->prepare(
-        "INSERT INTO input_stock (tempid, product_id, input_qty, input_date, godownid, input_remarks)
-         VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO input_stock (tempid, product_id, input_qty, input_date, godownid, warehouse_id, input_remarks)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
     );
 
     $stmtChkProd = $db_conn->prepare(
@@ -188,8 +188,8 @@ try {
 
         // 1. Insert into input_stock
         $stmtInsertInput->bind_param(
-            'siisis',
-            $tempId, $pid, $qty, $inputDate, $godownId, $rmk
+            'siisiis',
+            $tempId, $pid, $qty, $inputDate, $godownId, $warehouseId, $rmk
         );
         $stmtInsertInput->execute();
 

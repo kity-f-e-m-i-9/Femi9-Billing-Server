@@ -299,6 +299,7 @@ if ($prefill_po_id > 0) {
                         <?php elseif ($err === 'no_input_stock'): ?>
                             Input stock has not been set for this Territory Partner. Please <a href="add-tp-input-stock" style="color:inherit;font-weight:700;text-decoration:underline;">add input stock</a> before creating a TP invoice.
                         <?php elseif ($err === 'missing'): ?>Please fill in all required fields.
+                        <?php elseif ($err === 'missing_warehouse'): ?>Please select a godown (physical) to source this invoice from.
                         <?php elseif ($err === 'noproducts'): ?>Please add at least one product with a valid quantity.
                         <?php elseif ($err === 'nobalance'): ?>
                             <?php $_errType = tpResolveProductType($_GET['type'] ?? null); ?>
@@ -368,9 +369,8 @@ if ($prefill_po_id > 0) {
                                      company godown, never when CP-sourced (CP stock has no
                                      warehouse concept). Toggled by showGodownSource()/showCpSource(). -->
                                 <div class="col-lg-3 col-md-4" id="warehouseSection" style="display:none;">
-                                    <!-- TEMPORARY: required marker/attribute disabled on request — restore both by uncommenting. -->
-                                    <label class="form-label">Godown (physical) <?php /* <span class="required">*</span> */ ?></label>
-                                    <select id="warehouseDrop" class="form-control" <?php /* required */ ?>>
+                                    <label class="form-label">Godown (physical) <span class="required">*</span></label>
+                                    <select id="warehouseDrop" class="form-control">
                                         <option value="" hidden>Select</option>
                                         <?php foreach ($warehouses_list as $wh): ?>
                                             <option value="<?php echo (int)$wh['id']; ?>">
@@ -642,6 +642,15 @@ $(document).ready(function() {
        built dynamically only when the godown section becomes visible. ── */
     $('#warehouseDrop').on('change', function () {
         $('#sourceWarehouseId').val($(this).val());
+        // Reload products scoped to this specific warehouse — showing the
+        // combined total across all warehouses here let a user pick a
+        // warehouse with little/no stock while Available Qty still showed
+        // the sum across all of them, causing a confusing "insufficient
+        // stock" failure at submit (StockService::deduct() checks the
+        // specific warehouse only).
+        if (sourceMode === 'godown' && currentGodownId) {
+            loadGodownProducts(currentGodownId);
+        }
     });
 
     /* ── Prefill from a TP purchase order (tp-today-orders.php "Invoice" button) ── */
@@ -818,11 +827,11 @@ $(document).ready(function() {
         $('#sourceLocationId').val('');
         $('#sourceCpId').val('');
         if (currentCpSources.length) {
-            $('#sourceHint').text('Select a company godown to source this invoice from');
+            $('#sourceHint').text('Select a company profile to source this invoice from');
             $('#sourceToggleLink').text('Use channel partner instead');
             $('#sourceToggle').show();
         } else {
-            $('#sourceHint').text('No CP assigned — select a company godown');
+            $('#sourceHint').text('No CP assigned — select a company profile');
             $('#sourceToggle').hide();
         }
         renderGodownDropdown();
@@ -937,7 +946,7 @@ $(document).ready(function() {
         });
         $('#sourceContent').html($sel);
 
-        $sel.select2({ placeholder: '— Select godown —', allowClear: false });
+        $sel.select2({ placeholder: '— Select company profile —', allowClear: false });
 
         $sel.on('change', function () {
             selectGodown(parseInt($(this).val()) || 0);
@@ -958,7 +967,10 @@ $(document).ready(function() {
     /* ── Load products from godown stock ── */
     function loadGodownProducts(godown_id) {
         $('#productSelect').html('<option value="">Loading…</option>').prop('disabled', true);
-        $.getJSON('get-godown-tp-products.php?godown_id=' + godown_id + '&product_type=' + encodeURIComponent($('#productTypeInput').val() || 'napkin'), function (data) {
+        var wid = $('#warehouseDrop').val();
+        var url = 'get-godown-tp-products.php?godown_id=' + godown_id + '&product_type=' + encodeURIComponent($('#productTypeInput').val() || 'napkin');
+        if (wid) url += '&warehouse_id=' + wid;
+        $.getJSON(url, function (data) {
             availableProducts = data;
             var opts = '<option value="">— Select Product —</option>';
             $.each(data, function (_, p) {
@@ -967,7 +979,7 @@ $(document).ready(function() {
             $('#productSelect').html(opts).prop('disabled', false);
             if (!data.length) {
                 $('#productSelect').html('<option value="">No stock available</option>');
-                showAddError('No stock available in this godown.');
+                showAddError('No stock available in this company profile.');
             } else {
                 hideAddError();
                 $('#productAddWrapper').show();
@@ -1222,8 +1234,7 @@ $(document).ready(function() {
     /* ── Form submit validation ── */
     $('#invoiceForm').on('submit', function (e) {
         if (!$('#sourceCpId').val() && !$('#sourceGodownId').val()) { e.preventDefault(); alert('Please select a channel partner or company.'); return; }
-        // TEMPORARY: godown (physical) requirement disabled on request — restore by uncommenting below.
-        // if (sourceMode === 'godown' && !$('#sourceWarehouseId').val()) { e.preventDefault(); alert('Please select a godown (physical).'); return; }
+        if (sourceMode === 'godown' && !$('#sourceWarehouseId').val()) { e.preventDefault(); alert('Please select a godown (physical).'); return; }
         if (!invoiceItems.length)          { e.preventDefault(); alert('Please add at least one product.'); return; }
         if ($('#productBody .row-edit-input.is-invalid').length) { e.preventDefault(); alert('Fix the highlighted Qty/Rate value(s) before submitting.'); return; }
         buildHiddenInputs();

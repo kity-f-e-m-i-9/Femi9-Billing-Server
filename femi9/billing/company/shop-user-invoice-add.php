@@ -91,7 +91,10 @@ $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 									
 									<?php if(isset($_REQUEST['invoicealready'])){?><div class="alert alert-danger">Invoice Number already exists!</div>
 									<?php }?>
-									
+
+									<?php if(isset($_REQUEST['missing_warehouse'])){?><div class="alert alert-danger">Please select a warehouse (physical).</div>
+									<?php }?>
+
 									<?php if(isset($_REQUEST['InvoiceUpdatedSuccess'])){?><div class="alert alert-success">Invoice Number Updated Success!.</div><?php }?>
 								
 								 <h1>
@@ -650,9 +653,9 @@ xmlhttp.send();}
 							   <div id="opstock"></div>
 <!------------------------------------------------------------------------------>
 <!--------------------------GODOWN (PHYSICAL WAREHOUSE)-------------------------->
-<label class="form-label">Godown (physical)</label>
-<select name="warehouse_id" class="form-control">
-<option value="">— Not tracked —</option>
+<label class="form-label">Warehouse (physical) *</label>
+<select required name="warehouse_id" class="form-control">
+<option value="" hidden>Select</option>
 <?php $select_Warehouse="select id, code, name from warehouses where is_active = 1 order by code asc";
 $fetch_Warehouse=mysqli_query($db_conn,$select_Warehouse);
 while($result_Warehouse=mysqli_fetch_array($fetch_Warehouse))
