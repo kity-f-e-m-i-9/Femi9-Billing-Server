@@ -90,7 +90,7 @@ $districtSet = []; // districtKey (node id, or 0 = unmapped) => display name
 if (!empty($markeingSTFID)) {
     $msid_esc = mysqli_real_escape_string($db_conn, $markeingSTFID);
     $r = mysqli_query($db_conn,
-        "SELECT s.id, s.name, s.district_name, s.taluk_name, s.latitude, s.longitude,
+        "SELECT s.id, s.name, s.mobile_number, s.district_name, s.taluk_name, s.latitude, s.longitude,
                 s.district_node_id, s.taluk_node_id,
                 dn.name AS clean_district_name, tn.name AS clean_taluk_name
          FROM ms_shop s
@@ -336,7 +336,34 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <br/>
                                                     </div>
 
-                                                    <label class="form-label">Shop*</label>
+                                                    <style>
+                                                        .shop-field-header { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+                                                        .shop-field-links { display:flex; gap:8px; flex-wrap:wrap; }
+                                                        .shop-link-btn {
+                                                            display:inline-flex; align-items:center; gap:4px;
+                                                            font-size:12px; font-weight:600; text-decoration:none; white-space:nowrap;
+                                                            padding:6px 12px; border-radius:20px; border:1px solid transparent;
+                                                        }
+                                                        .shop-link-btn .material-icons { font-size:15px; }
+                                                        #tpShopsLink { display:none; color:#059669; background:#ecfdf5; border-color:#a7f3d0; }
+                                                        #manageShopLink { color:#4f46e5; background:#eef2ff; border-color:#c7d2fe; }
+                                                        @media (max-width: 576px) {
+                                                            .shop-field-header { flex-direction:column; align-items:flex-start; }
+                                                            .shop-field-links { width:100%; }
+                                                            .shop-link-btn { flex:1 1 auto; justify-content:center; padding:9px 12px; font-size:12.5px; }
+                                                        }
+                                                    </style>
+                                                    <div class="shop-field-header">
+                                                        <span class="form-label" style="margin:0;">Shop*</span>
+                                                        <span class="shop-field-links">
+                                                            <a href="#" id="tpShopsLink" target="_blank" class="shop-link-btn" title="See the shops this firka's TP already services (view only)">
+                                                                <i class="material-icons">storefront</i><span id="tpShopsLinkLabel">TP's Shops</span>
+                                                            </a>
+                                                            <a href="javascript:void(0);" id="manageShopLink" class="shop-link-btn" title="Show every shop you own in the dropdown below, ignoring the district/taluk/firka filter" onclick="showAllMyShops();">
+                                                                <i class="material-icons">store</i>My Manage Shop
+                                                            </a>
+                                                        </span>
+                                                    </div>
                                                     <select class="my-select form-control" name="shop_id" id="shop_select" required>
                                                         <option value="" hidden>Select</option>
                                                         <?php foreach($shopList as $s): ?>
@@ -345,12 +372,17 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                                 data-taluk-id="<?=$s['taluk_key']?>"
                                                                 data-taluk-label="<?=htmlspecialchars($s['taluk_label'])?>"
                                                                 data-district="<?=htmlspecialchars($s['district_name'])?>"
+                                                                data-mobile="<?=htmlspecialchars(trim((string)($s['mobile_number'] ?? '')))?>"
                                                                 data-lat="<?=htmlspecialchars($s['latitude'])?>"
                                                                 data-lng="<?=htmlspecialchars($s['longitude'])?>">
                                                             <?=htmlspecialchars($s['name'])?> (<?=htmlspecialchars($s['taluk_label'])?>)
                                                         </option>
                                                         <?php endforeach; ?>
                                                     </select>
+                                                    <div id="shopTpMatchHint" style="display:none;margin-top:4px;font-size:12px;background:#fef3c7;color:#92400e;padding:5px 9px;border-radius:6px;">
+                                                        <i class="material-icons" style="font-size:14px;vertical-align:middle;">info</i>
+                                                        Shops highlighted in <span style="background:#fef3c7;border:1px solid #fcd34d;padding:0 5px;border-radius:3px;">yellow</span> already exist with this TP — picking one reuses their existing shop record instead of creating a new one.
+                                                    </div>
                                                     <div id="shopDistanceInfo" style="margin-top:4px; font-size:13px; color:#555;"></div>
                                                     <br/>
 
@@ -500,6 +532,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     }
 
     $(document).ready(function() {
+        if (document.getElementById('shopTpMatchHint')) { initShopSelect2(); }
         var tbl = document.getElementById('dataTable');
         if (tbl && tbl.rows.length > 1) {
             // Row 0 is just the header labels row (no real <select> in it since
@@ -588,6 +621,13 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     // (data-district-id/data-taluk-id), not raw text — that's what collapses
     // "Erode"/"Erode/"/"Erode-" etc into one dropdown entry. Shops that never
     // matched a node (id 0) sit together under "Other / Unmapped".
+    // Mobile numbers this firka's auto-detected TP already has under their own
+    // shop list — populated via AJAX once a TP is known (see
+    // fetchTpShopMobiles below), used to colour-highlight matching shop
+    // options so a DM can see BEFORE picking whether a shop will be
+    // reused/merged into the TP's existing record instead of created fresh.
+    var tpShopMobiles = new Set();
+
     var allShops = [];
     document.querySelectorAll('#shop_select option[data-district-id]').forEach(function(opt) {
         allShops.push({
@@ -597,6 +637,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
             talukId:    opt.getAttribute('data-taluk-id'),
             talukLabel: opt.getAttribute('data-taluk-label'),
             district:   opt.getAttribute('data-district'),
+            mobile:     opt.getAttribute('data-mobile'),
             lat:        opt.getAttribute('data-lat'),
             lng:        opt.getAttribute('data-lng')
         });
@@ -666,6 +707,9 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         if (!$tp.length) { return; }
         $tp.next('.select2-container').css('pointer-events', '');
         if (typeof rebuildTPs === 'function') { rebuildTPs(''); }
+        updateTpShopsLink(null);
+        tpShopMobiles = new Set();
+        $('#shopTpMatchHint').hide();
     }
 
     function onDistrictChange(districtId) {
@@ -706,6 +750,55 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         unlockTpSelect();
     }
 
+    function updateTpShopsLink(tp) {
+        var link = document.getElementById('tpShopsLink');
+        if (!link) { return; }
+        if (tp) {
+            link.href = 'view-tp-shops.php?tp_id=' + encodeURIComponent(tp.id);
+            document.getElementById('tpShopsLinkLabel').textContent = tp.name + "'s Shops";
+            link.style.display = 'inline-flex';
+        } else {
+            // No TP covers this firka — nothing to show, fall back to just
+            // "My Manage Shop" (the DM's own list) being visible.
+            link.style.display = 'none';
+        }
+    }
+
+    // Renders each shop option — highlights ones whose mobile number already
+    // matches a shop under the currently-detected TP (see tpShopMobiles),
+    // since selecting one of those REUSES the TP's existing shop record
+    // (bridgeOrderToTp's mobile-match dedupe) instead of creating a new one.
+    function shopOptionTemplate(state) {
+        if (!state.id) { return state.text; }
+        var mobile = state.element ? (state.element.getAttribute('data-mobile') || '') : '';
+        var $wrap = $('<span></span>').text(state.text);
+        if (mobile && tpShopMobiles.has(mobile)) {
+            $wrap.css({ background: '#fef3c7', display: 'block', padding: '4px 6px', borderRadius: '4px' });
+            $wrap.append($('<small></small>').css({ color: '#92400e', fontWeight: '600', marginLeft: '6px' }).text('(Already with TP)'));
+        }
+        return $wrap;
+    }
+
+    function initShopSelect2() {
+        var $shop = $('#shop_select');
+        if ($shop.data('select2')) { $shop.select2('destroy'); }
+        $shop.select2({ width: '100%', templateResult: shopOptionTemplate });
+    }
+
+    // Pulls the TP's own existing shop mobile numbers so shopOptionTemplate
+    // can highlight matches. Best-effort: a failed/slow request just leaves
+    // nothing highlighted rather than blocking the form.
+    function fetchTpShopMobiles(tpId) {
+        tpShopMobiles = new Set();
+        $('#shopTpMatchHint').hide();
+        $.getJSON('get-tp-shop-mobiles.php', { tp_id: tpId }, function (resp) {
+            if (resp && resp.success && Array.isArray(resp.mobiles)) {
+                tpShopMobiles = new Set(resp.mobiles);
+                if (tpShopMobiles.size > 0) { $('#shopTpMatchHint').show(); }
+            }
+        });
+    }
+
     function onFirkaChange(firkaId) {
         var $tp = $('#tp_select');
         if (!$tp.length) { return; }
@@ -721,6 +814,20 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         }
         $tp.val(tp.id).trigger('change.select2');
         $tp.next('.select2-container').css('pointer-events', 'none');
+        updateTpShopsLink(tp);
+        fetchTpShopMobiles(tp.id);
+    }
+
+    // "My Manage Shop" — instead of navigating away, shows every shop this DM
+    // owns right in the same dropdown (ignores the district/taluk/firka
+    // filter entirely) and opens it immediately for picking, so a get-order
+    // can be raised for any of their shops without leaving the page.
+    function showAllMyShops() {
+        rebuildShops('', '');
+        var $shop = $('#shop_select');
+        if ($shop.data('select2')) {
+            $shop.select2('open');
+        }
     }
 
     function rebuildShops(districtId, talukId) {
@@ -739,6 +846,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                         'data-taluk-id':    s.talukId,
                         'data-taluk-label': s.talukLabel,
                         'data-district':    s.district,
+                        'data-mobile':      s.mobile,
                         'data-lat':         s.lat,
                         'data-lng':         s.lng,
                         text:               s.text

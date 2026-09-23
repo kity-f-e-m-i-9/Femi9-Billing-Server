@@ -186,10 +186,30 @@ if (isset($_SESSION['errorMessage'])) {
 <div id="searchbuttoncont">&nbsp;
 <button type="button" onclick="javascript:window.location='ot-sale-view';" class="btn btn-danger">Reset</button>
 </div>
+
+<div id="searchbuttoncont">&nbsp;
+<button type="button" onclick="printAllConfirmed();" class="btn btn-dark" title="Print every Confirmed invoice in this date range/category as one document"><i class="material-icons" style="font-size:16px;vertical-align:middle;">print</i> Print All Confirmed</button>
+</div>
 							</div>
 							<div style="clear:both;"></div>
 							<br/>
-							</form>	
+							</form>
+							<script>
+							function printAllConfirmed() {
+								// A hand-picked checkbox selection (any row, draft or confirmed —
+								// the print page itself filters down to confirmed-only) always wins
+								// over the date/category filter, so a company user can print just
+								// the particular orders they ticked instead of everything in range.
+								var checked = Array.prototype.slice.call(document.querySelectorAll('.ot-draft-checkbox:checked'));
+								var params = new URLSearchParams({
+									frdate: document.querySelector('input[name="frdate"]').value,
+									todate: document.querySelector('input[name="todate"]').value,
+									se_cat: document.querySelector('select[name="se_cat"]').value
+								});
+								checked.forEach(function (cb) { params.append('tempids[]', cb.value); });
+								window.open('ot-sale-print-bulk.php?' + params.toString(), '_blank');
+							}
+							</script>
 							
 							<br/>
 <form method="post" enctype="multipart/form-data" action="ot-sale-view">
@@ -374,7 +394,7 @@ foreach ($tempidList as $tempid) {
 
                                                 <tr>
                                                     <?php $ot_row_status = $Result_productDetils122["status"] ?? 'confirmed'; ?>
-                                                    <td><?php if ($ot_row_status === 'draft'): ?><input type="checkbox" name="tempids[]" value="<?=htmlspecialchars($tempid, ENT_QUOTES)?>" class="ot-draft-checkbox" onclick="otUpdateBulkConfirmButton()"><?php endif; ?></td>
+                                                    <td><input type="checkbox" name="tempids[]" value="<?=htmlspecialchars($tempid, ENT_QUOTES)?>" class="ot-draft-checkbox" onclick="otUpdateBulkConfirmButton()"></td>
                                                     <td><?php echo ++$i; ?></td>
 				<td><?php echo $result_godowndetails["gname"] ?? '';?></td>
 													<td><?php echo $Result_productDetils["cat"];?></td>

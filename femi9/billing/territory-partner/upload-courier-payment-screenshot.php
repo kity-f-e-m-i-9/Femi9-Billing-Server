@@ -298,19 +298,57 @@ function courierClassifyFromOcr(array $ocrResult, float $remainingAmount, ?strin
     }
     // OCR text has no structured recipient field, so plain-text search is the
     // only tool here — matched against EITHER the UPI ID or the configured
-    // payee name (a short first-name fragment is enough, e.g. "Uma"), unlike
-    // the Claude Vision path this never escalates to an outright reject on
-    // its own: raw OCR text is noisy enough that "the ID/name text isn't
-    // found" doesn't reliably mean "paid to someone else" — it commonly just
-    // means OCR failed to isolate that line. Always pending_review here.
+    // payee name (a short first-name fragment is enough, e.g. "Uma").
     $recipientTextMatches = $expectedUpi !== null && stripos($ocrResult['raw_text'], $expectedUpi) !== false;
     if (!$recipientTextMatches && $expectedPayeeName !== null) {
+        // Whole-word match against the raw text — a raw substring search
+        // would treat "Uma" as found inside an unrelated word like "Kumar"
+        // ("K-uma-r") and wrongly accept a different person's payment.
         $firstName = trim(explode(' ', $expectedPayeeName)[0] ?? '');
-        if ($firstName !== '' && stripos($ocrResult['raw_text'], $firstName) !== false) {
+        if ($firstName !== '' && preg_match('/(?<![A-Za-z])' . preg_quote($firstName, '/') . '(?![A-Za-z])/i', $ocrResult['raw_text'])) {
             $recipientTextMatches = true;
         }
     }
     if ($expectedUpi !== null && !$recipientTextMatches) {
+        // This is the ONLY safety net when Claude Vision is unavailable (e.g.
+        // ANTHROPIC_API_KEY unconfigured, or the API is down) — without it,
+        // a screenshot clearly paid to a completely different person (Google
+        // Pay/PhonePe success screens almost always print "To <NAME>" in
+        // plain readable text) would silently sit as pending_review and
+        // still count toward the courier payment pool, letting the order go
+        // through unpaid. A confidently-extracted "To <name>" that clearly
+        // isn't the expected payee is rejected outright, same posture as the
+        // Claude Vision path; if no such name can be confidently pulled out
+        // of the noisy OCR text, this stays the safer pending_review.
+        // Confirmed 2026-09-23.
+        $extractedName = null;
+        if (preg_match('/\bTo:?\s+([A-Za-z][A-Za-z.\' ]{2,40}?)(?=\s*(?:\r?\n|₹|Rs\.?\s?\d|UPI|Bank|\d|$))/', $ocrResult['raw_text'], $m)) {
+            $extractedName = trim($m[1]);
+        }
+        if ($extractedName !== null && mb_strlen($extractedName) >= 3) {
+            // Whole-WORD comparison, not raw substring containment — "Uma" is
+            // a literal substring of "Kumar" ("K-uma-r"), so a naive
+            // stripos() would wrongly accept a totally different person
+            // whose name just happens to contain those letters. Confirmed
+            // 2026-09-23.
+            $nameMatches = false;
+            if ($expectedPayeeName !== null) {
+                $extractedWords = preg_split('/[^A-Za-z]+/', $extractedName, -1, PREG_SPLIT_NO_EMPTY);
+                foreach (preg_split('/\s+/', $expectedPayeeName) as $part) {
+                    if (mb_strlen($part) < 3) { continue; }
+                    foreach ($extractedWords as $word) {
+                        if (strcasecmp($word, $part) === 0) { $nameMatches = true; break 2; }
+                    }
+                }
+            }
+            if (!$nameMatches) {
+                return ['status' => 'rejected', 'amount' => $ocrResult['amount'], 'reference' => $ocrResult['reference'], 'payment_date' => null,
+                    'reason' => 'This payment was made to "' . $extractedName . '", not the courier collection account'
+                        . ($expectedPayeeName ? ' (' . $expectedPayeeName . ')' : '') . '. Please pay to '
+                        . ($expectedPayeeName ?: $expectedUpi) . ' (' . $expectedUpi . ') and upload that screenshot.',
+                    'raw_text' => $ocrResult['raw_text']];
+            }
+        }
         return ['status' => 'pending_review', 'amount' => $ocrResult['amount'], 'reference' => $ocrResult['reference'], 'payment_date' => null,
             'reason' => 'Could not confirm the payment was made to ' . $expectedUpi . ' — needs manual review.',
             'raw_text' => $ocrResult['raw_text']];

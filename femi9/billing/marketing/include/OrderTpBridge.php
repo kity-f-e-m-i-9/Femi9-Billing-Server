@@ -41,6 +41,39 @@ function bridgeOrderToTp($db_conn, int $tp_id, $ms_id, $shop_id, string $order_i
         if ($found) {
             $bridgedShopId = (int)$found['id'];
         } else {
+            // Before creating a new row, check whether this TP already has a
+            // shop with the SAME mobile number — added independently via
+            // their own "Add Shop" (source_ms_shop_id NULL, no way for the
+            // source_ms_shop_id lookup above to have found it). Without this,
+            // every DM whose ms_shop happens to be a shop the TP already
+            // onboarded themselves would get a second, duplicate shop row on
+            // the TP's own Manage Shop the moment a Get Order bridges it.
+            // Confirmed 2026-09-23.
+            $bridgedShopId = null;
+            $mobile_for_match = trim((string)($msShop['mobile_number'] ?? ''));
+            if ($mobile_for_match !== '') {
+                $stmtMobile = $db_conn->prepare(
+                    "SELECT id FROM shop WHERE onboard_userTYPE = 'territory_partner' AND onboard_userID = ?
+                     AND mobile_number = ? LIMIT 1"
+                );
+                $stmtMobile->bind_param('ss', $tp_id_str, $mobile_for_match);
+                $stmtMobile->execute();
+                $mobileMatch = $stmtMobile->get_result()->fetch_assoc();
+                $stmtMobile->close();
+                if ($mobileMatch) {
+                    $bridgedShopId = (int)$mobileMatch['id'];
+                    // Backfill so the cheap source_ms_shop_id lookup above
+                    // finds this row directly next time, instead of
+                    // re-matching by mobile on every single order.
+                    $stmtBackfill = $db_conn->prepare("UPDATE shop SET source_ms_shop_id = ? WHERE id = ? AND source_ms_shop_id IS NULL");
+                    $stmtBackfill->bind_param('ii', $shop_id_int, $bridgedShopId);
+                    $stmtBackfill->execute();
+                    $stmtBackfill->close();
+                }
+            }
+        }
+
+        if ($bridgedShopId === null) {
             // Best-effort text match against the state/district master tables.
             // If unmatched, left as 0 — order-to-invoice.php's inner/outer GST
             // detection will default to "outer" in that case (known limitation).
