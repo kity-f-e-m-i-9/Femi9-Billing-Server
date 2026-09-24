@@ -136,9 +136,33 @@ xmlhttp.open("GET","loadInvoiceNumber.php?q="+str + '&invtype='+ invtype,true);
 xmlhttp.send();}
 </script>
 			<label class="form-label">Invoice Number *</label>
-            <input type="text" onKeyup="showInvoiceDuplicate(this.value)"; name="inv_number" autofocus required="" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" id="inv_number" onKeyup="showInvoiceDuplicate(this.value)"; name="inv_number" autofocus required="" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>
 			<span id="txtHintInvoice"></span>
+			<script>
+			// Auto-suggests the next invoice number for whichever "Send From"
+			// company profile is picked — one more than that profile's own
+			// highest invoice number used so far, so the finance user doesn't
+			// have to look it up manually before typing it in.
+			function fetchNextTransferInvoiceNumber(sendFromId) {
+				if (!sendFromId) { return; }
+				var xhr = new XMLHttpRequest();
+				xhr.onreadystatechange = function () {
+					if (xhr.readyState === 4 && xhr.status === 200) {
+						try {
+							var res = JSON.parse(xhr.responseText);
+							if (res.success && res.inv_number) {
+								var field = document.getElementById('inv_number');
+								field.value = res.inv_number;
+								showInvoiceDuplicate(res.inv_number);
+							}
+						} catch (e) {}
+					}
+				};
+				xhr.open('GET', 'get-next-transfer-invoice-number.php?send_from=' + encodeURIComponent(sendFromId), true);
+				xhr.send();
+			}
+			</script>
 			
 			
 										
@@ -154,7 +178,7 @@ xmlhttp.open("GET","loadopeningstock2.php?q="+str,true);
 xmlhttp.send();}
 </script>
 							   <label for="exampleInputEmail1" class="form-label">Send From</label>
-                               <select id="sendFromSelect" required="" name="send_from" class="form-control" onchange="checkopeningstock(this.value);">
+                               <select id="sendFromSelect" required="" name="send_from" class="form-control" onchange="checkopeningstock(this.value); fetchNextTransferInvoiceNumber(this.value);">
 							   <option value="" hidden="">Select</option>
 							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
@@ -332,7 +356,7 @@ function deleteRow(tableID) {
 					     </td>
 						 <td><input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control" required=""/></td>
 						 <td>
-						 <input type="number" placeholder="Rate(Rs.)" min="0" name="rate[]" class="form-control" required=""/>
+						 <input type="number" placeholder="Rate(Rs.)" min="0.01" name="rate[]" class="form-control" required=""/>
 						 </td>
 						 <td>
 						 <input type="number" placeholder="Discount(Rs.)" min="0" name="discount[]" class="form-control" required=""/>

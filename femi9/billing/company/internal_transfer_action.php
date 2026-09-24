@@ -73,13 +73,35 @@ if (!is_array($product_ids) || count($product_ids) === 0) {
 
 // Normalise per-row values
 $rows = [];
+$zeroRateProductIds = [];
 foreach ($product_ids as $i => $rawPid) {
     $pid  = (int) $rawPid;
     $qty  = (int) RemoveSpecialChar($qty_arr[$i]      ?? '0');
     $rate = (float)($rate_arr[$i]                     ?? 0);
     $disc = (float)($discount_arr[$i]                 ?? 0);
     if ($pid <= 0 || $qty <= 0) continue;
+    // A ₹0 (or blank, which casts to 0) rate silently produced a real
+    // internal_transfer row with a zero-value line — the qty/stock still
+    // moved correctly, but the invoice showed that product transferred for
+    // free, with no amount/GST recorded at all. The client-side rate input
+    // only enforces min="0" (required="" doesn't block an explicit "0"), so
+    // this is the actual gatekeeper. The WHOLE submission is rejected
+    // (rather than silently dropping just that row) so what gets saved
+    // always matches exactly what the user reviewed on screen before
+    // clicking Submit. Confirmed 2026-09-24.
+    if ($rate <= 0) { $zeroRateProductIds[] = $pid; continue; }
     $rows[] = compact('pid', 'qty', 'rate', 'disc');
+}
+
+if (!empty($zeroRateProductIds)) {
+    $namesStmt = $db_conn->prepare("SELECT productName FROM products WHERE id IN (" . implode(',', array_fill(0, count($zeroRateProductIds), '?')) . ")");
+    $namesStmt->bind_param(str_repeat('i', count($zeroRateProductIds)), ...$zeroRateProductIds);
+    $namesStmt->execute();
+    $names = array_column($namesStmt->get_result()->fetch_all(MYSQLI_ASSOC), 'productName');
+    $namesStmt->close();
+    $_SESSION['errorMessage'] = "This transfer was NOT saved — no rate (₹0) was entered for: " . implode(', ', $names) . ". Please enter a valid rate for every product and resubmit.";
+    echo "<script>window.location='internal_transfer?invalid';</script>";
+    exit;
 }
 
 if (empty($rows)) {

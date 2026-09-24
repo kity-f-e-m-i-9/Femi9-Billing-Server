@@ -985,9 +985,32 @@ $(document).ready(function() {
                 $('#productAddWrapper').show();
                 tryAutoAddPrefill();
             }
+            refreshAddedItemsAvailability();
         }).fail(function () {
             $('#productSelect').html('<option value="">Error loading products</option>');
         });
+    }
+
+    // Re-syncs the Available figure shown for products ALREADY added to the
+    // invoice table against whichever godown/warehouse is now selected —
+    // without this, a product added before picking (or while a different)
+    // "Godown (physical)" warehouse was selected kept showing its old
+    // snapshot Available number forever, never reflecting the warehouse
+    // actually chosen (e.g. staying at the all-warehouses combined total
+    // after switching to "HO", which only has its own smaller quantity).
+    // Confirmed 2026-09-24.
+    function refreshAddedItemsAvailability() {
+        if (!invoiceItems.length) { return; }
+        var changed = false;
+        invoiceItems.forEach(function (item) {
+            var match = availableProducts.find(function (p) { return parseInt(p.product_id) === item.product_id; });
+            var newAvail = match ? (parseInt(match.available_qty) || 0) : 0;
+            if (newAvail !== item.avail) {
+                item.avail = newAvail;
+                changed = true;
+            }
+        });
+        if (changed) { renderTable(); }
     }
 
     /* ── Load products for CP ── */
