@@ -1,5 +1,6 @@
 <?php include("checksession.php");
 include("config.php");
+require_once("include/StockService.php");
 
 if(isset($_REQUEST['addInvoice']))
 {
@@ -57,13 +58,13 @@ if(isset($_REQUEST['addInvoice']))
 	$gstamount_singlepr=0;
 
 
-	//count available stock
-	$select_count_AVSTOCK="select * from stock where product_id='$pr_id' and user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
-	$FETCH_count_AVSTOCK=mysqli_query($db_conn,$select_count_AVSTOCK);
-	$RESULT_count_AVSTOCK=mysqli_fetch_array($FETCH_count_AVSTOCK);
-	$AVMstock=$RESULT_count_AVSTOCK['closing_qty'];
-	
-	if($AVMstock<$qty)
+	//count available stock — same unassigned-warehouse row invoice-submit.php
+	//deducts from (customer invoices have no warehouse picker), not whichever
+	//row a warehouse_id-less query happens to return first.
+	$stockService = new StockService($db_conn);
+	$AVMstock = $stockService->getClosingQty($pr_id, $user_type_Loginvl, $user_id_Loginvl);
+
+	if($AVMstock===null || $AVMstock<$qty)
 	{
 		echo "<script>window.location='invoice?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError';</script>";
 		
@@ -81,19 +82,21 @@ if(isset($_REQUEST['addInvoice']))
 		values ('$inv_id','$pr_id','$amount','$qty','$total','$Login_user_TYPEvl','$Login_user_IDvl',
 		'$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal','$discount_percentage','$discount_amount','$gst_type','$hsn','$date','$buyer_gsttype')";
 		mysqli_query($db_conn,$insert_InvoiceItems);
-		
-		//2. update stock
-		$select_stockDetails="select * from stock where product_id='$pr_id' and user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
-		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
-		
-		$update_Sales_stock=$result_stockDetails['sales_qty']+$qty;
-		$update_Closing_stock=$result_stockDetails['closing_qty']-$qty;
-		
-		$update_stockDetails="update stock set sales_qty='$update_Sales_stock',closing_qty='$update_Closing_stock' where product_id='$pr_id' and user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
-		mysqli_query($db_conn,$update_stockDetails);
-		
-		
+
+		//2. update stock — via StockService so this hits the same single
+		//(unassigned) row getClosingQty() just checked, and gets a proper
+		//ledger entry instead of silently bypassing it.
+		try {
+			$stockService->deduct(
+				(int)$pr_id, $user_type_Loginvl, $user_id_Loginvl, (int)$qty,
+				'invoice', $inv_id, $user_id_Loginvl, false
+			);
+		} catch (StockException $e) {
+			echo "<script>window.location='invoice?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError';</script>";
+			exit;
+		}
+
+
 		echo "<script>window.location='invoice?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded';</script>";
 		
 	}else{

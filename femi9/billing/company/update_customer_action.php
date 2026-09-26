@@ -2,6 +2,7 @@
 session_start();
 include("include/db-connect.php");
 include("config.php");
+require_once("include/StockService.php");
 error_reporting(0);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -31,29 +32,26 @@ while($resultprlist=mysqli_fetch_array($fetch_prlist))
 $product_id=$resultprlist['pr_id'];
 $qty=$resultprlist['qty'];
 
-//stock decrement to old customer
-$select_old_cus_stock="select * from stock where user_id='$old_customer_id' and product_id='$product_id'";
-$fetch_old_cus_stock=mysqli_query($db_conn,$select_old_cus_stock);
-$result_old_cus_stock=mysqli_fetch_array($fetch_old_cus_stock);
-
-$update_old_cus_selling_stock=$result_old_cus_stock['input_qty']-$qty;
-$update_old_cus_closing_stock=$result_old_cus_stock['closing_qty']-$qty;
-
-$update_old_cus_stock="update stock set input_qty='$update_old_cus_selling_stock',closing_qty='$update_old_cus_closing_stock' where user_id='$old_customer_id' and product_id='$product_id'";
-mysqli_query($db_conn,$update_old_cus_stock);
-
-
-//stock increment to new customer
-$select_new_cus_stock="select * from stock where user_id='$new_customer_id' and product_id='$product_id'";
-$fetch_new_cus_stock=mysqli_query($db_conn,$select_new_cus_stock);
-$result_new_cus_stock=mysqli_fetch_array($fetch_new_cus_stock);
-
-$update_new_cus_selling_stock=$result_new_cus_stock['input_qty']+$qty;
-$update_new_cus_closing_stock=$result_new_cus_stock['closing_qty']+$qty;
-
-$update_new_cus_stock="update stock set input_qty='$update_new_cus_selling_stock',closing_qty='$update_new_cus_closing_stock' where user_id='$new_customer_id' and product_id='$product_id'";
-mysqli_query($db_conn,$update_new_cus_stock);
-
+// Move this line's stock from the old customer account to the new one —
+// via StockService (scoped by user_type + the unassigned warehouse row,
+// unlike the old raw UPDATEs which matched on user_id + product_id alone
+// and could hit a same-id row under a different user_type or warehouse).
+try {
+	$stockService = new StockService($db_conn);
+	$db_conn->begin_transaction();
+	$stockService->reverseCredit(
+		(int)$product_id, $invuser, $old_customer_id, (int)$qty,
+		'user_invoice', $invid, $invuser, true
+	);
+	$stockService->credit(
+		(int)$product_id, $invuser, $new_customer_id, (int)$qty,
+		'user_invoice', $invid, $invuser, true
+	);
+	$db_conn->commit();
+} catch (\Throwable $e) {
+	$db_conn->rollback();
+	error_log("update_customer_action stock move error: " . $e->getMessage());
+}
 
 }
 

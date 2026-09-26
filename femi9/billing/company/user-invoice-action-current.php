@@ -15,6 +15,7 @@
 session_start();
 include("checksession.php");
 include("config.php");
+require_once("include/StockService.php");
 
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(E_ALL);
@@ -151,13 +152,12 @@ if ($result_count_invoice['numInvoice'] == 0) {
     mysqli_query($db_conn, $insert_Invoice);
 }
 
-// Check available stock
-$select_count_AVSTOCK = "select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-$FETCH_count_AVSTOCK = mysqli_query($db_conn, $select_count_AVSTOCK);
-$RESULT_count_AVSTOCK = mysqli_fetch_array($FETCH_count_AVSTOCK);
-$AVMstock = $RESULT_count_AVSTOCK['closing_qty'];
+// Check available stock — same unassigned row deductAndCredit() below will
+// actually deduct from (this form has no warehouse picker).
+$stockService = new StockService($db_conn);
+$AVMstock = $stockService->getClosingQty($pr_id, $Login_user_TYPEvl, $godownid);
 
-if ($AVMstock < $qty) {
+if ($AVMstock === null || $AVMstock < $qty) {
     echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=" . $invuser . "&&AlertStockError&&action=" . $_SESSION['ACTIONEDIT'] . "&&gid=" . $godownid . "';</script>";
     exit;
 }
@@ -175,39 +175,20 @@ if ($result_count_invoiceItem['numInvoiceItem'] == 0) {
     values ('$inv_id','$pr_id','$amount','$qty','$total','$invuser','$customer_id','$Login_user_TYPEvl','$godownid','$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal',
     '$discount_percentage','$discount_amount','$gst_type','$hsn','$date','$rwpoints','$buyer_gsttype')";
     mysqli_query($db_conn, $insert_InvoiceItems);
-    
-    // Update company stock (decrement)
-    $select_stockDetails = "select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-    $fetch_stockDetails = mysqli_query($db_conn, $select_stockDetails);
-    $result_stockDetails = mysqli_fetch_array($fetch_stockDetails);
-    
-    $update_Sales_stock = $result_stockDetails['sales_qty'] + $qty;
-    $update_Closing_stock = $result_stockDetails['closing_qty'] - $qty;
-    
-    $update_stockDetails = "update stock set sales_qty='$update_Sales_stock',closing_qty='$update_Closing_stock' where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-    mysqli_query($db_conn, $update_stockDetails);
-    
-    // Check if customer stock record exists
-    $select_stockDetailscheck = "select count(*) as numprcheck from stock where product_id='$pr_id' and user_type='$invuser' and user_id='$customer_id'";
-    $fetch_stockDetailscheck = mysqli_query($db_conn, $select_stockDetailscheck);
-    $result_stockDetailscheck = mysqli_fetch_array($fetch_stockDetailscheck);
-    
-    if ($result_stockDetailscheck['numprcheck'] == 0) {
-        $insertprstock = "insert into stock (product_id,opening_qty,opening_date,input_qty,sales_qty,sent_qty,returnqty,closing_qty,user_type,user_id) values ('$pr_id','0','$date','0','0','0','0','0','$invuser','$customer_id')";
-        mysqli_query($db_conn, $insertprstock);
+
+    // Move stock from company (godownid) to the buyer via StockService —
+    // scoped to the same unassigned rows on both sides, with a proper
+    // ledger entry, instead of two independent warehouse_id-less UPDATEs.
+    try {
+        $stockService->deductAndCredit(
+            (int)$pr_id, $Login_user_TYPEvl, $godownid, $invuser, $customer_id, (int)$qty,
+            'user_invoice', $inv_id, $Login_user_IDvl ?? $godownid
+        );
+    } catch (StockException $e) {
+        echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=" . $invuser . "&&AlertStockError&&action=" . $_SESSION['ACTIONEDIT'] . "&&gid=" . $godownid . "';</script>";
+        exit;
     }
-    
-    // Update customer stock (increment)
-    $select_stockDetails12 = "select * from stock where product_id='$pr_id' and user_type='$invuser' and user_id='$customer_id'";
-    $fetch_stockDetails12 = mysqli_query($db_conn, $select_stockDetails12);
-    $result_stockDetails12 = mysqli_fetch_array($fetch_stockDetails12);
-    
-    $update_Sales_stock12 = $result_stockDetails12['input_qty'] + $qty;
-    $update_Closing_stock12 = $result_stockDetails12['closing_qty'] + $qty;
-    
-    $update_stockDetails = "update stock set input_qty='$update_Sales_stock12',closing_qty='$update_Closing_stock12' where product_id='$pr_id' and user_type='$invuser' and user_id='$customer_id'";
-    mysqli_query($db_conn, $update_stockDetails);
-    
+
     echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&AddedSuccess&&invuser=" . $invuser . "&&FemiAdded&&action=" . $_SESSION['ACTIONEDIT'] . "&&gid=" . $godownid . "';</script>";
 } else {
     echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&ItemAlreadyExists&&invuser=" . $invuser . "&&AlertMessage&&action=" . $_SESSION['ACTIONEDIT'] . "&&gid=" . $godownid . "';</script>";

@@ -1,5 +1,6 @@
 <?php include("checksession.php");
 include("config.php");
+require_once("include/StockService.php");
 error_reporting(0);
 
 $Roowid=base64_decode($_REQUEST['id']);
@@ -15,18 +16,19 @@ $select_count_product="select * from ot_sales_return where id='$Roowid'";
 	
 	if($product_id!=NULL)
 	{
-		//update stock
-		$select_stockDetails="select * from stock where product_id='$product_id' and user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
-		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
-		
-		$update_Input_stock=$result_stockDetails['sales_qty']+$input_qty;
-		$update_Closing_stock=$result_stockDetails['closing_qty']-$input_qty;
-		
-		$update_stockDetails="update stock set sales_qty='$update_Input_stock',closing_qty='$update_Closing_stock' where product_id='$product_id' and user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-		mysqli_query($db_conn,$update_stockDetails);
-		
-		
+		//update stock — via StockService, scoped to the same unassigned row
+		//this form has always used (no warehouse picker here).
+		try {
+			$stockService = new StockService($db_conn);
+			$stockService->otDeduct(
+				(int)$product_id, $Login_user_TYPEvl, $godownid, (int)$input_qty,
+				(string)$Roowid, $Login_user_IDvl ?? $godownid
+			);
+		} catch (StockException $e) {
+			$_SESSION['errorMessage'] = "Stock error: " . $e->getMessage();
+			echo "<script>window.location='ot-sale-return?stockerror&&tempid=$tempid';</script>";
+			exit;
+		}
 	}
 	
 $del_product="delete from ot_sales_return where id='$Roowid'";

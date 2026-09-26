@@ -165,30 +165,6 @@ try {
          VALUES (?, ?, ?, ?, ?, ?, ?, 1)"
     );
 
-    $stmtChkProd = $db_conn->prepare(
-        "SELECT COUNT(*) AS cnt FROM stock
-         WHERE product_id = ? AND user_type = ? AND user_id = ?
-         FOR UPDATE"
-    );
-
-    $stmtInsertStock = $db_conn->prepare(
-        "INSERT INTO stock
-             (product_id, opening_qty, opening_date, input_qty,
-              sales_qty, sent_qty, returnqty, closing_qty, user_type, user_id)
-         VALUES (?, 0, ?, 0, 0, 0, 0, 0, ?, ?)"
-    );
-
-    $stmtGetStock = $db_conn->prepare(
-        "SELECT input_qty, closing_qty FROM stock
-         WHERE product_id = ? AND user_type = ? AND user_id = ?
-         FOR UPDATE"
-    );
-
-    $stmtUpdateStock = $db_conn->prepare(
-        "UPDATE stock SET input_qty = ?, closing_qty = ?
-         WHERE product_id = ? AND user_type = ? AND user_id = ?"
-    );
-
     foreach ($rows as $row) {
         $pid = $row['product_id'];
         $qty = $row['input_qty'];
@@ -202,54 +178,18 @@ try {
         );
         $stmtInsertInput->execute();
 
-        // 2. Ensure stock row exists for product / user
-        // 3 params: i=pid, s=toUserType, s=toUserId
-        $stmtChkProd->bind_param('iss', $pid, $toUserType, $toUserId);
-        $stmtChkProd->execute();
-        $cntProd = (int) $stmtChkProd->get_result()->fetch_assoc()['cnt'];
-
-        if ($cntProd === 0) {
-            // 4 params: i=pid, s=inputDate, s=toUserType, s=toUserId
-            $stmtInsertStock->bind_param('isss', $pid, $inputDate, $toUserType, $toUserId);
-            $stmtInsertStock->execute();
-        }
-
-        // 3. Read current quantities (locked for update)
-        // 3 params: i=pid, s=toUserType, s=toUserId
-        $stmtGetStock->bind_param('iss', $pid, $toUserType, $toUserId);
-        $stmtGetStock->execute();
-        $stockRow = $stmtGetStock->get_result()->fetch_assoc();
-
-        $newInputQty   = (int) $stockRow['input_qty']   + $qty;
-        $newClosingQty = (int) $stockRow['closing_qty'] + $qty;
-
-        // 4. Update stock
-        $stmtUpdateStock->bind_param('iiiss', $newInputQty, $newClosingQty, $pid, $toUserType, $toUserId);
-        $stmtUpdateStock->execute();
-
-        // 5. Write ledger entry (audit trail)
-        $qtyBefore = (int)$stockRow['closing_qty'];
-        $qtyAfter  = $qtyBefore + $qty;
-        $stmtLedger = $db_conn->prepare(
-            "INSERT INTO stock_ledger
-                (product_id, user_type, user_id, action, qty,
-                 qty_before, qty_after, ref_type, ref_id, note, created_by)
-             VALUES (?, ?, ?, 'credit', ?, ?, ?, 'adjustment', ?, 'input stock', ?)"
-        );
-        $stmtLedger->bind_param(
-            'issiiiss',
+        // 2/3/4. Credit stock + write ledger entry — via StockService so this
+        // is scoped consistently (product_id/user_type/user_id, unassigned
+        // warehouse row) and audited, instead of a hand-rolled UPDATE +
+        // manual ledger insert that could drift apart from StockService's
+        // own bookkeeping.
+        $stockService->credit(
             $pid, $toUserType, $toUserId, $qty,
-            $qtyBefore, $qtyAfter, $tempId, $createdBy
+            'adjustment', $tempId, $createdBy, true
         );
-        $stmtLedger->execute();
-        $stmtLedger->close();
     }
 
     $stmtInsertInput->close();
-    $stmtChkProd->close();
-    $stmtInsertStock->close();
-    $stmtGetStock->close();
-    $stmtUpdateStock->close();
 
     $db_conn->commit();
 
