@@ -117,6 +117,61 @@ function ensure_raw_material_bundle_draws_table(mysqli $db_conn): void
     );
 }
 
+// Global, manageable reason lists for bundle adjustments — same pattern
+// as machine_code_master (see include/MachineCodes.php). Separate tables
+// per type (rather than one shared list) since damage and extra-found
+// reasons are conceptually distinct and shouldn't cross-pollute each
+// other's dropdown.
+function ensure_bundle_reason_tables(mysqli $db_conn): void
+{
+    foreach (['damage_reason_master', 'extra_reason_master'] as $table) {
+        $db_conn->query(
+            "CREATE TABLE IF NOT EXISTS $table (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                label VARCHAR(150) NOT NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_reason_label (label)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+        );
+    }
+}
+
+function get_active_bundle_reasons(mysqli $db_conn, string $type): array
+{
+    ensure_bundle_reason_tables($db_conn);
+    $table = $type === 'damage' ? 'damage_reason_master' : 'extra_reason_master';
+    return $db_conn->query(
+        "SELECT id, label FROM $table WHERE is_active = 1 ORDER BY label ASC"
+    )->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * One row per operator-recorded damage/extra adjustment against a
+ * bundle — preserves the individual qty + reason + note that
+ * record_damaged_pieces()/add_extra_pieces_to_bundle() would otherwise
+ * only fold into the bundle's running totals, losing the per-entry
+ * detail (see those functions below, which both insert here).
+ */
+function ensure_raw_material_bundle_adjustments_table(mysqli $db_conn): void
+{
+    $db_conn->query(
+        "CREATE TABLE IF NOT EXISTS raw_material_bundle_adjustments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            bundle_id INT NOT NULL,
+            type ENUM('damage','extra') NOT NULL,
+            reason_id INT NULL,
+            qty INT NOT NULL,
+            note VARCHAR(255) NULL,
+            ref_id VARCHAR(64) NULL,
+            created_by VARCHAR(100) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_rmba_bundle (bundle_id),
+            KEY idx_rmba_type (type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
 /**
  * Creates $bundleCount new open bundles, all sharing one $inputRefId
  * (links back to the Input Stock submission that created them, audit
@@ -169,9 +224,11 @@ function get_open_raw_material_bundles(mysqli $db_conn, int $rawProductId, int $
 {
     ensure_raw_material_bundles_table($db_conn);
     $stmt = $db_conn->prepare(
-        "SELECT id, remaining_pieces, nominal_pieces, created_at FROM raw_material_bundles
-         WHERE raw_product_id = ? AND company_godown_id = ? AND warehouse_id <=> ? AND status = 'open'
-         ORDER BY created_at ASC, id ASC"
+        "SELECT b.id, b.remaining_pieces, b.nominal_pieces, b.created_at, p.productName
+         FROM raw_material_bundles b
+         INNER JOIN products p ON p.id = b.raw_product_id
+         WHERE b.raw_product_id = ? AND b.company_godown_id = ? AND b.warehouse_id <=> ? AND b.status = 'open'
+         ORDER BY b.created_at ASC, b.id ASC"
     );
     $stmt->bind_param('iii', $rawProductId, $companyGodownId, $warehouseId);
     $stmt->execute();
@@ -182,7 +239,7 @@ function get_open_raw_material_bundles(mysqli $db_conn, int $rawProductId, int $
         $date = date('d-M-Y', strtotime($row['created_at']));
         return [
             'id'               => (int) $row['id'],
-            'label'            => "Bundle #{$row['id']} ($date)",
+            'label'            => "Bundle #{$row['id']} — {$row['productName']} ($date)",
             'remaining_pieces' => (int) $row['remaining_pieces'],
             'nominal_pieces'   => (int) $row['nominal_pieces'],
         ];
@@ -297,12 +354,19 @@ function convert_from_raw_material_bundle(mysqli $db_conn, int $bundleId, int $p
  * not a conversion draw, so the "never negative" rule doesn't apply
  * here the same way).
  *
+ * Every call is also logged as its own row in
+ * raw_material_bundle_adjustments (type='damage') with its reason and
+ * note, so multiple damage entries against the same bundle — each for a
+ * different reason — stay individually attributable instead of
+ * collapsing into one opaque running total.
+ *
  * @throws StockException if the bundle doesn't exist or is already closed.
  * @return array{remaining_after:int, damaged_total:int}
  */
-function record_damaged_pieces(mysqli $db_conn, int $bundleId, int $qtyPieces, ?string $note, ?string $recordedBy): array
+function record_damaged_pieces(mysqli $db_conn, int $bundleId, int $qtyPieces, ?string $note, ?string $recordedBy, ?int $reasonId = null, ?string $refId = null): array
 {
     ensure_raw_material_bundles_table($db_conn);
+    ensure_raw_material_bundle_adjustments_table($db_conn);
     if ($qtyPieces <= 0) {
         throw new StockException("Damaged quantity must be greater than zero.");
     }
@@ -326,6 +390,14 @@ function record_damaged_pieces(mysqli $db_conn, int $bundleId, int $qtyPieces, ?
     $updStmt->execute();
     $updStmt->close();
 
+    $logStmt = $db_conn->prepare(
+        "INSERT INTO raw_material_bundle_adjustments (bundle_id, type, reason_id, qty, note, ref_id, created_by)
+         VALUES (?, 'damage', ?, ?, ?, ?, ?)"
+    );
+    $logStmt->bind_param('iiisss', $bundleId, $reasonId, $qtyPieces, $note, $refId, $recordedBy);
+    $logStmt->execute();
+    $logStmt->close();
+
     return [
         'remaining_after' => (int) $bundleRow['remaining_pieces'] - $qtyPieces,
         'damaged_total'   => (int) $bundleRow['damaged_pieces'] + $qtyPieces,
@@ -341,12 +413,19 @@ function record_damaged_pieces(mysqli $db_conn, int $bundleId, int $qtyPieces, ?
  * ever added this way (added_extra_pieces) is what marks a closed
  * bundle as excess (see get_raw_material_bundles()).
  *
+ * Every call is also logged as its own row in
+ * raw_material_bundle_adjustments (type='extra') with its reason, so
+ * multiple extra-found entries against the same bundle stay
+ * individually attributable instead of collapsing into one opaque
+ * running total.
+ *
  * @throws StockException if the bundle doesn't exist or is already closed.
  * @return array{remaining_after:int, added_extra_total:int}
  */
-function add_extra_pieces_to_bundle(mysqli $db_conn, int $bundleId, int $qtyPieces, ?string $recordedBy): array
+function add_extra_pieces_to_bundle(mysqli $db_conn, int $bundleId, int $qtyPieces, ?string $recordedBy, ?int $reasonId = null, ?string $refId = null): array
 {
     ensure_raw_material_bundles_table($db_conn);
+    ensure_raw_material_bundle_adjustments_table($db_conn);
     if ($qtyPieces <= 0) {
         throw new StockException("Extra piece quantity must be greater than zero.");
     }
@@ -369,6 +448,14 @@ function add_extra_pieces_to_bundle(mysqli $db_conn, int $bundleId, int $qtyPiec
     $updStmt->bind_param('iii', $qtyPieces, $qtyPieces, $bundleId);
     $updStmt->execute();
     $updStmt->close();
+
+    $logStmt = $db_conn->prepare(
+        "INSERT INTO raw_material_bundle_adjustments (bundle_id, type, reason_id, qty, ref_id, created_by)
+         VALUES (?, 'extra', ?, ?, ?, ?)"
+    );
+    $logStmt->bind_param('iiiss', $bundleId, $reasonId, $qtyPieces, $refId, $recordedBy);
+    $logStmt->execute();
+    $logStmt->close();
 
     return [
         'remaining_after'    => (int) $bundleRow['remaining_pieces'] + $qtyPieces,

@@ -47,6 +47,17 @@ $rawPackCounts    = $_POST['pack_count'] ?? [];
 $rawBundleIds     = $_POST['bundle_id'] ?? [];
 $rawMachineCodeIds = $_POST['machine_code_id'] ?? [];
 
+// Each product row can carry any number of damaged/extra entries, each
+// tagged with its own reason — submitted as damaged_reason_id[rowIndex][]
+// / damaged_qty[rowIndex][] (and extra_ equivalents), rowIndex matching
+// this same row's position in product_id[] (see assignAdjustEntryNames()
+// in neksomo-piece-pack-convert.php, which stamps those names from live
+// DOM order right before submit).
+$rawDamagedReasonIds = $_POST['damaged_reason_id'] ?? [];
+$rawDamagedQtys      = $_POST['damaged_qty'] ?? [];
+$rawExtraReasonIds   = $_POST['extra_reason_id'] ?? [];
+$rawExtraQtys        = $_POST['extra_qty'] ?? [];
+
 if (!$godownId || !is_array($rawProductIds) || empty($rawProductIds)) {
     $_SESSION['errorMessage'] = "Invalid submission — please fill in every field.";
     header("Location: neksomo-piece-pack-convert.php");
@@ -71,6 +82,30 @@ if ($warehouseId === null) {
 // Validate and normalize every row up front, before touching StockService —
 // any malformed row fails the whole batch immediately rather than partway
 // through a transaction.
+// Parses one row's damaged/extra entry arrays into
+// [['reason_id' => int, 'qty' => int], ...], validating that every
+// entry has both a reason and a positive qty — re-checked here since
+// the client-side `required` on these dynamically-added fields is
+// never trusted.
+function parse_bundle_adjust_entries($rawReasonIds, $rawQtys, int $rowIndex, string $label): array
+{
+    $reasonIds = $rawReasonIds[$rowIndex] ?? [];
+    $qtys      = $rawQtys[$rowIndex] ?? [];
+    if (!is_array($reasonIds) || !is_array($qtys) || count($reasonIds) !== count($qtys)) {
+        throw new \RuntimeException("Invalid $label entries submitted.");
+    }
+    $entries = [];
+    foreach ($reasonIds as $j => $rawReasonId) {
+        $reasonId = filter_var($rawReasonId, FILTER_VALIDATE_INT) ?: null;
+        $qty      = (int) ($qtys[$j] ?? 0);
+        if (!$reasonId || $qty < 1) {
+            throw new \RuntimeException("Please select a reason and enter a valid quantity for every $label entry.");
+        }
+        $entries[] = ['reason_id' => $reasonId, 'qty' => $qty];
+    }
+    return $entries;
+}
+
 $rows = [];
 foreach ($rawProductIds as $i => $rawProductId) {
     $productId = (int) $rawProductId;
@@ -85,7 +120,16 @@ foreach ($rawProductIds as $i => $rawProductId) {
         exit;
     }
 
-    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId, 'machine_code_id' => $machineCodeId];
+    try {
+        $damagedEntries = parse_bundle_adjust_entries($rawDamagedReasonIds, $rawDamagedQtys, $i, 'damaged');
+        $extraEntries   = parse_bundle_adjust_entries($rawExtraReasonIds, $rawExtraQtys, $i, 'extra');
+    } catch (\RuntimeException $e) {
+        $_SESSION['errorMessage'] = $e->getMessage();
+        header("Location: neksomo-piece-pack-convert.php");
+        exit;
+    }
+
+    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId, 'machine_code_id' => $machineCodeId, 'damaged_entries' => $damagedEntries, 'extra_entries' => $extraEntries];
 }
 
 // A product appearing twice in one batch is never a legitimate
@@ -162,6 +206,24 @@ try {
         $rawSource = get_neksomo_source_for_company_product($db_conn, $row['product_id']);
 
         if ($rawSource && $row['direction'] === 'pieces_to_pack') {
+            // Damage/extra are applied against the bundle first, in the
+            // same transaction, so remaining_pieces reflects reality
+            // before the conversion draw computes its cap. Each entry
+            // is logged individually (own reason + qty) rather than
+            // collapsed into one call, so the adjustments log stays
+            // itemized — see record_damaged_pieces()/
+            // add_extra_pieces_to_bundle() in RawMaterialBundles.php.
+            $totalDamaged = 0;
+            foreach ($row['damaged_entries'] as $entry) {
+                record_damaged_pieces($db_conn, $row['bundle_id'], $entry['qty'], null, $createdBy, $entry['reason_id'], $refId);
+                $totalDamaged += $entry['qty'];
+            }
+            $totalExtra = 0;
+            foreach ($row['extra_entries'] as $entry) {
+                add_extra_pieces_to_bundle($db_conn, $row['bundle_id'], $entry['qty'], $createdBy, $entry['reason_id'], $refId);
+                $totalExtra += $entry['qty'];
+            }
+
             // The selected bundle's own remaining_pieces IS the hard limit
             // for this conversion — no pooled stock.closing_qty deduction
             // is involved at all. Caps at however many FULL packs the
@@ -176,10 +238,14 @@ try {
                 'conversion', $refId, $createdBy, true, $warehouseId, $row['machine_code_id'], $conversionDate
             );
 
+            $adjustNote = '';
+            if ($totalDamaged > 0) { $adjustNote .= ", $totalDamaged pc damaged"; }
+            if ($totalExtra > 0) { $adjustNote .= ", $totalExtra pc extra found"; }
+
             if ($bundleResult['packs_made'] < $bundleResult['requested_packs']) {
-                $summaries[] = "$productName: only {$bundleResult['packs_made']} of {$bundleResult['requested_packs']} pack(s) could be made — selected bundle ran short ({$bundleResult['remaining_after']} pc left). Now {$creditResult['qty_after']} pack(s) on hand";
+                $summaries[] = "$productName: only {$bundleResult['packs_made']} of {$bundleResult['requested_packs']} pack(s) could be made — selected bundle ran short ({$bundleResult['remaining_after']} pc left$adjustNote). Now {$creditResult['qty_after']} pack(s) on hand";
             } else {
-                $summaries[] = "$productName: assembled {$bundleResult['packs_made']} pack(s) from the selected bundle — now {$creditResult['qty_after']} pack(s) on hand";
+                $summaries[] = "$productName: assembled {$bundleResult['packs_made']} pack(s) from the selected bundle$adjustNote — now {$creditResult['qty_after']} pack(s) on hand";
             }
         } elseif ($row['direction'] === 'pieces_to_pack') {
             $result = $stockService->convertPiecesToPack(

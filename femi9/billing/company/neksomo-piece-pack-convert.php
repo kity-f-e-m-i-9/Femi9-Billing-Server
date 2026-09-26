@@ -1,6 +1,7 @@
 <?php include("checksession.php");
 require_once("include/GodownAccess.php");
 require_once("include/MachineCodes.php");
+require_once("include/RawMaterialBundles.php");
 include("config.php");
 
 // Dedicated to the neksomo login (admin retained for oversight/support).
@@ -31,6 +32,8 @@ $warehouses = $db_conn->query(
 )->fetch_all(MYSQLI_ASSOC);
 
 $machineCodes = get_active_machine_codes($db_conn);
+$damageReasons = get_active_bundle_reasons($db_conn, 'damage');
+$extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -114,8 +117,17 @@ $machineCodes = get_active_machine_codes($db_conn);
         .ata-row-card:hover { box-shadow:0 2px 10px rgba(16,24,40,.07); }
         .ata-row-card.dir-to-pack { border-left-color: var(--ata-tp-1); }
         .ata-row-card.dir-to-pieces { border-left-color: var(--ata-ot-1); }
-        .ata-row-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; align-items:end; }
+        .ata-row-grid {
+            display:grid;
+            grid-template-columns: 1.6fr 0.9fr 1.3fr 1.1fr 1.3fr 1.3fr auto;
+            gap:10px; align-items:end;
+        }
         .ata-row-grid .ata-field-wide { grid-column: span 2; }
+        .ata-field-action { width:auto; }
+        @media (max-width: 900px) {
+            .ata-row-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+            .ata-row-grid .ata-field-wide { grid-column: span 2; }
+        }
         .ata-stock-chip {
             display:inline-flex; align-items:center; gap:6px; height:46px; border-radius:9px; padding:0 14px;
             font-size:12.5px; font-weight:600; background:#eef2ff; color:#4338ca; line-height:1.3; white-space:normal;
@@ -135,25 +147,64 @@ $machineCodes = get_active_machine_codes($db_conn);
         .ata-remove-btn:disabled:hover { background: #fff; color: #e11d48; }
 
         .ata-bundle-strip { display:none; margin-top:14px; padding-top:14px; border-top:1px dashed #eaecf5; }
-        .ata-bundle-row { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; }
-        .ata-bundle-row .ata-field { flex:1 1 280px; min-width:220px; margin:0; }
-        .ata-bundle-label { display:flex; align-items:center; gap:4px; margin-bottom:4px; }
+        .ata-bundle-row { display:grid; grid-template-columns: 2.6fr 1fr; gap:10px; align-items:end; }
+        .ata-bundle-row .ata-field { margin:0; }
+        @media (max-width: 700px) {
+            .ata-bundle-row { grid-template-columns: 1fr; }
+        }
+        .ata-bundle-label { display:flex; align-items:center; gap:4px; margin-bottom:6px; }
         .ata-bundle-label i { font-size:15px; color:var(--ata-tp-2); }
         .ata-bundle-close-btn {
-            display:inline-flex; align-items:center; gap:5px; height:46px; padding:0 18px;
+            display:inline-flex; align-items:center; justify-content:center; gap:5px; height:46px; width:100%; padding:0 18px;
             border-radius:9px; border:1px solid #fecaca; background:#fff5f5; color:#b91c1c;
-            font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; flex:0 0 auto;
+            font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;
             transition:background .15s, opacity .15s;
         }
         .ata-bundle-close-btn:hover:not(:disabled) { background:#fee2e2; }
         .ata-bundle-close-btn:disabled { opacity:.4; cursor:not-allowed; }
-        .ata-bundle-empty-hint { flex:1 1 260px; background:#fef2f2; border:1px solid #fecaca; border-radius:9px; padding:0 14px; height:46px; display:none; align-items:center; font-size:12.5px; color:#b91c1c; line-height:1.3; }
+        .ata-bundle-empty-hint { grid-column: 1 / -1; background:#fef2f2; border:1px solid #fecaca; border-radius:9px; padding:0 14px; height:46px; display:none; align-items:center; font-size:12.5px; color:#b91c1c; line-height:1.3; }
         .ata-bundle-empty-hint i { font-size:14px; vertical-align:middle; margin-right:3px; }
 
-        .select2-container { width:100% !important; }
+        .ata-adjust-group { margin-top:16px; }
+        .ata-adjust-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+        .ata-adjust-title { font-size:12px; font-weight:600; color:#4b5563; text-transform:uppercase; letter-spacing:.02em; }
+        .ata-adjust-add-btn {
+            display:inline-flex; align-items:center; gap:3px; border:1px dashed #c7d2fe; background:#f5f6ff;
+            color:#4338ca; font-size:12px; font-weight:600; padding:5px 10px; border-radius:7px; cursor:pointer;
+            transition:background .15s;
+        }
+        .ata-adjust-add-btn:hover { background:#eef0ff; }
+        .ata-adjust-rows { display:flex; flex-direction:column; gap:8px; }
+        .ata-adjust-rows:empty { display:none; }
+        .ata-adjust-entry-row { display:grid; grid-template-columns: 2fr 1fr auto; gap:10px; align-items:center; }
+        .ata-adjust-entry-row .ata-field { margin:0; }
+        .ata-adjust-entry-row select, .ata-adjust-entry-row input {
+            border:1px solid #dde1ea; border-radius:8px; height:40px; font-size:13.5px; width:100%;
+            padding:0 12px; color:#344054; background:#fff;
+        }
+        .ata-adjust-entry-row select:focus, .ata-adjust-entry-row input:focus { border-color: var(--ata-tp-1); box-shadow: 0 0 0 3px rgba(102,126,234,.15); outline:none; }
+        .ata-adjust-remove-btn {
+            width:40px; height:40px; border-radius:8px; border:1px solid #fecdd3; background:#fff; color:#e11d48;
+            display:inline-flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
+            transition: background .15s, color .15s;
+        }
+        .ata-adjust-remove-btn:hover { background:#e11d48; color:#fff; border-color:#e11d48; }
+
+        /* Entry rows are shorter (40px) than the main product-row fields
+           (46px) — the reason select's Select2 container inherits the
+           global 46px sizing below, so it's overridden here to match its
+           own row's Qty input and Remove button height. */
+        .ata-adjust-entry-row .select2-container--default .select2-selection--single {
+            height:40px !important; padding:0 32px 0 12px !important; border-radius:8px !important; font-size:13.5px;
+        }
+        .ata-adjust-entry-row .select2-selection__rendered { font-size:13.5px !important; }
+
+        .select2-container { width:100% !important; margin:0 !important; }
         .select2-container--default .select2-selection--single {
-            border: 1px solid #dde1ea; border-radius: 9px; height: 46px; padding: 0 36px 0 14px;
-            display:flex; align-items:center; background:#fff;
+            box-sizing: border-box !important;
+            border: 1px solid #dde1ea !important; border-radius: 9px !important; height: 46px !important;
+            padding: 0 36px 0 14px !important; margin: 0 !important;
+            display:flex; align-items:center; background:#fff !important;
         }
         .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 1.4; padding: 0; color: #344054; font-size:14.5px; width:100%; overflow:hidden; text-overflow:ellipsis; }
         .select2-container--default .select2-selection--single .select2-selection__placeholder { color:#8a94a6; }
@@ -164,7 +215,7 @@ $machineCodes = get_active_machine_codes($db_conn);
             border-color: #6b7280 transparent transparent transparent;
             border-width: 5px 4px 0 4px;
         }
-        .select2-container--default.select2-container--open .select2-selection--single { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.15); }
+        .select2-container--default.select2-container--open .select2-selection--single { border-color: #667eea !important; box-shadow: 0 0 0 3px rgba(102,126,234,.15); }
         .select2-dropdown { border-radius: 9px; border-color: #dde1ea; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
         .select2-search--dropdown .select2-search__field { border-radius: 6px; border: 1px solid #dde1ea; padding: 7px 10px; font-size:13.5px; }
 
@@ -286,7 +337,7 @@ $machineCodes = get_active_machine_codes($db_conn);
                                     </select>
                                 </div>
                                 <div class="ata-field">
-                                    <label>No. of Packs</label>
+                                    <label>Total Packs Produced</label>
                                     <input type="number" min="1" required name="pack_count[]" class="pack-count-input" placeholder="e.g. 5">
                                 </div>
                                 <div class="ata-field">
@@ -302,7 +353,7 @@ $machineCodes = get_active_machine_codes($db_conn);
                                     <label>Current Stock</label>
                                     <span class="current-stock-panel ata-stock-chip is-empty"><i class="material-icons-outlined">inventory</i>&mdash;</span>
                                 </div>
-                                <div class="ata-field" style="flex:0 0 auto;width:auto;display:flex;justify-content:flex-end;">
+                                <div class="ata-field ata-field-action">
                                     <label>&nbsp;</label>
                                     <button type="button" class="ata-remove-btn" title="Remove this product">
                                         <i class="material-icons-outlined" style="font-size:19px;">delete</i>
@@ -311,22 +362,90 @@ $machineCodes = get_active_machine_codes($db_conn);
                             </div>
                             <div class="bundle-picker-wrap ata-bundle-strip">
                                 <div class="ata-bundle-row">
-                                    <div class="ata-field">
+                                    <div class="ata-field ata-field-bundle">
                                         <label class="ata-bundle-label"><i class="material-icons-outlined">inventory_2</i>Raw Material Bundle <span style="color:#ef4444;">*</span></label>
                                         <select class="bundle-select" name="bundle_id[]">
                                             <option value="">— Select bundle —</option>
                                         </select>
                                     </div>
-                                    <button type="button" class="ata-bundle-close-btn bundle-close-btn" disabled title="Select a bundle first">
-                                        <i class="material-icons-outlined" style="font-size:15px;">close</i> Close Bundle
-                                    </button>
+                                    <div class="ata-field ata-field-action">
+                                        <label class="ata-bundle-label">&nbsp;</label>
+                                        <button type="button" class="ata-bundle-close-btn bundle-close-btn" disabled title="Select a bundle first">
+                                            <i class="material-icons-outlined" style="font-size:15px;">close</i> Close Bundle
+                                        </button>
+                                    </div>
                                     <div class="bundle-empty-hint ata-bundle-empty-hint">
                                         <i class="material-icons-outlined">error_outline</i>No open bundle yet — add one via Input Stock &rarr; Raw Bundles.
                                     </div>
                                 </div>
+
+                                <div class="ata-adjust-group" data-adjust-type="damage">
+                                    <div class="ata-adjust-head">
+                                        <span class="ata-adjust-title"><i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;color:#b91c1c;">report</i> Damaged Pieces</span>
+                                        <button type="button" class="ata-adjust-add-btn" data-adjust-type="damage">
+                                            <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">add</i> Add damaged entry
+                                        </button>
+                                    </div>
+                                    <div class="ata-adjust-rows" data-adjust-type="damage"></div>
+                                </div>
+
+                                <div class="ata-adjust-group" data-adjust-type="extra">
+                                    <div class="ata-adjust-head">
+                                        <span class="ata-adjust-title"><i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;color:#b45309;">add_circle_outline</i> Extra Pieces Found</span>
+                                        <button type="button" class="ata-adjust-add-btn" data-adjust-type="extra">
+                                            <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">add</i> Add extra entry
+                                        </button>
+                                    </div>
+                                    <div class="ata-adjust-rows" data-adjust-type="extra"></div>
+                                </div>
                             </div>
                         </div>
                     </template>
+
+                    <!-- One damaged/extra adjustment entry row, cloned by JS for
+                         each entry added under a mapped product's bundle strip.
+                         data-adjust-type on the row (set at clone time) decides
+                         which reason list/field names it uses — damage_reason_id[]
+                         + damaged_qty[] vs extra_reason_id[] + extra_qty[]. -->
+                    <template id="adjustEntryRowTemplate">
+                        <div class="ata-adjust-entry-row">
+                            <div class="ata-field">
+                                <select class="adjust-reason-select" required>
+                                    <option value="" hidden>— Select reason —</option>
+                                    <option value="__manage__" class="adjust-manage-option">+ Manage Reasons…</option>
+                                </select>
+                            </div>
+                            <div class="ata-field ata-adjust-qty-field">
+                                <input type="number" min="1" required class="adjust-qty-input" placeholder="Qty">
+                            </div>
+                            <button type="button" class="ata-adjust-remove-btn" title="Remove this entry">
+                                <i class="material-icons-outlined" style="font-size:17px;">delete</i>
+                            </button>
+                        </div>
+                    </template>
+
+                    <!-- Manage Reasons modal: shared by both the Damaged Pieces and
+                         Extra Pieces Found reason dropdowns — which list it edits
+                         is set at open time (see openReasonManageModal()), same
+                         bootstrap-free overlay pattern as Manage Machine Codes. -->
+                    <div id="reasonModalBackdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:1050; align-items:center; justify-content:center; padding:20px;">
+                        <div style="background:#fff; border-radius:14px; width:100%; max-width:440px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.25);">
+                            <div class="ata-section-head" style="border-radius:14px 14px 0 0;">
+                                <div class="ata-section-title"><i class="material-icons-outlined" id="reasonModalIcon">report</i> <span id="reasonModalTitle">Manage Damage Reasons</span></div>
+                                <button type="button" id="reasonModalClose" style="border:none; background:none; cursor:pointer; color:#6b7280;"><i class="material-icons">close</i></button>
+                            </div>
+                            <div style="padding:16px 20px; overflow-y:auto; flex:1 1 auto;">
+                                <div style="display:flex; gap:8px; margin-bottom:14px;">
+                                    <input type="text" id="reasonFormLabel" placeholder="Reason (e.g. Torn during handling)" style="flex:1 1 auto; border:1px solid #dde1ea; border-radius:8px; height:40px; padding:0 12px; font-size:13.5px;">
+                                    <input type="hidden" id="reasonFormId" value="">
+                                    <button type="button" id="reasonFormSubmit" class="ata-btn ata-btn-tp" style="height:40px;">Add</button>
+                                    <button type="button" id="reasonFormCancelEdit" style="display:none; height:40px; padding:0 12px; border:1px solid #dde1ea; border-radius:8px; background:#fff; cursor:pointer;">Cancel</button>
+                                </div>
+                                <div id="reasonFormError" style="display:none; color:#b91c1c; font-size:12.5px; margin-bottom:10px;"></div>
+                                <div id="reasonList" style="display:flex; flex-direction:column; gap:6px;"></div>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Manage Machine Codes modal: bootstrap-style overlay, kept
                          simple (no bootstrap JS dependency) since it's just a
@@ -423,6 +542,19 @@ function updateBundlePicker(rowEl, mapped, openBundles) {
         wrap.style.display = 'none';
         select.removeAttribute('required');
         select.value = '';
+        // Clear any damaged/extra entries left over from when this row
+        // was mapped to a different, bundle-sourced product — they'd
+        // otherwise still submit (and fail validation) for a row that
+        // no longer even shows the bundle strip. Each entry's reason
+        // <select> is a Select2 instance, so it's torn down before its
+        // row is discarded rather than just wiping the container's
+        // innerHTML out from under it.
+        rowEl.querySelectorAll('.ata-adjust-rows').forEach(function (el) {
+            el.querySelectorAll('.adjust-reason-select').forEach(function (s) {
+                if ($(s).data('select2')) { $(s).select2('destroy'); }
+            });
+            el.innerHTML = '';
+        });
         return;
     }
 
@@ -459,12 +591,18 @@ function updateBundlePicker(rowEl, mapped, openBundles) {
 // Enables/disables the row's "Close Bundle" button based on whether a
 // bundle is currently selected, and updates its title with the
 // remaining-piece count so the operator sees at a glance what they're
-// about to close.
+// about to close. Also always restores the button's normal label —
+// closeSelectedBundle() swaps it to a "Closing…" spinner for the
+// duration of its fetch, and this is the function that runs afterward
+// (via refreshRowStock -> updateBundlePicker), so it's the one place
+// that must undo that swap or the spinner is left stuck on screen.
 function updateCloseBundleButton(rowEl) {
     var select = rowEl.querySelector('.bundle-select');
     var closeBtn = rowEl.querySelector('.bundle-close-btn');
     var selectedOption = select.options[select.selectedIndex];
     var bundleId = select.value;
+
+    closeBtn.innerHTML = '<i class="material-icons-outlined" style="font-size:15px;">close</i> Close Bundle';
 
     if (!bundleId || !selectedOption) {
         closeBtn.disabled = true;
@@ -475,6 +613,102 @@ function updateCloseBundleButton(rowEl) {
     var remaining = selectedOption.getAttribute('data-remaining');
     closeBtn.disabled = false;
     closeBtn.title = 'Close this bundle (' + remaining + ' pc remaining will carry forward)';
+}
+
+// In-memory cache of each reason type's active list, seeded from PHP so
+// the first render needs no round trip; refreshed from bundle-reason-
+// manage.php after any add/edit/delete in the Manage Reasons modal so
+// every row's dropdowns (and the modal's own list) stay in sync without
+// a page reload.
+var reasonCache = {
+    damage: <?php echo json_encode($damageReasons, JSON_HEX_TAG | JSON_HEX_APOS); ?>,
+    extra: <?php echo json_encode($extraReasons, JSON_HEX_TAG | JSON_HEX_APOS); ?>
+};
+var adjustEntryRowTemplate = document.getElementById('adjustEntryRowTemplate');
+
+// Rebuilds every rendered reason <select>'s options from reasonCache[type],
+// preserving each select's current selection where it still exists (same
+// pattern as refreshMachineCodeDropdowns()). The "+ Manage Reasons…"
+// option is always appended last so it never gets treated as a real
+// selectable reason. Each select is a Select2 (same searchable style as
+// the Product picker — see addAdjustEntryRow()), so it must be torn
+// down and reinitialized around the innerHTML rebuild rather than just
+// swapping options under it.
+function refreshReasonDropdowns(type) {
+    document.querySelectorAll('.adjust-reason-select[data-adjust-type="' + type + '"]').forEach(function (select) {
+        var currentVal = select.value;
+        if ($(select).data('select2')) {
+            $(select).select2('destroy');
+        }
+        var html = '<option value="" hidden>— Select reason —</option>';
+        (reasonCache[type] || []).forEach(function (r) {
+            html += '<option value="' + r.id + '">' + escBd(r.label) + '</option>';
+        });
+        html += '<option value="__manage__" class="adjust-manage-option">+ Manage Reasons…</option>';
+        select.innerHTML = html;
+        if (currentVal && currentVal !== '__manage__' && Array.from(select.options).some(function (o) { return o.value === currentVal; })) {
+            select.value = currentVal;
+        }
+        $(select).select2({ placeholder: 'Search a reason…', width: '100%' });
+    });
+}
+
+// Adds one damaged/extra entry row (reason + qty + remove) under the
+// given row's adjust group. The entry's <select>/<input> get no `name`
+// at this point — see assignAdjustEntryNames(), called right before
+// submit, which is what actually stamps damaged_reason_id[rowIndex][]
+// / damaged_qty[rowIndex][] (rowIndex = the product row's live position
+// in productRows). Naming it eagerly here would desync the moment any
+// earlier product row is removed, since array positions shift but a
+// previously-stamped name wouldn't.
+function addAdjustEntryRow(rowEl, type) {
+    var rowsContainerEl = rowEl.querySelector('.ata-adjust-rows[data-adjust-type="' + type + '"]');
+    var fragment = adjustEntryRowTemplate.content.cloneNode(true);
+    var entryEl = fragment.querySelector('.ata-adjust-entry-row');
+    var reasonSelect = entryEl.querySelector('.adjust-reason-select');
+
+    reasonSelect.setAttribute('data-adjust-type', type);
+
+    entryEl.querySelector('.ata-adjust-remove-btn').addEventListener('click', function () {
+        if ($(reasonSelect).data('select2')) {
+            $(reasonSelect).select2('destroy');
+        }
+        entryEl.remove();
+    });
+    // Picking "+ Manage Reasons…" should open the modal, not actually
+    // select it as a reason — jQuery's .val('').trigger('change') (not
+    // a plain DOM .value = '') is required here so Select2's own
+    // rendered selection box updates too; setting the native <select>'s
+    // .value alone leaves Select2's UI still showing "+ Manage
+    // Reasons…" as selected even though the underlying value reset.
+    $(reasonSelect).on('change', function () {
+        if (reasonSelect.value === '__manage__') {
+            $(reasonSelect).val('').trigger('change');
+            openReasonManageModal(type);
+        }
+    });
+
+    rowsContainerEl.appendChild(fragment);
+    refreshReasonDropdowns(type);
+}
+
+// Stamps every rendered adjust-entry row's <select>/<input> name
+// attributes from the product rows' CURRENT DOM order, so
+// damaged_reason_id[rowIndex][]/damaged_qty[rowIndex][] (and the extra_
+// equivalents) always line up with that same rowIndex's product_id[]/
+// bundle_id[] on the server — run right before every form submit
+// (see the convertForm submit handler) rather than at add-entry time,
+// so removing an earlier product row never leaves stale indices behind.
+function assignAdjustEntryNames() {
+    Array.from(rowsContainer.children).forEach(function (rowEl, rowIndex) {
+        ['damage', 'extra'].forEach(function (type) {
+            var namePrefix = type === 'damage' ? 'damaged' : 'extra';
+            rowEl.querySelectorAll('.ata-adjust-rows[data-adjust-type="' + type + '"] .ata-adjust-entry-row').forEach(function (entryEl) {
+                entryEl.querySelector('.adjust-reason-select').setAttribute('name', namePrefix + '_reason_id[' + rowIndex + '][]');
+                entryEl.querySelector('.adjust-qty-input').setAttribute('name', namePrefix + '_qty[' + rowIndex + '][]');
+            });
+        });
+    });
 }
 
 // Closes the row's currently-selected bundle right from the Convert
@@ -571,11 +805,19 @@ function addProductRow() {
     rowEl.querySelector('.ata-remove-btn').addEventListener('click', function () {
         $(productSelect).select2('destroy');
         if ($(bundleSelect).data('select2')) $(bundleSelect).select2('destroy');
+        rowEl.querySelectorAll('.adjust-reason-select').forEach(function (s) {
+            if ($(s).data('select2')) { $(s).select2('destroy'); }
+        });
         rowEl.remove();
         updateRemoveButtonsState();
     });
     rowEl.querySelector('.bundle-close-btn').addEventListener('click', function () {
         closeSelectedBundle(rowEl);
+    });
+    rowEl.querySelectorAll('.ata-adjust-add-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            addAdjustEntryRow(rowEl, btn.getAttribute('data-adjust-type'));
+        });
     });
     rowsContainer.appendChild(fragment);
 
@@ -712,6 +954,130 @@ mcFormSubmit.addEventListener('click', function () {
     });
 });
 
+// Manage Reasons modal: list/add/edit/delete against
+// bundle-reason-manage.php, shared by both the Damaged Pieces and Extra
+// Pieces Found reason dropdowns — reasonModalType tracks which list
+// (damage|extra) the currently-open modal is editing, set by
+// openReasonManageModal(). Same list/add/edit/delete flow as Manage
+// Machine Codes above, just parameterized by type instead of a fixed
+// endpoint/table.
+var reasonModalBackdrop = document.getElementById('reasonModalBackdrop');
+var reasonModalTitle = document.getElementById('reasonModalTitle');
+var reasonModalIcon = document.getElementById('reasonModalIcon');
+var reasonList = document.getElementById('reasonList');
+var reasonFormLabel = document.getElementById('reasonFormLabel');
+var reasonFormId = document.getElementById('reasonFormId');
+var reasonFormSubmit = document.getElementById('reasonFormSubmit');
+var reasonFormCancelEdit = document.getElementById('reasonFormCancelEdit');
+var reasonFormError = document.getElementById('reasonFormError');
+var reasonModalType = 'damage';
+
+function reasonPostAction(action, extraFields) {
+    var formData = new URLSearchParams();
+    formData.set('action', action);
+    formData.set('type', reasonModalType);
+    formData.set('csrf_token', csrfToken);
+    Object.keys(extraFields || {}).forEach(function (k) { formData.set(k, extraFields[k]); });
+    return fetch('bundle-reason-manage.php', { method: 'POST', body: formData }).then(function (r) { return r.json(); });
+}
+
+function resetReasonForm() {
+    reasonFormId.value = '';
+    reasonFormLabel.value = '';
+    reasonFormSubmit.textContent = 'Add';
+    reasonFormCancelEdit.style.display = 'none';
+    reasonFormError.style.display = 'none';
+}
+
+function renderReasonRow(r) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #eef0f3; border-radius:8px;';
+    var label = document.createElement('div');
+    label.style.cssText = 'flex:1 1 auto; font-size:13.5px; color:#344054;';
+    label.textContent = r.label;
+    var editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.title = 'Edit';
+    editBtn.style.cssText = 'border:none; background:none; cursor:pointer; color:#6b7280;';
+    editBtn.innerHTML = '<i class="material-icons-outlined" style="font-size:18px;">edit</i>';
+    editBtn.addEventListener('click', function () {
+        reasonFormId.value = r.id;
+        reasonFormLabel.value = r.label;
+        reasonFormSubmit.textContent = 'Save';
+        reasonFormCancelEdit.style.display = '';
+        reasonFormError.style.display = 'none';
+    });
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.title = 'Delete';
+    delBtn.style.cssText = 'border:none; background:none; cursor:pointer; color:#e11d48;';
+    delBtn.innerHTML = '<i class="material-icons-outlined" style="font-size:18px;">delete</i>';
+    delBtn.addEventListener('click', function () {
+        if (!confirm('Delete reason "' + r.label + '"? Entries already using it keep their history.')) return;
+        reasonPostAction('delete', { id: r.id }).then(function (data) {
+            if (data.success) { loadReasonList(); refreshReasonCacheAndDropdowns(); }
+            else alert(data.error || 'Could not delete.');
+        });
+    });
+    row.appendChild(label);
+    row.appendChild(editBtn);
+    row.appendChild(delBtn);
+    return row;
+}
+
+function loadReasonList() {
+    reasonPostAction('list', {}).then(function (data) {
+        reasonList.innerHTML = '';
+        (data.reasons || []).forEach(function (r) {
+            if (!r.is_active) return;
+            reasonList.appendChild(renderReasonRow(r));
+        });
+        if (!reasonList.children.length) {
+            reasonList.innerHTML = '<div style="color:#9ca3af; font-size:12.5px;">No reasons yet — add one above.</div>';
+        }
+    });
+}
+
+// Re-fetches the active list for reasonModalType, updates reasonCache,
+// and rebuilds every rendered row's dropdown of that type (see
+// refreshReasonDropdowns()) so a reason just added/renamed/removed
+// shows up immediately in every product row without a page reload.
+function refreshReasonCacheAndDropdowns() {
+    reasonPostAction('list', {}).then(function (data) {
+        reasonCache[reasonModalType] = (data.reasons || []).filter(function (r) { return r.is_active; });
+        refreshReasonDropdowns(reasonModalType);
+    });
+}
+
+function openReasonManageModal(type) {
+    reasonModalType = type;
+    reasonModalTitle.textContent = type === 'damage' ? 'Manage Damage Reasons' : 'Manage Extra-Found Reasons';
+    reasonModalIcon.textContent = type === 'damage' ? 'report' : 'add_circle_outline';
+    resetReasonForm();
+    loadReasonList();
+    reasonModalBackdrop.style.display = 'flex';
+}
+
+document.getElementById('reasonModalClose').addEventListener('click', function () { reasonModalBackdrop.style.display = 'none'; });
+reasonModalBackdrop.addEventListener('click', function (e) { if (e.target === reasonModalBackdrop) reasonModalBackdrop.style.display = 'none'; });
+reasonFormCancelEdit.addEventListener('click', resetReasonForm);
+
+reasonFormSubmit.addEventListener('click', function () {
+    var label = reasonFormLabel.value.trim();
+    if (!label) { reasonFormError.textContent = 'Reason is required.'; reasonFormError.style.display = ''; return; }
+    var isEdit = !!reasonFormId.value;
+    reasonPostAction(isEdit ? 'edit' : 'add', { id: reasonFormId.value, label: label }).then(function (data) {
+        if (data.success) {
+            resetReasonForm();
+            loadReasonList();
+            refreshReasonCacheAndDropdowns();
+        } else {
+            reasonFormError.textContent = data.error || 'Could not save.';
+            reasonFormError.style.display = '';
+        }
+    });
+});
+
 document.getElementById('addProductRowBtn').addEventListener('click', addProductRow);
 ['godownSelect', 'warehouseSelect'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', refreshAllRowsStock);
@@ -721,19 +1087,31 @@ document.getElementById('addProductRowBtn').addEventListener('click', addProduct
 addProductRow();
 
 // Blocks submission if any mapped-product row is missing its required
-// bundle selection — native `required` on a `display:none` field isn't
-// reliably enforced by browsers, so this is re-checked explicitly.
+// bundle selection, or any damaged/extra entry row is missing a reason
+// or a positive quantity — native `required` on a field inside a
+// `display:none` wrapper, or one whose `name` is assigned only at
+// submit time, isn't reliably enforced by browsers, so this is
+// re-checked explicitly. Entry names are stamped from live DOM order
+// right before this validation runs (see assignAdjustEntryNames()).
 document.getElementById('convertForm').addEventListener('submit', function (e) {
+    assignAdjustEntryNames();
+
     var blocked = false;
     rowsContainer.querySelectorAll('.product-row').forEach(function (rowEl) {
         var wrap = rowEl.querySelector('.bundle-picker-wrap');
         if (wrap.style.display === 'none') return; // not a mapped row
         var select = rowEl.querySelector('.bundle-select');
         if (!select.value) blocked = true;
+
+        rowEl.querySelectorAll('.ata-adjust-entry-row').forEach(function (entryEl) {
+            var reasonVal = entryEl.querySelector('.adjust-reason-select').value;
+            var qtyVal = parseInt(entryEl.querySelector('.adjust-qty-input').value, 10);
+            if (!reasonVal || reasonVal === '__manage__' || !(qtyVal > 0)) blocked = true;
+        });
     });
     if (blocked) {
         e.preventDefault();
-        alert('Please select a raw material bundle for every mapped product row before converting.');
+        alert('Please select a raw material bundle for every mapped product row, and a reason + quantity for every damaged/extra entry, before converting.');
     }
 });
 </script>
