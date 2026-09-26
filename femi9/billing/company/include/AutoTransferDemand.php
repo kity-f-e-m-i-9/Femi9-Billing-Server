@@ -213,14 +213,30 @@ function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, s
  * list functions do.
  *
  * Returns ['tp' => [...], 'ot' => [...]], each entry shaped
- * ['source_id' => string, 'label' => string, 'product_name' => string].
- * Only reason='transferred' rows are returned — 'excluded' rows (the
- * retired "Not Today" feature) are never created any more, but any old
- * ones are simply not shown here rather than being auto-deleted. A skip
- * whose underlying order/product no longer resolves (rare — e.g. the PO
- * was deleted after being skipped) still shows using the raw order_key/
- * product_id so it stays
+ * ['source_id' => string, 'label' => string, 'product_name' => string,
+ * 'qty' => int, 'reason' => 'transferred'|'excluded', 'order_type' =>
+ * 'napkin'|'diaper']. order_type is the PO's own product_type for a TP
+ * row, or the product's own category for an OT row (same convention
+ * get_auto_transfer_orders_overview() uses) — lets the client's Napkin/
+ * Lumi Diaper filter apply to this tab too, not just the TP/OT tabs.
+ * reason='transferred'
+ * means Auto Transfer actually moved this line's stock today;
+ * reason='excluded' means it was deliberately left out via the "View All
+ * Orders" modal's "Delete Selected" button (delete-auto-transfer-order.php)
+ * — stock was never touched for that one. The client renders these with
+ * different badges ("Already transferred" vs "Deleted") but both are
+ * undoable the same way via unskip-auto-transfer-order.php's "Re-add"
+ * button. A skip whose underlying order/product no longer resolves (rare
+ * — e.g. the PO was deleted after being skipped) still shows using the raw
+ * order_key/product_id so it stays
  * visible and undoable rather than silently vanishing.
+ *
+ * Deliberately NOT filtered by the order's own order_date — this tab's
+ * whole point is "what stock actually moved today," regardless of when
+ * the underlying PO/draft was originally raised (an older order whose
+ * shortage got resolved today is still a today transfer). An order_date
+ * filter was tried and reverted 2026-09-24 after it hid genuinely-today
+ * transfers whose PO happened to be raised on an earlier date.
  */
 function get_auto_transfer_skipped_today(mysqli $db_conn): array
 {
@@ -228,8 +244,8 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
     $skipped = ['tp' => [], 'ot' => []];
 
     $stmt = $db_conn->prepare(
-        "SELECT source_type, source_ref FROM auto_transfer_skip_today
-         WHERE skip_date = CURDATE() AND source_type IN ('tp', 'ot') AND reason = 'transferred' ORDER BY id"
+        "SELECT source_type, source_ref, reason FROM auto_transfer_skip_today
+         WHERE skip_date = CURDATE() AND source_type IN ('tp', 'ot') AND reason IN ('transferred', 'excluded') ORDER BY id"
     );
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -242,16 +258,23 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
         [$orderKey, $productIdStr] = $parts;
         $productId = (int) $productIdStr;
 
-        $prodStmt = $db_conn->prepare("SELECT productName FROM products WHERE id = ?");
+        $prodStmt = $db_conn->prepare("SELECT productName, category FROM products WHERE id = ?");
         $prodStmt->bind_param('i', $productId);
         $prodStmt->execute();
-        $productName = $prodStmt->get_result()->fetch_assoc()['productName'] ?? "Product #$productId";
+        $prodRow = $prodStmt->get_result()->fetch_assoc();
+        $productName = $prodRow['productName'] ?? "Product #$productId";
+        // Fallback only — TP rows overwrite this with the PO's own
+        // product_type just below, since a PO's declared type is the
+        // authoritative one (same convention get_auto_transfer_orders_
+        // overview() uses); this products.category read only matters for OT
+        // rows, which have no per-order type column of their own.
+        $orderType = ($prodRow['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin';
         $prodStmt->close();
 
         if ($sourceType === 'tp') {
             $poId = (int) $orderKey;
             $poStmt = $db_conn->prepare(
-                "SELECT tp.name AS tp_name, tp.tp_id AS tp_code
+                "SELECT tp.name AS tp_name, tp.tp_id AS tp_code, po.product_type
                  FROM tp_purchase_orders po
                  INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
                  WHERE po.id = ?"
@@ -261,6 +284,15 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
             $poRow = $poStmt->get_result()->fetch_assoc();
             $poStmt->close();
             $label = $poRow ? ($poRow['tp_name'] . ' (' . $poRow['tp_code'] . ') — PO #' . $poId) : ('PO #' . $poId);
+            if ($poRow) $orderType = $poRow['product_type'] === 'diaper' ? 'diaper' : 'napkin';
+
+            $qtyStmt = $db_conn->prepare(
+                "SELECT SUM(qty) AS qty FROM tp_purchase_order_items WHERE po_id = ? AND product_id = ?"
+            );
+            $qtyStmt->bind_param('ii', $poId, $productId);
+            $qtyStmt->execute();
+            $qty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
+            $qtyStmt->close();
         } else {
             $otStmt = $db_conn->prepare(
                 "SELECT os.customer_name, osi.cat FROM ot_sales os
@@ -272,12 +304,23 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
             $otRow = $otStmt->get_result()->fetch_assoc();
             $otStmt->close();
             $label = $otRow ? (($otRow['customer_name'] ?: 'Draft Order') . ' (' . $otRow['cat'] . ')') : $orderKey;
+
+            $qtyStmt = $db_conn->prepare(
+                "SELECT SUM(qty) AS qty FROM ot_sales WHERE tempid = ? AND prid = ?"
+            );
+            $qtyStmt->bind_param('si', $orderKey, $productId);
+            $qtyStmt->execute();
+            $qty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
+            $qtyStmt->close();
         }
 
         $skipped[$sourceType][] = [
             'source_id'    => $sourceType . ':' . $row['source_ref'],
             'label'        => $label,
             'product_name' => $productName,
+            'qty'          => $qty,
+            'reason'       => $row['reason'],
+            'order_type'   => $orderType,
         ];
     }
 
@@ -483,7 +526,7 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     $overview = ['tp' => [], 'ot' => []];
 
     $tpStmt = $db_conn->prepare(
-        "SELECT po.id AS po_id, tp.name AS tp_name, tp.tp_id AS tp_code,
+        "SELECT po.id AS po_id, po.product_type, tp.name AS tp_name, tp.tp_id AS tp_code,
                 poi.product_id, poi.qty, p.productName
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
@@ -503,9 +546,13 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
         $poId = (int) $row['po_id'];
         if (!isset($tpByPo[$poId])) {
             $tpByPo[$poId] = [
-                'order_key' => (string) $poId,
-                'label'     => $row['tp_name'] . ' (' . $row['tp_code'] . ') — PO #' . $poId,
-                'products'  => [],
+                'order_key'   => (string) $poId,
+                'label'       => $row['tp_name'] . ' (' . $row['tp_code'] . ') — PO #' . $poId,
+                // The PO's own napkin/diaper choice (add-purchase-order.php
+                // enforces a pure cart, never mixed) — powers the Napkin /
+                // Lumi Diaper filter in the "View All Orders" modal.
+                'order_type'  => $row['product_type'] === 'diaper' ? 'diaper' : 'napkin',
+                'products'    => [],
             ];
         }
         $tpByPo[$poId]['products'][] = [
@@ -518,7 +565,7 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     $overview['tp'] = array_values($tpByPo);
 
     $otStmt = $db_conn->prepare(
-        "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id, os.qty, p.productName
+        "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id, os.qty, p.productName, p.category
          FROM ot_sales os
          INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
          INNER JOIN products p ON p.id = os.prid
@@ -537,9 +584,14 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
         $tempid = $row['tempid'];
         if (!isset($otByTempid[$tempid])) {
             $otByTempid[$tempid] = [
-                'order_key' => $tempid,
-                'label'     => (($row['customer_name'] ?: 'Draft Order')) . ' (' . $row['cat'] . ')',
-                'products'  => [],
+                'order_key'  => $tempid,
+                'label'      => (($row['customer_name'] ?: 'Draft Order')) . ' (' . $row['cat'] . ')',
+                // OT drafts have no per-order product_type column like TP
+                // POs do — classified from its first line's own
+                // products.category instead (same napkin/diaper convention
+                // TpProductType.php uses elsewhere).
+                'order_type' => $row['category'] === 'diaper' ? 'diaper' : 'napkin',
+                'products'   => [],
             ];
         }
         $otByTempid[$tempid]['products'][] = [
@@ -552,6 +604,78 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     $overview['ot'] = array_values($otByTempid);
 
     return $overview;
+}
+
+/**
+ * Distinct count of still-waiting TP purchase orders that genuinely need
+ * Auto Transfer to move stock for them today — same WHERE clause as the
+ * 'tp' half of get_auto_transfer_orders_overview() (waiting, company-
+ * approved, not CP-preferred, not already fully marked 'transferred'
+ * today), just COUNT(DISTINCT po.id) instead of the full per-order/
+ * per-product breakdown. Powers the page-level "Total PO" stat card —
+ * a PO whose stock has already been moved today (even if the order's own
+ * status is still 'waiting', since fulfilling a PO is a separate manual
+ * step) is excluded, same as it disappears from the "TP Purchase Orders"
+ * tab in the "View All Orders" modal.
+ */
+function get_auto_transfer_waiting_po_count(mysqli $db_conn): int
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
+    $stmt = $db_conn->prepare(
+        "SELECT COUNT(DISTINCT po.id) AS n
+         FROM tp_purchase_order_items poi
+         INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
+         WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
+           )"
+    );
+    $stmt->execute();
+    $n = (int) ($stmt->get_result()->fetch_assoc()['n'] ?? 0);
+    $stmt->close();
+    return $n;
+}
+
+/**
+ * Same waiting-PO population as get_auto_transfer_waiting_po_count(), split
+ * by the PO's own napkin/diaper product_type — powers the "Napkin (n)" /
+ * "Lumi Diaper (n)" counts on the "View All Orders" modal's type filter
+ * buttons, so staff can see how many purchase orders each filter actually
+ * covers before clicking it (previously the buttons carried no count at
+ * all, so "how many napkin POs vs diaper POs" had no answer short of
+ * clicking each filter and counting rows by hand).
+ *
+ * Returns ['napkin' => int, 'diaper' => int]. A PO with items of only one
+ * product_type is counted once under that type — add-purchase-order.php
+ * enforces a pure napkin-only or diaper-only cart per PO, so a PO is never
+ * split across both counts.
+ */
+function get_auto_transfer_waiting_po_count_by_type(mysqli $db_conn): array
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
+    $stmt = $db_conn->prepare(
+        "SELECT po.product_type, COUNT(DISTINCT po.id) AS n
+         FROM tp_purchase_order_items poi
+         INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
+         WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
+           )
+         GROUP BY po.product_type"
+    );
+    $stmt->execute();
+    $counts = ['napkin' => 0, 'diaper' => 0];
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $type = $row['product_type'] === 'diaper' ? 'diaper' : 'napkin';
+        $counts[$type] += (int) $row['n'];
+    }
+    $stmt->close();
+    return $counts;
 }
 
 /**

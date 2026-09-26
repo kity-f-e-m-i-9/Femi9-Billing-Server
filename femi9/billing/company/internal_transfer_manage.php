@@ -84,6 +84,52 @@ $sucMessage = $_SESSION['sucMessage'];
 					</script>
 <?php  unset($_SESSION['sucMessage']); } ?>
 
+									<?php
+// Auto Transfer shortfall detail — one row per product that came up short
+// (requested more than what Neksomo/Healthcare actually had at commit
+// time), each with its own reason (which leg ran short). Set by
+// internal_transfer_auto_action.php only when at least one product was
+// capped; a normal, fully-covered transfer never sets this.
+if (isset($_SESSION['autoTransferShortfalls'])) {
+    $__shortfalls = json_decode($_SESSION['autoTransferShortfalls'], true) ?: [];
+    unset($_SESSION['autoTransferShortfalls']);
+    if (!empty($__shortfalls)) {
+        $__rowsHtml = '';
+        foreach ($__shortfalls as $__sf) {
+            $__rowsHtml .= '<tr>'
+                . '<td style="padding:4px 8px;text-align:left;">' . htmlspecialchars($__sf['product_name'], ENT_QUOTES, 'UTF-8') . '</td>'
+                . '<td style="padding:4px 8px;">' . (int) $__sf['requested'] . '</td>'
+                . '<td style="padding:4px 8px;">' . (int) $__sf['transferred'] . '</td>'
+                . '<td style="padding:4px 8px;color:#b91c1c;font-weight:600;">' . (int) $__sf['shortfall'] . '</td>'
+                . '<td style="padding:4px 8px;text-align:left;">' . htmlspecialchars($__sf['reason'], ENT_QUOTES, 'UTF-8') . '</td>'
+                . '</tr>';
+        }
+        $__tableHtml = '<div style="max-height:320px;overflow-y:auto;text-align:left;">'
+            . '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">'
+            . '<thead><tr style="background:#f8fafc;">'
+            . '<th style="padding:4px 8px;text-align:left;">Product</th>'
+            . '<th style="padding:4px 8px;">Requested</th>'
+            . '<th style="padding:4px 8px;">Transferred</th>'
+            . '<th style="padding:4px 8px;">Short by</th>'
+            . '<th style="padding:4px 8px;text-align:left;">Reason</th>'
+            . '</tr></thead><tbody>' . $__rowsHtml . '</tbody></table></div>';
+        $__tableHtmlJs = json_encode($__tableHtml);
+        ?>
+                      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                      <script>
+                        Swal.fire({
+                          icon: 'warning',
+                          title: 'Some products were short-transferred',
+                          html: <?php echo $__tableHtmlJs; ?>,
+                          width: 650,
+                          confirmButtonText: 'OK'
+                        });
+                      </script>
+                      <?php
+    }
+}
+?>
+
 
 								<?php /* if(isset($_REQUEST['addesuccess'])){?><div class="alert alert-success">Internal Stock Transfer details added success.</div><?php }?>
 								

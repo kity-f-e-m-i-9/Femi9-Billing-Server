@@ -356,7 +356,7 @@ function deleteRow(tableID) {
 					     </td>
 						 <td><input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control" required=""/></td>
 						 <td>
-						 <input type="number" placeholder="Rate(Rs.)" min="0.01" name="rate[]" class="form-control" required=""/>
+						 <input type="number" placeholder="Rate(Rs.)" min="0.01" step="0.01" name="rate[]" class="form-control" required=""/>
 						 </td>
 						 <td>
 						 <input type="number" placeholder="Discount(Rs.)" min="0" name="discount[]" class="form-control" required=""/>

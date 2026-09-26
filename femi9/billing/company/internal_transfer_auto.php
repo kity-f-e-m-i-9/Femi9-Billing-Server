@@ -62,19 +62,23 @@ $stockService = new StockService($db_conn);
 $requirements = get_auto_transfer_requirements($db_conn, $llpId);
 $defaultRates = get_auto_transfer_default_rates($db_conn);
 $otDraftsOutsideLlp = get_ot_drafts_outside_llp_godown($db_conn, $llpId);
+$waitingPoCount = get_auto_transfer_waiting_po_count($db_conn);
+$waitingPoCountByType = get_auto_transfer_waiting_po_count_by_type($db_conn);
 
 $rows = [];
 if (!empty($requirements)) {
     $productIds = array_keys($requirements);
     $placeholders = implode(',', array_fill(0, count($productIds), '?'));
     $types = str_repeat('i', count($productIds));
-    $stmt = $db_conn->prepare("SELECT id, productName FROM products WHERE id IN ($placeholders)");
+    $stmt = $db_conn->prepare("SELECT id, productName, category FROM products WHERE id IN ($placeholders)");
     $stmt->bind_param($types, ...$productIds);
     $stmt->execute();
     $productResult = $stmt->get_result();
     $productNames = [];
+    $productCategories = [];
     while ($p = $productResult->fetch_assoc()) {
         $productNames[(int) $p['id']] = $p['productName'];
+        $productCategories[(int) $p['id']] = $p['category'] === 'diaper' ? 'diaper' : 'napkin';
     }
     $stmt->close();
 
@@ -104,8 +108,20 @@ if (!empty($requirements)) {
             'healthcare_avail'=> $healthcareAvail,
             'rate_healthcare' => $defaultRates[$pid]['healthcare'] ?? null,
             'rate_llp'        => $defaultRates[$pid]['llp'] ?? null,
+            'category'        => $productCategories[$pid] ?? 'napkin',
         ];
     }
+}
+
+// Product-wise TP demand behind the "Total PO" stat card's hover tooltip —
+// scoped to required_tp only (that stat counts waiting TP purchase orders,
+// not OT drafts), split into the same napkin/diaper buckets as the
+// "Napkin (n) / Lumi Diaper (n)" filter counts, so hovering answers "which
+// products, how much, in which bucket" without opening "View All Orders".
+$poProductBreakdown = ['napkin' => [], 'diaper' => []];
+foreach ($rows as $r) {
+    if ((int) $r['required_tp'] <= 0) continue;
+    $poProductBreakdown[$r['category']][] = $r;
 }
 ?>
 <!DOCTYPE html>
@@ -162,6 +178,22 @@ if (!empty($requirements)) {
         .ata-stat.tp .num { color:var(--ata-tp-2); }
         .ata-stat.ot .num { color:var(--ata-ot-2); }
 
+        .ata-stat-hoverable { position:relative; cursor:default; }
+        .ata-stat-tooltip {
+            display:none; position:absolute; top:100%; left:0; margin-top:6px;
+            z-index:50; background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+            box-shadow:0 8px 24px rgba(16,24,40,.14); padding:12px 14px;
+            min-width:260px; max-width:340px; max-height:320px; overflow-y:auto; text-align:left;
+        }
+        .ata-stat-hoverable:hover .ata-stat-tooltip,
+        .ata-stat-hoverable:focus-within .ata-stat-tooltip,
+        .ata-stat-hoverable:focus .ata-stat-tooltip { display:block; }
+        .ata-stat-tooltip-summary { display:flex; justify-content:space-between; gap:12px; font-size:12.5px; color:#374151; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #f1f5f9; }
+        .ata-stat-tooltip-group-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; color:#9ca3af; margin:8px 0 4px; }
+        .ata-stat-tooltip-table { width:100%; border-collapse:collapse; font-size:12px; }
+        .ata-stat-tooltip-table td { padding:3px 4px; border-bottom:1px solid #f8fafc; }
+        .ata-stat-tooltip-table td:last-child { text-align:right; font-weight:600; color:#1f2937; white-space:nowrap; }
+
         .ata-tag { display:inline-flex; align-items:center; gap:4px; border-radius:6px; font-size:11px; font-weight:600; padding:2px 7px; white-space:nowrap; }
         .ata-tag-tp { background:#eef0ff; color:#4c3f9e; }
         .ata-tag-ot { background:#e0f7fa; color:#0c5c6e; }
@@ -202,6 +234,29 @@ if (!empty($requirements)) {
         .ata-bulk-btn:hover { background:#eef0f3; }
         .ata-bulk-btn i { font-size:15px; }
         .ata-bulk-hint { font-size:11px; color:#9ca3af; }
+
+        /* "View All Orders" modal toolbar — Select all / Omit all / Delete
+           Selected on their own row, Show:-filter segmented control below,
+           hint text moved out from between the buttons into its own small
+           caption. Redesigned 2026-09-25 (was one crowded, wrapping row). */
+        .ov-toolbar { border:1px solid #eef0f3; background:#fafbfc; border-radius:10px; padding:10px 12px; margin-top:10px; }
+        .ov-toolbar-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+        .ov-toolbar-row + .ov-toolbar-row { margin-top:8px; }
+        .ov-toolbar-group { display:flex; align-items:center; gap:6px; }
+        .ov-toolbar-divider { width:1px; align-self:stretch; background:#e5e7eb; min-height:22px; }
+        .ov-toolbar-label { font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:.03em; }
+        .ov-toolbar-hint { font-size:11px; color:#9ca3af; margin-top:8px; }
+        .ov-delete-btn { color:#b91c1c; border-color:#fecaca; background:#fef2f2; }
+        .ov-delete-btn:hover { background:#fee2e2; }
+
+        .ov-segmented { display:inline-flex; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; }
+        .ov-type-filter-btn { border:none; border-right:1px solid #e5e7eb; background:#fafbfc; color:#374151; font-size:12px; font-weight:500; padding:5px 12px; cursor:pointer; transition:background .15s; }
+        .ov-type-filter-btn:last-child { border-right:none; }
+        .ov-type-filter-btn:hover { background:#eef0f3; }
+        .ov-type-filter-btn:focus { outline:none; }
+        .ov-type-filter-btn.ov-type-all.active    { background:#374151; color:#fff; }
+        .ov-type-filter-btn.ov-type-napkin.active { background:#3b82f6; color:#fff; }
+        .ov-type-filter-btn.ov-type-diaper.active { background:#ec4899; color:#fff; }
 
         .bd-row.ata-line-off, .ov-product-row.ata-line-off { opacity:.5; }
         .bd-row, .ov-product-row { border-radius:8px; }
@@ -296,6 +351,35 @@ if (!empty($requirements)) {
                                         }
                                     ?>
                                     <div class="ata-summary">
+                                        <div class="ata-stat ata-stat-hoverable" tabindex="0">
+                                            <div class="num"><?php echo $waitingPoCount; ?></div>
+                                            <div class="lbl">Total PO</div>
+                                            <div class="ata-stat-tooltip">
+                                                <div class="ata-stat-tooltip-summary">
+                                                    <span>Napkin PO: <b><?php echo (int) $waitingPoCountByType['napkin']; ?></b></span>
+                                                    <span>Lumi Diaper PO: <b><?php echo (int) $waitingPoCountByType['diaper']; ?></b></span>
+                                                </div>
+                                                <?php if (!empty($poProductBreakdown['napkin'])): ?>
+                                                <div class="ata-stat-tooltip-group-title">Napkin products (TP qty)</div>
+                                                <table class="ata-stat-tooltip-table">
+                                                    <?php foreach ($poProductBreakdown['napkin'] as $r): ?>
+                                                    <tr><td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td><td><?php echo (int) $r['required_tp']; ?></td></tr>
+                                                    <?php endforeach; ?>
+                                                </table>
+                                                <?php endif; ?>
+                                                <?php if (!empty($poProductBreakdown['diaper'])): ?>
+                                                <div class="ata-stat-tooltip-group-title">Lumi Diaper products (TP qty)</div>
+                                                <table class="ata-stat-tooltip-table">
+                                                    <?php foreach ($poProductBreakdown['diaper'] as $r): ?>
+                                                    <tr><td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td><td><?php echo (int) $r['required_tp']; ?></td></tr>
+                                                    <?php endforeach; ?>
+                                                </table>
+                                                <?php endif; ?>
+                                                <?php if (empty($poProductBreakdown['napkin']) && empty($poProductBreakdown['diaper'])): ?>
+                                                <div class="text-muted" style="font-size:12px;">No waiting TP purchase orders.</div>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
                                         <div class="ata-stat">
                                             <div class="num"><?php echo $totalProducts; ?></div>
                                             <div class="lbl">Products</div>
@@ -524,12 +608,27 @@ if (!empty($requirements)) {
                 <ul class="nav nav-tabs ata-nav-tabs" role="tablist">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ovTpPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-tp-1);margin-right:6px;"></span>TP Purchase Orders</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovOtPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-ot-1);margin-right:6px;"></span>OT Channel Orders</button></li>
-                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovExcludedPane" type="button" onclick="loadExcludedToday()">Already Transferred Today</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovExcludedPane" type="button" onclick="loadExcludedAndDeletedToday()">Already Transferred Today</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovDeletedPane" type="button" onclick="loadExcludedAndDeletedToday()">Deleted</button></li>
                 </ul>
-                <div class="ata-bulk-row">
-                    <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(true)"><i class="material-icons-outlined">done_all</i>Select all</button>
-                    <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(false)"><i class="material-icons-outlined">remove_done</i>Omit all</button>
-                    <span class="ata-bulk-hint">(applies to the currently open tab)</span>
+                <div class="ov-toolbar">
+                    <div class="ov-toolbar-row">
+                        <div class="ov-toolbar-group">
+                            <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(true)"><i class="material-icons-outlined">done_all</i>Select all</button>
+                            <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(false)"><i class="material-icons-outlined">remove_done</i>Omit all</button>
+                        </div>
+                        <div class="ov-toolbar-divider"></div>
+                        <button type="button" class="ata-bulk-btn ov-delete-btn" onclick="ovDeleteSelected()"><i class="material-icons-outlined">delete_outline</i>Delete Selected</button>
+                    </div>
+                    <div class="ov-toolbar-row">
+                        <span class="ov-toolbar-label">Show</span>
+                        <div class="ov-segmented">
+                            <button type="button" class="ov-type-filter-btn ov-type-all active" data-type="all" onclick="ovSetTypeFilter('all', this)">All (<?php echo (int) $waitingPoCount; ?>)</button>
+                            <button type="button" class="ov-type-filter-btn ov-type-napkin" data-type="napkin" onclick="ovSetTypeFilter('napkin', this)">Napkin (<?php echo (int) $waitingPoCountByType['napkin']; ?>)</button>
+                            <button type="button" class="ov-type-filter-btn ov-type-diaper" data-type="diaper" onclick="ovSetTypeFilter('diaper', this)">Lumi Diaper (<?php echo (int) $waitingPoCountByType['diaper']; ?>)</button>
+                        </div>
+                    </div>
+                    <div class="ov-toolbar-hint">Select all / Omit all / Delete Selected apply to the currently open tab.</div>
                 </div>
                 <div class="tab-content" style="padding-top:10px;">
                     <div class="tab-pane fade show active" id="ovTpPane"><div id="ovTpList"></div></div>
@@ -540,6 +639,13 @@ if (!empty($requirements)) {
                             grouped by order, for reference only.
                         </p>
                         <div id="ovExcludedList"></div>
+                    </div>
+                    <div class="tab-pane fade" id="ovDeletedPane">
+                        <p class="text-muted small">
+                            Orders soft-deleted from today's Auto Transfer via "Delete Selected" —
+                            stock was never touched for these, and they can be re-added below.
+                        </p>
+                        <div id="ovDeletedList"></div>
                     </div>
                 </div>
             </div>
@@ -605,7 +711,31 @@ if (!empty($requirements)) {
     // refreshRowAvailability(), wired at page load — sees it defined.
     var lineState = {};
 
+    // Orders re-added to TP/OT via the "Already Transferred Today" tab's
+    // "Re-add" button this session — keyed by "tp:<order_key>" /
+    // "ot:<order_key>", so ovRenderOrderList() can flag them. Resets on
+    // page reload, same as lineState.
+    var reAddedGroupKeys = {};
+
     function escBd(str) { return $('<div>').text(str == null ? '' : str).html(); }
+
+    // escBd() only escapes <, >, & (via .html()) — fine for text content,
+    // but a JSON-stringified array of STRINGS (e.g. '["tp:800:17"]')
+    // contains literal " characters, which escBd() leaves untouched. Used
+    // directly inside a double-quoted HTML attribute, those embedded
+    // quotes terminate the attribute early, truncating the value the
+    // browser reads back — JSON.parse() then fails with "Unexpected end
+    // of JSON input". This also escapes ", so it's the one to use for any
+    // attribute value that isn't guaranteed quote-free (unlike, say, a
+    // JSON array of plain numbers, which never contains one). Confirmed
+    // 2026-09-24 via reAddToTpPurchaseOrders()'s data-source-ids attribute.
+    function escAttr(str) {
+        return (str == null ? '' : String(str))
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
 
     // Mirrors AutoTransferDemand.php's cap_auto_transfer_qty_by_source():
     // TP demand is capped/prioritized first, OT gets whatever's left.
@@ -921,7 +1051,10 @@ if (!empty($requirements)) {
     // (TP or OT) this render call is for.
     function ovRenderOrderList(containerId, orders, emptyMsg) {
         var el = document.getElementById(containerId);
-        if (!orders || !orders.length) {
+        orders = (orders || []).filter(function (order) {
+            return ovTypeFilter === 'all' || order.order_type === ovTypeFilter;
+        });
+        if (!orders.length) {
             el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">' + emptyMsg + '</div>';
             return;
         }
@@ -948,11 +1081,16 @@ if (!empty($requirements)) {
                 var remembered = lineState[sourceType + ':' + order.order_key + ':' + p.product_id];
                 return remembered ? remembered.checked : true;
             });
+            // Flags an order that just came back from "Already Transferred
+            // Today" via the Re-add button, so it's obvious in this list
+            // which one to re-check before running Transfer Now again.
+            var wasReAdded = !!reAddedGroupKeys[sourceType + ':' + order.order_key];
             html += '<div class="ov-order" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
                     '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:160px;font-weight:600;">' +
                         '<input type="checkbox" class="ov-check"' + (allChecked ? ' checked' : '') + ' style="margin-right:8px;flex-shrink:0;" title="Select/deselect every product in this order">' +
                         '<span style="overflow-wrap:anywhere;">' + escBd(order.label) + '</span>' +
+                        (wasReAdded ? ' <span class="badge" style="background:#fef3c7;color:#92400e;margin-left:6px;">Re-add</span>' : '') +
                     '</label>' +
                 '</div>' +
                 '<div style="margin-top:6px;padding-left:26px;border-top:1px solid #f1f5f9;padding-top:6px;">' + productsHtml + '</div>' +
@@ -1010,6 +1148,47 @@ if (!empty($requirements)) {
         lineState[sourceId] = { checked: checkbox.checked, qty: qty };
     }
 
+    // "Delete Selected" — TP Purchase Orders / OT Channel Orders tabs only
+    // (a no-op on the read-only "Already Transferred Today" tab, since it
+    // has no .ov-product-row checkboxes at all). Marks every currently
+    // CHECKED product line in the active tab as reason='excluded' via
+    // delete-auto-transfer-order.php — same table as a completed transfer's
+    // 'transferred' rows, so the line disappears from today's Required Qty
+    // and reappears in "Already Transferred Today" tagged "Deleted"
+    // (undoable with that tab's existing "Re-add" button). Never touches
+    // stock, unlike Transfer Now / Undo.
+    function ovDeleteSelected() {
+        var activePane = document.querySelector('#ordersOverviewModal .tab-pane.active');
+        if (!activePane) return;
+        var checkedRows = activePane.querySelectorAll('.ov-product-row');
+        var toDelete = [];
+        checkedRows.forEach(function (rowEl) {
+            var checkbox = rowEl.querySelector('.ov-product-check');
+            if (checkbox && checkbox.checked) toDelete.push(rowEl.getAttribute('data-source-id'));
+        });
+        if (!toDelete.length) {
+            alert('Select at least one product line to delete.');
+            return;
+        }
+        if (!confirm('Delete ' + toDelete.length + ' selected order line(s) from today\'s Auto Transfer?\n\nStock already moved is left untouched — this only removes it from today\'s Required Qty. It will show as "Deleted" in Already Transferred Today, and can be re-added from there.')) return;
+
+        var calls = toDelete.map(function (sourceId) {
+            return $.post('delete-auto-transfer-order.php', { source_id: sourceId }, null, 'json')
+                .then(function (res) { return res; }, function () { return { success: false }; });
+        });
+
+        $.when.apply($, calls).done(function () {
+            var results = Array.prototype.slice.call(arguments);
+            var anyFailed = results.some(function (res) { return !res || !res.success; });
+            if (anyFailed) {
+                alert('Could not delete some of the selected line(s). Please try again.');
+            }
+            window.location.reload();
+        }).fail(function () {
+            alert('Could not delete the selected line(s). Please try again.');
+        });
+    }
+
     // Recomputes every affected product row in the main table from
     // whatever's currently checked across both View All Orders tabs — a
     // product can be checked/unchecked from more than one order, so this
@@ -1018,37 +1197,47 @@ if (!empty($requirements)) {
     // to the server, so this resets on reload just like the per-product
     // breakdown modal's own checkbox+Apply.
     function applyOrdersOverview() {
-        // seenProductIds tracks every product that appears anywhere in the
-        // overview, checked or not — totalsByProduct alone can't tell "this
-        // product had 0 checked" apart from "this product never appeared
-        // here at all," since an unchecked row contributes nothing to
-        // either. Without this distinction, unchecking every row for a
-        // product looked like a no-op instead of zeroing it out.
+        // Computed from the FULL order set (ovLastData), not from whatever
+        // .ov-product-row elements happen to be rendered — but when a
+        // specific Napkin/Lumi Diaper filter is active (not "All"), every
+        // order of the OTHER type is treated as fully deselected for this
+        // Apply, regardless of its lineState. This matches how staff
+        // actually run Auto Transfer: one product type at a time (Napkin
+        // today, Lumi Diaper separately) — switching the filter and
+        // clicking Apply is meant to zero the type not currently being
+        // worked on, not silently leave its old total standing untouched.
+        // Confirmed 2026-09-25 (reverses an earlier same-day attempt that
+        // instead preserved the hidden type's total — that was the wrong
+        // direction). With "All" selected, both types are always live and
+        // behave exactly as before (each line's own checked/qty state).
         var tpTotalsByProduct = {};
         var otTotalsByProduct = {};
         var seenProductIds = {};
-        document.querySelectorAll('#ovTpList .ov-product-row, #ovOtList .ov-product-row').forEach(function (rowEl) {
-            var pid = rowEl.getAttribute('data-product-id');
-            seenProductIds[pid] = true;
-            var checkbox = rowEl.querySelector('.ov-product-check');
-            var qtyInput = rowEl.querySelector('.ov-product-qty');
-            if (!checkbox.checked) { ovSaveLineState(rowEl); return; }
-            var maxQty = parseInt(qtyInput.getAttribute('max'), 10) || 0;
-            var val = parseInt(qtyInput.value, 10);
-            if (isNaN(val) || val < 0) val = 0;
-            if (val > maxQty) val = maxQty;
-            qtyInput.value = val;
-            ovSaveLineState(rowEl);
-            // "tp:..." / "ot:..." prefix on data-source-id tells which list
-            // this row came from, same convention as the per-product
-            // breakdown modal — kept separate so TP is capped first.
-            var sourceId = rowEl.getAttribute('data-source-id') || '';
-            if (sourceId.indexOf('tp:') === 0) {
-                tpTotalsByProduct[pid] = (tpTotalsByProduct[pid] || 0) + val;
-            } else {
-                otTotalsByProduct[pid] = (otTotalsByProduct[pid] || 0) + val;
-            }
-        });
+
+        function accumulate(sourceType, orders) {
+            (orders || []).forEach(function (order) {
+                var otherTypeHidden = ovTypeFilter !== 'all' && order.order_type !== ovTypeFilter;
+                order.products.forEach(function (p) {
+                    var pid = String(p.product_id);
+                    seenProductIds[pid] = true;
+                    if (otherTypeHidden) return; // counted as seen (so it's zeroed, not left untouched), but contributes nothing
+                    var sourceId = sourceType + ':' + order.order_key + ':' + p.product_id;
+                    var remembered = lineState[sourceId];
+                    var checked = remembered ? remembered.checked : true;
+                    if (!checked) return;
+                    var qty = remembered ? remembered.qty : p.qty;
+                    if (isNaN(qty) || qty < 0) qty = 0;
+                    if (qty > p.qty) qty = p.qty; // never more than this order's own qty
+                    if (sourceType === 'tp') {
+                        tpTotalsByProduct[pid] = (tpTotalsByProduct[pid] || 0) + qty;
+                    } else {
+                        otTotalsByProduct[pid] = (otTotalsByProduct[pid] || 0) + qty;
+                    }
+                });
+            });
+        }
+        accumulate('tp', ovLastData.tp);
+        accumulate('ot', ovLastData.ot);
 
         document.querySelectorAll('.auto-transfer-row').forEach(function (row) {
             var pid = row.getAttribute('data-product-id');
@@ -1071,12 +1260,25 @@ if (!empty($requirements)) {
         if (modal) modal.hide();
     }
 
-    function openOrdersOverview() {
+    // Last-fetched TP/OT overview data, cached so the Napkin/Lumi Diaper
+    // filter (ovSetTypeFilter) can re-render instantly client-side instead
+    // of refetching from the server every time it's toggled.
+    var ovLastData = { tp: [], ot: [] };
+    // 'all' | 'napkin' | 'diaper' — which order_type ovRenderOrderList()
+    // keeps. Resets to 'all' on every fresh openOrdersOverview() open, same
+    // as lineState/reAddedGroupKeys resetting on page reload.
+    var ovTypeFilter = 'all';
+
+    // Shared by the modal's initial open AND by "Re-add to TP Purchase
+    // Orders" (which must refresh the TP/OT panes in place, without
+    // reopening the modal that's already showing).
+    function loadOrdersOverviewData() {
         var loading = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
         document.getElementById('ovTpList').innerHTML = loading;
         document.getElementById('ovOtList').innerHTML = loading;
 
-        $.getJSON('get-auto-transfer-orders-overview.php', {}, function (data) {
+        return $.getJSON('get-auto-transfer-orders-overview.php', {}, function (data) {
+            ovLastData = data;
             ovRenderOrderList('ovTpList', data.tp, 'No Territory Partner orders contributing today.');
             ovRenderOrderList('ovOtList', data.ot, 'No OT channel draft orders contributing today.');
         }).fail(function () {
@@ -1084,53 +1286,233 @@ if (!empty($requirements)) {
             document.getElementById('ovTpList').innerHTML = failMsg;
             document.getElementById('ovOtList').innerHTML = failMsg;
         });
+    }
 
+    // Napkin / Lumi Diaper / All toggle above ALL THREE tabs (TP, OT, and
+    // Already Transferred Today) — filters every list at once by each
+    // order's own order_type, purely client-side against already-fetched
+    // data (no re-fetch needed for any of the three).
+    function ovSetTypeFilter(type, btn) {
+        ovTypeFilter = type;
+        document.querySelectorAll('.ov-type-filter-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        ovRenderOrderList('ovTpList', ovLastData.tp, 'No Territory Partner orders contributing today.');
+        ovRenderOrderList('ovOtList', ovLastData.ot, 'No OT channel draft orders contributing today.');
+        if (ovExcludedLastData) {
+            renderTransferredToday(ovExcludedLastData);
+            renderDeletedToday(ovExcludedLastData);
+        }
+    }
+
+    function openOrdersOverview() {
+        ovTypeFilter = 'all';
+        document.querySelectorAll('.ov-type-filter-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-type') === 'all'); });
+        loadOrdersOverviewData();
         var modal = new bootstrap.Modal(document.getElementById('ordersOverviewModal'));
         modal.show();
     }
 
-    // ── "Already Transferred Today" — read-only, grouped by order ──
-    function loadExcludedToday() {
-        var el = document.getElementById('ovExcludedList');
-        el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
+    // ── "Already Transferred Today" and "Deleted" — two separate, read-only
+    // tabs sharing one data source (get-auto-transfer-skipped.php returns
+    // both reasons together). Cached so the Napkin/Lumi Diaper filter
+    // (ovSetTypeFilter) can re-render both tabs client-side, the same way
+    // it already does for the TP/OT tabs via ovLastData — no re-fetch
+    // needed when just the type filter changes. Originally rendered as one
+    // combined tab with "Deleted" as a section underneath — split into its
+    // own tab 2026-09-25 per request: a "Deleted" heading nested inside the
+    // "Already Transferred Today" tab still read as a second, confusing
+    // sub-tab.
+    var ovExcludedLastData = null;
+
+    function loadExcludedAndDeletedToday() {
+        if (ovExcludedLastData) {
+            renderTransferredToday(ovExcludedLastData);
+            renderDeletedToday(ovExcludedLastData);
+            return;
+        }
+        var loading = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
+        document.getElementById('ovExcludedList').innerHTML = loading;
+        document.getElementById('ovDeletedList').innerHTML = loading;
 
         $.getJSON('get-auto-transfer-skipped.php', {}, function (data) {
-            var all = (data.tp || []).concat(data.ot || []);
-            if (!all.length) {
-                el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">Nothing transferred yet today.</div>';
+            ovExcludedLastData = data;
+            renderTransferredToday(data);
+            renderDeletedToday(data);
+        }).fail(function () {
+            var failMsg = '<div class="text-danger small" style="padding:10px 4px;">Could not load orders.</div>';
+            document.getElementById('ovExcludedList').innerHTML = failMsg;
+            document.getElementById('ovDeletedList').innerHTML = failMsg;
+        });
+    }
+
+    // Groups a flat item list by order (source_id up to the trailing
+    // productId segment) — shared by the "Already Transferred" and
+    // "Deleted" sections below, which are now rendered as two fully
+    // separate lists (never mixed items within the same order-group), per
+    // request 2026-09-25: mixing a still-genuinely-transferred line with a
+    // soft-deleted one under the same "Already transferred" heading made
+    // the deleted (never-moved) qty look like it had actually shipped.
+    function ovExclGroupByOrder(items) {
+        var groups = [];
+        var groupsByKey = {};
+        items.forEach(function (item) {
+            var lastColon = item.source_id.lastIndexOf(':');
+            var groupKey = item.source_id.substring(0, lastColon);
+            if (!groupsByKey[groupKey]) {
+                groupsByKey[groupKey] = { key: groupKey, label: item.label, sourceType: item.source_id.slice(0, 2), items: [] };
+                groups.push(groupsByKey[groupKey]);
+            }
+            groupsByKey[groupKey].items.push(item);
+        });
+        return groups;
+    }
+
+    function ovExclProductTotals(items) {
+        var totals = [];
+        var byName = {};
+        items.forEach(function (item) {
+            if (!byName[item.product_name]) {
+                byName[item.product_name] = { name: item.product_name, qty: 0 };
+                totals.push(byName[item.product_name]);
+            }
+            byName[item.product_name].qty += Number(item.qty) || 0;
+        });
+        return totals;
+    }
+
+    function ovExclRenderSection(items, opts) {
+        // opts: { summaryColor, summaryBg, summaryTitle, badgeBg, badgeColor,
+        //         badgeLabel(item, group) }. No section title here — the
+        // caller (renderTransferredToday/renderDeletedToday) decides whether
+        // one is needed, since
+        // this tab is ALREADY titled "Already Transferred Today"; printing
+        // an "Already Transferred" heading right under it read like a
+        // second, nested tab. Confirmed 2026-09-25.
+        if (!items.length) return '';
+
+        var html = '';
+        var totals = ovExclProductTotals(items);
+        html += '<div style="border:1px solid ' + opts.summaryBorder + ';background:' + opts.summaryBg + ';border-radius:10px;padding:10px 12px;margin-bottom:12px;">' +
+            '<div style="font-weight:600;color:' + opts.summaryColor + ';margin-bottom:6px;">' + opts.summaryTitle + '</div>';
+        totals.forEach(function (p) {
+            html += '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;">' +
+                '<span>' + escBd(p.name) + '</span>' +
+                '<span style="font-weight:600;">' + p.qty + '</span>' +
+            '</div>';
+        });
+        html += '</div>';
+
+        var groups = ovExclGroupByOrder(items);
+        groups.forEach(function (group) {
+            var groupSourceIds = group.items.map(function (item) { return item.source_id; });
+            html += '<div class="ov-excl-group" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
+                    '<div style="font-weight:600;overflow-wrap:anywhere;">' + escBd(group.label) + '</div>' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary ov-readd-btn" ' +
+                        'data-source-ids="' + escAttr(JSON.stringify(groupSourceIds)) + '" ' +
+                        'data-group-key="' + escAttr(group.key) + '" ' +
+                        'style="white-space:nowrap;font-size:11px;padding:2px 10px;">Re-add to TP Purchase Orders</button>' +
+                '</div>';
+            group.items.forEach(function (item) {
+                html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0 0 4px;">' +
+                    '<span style="color:#9ca3af;">' + escBd(item.product_name) + '</span>' +
+                    '<span style="color:#374151;font-weight:600;">Qty: ' + (Number(item.qty) || 0) + '</span>' +
+                    '<span class="badge" style="background:' + opts.badgeBg + ';color:' + opts.badgeColor + ';">' + opts.badgeLabel(item, group) + '</span>' +
+                '</div>';
+            });
+            html += '</div>';
+        });
+        return html;
+    }
+
+    function renderTransferredToday(data) {
+        var el = document.getElementById('ovExcludedList');
+        var items = (data.tp || []).concat(data.ot || []).filter(function (item) {
+            return item.reason !== 'excluded' && (ovTypeFilter === 'all' || item.order_type === ovTypeFilter);
+        });
+        if (!items.length) {
+            el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">Nothing transferred yet today.</div>';
+            return;
+        }
+        el.innerHTML = ovExclRenderSection(items, {
+            summaryBorder: '#bbf7d0', summaryBg: '#f0fdf4', summaryColor: '#065f46',
+            summaryTitle: 'Total Transferred Qty (Product-wise)',
+            badgeBg: '#d1fae5', badgeColor: '#065f46',
+            badgeLabel: function () { return 'Already transferred'; }
+        });
+        el.querySelectorAll('.ov-readd-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () { reAddToTpPurchaseOrders(btn); });
+        });
+    }
+
+    function renderDeletedToday(data) {
+        var el = document.getElementById('ovDeletedList');
+        var items = (data.tp || []).concat(data.ot || []).filter(function (item) {
+            return item.reason === 'excluded' && (ovTypeFilter === 'all' || item.order_type === ovTypeFilter);
+        });
+        if (!items.length) {
+            el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">Nothing deleted today.</div>';
+            return;
+        }
+        el.innerHTML = ovExclRenderSection(items, {
+            summaryBorder: '#fecaca', summaryBg: '#fef2f2', summaryColor: '#991b1b',
+            summaryTitle: 'Total Deleted Qty (Product-wise) — never moved, stock untouched',
+            badgeBg: '#fee2e2', badgeColor: '#991b1b',
+            // "Deleted PO" for a TP purchase order line, "Deleted Order" for
+            // an OT channel draft line — OT orders aren't POs, so reusing
+            // "Deleted PO" there would misdescribe them.
+            badgeLabel: function (item, group) { return group.sourceType === 'tp' ? 'Deleted PO' : 'Deleted Order'; }
+        });
+        el.querySelectorAll('.ov-readd-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () { reAddToTpPurchaseOrders(btn); });
+        });
+    }
+
+    // "Re-add to TP Purchase Orders" — un-skips every product line of one
+    // order (deletes its auto_transfer_skip_today row so the existing,
+    // trusted demand calculation counts it again) WITHOUT touching stock
+    // at all. Used when an earlier auto-transfer for this order was wrong
+    // (bad qty/rate) and staff want to redo it manually — the stock that
+    // already moved is left exactly where it is; only the "still needed"
+    // flag comes back. Confirmed 2026-09-24: deliberately no stock
+    // reversal here, unlike undo-auto-transfer.php.
+    function reAddToTpPurchaseOrders(btn) {
+        var sourceIds = JSON.parse(btn.getAttribute('data-source-ids') || '[]');
+        var groupKey = btn.getAttribute('data-group-key') || '';
+        if (!sourceIds.length) return;
+        btn.disabled = true;
+        btn.textContent = 'Re-adding…';
+
+        var calls = sourceIds.map(function (sourceId) {
+            return $.post('unskip-auto-transfer-order.php', { source_id: sourceId }, null, 'json')
+                .then(function (res) { return res; }, function () { return { success: false }; });
+        });
+
+        $.when.apply($, calls).done(function () {
+            var results = Array.prototype.slice.call(arguments);
+            var anyFailed = results.some(function (res) { return !res || !res.success; });
+            if (anyFailed) {
+                alert('Could not re-add this order. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Re-add to TP Purchase Orders';
                 return;
             }
-
-            // Group by order: source_id is "tp:<orderKey>:<productId>" /
-            // "ot:<orderKey>:<productId>" — group key is everything but the
-            // trailing productId segment.
-            var groups = [];
-            var groupsByKey = {};
-            all.forEach(function (item) {
-                var lastColon = item.source_id.lastIndexOf(':');
-                var groupKey = item.source_id.substring(0, lastColon);
-                if (!groupsByKey[groupKey]) {
-                    groupsByKey[groupKey] = { label: item.label, items: [] };
-                    groups.push(groupsByKey[groupKey]);
-                }
-                groupsByKey[groupKey].items.push(item);
+            if (groupKey) reAddedGroupKeys[groupKey] = true;
+            ovExcludedLastData = null; // force a re-fetch — the re-add just changed the underlying skip rows
+            loadExcludedAndDeletedToday();
+            $.when(loadOrdersOverviewData()).done(function () {
+                var tpTabBtn = document.querySelector('#ordersOverviewModal button[data-bs-target="#ovTpPane"]');
+                // Bootstrap 5.0 (this site's version) has no Tab.getOrCreateInstance
+                // (added in 5.2) — `new bootstrap.Tab()` is the version that
+                // actually exists here. The earlier getOrCreateInstance call threw
+                // a TypeError, which silently aborted this whole callback before
+                // the list/tab ever updated. Confirmed 2026-09-24.
+                if (tpTabBtn) { try { new bootstrap.Tab(tpTabBtn).show(); } catch (e) {} }
             });
-
-            var html = '';
-            groups.forEach(function (group) {
-                html += '<div class="ov-excl-group" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
-                    '<div style="font-weight:600;overflow-wrap:anywhere;">' + escBd(group.label) + '</div>';
-                group.items.forEach(function (item) {
-                    html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0 0 4px;">' +
-                        '<span style="color:#9ca3af;">' + escBd(item.product_name) + '</span>' +
-                        '<span class="badge" style="background:#d1fae5;color:#065f46;">Already transferred</span>' +
-                    '</div>';
-                });
-                html += '</div>';
-            });
-            el.innerHTML = html;
         }).fail(function () {
-            el.innerHTML = '<div class="text-danger small" style="padding:10px 4px;">Could not load excluded orders.</div>';
+            alert('Could not re-add this order. Please try again.');
+            btn.disabled = false;
+            btn.textContent = 'Re-add to TP Purchase Orders';
         });
     }
 

@@ -150,9 +150,13 @@ try {
     /**
      * Writes one internal_transfer_invoice (once per tempid) + one
      * internal_transfer row, then performs the StockService
-     * transferOut/transferIn pair. Returns the actual qty moved
-     * (may be less than $qty if stock is insufficient at commit time —
-     * re-validated here, never trusting the popup's earlier snapshot).
+     * transferOut/transferIn pair. Returns ['qty' => actual qty moved,
+     * 'available' => stock available at this leg's source at commit time]
+     * — actual qty may be less than requested $qty if stock is insufficient
+     * at commit time (re-validated here, never trusting the popup's
+     * earlier snapshot); 'available' lets the caller build a specific
+     * "why was this short" reason instead of just reporting the shortfall
+     * number.
      */
     $writeLeg = function (
         string $tempid, string $invNumber, string $sendFrom, string $sendTo, int $pid, int $qty, float $rate,
@@ -160,15 +164,15 @@ try {
     ) use (
         $db_conn, $stockService, $createdBy, $username, $usertype, $date,
         $stmtInvChk, $stmtInvIns, $stmtProdIns, $stmtProd, $Login_user_TYPEvl
-    ): int {
-        $available = $stockService->getClosingQty($pid, $Login_user_TYPEvl, $sendFrom, $sourceWarehouseId);
-        $actualQty = min($qty, (int) ($available ?? 0));
-        if ($actualQty <= 0) return 0;
+    ): array {
+        $available = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, $sendFrom, $sourceWarehouseId) ?? 0);
+        $actualQty = min($qty, $available);
+        if ($actualQty <= 0) return ['qty' => 0, 'available' => $available];
 
         $stmtProd->bind_param('i', $pid);
         $stmtProd->execute();
         $prod = $stmtProd->get_result()->fetch_assoc();
-        if (!$prod) return 0;
+        if (!$prod) return ['qty' => 0, 'available' => $available];
 
         $gst      = (float) $prod['gst'];
         $gstType  = ($prod['gst_type'] === 'inclusive') ? 'inclusive' : 'exclusive';
@@ -211,8 +215,10 @@ try {
             $outResult['consumed_rate'] ?? null, $destWarehouseId
         );
 
-        return $actualQty;
+        return ['qty' => $actualQty, 'available' => $available];
     };
+
+    $stmtProdName = $db_conn->prepare("SELECT productName FROM products WHERE id = ?");
 
     foreach ($rows as $row) {
         $pid = $row['pid'];
@@ -234,14 +240,41 @@ try {
         // (Intermediate) is Leg 1's destination AND Leg 2's source — it's
         // one picker, not two, since it's the single physical place that
         // leg's stock actually sits between the two hops.
-        $legOneQty = $writeLeg($tempid1, $invNumber1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty, $row['rate1'], $row['source_warehouse_id'], $row['intermediate_warehouse_id']);
-        if ($legOneQty <= 0) continue;
+        $legOne    = $writeLeg($tempid1, $invNumber1, (string) $neksomoId, (string) $healthcareId, $pid, $requestedQty, $row['rate1'], $row['source_warehouse_id'], $row['intermediate_warehouse_id']);
+        $legOneQty = $legOne['qty'];
 
-        $legTwoQty = $writeLeg($tempid2, $invNumber2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty, $row['rate2'], $row['intermediate_warehouse_id'], $row['dest_warehouse_id']);
-
-        if ($legTwoQty < $requestedQty) {
-            $cappedRows[] = "Product #$pid: requested $requestedQty, transferred $legTwoQty";
+        $legTwoQty = 0;
+        if ($legOneQty > 0) {
+            $legTwo    = $writeLeg($tempid2, $invNumber2, (string) $healthcareId, (string) $llpId, $pid, $legOneQty, $row['rate2'], $row['intermediate_warehouse_id'], $row['dest_warehouse_id']);
+            $legTwoQty = $legTwo['qty'];
         }
+
+        // Popup-friendly shortfall detail — WHY this product came up short,
+        // not just by how much. Recorded for a full skip (legOneQty <= 0)
+        // too, which previously vanished from $cappedRows entirely via the
+        // old bare `continue`, silently under-reporting how many products
+        // never moved at all.
+        if ($legTwoQty < $requestedQty) {
+            $stmtProdName->bind_param('i', $pid);
+            $stmtProdName->execute();
+            $productName = $stmtProdName->get_result()->fetch_assoc()['productName'] ?? "Product #$pid";
+
+            if ($legOneQty < $requestedQty) {
+                $reason = "Insufficient stock in Neksomo (only {$legOne['available']} available, needed $requestedQty)";
+            } else {
+                $reason = "Insufficient stock in Healthcare after receiving from Neksomo (only {$legTwo['available']} available)";
+            }
+
+            $cappedRows[] = [
+                'product_name' => $productName,
+                'requested'    => $requestedQty,
+                'transferred'  => $legTwoQty,
+                'shortfall'    => $requestedQty - $legTwoQty,
+                'reason'       => $reason,
+            ];
+        }
+
+        if ($legOneQty <= 0) continue;
 
         save_auto_transfer_default_rate($db_conn, $pid, $row['rate1'], $row['rate2'], $createdBy);
 
@@ -271,6 +304,7 @@ try {
     $stmtInvIns->close();
     $stmtProdIns->close();
     $stmtProd->close();
+    $stmtProdName->close();
 
     $db_conn->commit();
 } catch (StockException $e) {
@@ -286,6 +320,12 @@ try {
     exit;
 }
 
-$_SESSION['sucMessage'] = "Auto transfer complete (Neksomo->Healthcare: $invNumber1, Healthcare->LLP: $invNumber2)."
-    . (empty($cappedRows) ? "" : " Capped: " . implode('; ', $cappedRows));
+$_SESSION['sucMessage'] = "Auto transfer complete (Neksomo->Healthcare: $invNumber1, Healthcare->LLP: $invNumber2).";
+// Rendered as its own detailed popup (product / requested / transferred /
+// short by / reason) on internal_transfer_manage.php — replaces the old
+// plain-text "Capped: ..." sentence, which only gave a total shortfall
+// number with no explanation of which leg ran short and why.
+if (!empty($cappedRows)) {
+    $_SESSION['autoTransferShortfalls'] = json_encode($cappedRows);
+}
 echo "<script>window.location='internal_transfer_manage';</script>";
