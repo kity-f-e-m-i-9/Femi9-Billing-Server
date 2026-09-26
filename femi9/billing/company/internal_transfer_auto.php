@@ -119,9 +119,11 @@ if (!empty($requirements)) {
 // "Napkin (n) / Lumi Diaper (n)" filter counts, so hovering answers "which
 // products, how much, in which bucket" without opening "View All Orders".
 $poProductBreakdown = ['napkin' => [], 'diaper' => []];
+$poQtyByType = ['napkin' => 0, 'diaper' => 0];
 foreach ($rows as $r) {
     if ((int) $r['required_tp'] <= 0) continue;
     $poProductBreakdown[$r['category']][] = $r;
+    $poQtyByType[$r['category']] += (int) $r['required_tp'];
 }
 ?>
 <!DOCTYPE html>
@@ -178,21 +180,43 @@ foreach ($rows as $r) {
         .ata-stat.tp .num { color:var(--ata-tp-2); }
         .ata-stat.ot .num { color:var(--ata-ot-2); }
 
+        /* "Total PO" card hover -> Napkin vs Lumi Diaper qty summary only.
+           "Products" card hover -> full per-product qty breakdown, split by
+           type. Two separate cards, two separate tooltips — redesigned
+           2026-09-26 per request (previously both lived combined on one
+           card, then briefly as two independently-hoverable chips). */
         .ata-stat-hoverable { position:relative; cursor:default; }
         .ata-stat-tooltip {
-            display:none; position:absolute; top:100%; left:0; margin-top:6px;
+            display:none; position:absolute; bottom:100%; left:0; margin-bottom:6px;
             z-index:50; background:#fff; border:1px solid #e5e7eb; border-radius:10px;
-            box-shadow:0 8px 24px rgba(16,24,40,.14); padding:12px 14px;
-            min-width:260px; max-width:340px; max-height:320px; overflow-y:auto; text-align:left;
+            box-shadow:0 -8px 24px rgba(16,24,40,.14); padding:10px 12px;
+            min-width:220px; max-width:320px; max-height:300px; overflow-y:auto; text-align:left;
+            cursor:default; font-weight:400; color:#374151;
         }
+        /* Products card's tooltip opens downward instead — it's a longer
+           per-product list and the user wants it below the card, unlike
+           Total PO's short Napkin/Diaper summary which opens upward so it
+           doesn't cover the View All Orders / Transfer History buttons. */
+        .ata-stat-tooltip-below { top:100%; bottom:auto; margin-top:6px; margin-bottom:0; box-shadow:0 8px 24px rgba(16,24,40,.14); }
         .ata-stat-hoverable:hover .ata-stat-tooltip,
         .ata-stat-hoverable:focus-within .ata-stat-tooltip,
         .ata-stat-hoverable:focus .ata-stat-tooltip { display:block; }
-        .ata-stat-tooltip-summary { display:flex; justify-content:space-between; gap:12px; font-size:12.5px; color:#374151; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #f1f5f9; }
+        .ata-stat-tooltip-summary { display:flex; flex-direction:column; gap:6px; min-width:190px; }
         .ata-stat-tooltip-group-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; color:#9ca3af; margin:8px 0 4px; }
+        .ata-stat-tooltip-group-title:first-child { margin-top:0; }
         .ata-stat-tooltip-table { width:100%; border-collapse:collapse; font-size:12px; }
         .ata-stat-tooltip-table td { padding:3px 4px; border-bottom:1px solid #f8fafc; }
         .ata-stat-tooltip-table td:last-child { text-align:right; font-weight:600; color:#1f2937; white-space:nowrap; }
+        .ata-stat-chip {
+            /* Sized to match .ata-btn (the "View All Orders" button below)
+               — same padding/font/radius, and stretched full-width of the
+               tooltip so both chips read as a consistent pair of buttons
+               rather than small inline pills. */
+            display:flex; align-items:center; justify-content:center;
+            font-size:13px; font-weight:500; border-radius:9px; padding:8px 14px; color:#fff;
+        }
+        .ata-stat-chip-napkin { background:#3b82f6; }
+        .ata-stat-chip-diaper { background:#8b5cf6; }
 
         .ata-tag { display:inline-flex; align-items:center; gap:4px; border-radius:6px; font-size:11px; font-weight:600; padding:2px 7px; white-space:nowrap; }
         .ata-tag-tp { background:#eef0ff; color:#4c3f9e; }
@@ -256,7 +280,7 @@ foreach ($rows as $r) {
         .ov-type-filter-btn:focus { outline:none; }
         .ov-type-filter-btn.ov-type-all.active    { background:#374151; color:#fff; }
         .ov-type-filter-btn.ov-type-napkin.active { background:#3b82f6; color:#fff; }
-        .ov-type-filter-btn.ov-type-diaper.active { background:#ec4899; color:#fff; }
+        .ov-type-filter-btn.ov-type-diaper.active { background:#8b5cf6; color:#fff; }
 
         .bd-row.ata-line-off, .ov-product-row.ata-line-off { opacity:.5; }
         .bd-row, .ov-product-row { border-radius:8px; }
@@ -356,11 +380,17 @@ foreach ($rows as $r) {
                                             <div class="lbl">Total PO</div>
                                             <div class="ata-stat-tooltip">
                                                 <div class="ata-stat-tooltip-summary">
-                                                    <span>Napkin PO: <b><?php echo (int) $waitingPoCountByType['napkin']; ?></b></span>
-                                                    <span>Lumi Diaper PO: <b><?php echo (int) $waitingPoCountByType['diaper']; ?></b></span>
+                                                    <span class="ata-stat-chip ata-stat-chip-napkin">Napkin Qty: <b><?php echo (int) $poQtyByType['napkin']; ?></b> (<?php echo (int) $waitingPoCountByType['napkin']; ?> PO)</span>
+                                                    <span class="ata-stat-chip ata-stat-chip-diaper">Lumi Diaper Qty: <b><?php echo (int) $poQtyByType['diaper']; ?></b> (<?php echo (int) $waitingPoCountByType['diaper']; ?> PO)</span>
                                                 </div>
+                                            </div>
+                                        </div>
+                                        <div class="ata-stat ata-stat-hoverable" tabindex="0">
+                                            <div class="num"><?php echo $totalProducts; ?></div>
+                                            <div class="lbl">Products</div>
+                                            <div class="ata-stat-tooltip ata-stat-tooltip-below">
                                                 <?php if (!empty($poProductBreakdown['napkin'])): ?>
-                                                <div class="ata-stat-tooltip-group-title">Napkin products (TP qty)</div>
+                                                <div class="ata-stat-tooltip-group-title">Napkin (TP qty)</div>
                                                 <table class="ata-stat-tooltip-table">
                                                     <?php foreach ($poProductBreakdown['napkin'] as $r): ?>
                                                     <tr><td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td><td><?php echo (int) $r['required_tp']; ?></td></tr>
@@ -368,7 +398,7 @@ foreach ($rows as $r) {
                                                 </table>
                                                 <?php endif; ?>
                                                 <?php if (!empty($poProductBreakdown['diaper'])): ?>
-                                                <div class="ata-stat-tooltip-group-title">Lumi Diaper products (TP qty)</div>
+                                                <div class="ata-stat-tooltip-group-title">Lumi Diaper (TP qty)</div>
                                                 <table class="ata-stat-tooltip-table">
                                                     <?php foreach ($poProductBreakdown['diaper'] as $r): ?>
                                                     <tr><td><?php echo htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8'); ?></td><td><?php echo (int) $r['required_tp']; ?></td></tr>
@@ -379,10 +409,6 @@ foreach ($rows as $r) {
                                                 <div class="text-muted" style="font-size:12px;">No waiting TP purchase orders.</div>
                                                 <?php endif; ?>
                                             </div>
-                                        </div>
-                                        <div class="ata-stat">
-                                            <div class="num"><?php echo $totalProducts; ?></div>
-                                            <div class="lbl">Products</div>
                                         </div>
                                         <div class="ata-stat tp">
                                             <div class="num"><?php echo $totalTp; ?></div>
@@ -613,20 +639,15 @@ foreach ($rows as $r) {
                 </ul>
                 <div class="ov-toolbar">
                     <div class="ov-toolbar-row">
-                        <div class="ov-toolbar-group">
-                            <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(true)"><i class="material-icons-outlined">done_all</i>Select all</button>
-                            <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(false)"><i class="material-icons-outlined">remove_done</i>Omit all</button>
-                        </div>
-                        <div class="ov-toolbar-divider"></div>
-                        <button type="button" class="ata-bulk-btn ov-delete-btn" onclick="ovDeleteSelected()"><i class="material-icons-outlined">delete_outline</i>Delete Selected</button>
-                    </div>
-                    <div class="ov-toolbar-row">
+                        <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(true)"><i class="material-icons-outlined">done_all</i>Select all</button>
+                        <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(false)"><i class="material-icons-outlined">remove_done</i>Omit all</button>
                         <span class="ov-toolbar-label">Show</span>
                         <div class="ov-segmented">
                             <button type="button" class="ov-type-filter-btn ov-type-all active" data-type="all" onclick="ovSetTypeFilter('all', this)">All (<?php echo (int) $waitingPoCount; ?>)</button>
                             <button type="button" class="ov-type-filter-btn ov-type-napkin" data-type="napkin" onclick="ovSetTypeFilter('napkin', this)">Napkin (<?php echo (int) $waitingPoCountByType['napkin']; ?>)</button>
                             <button type="button" class="ov-type-filter-btn ov-type-diaper" data-type="diaper" onclick="ovSetTypeFilter('diaper', this)">Lumi Diaper (<?php echo (int) $waitingPoCountByType['diaper']; ?>)</button>
                         </div>
+                        <button type="button" class="ata-bulk-btn ov-delete-btn" onclick="ovDeleteSelected()"><i class="material-icons-outlined">delete_outline</i>Delete Selected</button>
                     </div>
                     <div class="ov-toolbar-hint">Select all / Omit all / Delete Selected apply to the currently open tab.</div>
                 </div>
