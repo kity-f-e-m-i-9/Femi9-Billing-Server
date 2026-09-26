@@ -40,6 +40,24 @@ mysqli_stmt_execute($locStmt);
 $locCount = (int)(mysqli_stmt_get_result($locStmt)->fetch_assoc()['cnt'] ?? 0);
 mysqli_stmt_close($locStmt);
 
+// Names of every assigned location — powers the "Locations" stat card's
+// hover tooltip, so it's not just a bare count.
+$locNames = [];
+$locNamesStmt = mysqli_prepare($db_conn,
+    "SELECT n.name
+     FROM territory_partner_locations tpl
+     JOIN partner_location_nodes n ON n.id = tpl.location_id
+     WHERE tpl.territory_partner_id = ?
+     ORDER BY n.name ASC"
+);
+mysqli_stmt_bind_param($locNamesStmt, "i", $Login_user_IDvl);
+mysqli_stmt_execute($locNamesStmt);
+$locNamesResult = mysqli_stmt_get_result($locNamesStmt);
+while ($locRow = mysqli_fetch_assoc($locNamesResult)) {
+    $locNames[] = $locRow['name'];
+}
+mysqli_stmt_close($locNamesStmt);
+
 // Total invoices created by this TP (customer + shop)
 $custInvStmt = mysqli_prepare($db_conn,
     "SELECT COUNT(*) AS cnt FROM invoice WHERE user_id = ? AND user_type = 'territory_partner'"
@@ -247,6 +265,36 @@ mysqli_stmt_close($stockListStmt);
     <meta name="apple-mobile-web-app-title" content="Femi9 TP">
     <meta name="theme-color" content="#f5b400">
     <link rel="apple-touch-icon" href="../../assets/images/pwa-icon-apple-touch.png">
+    <style>
+        /* "Locations" stat card hover — shows the actual assigned location
+           names, not just the bare count. tabindex + focus-within so a tap
+           on mobile (no real hover there) can still open it. */
+        .tp-stat-hoverable { position:relative; cursor:default; }
+        .tp-stat-tooltip {
+            display:none; position:absolute; top:100%; left:0; margin-top:6px;
+            z-index:50; background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+            box-shadow:0 8px 24px rgba(16,24,40,.14); padding:10px 12px;
+            min-width:180px; max-width:260px; max-height:240px; overflow-y:auto; text-align:left;
+            font-size:12.5px; color:#374151;
+        }
+        .tp-stat-hoverable:hover .tp-stat-tooltip,
+        .tp-stat-hoverable:focus-within .tp-stat-tooltip,
+        .tp-stat-hoverable:focus .tp-stat-tooltip { display:block; }
+        .tp-stat-tooltip-row { padding:3px 0; border-bottom:1px solid #f8fafc; }
+        .tp-stat-tooltip-row:last-child { border-bottom:none; }
+
+        /* Mobile responsiveness — stat cards two-per-row instead of
+           stacking full-width one-per-row on small phones, and the product
+           table shrinks its padding/font so it fits without feeling huge. */
+        @media (max-width: 575.98px) {
+            .widget-stats-amount { font-size:20px; }
+            .widget-stats-title { font-size:11px; }
+            .widget-stats-icon { width:36px; height:36px; }
+            .card-title { font-size:15px; }
+            .table th, .table td { padding:8px 6px; font-size:12.5px; }
+            .badge { font-size:11px !important; padding:3px 7px !important; }
+        }
+    </style>
     <script>
     if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
@@ -296,8 +344,8 @@ mysqli_stmt_close($stockListStmt);
                                         <!-- Row 1: Locations / Invoices / Advance Balance / Total Target -->
                                         <div class="row" style="margin-top:20px;">
 
-                                            <div class="col-xl-3 col-md-6">
-                                                <div class="card widget widget-stats">
+                                            <div class="col-xl-3 col-md-6 col-6">
+                                                <div class="card widget widget-stats tp-stat-hoverable" tabindex="0">
                                                     <div class="card-body">
                                                         <div class="widget-stats-container d-flex">
                                                             <div class="widget-stats-icon widget-stats-icon-warning">
@@ -309,10 +357,17 @@ mysqli_stmt_close($stockListStmt);
                                                             </div>
                                                         </div>
                                                     </div>
+                                                    <?php if (!empty($locNames)): ?>
+                                                    <div class="tp-stat-tooltip">
+                                                        <?php foreach ($locNames as $ln): ?>
+                                                        <div class="tp-stat-tooltip-row"><?php echo htmlspecialchars($ln, ENT_QUOTES, 'UTF-8'); ?></div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
 
-                                            <div class="col-xl-3 col-md-6">
+                                            <div class="col-xl-3 col-md-6 col-6">
                                                 <div class="card widget widget-stats">
                                                     <div class="card-body">
                                                         <div class="widget-stats-container d-flex">
@@ -328,7 +383,7 @@ mysqli_stmt_close($stockListStmt);
                                                 </div>
                                             </div>
 
-                                            <div class="col-xl-3 col-md-6">
+                                            <div class="col-xl-3 col-md-6 col-6">
                                                 <div class="card widget widget-stats">
                                                     <div class="card-body">
                                                         <div class="widget-stats-container d-flex">
@@ -354,7 +409,7 @@ mysqli_stmt_close($stockListStmt);
                                                 </div>
                                             </div>
 
-                                            <div class="col-xl-3 col-md-6">
+                                            <div class="col-xl-3 col-md-6 col-6">
                                                 <div class="card widget widget-stats">
                                                     <div class="card-body">
                                                         <div class="widget-stats-container d-flex">
@@ -437,9 +492,6 @@ mysqli_stmt_close($stockListStmt);
                                                     <tr>
                                                         <th>#</th>
                                                         <th>Product Name</th>
-                                                        <th class="text-center">Sales Unit</th>
-                                                        <th class="text-center">Return Unit</th>
-                                                        <th class="text-center">Total Unit</th>
                                                         <th class="text-center">Closing Stock</th>
                                                         <th class="text-center">Sales Rank</th>
                                                     </tr>
@@ -451,34 +503,10 @@ mysqli_stmt_close($stockListStmt);
                                                 foreach ($stockList as $item):
                                                     $pct = $maxSold > 0 ? round(($item['sold_qty'] / $maxSold) * 100) : 0;
                                                     $badgeClass = $rank === 1 ? 'badge-warning' : ($rank === 2 ? 'badge-secondary' : ($rank === 3 ? 'badge-danger' : 'badge-light'));
-                                                    // Sales Unit = gross qty invoiced out; Return Unit = qty the shop/customer
-                                                    // sent back; Total Unit = net still out with them (what actually left
-                                                    // stock permanently) — this is what closing_qty's math reconciles against.
-                                                    $returnQty = (int)$item['return_qty'];
-                                                    $netSold   = (int)$item['sold_qty'] - $returnQty;
                                                 ?>
                                                     <tr>
                                                         <td><?php echo $rank; ?></td>
                                                         <td><b><?php echo htmlspecialchars($item['productName']); ?></b></td>
-                                                        <td class="text-center">
-                                                            <span class="badge <?php echo $badgeClass; ?> badge-style-light" style="font-size:13px;padding:4px 10px;">
-                                                                <?php echo inr_format((int)$item['sold_qty'], 0); ?> units
-                                                            </span>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <?php if ($returnQty > 0): ?>
-                                                            <span class="badge badge-danger badge-style-light" style="font-size:13px;padding:4px 10px;">
-                                                                <?php echo inr_format($returnQty, 0); ?> units
-                                                            </span>
-                                                            <?php else: ?>
-                                                            <span class="text-muted">0</span>
-                                                            <?php endif; ?>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <span class="badge badge-success badge-style-light" style="font-size:13px;padding:4px 10px;">
-                                                                <?php echo inr_format($netSold, 0); ?> units
-                                                            </span>
-                                                        </td>
                                                         <td class="text-center"><?php echo inr_format((int)$item['closing_qty'], 0); ?></td>
                                                         <td style="min-width:140px;">
                                                             <div class="progress" style="height:8px;">
