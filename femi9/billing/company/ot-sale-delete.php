@@ -8,7 +8,7 @@ $tempid = $_REQUEST['tempid'] ?? '';
 
 // Fetch the OT sale item before deleting it
 $stmt = $db_conn->prepare(
-    "SELECT prid, qty, godownid FROM ot_sales WHERE id = ?"
+    "SELECT prid, qty, godownid, warehouse_id FROM ot_sales WHERE id = ?"
 );
 $stmt->bind_param('i', $rowid);
 $stmt->execute();
@@ -16,9 +16,10 @@ $item = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if ($item) {
-    $productId = (int)    $item['prid'];
-    $qty       = (int)    $item['qty'];
-    $godownid  = (string) $item['godownid'];
+    $productId    = (int)    $item['prid'];
+    $qty          = (int)    $item['qty'];
+    $godownid     = (string) $item['godownid'];
+    $warehouseId  = $item['warehouse_id'] !== null ? (int) $item['warehouse_id'] : null;
     // Stock is kept under the deducting session's own type (see
     // ot-sale-action.php's otDeduct call and ot-sale-return.php's otReverse
     // call, both of which use $Login_user_TYPEvl) -- ot_sales.usertype is a
@@ -32,7 +33,9 @@ if ($item) {
     try {
         $stockService->otReverse(
             $productId, $usertype, $godownid,
-            $qty, (string)$rowid, $createdBy
+            $qty, (string)$rowid, $createdBy,
+            false, // externalTransaction
+            $warehouseId
         );
     } catch (\Throwable $e) {
         error_log("ot-sale-delete otReverse error: " . $e->getMessage());
