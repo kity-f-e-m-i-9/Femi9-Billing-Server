@@ -117,6 +117,26 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
 							   </div>
 </div>
 
+<div id="searchleftcont">
+<label class="form-label">Warehouse</label>
+							   <div class="ms-dropdown" style="position:relative;">
+							   <div class="form-control" id="warehouseDropdownToggle" onclick="toggleWarehouseDropdown(event)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+							   <span id="warehouseDropdownLabel" style="color:#6c757d;">All</span>
+							   <i class="material-icons" style="font-size:20px;">arrow_drop_down</i>
+							   </div>
+							   <div id="warehouseDropdownPanel" style="display:none;position:absolute;z-index:20;background:#fff;border:1px solid #ced4da;border-radius:4px;padding:8px 12px;margin-top:2px;min-width:100%;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+							   <label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
+							   <input type="checkbox" name="warehouseid[]" value="unassigned" class="warehouse-check"> Unassigned
+							   </label>
+							   <?php foreach ($warehouseNames as $whId => $whLabel): ?>
+							   <label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
+							   <input type="checkbox" name="warehouseid[]" value="<?=(int)$whId;?>" class="warehouse-check"> <?=htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8');?>
+							   </label>
+							   <?php endforeach; ?>
+							   </div>
+							   </div>
+</div>
+
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
 </div>
@@ -378,14 +398,42 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
         }
     }
 
+    function toggleWarehouseDropdown(e) {
+        e.stopPropagation();
+        var panel = document.getElementById('warehouseDropdownPanel');
+        panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+    }
+
+    document.querySelectorAll('.warehouse-check').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            var checked = document.querySelectorAll('.warehouse-check:checked');
+            var label = document.getElementById('warehouseDropdownLabel');
+            if (checked.length === 0) {
+                label.textContent = 'All';
+                label.style.color = '#6c757d';
+            } else if (checked.length === 1) {
+                label.textContent = checked[0].closest('label').textContent.trim();
+                label.style.color = '#000';
+            } else {
+                label.textContent = checked.length + ' warehouses selected';
+                label.style.color = '#000';
+            }
+        });
+    });
+
     document.addEventListener('click', function (e) {
-        var dropdown = document.querySelector('.ms-dropdown');
-        if (dropdown && !dropdown.contains(e.target)) {
-            document.getElementById('godownDropdownPanel').style.display = 'none';
-        }
+        document.querySelectorAll('.ms-dropdown').forEach(function (dropdown) {
+            if (!dropdown.contains(e.target)) {
+                var panel = dropdown.querySelector('[id$="DropdownPanel"]');
+                if (panel) panel.style.display = 'none';
+            }
+        });
     });
 
     document.getElementById('godownDropdownPanel').addEventListener('click', function (e) {
+        e.stopPropagation();
+    });
+    document.getElementById('warehouseDropdownPanel').addEventListener('click', function (e) {
         e.stopPropagation();
     });
 

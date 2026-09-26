@@ -33,6 +33,129 @@ if (!empty($get_company_ids)) {
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown)) { $selected_godown_names[] = $result_Godown['gname']; }
 }
+
+// Warehouse selection — same convention as overall-stock.php /
+// overstock_datewise.php. "unassigned" means warehouse_id IS NULL.
+$warehouseNames = [];
+$whRes = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+while ($whRes && ($whRow = $whRes->fetch_assoc())) {
+    $warehouseNames[(int)$whRow['id']] = $whRow['code'] . ($whRow['name'] ? ' - ' . $whRow['name'] : '');
+}
+$selectedWarehouseIds = [];
+$includeUnassigned    = false;
+$filterByWarehouse    = false;
+if (!empty($_REQUEST['warehouseid'])) {
+    $rawWarehouseIds = is_array($_REQUEST['warehouseid']) ? $_REQUEST['warehouseid'] : [$_REQUEST['warehouseid']];
+    foreach ($rawWarehouseIds as $wid) {
+        if ($wid === 'unassigned') { $includeUnassigned = true; continue; }
+        $wid = (int)$wid;
+        if ($wid > 0 && isset($warehouseNames[$wid])) $selectedWarehouseIds[] = $wid;
+    }
+    $filterByWarehouse = true;
+}
+$selected_warehouse_names = [];
+if ($includeUnassigned) $selected_warehouse_names[] = 'Unassigned';
+foreach ($selectedWarehouseIds as $wid) $selected_warehouse_names[] = $warehouseNames[$wid];
+function warehouseLedgerCondition(bool $filterByWarehouse, array $selectedWarehouseIds, bool $includeUnassigned): string {
+    if (!$filterByWarehouse) return '';
+    $parts = [];
+    if (!empty($selectedWarehouseIds)) $parts[] = 'warehouse_id IN (' . implode(',', $selectedWarehouseIds) . ')';
+    if ($includeUnassigned) $parts[] = 'warehouse_id IS NULL';
+    if (empty($parts)) return ' AND 1=0';
+    return ' AND (' . implode(' OR ', $parts) . ')';
+}
+$warehouseCond = warehouseLedgerCondition($filterByWarehouse, $selectedWarehouseIds, $includeUnassigned);
+
+$neksomoGodownId = (int) (mysqli_fetch_row(mysqli_query($db_conn,
+    "SELECT id FROM company_godown WHERE gname = 'NEKSOMO HYGIENE INDUSTRIES' LIMIT 1"
+))[0] ?? 0);
+$showManufPurchases = empty($get_company_ids) || in_array($neksomoGodownId, $get_company_ids, true);
+$filterByGodown = ($_REQUEST['godownid'] != NULL);
+
+// Same stock_ledger-based reconstruction as overstock_datewise.php — see
+// that file for the full rationale (warehouse_id is only reliably present
+// on stock_ledger, not on the ~10 legacy transaction tables this page used
+// to query directly).
+function computeStockMovement($db_conn, $prid, $fromDate, $toDate, $companyIdsSql, $filterByGodown, $showManufPurchases, $warehouseCond) {
+    $prid = (int)$prid;
+    $fromDate = mysqli_real_escape_string($db_conn, $fromDate);
+    $toDate   = mysqli_real_escape_string($db_conn, $toDate);
+    $sum = function($sql) use ($db_conn) {
+        return (int)(mysqli_fetch_row(mysqli_query($db_conn, $sql))[0] ?? 0);
+    };
+    $godownCond = $filterByGodown ? " AND user_id IN ($companyIdsSql)" : '';
+    $dateCond   = " AND created_at >= '$fromDate 00:00:00' AND created_at <= '$toDate 23:59:59'";
+    $base       = "product_id=$prid AND user_type='company'$godownCond$warehouseCond$dateCond";
+    $sumAction  = function($action) use ($sum, $base) {
+        return $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='$action'");
+    };
+
+    $credit       = $sumAction('credit');
+    $reverseCr    = $sumAction('reverse_credit');
+    $transferIn   = $sumAction('transfer_in');
+    $transferInRv = $sumAction('transfer_in_reverse');
+    $returnAccept = $sumAction('return_accept');
+    $input_qty    = $credit - $reverseCr + $transferIn - $transferInRv + $returnAccept;
+
+    $deduct      = $sumAction('deduct');
+    $reverseDed  = $sumAction('reverse_deduct');
+    $otDeduct    = $sumAction('ot_deduct');
+    $otReverse   = $sumAction('ot_reverse');
+    $dfd         = (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out' AND ref_type='demofree'")
+                 - (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out_reverse' AND ref_type='demofree'");
+    $total_sales = $deduct - $reverseDed + $otDeduct - $otReverse + $dfd;
+
+    $total_sales_return = $reverseDed + $otReverse;
+
+    $transferOut   = (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out' AND ref_type != 'demofree'");
+    $transferOutRv = (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out_reverse' AND ref_type != 'demofree'");
+    $internal_transfer = $transferOut - $transferOutRv;
+
+    $movement_to_cp = 0; // already included in transfer_out above (PLT writes through StockService too)
+
+    $manuf = 0;
+    if ($showManufPurchases) {
+        $manuf = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='credit' AND ref_id LIKE 'manuf_purchase_%'");
+    }
+
+    return [
+        'input_qty'          => $input_qty,
+        'total_sales'        => $total_sales,
+        'total_sales_return' => $total_sales_return,
+        'internal_transfer'  => $internal_transfer,
+        'movement_to_cp'      => $movement_to_cp,
+        'manuf_qty'          => $manuf,
+        'net_change'         => $input_qty - $total_sales - $internal_transfer,
+    ];
+}
+
+$allProducts = [];
+$fetch_productDetils = mysqli_query($db_conn, "select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc");
+while ($p = mysqli_fetch_assoc($fetch_productDetils)) { $allProducts[] = $p; }
+
+// Same today-anchored closing-qty reconstruction as overstock_datewise.php.
+$todayClosingByProduct = [];
+$select_today_closing = "SELECT product_id, SUM(closing_qty) sum_closing FROM stock WHERE user_type='company'"
+    . ($filterByGodown ? " AND user_id IN ($get_company_ids_sql)" : '')
+    . $warehouseCond
+    . " GROUP BY product_id";
+$fetch_today_closing = mysqli_query($db_conn, $select_today_closing);
+while ($row = mysqli_fetch_assoc($fetch_today_closing)) {
+    $todayClosingByProduct[(int)$row['product_id']] = (int)$row['sum_closing'];
+}
+
+$runningClosing = [];
+$today = date('Y-m-d');
+foreach ($allProducts as $p) {
+    $prid = (int)$p['id'];
+    $todayClosing = $todayClosingByProduct[$prid] ?? 0;
+    if ($get_from_date <= $today) {
+        $sinceFrom = computeStockMovement($db_conn, $prid, $get_from_date, $today, $get_company_ids_sql, $filterByGodown, $showManufPurchases, $warehouseCond);
+        $runningClosing[$prid] = $todayClosing - $sinceFrom['net_change'];
+    } else {
+        $runningClosing[$prid] = $todayClosing;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -79,6 +202,9 @@ if (!empty($get_company_ids)) {
 									<?php if(!empty($selected_godown_names)){?>
 									<br/>Company Profile : <b><?=htmlspecialchars(implode(', ', $selected_godown_names));?></b>
 									<?php }?>
+									<?php if(!empty($selected_warehouse_names)){?>
+									<br/>Warehouse : <b><?=htmlspecialchars(implode(', ', $selected_warehouse_names));?></b>
+									<?php }?>
 									</h5>
 									</td>
 									</tr>
@@ -107,160 +233,28 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 											<th style="text-align:right;">Return Qty</th>
 											<th style="text-align:right;">Internal Transfer Qty</th>
 											<th style="text-align:right;">Movement to CP</th>
+											<th style="text-align:right;">Closing Stock</th>
 											</tr>
                                             </thead>
-											
+
 											<tbody>
-<?php 
-$select_productDetils="select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
-						while($Result_productDetils=mysqli_fetch_array($Fetch_productDetils))
-										{
-											$report_date=$thisDate;
-											$report_prid=$Result_productDetils['id'];
-											
-//INPUT QTY
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_input_qty="select sum(input_qty) from input_stock where input_date='$report_date' and product_id='$report_prid'";
-}else{
-$select_sum_input_qty="select sum(input_qty) from input_stock where input_date='$report_date' and product_id='$report_prid' and godownid IN ($get_company_ids_sql)";
-}
-$fetch_sum_input_qty=mysqli_query($db_conn,$select_sum_input_qty);
-$result_sum_input_qty=mysqli_fetch_array($fetch_sum_input_qty);
-if($result_sum_input_qty[0]!=NULL){ $Total_input_qty=$result_sum_input_qty[0];}else{ $Total_input_qty="0";}
-
-
-//SALES QTY
-//OT-SALES
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_OTSLS_qty="select sum(qty) from ot_sales where date='$report_date' and prid='$report_prid'";
-}else{
-$select_sum_OTSLS_qty="select sum(qty) from ot_sales where date='$report_date' and prid='$report_prid' and godownid IN ($get_company_ids_sql)";
-}
-
-$fetch_sum_OTSLS_qty=mysqli_query($db_conn,$select_sum_OTSLS_qty);
-$result_sum_OTSLS_qty=mysqli_fetch_array($fetch_sum_OTSLS_qty);
-if($result_sum_OTSLS_qty[0]!=NULL){ $Total_OTSLS_qty=$result_sum_OTSLS_qty[0];}else{ $Total_OTSLS_qty="0";}
-
-//OT-SALES-RETURN
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_OTSLSrtn_qty="select sum(qty) from ot_sales_return where return_date='$report_date' and prid='$report_prid'";
-}else{
-$select_sum_OTSLSrtn_qty="select sum(qty) from ot_sales_return where return_date='$report_date' and prid='$report_prid' and godownid IN ($get_company_ids_sql)";
-}
-
-$fetch_sum_OTSLSrtn_qty=mysqli_query($db_conn,$select_sum_OTSLSrtn_qty);
-$result_sum_OTSLSrtn_qty=mysqli_fetch_array($fetch_sum_OTSLSrtn_qty);
-if($result_sum_OTSLSrtn_qty[0]!=NULL){ $Total_OTSLSrtn_qty=$result_sum_OTSLSrtn_qty[0];}else{ $Total_OTSLSrtn_qty="0";}
-
-
-//SALES-1 — every channel's sales (company, TP, SS, stockiest, distributor, ...)
-// count toward "Overall" stock movement, not just whichever type is logged in.
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_SLS1_qty="select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid'";
-}else{
-$select_sum_SLS1_qty="select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid' and from_user_id IN ($get_company_ids_sql) and from_user_type='company'";
-}
-
-$fetch_sum_SLS1_qty=mysqli_query($db_conn,$select_sum_SLS1_qty);
-$result_sum_SLS1_qty=mysqli_fetch_array($fetch_sum_SLS1_qty);
-if($result_sum_SLS1_qty[0]!=NULL){ $Total_SLS1_qty=$result_sum_SLS1_qty[0];}else{ $Total_SLS1_qty="0";}
-
-//SALES-2 — same "all channels" scope as SALES-1 above.
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_SLS2_qty="select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid'";
-}else{
-$select_sum_SLS2_qty="select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid' and user_id IN ($get_company_ids_sql) and user_type='company'";
-}
-
-$fetch_sum_SLS2_qty=mysqli_query($db_conn,$select_sum_SLS2_qty);
-$result_sum_SLS2_qty=mysqli_fetch_array($fetch_sum_SLS2_qty);
-if($result_sum_SLS2_qty[0]!=NULL){ $Total_SLS2_qty=$result_sum_SLS2_qty[0];}else{ $Total_SLS2_qty="0";}
-
-//SALES-3 — company-to-Territory-Partner invoices (Add TP Invoice / tp-invoice-action.php).
-// These land in their own dedicated tp_invoices/tp_invoice_items tables, not
-// user_invoice_items/invoice_items, so SALES-1/2 above never see them.
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_SLS3_qty="select sum(tpi.quantity) from tp_invoice_items tpi inner join tp_invoices ti on ti.id=tpi.tp_invoice_id where ti.invoice_date='$report_date' and tpi.product_id='$report_prid'";
-}else{
-$select_sum_SLS3_qty="select sum(tpi.quantity) from tp_invoice_items tpi inner join tp_invoices ti on ti.id=tpi.tp_invoice_id where ti.invoice_date='$report_date' and tpi.product_id='$report_prid' and ti.source_godown_id IN ($get_company_ids_sql)";
-}
-
-$fetch_sum_SLS3_qty=mysqli_query($db_conn,$select_sum_SLS3_qty);
-$result_sum_SLS3_qty=mysqli_fetch_array($fetch_sum_SLS3_qty);
-if($result_sum_SLS3_qty[0]!=NULL){ $Total_SLS3_qty=$result_sum_SLS3_qty[0];}else{ $Total_SLS3_qty="0";}
-
-//SALES-RETURN — same "all channels" scope as SALES-1/2 above.
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_SLSreturn_qty="select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid'";
-}else{
-$select_sum_SLSreturn_qty="select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid' and to_userid IN ($get_company_ids_sql) and to_usertype='company'";
-}
-
-$fetch_sum_SLSreturn_qty=mysqli_query($db_conn,$select_sum_SLSreturn_qty);
-$result_sum_SLSreturn_qty=mysqli_fetch_array($fetch_sum_SLSreturn_qty);
-if($result_sum_SLSreturn_qty[0]!=NULL){ $Total_SLSreturn_qty=$result_sum_SLSreturn_qty[0];}else{ $Total_SLSreturn_qty="0";}
-
-//DEMO/FREE/DAMAGE — same "all channels" scope as SALES-1/2 above.
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_date' and product_id='$report_prid'";
-}else{
-$select_sum_DFD_qty="select sum(qty) from demofreedamage where date='$report_date' and product_id='$report_prid' and userid IN ($get_company_ids_sql)";
-}
-$fetch_sum_DFD_qty=mysqli_query($db_conn,$select_sum_DFD_qty);
-$result_sum_DFD_qty=mysqli_fetch_array($fetch_sum_DFD_qty);
-if($result_sum_DFD_qty[0]!=NULL){ $Total_DFD_qty=$result_sum_DFD_qty[0];}else{ $Total_DFD_qty="0";}
-
-//AVERAGE SALES — demo/free/damage folded in alongside invoiced sales.
-$Average_total_sales=$Total_OTSLS_qty+$Total_SLS1_qty+$Total_SLS2_qty+$Total_SLS3_qty+$Total_DFD_qty;
-$Average_total_salesReturn=$Total_OTSLSrtn_qty+$Total_SLSreturn_qty;
-
-//Total sales qty
-$Total_slsQTY=$Average_total_sales-$Average_total_salesReturn;
-
-//INTERNAL TRANSFER
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_INTRN_qty="select sum(qty) from internal_transfer where date='$report_date' and product_id='$report_prid'";
-}else{
-$select_sum_INTRN_qty="select sum(qty) from internal_transfer where date='$report_date' and product_id='$report_prid' and send_from IN ($get_company_ids_sql)";
-}
-$fetch_sum_INTRN_qty=mysqli_query($db_conn,$select_sum_INTRN_qty);
-$result_sum_INTRN_qty=mysqli_fetch_array($fetch_sum_INTRN_qty);
-if($result_sum_INTRN_qty[0]!=NULL){ $Total_INTRN_qty=$result_sum_INTRN_qty[0];}else{ $Total_INTRN_qty="0";}
-
-// MOVEMENT TO CP — stock physically transferred from this godown to a
-// Channel Partner via add-godown-to-location.php (pl-godown-transfer-
-// action.php, transfer_type='godown_to_location'), distinct from the
-// invoiced CP sales already counted in Sales Qty above.
-if($_REQUEST['godownid']==NULL)
-{
-$select_sum_PLT_qty="select sum(i.quantity) from pl_godown_transfer_items i inner join pl_godown_transfers t on t.id=i.transfer_id where t.transfer_date='$report_date' and i.product_id='$report_prid' and t.transfer_type='godown_to_location'";
-}else{
-$select_sum_PLT_qty="select sum(i.quantity) from pl_godown_transfer_items i inner join pl_godown_transfers t on t.id=i.transfer_id where t.transfer_date='$report_date' and i.product_id='$report_prid' and t.transfer_type='godown_to_location' and t.godown_id IN ($get_company_ids_sql)";
-}
-$fetch_sum_PLT_qty=mysqli_query($db_conn,$select_sum_PLT_qty);
-$result_sum_PLT_qty=mysqli_fetch_array($fetch_sum_PLT_qty);
-if($result_sum_PLT_qty[0]!=NULL){ $Total_MovementToCP_qty=$result_sum_PLT_qty[0];}else{ $Total_MovementToCP_qty="0";}
-						?>
+<?php foreach ($allProducts as $Result_productDetils):
+	$report_prid = (int)$Result_productDetils['id'];
+	$m = computeStockMovement($db_conn, $report_prid, $thisDate, $thisDate, $get_company_ids_sql, $filterByGodown, $showManufPurchases, $warehouseCond);
+	$runningClosing[$report_prid] = ($runningClosing[$report_prid] ?? 0) + $m['net_change'];
+	$closingStock = $runningClosing[$report_prid];
+?>
                        <tr>
                         <td><?php echo $Result_productDetils["productName"];?></td>
-						<td align="right"><?php echo $Total_input_qty;?></td>
-						<td align="right"><?php echo $Average_total_sales;?></td>
-						<td align="right"><?php echo $Average_total_salesReturn;?></td>
-						<td align="right"><?php echo $Total_INTRN_qty;?></td>
-						<td align="right"><?php echo $Total_MovementToCP_qty;?></td>
+						<td align="right"><?php echo $m['input_qty'];?></td>
+						<td align="right"><?php echo $m['total_sales'];?></td>
+						<td align="right"><?php echo $m['total_sales_return'];?></td>
+						<td align="right"><?php echo $m['internal_transfer'];?></td>
+						<td align="right"><?php echo $m['movement_to_cp'];?></td>
+						<td align="right"><b><?php echo $filterByGodown ? $closingStock : '—'; ?></b></td>
                         </tr>
-						<?php }?>
-										
+						<?php endforeach; ?>
+
 									    </tbody>
                                         </table>
 										
