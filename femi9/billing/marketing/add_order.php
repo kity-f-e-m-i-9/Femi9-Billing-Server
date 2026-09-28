@@ -118,8 +118,12 @@ if (!empty($markeingSTFID)) {
 // ── Products — fetched once, used in GET ORDER form ───────────────────────────
 // Neksomo-sourced products (temp_id LIKE 'NKS-%') are excluded from selection
 // here, same convention as the shop/customer/TP invoice "add product" dropdowns.
+// deleted_at IS NULL excludes Inactive products — without this, a DM could
+// still raise a Get Order for a product the company already deactivated in
+// Manage Products (confirmed happening: "Combo pack" was deactivated
+// 2026-08-31 but still showed up here and got ordered on 2026-09-09).
 $productList = [];
-$r = mysqli_query($db_conn, "SELECT id, productName, outlet_price FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
+$r = mysqli_query($db_conn, "SELECT id, productName, outlet_price FROM products WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 while ($p = mysqli_fetch_assoc($r)) $productList[] = $p;
 
 // ── Active TPs — used to populate the "Assign To TP" dropdown, filtered

@@ -1,5 +1,8 @@
 <?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata");
-require_once("include/PermissionCheck.php"); requirePermission('ms');?>
+require_once("include/PermissionCheck.php"); requirePermission('ms');
+require_once("include/PartnerZones.php");
+$zonesForDropdown = getAllZonesWithCounts($db_conn);
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -169,7 +172,15 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 </br>
 
 <label class="form-label">Zone</label>
-<input type="text" name="zone" class="form-control" placeholder="optional" onkeypress="restrictSpecialChars(event)">
+<select name="zone" class="form-control">
+    <option value="">-- optional --</option>
+    <?php foreach ($zonesForDropdown as $z): ?>
+    <option value="<?=htmlspecialchars($z['name'])?>"><?=htmlspecialchars($z['name'])?></option>
+    <?php endforeach; ?>
+</select>
+<?php if (empty($zonesForDropdown)): ?>
+<small class="text-muted">No zones set up yet — <a href="manage-zones.php" target="_blank">create one</a> first.</small>
+<?php endif; ?>
 </br>
 
 <?php

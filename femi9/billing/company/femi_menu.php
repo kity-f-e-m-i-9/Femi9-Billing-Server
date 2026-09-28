@@ -339,6 +339,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 							<li><a href="add-channel-partner">Add Channel Partner</a></li>
 							<li><a href="manage-channel-partner">Manage Channel Partner</a></li>
+							<li><a href="manage-agreements">Manage Agreements (CP/TP)</a></li>
 							<li><a href="cp-stock">CP Stock</a></li>
 							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
@@ -362,10 +363,12 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 								<li><a href="tp-cnote-manage">TP Return Invoice</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
 							<li><a href="manage-tp-advance-submissions">TP Advance Payment Submissions</a></li>
+							<li><a href="tp-zone-advance-payments">TP Zone wise Advance Payments</a></li>
 							<li><a href="tp-po-screenshot-review">PO Screenshot Review</a></li>
 							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
 							<li><a href="tp-bonus-advance-payments">Manage TP Bonus Points</a></li>
 							<li><a href="tp-wallet-referral-calculator">TP Wallet Referral Calculator</a></li>
+							<li><a href="manage-zones">Manage Zones</a></li>
                         </ul>
                     </li>
 					<!----------------------Stock Transfers--------------------------->
@@ -846,6 +849,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 							<li><a href="add-channel-partner">Add Channel Partner</a></li>
 							<li><a href="manage-channel-partner">Manage Channel Partner</a></li>
+							<li><a href="manage-agreements">Manage Agreements (CP/TP)</a></li>
 							<li><a href="cp-stock">CP Stock</a></li>
 							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
@@ -873,10 +877,12 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 								<li><a href="tp-cnote-manage">TP Return Invoice</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
 							<li><a href="manage-tp-advance-submissions">TP Advance Payment Submissions</a></li>
+							<li><a href="tp-zone-advance-payments">TP Zone wise Advance Payments</a></li>
 							<li><a href="tp-po-screenshot-review">PO Screenshot Review</a></li>
 							<li><a href="tp-bonus-points-calculator">TP Bonus Calculator</a></li>
 							<li><a href="tp-bonus-advance-payments">Manage TP Bonus Points</a></li>
 							<li><a href="tp-wallet-referral-calculator">TP Wallet Referral Calculator</a></li>
+							<li><a href="manage-zones">Manage Zones</a></li>
                         </ul>
                     </li>
 					<?php }?>

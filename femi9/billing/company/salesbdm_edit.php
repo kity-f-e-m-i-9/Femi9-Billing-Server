@@ -1,5 +1,7 @@
 <?php include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms');
+require_once("include/PartnerZones.php");
+$zonesForDropdown = getAllZonesWithCounts($db_conn);
 
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
@@ -294,7 +296,16 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 </br>
 
 <label class="form-label">Zone</label>
-<input type="text" name="zone" value="<?=htmlspecialchars($result_product_list['zone'] ?? '');?>" class="form-control" placeholder="optional" onkeypress="restrictSpecialChars(event)">
+<?php $currentZone = $result_product_list['zone'] ?? ''; ?>
+<select name="zone" class="form-control">
+    <option value="">-- optional --</option>
+    <?php foreach ($zonesForDropdown as $z): ?>
+    <option value="<?=htmlspecialchars($z['name'])?>" <?=($currentZone === $z['name']) ? 'selected' : ''?>><?=htmlspecialchars($z['name'])?></option>
+    <?php endforeach; ?>
+    <?php if ($currentZone !== '' && !in_array($currentZone, array_column($zonesForDropdown, 'name'), true)): ?>
+    <option value="<?=htmlspecialchars($currentZone)?>" selected><?=htmlspecialchars($currentZone)?> (old value, no matching zone)</option>
+    <?php endif; ?>
+</select>
 </br>
 
 <div class="form-group" style="display:block;">

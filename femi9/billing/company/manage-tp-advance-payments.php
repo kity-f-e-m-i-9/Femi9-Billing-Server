@@ -2,9 +2,30 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 require_once("include/GodownAccess.php");
+require_once("include/PartnerZones.php");
 require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);
 tpEnsureAdvanceWalletColumns($db_conn);
+
+// Optional zone scope — arrived here via tp-zone-advance-payments.php's
+// "View Full List" link. Narrows both the query and the Payer Name dropdown
+// to that zone's TPs; a normal (non-zone) visit to this page is unaffected.
+$filter_zone_id = (int)($_GET['zone_id'] ?? 0);
+$zoneName = '';
+$zoneTpIds = [];
+if ($filter_zone_id > 0) {
+    $zStmt = $db_conn->prepare("SELECT name FROM partner_zones WHERE id = ?");
+    $zStmt->bind_param('i', $filter_zone_id);
+    $zStmt->execute();
+    $zRow = $zStmt->get_result()->fetch_assoc();
+    $zStmt->close();
+    if ($zRow) {
+        $zoneName = $zRow['name'];
+        $zoneTpIds = getZoneTpIds($db_conn, $filter_zone_id, true);
+    } else {
+        $filter_zone_id = 0;
+    }
+}
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -57,6 +78,10 @@ if ($filter_type !== '') {
     $params[] = $filter_type;
     $types .= "s";
 }
+if ($filter_zone_id > 0) {
+    if (empty($zoneTpIds)) { $zoneTpIds = [0]; }
+    $where[] = "tap.territory_partner_id IN (" . implode(',', array_map('intval', $zoneTpIds)) . ")";
+}
 
 $where[] = "(tap.company_id IS NULL OR " . godown_finance_filter_sql($db_conn, 'cg') . ")";
 
@@ -108,8 +133,13 @@ foreach ($payments as $p) {
     $stats_by_type[$t]['adjusted'] += (float)$p['adjusted_amount'];
 }
 
-// TPs for filter dropdown (payers)
-$tps = $db_conn->query("SELECT id, tp_id, name FROM territory_partners ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+// TPs for filter dropdown (payers) — scoped to the zone's TPs when arrived
+// here via a zone (so Payer Name only ever offers that zone's TPs).
+if ($filter_zone_id > 0) {
+    $tps = empty($zoneTpIds) ? [] : $db_conn->query("SELECT id, tp_id, name FROM territory_partners WHERE id IN (" . implode(',', array_map('intval', $zoneTpIds)) . ") ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+} else {
+    $tps = $db_conn->query("SELECT id, tp_id, name FROM territory_partners ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+}
 
 $i = 0;
 ?>
@@ -186,11 +216,17 @@ $i = 0;
                             <div class="page-description">
                                 <h1>
                                     <table class="headertble"><tr>
-                                        <td>TP Advance Payments</td>
+                                        <td>TP Advance Payments<?php if ($filter_zone_id > 0): ?> &mdash; Zone: <?=htmlspecialchars($zoneName)?><?php endif; ?></td>
                                         <td><a href="add-tp-advance-payment" title="Add Payment"><i class="material-icons">add_circle</i></a></td>
                                     </tr></table>
                                 </h1>
                                 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+                                    <?php if ($filter_zone_id > 0): ?>
+                                    <a href="tp-zone-advance-payments.php?zone_id=<?=(int)$filter_zone_id?>" style="display:inline-flex;align-items:center;gap:6px;background:#eaf2fc;color:#2a78d6;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">
+                                        <i class="material-icons-outlined" style="font-size:17px;">arrow_back</i>
+                                        Back to Zone Summary
+                                    </a>
+                                    <?php endif; ?>
                                     <a href="review-mixed-advance-payments.php" style="display:inline-flex;align-items:center;gap:6px;background:#ede9fe;color:#6d28d9;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">
                                         <i class="material-icons-outlined" style="font-size:17px;">fact_check</i>
                                         Review Mixed Napkin/Diaper Payments
@@ -249,6 +285,7 @@ $i = 0;
                         <div class="col-12">
                             <div class="filter-card">
                                 <form method="GET" action="">
+                                    <?php if ($filter_zone_id > 0): ?><input type="hidden" name="zone_id" value="<?=(int)$filter_zone_id?>"><?php endif; ?>
                                     <div class="row g-2 align-items-end">
                                         <div class="col-md-2">
                                             <label class="form-label">From Date</label>
@@ -301,7 +338,7 @@ $i = 0;
                                             <button type="submit" class="btn btn-light font-weight-bold">
                                                 <i class="material-icons" style="vertical-align:middle;font-size:17px;">filter_list</i> Filter
                                             </button>
-                                            <a href="manage-tp-advance-payments" class="btn" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.5);">
+                                            <a href="manage-tp-advance-payments<?=$filter_zone_id > 0 ? '?zone_id=' . (int)$filter_zone_id : ''?>" class="btn" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.5);">
                                                 <i class="material-icons" style="vertical-align:middle;font-size:17px;">refresh</i> Reset
                                             </a>
                                         </div>

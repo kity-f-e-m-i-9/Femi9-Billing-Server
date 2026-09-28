@@ -9,6 +9,7 @@ $from_date = $_REQUEST['frdate'] ?? date("Y-m-d", strtotime("-6 days"));
 $to_date   = $_REQUEST['todate'] ?? $today;
 $status_filter = $_REQUEST['status_filter'] ?? 'pending';
 if (!in_array($status_filter, ['pending', 'incomplete', 'completed'], true)) { $status_filter = 'pending'; }
+$shop_search = trim($_REQUEST['shop_search'] ?? '');
 
 $stmt = mysqli_prepare($db_conn,
     "SELECT o.id, o.order_id, o.order_date, o.new_order, o.noorder_reason, o.marketing_tool,
@@ -92,6 +93,10 @@ foreach ($visits as $oid => &$v) {
 unset($v);
 
 $visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filter);
+
+if ($shop_search !== '') {
+    $visits = array_filter($visits, fn($v) => stripos($v['shop_name'] ?? '', $shop_search) !== false);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -201,6 +206,10 @@ $visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filte
                                     <option value="incomplete" <?=$status_filter==='incomplete'?'selected':''?>>Incomplete</option>
                                     <option value="completed" <?=$status_filter==='completed'?'selected':''?>>Completed</option>
                                 </select>
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label">Shop Name</label>
+                                <input type="text" name="shop_search" value="<?=htmlspecialchars($shop_search)?>" placeholder="Search shop..." class="form-control">
                             </div>
                             <div class="col-auto">
                                 <button type="submit" class="btn btn-primary"><i class="material-icons">search</i> Search</button>
