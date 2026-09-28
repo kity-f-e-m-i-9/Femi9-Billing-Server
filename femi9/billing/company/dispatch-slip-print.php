@@ -115,12 +115,22 @@ $branch_parts = array_filter([
             <div class="app-content">
 
                 <script type="text/javascript">
+                // Save-as-PDF from the print dialog uses the printed window's
+                // <title> as its suggested filename — this is set to
+                // TPName_Dispatch_Slip so that's what downloads, instead of a
+                // generic "Dispatch Slip : ..." name. The TP name's spaces
+                // are dropped entirely (joined, not underscored — a
+                // two/three-word name shouldn't turn into a run of
+                // underscores).
+                var printDocTitle = <?php echo json_encode(
+                    preg_replace('/[^a-zA-Z0-9]+/', '', trim($po['tp_name'] ?? 'TP')) . '_Dispatch_Slip'
+                ); ?>;
                 function PrintDiv() {
                     var divToPrint = document.getElementById('divToPrint');
                     var popupWin = window.open('', '_blank', 'width=990,height=540,left=200,top=80');
                     popupWin.document.open();
                     popupWin.document.write(
-                        '<html><head><style>' +
+                        '<html><head><title>' + printDocTitle + '</title><style>' +
                         '@page { margin: 0; size: auto; }' +
                         'body { margin: 10mm; }' +
                         '</style></head>' +

@@ -73,7 +73,9 @@ $dompdf->setPaper('A4', 'portrait');
 $dompdf->loadHtml($html);
 $dompdf->render();
 
-$fileName = 'TPInvoice_' . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invData['result_Invoice_Details']['invoice_number'] ?? 'invoice') . '.pdf';
+$__tpName   = preg_replace('/[^a-zA-Z0-9]+/', '', trim($invData['result_Invoice_Details']['tp_name'] ?? 'TP'));
+$__invNo    = str_replace(['/', '\\'], '-', trim($invData['result_Invoice_Details']['invoice_number'] ?? 'invoice'));
+$fileName   = "{$__tpName}_Invoice_{$__invNo}.pdf";
 
 // dompdf's stream() sends no cache-control headers of its own, so without
 // this a browser (and any CDN in front of the site) is free to cache this

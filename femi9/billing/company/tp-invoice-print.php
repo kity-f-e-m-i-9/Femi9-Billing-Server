@@ -53,12 +53,24 @@ $show_carton_cols = $has_carton_data;
             <div class="app-content">
 
                 <script type="text/javascript">
+                // Save-as-PDF from the print dialog uses the printed window's
+                // <title> as its suggested filename — this is set to
+                // TPName_Invoice_InvoiceNumber so that's what downloads,
+                // instead of a generic "TP Invoice : ..." name. The TP name's
+                // spaces are dropped entirely (joined, not underscored — a
+                // two/three-word name shouldn't turn into a run of
+                // underscores); the invoice number is kept as-is other than
+                // swapping '/' for '-' since '/' can't appear in a filename.
+                var printDocTitle = <?php echo json_encode(
+                    preg_replace('/[^a-zA-Z0-9]+/', '', trim($result_Invoice_Details['tp_name'] ?? 'TP')) . '_Invoice_' .
+                    str_replace(['/', '\\'], '-', trim($result_Invoice_Details['invoice_number'] ?? 'invoice'))
+                ); ?>;
                 function PrintDiv() {
                     var divToPrint = document.getElementById('divToPrint');
                     var popupWin = window.open('', '_blank', 'width=990,height=540,left=200,top=80');
                     popupWin.document.open();
                     popupWin.document.write(
-                        '<html><head><style>' +
+                        '<html><head><title>' + printDocTitle + '</title><style>' +
                         '@page { margin: 0; size: auto; }' +
                         'body { margin: 10mm; }' +
                         '</style></head>' +
