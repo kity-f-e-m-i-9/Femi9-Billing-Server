@@ -33,10 +33,14 @@ foreach ($raw_godownids as $gid) {
 $get_company_ids_sql = implode(',', $get_company_ids ?: [0]);
 //company details (all selected)
 $selected_godown_names = [];
+$godownNamesById = [];   // id => gname, for datewiseGodownBuckets() labels
 if (!empty($get_company_ids)) {
-    $select_Godown="select gname from company_godown where id IN ($get_company_ids_sql) order by id asc";
+    $select_Godown="select id, gname from company_godown where id IN ($get_company_ids_sql) order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
-							   while($result_Godown=mysqli_fetch_array($fetch_Godown)) { $selected_godown_names[] = $result_Godown['gname']; }
+							   while($result_Godown=mysqli_fetch_array($fetch_Godown)) {
+							       $selected_godown_names[] = $result_Godown['gname'];
+							       $godownNamesById[(int)$result_Godown['id']] = $result_Godown['gname'];
+							   }
 }
 
 // Warehouse selection — checkboxes from overall-stock.php's filter form.
@@ -75,6 +79,13 @@ $warehouseCond = warehouseLedgerCondition($filterByWarehouse, $selectedWarehouse
 $selectedBucketCount = count($selectedWarehouseIds) + ($includeUnassigned ? 1 : 0);
 $warehouseBuckets = $selectedBucketCount >= 2
     ? datewiseWarehouseBuckets($selectedWarehouseIds, $includeUnassigned, $warehouseNames)
+    : [];
+
+// Same idea, per Company Profile: 2+ godowns selected splits the report
+// into one block per godown (nesting the warehouse breakdown inside it, if
+// that's also active) instead of one merged total across them.
+$godownBuckets = count($get_company_ids) >= 2
+    ? datewiseGodownBuckets($get_company_ids, $godownNamesById)
     : [];
 
 // Manufacturer purchases (Neksomo "Purchase from Manufacturer") always credit
@@ -211,50 +222,75 @@ $allProducts = [];
 $fetch_productDetils = mysqli_query($db_conn, "select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc");
 while ($p = mysqli_fetch_assoc($fetch_productDetils)) { $allProducts[] = $p; }
 
-// Today's real closing_qty per product is the trusted anchor for seeding the
-// running closing balance (see datewiseSeedRunningClosing() for the full
-// rationale — bulk-imported/migrated stock predates stock_ledger, so
-// building forward from opening_date can be wildly wrong; anchoring to
-// today and working backward only needs the recent tracking window to be
-// complete). Merged-view path (0/1 warehouse selected) seeds one map as
-// before; breakdown path (2+ warehouses selected) seeds one map per
-// warehouse bucket, each independently anchored to that warehouse's own
-// today's closing_qty — summing the merged total then splitting it isn't
-// possible since movement isn't warehouse-attributable after aggregation.
-if (empty($warehouseBuckets)) {
-    $runningClosing = datewiseSeedRunningClosing($db_conn, $allProducts, $get_from_date, $filterByGodown, $get_company_ids_sql, $showManufPurchases, $warehouseCond);
-} else {
-    $runningClosingByBucket = [];
-    foreach ($warehouseBuckets as $bi => $bucket) {
-        $runningClosingByBucket[$bi] = datewiseSeedRunningClosing($db_conn, $allProducts, $get_from_date, $filterByGodown, $get_company_ids_sql, $showManufPurchases, $bucket['cond']);
+// Build the flat list of "leaves" to render — each leaf is one independent
+// (Company Profile, Warehouse) scope with its own movement queries and its
+// own running-closing balance (merged totals can't be split after the fact,
+// same reasoning as the single-axis breakdowns below). Company Profile is
+// the outer grouping and Warehouse the inner one, matching the Current
+// Stock tab's godown-card -> warehouse-bucket nesting:
+//   - 1 godown (or none), 1 warehouse (or none)         -> single leaf (today's merged behavior)
+//   - 2+ godowns, <2 warehouses selected                 -> one leaf per godown
+//   - <2 godowns, 2+ warehouses selected                 -> one leaf per warehouse (existing behavior)
+//   - 2+ godowns AND 2+ warehouses                        -> one leaf per (godown, warehouse) pair, grouped by godown
+$leaves = [];
+if (empty($godownBuckets)) {
+    if (empty($warehouseBuckets)) {
+        $leaves[] = ['key' => 'merged', 'godownLabel' => null, 'warehouseLabel' => null, 'idsSql' => $get_company_ids_sql, 'whCond' => $warehouseCond, 'whParam' => ''];
+    } else {
+        foreach ($warehouseBuckets as $wi => $wb) {
+            $leaves[] = ['key' => "wh$wi", 'godownLabel' => null, 'warehouseLabel' => $wb['label'], 'idsSql' => $get_company_ids_sql, 'whCond' => $wb['cond'], 'whParam' => $wb['whParam']];
+        }
     }
+} else {
+    foreach ($godownBuckets as $gi => $gb) {
+        if (empty($warehouseBuckets)) {
+            $leaves[] = ['key' => "gd$gi", 'godownLabel' => $gb['label'], 'warehouseLabel' => null, 'idsSql' => $gb['ids_sql'], 'whCond' => $warehouseCond, 'whParam' => ''];
+        } else {
+            foreach ($warehouseBuckets as $wi => $wb) {
+                $leaves[] = ['key' => "gd{$gi}_wh{$wi}", 'godownLabel' => $gb['label'], 'warehouseLabel' => $wb['label'], 'idsSql' => $gb['ids_sql'], 'whCond' => $wb['cond'], 'whParam' => $wb['whParam']];
+            }
+        }
+    }
+}
+
+// Today's real closing_qty per product is the trusted anchor for seeding
+// each leaf's running closing balance (see datewiseSeedRunningClosing() for
+// the full rationale — bulk-imported/migrated stock predates stock_ledger,
+// so building forward from opening_date can be wildly wrong; anchoring to
+// today and working backward only needs the recent tracking window to be
+// complete). One map per leaf, keyed by product id, carried forward day by
+// day inside the loop below.
+$runningClosingByLeaf = [];
+foreach ($leaves as $leaf) {
+    $runningClosingByLeaf[$leaf['key']] = datewiseSeedRunningClosing($db_conn, $allProducts, $get_from_date, $filterByGodown, $leaf['idsSql'], $showManufPurchases, $leaf['whCond']);
 }
 
 $startTime = strtotime($get_from_date);
 $endTime = strtotime($get_to_date);
 $totalDays = (int)floor(($endTime - $startTime) / 86400) + 1;
+
+// Pass 1: walk every day once, computing each leaf's movement table +
+// totals for that day, and each day's combined quick-totals. Stored keyed
+// by day index / leaf key rather than emitted immediately, so Pass 2 below
+// can regroup the output with Company Profile as the outer structure (one
+// card per profile) instead of Date as the outer structure — the running-
+// closing balances still only need to be carried forward once, in this
+// same single walk from oldest day to newest.
+$dayDates = [];
+$dayTotalsByDay = [];      // dayIndex => totals array
+$leafResultsByDay = [];    // dayIndex => [leafKey => ['html'=>..., 'totals'=>...]]
 $dayIndex = 0;
 
-// Loop between timestamps, 24 hours at a time
-for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
-
- $thisDate = date( 'Y-m-d', $i ); // 2010-05-01, 2010-05-02, etc
- $dayIndex++;
- // Each date is its own collapsible <details> section rather than a stacked
- // full table — a wide date range used to dump every day's table open at
- // once. Only the most recent date (last in the loop) opens by default;
- // earlier days start collapsed but are still fully in the DOM (no re-fetch
- // needed to expand one).
- $isLastDay = ($dayIndex === $totalDays);
-
- // Renders one <table> of product movement rows for $warehouseCondForBucket,
- // carrying forward $runningClosingRef (byref map, keyed by product id) day
- // by day. Returns [html, totals]. Shared by both the merged single-table
- // path and the per-warehouse breakdown path below — same table markup
- // either way, just scoped to a different warehouse condition and its own
- // running-closing map.
- $renderMovementTable = function($warehouseCondForBucket, array &$runningClosingRef) use ($db_conn, $allProducts, $thisDate, $get_company_ids_sql, $filterByGodown, $showManufPurchases) {
-    $totals = ['opening_qty'=>0,'input_qty'=>0,'total_sales'=>0,'total_sales_return'=>0,'internal_transfer'=>0,'manuf_qty'=>0,'closing'=>0];
+// Renders one <table> of product movement rows for one leaf's
+// ($idsSqlForLeaf, $warehouseCondForBucket) scope on $thisDate, carrying
+// forward $runningClosingRef (byref map, keyed by product id) day by day.
+// Returns [html, totals]. Shared by every leaf regardless of whether it's
+// the single merged view or one cell of the godown x warehouse breakdown —
+// same table markup either way, just scoped to a different (company ids,
+// warehouse condition) pair and its own running-closing map. Defined once
+// outside the day loop (Pass 1 below) and called once per (day, leaf).
+$renderMovementTable = function($thisDate, $idsSqlForLeaf, $warehouseCondForBucket, $whParamForBucket, array &$runningClosingRef) use ($db_conn, $allProducts, $filterByGodown, $showManufPurchases) {
+    $totals = ['opening_qty'=>0,'input_qty'=>0,'total_sales'=>0,'total_sales_return'=>0,'dfd_qty'=>0,'internal_transfer'=>0,'movement_to_cp'=>0,'manuf_qty'=>0,'closing'=>0];
     $rowsHtml = '';
     foreach ($allProducts as $Result_productDetils) {
         $report_prid = (int)$Result_productDetils['id'];
@@ -263,7 +299,7 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
         // from the previous day, captured before this day's net_change is
         // folded in below.
         $openingStock = $runningClosingRef[$report_prid] ?? 0;
-        $m = computeStockMovement($db_conn, $report_prid, $thisDate, $thisDate, $get_company_ids_sql, $filterByGodown, $showManufPurchases, $warehouseCondForBucket);
+        $m = computeStockMovement($db_conn, $report_prid, $thisDate, $thisDate, $idsSqlForLeaf, $filterByGodown, $showManufPurchases, $warehouseCondForBucket);
         $runningClosingRef[$report_prid] = $openingStock + $m['net_change'];
         $closingStock = $runningClosingRef[$report_prid];
         $PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
@@ -271,7 +307,9 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
         $totals['input_qty'] += $m['input_qty'];
         $totals['total_sales'] += $m['total_sales'];
         $totals['total_sales_return'] += $m['total_sales_return'];
+        $totals['dfd_qty'] += $m['dfd_qty'];
         $totals['internal_transfer'] += $m['internal_transfer'];
+        $totals['movement_to_cp'] += $m['movement_to_cp'];
         $totals['manuf_qty'] += $m['manuf_qty'];
         if ($filterByGodown) $totals['closing'] += $closingStock;
         ob_start();
@@ -287,11 +325,13 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['input_qty']*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $m['total_sales'];?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sales']*$PiecesPerPack;?></td><?php endif; ?>
+						<td align="right"><?php echo $m['dfd_qty'];?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['dfd_qty']*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $m['total_sales_return'];?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sales_return']*$PiecesPerPack;?></td><?php endif; ?>
-						<td align="right"><?php echo $m['internal_transfer'];?></td>
+						<td align="right"><?php if ($m['internal_transfer'] > 0): ?><a href="javascript:void(0)" class="intrn-transfer-link" data-product-id="<?=$report_prid;?>" data-godown-id="<?=htmlspecialchars($idsSqlForLeaf, ENT_QUOTES, 'UTF-8');?>" data-warehouse="<?=htmlspecialchars((string)$whParamForBucket, ENT_QUOTES, 'UTF-8');?>" data-from-date="<?=$thisDate;?>" data-to-date="<?=$thisDate;?>"><?php echo $m['internal_transfer'];?></a><?php else: ?><?php echo $m['internal_transfer'];?><?php endif; ?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['internal_transfer']*$PiecesPerPack;?></td><?php endif; ?>
-						<td align="right"><?php echo $m['movement_to_cp'];?></td>
+						<td align="right"><?php if ($m['movement_to_cp'] > 0): ?><a href="javascript:void(0)" class="cp-movement-link" data-product-id="<?=$report_prid;?>" data-godown-id="<?=htmlspecialchars($idsSqlForLeaf, ENT_QUOTES, 'UTF-8');?>" data-warehouse="<?=htmlspecialchars((string)$whParamForBucket, ENT_QUOTES, 'UTF-8');?>" data-from-date="<?=$thisDate;?>" data-to-date="<?=$thisDate;?>"><?php echo $m['movement_to_cp'];?></a><?php else: ?><?php echo $m['movement_to_cp'];?><?php endif; ?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['movement_to_cp']*$PiecesPerPack;?></td><?php endif; ?>
 						<?php if ($showManufPurchases): ?><td align="right"><?php echo $m['manuf_qty'];?></td><?php endif; ?>
 						<?php if ($showManufPurchases && is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['manuf_qty']*$PiecesPerPack;?></td><?php endif; ?>
@@ -319,6 +359,8 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Input Stock Qty (Pieces)</th><?php endif; ?>
 			<th style="text-align:right;">Sales Qty</th>
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sales Qty (Pieces)</th><?php endif; ?>
+			<th style="text-align:right;">Demo/Free/Damage Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Demo/Free/Damage Qty (Pieces)</th><?php endif; ?>
 			<th style="text-align:right;">Return Qty</th>
 <?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Return Qty (Pieces)</th><?php endif; ?>
 			<th style="text-align:right;">Internal Transfer Qty</th>
@@ -337,27 +379,78 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
     </table>
     <?php
     return ['html' => ob_get_clean(), 'totals' => $totals];
- };
+};
 
- if (empty($warehouseBuckets)) {
-    // Merged view (0 or 1 warehouse selected) — same single table as before.
-    $result = $renderMovementTable($warehouseCond, $runningClosing);
-    $dayTotals = $result['totals'];
-    $dayBodyHtml = $result['html'];
- } else {
-    // Breakdown view (2+ warehouses selected) — one sub-table per warehouse,
-    // each with its own independently-seeded running closing balance. The
-    // day's quick-totals line still sums across all selected warehouses.
-    $dayTotals = ['input_qty'=>0,'total_sales'=>0,'total_sales_return'=>0,'internal_transfer'=>0,'manuf_qty'=>0,'closing'=>0];
-    $dayBodyHtml = '';
-    foreach ($warehouseBuckets as $bi => $bucket) {
-        $result = $renderMovementTable($bucket['cond'], $runningClosingByBucket[$bi]);
+// Pass 1: walk every day once (oldest to newest, so each leaf's running-
+// closing balance carries forward correctly), computing every leaf's
+// movement table + totals for that day. Nothing is emitted yet — just
+// collected into $leafResultsByDay / $dayTotalsByDay, keyed by day index,
+// so Pass 2 below can regroup the output with Company Profile as the outer
+// structure (one card per profile) instead of walking days once per card.
+for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
+    $dayIndex++;
+    $thisDate = date( 'Y-m-d', $i ); // 2010-05-01, 2010-05-02, etc
+    $dayDates[$dayIndex] = $thisDate;
+
+    $dayTotals = ['opening_qty'=>0,'input_qty'=>0,'total_sales'=>0,'total_sales_return'=>0,'dfd_qty'=>0,'internal_transfer'=>0,'movement_to_cp'=>0,'manuf_qty'=>0,'closing'=>0];
+    $leafResults = [];
+    foreach ($leaves as $leaf) {
+        $result = $renderMovementTable($thisDate, $leaf['idsSql'], $leaf['whCond'], $leaf['whParam'], $runningClosingByLeaf[$leaf['key']]);
         foreach ($dayTotals as $k => $v) { $dayTotals[$k] += $result['totals'][$k]; }
-        $dayBodyHtml .= '<div class="datewise-warehouse-block">'
-            . '<div class="datewise-warehouse-label">' . htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8') . '</div>'
-            . $result['html'] . '</div>';
+        $leafResults[$leaf['key']] = $result;
     }
- }
+    $dayTotalsByDay[$dayIndex] = $dayTotals;
+    $leafResultsByDay[$dayIndex] = $leafResults;
+}
+
+// Pass 2: assemble the output. Company Profile is the outermost structure —
+// one card per selected profile (or a single unwrapped section when 0/1
+// profile is selected, matching today's simpler view). Inside each card,
+// dates are still the collapsible <details> sections; Warehouse breakdown
+// (if active) nests inside each date, same as before.
+$godownCardKeys = !empty($godownBuckets)
+    ? array_map(fn($gb) => $gb['label'], $godownBuckets)
+    : [null]; // single unwrapped section
+
+foreach ($godownCardKeys as $cardGodownLabel) {
+    // Leaves belonging to this card — every leaf if there's no godown
+    // breakdown, else just the ones whose godownLabel matches this card.
+    $cardLeaves = array_values(array_filter($leaves, fn($leaf) => $leaf['godownLabel'] === $cardGodownLabel));
+    if (empty($cardLeaves)) continue;
+
+    if ($cardGodownLabel !== null) {
+        echo '<div class="datewise-godown-card"><div class="datewise-godown-card-header">' . htmlspecialchars($cardGodownLabel, ENT_QUOTES, 'UTF-8') . '</div><div class="datewise-godown-card-body">';
+    }
+
+    for ($dayIndex = 1; $dayIndex <= $totalDays; $dayIndex++) {
+        $thisDate = $dayDates[$dayIndex];
+        $isLastDay = ($dayIndex === $totalDays);
+        $leafResults = $leafResultsByDay[$dayIndex];
+
+        // Combined quick-totals for just this card's leaves (not the whole
+        // day across every card) — sum only the leaves that belong here.
+        $dayTotals = ['opening_qty'=>0,'input_qty'=>0,'total_sales'=>0,'total_sales_return'=>0,'dfd_qty'=>0,'internal_transfer'=>0,'movement_to_cp'=>0,'manuf_qty'=>0,'closing'=>0];
+        foreach ($cardLeaves as $leaf) {
+            foreach ($dayTotals as $k => $v) { $dayTotals[$k] += $leafResults[$leaf['key']]['totals'][$k]; }
+        }
+
+        if (count($cardLeaves) === 1) {
+            // Single leaf on this card — no warehouse wrapper needed.
+            $dayBodyHtml = $leafResults[$cardLeaves[0]['key']]['html'];
+        } else {
+            // 2+ warehouse leaves within this card — wrap each in a
+            // warehouse-style block.
+            $dayBodyHtml = '';
+            foreach ($cardLeaves as $leaf) {
+                $html = $leafResults[$leaf['key']]['html'];
+                if ($leaf['warehouseLabel'] !== null) {
+                    $html = '<div class="datewise-warehouse-block">'
+                        . '<div class="datewise-warehouse-label">' . htmlspecialchars($leaf['warehouseLabel'], ENT_QUOTES, 'UTF-8') . '</div>'
+                        . $html . '</div>';
+                }
+                $dayBodyHtml .= $html;
+            }
+        }
 ?>
 <details class="datewise-day" <?php echo $isLastDay ? 'open' : ''; ?>>
 	<summary class="datewise-day-summary">
@@ -366,7 +459,9 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 			<?php if ($filterByGodown): ?>Opening <b><?=$dayTotals['opening_qty'];?></b> &middot; <?php endif; ?>
 			In <b><?=$dayTotals['input_qty'];?></b> &middot;
 			Sales <b><?=$dayTotals['total_sales'];?></b> &middot;
-			Transfer <b><?=$dayTotals['internal_transfer'];?></b>
+			DFD <b><?=$dayTotals['dfd_qty'];?></b> &middot;
+			Transfer <b><?=$dayTotals['internal_transfer'];?></b> &middot;
+			CP <b><?=$dayTotals['movement_to_cp'];?></b>
 			<?php if ($filterByGodown): ?> &middot; Closing <b><?=$dayTotals['closing'];?></b><?php endif; ?>
 		</span>
 	</summary>
@@ -375,7 +470,12 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 	</div>
 </details>
 <?php
-}
+    } // end date loop
+
+    if ($cardGodownLabel !== null) {
+        echo '</div></div><!-- /.datewise-godown-card -->';
+    }
+} // end godown card loop
 
 if (!$is_ajax) {
 ?>

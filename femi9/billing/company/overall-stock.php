@@ -1,5 +1,6 @@
 <?php include("checksession.php"); require_once("include/GodownAccess.php");
 require_once("include/PermissionCheck.php"); requirePermission('products');
+require_once("include/DatewiseStockReport.php");
 error_reporting(0);
 // Pulled from the Neksomo menu — a purpose-built stock view is coming for that login.
 if (is_neksomo_login($db_conn)) { header("Location: dashboard.php"); exit; }
@@ -112,6 +113,18 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
             font-size:12px; font-weight:700; color:#3f51b5; text-transform:uppercase;
             letter-spacing:.03em; padding:8px 14px 4px;
         }
+        /* One card per Company Profile in the Datewise tab — same visual
+           language as the Current Stock tab's godown cards. */
+        .datewise-godown-card {
+            border:1px solid #e9ecef; border-radius:8px; margin-bottom:20px;
+            background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04); overflow:hidden;
+        }
+        .datewise-godown-card:last-child { margin-bottom:0; }
+        .datewise-godown-card-header {
+            font-size:15px; font-weight:700; color:#212529; padding:12px 16px;
+            background:#f8f9fb; border-bottom:1px solid #e9ecef;
+        }
+        .datewise-godown-card-body { padding:14px 16px; }
         .datewise-ajax-summary { padding:8px 2px 14px; }
         .datewise-ajax-summary-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
         .datewise-ajax-summary-meta { font-size:12px; color:#6c757d; margin-top:4px; }
@@ -286,12 +299,20 @@ while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
 }
 
 // Render the Unassigned bucket first (it's where every pre-warehouse row
-// already lives, and where Internal Transfer / Movement to CP still show —
-// see below), then each real warehouse in code order.
+// already lives, and where Demo/Free/Damage still only shows — its source
+// table, demofreedamage, has no warehouse_id), then each real warehouse in
+// code order. Internal Transfer Qty and Movement to CP show on every card
+// now, each scoped to its own warehouse via stock_ledger (see $cardWarehouseCond).
 foreach ($warehouseBuckets as $bucketKey => $bucket) {
     if (empty($bucket['rows']) && $bucketKey !== '') continue; // skip empty warehouse cards entirely
     $isUnassignedBucket = ($bucketKey === '');
     $cardFilterClass = $isUnassignedBucket ? 'unassigned' : 'wh-' . (int)$bucketKey;
+    // This card's own single-warehouse ledger condition — used to scope
+    // Internal Transfer Qty (stock_ledger-based) to exactly this warehouse,
+    // same convention as the Datewise tab's per-warehouse breakdown.
+    $cardWarehouseCond = $isUnassignedBucket
+        ? warehouseLedgerCondition(true, [], true)
+        : warehouseLedgerCondition(true, [(int)$bucketKey], false);
 ?>
 						<div class="row wh-card" data-warehouse="<?=$cardFilterClass;?>" data-gname="<?=htmlspecialchars(strtolower($result_Godown['gname']), ENT_QUOTES, 'UTF-8');?>">
 							<div class="col">
@@ -307,6 +328,7 @@ foreach ($warehouseBuckets as $bucketKey => $bucket) {
 													<th>Opening Stock Date</th>
 													<th style="text-align:right;">Input Stock Qty</th>
 													<th style="text-align:right;">Sales Qty</th>
+													<th style="text-align:right;">Demo/Free/Damage Qty</th>
 													<th style="text-align:right;">Internal Transfer Qty</th>
 													<th style="text-align:right;">Movement to CP</th>
 													<th style="text-align:right;">Closing Qty</th>
@@ -321,6 +343,7 @@ $total_closing_pieces=0;
 $total_closing_qty_shown=0;
 $total_intrn_transfer=0;
 $total_sent_other=0;
+$total_dfd=0;
 foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
     $select_productDetils="select * from products where id='$StockProductID'";
     $Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
@@ -337,38 +360,31 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
     $total_closing_pieces+=$ClosingStockPieces;
     $total_closing_qty_shown+=$ClosingStock;
 
-    // Internal Transfer Qty and Movement to CP are computed from tables
-    // (internal_transfer, pl_godown_transfer_items) that have no
-    // warehouse_id — they can't be attributed to a specific physical
-    // warehouse, so they only appear on the Unassigned card; real
-    // warehouse cards show a dash.
-    $IntrnTransferQty = 0;
-    $MovementToCP = 0;
+    // Internal Transfer Qty and Movement to CP are both computed from
+    // stock_ledger, scoped to this card's own single warehouse
+    // ($cardWarehouseCond) — accurate per warehouse, unlike the old
+    // internal_transfer / pl_godown_transfer_items tables which have no
+    // warehouse_id at all. Demo/Free/Damage still only appears on the
+    // Unassigned card: its source table (demofreedamage) genuinely has no
+    // warehouse_id to scope by.
+    $IntrnTransferQty = datewiseTransferOutTotal($db_conn, (int)$StockProductID, '2000-01-01', date('Y-m-d'), (string)$user_id_Loginvl, true, $cardWarehouseCond);
+    $total_intrn_transfer+=$IntrnTransferQty;
+
+    $MovementToCP = datewiseCpMovementTotal($db_conn, (int)$StockProductID, '2000-01-01', date('Y-m-d'), (string)$user_id_Loginvl, true, $cardWarehouseCond);
+    $total_sent_other+=$MovementToCP;
+
     $DfdQty = 0;
     if ($isUnassignedBucket) {
-        // Internal transfer broken out from the internal_transfer table itself
-        // (send_from side, cumulative to date).
-        $select_intrnQty="select sum(qty) from internal_transfer where product_id='$StockProductID' and send_from='$user_id_Loginvl'";
-        $Fetch_intrnQty=mysqli_query($db_conn,$select_intrnQty);
-        $IntrnTransferQty=(int)(mysqli_fetch_row($Fetch_intrnQty)[0] ?? 0);
-        $total_intrn_transfer+=$IntrnTransferQty;
-
-        // Demo/Free/Damage folded into Sales Qty (goods that left as demo/
-        // free/damage grouped with sales rather than shown separately).
+        // Demo/Free/Damage — shown in its own column (see $DfdQty below),
+        // only attributable to the Unassigned bucket for the reason above.
         $select_dfdQty="select sum(qty) from demofreedamage where product_id='$StockProductID' and userid='$user_id_Loginvl'";
         $Fetch_dfdQty=mysqli_query($db_conn,$select_dfdQty);
         $DfdQty=(int)(mysqli_fetch_row($Fetch_dfdQty)[0] ?? 0);
-
-        // "Movement to CP" — stock physically transferred from this godown to
-        // a Channel Partner via add-godown-to-location.php (pl-godown-
-        // transfer-action.php, transfer_type='godown_to_location'), distinct
-        // from the invoiced CP sales already counted in Sales Qty above.
-        $select_plt2cpQty="select sum(i.quantity) from pl_godown_transfer_items i inner join pl_godown_transfers t on t.id=i.transfer_id where t.transfer_type='godown_to_location' and i.product_id='$StockProductID' and t.godown_id='$user_id_Loginvl'";
-        $Fetch_plt2cpQty=mysqli_query($db_conn,$select_plt2cpQty);
-        $MovementToCP=(int)(mysqli_fetch_row($Fetch_plt2cpQty)[0] ?? 0);
-        $total_sent_other+=$MovementToCP;
+        $total_dfd+=$DfdQty;
     }
-    $SalesQtyShown=(int)$Result_OPStock['sales_qty']+$DfdQty;
+    // Sales Qty now shows only actual sales — Demo/Free/Damage is its own
+    // column (previously folded together, see $DfdQty above).
+    $SalesQtyShown=(int)$Result_OPStock['sales_qty'];
 ?>
 												<tr class="product-row" data-product-name="<?php echo htmlspecialchars(strtolower($Result_productDetils['productName']), ENT_QUOTES, 'UTF-8'); ?>">
 													<td><?php echo $Result_productDetils["productName"];?></td>
@@ -376,8 +392,9 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
 													<td><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
 													<td align="right"><?php echo $Result_OPStock['input_qty'];?></td>
 													<td align="right"><?php echo $SalesQtyShown;?></td>
-													<td align="right"><?php echo $isUnassignedBucket ? $IntrnTransferQty : '&mdash;';?></td>
-													<td align="right"><?php echo $isUnassignedBucket ? $MovementToCP : '&mdash;';?></td>
+													<td align="right"><?php echo $isUnassignedBucket ? $DfdQty : '&mdash;';?></td>
+													<td align="right"><?php if ($IntrnTransferQty > 0): ?><a href="javascript:void(0)" class="intrn-transfer-link" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="<?=$isUnassignedBucket ? 'unassigned' : (int)$bucketKey;?>" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo $IntrnTransferQty;?></a><?php else: ?><?php echo $IntrnTransferQty;?><?php endif; ?></td>
+													<td align="right"><?php if ($MovementToCP > 0): ?><a href="javascript:void(0)" class="cp-movement-link" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="<?=$isUnassignedBucket ? 'unassigned' : (int)$bucketKey;?>" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo $MovementToCP;?></a><?php else: ?><?php echo $MovementToCP;?><?php endif; ?></td>
 													<td align="right"><b><?php echo $ClosingStock;?></b></td>
 													<?php if (is_neksomo_login($db_conn)): ?>
 													<td align="right"><b><?php echo $ClosingStockPieces;?></b></td>
@@ -391,8 +408,9 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
 											<tfoot>
 												<tr>
 													<td colspan="5" style="text-align:right;">Total</td>
-													<td align="right"><b><?=$isUnassignedBucket ? $total_intrn_transfer : '&mdash;';?></b></td>
-													<td align="right"><b><?=$isUnassignedBucket ? $total_sent_other : '&mdash;';?></b></td>
+													<td align="right"><b><?=$isUnassignedBucket ? $total_dfd : '&mdash;';?></b></td>
+													<td align="right"><b><?=$total_intrn_transfer;?></b></td>
+													<td align="right"><b><?=$total_sent_other;?></b></td>
 													<td align="right"><b><?=$total_closing_qty_shown;?></b></td>
 													<?php if (is_neksomo_login($db_conn)): ?>
 													<td align="right"><b><?=$total_closing_pieces;?></b></td>
@@ -616,7 +634,96 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
     }
 
     document.getElementById('productFilterInput').addEventListener('input', applyCurrentStockFilters);
+
+    /* ── Internal Transfer Qty click-to-view breakdown popup — shared by
+       both tabs (Current Stock's server-rendered links, and Datewise's
+       AJAX-injected links use the same .intrn-transfer-link /
+       .cp-movement-link classes and data-* attributes, so one delegated
+       listener covers both, for both Internal Transfer and Movement to CP). ── */
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('.intrn-transfer-link, .cp-movement-link');
+        if (!link) return;
+        e.preventDefault();
+
+        var isCp = link.classList.contains('cp-movement-link');
+        var params = new URLSearchParams();
+        params.set('type', isCp ? 'cp' : 'internal');
+        params.set('product_id', link.dataset.productId);
+        params.set('from_date', link.dataset.fromDate);
+        params.set('to_date', link.dataset.toDate);
+        if (link.dataset.warehouse) params.set('warehouse', link.dataset.warehouse);
+        // data-godown-id may be a single id (Current Stock's one card) or a
+        // comma-list (a Datewise leaf spanning multiple selected profiles).
+        if (link.dataset.godownId) {
+            link.dataset.godownId.split(',').forEach(function (gid) {
+                if (gid) params.append('godownid[]', gid);
+            });
+        }
+
+        document.getElementById('intrnTransferModalTitle').textContent = isCp ? 'Movement to CP Breakdown' : 'Internal Transfer Breakdown';
+        var modalBody = document.getElementById('intrnTransferModalBody');
+        modalBody.innerHTML = '<div class="loading-placeholder">Loading…</div>';
+        var modal = new bootstrap.Modal(document.getElementById('intrnTransferModal'));
+        modal.show();
+
+        fetch('get-internal-transfer-breakdown?' + params.toString())
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var rows = data.rows || [];
+                if (!rows.length) {
+                    modalBody.innerHTML = '<div class="loading-placeholder">No detail available for this transfer.</div>';
+                    return;
+                }
+                var html;
+                if (isCp) {
+                    html = '<table class="table table-sm"><thead><tr>'
+                        + '<th>From Company Profile</th><th>From Warehouse</th>'
+                        + '<th>Channel Partner</th>'
+                        + '<th style="text-align:right;">Qty</th></tr></thead><tbody>';
+                    rows.forEach(function (r) {
+                        html += '<tr><td>' + escapeHtml(r.from_godown) + '</td><td>' + escapeHtml(r.from_warehouse) + '</td>'
+                            + '<td>' + escapeHtml(r.cp_name) + '</td>'
+                            + '<td style="text-align:right;"><b>' + r.qty + '</b></td></tr>';
+                    });
+                } else {
+                    html = '<table class="table table-sm"><thead><tr>'
+                        + '<th>From Company Profile</th><th>From Warehouse</th>'
+                        + '<th>To Company Profile</th><th>To Warehouse</th>'
+                        + '<th style="text-align:right;">Qty</th></tr></thead><tbody>';
+                    rows.forEach(function (r) {
+                        html += '<tr><td>' + escapeHtml(r.from_godown) + '</td><td>' + escapeHtml(r.from_warehouse) + '</td>'
+                            + '<td>' + escapeHtml(r.to_godown) + '</td><td>' + escapeHtml(r.to_warehouse) + '</td>'
+                            + '<td style="text-align:right;"><b>' + r.qty + '</b></td></tr>';
+                    });
+                }
+                html += '</tbody></table>';
+                modalBody.innerHTML = html;
+            })
+            .catch(function () {
+                modalBody.innerHTML = '<div class="loading-placeholder">Could not load the breakdown. Please try again.</div>';
+            });
+    });
+
+    function escapeHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : s;
+        return d.innerHTML;
+    }
     </script>
+
+    <div class="modal fade" id="intrnTransferModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="intrnTransferModalTitle">Internal Transfer Breakdown</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="intrnTransferModalBody">
+                    <div class="loading-placeholder">Loading…</div>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
