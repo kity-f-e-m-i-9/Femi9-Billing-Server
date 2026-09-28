@@ -2,6 +2,7 @@
 if (!is_dir(session_save_path()) || !is_writable(session_save_path())) {
     session_save_path(sys_get_temp_dir());
 }
+ini_set('session.gc_maxlifetime', 18000); // match 5-hour app timeout; php.ini default (24min) was killing idle sessions
 session_start();
 error_reporting(0);
 
