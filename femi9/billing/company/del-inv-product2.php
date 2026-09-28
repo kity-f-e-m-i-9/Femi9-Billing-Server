@@ -74,29 +74,23 @@ if ($item && (int)$item['pr_id'] > 0) {
                 );
             }
         } else {
-            // Legacy path: no ledger entries — fall back to direct stock correction
-            // Restore seller (closing_qty ↑, sales_qty ↓)
-            $s = $db_conn->prepare(
-                "UPDATE stock
-                    SET sales_qty    = GREATEST(0, sales_qty - ?),
-                        closing_qty  = closing_qty + ?
-                  WHERE product_id = ? AND user_type = ? AND user_id = ?"
+            // Legacy path: no ledger entries (item predates the ledger-backed
+            // convert-invoice.php) — fall back to direct correction, but still
+            // via StockService so it's scoped to the unassigned warehouse row
+            // (never touches a split warehouse row) instead of a raw UPDATE
+            // matching every warehouse row for this product/account.
+            $stockService->reverseDeduct(
+                $pr_id, $Login_user_TYPEvl, $Login_user_IDvl, $qty,
+                'stock_request', $reqid, $createdBy,
+                true
             );
-            $s->bind_param('iiiss', $qty, $qty, $pr_id, $Login_user_TYPEvl, $Login_user_IDvl);
-            $s->execute();
-            $s->close();
 
-            // Remove buyer's stock (closing_qty ↓, input_qty ↓) — only if they maintain stock
             if (in_array($buyer_type, StockService::STOCK_MAINTAINING_TYPES, true)) {
-                $s2 = $db_conn->prepare(
-                    "UPDATE stock
-                        SET input_qty   = GREATEST(0, input_qty - ?),
-                            closing_qty = GREATEST(0, closing_qty - ?)
-                      WHERE product_id = ? AND user_type = ? AND user_id = ?"
+                $stockService->reverseCredit(
+                    $pr_id, $buyer_type, $buyer_id, $qty,
+                    'stock_request', $reqid, $createdBy,
+                    true
                 );
-                $s2->bind_param('iiiss', $qty, $qty, $pr_id, $buyer_type, $buyer_id);
-                $s2->execute();
-                $s2->close();
             }
         }
 

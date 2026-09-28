@@ -26,6 +26,7 @@ $Total_sls_qty=$result_sls_details['qty'];
 $buyer_gsttype=$result_sls_details['buyer_gsttype'];
 $hsn=$result_sls_details['hsn'];
 $gst_type=$result_sls_details['gst_type']; /*inner, outer*/
+$lineWarehouseId=$result_sls_details['warehouse_id']!==null ? (int)$result_sls_details['warehouse_id'] : null;
 
 //gstin
 /*
@@ -71,7 +72,8 @@ if($result_count_product['numCountRcds']==0)
 			$stockService->otReverse(
 				$product_id_i, $Login_user_TYPEvl, $godownid_s,
 				$qty_i, $tempid, $createdBy,
-				true // externalTransaction
+				true, // externalTransaction
+				$lineWarehouseId
 			);
 
 			$db_conn->commit();

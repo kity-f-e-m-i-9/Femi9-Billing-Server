@@ -9,16 +9,24 @@ if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
 }
 
 // Deliberately bypasses godown_finance_filter_sql (which would restrict a
-// neksomo login to only its own godown) — this page exists specifically to
-// give Neksomo visibility into LLP/Healthcare stock, by name, not the full
-// godown list. The Neksomo section itself is filtered to non-NKS products —
-// i.e. stock credited via the generic "Add Input Stock" flow, as distinct
-// from the piece-native NKS- products covered by the Purchase Stock page.
+// neksomo login to only its own godown) — kept even though this page is now
+// scoped to just NEKSOMO HYGIENE INDUSTRIES, since that godown may not be
+// the one the filter would otherwise resolve for this login. Filtered to
+// non-NKS products — i.e. stock credited via the generic "Add Input Stock"
+// flow, as distinct from the piece-native NKS- products covered by the
+// Purchase Stock page.
 $sections = [
-    ['gname' => 'FEMI NAYAN LLP',              'exclude_nks' => false],
-    ['gname' => 'FEMI HEALTH CARE',             'exclude_nks' => false],
     ['gname' => 'NEKSOMO HYGIENE INDUSTRIES',   'exclude_nks' => true],
 ];
+
+// Warehouse code/name lookup, used both to label per-warehouse cards below
+// and to build the warehouse filter checkboxes — same convention as
+// overall-stock.php.
+$warehouseNames = [];
+$whRes = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC");
+while ($whRes && ($whRow = $whRes->fetch_assoc())) {
+    $warehouseNames[(int)$whRow['id']] = $whRow['code'] . ($whRow['name'] ? ' - ' . $whRow['name'] : '');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -30,7 +38,7 @@ $sections = [
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
     <!-- Title -->
-    <title>Company Stock : <?php echo $business_name; ?></title>
+    <title>Neksomo Stock : <?php echo $business_name; ?></title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -79,36 +87,106 @@ $sections = [
                                     <h1>
 									<table class="headertble">
 									<tr>
-									<td>Company Stock</td>
+									<td>Neksomo Stock</td>
 									</tr>
 									</table>
 									</h1>
 									<p class="text-muted" style="font-size:13px;">
-										All sections shown in both pack and piece units (pieces = pack qty &times; pieces per pack).
-										Neksomo's section is stock added through the generic "Add Input Stock" flow (the pack-based
-										products it holds, not the piece-native purchases already covered on Purchase Stock).
+										Shown in both pack and piece units (pieces = pack qty &times; pieces per pack).
+										This is stock added through the generic "Add Input Stock" flow (the pack-based products
+										Neksomo holds, not the piece-native purchases already covered on Purchase Stock).
+										Broken out into one card per physical warehouse, same as Overall Stocks.
 									</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="row">
+						<!-- Product / Godown filters — client-side, applied across all cards below -->
+						<div class="row">
+							<div class="col">
+								<div class="card">
+									<div class="card-body">
+										<div class="row g-3 align-items-end">
+											<div class="col-md-5">
+												<label class="form-label">Filter by Product</label>
+												<input type="text" id="productFilterInput" class="form-control" placeholder="Type a product name…">
+											</div>
+											<div class="col-md-7">
+												<label class="form-label">Filter by Godown</label>
+												<div>
+													<label style="font-weight:normal;display:inline-flex;align-items:center;gap:4px;margin-right:14px;">
+														<input type="checkbox" class="warehouse-filter-check" value="all" checked> All
+													</label>
+													<?php foreach ($warehouseNames as $whId => $whLabel): ?>
+													<label style="font-weight:normal;display:inline-flex;align-items:center;gap:4px;margin-right:14px;">
+														<input type="checkbox" class="warehouse-filter-check" value="wh-<?=(int)$whId;?>" checked> <?=htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8');?>
+													</label>
+													<?php endforeach; ?>
+													<label style="font-weight:normal;display:inline-flex;align-items:center;gap:4px;">
+														<input type="checkbox" class="warehouse-filter-check" value="unassigned" checked> Unassigned
+													</label>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+                        <?php foreach ($sections as $section):
+                            $result_Godown = mysqli_fetch_array(mysqli_query(
+                                $db_conn,
+                                "SELECT * FROM company_godown WHERE gname = '" . mysqli_real_escape_string($db_conn, $section['gname']) . "' LIMIT 1"
+                            ));
+                            if (!$result_Godown) continue;
+                            $user_id_Loginvl = $result_Godown['id'];
+                            $show_pieces = true;
+
+                            // Pull every stock row for this godown (no GROUP BY — each
+                            // warehouse's row stays separate so it can render as its own
+                            // card), keyed by warehouse bucket. "" (empty string key) is
+                            // the Unassigned bucket (warehouse_id IS NULL). Same convention
+                            // as overall-stock.php.
+                            $warehouseBuckets = [];
+                            $warehouseBuckets[''] = ['label' => 'Unassigned', 'rows' => []];
+                            foreach ($warehouseNames as $whId => $whLabel) {
+                                $warehouseBuckets[(string)$whId] = ['label' => $whLabel, 'rows' => []];
+                            }
+
+                            $nks_condition = $section['exclude_nks'] ? "AND p.temp_id NOT LIKE 'NKS-%'" : "";
+                            $select_OPStock = "SELECT s.product_id, s.warehouse_id, p.productName, p.pieces_per_pack,
+                                    s.opening_date, s.opening_qty, s.input_qty, s.sales_qty,
+                                    s.sent_qty, s.extra_pieces, s.closing_qty
+                                FROM stock s
+                                JOIN products p ON p.id = s.product_id
+                                WHERE s.user_type = 'company' AND s.user_id = '$user_id_Loginvl'
+                                  $nks_condition
+                                ORDER BY p.productName ASC";
+                            $Fetch_OPStock = mysqli_query($db_conn, $select_OPStock);
+                            while ($Result_OPStock = mysqli_fetch_array($Fetch_OPStock)) {
+                                $StockProductID = $Result_OPStock['product_id'];
+                                $bucketKey = $Result_OPStock['warehouse_id'] !== null ? (string)$Result_OPStock['warehouse_id'] : '';
+                                if (!isset($warehouseBuckets[$bucketKey])) {
+                                    // Row references a warehouse that's since been
+                                    // deactivated/removed — still show its stock rather
+                                    // than silently dropping it.
+                                    $warehouseBuckets[$bucketKey] = ['label' => "Godown #$bucketKey", 'rows' => []];
+                                }
+                                $warehouseBuckets[$bucketKey]['rows'][$StockProductID] = $Result_OPStock;
+                            }
+
+                            foreach ($warehouseBuckets as $bucketKey => $bucket):
+                                if (empty($bucket['rows']) && $bucketKey !== '') continue; // skip empty warehouse cards entirely
+                                $isUnassignedBucket = ($bucketKey === '');
+                                $cardFilterClass = $isUnassignedBucket ? 'unassigned' : 'wh-' . (int)$bucketKey;
+                        ?>
+
+                        <div class="row wh-card" data-warehouse="<?=$cardFilterClass;?>">
                             <div class="col">
                                 <div class="card">
                                     <div class="card-body">
+									<h1><?=$result_Godown['gname'];?> &mdash; <?=htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8');?></h1>
 									<div style="background:#fff;overflow:scroll;width:100%;">
-
-									<?php foreach ($sections as $section):
-										$result_Godown = mysqli_fetch_array(mysqli_query(
-											$db_conn,
-											"SELECT * FROM company_godown WHERE gname = '" . mysqli_real_escape_string($db_conn, $section['gname']) . "' LIMIT 1"
-										));
-										if (!$result_Godown) continue;
-										$user_id_Loginvl = $result_Godown['id'];
-										$show_pieces = true;
-									?>
-
-									<h1><?=$result_Godown['gname'];?></h1>
 
                                         <table class="table">
                                             <thead>
@@ -131,41 +209,15 @@ $sections = [
 $total_closing = 0;
 $total_closing_pieces = 0;
 
-$nks_condition = $section['exclude_nks'] ? "AND p.temp_id NOT LIKE 'NKS-%'" : "";
-// GROUP BY s.product_id, summing across any per-warehouse rows — a
-// product's stock can now be split across multiple physical godowns
-// (H1/G1/G2), and this report shows one aggregated line per product,
-// same as before physical warehouses existed. opening_date has no sum
-// equivalent, so MIN() picks the earliest one across a product's rows.
-// p.productName/p.pieces_per_pack are functionally dependent on
-// s.product_id, safe to select alongside the GROUP BY.
-$select_OPStock = "SELECT s.product_id, p.productName, p.pieces_per_pack,
-                        MIN(s.opening_date) as opening_date,
-                        SUM(s.opening_qty) as opening_qty,
-                        SUM(s.input_qty) as input_qty,
-                        SUM(s.sales_qty) as sales_qty,
-                        SUM(s.sent_qty) as sent_qty,
-                        SUM(s.extra_pieces) as extra_pieces,
-                        SUM(s.closing_qty) as closing_qty
-                    FROM stock s
-                    JOIN products p ON p.id = s.product_id
-                    WHERE s.user_type = 'company' AND s.user_id = '$user_id_Loginvl'
-                      $nks_condition
-                    GROUP BY s.product_id
-                    ORDER BY p.productName ASC";
-										$Fetch_OPStock = mysqli_query($db_conn, $select_OPStock);
-										$row_count = mysqli_num_rows($Fetch_OPStock);
-										while ($Result_OPStock = mysqli_fetch_array($Fetch_OPStock)) {
-											$ClosingStock = $Result_OPStock['closing_qty'];
-											$total_closing += $ClosingStock;
-											if ($show_pieces) {
-												$PiecesPerPack = max((int)($Result_OPStock['pieces_per_pack'] ?? 1), 1);
-												$ExtraPieces   = (int)($Result_OPStock['extra_pieces'] ?? 0);
-												$ClosingStockPieces = ($ClosingStock * $PiecesPerPack) + $ExtraPieces;
-												$total_closing_pieces += $ClosingStockPieces;
-											}
-										?>
-                                                <tr>
+foreach ($bucket['rows'] as $StockProductID => $Result_OPStock):
+    $ClosingStock = $Result_OPStock['closing_qty'];
+    $total_closing += $ClosingStock;
+    $PiecesPerPack = max((int)($Result_OPStock['pieces_per_pack'] ?? 1), 1);
+    $ExtraPieces   = (int)($Result_OPStock['extra_pieces'] ?? 0);
+    $ClosingStockPieces = ($ClosingStock * $PiecesPerPack) + $ExtraPieces;
+    $total_closing_pieces += $ClosingStockPieces;
+?>
+                                                <tr class="product-row" data-product-name="<?php echo htmlspecialchars(strtolower($Result_OPStock['productName']), ENT_QUOTES, 'UTF-8'); ?>">
                                                     <td><?php echo $Result_OPStock["productName"];?></td>
 													<td><?php echo inr_format($Result_OPStock['opening_qty'], 0);?></td>
 													<td><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
@@ -186,8 +238,8 @@ $select_OPStock = "SELECT s.product_id, p.productName, p.pieces_per_pack,
 						<?php endif; ?>
 
                                                 </tr>
-										<?php }
-										if ($row_count === 0) { ?>
+										<?php endforeach;
+										if (empty($bucket['rows'])) { ?>
 										<tr><td colspan="<?= $show_pieces ? 8 : 7 ?>" style="text-align:center;color:#898781;">No stock recorded.</td></tr>
 										<?php } ?>
 
@@ -204,84 +256,14 @@ $select_OPStock = "SELECT s.product_id, p.productName, p.pieces_per_pack,
 										 </tfoot>
 
                                         </table>
-									<br/>
-									<?php endforeach; ?>
-
-									<?php
-									// Channel Partner: not a company_godown row like the sections above —
-									// channel_partner_stock is keyed by (channel_partner_id, product_id), so
-									// this is a closing qty aggregated across every active CP, per product,
-									// not a single location's own stock. No opening/sales/sent breakdown
-									// exists at this level (channel_partner_stock only tracks input_qty and
-									// closing_qty), so this table has fewer columns than the sections above.
-									// NKS- products excluded to match cp-stock.php's own convention.
-									$select_CPStock = "SELECT p.id, p.productName, p.pieces_per_pack,
-										COALESCE(SUM(cps.input_qty), 0) AS input_qty,
-										COALESCE(SUM(cps.closing_qty), 0) AS closing_qty
-										FROM products p
-										LEFT JOIN (
-											SELECT cps.product_id, cps.input_qty, cps.closing_qty
-											FROM channel_partner_stock cps
-											JOIN channel_partners cp ON cp.id = cps.channel_partner_id AND cp.is_active = 1
-										) cps ON cps.product_id = p.id
-										WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)
-										GROUP BY p.id, p.productName, p.pieces_per_pack
-										ORDER BY p.productName ASC";
-									$Fetch_CPStock = mysqli_query($db_conn, $select_CPStock);
-									$cp_total_input = 0;
-									$cp_total_closing = 0;
-									$cp_total_closing_pieces = 0;
-									?>
-
-									<h1>Channel Partner (All CPs)</h1>
-
-									<table class="table">
-										<thead>
-											<tr>
-												<th>Product Name</th>
-												<th style="text-align:right;">Input Stock Qty</th>
-												<th style="text-align:right;">Closing Qty</th>
-												<th style="text-align:right;">Closing Qty (Pieces)</th>
-											</tr>
-										</thead>
-
-										<tbody>
-										<?php while ($Result_CPStock = mysqli_fetch_array($Fetch_CPStock)):
-											$CPInputQty      = $Result_CPStock['input_qty'];
-											$CPClosing       = $Result_CPStock['closing_qty'];
-											$CPPiecesPerPack = max((int)($Result_CPStock['pieces_per_pack'] ?? 1), 1);
-											$CPClosingPieces = $CPClosing * $CPPiecesPerPack;
-
-											$cp_total_input          += $CPInputQty;
-											$cp_total_closing        += $CPClosing;
-											$cp_total_closing_pieces += $CPClosingPieces;
-										?>
-											<tr>
-												<td><?php echo $Result_CPStock['productName']; ?></td>
-												<td align="right"><?php echo inr_format($CPInputQty, 0); ?></td>
-												<td align="right"><b><?php echo inr_format($CPClosing, 0); ?></b></td>
-												<td align="right"><b><?php echo inr_format($CPClosingPieces, 0); ?></b></td>
-											</tr>
-										<?php endwhile; ?>
-										</tbody>
-
-										<tfoot>
-											<tr>
-												<td style="text-align:right;">Total Stock Qty</td>
-												<td align="right"><b><?=inr_format($cp_total_input, 0);?></b></td>
-												<td align="right"><b><?=inr_format($cp_total_closing, 0);?></b></td>
-												<td align="right"><b><?=inr_format($cp_total_closing_pieces, 0);?></b></td>
-											</tr>
-										</tfoot>
-									</table>
-									<br/>
-
 									</div>
-                                    </div>
-                                </div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<?php endforeach; ?>
+						<?php endforeach; ?>
 
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -299,6 +281,54 @@ $select_OPStock = "SELECT s.product_id, p.productName, p.pieces_per_pack,
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
     <script src="../../assets/js/pages/datatables.js"></script>
+    <script>
+    /* ── Product / Godown filters — purely client-side over the already-
+       rendered cards, no page reload. Same behavior as overall-stock.php. ── */
+    function applyStockFilters() {
+        var searchTerm = (document.getElementById('productFilterInput').value || '').trim().toLowerCase();
+        var checkedWarehouses = Array.prototype.slice.call(document.querySelectorAll('.warehouse-filter-check:checked')).map(function (cb) { return cb.value; });
+        var allChecked = checkedWarehouses.indexOf('all') !== -1;
+
+        document.querySelectorAll('.wh-card').forEach(function (card) {
+            var wh = card.getAttribute('data-warehouse');
+            var warehouseVisible = allChecked || checkedWarehouses.indexOf(wh) !== -1;
+            if (!warehouseVisible) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = '';
+
+            // Within a visible card, filter individual product rows by name;
+            // hide the whole card if the search term matches nothing in it.
+            var anyRowVisible = !searchTerm;
+            card.querySelectorAll('.product-row').forEach(function (row) {
+                var name = row.getAttribute('data-product-name') || '';
+                var matches = !searchTerm || name.indexOf(searchTerm) !== -1;
+                row.style.display = matches ? '' : 'none';
+                if (matches) anyRowVisible = true;
+            });
+            if (searchTerm) {
+                card.style.display = anyRowVisible ? '' : 'none';
+            }
+        });
+    }
+
+    document.getElementById('productFilterInput').addEventListener('input', applyStockFilters);
+    document.querySelectorAll('.warehouse-filter-check').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            if (this.value === 'all' && this.checked) {
+                // "All" overrides individual selections back to checked
+                document.querySelectorAll('.warehouse-filter-check').forEach(function (other) { other.checked = true; });
+            } else if (this.value !== 'all' && !this.checked) {
+                document.querySelector('.warehouse-filter-check[value="all"]').checked = false;
+            } else if (this.value !== 'all' && this.checked) {
+                var allOthersChecked = Array.prototype.every.call(document.querySelectorAll('.warehouse-filter-check:not([value="all"])'), function (other) { return other.checked; });
+                if (allOthersChecked) document.querySelector('.warehouse-filter-check[value="all"]').checked = true;
+            }
+            applyStockFilters();
+        });
+    });
+    </script>
 </body>
 
 </html>

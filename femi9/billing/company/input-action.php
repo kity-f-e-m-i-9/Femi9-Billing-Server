@@ -227,21 +227,39 @@ try {
         }
         $stmtUpdateStock->execute();
 
-        // 5. Write ledger entry (audit trail)
+        // 5. Write ledger entry (audit trail) — must carry the same
+        // warehouse_id as the stock row just updated above, or the ledger
+        // permanently misreports this credit as belonging to the unassigned
+        // row even when a real warehouse was credited (confirmed cause of
+        // stock.closing_qty vs stock_ledger disagreement on multiple rows).
         $qtyBefore = (int)$stockRow['closing_qty'];
         $qtyAfter  = $qtyBefore + $qty;
-        $stmtLedger = $db_conn->prepare(
-            "INSERT INTO stock_ledger
-                (product_id, user_type, user_id, action, qty,
-                 qty_before, qty_after, ref_type, ref_id, note, created_by)
-             VALUES (?, ?, ?, 'credit', ?, ?, ?, 'adjustment', ?, 'input stock', ?)"
-        );
         $userIdStr = (string)$userId;
-        $stmtLedger->bind_param(
-            'issiiiss',
-            $pid, $userType, $userIdStr, $qty,
-            $qtyBefore, $qtyAfter, $tempId, $createdBy
-        );
+        if ($warehouseId === null) {
+            $stmtLedger = $db_conn->prepare(
+                "INSERT INTO stock_ledger
+                    (product_id, user_type, user_id, action, qty,
+                     qty_before, qty_after, ref_type, ref_id, note, created_by)
+                 VALUES (?, ?, ?, 'credit', ?, ?, ?, 'adjustment', ?, 'input stock', ?)"
+            );
+            $stmtLedger->bind_param(
+                'issiiiss',
+                $pid, $userType, $userIdStr, $qty,
+                $qtyBefore, $qtyAfter, $tempId, $createdBy
+            );
+        } else {
+            $stmtLedger = $db_conn->prepare(
+                "INSERT INTO stock_ledger
+                    (product_id, user_type, user_id, warehouse_id, action, qty,
+                     qty_before, qty_after, ref_type, ref_id, note, created_by)
+                 VALUES (?, ?, ?, ?, 'credit', ?, ?, ?, 'adjustment', ?, 'input stock', ?)"
+            );
+            $stmtLedger->bind_param(
+                'issiiiiss',
+                $pid, $userType, $userIdStr, $warehouseId, $qty,
+                $qtyBefore, $qtyAfter, $tempId, $createdBy
+            );
+        }
         $stmtLedger->execute();
         $stmtLedger->close();
     }

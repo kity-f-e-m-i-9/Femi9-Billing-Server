@@ -172,23 +172,15 @@ try {
     */
     if (in_array($from_usertype, ['super_stockiest', 'stockiest', 'super_distributor', 'distributor', 'candf'])) {
 
-        $stmt = $db_conn->prepare("
-            UPDATE stock
-            SET input_qty = input_qty + ?,
-                closing_qty = closing_qty + ?
-            WHERE product_id = ?
-              AND user_type = ?
-              AND user_id = ?
-            LIMIT 1
-        ");
-        $stmt->bind_param("iisss", $returnqty, $returnqty, $prid, $from_usertype, $from_userid);
-        $stmt->execute();
-        $affected = $stmt->affected_rows;
-        $stmt->close();
-
-        if ($affected === 0) {
-            error_log("STOCK REVERSAL WARNING: No stock record found for sender - Product: $prid, User: $from_usertype/$from_userid");
-        }
+        // Reverse of cnote_finish.php's reverseCredit() on this same sender —
+        // via StockService so this is ledger-audited and scoped consistently
+        // with every other write to this account's stock, instead of a raw
+        // UPDATE with no warehouse_id and no audit trail.
+        $stockService->credit(
+            $prid, $from_usertype, $from_userid, $returnqty,
+            'return', $returnid_decode, $Login_user_TYPEvl ?? 'system',
+            true // externalTransaction
+        );
     }
     } else {
         error_log("STOCK REVERSAL SKIPPED: Item $rowid_decode was still 'pending' (never finished) - no stock movement to reverse");

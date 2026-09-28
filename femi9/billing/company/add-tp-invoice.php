@@ -931,7 +931,18 @@ $(document).ready(function() {
         currentGodownId = gd_id;
         $('#sourceGodownId').val(gd_id);
         fetchBalance(currentTpId, gd_id);
-        loadGodownProducts(gd_id);
+        // Don't load products until a warehouse is also picked — the
+        // combined-across-all-warehouses total shown before that point
+        // doesn't match what StockService::deduct() will actually check
+        // (the specific warehouse only), the same bug already fixed for
+        // add-godown-to-location.php/demofree_new.php.
+        if ($('#warehouseDrop').val()) {
+            loadGodownProducts(gd_id);
+        } else {
+            $('#productSelect').html('<option value="">Select a warehouse first</option>').prop('disabled', true);
+            $('#productAddWrapper').hide();
+            showAddError('Please select a warehouse (physical) to see available stock.');
+        }
     }
 
     function renderGodownDropdown() {
@@ -1309,7 +1320,13 @@ $(document).ready(function() {
     window.onProductTypeChange = function onProductTypeChange() {
         resetProducts();
         if (sourceMode === 'godown' && currentGodownId) {
-            loadGodownProducts(currentGodownId);
+            if ($('#warehouseDrop').val()) {
+                loadGodownProducts(currentGodownId);
+            } else {
+                $('#productSelect').html('<option value="">Select a warehouse first</option>').prop('disabled', true);
+                $('#productAddWrapper').hide();
+                showAddError('Please select a warehouse (physical) to see available stock.');
+            }
             fetchBalance(currentTpId, currentGodownId);
         } else if (currentCpId) {
             loadProducts(currentCpId);

@@ -1,5 +1,6 @@
-<?php 
+<?php
 include("RemoveSpecialChar.php");
+require_once("include/StockService.php");
 
 if(isset($_REQUEST['add-record']))
 {
@@ -177,18 +178,22 @@ for ($i=0; $i<=$number; $i++)
 		'$customer_address','$order_number','$amount_received','$amount_date','$shipping_address','$gst_number',
 		'$order_date','$ship_date','$hsn','$buyer_gsttype','$state_id','$gst_type','$username','$usertype')";
 		mysqli_query($db_conn,$insert_products);
-		
-		//UPDATE STOCK
-		$select_stockDetails="select * from stock where product_id='$product_id_value' and user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
-		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
-		
-		$update_Input_stock=$result_stockDetails['sales_qty']+$qty_value;
-		$update_Closing_stock=$result_stockDetails['closing_qty']-$qty_value;
-		
-		$update_stockDetails="update stock set sales_qty='$update_Input_stock',closing_qty='$update_Closing_stock' where product_id='$product_id_value' and user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-		mysqli_query($db_conn,$update_stockDetails);
-		
+
+		//UPDATE STOCK — via StockService so this scopes to the same
+		//unassigned row consistently (no warehouse picker on this form) and
+		//gets a proper ledger entry instead of silently bypassing it.
+		try {
+			$stockService = new StockService($db_conn);
+			$stockService->otDeduct(
+				(int)$product_id_value, $Login_user_TYPEvl, $godownid, (int)$qty_value,
+				$tempid, $Login_user_IDvl ?? $godownid
+			);
+		} catch (StockException $e) {
+			$_SESSION['errorMessage'] = "Stock error: " . $e->getMessage();
+			echo "<script>window.location='ot-sale-add?stockerror';</script>";
+			exit;
+		}
+
 	}
 	 }
 	 }

@@ -78,11 +78,25 @@ $totalBundles  = count($bundles);
 $openCount     = 0;
 $carriedCount  = 0;
 $excessCount   = 0;
+$productNames   = [];
+$godownNames    = [];
+$warehouseCodes = [];
 foreach ($bundles as $b) {
     if ($b['status'] === 'open') $openCount++;
     if ($b['carried_to_bundle_id'] !== null) $carriedCount++;
     if ($b['variance_label'] !== null && strpos($b['variance_label'], 'Excess') !== false) $excessCount++;
+    $productNames[$b['product_name']] = true;
+    $godownNames[$b['gname']] = true;
+    if ($b['warehouse_code']) {
+        $warehouseCodes[$b['warehouse_code']] = true;
+    }
 }
+$productNames   = array_keys($productNames);
+$godownNames    = array_keys($godownNames);
+$warehouseCodes = array_keys($warehouseCodes);
+sort($productNames);
+sort($godownNames);
+sort($warehouseCodes);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -132,10 +146,32 @@ foreach ($bundles as $b) {
         .badge-excess { background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600; }
         .badge-exact { background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600; }
 
-        .ata-filters { display:flex; gap:8px; margin-bottom:16px; }
-        .ata-filter-btn { border:1px solid #e5e7eb; background:#fff; color:#4b5563; font-size:13px; font-weight:500; padding:6px 14px; border-radius:8px; cursor:pointer; transition:background .15s; }
+        .ata-filters { display:flex; align-items:flex-end; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+        .ata-filter-btn { border:1px solid #e5e7eb; background:#fff; color:#4b5563; font-size:13px; font-weight:500; padding:6px 14px; border-radius:8px; cursor:pointer; transition:background .15s; height:38px; }
         .ata-filter-btn:hover { background:#f3f4f6; }
         .ata-filter-btn.active { background:#1f2937; color:#fff; border-color:#1f2937; }
+        .ata-filter-status-group { display:flex; gap:8px; }
+
+        .ata-filter-field { display:flex; flex-direction:column; gap:5px; flex:1 1 200px; min-width:160px; max-width:260px; }
+        .ata-filter-field label { font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:.02em; }
+        .ata-filter-field select, .ata-filter-field input {
+            border:1px solid #dde1ea; border-radius:8px; height:38px; font-size:13.5px; width:100%;
+            padding:0 32px 0 12px; color:#344054; background:#fff;
+        }
+        .ata-filter-field input { padding:0 12px 0 34px; background-repeat:no-repeat; background-position:10px center; }
+        .ata-filter-field.search-field { position:relative; }
+        .ata-filter-field.search-field i { position:absolute; left:10px; bottom:10px; font-size:18px; color:#9ca3af; pointer-events:none; }
+        .ata-filter-field.search-field input { padding-left:34px; }
+        .ata-filter-field select {
+            appearance:none; -webkit-appearance:none; -moz-appearance:none;
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat:no-repeat; background-position:right 12px center;
+        }
+        .ata-filter-field select:focus, .ata-filter-field input:focus { border-color: var(--ata-tp-1); box-shadow: 0 0 0 3px rgba(102,126,234,.15); outline:none; }
+        .ata-filter-clear-btn { border:1px solid #e5e7eb; background:#fff; color:#6b7280; font-size:13px; font-weight:500; padding:0 14px; height:38px; border-radius:8px; cursor:pointer; transition:background .15s; white-space:nowrap; }
+        .ata-filter-clear-btn:hover { background:#f3f4f6; }
+        .ata-empty-state { text-align:center; padding:40px 20px; color:#9ca3af; font-size:13.5px; display:none; }
+        .ata-empty-state i { font-size:32px; display:block; margin-bottom:8px; color:#d1d5db; }
 
         .ata-bundle-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:14px; }
         .ata-bundle-card { border:1px solid #eef0f3; border-radius:14px; padding:16px 18px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.04); transition:box-shadow .15s; }
@@ -211,9 +247,51 @@ foreach ($bundles as $b) {
                         <div class="alert alert-info">No bundles recorded yet.</div>
                     <?php else: ?>
                     <div class="ata-filters">
-                        <button type="button" class="ata-filter-btn active" data-filter="all">All (<?php echo $totalBundles; ?>)</button>
-                        <button type="button" class="ata-filter-btn" data-filter="open">Open (<?php echo $openCount; ?>)</button>
-                        <button type="button" class="ata-filter-btn" data-filter="closed">Closed (<?php echo $totalBundles - $openCount; ?>)</button>
+                        <div class="ata-filter-field search-field">
+                            <label>Search</label>
+                            <i class="material-icons-outlined">search</i>
+                            <input type="text" id="bundleSearchInput" placeholder="Bundle, product, godown…">
+                        </div>
+                        <div class="ata-filter-field">
+                            <label>Product</label>
+                            <select id="bundleProductFilter">
+                                <option value="">All Products</option>
+                                <?php foreach ($productNames as $pn): ?>
+                                <option value="<?= htmlspecialchars($pn, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($pn, ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="ata-filter-field">
+                            <label>Godown</label>
+                            <select id="bundleGodownFilter">
+                                <option value="">All Godowns</option>
+                                <?php foreach ($godownNames as $gn): ?>
+                                <option value="<?= htmlspecialchars($gn, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($gn, ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="ata-filter-field">
+                            <label>Warehouse</label>
+                            <select id="bundleWarehouseFilter">
+                                <option value="">All Warehouses</option>
+                                <?php foreach ($warehouseCodes as $wc): ?>
+                                <option value="<?= htmlspecialchars($wc, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($wc, ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="ata-filter-status-group">
+                            <button type="button" class="ata-filter-btn active" data-filter="all">All (<?php echo $totalBundles; ?>)</button>
+                            <button type="button" class="ata-filter-btn" data-filter="open">Open (<?php echo $openCount; ?>)</button>
+                            <button type="button" class="ata-filter-btn" data-filter="closed">Closed (<?php echo $totalBundles - $openCount; ?>)</button>
+                        </div>
+                        <button type="button" class="ata-filter-clear-btn" id="bundleFilterClearBtn">
+                            <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">close</i> Clear
+                        </button>
+                    </div>
+
+                    <div class="ata-empty-state" id="bundleEmptyState">
+                        <i class="material-icons-outlined">search_off</i>
+                        No bundles match your filters.
                     </div>
 
                     <div class="ata-bundle-grid" id="bundleGrid">
@@ -223,8 +301,14 @@ foreach ($bundles as $b) {
                             $cardExtraClass = $isCarried ? ' is-short' : ($isExcess ? ' is-excess' : '');
                             $pct = $b['nominal_pieces'] > 0 ? max(0, min(100, round((($b['nominal_pieces'] - max($b['remaining_pieces'], 0)) / $b['nominal_pieces']) * 100))) : 0;
                             $barExtraClass = $cardExtraClass;
+                            $searchBlob = mb_strtolower($b['label'] . ' ' . $b['product_name'] . ' ' . $b['gname'] . ' ' . ($b['warehouse_code'] ?? ''));
                         ?>
-                        <div class="ata-bundle-card<?php echo $cardExtraClass; ?>" data-status="<?php echo $b['status']; ?>">
+                        <div class="ata-bundle-card<?php echo $cardExtraClass; ?>"
+                             data-status="<?php echo $b['status']; ?>"
+                             data-product="<?php echo htmlspecialchars($b['product_name'], ENT_QUOTES, 'UTF-8'); ?>"
+                             data-godown="<?php echo htmlspecialchars($b['gname'], ENT_QUOTES, 'UTF-8'); ?>"
+                             data-warehouse="<?php echo htmlspecialchars($b['warehouse_code'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
+                             data-search="<?php echo htmlspecialchars($searchBlob, ENT_QUOTES, 'UTF-8'); ?>">
                             <div class="ata-bc-top">
                                 <div>
                                     <div class="ata-bc-title"><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></div>
@@ -341,17 +425,58 @@ foreach ($bundles as $b) {
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script>
+var statusFilter = 'all';
+var searchInput = document.getElementById('bundleSearchInput');
+var productFilter = document.getElementById('bundleProductFilter');
+var godownFilter = document.getElementById('bundleGodownFilter');
+var warehouseFilter = document.getElementById('bundleWarehouseFilter');
+var emptyState = document.getElementById('bundleEmptyState');
+var bundleCards = document.querySelectorAll('.ata-bundle-card');
+
+function applyFilters() {
+    var searchTerm = searchInput.value.trim().toLowerCase();
+    var product = productFilter.value;
+    var godown = godownFilter.value;
+    var warehouse = warehouseFilter.value;
+    var visibleCount = 0;
+
+    bundleCards.forEach(function (card) {
+        var matchesStatus = statusFilter === 'all' || card.getAttribute('data-status') === statusFilter;
+        var matchesProduct = !product || card.getAttribute('data-product') === product;
+        var matchesGodown = !godown || card.getAttribute('data-godown') === godown;
+        var matchesWarehouse = !warehouse || card.getAttribute('data-warehouse') === warehouse;
+        var matchesSearch = !searchTerm || card.getAttribute('data-search').indexOf(searchTerm) !== -1;
+        var show = matchesStatus && matchesProduct && matchesGodown && matchesWarehouse && matchesSearch;
+        card.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+    });
+
+    emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+}
+
 document.querySelectorAll('.ata-filter-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
         document.querySelectorAll('.ata-filter-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
-        var filter = btn.getAttribute('data-filter');
-        document.querySelectorAll('.ata-bundle-card').forEach(function (card) {
-            var status = card.getAttribute('data-status');
-            var show = filter === 'all' || filter === status;
-            card.style.display = show ? '' : 'none';
-        });
+        statusFilter = btn.getAttribute('data-filter');
+        applyFilters();
     });
+});
+
+searchInput.addEventListener('input', applyFilters);
+productFilter.addEventListener('change', applyFilters);
+godownFilter.addEventListener('change', applyFilters);
+warehouseFilter.addEventListener('change', applyFilters);
+
+document.getElementById('bundleFilterClearBtn').addEventListener('click', function () {
+    searchInput.value = '';
+    productFilter.value = '';
+    godownFilter.value = '';
+    warehouseFilter.value = '';
+    statusFilter = 'all';
+    document.querySelectorAll('.ata-filter-btn').forEach(function (b) { b.classList.remove('active'); });
+    document.querySelector('.ata-filter-btn[data-filter="all"]').classList.add('active');
+    applyFilters();
 });
 
 function openBundleActionModal(bundleId, bundleLabel, action) {

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php include("checksession.php"); require_once("include/StockService.php"); error_reporting(0);
 
 $Roowid=$_REQUEST['Roowid'];
 $Roowid=base64_decode($Roowid);
@@ -15,20 +15,18 @@ $select_count_product="select * from input_stock_users where id='$Roowid'";
 	
 	if($product_id!=NULL)
 	{
-		//update stock
-		$select_stockDetails="select * from stock where product_id='$product_id' 
-		and user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
-		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
-		
-		$update_Input_stock=$result_stockDetails['input_qty']-$input_qty;
-		$update_Closing_stock=$result_stockDetails['closing_qty']-$input_qty;
-		
-		$update_stockDetails="update stock set input_qty='$update_Input_stock',
-		closing_qty='$update_Closing_stock' where product_id='$product_id' 
-		and user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
-		mysqli_query($db_conn,$update_stockDetails);
-		
+		//update stock — via StockService, scoped to the same unassigned row
+		//this always used (this table has no warehouse_id column).
+		try {
+			$stockService = new StockService($db_conn);
+			$stockService->reverseCredit(
+				(int)$product_id, $user_type_Loginvl, $user_id_Loginvl, (int)$input_qty,
+				'input_stock_users', (string)$Roowid, $user_id_Loginvl
+			);
+		} catch (\Throwable $e) {
+			error_log("delete-input-users stock reversal error: " . $e->getMessage());
+		}
+
 	}
 	
 $del_product="delete from input_stock_users where id='$Roowid'";

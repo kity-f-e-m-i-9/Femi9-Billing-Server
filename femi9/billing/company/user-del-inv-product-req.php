@@ -1,5 +1,6 @@
 <?php include("checksession.php");
 include("config.php");
+require_once("include/StockService.php");
 
 if(isset($_REQUEST['inv_id']))
 {
@@ -21,33 +22,32 @@ if(isset($_REQUEST['inv_id']))
 		$qty=$result_INVProductDetails['qty'];
 		
 		$Login_user_IDvl=$result_INVProductDetails['from_user_id'];
-		
-		//------------------------------
-		//2. stock increment to company
-		//------------------------------
-		$select_stockDetails="select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
-		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
-		
-		$update_Sales_stock=$result_stockDetails['sales_qty']-$qty;
-		$update_Closing_stock=$result_stockDetails['closing_qty']+$qty;
-		
-		$update_stockDetails="update stock set sales_qty='$update_Sales_stock',closing_qty='$update_Closing_stock' where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-		mysqli_query($db_conn,$update_stockDetails);
-		
-		//-------------------------------------------------------------------
-		//3. stock decrement to user (super-stockist, stockist, distributor, outlet)
-		//--------------------------------------------------------------------
-		$select_stockDetails12="select * from stock where product_id='$pr_id' and user_type='$invuser' and user_id='$customer_id'";
-		$fetch_stockDetails12=mysqli_query($db_conn,$select_stockDetails12);
-		$result_stockDetails12=mysqli_fetch_array($fetch_stockDetails12);
-		
-		$update_Sales_stock12=$result_stockDetails12['input_qty']-$qty;
-		$update_Closing_stock12=$result_stockDetails12['closing_qty']-$qty;
-		
-		$update_stockDetails="update stock set input_qty='$update_Sales_stock12',closing_qty='$update_Closing_stock12' where product_id='$pr_id' and user_type='$invuser' and user_id='$customer_id'";
-		mysqli_query($db_conn,$update_stockDetails);
-		
+
+		//------------------------------------------------------------------
+		//Reverse the original deductAndCredit: restore company stock, pull
+		//back the buyer's — same unassigned rows both sides always used,
+		//via StockService instead of two independent warehouse_id-less
+		//UPDATEs that could stomp another warehouse row for this product.
+		//------------------------------------------------------------------
+		try {
+			$stockService = new StockService($db_conn);
+			$db_conn->begin_transaction();
+			$stockService->reverseDeduct(
+				(int)$pr_id, $Login_user_TYPEvl, $Login_user_IDvl, (int)$qty,
+				'user_invoice', $invoice_id_encode, $Login_user_IDvl, true
+			);
+			if (in_array($invuser, StockService::STOCK_MAINTAINING_TYPES, true)) {
+				$stockService->reverseCredit(
+					(int)$pr_id, $invuser, $customer_id, (int)$qty,
+					'user_invoice', $invoice_id_encode, $Login_user_IDvl, true
+				);
+			}
+			$db_conn->commit();
+		} catch (\Throwable $e) {
+			$db_conn->rollback();
+			error_log("user-del-inv-product-req stock reversal error: " . $e->getMessage());
+		}
+
 	}
 	
 	$delRecord="delete from user_invoice_items where id='$rowid_decode'";
