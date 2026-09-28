@@ -101,8 +101,8 @@ if (!isset($_SESSION['LOGIN_USER']) || $_SESSION['LOGIN_USER'] === '') {
     exit;
 }
 
-// Session timeout check (30 minutes of inactivity)
-$timeout_duration = 1800; // 30 minutes
+// Session timeout check (5 hours of inactivity)
+$timeout_duration = 18000; // 5 hours
 
 if (isset($_SESSION['last_activity'])) {
     $elapsed_time = time() - $_SESSION['last_activity'];

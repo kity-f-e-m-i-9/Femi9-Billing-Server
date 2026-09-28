@@ -14,8 +14,8 @@ if (!isset($_SESSION['LOGIN_USER']) || $_SESSION['LOGIN_USER'] === '') {
     exit;
 }
 
-// 30-minute inactivity timeout
-$timeout_duration = 1800;
+// 5-hour inactivity timeout
+$timeout_duration = 18000;
 if (isset($_SESSION['last_activity'])) {
     if ((time() - $_SESSION['last_activity']) > $timeout_duration) {
         session_unset();
