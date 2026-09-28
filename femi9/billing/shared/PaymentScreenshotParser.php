@@ -36,6 +36,12 @@ class PaymentScreenshotParser {
 
     private static $currencyLinePattern = '/(?:₹|Rs\.?|INR)\s*[\d,]+\.?\d*/i';
 
+    private static $paymentFailedKeywords = [
+        'payment failed', 'transaction failed', 'payment unsuccessful',
+        'transaction unsuccessful', 'declined', 'not been debited',
+        'could not be processed', 'please try again', 'transaction declined',
+    ];
+
     /**
      * @return array{status:string,amount:?float,reference:?string,reason:?string,raw_text:string}
      */
@@ -52,6 +58,21 @@ class PaymentScreenshotParser {
                 'amount' => null,
                 'reference' => null,
                 'reason' => "This doesn't look like a payment screenshot — no amount, UTR, or transaction reference was found.",
+                'raw_text' => $text,
+            ];
+        }
+
+        // Failed-payment language is also a hard gate, checked before
+        // recipient/amount/reference quality: a screenshot of a declined
+        // payment is never valid proof no matter how cleanly it otherwise
+        // reads, so it's rejected outright rather than routed to
+        // pending_review or auto-accepted.
+        if (self::hasPaymentFailedSignal($text)) {
+            return [
+                'status' => 'rejected',
+                'amount' => count($amounts) === 1 ? array_values($amounts)[0] : null,
+                'reference' => count($references) === 1 ? array_values($references)[0] : null,
+                'reason' => "This screenshot shows the payment was NOT successful (failed / declined / not completed) — please upload a screenshot of a successful payment, or complete the payment and try again.",
                 'raw_text' => $text,
             ];
         }
@@ -112,6 +133,14 @@ class PaymentScreenshotParser {
             if (strpos($lower, $kw) !== false) return true;
         }
         return (bool)preg_match(self::$currencyLinePattern, $text);
+    }
+
+    private static function hasPaymentFailedSignal($text) {
+        $lower = strtolower($text);
+        foreach (self::$paymentFailedKeywords as $kw) {
+            if (strpos($lower, $kw) !== false) return true;
+        }
+        return false;
     }
 
     // Confirms the screenshot shows a payment actually made to the company
