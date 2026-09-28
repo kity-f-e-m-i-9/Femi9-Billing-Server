@@ -49,6 +49,79 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
         <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
         <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
         <![endif]-->
+
+    <style>
+        /* ── Overall Stocks page: tabs + sticky filter bar ── */
+        .stock-tabs { display:flex; gap:4px; border-bottom:2px solid #e9ecef; margin-bottom:0; }
+        .stock-tab-btn {
+            border:none; background:none; padding:10px 18px; font-weight:600; font-size:14px;
+            color:#6c757d; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px;
+        }
+        .stock-tab-btn.active { color:#3f51b5; border-bottom-color:#3f51b5; }
+        .stock-tab-btn:hover:not(.active) { color:#495057; }
+
+        .stock-filter-bar {
+            position:sticky; top:0; z-index:15; background:#fff; padding:14px 16px;
+            border:1px solid #e9ecef; border-top:none; border-radius:0 0 8px 8px;
+            box-shadow:0 2px 6px rgba(0,0,0,0.04); margin-bottom:16px;
+        }
+        .stock-filter-row { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+        .stock-filter-item { min-width:180px; flex:1 1 180px; }
+        .stock-filter-item label { font-size:12px; font-weight:600; color:#6c757d; text-transform:uppercase; letter-spacing:.02em; margin-bottom:4px; display:block; }
+        .stock-filter-item.grow { flex:2 1 240px; }
+        .stock-filter-item.datewise-only { display:none; }
+        body.tab-datewise .stock-filter-item.datewise-only { display:block; }
+
+        .ms-dropdown-selectall {
+            display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600;
+            padding:0 0 6px; margin-bottom:6px; border-bottom:1px solid #e9ecef; white-space:nowrap;
+        }
+        .ms-dropdown-selectall a { color:#3f51b5; text-decoration:none; }
+        .ms-dropdown-selectall a:hover { text-decoration:underline; }
+        .ms-dropdown-selectall span { color:#ced4da; }
+
+        .stock-summary-strip {
+            display:flex; flex-wrap:wrap; gap:24px; align-items:center; padding:12px 16px;
+            background:#f8f9fb; border:1px solid #e9ecef; border-radius:8px; margin-bottom:16px;
+        }
+        .stock-summary-strip .stat { display:flex; flex-direction:column; }
+        .stock-summary-strip .stat .label { font-size:11px; color:#6c757d; text-transform:uppercase; letter-spacing:.03em; }
+        .stock-summary-strip .stat .value { font-size:20px; font-weight:700; color:#212529; }
+
+        .wh-card .card-body h1 { font-size:16px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+        .wh-card .card-summary-line { font-size:12px; color:#6c757d; font-weight:500; }
+        .wh-card thead th { position:sticky; top:0; background:#f8f9fb; z-index:2; }
+
+        #datewiseTabPane { display:none; }
+        #datewiseTabPane.active { display:block; }
+        #currentStockTabPane.hidden-by-tab { display:none; }
+
+        .datewise-day { border:1px solid #e9ecef; border-radius:6px; margin-bottom:10px; background:#fff; }
+        .datewise-day > summary { list-style:none; cursor:pointer; }
+        .datewise-day > summary::-webkit-details-marker { display:none; }
+        .datewise-day-summary {
+            display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;
+            padding:10px 14px; font-weight:600;
+        }
+        .datewise-day-date { font-size:14px; }
+        .datewise-day-quicktotals { font-size:12px; color:#6c757d; font-weight:500; }
+        .datewise-day table { margin-bottom:0; }
+        .datewise-warehouse-block { margin-bottom:14px; }
+        .datewise-warehouse-block:last-child { margin-bottom:0; }
+        .datewise-warehouse-label {
+            font-size:12px; font-weight:700; color:#3f51b5; text-transform:uppercase;
+            letter-spacing:.03em; padding:8px 14px 4px;
+        }
+        .datewise-ajax-summary { padding:8px 2px 14px; }
+        .datewise-ajax-summary-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+        .datewise-ajax-summary-meta { font-size:12px; color:#6c757d; margin-top:4px; }
+        #datewiseResults .loading-placeholder { padding:40px; text-align:center; color:#6c757d; }
+
+        @media (max-width: 768px) {
+            .stock-filter-bar { position:static; }
+            .stock-filter-item { min-width:100%; }
+        }
+    </style>
 </head>
 
 <body>
@@ -86,66 +159,84 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
                             </div>
                         </div>
 
-						<form method="post" enctype="multipart/form-data" action="overstock_datewise" id="datewiseFilterForm" onsubmit="return validateGodownChecks();">
+						<!-- Tabs: Current Stock (today's cards, client-side filtered) vs
+						     Datewise View (movement report, loaded via AJAX into this same
+						     page — no more navigating away to overstock_datewise). -->
+						<div class="stock-tabs">
+							<button type="button" class="stock-tab-btn active" id="tabBtnCurrent" onclick="switchStockTab('current')">Current Stock</button>
+							<button type="button" class="stock-tab-btn" id="tabBtnDatewise" onclick="switchStockTab('datewise')">Datewise View</button>
+						</div>
 
-							<div class="overviewcontainar">
-							<div id="searchleftcont">
-<label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" class="form-control">
-</div>
-<div id="searchleftcont">
-<label class="form-label">To Date</label>
-<input type="date" required="" name="todate" class="form-control">
-</div>
-<div id="searchleftcont">
-<label class="form-label">Company Profile <span style="color:red;">*</span></label>
-							   <div class="ms-dropdown" style="position:relative;">
-							   <div class="form-control" id="godownDropdownToggle" onclick="toggleGodownDropdown(event)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
-							   <span id="godownDropdownLabel" style="color:#6c757d;">Select</span>
-							   <i class="material-icons" style="font-size:20px;">arrow_drop_down</i>
-							   </div>
-							   <div id="godownDropdownPanel" style="display:none;position:absolute;z-index:20;background:#fff;border:1px solid #ced4da;border-radius:4px;padding:8px 12px;margin-top:2px;min-width:100%;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
-							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
-							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
-							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
-							   {?>
-						   <label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
-						   <input type="checkbox" name="godownid[]" value="<?=$result_Godown['id'];?>" class="godown-check" onchange="updateGodownDropdownLabel()"> <?=$result_Godown['gname'];?>
-						   </label>
-							   <?php }?>
-							   </div>
-							   </div>
-</div>
+						<!-- Shared sticky filter bar. Company Profile / Warehouse / Product
+						     search apply to whichever tab is active; From/To Date only matter
+						     (and only show) on the Datewise tab. -->
+						<div class="stock-filter-bar">
+							<div class="stock-filter-row">
+								<div class="stock-filter-item datewise-only">
+									<label class="form-label">From Date</label>
+									<input type="date" id="frdate" class="form-control">
+								</div>
+								<div class="stock-filter-item datewise-only">
+									<label class="form-label">To Date</label>
+									<input type="date" id="todate" class="form-control">
+								</div>
+								<div class="stock-filter-item">
+									<label class="form-label">Company Profile</label>
+									<div class="ms-dropdown" style="position:relative;">
+									<div class="form-control" id="godownDropdownToggle" onclick="toggleGodownDropdown(event)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+									<span id="godownDropdownLabel" style="color:#6c757d;">All</span>
+									<i class="material-icons" style="font-size:20px;">arrow_drop_down</i>
+									</div>
+									<div id="godownDropdownPanel" style="display:none;position:absolute;z-index:20;background:#fff;border:1px solid #ced4da;border-radius:4px;padding:8px 12px;margin-top:2px;min-width:100%;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+									<?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
+									$fetch_Godown=mysqli_query($db_conn,$select_Godown);
+									while($result_Godown=mysqli_fetch_array($fetch_Godown))
+									{?>
+								<label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
+								<input type="checkbox" name="godownid[]" value="<?=$result_Godown['id'];?>" class="godown-check" data-gname="<?=htmlspecialchars($result_Godown['gname'], ENT_QUOTES, 'UTF-8');?>" onchange="onGodownFilterChange()"> <?=$result_Godown['gname'];?>
+								</label>
+									<?php }?>
+									</div>
+									</div>
+								</div>
 
-<div id="searchleftcont">
-<label class="form-label">Warehouse</label>
-							   <div class="ms-dropdown" style="position:relative;">
-							   <div class="form-control" id="warehouseDropdownToggle" onclick="toggleWarehouseDropdown(event)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
-							   <span id="warehouseDropdownLabel" style="color:#6c757d;">All</span>
-							   <i class="material-icons" style="font-size:20px;">arrow_drop_down</i>
-							   </div>
-							   <div id="warehouseDropdownPanel" style="display:none;position:absolute;z-index:20;background:#fff;border:1px solid #ced4da;border-radius:4px;padding:8px 12px;margin-top:2px;min-width:100%;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
-							   <label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
-							   <input type="checkbox" name="warehouseid[]" value="unassigned" class="warehouse-check"> Unassigned
-							   </label>
-							   <?php foreach ($warehouseNames as $whId => $whLabel): ?>
-							   <label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
-							   <input type="checkbox" name="warehouseid[]" value="<?=(int)$whId;?>" class="warehouse-check"> <?=htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8');?>
-							   </label>
-							   <?php endforeach; ?>
-							   </div>
-							   </div>
-</div>
+								<div class="stock-filter-item grow">
+									<label class="form-label">Filter by Product</label>
+									<input type="text" id="productFilterInput" class="form-control" placeholder="Type a product name…">
+								</div>
 
-<div id="searchbuttoncont">
-<button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
-</div>
+								<div class="stock-filter-item">
+									<label class="form-label">Warehouse</label>
+									<div class="ms-dropdown" style="position:relative;">
+									<div class="form-control" id="warehouseDropdownToggle" onclick="toggleWarehouseDropdown(event)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+									<span id="warehouseDropdownLabel" style="color:#6c757d;">All</span>
+									<i class="material-icons" style="font-size:20px;">arrow_drop_down</i>
+									</div>
+									<div id="warehouseDropdownPanel" style="display:none;position:absolute;z-index:20;background:#fff;border:1px solid #ced4da;border-radius:4px;padding:8px 12px;margin-top:2px;min-width:100%;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+									<div class="ms-dropdown-selectall">
+										<a href="javascript:void(0)" onclick="setAllWarehouseChecks(true)">Select all</a>
+										<span>&middot;</span>
+										<a href="javascript:void(0)" onclick="setAllWarehouseChecks(false)">Deselect all</a>
+									</div>
+									<label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
+									<input type="checkbox" name="warehouseid[]" value="unassigned" class="warehouse-check" checked onchange="onWarehouseFilterChange(this)"> Unassigned
+									</label>
+									<?php foreach ($warehouseNames as $whId => $whLabel): ?>
+									<label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
+									<input type="checkbox" name="warehouseid[]" value="<?=(int)$whId;?>" class="warehouse-check" checked onchange="onWarehouseFilterChange(this)"> <?=htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8');?>
+									</label>
+									<?php endforeach; ?>
+									</div>
+									</div>
+								</div>
+
+								<div class="stock-filter-item" style="flex:0 0 auto;min-width:0;">
+									<button type="button" class="btn btn-primary" id="applyFiltersBtn" onclick="applyStockFilters()"><i class="material-icons" style="font-size:18px;vertical-align:-4px;">search</i> Apply</button>
+								</div>
 							</div>
-							<div style="clear:both;"></div>
-							<br/>
-							</form>
+						</div>
 
-<?php
+						<?php
 //----Continuos Serial Number In Next Page.......................
 $num_rec_per_page=30;
 if (isset($_GET["page"])) { $page  = $_GET["page"]; } else { $page=1; };
@@ -155,38 +246,7 @@ $i= $start_from;
 //echo ++$i;
 ?>
 
-						<!-- Product / Godown filters — client-side, applied across all cards below -->
-						<div class="row">
-							<div class="col">
-								<div class="card">
-									<div class="card-body">
-										<div class="row g-3 align-items-end">
-											<div class="col-md-5">
-												<label class="form-label">Filter by Product</label>
-												<input type="text" id="productFilterInput" class="form-control" placeholder="Type a product name…">
-											</div>
-											<div class="col-md-7">
-												<label class="form-label">Filter by Godown</label>
-												<div>
-													<label style="font-weight:normal;display:inline-flex;align-items:center;gap:4px;margin-right:14px;">
-														<input type="checkbox" class="warehouse-filter-check" value="all" checked> All
-													</label>
-													<?php foreach ($warehouseNames as $whId => $whLabel): ?>
-													<label style="font-weight:normal;display:inline-flex;align-items:center;gap:4px;margin-right:14px;">
-														<input type="checkbox" class="warehouse-filter-check" value="wh-<?=(int)$whId;?>" checked> <?=htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8');?>
-													</label>
-													<?php endforeach; ?>
-													<label style="font-weight:normal;display:inline-flex;align-items:center;gap:4px;">
-														<input type="checkbox" class="warehouse-filter-check" value="unassigned" checked> Unassigned
-													</label>
-												</div>
-											</div>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
-
+						<div id="currentStockTabPane">
 						<?php
 						//get Godown Details
 $select_Godowndetails="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
@@ -233,11 +293,11 @@ foreach ($warehouseBuckets as $bucketKey => $bucket) {
     $isUnassignedBucket = ($bucketKey === '');
     $cardFilterClass = $isUnassignedBucket ? 'unassigned' : 'wh-' . (int)$bucketKey;
 ?>
-						<div class="row wh-card" data-warehouse="<?=$cardFilterClass;?>">
+						<div class="row wh-card" data-warehouse="<?=$cardFilterClass;?>" data-gname="<?=htmlspecialchars(strtolower($result_Godown['gname']), ENT_QUOTES, 'UTF-8');?>">
 							<div class="col">
 								<div class="card">
 									<div class="card-body">
-										<h1><?=$result_Godown['gname'];?> &mdash; <?=htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8');?></h1>
+										<h1><span><?=$result_Godown['gname'];?> &mdash; <?=htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8');?></span> <span class="card-summary-line" id="cardSummary-<?=$user_id_Loginvl;?>-<?=htmlspecialchars($cardFilterClass, ENT_QUOTES, 'UTF-8');?>"></span></h1>
 										<div style="background:#fff;overflow:scroll;width:100%;">
 										<table class="table">
 											<thead>
@@ -346,9 +406,21 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
 							</div>
 						</div>
 <?php
+    // Fill in the always-visible summary line now that totals for this card
+    // are known (item count + closing qty), so it's readable before
+    // scrolling into the table itself.
+    $itemCount = count($bucket['rows']);
+    echo '<script>document.getElementById(' . json_encode('cardSummary-' . $user_id_Loginvl . '-' . $cardFilterClass) . ').textContent = ' . json_encode("$itemCount item" . ($itemCount === 1 ? '' : 's') . " \xC2\xB7 Closing qty $total_closing_qty_shown") . ';</script>';
 }
 }
 ?>
+						</div><!-- /#currentStockTabPane -->
+
+						<div id="datewiseTabPane">
+							<div id="datewiseResults">
+								<div class="loading-placeholder">Pick a date range and Company Profile, then click Apply to load the datewise report.</div>
+							</div>
+						</div>
 
                     </div>
                 </div>
@@ -368,15 +440,23 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
     <script src="../../assets/js/custom.js"></script>
     <script src="../../assets/js/pages/datatables.js"></script>
     <script>
-    function validateGodownChecks() {
-        var checked = document.querySelectorAll('.godown-check:checked');
-        if (checked.length === 0) {
-            alert('Select at least one Company Profile.');
-            return false;
+    /* ── Tabs ── */
+    function switchStockTab(tab) {
+        var isDatewise = (tab === 'datewise');
+        document.getElementById('tabBtnCurrent').classList.toggle('active', !isDatewise);
+        document.getElementById('tabBtnDatewise').classList.toggle('active', isDatewise);
+        document.getElementById('currentStockTabPane').classList.toggle('hidden-by-tab', isDatewise);
+        document.getElementById('datewiseTabPane').classList.toggle('active', isDatewise);
+        document.body.classList.toggle('tab-datewise', isDatewise);
+        if (isDatewise && !document.getElementById('datewiseTabPane').dataset.loadedOnce) {
+            // Don't auto-fetch on first switch — wait for the user to pick
+            // dates and hit Apply (date range is required and has no sane
+            // default). Once they've applied once, later Apply clicks reuse
+            // the same panel.
         }
-        return true;
     }
 
+    /* ── Company Profile dropdown ── */
     function toggleGodownDropdown(e) {
         e.stopPropagation();
         var panel = document.getElementById('godownDropdownPanel');
@@ -387,7 +467,7 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
         var checked = document.querySelectorAll('.godown-check:checked');
         var label = document.getElementById('godownDropdownLabel');
         if (checked.length === 0) {
-            label.textContent = 'Select';
+            label.textContent = 'All';
             label.style.color = '#6c757d';
         } else if (checked.length === 1) {
             label.textContent = checked[0].closest('label').textContent.trim();
@@ -398,28 +478,50 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
         }
     }
 
+    function onGodownFilterChange() {
+        updateGodownDropdownLabel();
+        // Company Profile also drives the Current Stock cards client-side
+        // (no reload needed there); Datewise only re-fetches on Apply since
+        // it needs a server round trip anyway.
+        applyStockFilters();
+    }
+
+    /* ── Warehouse dropdown ── */
     function toggleWarehouseDropdown(e) {
         e.stopPropagation();
         var panel = document.getElementById('warehouseDropdownPanel');
         panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
     }
 
-    document.querySelectorAll('.warehouse-check').forEach(function (cb) {
-        cb.addEventListener('change', function () {
-            var checked = document.querySelectorAll('.warehouse-check:checked');
-            var label = document.getElementById('warehouseDropdownLabel');
-            if (checked.length === 0) {
-                label.textContent = 'All';
-                label.style.color = '#6c757d';
-            } else if (checked.length === 1) {
-                label.textContent = checked[0].closest('label').textContent.trim();
-                label.style.color = '#000';
-            } else {
-                label.textContent = checked.length + ' warehouses selected';
-                label.style.color = '#000';
-            }
-        });
-    });
+    function updateWarehouseDropdownLabel() {
+        var boxes = document.querySelectorAll('.warehouse-check');
+        var checked = document.querySelectorAll('.warehouse-check:checked');
+        var label = document.getElementById('warehouseDropdownLabel');
+        if (checked.length === boxes.length) {
+            label.textContent = 'All';
+            label.style.color = '#6c757d';
+        } else if (checked.length === 0) {
+            label.textContent = 'None';
+            label.style.color = '#000';
+        } else if (checked.length === 1) {
+            label.textContent = checked[0].closest('label').textContent.trim();
+            label.style.color = '#000';
+        } else {
+            label.textContent = checked.length + ' warehouses selected';
+            label.style.color = '#000';
+        }
+    }
+
+    function onWarehouseFilterChange() {
+        updateWarehouseDropdownLabel();
+        applyStockFilters();
+    }
+    updateWarehouseDropdownLabel();
+
+    function setAllWarehouseChecks(checked) {
+        document.querySelectorAll('.warehouse-check').forEach(function (cb) { cb.checked = checked; });
+        onWarehouseFilterChange();
+    }
 
     document.addEventListener('click', function (e) {
         document.querySelectorAll('.ms-dropdown').forEach(function (dropdown) {
@@ -437,17 +539,22 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
         e.stopPropagation();
     });
 
-    /* ── Product / Godown filters — purely client-side over the already-
-       rendered cards, no page reload. ── */
-    function applyStockFilters() {
+    /* ── Current Stock tab: Product / Company Profile / Warehouse filters,
+       purely client-side over the already-rendered cards, no page reload. ── */
+    function applyCurrentStockFilters() {
         var searchTerm = (document.getElementById('productFilterInput').value || '').trim().toLowerCase();
-        var checkedWarehouses = Array.prototype.slice.call(document.querySelectorAll('.warehouse-filter-check:checked')).map(function (cb) { return cb.value; });
-        var allChecked = checkedWarehouses.indexOf('all') !== -1;
+        var checkedWarehouseBoxes = Array.prototype.slice.call(document.querySelectorAll('.warehouse-check:checked')).map(function (cb) { return cb.value; });
+        var allWarehouses = checkedWarehouseBoxes.length === document.querySelectorAll('.warehouse-check').length;
+        var checkedGodownNames = Array.prototype.slice.call(document.querySelectorAll('.godown-check:checked')).map(function (cb) { return cb.dataset.gname.toLowerCase(); });
+        var allGodowns = checkedGodownNames.length === 0;
 
         document.querySelectorAll('.wh-card').forEach(function (card) {
-            var wh = card.getAttribute('data-warehouse');
-            var warehouseVisible = allChecked || checkedWarehouses.indexOf(wh) !== -1;
-            if (!warehouseVisible) {
+            var wh = card.getAttribute('data-warehouse'); // 'unassigned' or 'wh-<id>'
+            var whId = wh === 'unassigned' ? 'unassigned' : wh.replace('wh-', '');
+            var warehouseVisible = allWarehouses || checkedWarehouseBoxes.indexOf(whId) !== -1;
+            var gname = card.getAttribute('data-gname') || '';
+            var godownVisible = allGodowns || checkedGodownNames.indexOf(gname) !== -1;
+            if (!warehouseVisible || !godownVisible) {
                 card.style.display = 'none';
                 return;
             }
@@ -468,21 +575,47 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
         });
     }
 
-    document.getElementById('productFilterInput').addEventListener('input', applyStockFilters);
-    document.querySelectorAll('.warehouse-filter-check').forEach(function (cb) {
-        cb.addEventListener('change', function () {
-            if (this.value === 'all' && this.checked) {
-                // "All" overrides individual selections back to checked
-                document.querySelectorAll('.warehouse-filter-check').forEach(function (other) { other.checked = true; });
-            } else if (this.value !== 'all' && !this.checked) {
-                document.querySelector('.warehouse-filter-check[value="all"]').checked = false;
-            } else if (this.value !== 'all' && this.checked) {
-                var allOthersChecked = Array.prototype.every.call(document.querySelectorAll('.warehouse-filter-check:not([value="all"])'), function (other) { return other.checked; });
-                if (allOthersChecked) document.querySelector('.warehouse-filter-check[value="all"]').checked = true;
-            }
-            applyStockFilters();
-        });
-    });
+    /* ── Datewise tab: fetch the report fragment via AJAX using the shared
+       filter bar's dates / Company Profile / Warehouse selections. ── */
+    function loadDatewiseTab() {
+        var frdate = document.getElementById('frdate').value;
+        var todate = document.getElementById('todate').value;
+        var resultsEl = document.getElementById('datewiseResults');
+        if (!frdate || !todate) {
+            resultsEl.innerHTML = '<div class="loading-placeholder">Pick both a From Date and To Date, then click Apply.</div>';
+            return;
+        }
+
+        var params = new URLSearchParams();
+        params.set('ajax', '1');
+        params.set('frdate', frdate);
+        params.set('todate', todate);
+        document.querySelectorAll('.godown-check:checked').forEach(function (cb) { params.append('godownid[]', cb.value); });
+        document.querySelectorAll('.warehouse-check:checked').forEach(function (cb) { params.append('warehouseid[]', cb.value); });
+
+        resultsEl.innerHTML = '<div class="loading-placeholder">Loading…</div>';
+        fetch('overstock_datewise?' + params.toString())
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                resultsEl.innerHTML = html;
+                document.getElementById('datewiseTabPane').dataset.loadedOnce = '1';
+            })
+            .catch(function () {
+                resultsEl.innerHTML = '<div class="loading-placeholder">Could not load the report. Please try again.</div>';
+            });
+    }
+
+    /* ── Apply button: runs whichever tab is active. ── */
+    function applyStockFilters() {
+        var isDatewise = document.body.classList.contains('tab-datewise');
+        if (isDatewise) {
+            loadDatewiseTab();
+        } else {
+            applyCurrentStockFilters();
+        }
+    }
+
+    document.getElementById('productFilterInput').addEventListener('input', applyCurrentStockFilters);
     </script>
 </body>
 

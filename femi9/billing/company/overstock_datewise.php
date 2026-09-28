@@ -1,7 +1,14 @@
 <?php include("checksession.php");
 include("config.php");
 require_once("include/GodownAccess.php");
+require_once("include/DatewiseStockReport.php");
 error_reporting(0);
+
+// AJAX fragment mode — called from overall-stock.php's Datewise tab. Skips
+// the page shell (head/sidebar/header) and renders just the results block,
+// with each date as a collapsible <details> section instead of a stacked
+// full table, so a wide date range doesn't dump everything open at once.
+$is_ajax = isset($_REQUEST['ajax']) && $_REQUEST['ajax'] == '1';
 
 $get_from_date=$_REQUEST['frdate'];
 //$get_from_date=date ("Y-m-d", strtotime("-1 day", strtotime($get_from_date1)));
@@ -56,18 +63,19 @@ if (!empty($_REQUEST['warehouseid'])) {
 $selected_warehouse_names = [];
 if ($includeUnassigned) $selected_warehouse_names[] = 'Unassigned';
 foreach ($selectedWarehouseIds as $wid) $selected_warehouse_names[] = $warehouseNames[$wid];
-// SQL fragment: "AND warehouse_id IN (...)" / "AND warehouse_id IS NULL" /
-// combined via OR — applied to stock_ledger queries only when a warehouse
-// filter was actually submitted.
-function warehouseLedgerCondition(bool $filterByWarehouse, array $selectedWarehouseIds, bool $includeUnassigned): string {
-    if (!$filterByWarehouse) return '';
-    $parts = [];
-    if (!empty($selectedWarehouseIds)) $parts[] = 'warehouse_id IN (' . implode(',', $selectedWarehouseIds) . ')';
-    if ($includeUnassigned) $parts[] = 'warehouse_id IS NULL';
-    if (empty($parts)) return ' AND 1=0'; // filter submitted but nothing selected — show nothing rather than silently ignore it
-    return ' AND (' . implode(' OR ', $parts) . ')';
-}
+// warehouseLedgerCondition() and computeStockMovement() live in
+// include/DatewiseStockReport.php, shared with overstock_datewise_pdf.php.
 $warehouseCond = warehouseLedgerCondition($filterByWarehouse, $selectedWarehouseIds, $includeUnassigned);
+
+// When 2+ warehouse buckets are selected (a real warehouse and/or
+// Unassigned), the report splits into one sub-table per warehouse instead
+// of one merged total — $warehouseBuckets is empty when 0 or 1 bucket is
+// selected, which is the signal the render loop below uses to fall back to
+// today's single-table behavior.
+$selectedBucketCount = count($selectedWarehouseIds) + ($includeUnassigned ? 1 : 0);
+$warehouseBuckets = $selectedBucketCount >= 2
+    ? datewiseWarehouseBuckets($selectedWarehouseIds, $includeUnassigned, $warehouseNames)
+    : [];
 
 // Manufacturer purchases (Neksomo "Purchase from Manufacturer") always credit
 // into Neksomo's own godown, tracked separately from the legacy input_stock
@@ -81,6 +89,12 @@ $neksomoGodownId = (int) (mysqli_fetch_row(mysqli_query($db_conn,
 // purchase credits from the closing-stock total) whenever Neksomo's godown
 // was selected via the real form rather than a single scalar value.
 $showManufPurchases = empty($get_company_ids) || in_array($neksomoGodownId, $get_company_ids, true);
+
+$pdfHref = "overstock_datewise_pdf?frdate=$get_from_date&&todate=$get_to_date&&"
+    . implode('&&', array_map(fn($gid) => 'godownid[]=' . $gid, $get_company_ids))
+    . ($filterByWarehouse ? '&&' . implode('&&', array_map(fn($w) => 'warehouseid[]=' . urlencode($w), array_merge($selectedWarehouseIds, $includeUnassigned ? ['unassigned'] : []))) : '');
+
+if (!$is_ajax) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -122,29 +136,29 @@ $showManufPurchases = empty($get_company_ids) || in_array($neksomoGodownId, $get
 
 <body>
     <div class="app align-content-stretch d-flex flex-wrap">
-	
+
         <div class="app-sidebar">
             <?php include("logo.php");?>
             <?php include("femi_menu.php");?>
         </div>
-		
+
         <div class="app-container">
-            
+
           <?php include("app-header.php");?>
-			
+
             <div class="app-content">
                 <div class="content-wrapper">
                     <div class="container-fluid">
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
-								
+
                                     <h1>
 									<table class="headertble">
 									<tr>
 									<td>Datewise Overall stock</td>
 									<td><a href="overall-stock">&#8592; Go Back</a></td>
-									<td><a href="overstock_datewise_pdf?frdate=<?=$get_from_date;?>&&todate=<?=$get_to_date;?>&&<?php echo implode('&&', array_map(fn($gid) => 'godownid[]=' . $gid, $get_company_ids)); ?><?php echo $filterByWarehouse ? '&&' . implode('&&', array_map(fn($w) => 'warehouseid[]=' . urlencode($w), array_merge($selectedWarehouseIds, $includeUnassigned ? ['unassigned'] : []))) : ''; ?>" title="Export" target="_blank"><img src="32-pdf.png"></a></td>
+									<td><a href="<?=htmlspecialchars($pdfHref, ENT_QUOTES, 'UTF-8');?>" title="Export" target="_blank"><img src="32-pdf.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -159,103 +173,36 @@ $showManufPurchases = empty($get_company_ids) || in_array($neksomoGodownId, $get
                                 </div>
                             </div>
                         </div>
-						
+
                         <div class="row">
                             <div class="col">
                                 <div class="card">
                                     <div class="card-body">
 									<div style="background:#fff;overflow:scroll;width:100%;">
-									
+
+									<?php } // !$is_ajax ?>
+									<?php if ($is_ajax): ?>
+									<div class="datewise-ajax-summary">
+										<div class="datewise-ajax-summary-row">
+											<span><strong><?=date("d M Y",strtotime($get_from_date));?></strong> &rarr; <strong><?=date("d M Y",strtotime($get_to_date));?></strong></span>
+											<a href="<?=htmlspecialchars($pdfHref, ENT_QUOTES, 'UTF-8');?>" class="btn btn-sm btn-outline-secondary" title="Export PDF" target="_blank"><i class="material-icons" style="font-size:16px;vertical-align:-3px;">picture_as_pdf</i> Export PDF</a>
+										</div>
+										<?php if(!empty($selected_godown_names)){?>
+										<div class="datewise-ajax-summary-meta">Company Profile: <b><?=htmlspecialchars(implode(', ', $selected_godown_names));?></b></div>
+										<?php }?>
+										<?php if(!empty($selected_warehouse_names)){?>
+										<div class="datewise-ajax-summary-meta">Warehouse: <b><?=htmlspecialchars(implode(', ', $selected_warehouse_names));?></b></div>
+										<?php }?>
+									</div>
+									<?php endif; ?>
 									<?php
-// Net stock movement for one product over an inclusive date range, read
-// entirely from stock_ledger — the one table StockService guarantees is
-// warehouse-scoped and complete for every write since it was introduced
-// (2026-06-22 onward). Replaces the old 10-table reconstruction (input_stock,
+// computeStockMovement() lives in include/DatewiseStockReport.php — reads
+// stock_ledger, the one table StockService guarantees is warehouse-scoped
+// and complete for every write since it was introduced (2026-06-22
+// onward). Replaces the old 10-table reconstruction (input_stock,
 // ot_sales, invoice_items, tp_invoice_items, internal_transfer,
-// pl_godown_transfer_items, ...), most of which have no warehouse_id column
-// at all and so could never honor a warehouse filter. $warehouseCond is the
-// pre-built "AND (warehouse_id IN (...) OR warehouse_id IS NULL)" fragment
-// (empty string when no warehouse filter was submitted).
-function computeStockMovement($db_conn, $prid, $fromDate, $toDate, $companyIdsSql, $filterByGodown, $showManufPurchases, $warehouseCond) {
-    $prid = (int)$prid;
-    $fromDate = mysqli_real_escape_string($db_conn, $fromDate);
-    $toDate   = mysqli_real_escape_string($db_conn, $toDate);
-    $sum = function($sql) use ($db_conn) {
-        return (int)(mysqli_fetch_row(mysqli_query($db_conn, $sql))[0] ?? 0);
-    };
-    $godownCond = $filterByGodown ? " AND user_id IN ($companyIdsSql)" : '';
-    $dateCond   = " AND created_at >= '$fromDate 00:00:00' AND created_at <= '$toDate 23:59:59'";
-    $base       = "product_id=$prid AND user_type='company'$godownCond$warehouseCond$dateCond";
-    $sumAction  = function($action) use ($sum, $base) {
-        return $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='$action'");
-    };
-
-    // Input Stock Qty — every credit into this godown: input_stock
-    // submissions, Neksomo conversions, transfer-in from another godown/
-    // warehouse, and accepted returns. Net of reverse_credit (a credit later
-    // undone) and transfer_in_reverse (a transfer_in later undone).
-    $credit       = $sumAction('credit');
-    $reverseCr    = $sumAction('reverse_credit');
-    $transferIn   = $sumAction('transfer_in');
-    $transferInRv = $sumAction('transfer_in_reverse');
-    $returnAccept = $sumAction('return_accept');
-    $input_qty    = $credit - $reverseCr + $transferIn - $transferInRv + $returnAccept;
-
-    // Sales Qty — every deduction from this godown that represents goods
-    // leaving via a sale: ordinary deduct (customer/TP/user invoices),
-    // ot_deduct (OT sales), and demofree's transfer_out (demo/free/damage,
-    // folded into Sales per this page's existing convention). Net of
-    // reverse_deduct and ot_reverse.
-    $deduct      = $sumAction('deduct');
-    $reverseDed  = $sumAction('reverse_deduct');
-    $otDeduct    = $sumAction('ot_deduct');
-    $otReverse   = $sumAction('ot_reverse');
-    $dfd         = (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out' AND ref_type='demofree'")
-                 - (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out_reverse' AND ref_type='demofree'");
-    $total_sales = $deduct - $reverseDed + $otDeduct - $otReverse + $dfd;
-
-    // Return Qty — reverse_deduct entries are already netted into Sales
-    // above (a return of a prior sale reduces net sales), but this page
-    // also shows the gross return amount as its own column, same as before.
-    $total_sales_return = $reverseDed + $otReverse;
-
-    // Internal Transfer Qty — outbound godown-to-godown/warehouse-to-
-    // warehouse transfer_out, excluding demofree's transfer_out (already
-    // counted in Sales above). Net of transfer_out_reverse.
-    $transferOut   = (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out' AND ref_type != 'demofree'");
-    $transferOutRv = (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out_reverse' AND ref_type != 'demofree'");
-    $internal_transfer = $transferOut - $transferOutRv;
-
-    // Movement to CP — Partner-Location <-> Godown transfers
-    // (pl-godown-transfer-action.php) write their own ref_type/ref_id
-    // ('PLT-xxxxx') through StockService like everything else, so they're
-    // already included in transfer_out above; no separate query needed.
-    $movement_to_cp = 0;
-
-    // Neksomo "Purchase from Manufacturer" — StockService-based like
-    // everything else here (ref_type='adjustment', note references the
-    // manufacturer purchase), already included in $credit above when this
-    // godown is Neksomo's. Kept as its own reported column via a dedicated
-    // ref_id pattern match, same rows already counted in $input_qty (not
-    // double-added to net_change).
-    $manuf = 0;
-    if ($showManufPurchases) {
-        $manuf = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='credit' AND ref_id LIKE 'manuf_purchase_%'");
-    }
-
-    return [
-        'input_qty'          => $input_qty,
-        'total_sales'        => $total_sales,
-        'total_sales_return' => $total_sales_return,
-        'internal_transfer'  => $internal_transfer,
-        'movement_to_cp'      => $movement_to_cp,
-        'manuf_qty'          => $manuf,
-        // Credits add to stock; sales (incl. demo/free/damage) and internal
-        // transfer remove from it. Return Qty is informational only — its
-        // effect is already netted into total_sales via reverse_deduct.
-        'net_change'         => $input_qty - $total_sales - $internal_transfer,
-    ];
-}
+// pl_godown_transfer_items, ...), most of which have no warehouse_id
+// column at all and so could never honor a warehouse filter.
 
 $filterByGodown = ($_REQUEST['godownid'] != NULL);
 
@@ -264,85 +211,78 @@ $allProducts = [];
 $fetch_productDetils = mysqli_query($db_conn, "select * from products where (temp_id not like 'NKS-%' or temp_id is null) order by id asc");
 while ($p = mysqli_fetch_assoc($fetch_productDetils)) { $allProducts[] = $p; }
 
-// Today's real closing_qty per product (summed across whichever godowns are
-// in scope) — the live `stock` table is always accurate, so this is used as
-// a trusted anchor instead of building forward from opening_qty. Older
-// company-godown stock includes bulk-imported/migrated quantities that were
-// never logged into input_stock or stock_ledger with a date, so reconstructing
-// history forward from opening_date can be wildly wrong wherever that gap
-// exists. Anchoring to today and working backward only needs the *recent*
-// movement window (report's from_date through today) to be complete, which
-// normal day-to-day tracked activity reliably is.
-$todayClosingByProduct = [];
-$select_today_closing = "SELECT product_id, SUM(closing_qty) sum_closing FROM stock WHERE user_type='company'"
-    . ($filterByGodown ? " AND user_id IN ($get_company_ids_sql)" : '')
-    . $warehouseCond
-    . " GROUP BY product_id";
-$fetch_today_closing = mysqli_query($db_conn, $select_today_closing);
-while ($row = mysqli_fetch_assoc($fetch_today_closing)) {
-    $todayClosingByProduct[(int)$row['product_id']] = (int)$row['sum_closing'];
-}
-
-// Running closing balance per product, seeded with: today's real closing_qty
-// minus the net movement from this report's from_date through today
-// (inclusive) — i.e. the balance as it stood right before from_date, derived
-// only from the recent/reliable tracking window. Carried forward day by day
-// inside the loop below.
-$runningClosing = [];
-$today = date('Y-m-d');
-foreach ($allProducts as $p) {
-    $prid = (int)$p['id'];
-    $todayClosing = $todayClosingByProduct[$prid] ?? 0;
-    if ($get_from_date <= $today) {
-        $sinceFrom = computeStockMovement($db_conn, $prid, $get_from_date, $today, $get_company_ids_sql, $filterByGodown, $showManufPurchases, $warehouseCond);
-        $runningClosing[$prid] = $todayClosing - $sinceFrom['net_change'];
-    } else {
-        // Report starts in the future — nothing to unwind, start from today's balance.
-        $runningClosing[$prid] = $todayClosing;
+// Today's real closing_qty per product is the trusted anchor for seeding the
+// running closing balance (see datewiseSeedRunningClosing() for the full
+// rationale — bulk-imported/migrated stock predates stock_ledger, so
+// building forward from opening_date can be wildly wrong; anchoring to
+// today and working backward only needs the recent tracking window to be
+// complete). Merged-view path (0/1 warehouse selected) seeds one map as
+// before; breakdown path (2+ warehouses selected) seeds one map per
+// warehouse bucket, each independently anchored to that warehouse's own
+// today's closing_qty — summing the merged total then splitting it isn't
+// possible since movement isn't warehouse-attributable after aggregation.
+if (empty($warehouseBuckets)) {
+    $runningClosing = datewiseSeedRunningClosing($db_conn, $allProducts, $get_from_date, $filterByGodown, $get_company_ids_sql, $showManufPurchases, $warehouseCond);
+} else {
+    $runningClosingByBucket = [];
+    foreach ($warehouseBuckets as $bi => $bucket) {
+        $runningClosingByBucket[$bi] = datewiseSeedRunningClosing($db_conn, $allProducts, $get_from_date, $filterByGodown, $get_company_ids_sql, $showManufPurchases, $bucket['cond']);
     }
 }
 
 $startTime = strtotime($get_from_date);
 $endTime = strtotime($get_to_date);
+$totalDays = (int)floor(($endTime - $startTime) / 86400) + 1;
+$dayIndex = 0;
 
 // Loop between timestamps, 24 hours at a time
 for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 
  $thisDate = date( 'Y-m-d', $i ); // 2010-05-01, 2010-05-02, etc
+ $dayIndex++;
+ // Each date is its own collapsible <details> section rather than a stacked
+ // full table — a wide date range used to dump every day's table open at
+ // once. Only the most recent date (last in the loop) opens by default;
+ // earlier days start collapsed but are still fully in the DOM (no re-fetch
+ // needed to expand one).
+ $isLastDay = ($dayIndex === $totalDays);
 
- ?>
- <h1 align="center"><?=date("d-m-Y",strtotime($thisDate));?></h1>
-                                        <table class="table">
-                                            <thead>
-                                               <tr>
-											<th>Product Name</th>
-											<th style="text-align:right;">Input Stock Qty</th>
-<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Input Stock Qty (Pieces)</th><?php endif; ?>
-											<th style="text-align:right;">Sales Qty</th>
-<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sales Qty (Pieces)</th><?php endif; ?>
-											<th style="text-align:right;">Return Qty</th>
-<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Return Qty (Pieces)</th><?php endif; ?>
-											<th style="text-align:right;">Internal Transfer Qty</th>
-<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Internal Transfer Qty (Pieces)</th><?php endif; ?>
-											<th style="text-align:right;">Movement to CP</th>
-<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Movement to CP (Pieces)</th><?php endif; ?>
-<?php if ($showManufPurchases): ?><th style="text-align:right;">Manufacturer Purchase Qty</th><?php endif; ?>
-<?php if ($showManufPurchases && is_neksomo_login($db_conn)): ?><th style="text-align:right;">Manufacturer Purchase Qty (Pieces)</th><?php endif; ?>
-											<th style="text-align:right;">Closing Stock</th>
-<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Closing Stock (Pieces)</th><?php endif; ?>
-											</tr>
-                                            </thead>
-
-											<tbody>
-<?php foreach ($allProducts as $Result_productDetils):
-	$report_prid = (int)$Result_productDetils['id'];
-	$m = computeStockMovement($db_conn, $report_prid, $thisDate, $thisDate, $get_company_ids_sql, $filterByGodown, $showManufPurchases, $warehouseCond);
-	$runningClosing[$report_prid] = ($runningClosing[$report_prid] ?? 0) + $m['net_change'];
-	$closingStock = $runningClosing[$report_prid];
-	$PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
-						?>
+ // Renders one <table> of product movement rows for $warehouseCondForBucket,
+ // carrying forward $runningClosingRef (byref map, keyed by product id) day
+ // by day. Returns [html, totals]. Shared by both the merged single-table
+ // path and the per-warehouse breakdown path below — same table markup
+ // either way, just scoped to a different warehouse condition and its own
+ // running-closing map.
+ $renderMovementTable = function($warehouseCondForBucket, array &$runningClosingRef) use ($db_conn, $allProducts, $thisDate, $get_company_ids_sql, $filterByGodown, $showManufPurchases) {
+    $totals = ['opening_qty'=>0,'input_qty'=>0,'total_sales'=>0,'total_sales_return'=>0,'internal_transfer'=>0,'manuf_qty'=>0,'closing'=>0];
+    $rowsHtml = '';
+    foreach ($allProducts as $Result_productDetils) {
+        $report_prid = (int)$Result_productDetils['id'];
+        // Opening Stock Qty — the balance as it stood before any of this
+        // day's transactions: simply the running-closing value carried over
+        // from the previous day, captured before this day's net_change is
+        // folded in below.
+        $openingStock = $runningClosingRef[$report_prid] ?? 0;
+        $m = computeStockMovement($db_conn, $report_prid, $thisDate, $thisDate, $get_company_ids_sql, $filterByGodown, $showManufPurchases, $warehouseCondForBucket);
+        $runningClosingRef[$report_prid] = $openingStock + $m['net_change'];
+        $closingStock = $runningClosingRef[$report_prid];
+        $PiecesPerPack=max((int)($Result_productDetils['pieces_per_pack'] ?? 1), 1);
+        if ($filterByGodown) $totals['opening_qty'] += $openingStock;
+        $totals['input_qty'] += $m['input_qty'];
+        $totals['total_sales'] += $m['total_sales'];
+        $totals['total_sales_return'] += $m['total_sales_return'];
+        $totals['internal_transfer'] += $m['internal_transfer'];
+        $totals['manuf_qty'] += $m['manuf_qty'];
+        if ($filterByGodown) $totals['closing'] += $closingStock;
+        ob_start();
+                            ?>
                         <tr>
                         <td><?php echo $Result_productDetils["productName"];?></td>
+						<?php // Opening stock, like Closing Stock, is only meaningful once scoped
+						// to specific company godown(s) — see the Closing Stock column's note
+						// below for the full rationale. ?>
+						<td align="right"><?php echo $filterByGodown ? $openingStock : '—'; ?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $filterByGodown ? $openingStock*$PiecesPerPack : '—'; ?></td><?php endif; ?>
 						<td align="right"><?php echo $m['input_qty'];?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['input_qty']*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $m['total_sales'];?></td>
@@ -364,17 +304,85 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 						<td align="right"><b><?php echo $filterByGodown ? $closingStock : '—'; ?></b></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><b><?php echo $filterByGodown ? $closingStock*$PiecesPerPack : '—'; ?></b></td><?php endif; ?>
                         </tr>
-						<?php endforeach; ?>
+						<?php
+        $rowsHtml .= ob_get_clean();
+    }
+    ob_start();
+    ?>
+    <table class="table">
+        <thead>
+           <tr>
+			<th>Product Name</th>
+			<th style="text-align:right;">Opening Stock Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Opening Stock Qty (Pieces)</th><?php endif; ?>
+			<th style="text-align:right;">Input Stock Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Input Stock Qty (Pieces)</th><?php endif; ?>
+			<th style="text-align:right;">Sales Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Sales Qty (Pieces)</th><?php endif; ?>
+			<th style="text-align:right;">Return Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Return Qty (Pieces)</th><?php endif; ?>
+			<th style="text-align:right;">Internal Transfer Qty</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Internal Transfer Qty (Pieces)</th><?php endif; ?>
+			<th style="text-align:right;">Movement to CP</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Movement to CP (Pieces)</th><?php endif; ?>
+<?php if ($showManufPurchases): ?><th style="text-align:right;">Manufacturer Purchase Qty</th><?php endif; ?>
+<?php if ($showManufPurchases && is_neksomo_login($db_conn)): ?><th style="text-align:right;">Manufacturer Purchase Qty (Pieces)</th><?php endif; ?>
+			<th style="text-align:right;">Closing Stock</th>
+<?php if (is_neksomo_login($db_conn)): ?><th style="text-align:right;">Closing Stock (Pieces)</th><?php endif; ?>
+			</tr>
+        </thead>
+		<tbody>
+		<?php echo $rowsHtml; ?>
+		</tbody>
+    </table>
+    <?php
+    return ['html' => ob_get_clean(), 'totals' => $totals];
+ };
 
-									    </tbody>
-                                        </table>
+ if (empty($warehouseBuckets)) {
+    // Merged view (0 or 1 warehouse selected) — same single table as before.
+    $result = $renderMovementTable($warehouseCond, $runningClosing);
+    $dayTotals = $result['totals'];
+    $dayBodyHtml = $result['html'];
+ } else {
+    // Breakdown view (2+ warehouses selected) — one sub-table per warehouse,
+    // each with its own independently-seeded running closing balance. The
+    // day's quick-totals line still sums across all selected warehouses.
+    $dayTotals = ['input_qty'=>0,'total_sales'=>0,'total_sales_return'=>0,'internal_transfer'=>0,'manuf_qty'=>0,'closing'=>0];
+    $dayBodyHtml = '';
+    foreach ($warehouseBuckets as $bi => $bucket) {
+        $result = $renderMovementTable($bucket['cond'], $runningClosingByBucket[$bi]);
+        foreach ($dayTotals as $k => $v) { $dayTotals[$k] += $result['totals'][$k]; }
+        $dayBodyHtml .= '<div class="datewise-warehouse-block">'
+            . '<div class="datewise-warehouse-label">' . htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8') . '</div>'
+            . $result['html'] . '</div>';
+    }
+ }
+?>
+<details class="datewise-day" <?php echo $isLastDay ? 'open' : ''; ?>>
+	<summary class="datewise-day-summary">
+		<span class="datewise-day-date"><?=date("d M Y (D)",strtotime($thisDate));?></span>
+		<span class="datewise-day-quicktotals">
+			<?php if ($filterByGodown): ?>Opening <b><?=$dayTotals['opening_qty'];?></b> &middot; <?php endif; ?>
+			In <b><?=$dayTotals['input_qty'];?></b> &middot;
+			Sales <b><?=$dayTotals['total_sales'];?></b> &middot;
+			Transfer <b><?=$dayTotals['internal_transfer'];?></b>
+			<?php if ($filterByGodown): ?> &middot; Closing <b><?=$dayTotals['closing'];?></b><?php endif; ?>
+		</span>
+	</summary>
+	<div style="overflow-x:auto;">
+	<?php echo $dayBodyHtml; ?>
+	</div>
+</details>
+<?php
+}
 
-										<?php }?>
-
+if (!$is_ajax) {
+?>
 										</div>
                                     </div>
                                 </div>
-                                
+
                             </div>
                         </div>
                     </div>
@@ -397,3 +405,4 @@ for ( $i = $startTime; $i <= $endTime; $i = $i + 86400 ) {
 </body>
 
 </html>
+<?php } // !$is_ajax ?>
