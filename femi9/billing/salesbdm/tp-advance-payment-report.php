@@ -24,17 +24,35 @@ $allowed_statuses = ['active','partially_adjusted','fully_adjusted',''];
 if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = '';
 $filter_type = $_GET['type'] ?? '';
 if (!in_array($filter_type, ['', 'napkin', 'diaper'], true)) $filter_type = '';
+$filter_district = trim($_GET['district'] ?? '');
 
 $payments = [];
 $tpTargets = [];
 $tpInvoiced = [];
 $tps = [];
+$districtList = [];
 $total_count = 0; $total_amount = 0; $total_balance = 0; $total_adjusted = 0;
 
 if ($hasTps) {
-    $tps = call_rows_local($db_conn, "SELECT id, tp_id, name, is_active FROM territory_partners WHERE id IN ($tpIdList) ORDER BY name ASC", '', []);
+    $tps = call_rows_local($db_conn, "SELECT id, tp_id, name, is_active, COALESCE(NULLIF(assigned_district,''), branch_district) AS district_name FROM territory_partners WHERE id IN ($tpIdList) ORDER BY name ASC", '', []);
+    $tpDistricts = [];
+    foreach ($tps as $_t) { $tpDistricts[(int)$_t['id']] = $_t['district_name'] ?? ''; }
 
-    $where = ["tap.deleted_at IS NULL", "tap.payment_date BETWEEN ? AND ?", "tap.territory_partner_id IN ($tpIdList)"];
+    // Distinct district names across this BDM's own TPs, for the District filter.
+    $districtList = array_values(array_unique(array_filter(array_column($tps, 'district_name'))));
+    sort($districtList);
+    if ($filter_district !== '' && !in_array($filter_district, $districtList, true)) { $filter_district = ''; }
+
+    // Restricts the query to only TPs in the selected district — everything
+    // else (target/invoiced lookups, the table itself) already keys off
+    // territory_partner_id, so narrowing this list is enough to make the
+    // whole report district-scoped.
+    $scopedTpIds = $filter_district !== ''
+        ? array_keys(array_filter($tpDistricts, fn($d) => $d === $filter_district))
+        : $tpIds;
+    $scopedTpIdList = !empty($scopedTpIds) ? implode(',', array_map('intval', $scopedTpIds)) : '0';
+
+    $where = ["tap.deleted_at IS NULL", "tap.payment_date BETWEEN ? AND ?", "tap.territory_partner_id IN ($scopedTpIdList)"];
     $params = [$filter_from, $filter_to];
     $types = "ss";
     if ($filter_tp > 0) {
@@ -132,6 +150,8 @@ $i = 0;
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
     <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" href="../../assets/images/neptune.png">
@@ -208,6 +228,15 @@ $i = 0;
                     <div class="mis-filter">
                         <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
                             <div>
+                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">District</label>
+                                <select name="district" class="form-control form-control-sm" style="width:180px;">
+                                    <option value="">All Districts</option>
+                                    <?php foreach ($districtList as $d): ?>
+                                        <option value="<?php echo htmlspecialchars($d); ?>" <?php echo $filter_district === $d ? 'selected' : ''; ?>><?php echo htmlspecialchars($d); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div>
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Territory Partner</label>
                                 <select name="tp_id" id="tpSelect" class="form-control form-control-sm" style="width:220px;">
                                     <option value="0">All Territory Partners</option>
@@ -247,12 +276,13 @@ $i = 0;
 
                     <div class="card">
                         <div class="card-body" style="overflow-x:auto;">
-                            <table class="mt">
+                            <table id="advPayReportTable" class="mt" style="width:100%;">
                                 <thead>
                                     <tr>
                                         <th>#</th>
                                         <th>TP Name</th>
                                         <th>TP ID</th>
+                                        <th>District</th>
                                         <th>Type</th>
                                         <th>TP Target (&#8377;)</th>
                                         <th>Invoiced &mdash; Napkin (&#8377;)</th>
@@ -261,19 +291,18 @@ $i = 0;
                                         <th>Amount (&#8377;)</th>
                                         <th>Balance (&#8377;)</th>
                                         <th>Adjusted (&#8377;)</th>
-                                        <th>Mode</th>
-                                        <th>Reference</th>
+                                        <th class="no-export">Mode</th>
+                                        <th class="no-export">Reference</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                <?php if (empty($payments)): ?>
-                                    <tr><td colspan="14" class="text-muted">No advance payments in this period.</td></tr>
-                                <?php else: foreach ($payments as $p): ?>
+                                <?php foreach ($payments as $p): ?>
                                     <tr>
                                         <td><?php echo ++$i; ?></td>
                                         <td><?php echo htmlspecialchars($p['tp_name']); ?></td>
                                         <td><code style="font-size:12px;"><?php echo htmlspecialchars($p['tp_code']); ?></code></td>
+                                        <td><?php echo htmlspecialchars($tpDistricts[$p['territory_partner_id']] ?? '—') ?: '—'; ?></td>
                                         <td>
                                             <?php $_payType = tpResolveProductType($p['product_type'] ?? null); [$_tBg, $_tFg] = tpProductTypeBadgeColors($_payType); ?>
                                             <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?php echo $_tBg; ?>;color:<?php echo $_tFg; ?>;"><?php echo htmlspecialchars(tpProductTypeLabel($_payType)); ?></span>
@@ -304,7 +333,7 @@ $i = 0;
                                             <?php endif; ?>
                                         </td>
                                     </tr>
-                                <?php endforeach; endif; ?>
+                                <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -322,10 +351,25 @@ $i = 0;
 <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
 <script>
 $('#tpSelect').select2({ width: '220px', placeholder: 'All Territory Partners' });
+
+$('#advPayReportTable').DataTable({
+    dom: '<"row"<"col-sm-6"l><"col-sm-6"f>><"row"<"col-sm-12"B>><"row"<"col-sm-12"tr>><"row"<"col-sm-5"i><"col-sm-7"p>>',
+    buttons: [
+        { extend: 'excel', text: '<i class="material-icons" style="vertical-align:middle">download</i> Excel', className: 'btn btn-success', exportOptions: { columns: ':not(.no-export)' } },
+        { extend: 'print', text: '<i class="material-icons" style="vertical-align:middle">print</i> Print', className: 'btn btn-info' }
+    ]
+});
 </script>
 </body>
 </html>
