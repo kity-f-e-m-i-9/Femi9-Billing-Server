@@ -122,16 +122,4 @@ function findMatchingAccounts(mysqli $db_conn, string $mobile, string $password)
 
     return $matches;
 }
-
-/**
- * Set the session keys every panel's checksession.php/config.php/dashboard.php
- * already expects, matching each category's own CheckLogin.php contract exactly.
- */
-function activateAccountSession(array $account): void {
-    $_SESSION['LOGIN_USER']      = $account['mobile'];
-    $_SESSION['LOGIN_USER_ID']   = $account['id'];
-    $_SESSION['LOGIN_USER_NAME'] = $account['name'];
-    $_SESSION['LOGIN_USER_TYPE'] = $account['type'];
-    $_SESSION['last_activity']   = time();
-}
 ?>

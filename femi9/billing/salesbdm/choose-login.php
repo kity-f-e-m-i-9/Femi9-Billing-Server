@@ -26,9 +26,8 @@ if ($choice === 'salesbdm') {
     unset($_SESSION['pending_switch_bdm_id'], $_SESSION['pending_switch_bdm_mobile'], $_SESSION['pending_switch_bdm_name'], $_SESSION['pending_switch_admin_id'], $_SESSION['pending_switch_admin_username']);
 
     if ($user && $user['account_status'] === 'active') {
-        finalizeSalesBdmSession($db_conn, $user);
-        session_regenerate_id(true);
-        header('Location: dashboard.php');
+        $bridgeToken = finalizeSalesBdmSession($db_conn, $user);
+        header('Location: switch-login-central.php?token=' . urlencode($bridgeToken));
         exit;
     }
     header('Location: index.php?sessionexpiry');

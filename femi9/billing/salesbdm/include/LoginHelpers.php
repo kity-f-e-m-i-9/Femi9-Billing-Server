@@ -2,12 +2,14 @@
 // Shared by CheckLogin.php and choose-login.php so the "finalize a Sales BDM
 // session" logic (and the salesbdm→company TP-page bridge cookie) only
 // exists in one place.
-function finalizeSalesBdmSession($db_conn, array $user): void {
-    $_SESSION['LOGIN_USER'] = $user['bdm_mobile'];
-    $_SESSION['LOGIN_USER_ID'] = $user['id'];
-    $_SESSION['LOGIN_USER_NAME'] = $user['bdm_name'];
-    $_SESSION['LOGIN_USER_TYPE'] = 'salesbdm';
-    $_SESSION['last_activity'] = time();
+function finalizeSalesBdmSession($db_conn, array $user): string {
+    require_once __DIR__ . '/../../shared/session-bridge.php';
+    $ownBridgeToken = mintBridgeToken($db_conn, [
+        'type'   => 'salesbdm',
+        'id'     => $user['id'],
+        'name'   => $user['bdm_name'],
+        'mobile' => $user['bdm_mobile'],
+    ], []);
 
     $db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_company_bridge (
         token VARCHAR(64) PRIMARY KEY,
@@ -15,17 +17,19 @@ function finalizeSalesBdmSession($db_conn, array $user): void {
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
-    $bridgeToken = bin2hex(random_bytes(32));
+    $companyBridgeToken = bin2hex(random_bytes(32));
     $bridgeStmt = $db_conn->prepare("INSERT INTO salesbdm_company_bridge (token, bdm_id, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))");
-    $bridgeStmt->bind_param('si', $bridgeToken, $user['id']);
+    $bridgeStmt->bind_param('si', $companyBridgeToken, $user['id']);
     $bridgeStmt->execute();
     $bridgeStmt->close();
-    setcookie('femi9_bdm_bridge', $bridgeToken, ['path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+    setcookie('femi9_bdm_bridge', $companyBridgeToken, ['path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
 
     $updateStmt = mysqli_prepare($db_conn, "UPDATE sales_bdm_staff SET last_login = NOW() WHERE id = ?");
     mysqli_stmt_bind_param($updateStmt, "i", $user['id']);
     mysqli_stmt_execute($updateStmt);
     mysqli_stmt_close($updateStmt);
+
+    return $ownBridgeToken;
 }
 
 // One-time, short-lived token that hands off to company/switch-login.php —

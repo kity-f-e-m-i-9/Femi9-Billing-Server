@@ -88,12 +88,6 @@ try {
         throw new Exception('Invalid mobile number or password');
     }
 
-    $_SESSION['LOGIN_USER'] = $user['mobile'];
-    $_SESSION['LOGIN_USER_ID'] = $user['id'];
-    $_SESSION['LOGIN_USER_NAME'] = $user['name'];
-    $_SESSION['LOGIN_USER_TYPE'] = 'track';
-    $_SESSION['last_activity'] = time();
-
     $upd = $db_conn->prepare("UPDATE track_users SET last_login = NOW() WHERE id = ?");
     $upd->bind_param('i', $user['id']);
     $upd->execute();
@@ -108,8 +102,14 @@ try {
         file_put_contents($rateLimitFile, json_encode($rateLimits));
     }
 
-    session_regenerate_id(true);
-    header('Location: dashboard.php');
+    require_once __DIR__ . '/../shared/session-bridge.php';
+    $bridgeToken = mintBridgeToken($db_conn, [
+        'type'   => 'track',
+        'id'     => $user['id'],
+        'name'   => $user['name'],
+        'mobile' => $user['mobile'],
+    ], []);
+    header('Location: switch-login.php?token=' . urlencode($bridgeToken));
     exit;
 
 } catch (Exception $e) {

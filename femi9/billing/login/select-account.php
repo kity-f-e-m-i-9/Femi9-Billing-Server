@@ -36,10 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['choose_type'])) {
             throw new Exception('Invalid selection.');
         }
 
-        activateAccountSession($chosen);
+        require_once __DIR__ . '/../shared/session-bridge.php';
+        $bridgeToken = mintBridgeToken($db_conn, $chosen, $accounts);
         unset($_SESSION['PENDING_LOGIN']);
-        session_regenerate_id(true);
-        header('Location: ../' . $chosen['folder'] . '/dashboard.php');
+        header('Location: ../' . $chosen['folder'] . '/switch-login.php?token=' . urlencode($bridgeToken));
         exit;
     } catch (Exception $e) {
         $_SESSION['errorMessage'] = $e->getMessage();

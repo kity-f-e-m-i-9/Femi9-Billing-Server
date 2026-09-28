@@ -149,7 +149,7 @@ try {
 
     // Login successful - Create session
     require_once __DIR__ . '/include/LoginHelpers.php';
-    finalizeSalesBdmSession($db_conn, $user);
+    $bridgeToken = finalizeSalesBdmSession($db_conn, $user);
 
     // Log successful login
     logLoginAttempt($mobileNumber, true, 'Login successful');
@@ -162,11 +162,10 @@ try {
         file_put_contents($rateLimitFile, json_encode($rateLimits));
     }
 
-    // Regenerate session ID to prevent session fixation
-    session_regenerate_id(true);
-
-    // Redirect to dashboard
-    header('Location: dashboard.php');
+    // Redirect through the bridge so this portal's own session cookie
+    // (femi9_salesbdm_sess) gets the login, not whatever cookie this
+    // request happened to run under.
+    header('Location: switch-login-central.php?token=' . urlencode($bridgeToken));
     exit;
 
 } catch (Exception $e) {
