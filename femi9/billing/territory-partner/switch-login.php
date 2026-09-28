@@ -1,8 +1,10 @@
 <?php
-// Landing point for the company "Login as Territory Partner" button
-// (company/login-as-tp.php). Consumes a single-use token and starts a real
-// Territory Partner session here — same session shape territory-partner/
-// checksession.php expects, mirroring salesbdm/switch-login.php's pattern.
+// Landing point for BOTH:
+// 1. company/login-as-tp.php's admin "Login as TP" bridge
+//    (company_tp_login_bridge table) — existing, unchanged.
+// 2. The central login handoff (login/authenticate.php,
+//    login/select-account.php, login/switch-account.php) via the shared
+//    portal_login_bridge table — new, added here.
 //
 // Whether a PHPSESSID cookie already existed BEFORE this request's
 // session_start() — determines whether session_regenerate_id() below is
@@ -23,6 +25,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/include/db-connect.php';
+require_once __DIR__ . '/../shared/session-bridge.php';
 
 $token = $_GET['token'] ?? '';
 if (!$token) {
@@ -50,18 +53,38 @@ $del->bind_param('s', $token);
 $del->execute();
 $del->close();
 
-if (!$row) {
-    header('Location: ../login/index.php?sessionexpiry');
+if ($row) {
+    $stmt = $db_conn->prepare("SELECT id, name, mobile, is_active FROM territory_partners WHERE id = ? AND deleted_at IS NULL LIMIT 1");
+    $stmt->bind_param('i', $row['tp_id']);
+    $stmt->execute();
+    $tp = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$tp || !$tp['is_active']) {
+        header('Location: ../login/index.php?sessionexpiry');
+        exit;
+    }
+
+    if ($_hadExistingTpSession) {
+        session_regenerate_id(true);
+    }
+    $_SESSION['LOGIN_USER']      = $tp['mobile'];
+    $_SESSION['LOGIN_USER_ID']   = $tp['id'];
+    $_SESSION['LOGIN_USER_NAME'] = $tp['name'];
+    $_SESSION['LOGIN_USER_TYPE'] = 'territory_partner';
+    $_SESSION['last_activity']   = time();
+    // Marks this session as company-initiated so the header can offer a way
+    // back — the company session itself was never touched (different cookie
+    // name, see company/login-as-tp.php), this just points the header link.
+    $_SESSION['LOGGED_IN_VIA_COMPANY'] = true;
+
+    header('Location: dashboard.php');
     exit;
 }
 
-$stmt = $db_conn->prepare("SELECT id, name, mobile, is_active FROM territory_partners WHERE id = ? AND deleted_at IS NULL LIMIT 1");
-$stmt->bind_param('i', $row['tp_id']);
-$stmt->execute();
-$tp = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-
-if (!$tp || !$tp['is_active']) {
+// Not a company-bridge token — try the shared central-login bridge instead.
+$payload = consumeBridgeToken($db_conn, $token);
+if (!$payload || ($payload['type'] ?? '') !== 'territory_partner') {
     header('Location: ../login/index.php?sessionexpiry');
     exit;
 }
@@ -69,15 +92,12 @@ if (!$tp || !$tp['is_active']) {
 if ($_hadExistingTpSession) {
     session_regenerate_id(true);
 }
-$_SESSION['LOGIN_USER']      = $tp['mobile'];
-$_SESSION['LOGIN_USER_ID']   = $tp['id'];
-$_SESSION['LOGIN_USER_NAME'] = $tp['name'];
-$_SESSION['LOGIN_USER_TYPE'] = 'territory_partner';
+$_SESSION['LOGIN_USER']      = $payload['mobile'];
+$_SESSION['LOGIN_USER_ID']   = $payload['id'];
+$_SESSION['LOGIN_USER_NAME'] = $payload['name'];
+$_SESSION['LOGIN_USER_TYPE'] = $payload['type'];
+$_SESSION['LINKED_ACCOUNTS'] = $payload['linked_accounts'] ?? [];
 $_SESSION['last_activity']   = time();
-// Marks this session as company-initiated so the header can offer a way
-// back — the company session itself was never touched (different cookie
-// name, see company/login-as-tp.php), this just points the header link.
-$_SESSION['LOGGED_IN_VIA_COMPANY'] = true;
 
 header('Location: dashboard.php');
 exit;
