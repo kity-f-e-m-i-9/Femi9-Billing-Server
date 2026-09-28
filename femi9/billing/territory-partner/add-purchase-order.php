@@ -137,7 +137,14 @@ $assignedSs = tpGetAssignedSs($db_conn, (int)$Login_user_IDvl);
 // CP-sourced order still draws from and is approved against the Company
 // pool exactly like a plain Company order (per explicit instruction,
 // 2026-09-15). Only the product picker changes, to the CP's own real stock.
-$myCp = null;
+// Collects EVERY distinct covering CP across ALL of this TP's assigned
+// locations — not just the first one found. A TP who covers firkas in two
+// different districts (e.g. one in Namakkal, one in Erode) can have a
+// different covering CP per district, and needs to see and choose between
+// both when placing an order; the earlier version's `break` on the first
+// match silently hid every CP after the first. Confirmed 2026-09-26.
+$myCps = [];
+$seenCpIds = [];
 $tpLocRes = mysqli_query($db_conn, "SELECT location_id FROM territory_partner_locations WHERE territory_partner_id=" . (int)$Login_user_IDvl);
 if ($tpLocRes) {
     while ($locRow = mysqli_fetch_assoc($tpLocRes)) {
@@ -161,11 +168,18 @@ if ($tpLocRes) {
             LIMIT 1
         ");
         if ($cpRes && ($found = mysqli_fetch_assoc($cpRes))) {
-            $myCp = $found;
-            break;
+            $cpDbId = (int)$found['cp_db_id'];
+            if (!isset($seenCpIds[$cpDbId])) {
+                $seenCpIds[$cpDbId] = true;
+                $myCps[] = $found;
+            }
         }
     }
 }
+// Kept for any code path that only needs "is there at least one CP option" —
+// the first one found, same as the old single-CP behavior where that's all
+// that's needed (e.g. gating a hint's wording).
+$myCp = $myCps[0] ?? null;
 
 // Available advance balance and reserved-by-waiting-orders amount, computed
 // per approver pool — reused as-is (same query, just filtered by approver)
@@ -454,7 +468,7 @@ $tpDeliveryAddressParts = array_filter([
                             <input type="hidden" name="product_type" value="<?=htmlspecialchars($productType)?>">
                             <input type="hidden" name="preferred_cp_id" id="preferred_cp_id_input" value="">
 
-                            <?php if ($assignedSs !== null || $myCp !== null): ?>
+                            <?php if ($assignedSs !== null || !empty($myCps)): ?>
                             <div class="apo-card">
                                 <div class="apo-card-title"><i class="material-icons-outlined">alt_route</i>Submit To</div>
                                 <div class="row g-2">
@@ -470,16 +484,16 @@ $tpDeliveryAddressParts = array_filter([
                                         </label>
                                     </div>
                                     <?php endif; ?>
-                                    <?php if ($myCp !== null): ?>
+                                    <?php foreach ($myCps as $cpOption): ?>
                                     <div class="col-md-4">
                                         <label class="d-flex align-items-center gap-2" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;cursor:pointer;">
-                                            <input type="radio" name="approver_choice" value="cp" data-cp-id="<?=(int)$myCp['cp_db_id']?>" onchange="onApproverChange()"> <?=htmlspecialchars($myCp['cp_name'])?> (<?=htmlspecialchars($myCp['cp_code'])?>)
+                                            <input type="radio" name="approver_choice" value="cp" data-cp-id="<?=(int)$cpOption['cp_db_id']?>" onchange="onApproverChange()"> <?=htmlspecialchars($cpOption['cp_name'])?> (<?=htmlspecialchars($cpOption['cp_code'])?>)
                                         </label>
                                     </div>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </div>
-                                <?php if ($myCp !== null): ?>
-                                <div id="cpStockHint" class="text-muted" style="font-size:12px;margin-top:8px;display:none;">Only products currently in stock at <?=htmlspecialchars($myCp['cp_name'])?> are shown below.</div>
+                                <?php if (!empty($myCps)): ?>
+                                <div id="cpStockHint" class="text-muted" style="font-size:12px;margin-top:8px;display:none;">Only products currently in stock at the selected Channel Partner are shown below.</div>
                                 <?php endif; ?>
                             </div>
                             <?php endif; ?>
@@ -801,6 +815,12 @@ $tpDeliveryAddressParts = array_filter([
     // refreshPickupAvailability() rather than baked in at page render.
     var pickupMode      = <?php echo json_encode($pickupMode); ?>;
     var currentApprover = 'company';
+    // The actual radio element currently in effect — tracked separately
+    // from currentApprover's string value because a TP covering more than
+    // one district can now have several radios all sharing value="cp" (one
+    // per Channel Partner), so looking a radio back up by value="cp" alone
+    // is ambiguous. cancelCpSwitch() needs the exact element to restore.
+    var currentApproverEl = document.querySelector('input[name="approver_choice"][value="company"]');
 
     var poLines = [];
 
@@ -1088,11 +1108,12 @@ $tpDeliveryAddressParts = array_filter([
     }
 
     // TP declined to drop the mismatched items — the radio never actually
-    // changed in applyApproverChange(), so currentApprover still holds
-    // whatever was active before this attempt; just re-check that radio.
+    // changed in applyApproverChange(), so currentApproverEl still holds
+    // whatever was active before this attempt; just re-check that exact
+    // element (not a value="..." lookup — ambiguous now that multiple CP
+    // radios can share value="cp").
     function cancelCpSwitch() {
-        var prevRadio = document.querySelector('input[name="approver_choice"][value="' + currentApprover + '"]');
-        if (prevRadio) prevRadio.checked = true;
+        if (currentApproverEl) currentApproverEl.checked = true;
         pendingCpSwitchChoice = null;
         pendingCpMismatchedIds = [];
         var modalEl = document.getElementById('cpSwitchWarningModal');
@@ -1115,6 +1136,7 @@ $tpDeliveryAddressParts = array_filter([
 
     function applyApproverChange(choice, approver) {
         currentApprover = approver;
+        currentApproverEl = choice;
         // A CP-sourced order still draws from and is approved against the
         // Company advance pool — 'cp' is a stock-source tag, not a third
         // balance pool (see the PHP comment above $myCp). approver_type

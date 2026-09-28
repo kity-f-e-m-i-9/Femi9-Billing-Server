@@ -14,7 +14,7 @@ if (empty($_SESSION['csrf_token'])) {
 // PO header + TP billing/delivery details — same query shape as
 // dispatch-slip-print.php, since From/To default text is seeded from it.
 $stmt = $db_conn->prepare("
-    SELECT o.id, o.order_date,
+    SELECT o.id, o.order_date, o.tp_invoice_id,
            o.use_default_delivery_address, o.custom_delivery_line1, o.custom_delivery_line2,
            o.custom_delivery_city, o.custom_delivery_district, o.custom_delivery_state,
            o.custom_delivery_country, o.custom_delivery_pincode,
@@ -31,6 +31,11 @@ $stmt->execute();
 $po = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 if (!$po) { header("Location: tp-today-orders"); exit; }
+
+// Filename for this page's Print > Save-as-PDF: TPName_Shipping_Label —
+// the TP name's spaces are dropped entirely (joined, not underscored — a
+// two/three-word name shouldn't turn into a run of underscores).
+$printDocTitle = preg_replace('/[^a-zA-Z0-9]+/', '', trim($po['tp_name'] ?? 'TP')) . '_Shipping_Label';
 
 $result_Godown = $db_conn->query("SELECT * FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " LIMIT 1")->fetch_assoc();
 
@@ -106,7 +111,7 @@ $recentSources = $db_conn->query("
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Shipping Label : <?php echo $business_name; ?></title>
+    <title><?php echo htmlspecialchars($printDocTitle); ?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
