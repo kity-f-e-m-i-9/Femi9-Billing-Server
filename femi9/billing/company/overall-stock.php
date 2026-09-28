@@ -328,6 +328,7 @@ foreach ($warehouseBuckets as $bucketKey => $bucket) {
 													<th>Opening Stock Date</th>
 													<th style="text-align:right;">Input Stock Qty</th>
 													<th style="text-align:right;">Sales Qty</th>
+													<th style="text-align:right;">Return Qty</th>
 													<th style="text-align:right;">Demo/Free/Damage Qty</th>
 													<th style="text-align:right;">Internal Transfer Qty</th>
 													<th style="text-align:right;">Movement to CP</th>
@@ -344,6 +345,7 @@ $total_closing_qty_shown=0;
 $total_intrn_transfer=0;
 $total_sent_other=0;
 $total_dfd=0;
+$total_return=0;
 foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
     $select_productDetils="select * from products where id='$StockProductID'";
     $Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
@@ -373,6 +375,13 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
     $MovementToCP = datewiseCpMovementTotal($db_conn, (int)$StockProductID, '2000-01-01', date('Y-m-d'), (string)$user_id_Loginvl, true, $cardWarehouseCond);
     $total_sent_other+=$MovementToCP;
 
+    // Return Qty — regular invoice returns and OT-channel sale
+    // returns/deletes (gross; Sales Qty above is already net of these, per
+    // stock.sales_qty's own convention). Same per-warehouse stock_ledger
+    // scoping as Internal Transfer / Movement to CP above.
+    $ReturnQty = datewiseReturnTotal($db_conn, (int)$StockProductID, '2000-01-01', date('Y-m-d'), (string)$user_id_Loginvl, true, $cardWarehouseCond);
+    $total_return+=$ReturnQty;
+
     $DfdQty = 0;
     if ($isUnassignedBucket) {
         // Demo/Free/Damage — shown in its own column (see $DfdQty below),
@@ -392,6 +401,7 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
 													<td><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
 													<td align="right"><?php echo $Result_OPStock['input_qty'];?></td>
 													<td align="right"><?php echo $SalesQtyShown;?></td>
+													<td align="right"><?php echo $ReturnQty;?></td>
 													<td align="right"><?php echo $isUnassignedBucket ? $DfdQty : '&mdash;';?></td>
 													<td align="right"><?php if ($IntrnTransferQty > 0): ?><a href="javascript:void(0)" class="intrn-transfer-link" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="<?=$isUnassignedBucket ? 'unassigned' : (int)$bucketKey;?>" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo $IntrnTransferQty;?></a><?php else: ?><?php echo $IntrnTransferQty;?><?php endif; ?></td>
 													<td align="right"><?php if ($MovementToCP > 0): ?><a href="javascript:void(0)" class="cp-movement-link" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="<?=$isUnassignedBucket ? 'unassigned' : (int)$bucketKey;?>" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo $MovementToCP;?></a><?php else: ?><?php echo $MovementToCP;?><?php endif; ?></td>
@@ -408,6 +418,7 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
 											<tfoot>
 												<tr>
 													<td colspan="5" style="text-align:right;">Total</td>
+													<td align="right"><b><?=$total_return;?></b></td>
 													<td align="right"><b><?=$isUnassignedBucket ? $total_dfd : '&mdash;';?></b></td>
 													<td align="right"><b><?=$total_intrn_transfer;?></b></td>
 													<td align="right"><b><?=$total_sent_other;?></b></td>

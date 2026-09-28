@@ -142,17 +142,26 @@ function datewiseTransferBreakdownRows($db_conn, int $prid, string $fromDate, st
     // warehouseLedgerCondition()) — applied to the outbound leg (o), which
     // is the leg every other Internal Transfer query in this file scopes by.
     $outWarehouseCond = str_replace('warehouse_id', 'o.warehouse_id', $warehouseCond);
+    // Both transfer_out (+qty) and transfer_out_reverse (-qty, a transfer
+    // later undone) are summed per (from, to, ref_id) so a reversed transfer
+    // nets to 0 here too — otherwise this breakdown's total could exceed the
+    // Internal Transfer Qty cell it's explaining, which already nets
+    // transfer_out_reverse out (see computeStockMovement()'s
+    // $internal_transfer above).
     $sql = "SELECT o.user_id AS from_godown_id, o.warehouse_id AS from_wh,
                    i.user_id AS to_godown_id, i.warehouse_id AS to_wh,
-                   o.ref_id AS ref_id, SUM(o.qty) AS qty
+                   o.ref_id AS ref_id,
+                   SUM(CASE WHEN o.action = 'transfer_out' THEN o.qty ELSE -o.qty END) AS qty
             FROM stock_ledger o
             LEFT JOIN stock_ledger i
                 ON i.ref_id = o.ref_id AND i.product_id = o.product_id
                AND i.user_type = o.user_type AND i.action = 'transfer_in'
-            WHERE o.product_id = $prid AND o.user_type = 'company' AND o.action = 'transfer_out'
+            WHERE o.product_id = $prid AND o.user_type = 'company'
+              AND o.action IN ('transfer_out', 'transfer_out_reverse')
               AND o.ref_type != 'demofree'$godownCond$outWarehouseCond$dateCond
               AND NOT EXISTS (SELECT 1 FROM pl_godown_transfers t WHERE t.ref_number COLLATE utf8mb4_general_ci = o.ref_id AND t.transfer_type = 'godown_to_location')
             GROUP BY o.user_id, o.warehouse_id, i.user_id, i.warehouse_id, o.ref_id
+            HAVING qty != 0
             ORDER BY qty DESC";
     $res = mysqli_query($db_conn, $sql);
 
@@ -194,6 +203,29 @@ function datewiseTransferBreakdownRows($db_conn, int $prid, string $fromDate, st
         $out[] = ['from_godown' => $fromGodown, 'from_warehouse' => $fromWarehouse, 'to_godown' => $toGodown, 'to_warehouse' => $toWarehouse, 'qty' => $qty];
     }
     return $out;
+}
+
+// Return Qty for one product, scoped to a single warehouse condition (a
+// bare "warehouse_id" fragment — see warehouseLedgerCondition()) — the same
+// gross-return total that feeds computeStockMovement()'s
+// $total_sales_return (reverse_deduct + ot_reverse: a regular invoice
+// return credited back, or an OT-channel sale returned/deleted), but
+// callable standalone for a card that isn't going through the day-by-day
+// movement loop (e.g. the Current Stock tab's all-time cumulative view).
+// This is what surfaces OT channel returns on that tab, which previously
+// had no Return Qty column at all — only Sales Qty (net of returns).
+function datewiseReturnTotal($db_conn, int $prid, string $fromDate, string $toDate, string $companyIdsSql, bool $filterByGodown, string $warehouseCond): int {
+    $fromDate = mysqli_real_escape_string($db_conn, $fromDate);
+    $toDate   = mysqli_real_escape_string($db_conn, $toDate);
+    $godownCond = $filterByGodown ? " AND user_id IN ($companyIdsSql)" : '';
+    $dateCond   = " AND created_at >= '$fromDate 00:00:00' AND created_at <= '$toDate 23:59:59'";
+    $base       = "product_id=$prid AND user_type='company'$godownCond$warehouseCond$dateCond";
+    $sum = function($sql) use ($db_conn) {
+        return (int)(mysqli_fetch_row(mysqli_query($db_conn, $sql))[0] ?? 0);
+    };
+    $reverseDed = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='reverse_deduct'");
+    $otReverse  = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='ot_reverse'");
+    return $reverseDed + $otReverse;
 }
 
 // Internal Transfer Qty for one product, scoped to a single warehouse
@@ -253,12 +285,19 @@ function datewiseCpMovementBreakdownRows($db_conn, int $prid, string $fromDate, 
         . ($filterByGodown ? " AND sl.user_id IN ($companyIdsSql)" : '')
         . str_replace('warehouse_id', 'sl.warehouse_id', $warehouseCond)
         . " AND sl.created_at >= '$fromDate 00:00:00' AND sl.created_at <= '$toDate 23:59:59'";
-    $sql = "SELECT sl.user_id AS from_godown_id, sl.warehouse_id AS from_wh, cp.name AS cp_name, SUM(sl.qty) AS qty
+    // Both transfer_out (+qty) and transfer_out_reverse (-qty, a CP
+    // movement later undone) are summed so a reversed movement nets to 0
+    // here too — see datewiseTransferBreakdownRows() for why this matters
+    // (this popup's total must match datewiseCpMovementTotal()'s own
+    // transfer_out - transfer_out_reverse netting).
+    $sql = "SELECT sl.user_id AS from_godown_id, sl.warehouse_id AS from_wh, cp.name AS cp_name,
+                   SUM(CASE WHEN sl.action = 'transfer_out' THEN sl.qty ELSE -sl.qty END) AS qty
             FROM stock_ledger sl
             INNER JOIN pl_godown_transfers t ON t.ref_number COLLATE utf8mb4_general_ci = sl.ref_id AND t.transfer_type = 'godown_to_location'
             LEFT JOIN channel_partners cp ON cp.id = t.cp_id
-            WHERE $baseSl AND sl.action = 'transfer_out'
+            WHERE $baseSl AND sl.action IN ('transfer_out', 'transfer_out_reverse')
             GROUP BY sl.user_id, sl.warehouse_id, cp.name
+            HAVING qty != 0
             ORDER BY qty DESC";
     $res = mysqli_query($db_conn, $sql);
 
