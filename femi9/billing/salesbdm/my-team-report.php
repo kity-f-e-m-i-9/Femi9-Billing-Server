@@ -69,7 +69,7 @@ foreach ($reportIds as $rid) {
         'zone' => $row['zone'] ?? '',
         'target' => $roll['target'], 'achieved' => $roll['achieved'],
         'advance_paid' => $roll['advance_paid'], 'napkin_purchase' => $roll['napkin_purchase'],
-        'tp_count' => $roll['tp_count'], 'pct' => $pct,
+        'tp_count' => $roll['tp_count'], 'selling_tp_count' => $roll['selling_tp_count'], 'pct' => $pct,
     ];
 }
 usort($reportRows, fn($a, $b) => $b['pct'] <=> $a['pct']);
@@ -156,7 +156,8 @@ usort($reportRows, fn($a, $b) => $b['pct'] <=> $a['pct']);
                                         <th>BDM</th>
                                         <th>Level</th>
                                         <th>Zone</th>
-                                        <th>TPs</th>
+                                        <th>Active TPs</th>
+                                        <th>Selling TPs</th>
                                         <th>Target (&#8377;)</th>
                                         <th>Advance Paid (&#8377;)</th>
                                         <th>Napkin Purchase (&#8377;)</th>
@@ -165,7 +166,7 @@ usort($reportRows, fn($a, $b) => $b['pct'] <=> $a['pct']);
                                 </thead>
                                 <tbody>
                                 <?php if (empty($reportRows)): ?>
-                                    <tr><td colspan="8" class="text-muted">No one reports to you yet.</td></tr>
+                                    <tr><td colspan="9" class="text-muted">No one reports to you yet.</td></tr>
                                 <?php else: foreach ($reportRows as $r):
                                     $bc = $r['pct'] >= 100 ? 'var(--good)' : ($r['pct'] >= 50 ? '#eab308' : 'var(--critical)');
                                     $viewUrl = 'dashboard.php?view_bdm_id=' . $r['id'];
@@ -175,6 +176,7 @@ usort($reportRows, fn($a, $b) => $b['pct'] <=> $a['pct']);
                                         <td><span class="lvl-badge" style="background:<?php echo $r['color']; ?>;"><?php echo htmlspecialchars($r['level_name']); ?></span></td>
                                         <td><?php echo $r['zone'] ? htmlspecialchars($r['zone']) : '—'; ?></td>
                                         <td><?php echo (int)$r['tp_count']; ?></td>
+                                        <td><?php echo (int)$r['selling_tp_count']; ?></td>
                                         <td>&#8377;<?php echo inr_format($r['target'], 0); ?></td>
                                         <td>&#8377;<?php echo inr_format($r['advance_paid'], 0); ?></td>
                                         <td>&#8377;<?php echo inr_format($r['napkin_purchase'], 0); ?></td>

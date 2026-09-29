@@ -10,9 +10,25 @@ function getBdmRawTargetAchieved($db_conn, int $bdmId, string $fromDate, string 
     require_once __DIR__ . '/BdmTpScope.php';
     $tpIds = getBdmAssignedTpIds($db_conn, $bdmId);
     if (empty($tpIds)) {
-        return ['target' => 0.0, 'achieved' => 0.0, 'tp_count' => 0, 'advance_paid' => 0.0, 'napkin_purchase' => 0.0];
+        return ['target' => 0.0, 'achieved' => 0.0, 'tp_count' => 0, 'selling_tp_count' => 0, 'advance_paid' => 0.0, 'napkin_purchase' => 0.0];
     }
     $tpIdList = implode(',', array_map('intval', $tpIds));
+
+    // "TPS" = the same "Active TPs" figure as dashboard.php's own TP
+    // coverage card: every TP assigned to this BDM's districts (including
+    // ones getBdmAssignedTpIds()'s default call already drops as inactive)
+    // re-checked here against is_active=1 AND deleted_at IS NULL, so this
+    // column always agrees with what the BDM sees on their own dashboard —
+    // not date-scoped, same as that card.
+    $tpIdsAll = getBdmAssignedTpIds($db_conn, $bdmId, true);
+    $activeTpCount = 0;
+    if (!empty($tpIdsAll)) {
+        $tpIdListAll = implode(',', array_map('intval', $tpIdsAll));
+        $activeTpCount = (int)($db_conn->query("
+            SELECT COUNT(*) FROM territory_partners
+            WHERE id IN ($tpIdListAll) AND is_active = 1 AND deleted_at IS NULL
+        ")->fetch_row()[0] ?? 0);
+    }
 
     $target = (float)($db_conn->query("
         SELECT COALESCE(SUM(pln.target_amount),0) FROM territory_partner_locations tpl
@@ -33,26 +49,38 @@ function getBdmRawTargetAchieved($db_conn, int $bdmId, string $fromDate, string 
     $advancePaid = (float)($stmtAdvance->get_result()->fetch_row()[0] ?? 0);
     $stmtAdvance->close();
 
+    // Also tracks which TPs actually sold something in [fromDate, toDate] —
+    // a SEPARATE "Selling TPs" count from $activeTpCount above (that one is
+    // "currently active" regardless of period; this one moves with the
+    // date filter, per explicit request: both numbers shown side by side).
+    $sellingTpIds = [];
+
     $stmtCust = $db_conn->prepare("
-        SELECT COALESCE(SUM(ii.total),0) FROM invoice_items ii
+        SELECT i.user_id tp_id, COALESCE(SUM(ii.total),0) amt FROM invoice_items ii
         JOIN invoice i ON i.inv_id = ii.inv_id JOIN products p ON p.id = ii.pr_id
         WHERE i.user_type='territory_partner' AND i.sub_total>0 AND i.date BETWEEN ? AND ?
           AND i.user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'
+        GROUP BY i.user_id
     ");
     $stmtCust->bind_param('ss', $fromDate, $toDate);
     $stmtCust->execute();
-    $custAmt = (float)($stmtCust->get_result()->fetch_row()[0] ?? 0);
+    $custRes = $stmtCust->get_result();
+    $custAmt = 0.0;
+    while ($r = $custRes->fetch_assoc()) { $custAmt += (float)$r['amt']; $sellingTpIds[(int)$r['tp_id']] = true; }
     $stmtCust->close();
 
     $stmtShop = $db_conn->prepare("
-        SELECT COALESCE(SUM(uii.total),0) FROM user_invoice_items uii
+        SELECT ui.from_user_id tp_id, COALESCE(SUM(uii.total),0) amt FROM user_invoice_items uii
         JOIN user_invoice ui ON ui.inv_id = uii.inv_id JOIN products p ON p.id = uii.pr_id
         WHERE ui.from_user_type='territory_partner' AND ui.sub_total>0 AND ui.date BETWEEN ? AND ?
           AND ui.from_user_id IN ($tpIdList) AND COALESCE(p.category,'') != 'diaper'
+        GROUP BY ui.from_user_id
     ");
     $stmtShop->bind_param('ss', $fromDate, $toDate);
     $stmtShop->execute();
-    $shopAmt = (float)($stmtShop->get_result()->fetch_row()[0] ?? 0);
+    $shopRes = $stmtShop->get_result();
+    $shopAmt = 0.0;
+    while ($r = $shopRes->fetch_assoc()) { $shopAmt += (float)$r['amt']; $sellingTpIds[(int)$r['tp_id']] = true; }
     $stmtShop->close();
 
     // How much these TPs bought FROM the company (tp_invoices) in the range —
@@ -72,7 +100,8 @@ function getBdmRawTargetAchieved($db_conn, int $bdmId, string $fromDate, string 
     $stmtPurchase->close();
 
     return [
-        'target' => $target, 'achieved' => $custAmt + $shopAmt, 'tp_count' => count($tpIds),
+        'target' => $target, 'achieved' => $custAmt + $shopAmt,
+        'tp_count' => $activeTpCount, 'selling_tp_count' => count($sellingTpIds),
         'napkin_purchase' => $napkinPurchase, 'advance_paid' => $advancePaid,
     ];
 }

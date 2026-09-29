@@ -67,7 +67,7 @@ foreach ($staffRows as $r) {
         'zone' => $r['zone'] ?? '', 'manager_name' => $r['manager_name'],
         'status' => $r['account_status'], 'target' => $roll['target'],
         'advance_paid' => $roll['advance_paid'], 'napkin_purchase' => $roll['napkin_purchase'],
-        'achieved' => $roll['achieved'], 'tp_count' => $roll['tp_count'], 'pct' => $pct,
+        'achieved' => $roll['achieved'], 'tp_count' => $roll['tp_count'], 'selling_tp_count' => $roll['selling_tp_count'], 'pct' => $pct,
         'color' => $levelColorMap[(int)$r['team_level_id']] ?? '#999999',
     ];
     $rows[] = $entry;
@@ -148,7 +148,8 @@ foreach ($staffRows as $r) {
                                         <th>Reports To</th>
                                         <th>Zone</th>
                                         <th>Status</th>
-                                        <th>TPs</th>
+                                        <th>Active TPs</th>
+                                        <th>Selling TPs</th>
                                         <th>Target (&#8377;)</th>
                                         <th>Advance Paid (&#8377;)</th>
                                         <th>Napkin Purchase (&#8377;)</th>
@@ -158,7 +159,7 @@ foreach ($staffRows as $r) {
                                 </thead>
                                 <tbody>
                                 <?php if (empty($rows)): ?>
-                                    <tr><td colspan="11" class="text-muted">No Sales BDM found.</td></tr>
+                                    <tr><td colspan="12" class="text-muted">No Sales BDM found.</td></tr>
                                 <?php else: foreach ($rows as $r):
                                     $bc = $r['pct'] >= 100 ? 'var(--good)' : ($r['pct'] >= 50 ? '#eab308' : 'var(--critical)');
                                 ?>
@@ -170,6 +171,7 @@ foreach ($staffRows as $r) {
                                         <td><?php echo $r['zone'] ? htmlspecialchars($r['zone']) : '<span class="text-muted">—</span>'; ?></td>
                                         <td><?php echo $r['status'] === 'active' ? '<span style="color:#0ca30c;font-weight:600;">Active</span>' : '<span style="color:#d03b3b;font-weight:600;">Inactive</span>'; ?></td>
                                         <td><?php echo (int)$r['tp_count']; ?></td>
+                                        <td><?php echo (int)$r['selling_tp_count']; ?></td>
                                         <td>&#8377;<?php echo inr_format($r['target'], 0); ?></td>
                                         <td>&#8377;<?php echo inr_format($r['advance_paid'], 0); ?></td>
                                         <td>&#8377;<?php echo inr_format($r['napkin_purchase'], 0); ?></td>
