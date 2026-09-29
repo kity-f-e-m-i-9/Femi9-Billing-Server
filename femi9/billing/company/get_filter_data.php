@@ -117,18 +117,22 @@ if($action == 'get_taluks') {
 // partner_location_nodes, not the district/taluk tables above)
 // ============================================
 if($action == 'get_firkas') {
-    $district_id = isset($_GET['district_id']) ? intval($_GET['district_id']) : 0;
+    // Accepts either a single district_id or a comma-separated list (used
+    // by the Territory Partner report's multi-select District filter).
+    $district_ids = array_values(array_filter(array_map('intval', explode(',', (string)($_GET['district_id'] ?? '')))));
 
-    if($district_id <= 0) {
+    if(empty($district_ids)) {
         sendJSON(['success' => false, 'message' => 'Invalid district ID']);
     }
 
     try {
-        $query = "SELECT f.id, f.name
+        $placeholders = implode(',', array_fill(0, count($district_ids), '?'));
+        $types = str_repeat('i', count($district_ids));
+        $query = "SELECT DISTINCT f.id, f.name
                   FROM partner_location_nodes dv
                   INNER JOIN partner_location_nodes t ON t.parent_id = dv.id AND t.depth = 5
                   INNER JOIN partner_location_nodes f ON f.parent_id = t.id AND f.depth = 6
-                  WHERE dv.parent_id = ? AND dv.depth = 4
+                  WHERE dv.parent_id IN ($placeholders) AND dv.depth = 4
                   ORDER BY f.name ASC";
         $stmt = $db_conn->prepare($query);
 
@@ -136,7 +140,7 @@ if($action == 'get_firkas') {
             sendJSON(['success' => false, 'message' => 'Query preparation failed']);
         }
 
-        $stmt->bind_param("i", $district_id);
+        $stmt->bind_param($types, ...$district_ids);
         $stmt->execute();
         $result = $stmt->get_result();
 

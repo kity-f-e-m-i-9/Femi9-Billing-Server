@@ -17,7 +17,7 @@ if(isset($_GET['clear_filters']) || isset($_POST['clear_all'])) {
     ob_clean();
     unset($_SESSION['tp_retail_report_from_date']);
     unset($_SESSION['tp_retail_report_to_date']);
-    unset($_SESSION['tp_retail_report_district_id']);
+    unset($_SESSION['tp_retail_report_district_ids']);
     unset($_SESSION['tp_retail_report_firka_id']);
     unset($_SESSION['tp_retail_report_amount_range']);
     unset($_SESSION['tp_retail_report_records_per_page']);
@@ -49,17 +49,20 @@ if(isset($_SESSION['tp_retail_report_to_date'])) {
     $to_date = $_SESSION['tp_retail_report_to_date'];
 }
 
-// District filter (partner_location_nodes depth=3)
-$selected_district_id = 0;
+// District filter (partner_location_nodes depth=3) -- multi-select
+$prevDistrictIds = isset($_SESSION['tp_retail_report_district_ids']) ? (array)$_SESSION['tp_retail_report_district_ids'] : [];
+
+$selected_district_ids = [];
 if(isset($_POST['district_id'])) {
-    $selected_district_id = !empty($_POST['district_id']) ? (int)$_POST['district_id'] : 0;
-    if($selected_district_id > 0) {
-        $_SESSION['tp_retail_report_district_id'] = $selected_district_id;
+    $selected_district_ids = array_values(array_unique(array_map('intval', (array)$_POST['district_id'])));
+    $selected_district_ids = array_values(array_filter($selected_district_ids, fn($id) => $id > 0));
+    if(!empty($selected_district_ids)) {
+        $_SESSION['tp_retail_report_district_ids'] = $selected_district_ids;
     } else {
-        unset($_SESSION['tp_retail_report_district_id']);
+        unset($_SESSION['tp_retail_report_district_ids']);
     }
-} elseif(isset($_SESSION['tp_retail_report_district_id'])) {
-    $selected_district_id = (int)$_SESSION['tp_retail_report_district_id'];
+} elseif(!empty($prevDistrictIds)) {
+    $selected_district_ids = $prevDistrictIds;
 }
 
 // Firka filter (partner_location_nodes depth=6)
@@ -75,9 +78,11 @@ if(isset($_POST['firka_id'])) {
     $selected_firka_id = (int)$_SESSION['tp_retail_report_firka_id'];
 }
 
-// Clear firka if district changed
-if(isset($_POST['district_id']) && isset($_SESSION['tp_retail_report_district_id'])) {
-    if($_POST['district_id'] != $_SESSION['tp_retail_report_district_id']) {
+// Clear firka if the district selection changed
+if(isset($_POST['district_id'])) {
+    $prevSorted = $prevDistrictIds; sort($prevSorted);
+    $newSorted = $selected_district_ids; sort($newSorted);
+    if($prevSorted != $newSorted) {
         $selected_firka_id = 0;
         unset($_SESSION['tp_retail_report_firka_id']);
     }
@@ -151,6 +156,7 @@ $qparam = urlencode($search ?? '');
     <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
     <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="../../assets/plugins/highlight/styles/github-gist.css" rel="stylesheet">
+    <link href="../../assets/plugins/select2/css/select2.min.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
@@ -234,8 +240,7 @@ $qparam = urlencode($search ?? '');
                                                 </div>
                                                 <div class="col-md-3 col-sm-6 mb-2">
                                                     <label class="form-label">District</label>
-                                                    <select name="district_id" id="district_filter" class="form-control">
-                                                        <option value="">All Districts</option>
+                                                    <select name="district_id[]" id="district_filter" class="form-control" multiple="multiple" style="width:100%;">
                                                         <?php
                                                         $dist_query = "SELECT id, name FROM partner_location_nodes
                                                                        WHERE depth = 3
@@ -244,7 +249,7 @@ $qparam = urlencode($search ?? '');
                                                         $dist_result = mysqli_query($db_conn, $dist_query);
                                                         if($dist_result) {
                                                             while($dist = mysqli_fetch_assoc($dist_result)) {
-                                                                $selected_attr = ($selected_district_id == $dist['id']) ? 'selected' : '';
+                                                                $selected_attr = in_array((int)$dist['id'], $selected_district_ids, true) ? 'selected' : '';
                                                                 echo '<option value="'.$dist['id'].'" '.$selected_attr.'>'.htmlspecialchars($dist['name']).'</option>';
                                                             }
                                                         }
@@ -256,15 +261,17 @@ $qparam = urlencode($search ?? '');
                                                     <select name="firka_id" id="firka_filter" class="form-control">
                                                         <option value="">All Firkas</option>
                                                         <?php
-                                                        if(!empty($selected_district_id)) {
-                                                            $firka_query = "SELECT f.id, f.name
+                                                        if(!empty($selected_district_ids)) {
+                                                            $placeholders = implode(',', array_fill(0, count($selected_district_ids), '?'));
+                                                            $types = str_repeat('i', count($selected_district_ids));
+                                                            $firka_query = "SELECT DISTINCT f.id, f.name
                                                                              FROM partner_location_nodes dv
                                                                              INNER JOIN partner_location_nodes t ON t.parent_id = dv.id AND t.depth = 5
                                                                              INNER JOIN partner_location_nodes f ON f.parent_id = t.id AND f.depth = 6
-                                                                             WHERE dv.parent_id = ? AND dv.depth = 4
+                                                                             WHERE dv.parent_id IN ($placeholders) AND dv.depth = 4
                                                                              ORDER BY f.name ASC";
                                                             $stmt_firka = $db_conn->prepare($firka_query);
-                                                            $stmt_firka->bind_param("i", $selected_district_id);
+                                                            $stmt_firka->bind_param($types, ...$selected_district_ids);
                                                             $stmt_firka->execute();
                                                             $firka_result = $stmt_firka->get_result();
                                                             while($firka = $firka_result->fetch_assoc()) {
@@ -303,12 +310,17 @@ $qparam = urlencode($search ?? '');
 
                                             <?php
                                             $active_filters = [];
-                                            if(!empty($selected_district_id)) {
-                                                $dn_stmt = $db_conn->prepare("SELECT name FROM partner_location_nodes WHERE id = ?");
-                                                $dn_stmt->bind_param("i", $selected_district_id);
+                                            if(!empty($selected_district_ids)) {
+                                                $placeholders = implode(',', array_fill(0, count($selected_district_ids), '?'));
+                                                $types = str_repeat('i', count($selected_district_ids));
+                                                $dn_stmt = $db_conn->prepare("SELECT name FROM partner_location_nodes WHERE id IN ($placeholders) ORDER BY name ASC");
+                                                $dn_stmt->bind_param($types, ...$selected_district_ids);
                                                 $dn_stmt->execute();
-                                                if($row_dn = $dn_stmt->get_result()->fetch_assoc()) {
-                                                    $active_filters[] = "District: " . $row_dn['name'];
+                                                $dn_names = [];
+                                                $dn_res = $dn_stmt->get_result();
+                                                while($row_dn = $dn_res->fetch_assoc()) { $dn_names[] = $row_dn['name']; }
+                                                if(!empty($dn_names)) {
+                                                    $active_filters[] = "District: " . implode(', ', $dn_names);
                                                 }
                                                 $dn_stmt->close();
                                             }
@@ -352,7 +364,9 @@ $qparam = urlencode($search ?? '');
                                             <form method="post" action="<?=$_SERVER['PHP_SELF'];?>" class="d-flex align-items-center gap-2">
                                                 <input type="hidden" name="frdate" value="<?=$from_date;?>">
                                                 <input type="hidden" name="todate" value="<?=$to_date;?>">
-                                                <input type="hidden" name="district_id" value="<?=$selected_district_id;?>">
+                                                <?php foreach($selected_district_ids as $did): ?>
+                                                <input type="hidden" name="district_id[]" value="<?=(int)$did;?>">
+                                                <?php endforeach; ?>
                                                 <input type="hidden" name="firka_id" value="<?=$selected_firka_id;?>">
                                                 <input type="hidden" name="amount_range" value="<?=$selected_amount_range;?>">
                                                 <input type="hidden" name="page" value="1">
@@ -402,13 +416,14 @@ if(!empty($selected_firka_id)) {
         SELECT 1 FROM territory_partner_locations tpl
         WHERE tpl.territory_partner_id = tp.id AND tpl.location_id = " . (int)$selected_firka_id . "
     )";
-} elseif(!empty($selected_district_id)) {
+} elseif(!empty($selected_district_ids)) {
+    $districtIdList = implode(',', array_map('intval', $selected_district_ids));
     $tp_location_condition = " AND EXISTS (
         SELECT 1 FROM territory_partner_locations tpl
         INNER JOIN partner_location_nodes f  ON f.id = tpl.location_id
         INNER JOIN partner_location_nodes t  ON t.id = f.parent_id
         INNER JOIN partner_location_nodes dv ON dv.id = t.parent_id
-        WHERE tpl.territory_partner_id = tp.id AND dv.parent_id = " . (int)$selected_district_id . "
+        WHERE tpl.territory_partner_id = tp.id AND dv.parent_id IN ($districtIdList)
     )";
 }
 
@@ -651,21 +666,31 @@ if(!empty($sellers_paginated)) {
     <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
     <script src="../../assets/plugins/pace/pace.min.js"></script>
     <script src="../../assets/js/main.min.js"></script>
+    <script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
 
     <script>
+        $(function () {
+            $('#district_filter').select2({
+                placeholder: 'All Districts',
+                allowClear: true,
+                closeOnSelect: false,
+                width: '100%'
+            });
+        });
+
         document.addEventListener('DOMContentLoaded', function() {
             const districtEl = document.getElementById('district_filter');
             if (districtEl) {
-                districtEl.addEventListener('change', function() {
-                    const districtId = this.value;
+                $(districtEl).on('change', function() {
+                    const districtIds = $(this).val() || [];
                     const firkaSelect = document.getElementById('firka_filter');
                     if (!firkaSelect) return;
 
                     firkaSelect.innerHTML = '<option value="">All Firkas</option>';
 
-                    if(districtId) {
+                    if(districtIds.length > 0) {
                         firkaSelect.innerHTML = '<option value="">Loading firkas...</option>';
-                        const url = `get_filter_data.php?action=get_firkas&district_id=${districtId}&_=${Date.now()}`;
+                        const url = `get_filter_data.php?action=get_firkas&district_id=${districtIds.join(',')}&_=${Date.now()}`;
                         fetch(url)
                             .then(response => response.json())
                             .then(data => {
