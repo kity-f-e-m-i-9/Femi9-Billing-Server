@@ -230,6 +230,26 @@ $qparam = urlencode($search ?? '');
                                         <table class="headertble">
                                             <tr>
                                                 <td><?=$Report_LABLE;?></td>
+                                                <td>
+                                                  <form method="post" action="export_retail_report_tp_xlsx.php" target="_blank" class="d-inline">
+                                                    <input type="hidden" name="frdate" value="<?=$from_date;?>">
+                                                    <input type="hidden" name="todate" value="<?=$to_date;?>">
+                                                    <?php foreach($selected_district_ids as $did): ?>
+                                                    <input type="hidden" name="district_id[]" value="<?=(int)$did;?>">
+                                                    <?php endforeach; ?>
+                                                    <?php foreach($selected_firka_ids as $fid): ?>
+                                                    <input type="hidden" name="firka_id[]" value="<?=(int)$fid;?>">
+                                                    <?php endforeach; ?>
+                                                    <?php foreach($selected_tp_ids as $tid): ?>
+                                                    <input type="hidden" name="tp_id[]" value="<?=(int)$tid;?>">
+                                                    <?php endforeach; ?>
+                                                    <input type="hidden" name="amount_range" value="<?=$selected_amount_range;?>">
+                                                    <input type="hidden" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>">
+                                                    <button type="submit" class="btn btn-success btn-sm">
+                                                      Export
+                                                    </button>
+                                                  </form>
+                                                </td>
                                             </tr>
                                         </table>
                                     </h1>
