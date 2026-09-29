@@ -177,6 +177,26 @@ try {
     $sheet->getStyle($headerRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $sheet->getStyle($headerRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
 
+    // Each month gets its own colour (header band darker, data columns a
+    // pale tint of the same colour) so the four months are easy to tell
+    // apart at a glance while scanning across a row.
+    $monthColors = [
+        '2026-06' => ['header' => '2E75B6', 'tint' => 'DDEBF7'], // blue
+        '2026-07' => ['header' => '548235', 'tint' => 'E2EFDA'], // green
+        '2026-08' => ['header' => 'BF8F00', 'tint' => 'FFF2CC'], // amber
+        '2026-09' => ['header' => 'C55A11', 'tint' => 'FCE4D6'], // orange
+    ];
+    $monthColRanges = []; // ym => [startColIndex, endColIndex]
+    $mc = 4;
+    foreach ($months as $ym => $label) {
+        $monthColRanges[$ym] = [$mc, $mc + 2];
+        $startCol = Coordinate::stringFromColumnIndex($mc);
+        $endCol   = Coordinate::stringFromColumnIndex($mc + 2);
+        $sheet->getStyle($startCol . $headerRow1 . ':' . $endCol . $headerRow2)
+            ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($monthColors[$ym]['header']);
+        $mc += 3;
+    }
+
     $row = $headerRow2 + 1;
     foreach ($districtOrder as $key) {
         $d = $districts[$key];
@@ -248,6 +268,20 @@ try {
         // Currency-style number formatting on every amount column (D onward).
         $sheet->getStyle('D' . ($headerRow2 + 1) . ':' . Coordinate::stringFromColumnIndex($lastCol) . ($row - 1))
             ->getNumberFormat()->setFormatCode('#,##0');
+
+        // Tint each month's own 3 data columns with its colour, on top of
+        // (not instead of) the grey "District Total" row fill already set
+        // above -- applying the plain per-cell fill here would otherwise
+        // overwrite that bold grey styling row by row.
+        foreach ($months as $ym => $label) {
+            [$startColIdx, $endColIdx] = $monthColRanges[$ym];
+            for ($r = $headerRow2 + 1; $r <= $row - 1; $r++) {
+                $isTotalRow = trim((string) $sheet->getCell('B' . $r)->getValue()) === 'District Total';
+                if ($isTotalRow) continue;
+                $rangeStr = Coordinate::stringFromColumnIndex($startColIdx) . $r . ':' . Coordinate::stringFromColumnIndex($endColIdx) . $r;
+                $sheet->getStyle($rangeStr)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($monthColors[$ym]['tint']);
+            }
+        }
     }
 
     foreach (range(1, $lastCol) as $ci) {
