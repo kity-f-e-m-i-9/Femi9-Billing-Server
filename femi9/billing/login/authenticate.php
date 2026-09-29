@@ -2,6 +2,7 @@
 if (!is_dir(session_save_path()) || !is_writable(session_save_path())) {
     session_save_path(sys_get_temp_dir());
 }
+ini_set('session.gc_maxlifetime', 18000); // match 5-hour app timeout; php.ini default (24min) was killing idle sessions
 session_start();
 error_reporting(0);
 
@@ -101,11 +102,10 @@ try {
     clearRateLimit($rlKey);
 
     if (count($matches) === 1) {
-        activateAccountSession($matches[0]);
+        require_once __DIR__ . '/../shared/session-bridge.php';
+        $bridgeToken = mintBridgeToken($db_conn, $matches[0], $matches);
         unset($_SESSION['PENDING_LOGIN']);
-        $_SESSION['LINKED_ACCOUNTS'] = $matches;
-        session_regenerate_id(true);
-        header('Location: ../' . $matches[0]['folder'] . '/dashboard.php');
+        header('Location: ../' . $matches[0]['folder'] . '/switch-login.php?token=' . urlencode($bridgeToken));
         exit;
     }
 

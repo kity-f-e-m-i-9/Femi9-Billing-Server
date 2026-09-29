@@ -1,3 +1,10 @@
+# Give this module its own session cookie so it doesn't share a session
+# file (and its file lock) with other billing modules open in other tabs
+# on the same domain.
+<IfModule php_module>
+  php_value session.name "femi9_territory_partner_sess"
+</IfModule>
+
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}.php -f

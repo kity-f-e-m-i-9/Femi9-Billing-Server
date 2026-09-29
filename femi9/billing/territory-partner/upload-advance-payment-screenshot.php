@@ -307,6 +307,7 @@ function classifyAdvancePaymentVisionResult(array $v): array {
     $raw = 'Claude vision: amount=' . ($v['amount'] ?? 'null') . ' reference=' . ($v['reference'] ?? 'null')
         . ' recipient_matches=' . ($v['recipient_matches'] ? 'true' : 'false') . ' confidence=' . $v['confidence']
         . ' looks_like_payment_screenshot=' . ($v['looks_like_payment_screenshot'] ? 'true' : 'false')
+        . ' payment_succeeded=' . ($v['payment_succeeded'] ? 'true' : 'false')
         . ($v['reasoning'] ? (' — ' . $v['reasoning']) : '');
 
     if (!$v['looks_like_payment_screenshot']) {
@@ -325,6 +326,16 @@ function classifyAdvancePaymentVisionResult(array $v): array {
             'amount' => $v['amount'],
             'reference' => $v['reference'],
             'reason' => "This payment does not appear to have been made to Femi9 — please upload a screenshot showing the payment made to Femi9 / Femi Nayan LLP / Anand Praveen.",
+            'raw_text' => $raw,
+        ];
+    }
+
+    if (!$v['payment_succeeded']) {
+        return [
+            'status' => 'rejected',
+            'amount' => $v['amount'],
+            'reference' => $v['reference'],
+            'reason' => "This screenshot shows the payment was NOT successful (failed / declined / not completed) — please upload a screenshot of a successful payment, or complete the payment and try again.",
             'raw_text' => $raw,
         ];
     }

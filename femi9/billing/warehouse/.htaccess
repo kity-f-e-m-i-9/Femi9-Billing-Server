@@ -2,7 +2,7 @@
 # file (and its file lock) with other billing modules open in other tabs
 # on the same domain.
 <IfModule php_module>
-  php_value session.name "femi9_super_stockist_sess"
+  php_value session.name "femi9_warehouse_sess"
 </IfModule>
 
 RewriteEngine On

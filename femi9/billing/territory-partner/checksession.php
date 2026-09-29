@@ -1,4 +1,5 @@
 <?php
+ini_set('session.gc_maxlifetime', 18000); // match 5-hour app timeout; php.ini default (24min) was killing idle sessions
 if (session_status() === PHP_SESSION_NONE) {
     if (!is_dir(session_save_path()) || !is_writable(session_save_path())) {
         session_save_path(sys_get_temp_dir());
@@ -14,8 +15,8 @@ if (!isset($_SESSION['LOGIN_USER']) || $_SESSION['LOGIN_USER'] === '') {
     exit;
 }
 
-// 30-minute inactivity timeout
-$timeout_duration = 1800;
+// 5-hour inactivity timeout
+$timeout_duration = 18000;
 if (isset($_SESSION['last_activity'])) {
     if ((time() - $_SESSION['last_activity']) > $timeout_duration) {
         session_unset();

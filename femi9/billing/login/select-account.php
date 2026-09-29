@@ -2,6 +2,7 @@
 if (!is_dir(session_save_path()) || !is_writable(session_save_path())) {
     session_save_path(sys_get_temp_dir());
 }
+ini_set('session.gc_maxlifetime', 18000); // match 5-hour app timeout; php.ini default (24min) was killing idle sessions
 session_start();
 error_reporting(0);
 
@@ -35,10 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['choose_type'])) {
             throw new Exception('Invalid selection.');
         }
 
-        activateAccountSession($chosen);
+        require_once __DIR__ . '/../shared/session-bridge.php';
+        $bridgeToken = mintBridgeToken($db_conn, $chosen, $accounts);
         unset($_SESSION['PENDING_LOGIN']);
-        session_regenerate_id(true);
-        header('Location: ../' . $chosen['folder'] . '/dashboard.php');
+        header('Location: ../' . $chosen['folder'] . '/switch-login.php?token=' . urlencode($bridgeToken));
         exit;
     } catch (Exception $e) {
         $_SESSION['errorMessage'] = $e->getMessage();

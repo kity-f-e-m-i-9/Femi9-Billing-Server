@@ -1028,7 +1028,10 @@ foreach ($rows as $r) {
         var tpCapped = Math.max(0, Math.min(tpTotal, available));
         var otCapped = Math.max(0, Math.min(otTotal, available - tpCapped));
         updateRequiredDisplay(pid, tpCapped, otCapped);
-        document.getElementById('qty_' + pid).value = tpCapped + otCapped;
+        var qtyEl = document.getElementById('qty_' + pid);
+        if (qtyEl) qtyEl.value = tpCapped + otCapped;
+        var rowEl = qtyEl ? qtyEl.closest('.auto-transfer-row') : null;
+        if (rowEl) rowEl.style.display = (tpCapped + otCapped) > 0 ? '' : 'none';
     }
 
     function openBreakdown(pid, neksomoAvail, healthcareAvail) {
@@ -1274,6 +1277,7 @@ foreach ($rows as $r) {
             updateRequiredDisplay(pid, tpCapped, otCapped);
             var qtyEl = document.getElementById('qty_' + pid);
             if (qtyEl) qtyEl.value = tpCapped + otCapped;
+            row.style.display = (tpCapped + otCapped) > 0 ? '' : 'none';
         });
 
         var modalEl = document.getElementById('ordersOverviewModal');
