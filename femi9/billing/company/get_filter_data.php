@@ -106,7 +106,51 @@ if($action == 'get_taluks') {
         $stmt->close();
         
         sendJSON(['success' => true, 'data' => $taluks, 'count' => count($taluks)]);
-        
+
+    } catch(Exception $e) {
+        sendJSON(['success' => false, 'message' => 'Exception: ' . $e->getMessage()]);
+    }
+}
+
+// ============================================
+// GET FIRKAS BY DISTRICT (Territory Partner's own location tree --
+// partner_location_nodes, not the district/taluk tables above)
+// ============================================
+if($action == 'get_firkas') {
+    $district_id = isset($_GET['district_id']) ? intval($_GET['district_id']) : 0;
+
+    if($district_id <= 0) {
+        sendJSON(['success' => false, 'message' => 'Invalid district ID']);
+    }
+
+    try {
+        $query = "SELECT f.id, f.name
+                  FROM partner_location_nodes dv
+                  INNER JOIN partner_location_nodes t ON t.parent_id = dv.id AND t.depth = 5
+                  INNER JOIN partner_location_nodes f ON f.parent_id = t.id AND f.depth = 6
+                  WHERE dv.parent_id = ? AND dv.depth = 4
+                  ORDER BY f.name ASC";
+        $stmt = $db_conn->prepare($query);
+
+        if(!$stmt) {
+            sendJSON(['success' => false, 'message' => 'Query preparation failed']);
+        }
+
+        $stmt->bind_param("i", $district_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $firkas = array();
+        while($row = $result->fetch_assoc()) {
+            $firkas[] = array(
+                'id' => $row['id'],
+                'name' => $row['name']
+            );
+        }
+        $stmt->close();
+
+        sendJSON(['success' => true, 'data' => $firkas, 'count' => count($firkas)]);
+
     } catch(Exception $e) {
         sendJSON(['success' => false, 'message' => 'Exception: ' . $e->getMessage()]);
     }

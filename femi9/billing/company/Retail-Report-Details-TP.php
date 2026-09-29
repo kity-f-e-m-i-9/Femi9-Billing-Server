@@ -1,0 +1,691 @@
+<?php
+// Territory Partner Retail Sales Report -- standalone (not folded into
+// Retail-Report-Details.php's super_stockiest/stockiest flow, since TP
+// uses a completely different location hierarchy: partner_location_nodes
+// District(3) -> Division(4) -> Taluk(5) -> Firka(6), not the district/
+// taluk tables that page's District/Taluk dropdowns read from. No Taluk
+// filter, no Excel export -- per request.
+ob_start();
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+include("checksession.php");
+include("config.php");
+
+if(isset($_GET['clear_filters']) || isset($_POST['clear_all'])) {
+    ob_clean();
+    unset($_SESSION['tp_retail_report_from_date']);
+    unset($_SESSION['tp_retail_report_to_date']);
+    unset($_SESSION['tp_retail_report_district_id']);
+    unset($_SESSION['tp_retail_report_firka_id']);
+    unset($_SESSION['tp_retail_report_amount_range']);
+    unset($_SESSION['tp_retail_report_records_per_page']);
+    unset($_SESSION['tp_retail_report_search']);
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+mysqli_set_charset($db_conn, 'utf8mb4');
+mysqli_query($db_conn, "SET collation_connection = 'utf8mb4_general_ci'");
+mysqli_query($db_conn, "SET collation_server = 'utf8mb4_general_ci'");
+
+// Calculate last 7 days date range (default)
+$to_date = date('Y-m-d');
+$from_date = date('Y-m-d', strtotime('-7 days'));
+
+if(isset($_POST['frdate']) && !empty($_POST['frdate'])) {
+    $from_date = $_POST['frdate'];
+    $_SESSION['tp_retail_report_from_date'] = $from_date;
+}
+if(isset($_POST['todate']) && !empty($_POST['todate'])) {
+    $to_date = $_POST['todate'];
+    $_SESSION['tp_retail_report_to_date'] = $to_date;
+}
+if(isset($_SESSION['tp_retail_report_from_date'])) {
+    $from_date = $_SESSION['tp_retail_report_from_date'];
+}
+if(isset($_SESSION['tp_retail_report_to_date'])) {
+    $to_date = $_SESSION['tp_retail_report_to_date'];
+}
+
+// District filter (partner_location_nodes depth=3)
+$selected_district_id = 0;
+if(isset($_POST['district_id'])) {
+    $selected_district_id = !empty($_POST['district_id']) ? (int)$_POST['district_id'] : 0;
+    if($selected_district_id > 0) {
+        $_SESSION['tp_retail_report_district_id'] = $selected_district_id;
+    } else {
+        unset($_SESSION['tp_retail_report_district_id']);
+    }
+} elseif(isset($_SESSION['tp_retail_report_district_id'])) {
+    $selected_district_id = (int)$_SESSION['tp_retail_report_district_id'];
+}
+
+// Firka filter (partner_location_nodes depth=6)
+$selected_firka_id = 0;
+if(isset($_POST['firka_id'])) {
+    $selected_firka_id = !empty($_POST['firka_id']) ? (int)$_POST['firka_id'] : 0;
+    if($selected_firka_id > 0) {
+        $_SESSION['tp_retail_report_firka_id'] = $selected_firka_id;
+    } else {
+        unset($_SESSION['tp_retail_report_firka_id']);
+    }
+} elseif(isset($_SESSION['tp_retail_report_firka_id'])) {
+    $selected_firka_id = (int)$_SESSION['tp_retail_report_firka_id'];
+}
+
+// Clear firka if district changed
+if(isset($_POST['district_id']) && isset($_SESSION['tp_retail_report_district_id'])) {
+    if($_POST['district_id'] != $_SESSION['tp_retail_report_district_id']) {
+        $selected_firka_id = 0;
+        unset($_SESSION['tp_retail_report_firka_id']);
+    }
+}
+
+// Amount range filter
+$selected_amount_range = '';
+if(isset($_POST['amount_range'])) {
+    $selected_amount_range = !empty($_POST['amount_range']) ? $_POST['amount_range'] : '';
+    if($selected_amount_range) {
+        $_SESSION['tp_retail_report_amount_range'] = $selected_amount_range;
+    } else {
+        unset($_SESSION['tp_retail_report_amount_range']);
+    }
+} elseif(isset($_SESSION['tp_retail_report_amount_range'])) {
+    $selected_amount_range = $_SESSION['tp_retail_report_amount_range'];
+}
+
+$Report_LABLE = "Retail Sales Report - Territory Partner";
+
+// Pagination settings
+$records_per_page = 20;
+if(isset($_POST['records_per_page'])) {
+    $records_per_page = (int)$_POST['records_per_page'];
+    $_SESSION['tp_retail_report_records_per_page'] = $records_per_page;
+} elseif(isset($_SESSION['tp_retail_report_records_per_page'])) {
+    $records_per_page = (int)$_SESSION['tp_retail_report_records_per_page'];
+}
+$allowed_values = [20, 40, 60];
+if(!in_array($records_per_page, $allowed_values)) {
+    $records_per_page = 20;
+}
+
+// Universal search
+$search = '';
+if (isset($_GET['q'])) {
+    $search = trim($_GET['q']);
+    $_SESSION['tp_retail_report_search'] = $search;
+} elseif (isset($_POST['q'])) {
+    $search = trim($_POST['q']);
+    $_SESSION['tp_retail_report_search'] = $search;
+} elseif (isset($_SESSION['tp_retail_report_search'])) {
+    $search = $_SESSION['tp_retail_report_search'];
+}
+$search_esc = $db_conn->real_escape_string($search);
+$is_search = ($search !== '');
+
+$page = isset($_GET["page"]) ? (int)$_GET["page"] : 1;
+$offset = ($page - 1) * $records_per_page;
+if ($is_search) {
+    $MAX_SEARCH_ROWS = 5000;
+    $page = 1;
+    $offset = 0;
+    $records_per_page = $MAX_SEARCH_ROWS;
+}
+$qparam = urlencode($search ?? '');
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?=$Report_LABLE;?> : <?php echo $business_name;?></title>
+
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
+    <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
+    <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
+    <link href="../../assets/plugins/highlight/styles/github-gist.css" rel="stylesheet">
+    <link href="../../assets/css/main.min.css" rel="stylesheet">
+    <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../../assets/images/neptune.png" />
+
+    <style>
+        #overflowon { width: 100%; overflow-x: auto; }
+        .table th {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            font-weight: 600; white-space: nowrap; font-size: 14px;
+            padding: 12px 8px; border-color: #dee2e6; color: #495057;
+        }
+        .table td {
+            white-space: nowrap; font-size: 13px; padding: 10px 8px;
+            vertical-align: middle; border-color: #dee2e6;
+        }
+        .product-col {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%);
+            text-align: center; min-width: 80px; font-weight: 500;
+        }
+        .table-bordered { border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
+        .table-hover tbody tr:hover { background-color: rgba(0,123,255,0.05); transition: background-color 0.2s ease; }
+        .card { border: none; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border-radius: 12px; }
+        .card-header { background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-bottom: 1px solid #e9ecef; border-radius: 12px 12px 0 0; }
+        .pagination .page-link { border-radius: 6px; margin: 0 2px; border: none; background: #f8f9fa; color: #495057; font-weight: 500; }
+        .pagination .page-item.active .page-link { background: #0d6efd; color: white; box-shadow: 0 2px 4px rgba(13,110,253,0.3); }
+        .pagination .page-link:hover { background: #e9ecef; color: #495057; }
+        .form-select-sm { border-radius: 6px; border-color: #ced4da; font-size: 13px; }
+        .alert { border-radius: 8px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        @media (max-width: 768px) {
+            .table th, .table td { font-size: 12px; padding: 8px 4px; }
+            .card-header .d-flex { flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app align-content-stretch d-flex flex-wrap">
+        <div class="app-sidebar">
+            <?php include("logo.php");?>
+            <?php include("femi_menu.php");?>
+        </div>
+
+        <div class="app-container">
+            <?php include("app-header.php");?>
+
+            <div class="app-content">
+                <div class="content-wrapper">
+                    <div class="container-fluid">
+
+                        <div class="row">
+                            <div class="col">
+                                <div class="page-description">
+                                    <h1>
+                                        <table class="headertble">
+                                            <tr>
+                                                <td><?=$Report_LABLE;?></td>
+                                            </tr>
+                                        </table>
+                                    </h1>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="card-title">Advanced Filters</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form method="post" action="<?=$_SERVER['PHP_SELF'];?>" id="filterForm">
+                                            <div class="row mb-3">
+                                                <div class="col-md-3 col-sm-6 mb-2">
+                                                    <label class="form-label">From Date <span class="text-danger">*</span></label>
+                                                    <input type="date" name="frdate" value="<?=$from_date;?>" class="form-control" required>
+                                                </div>
+                                                <div class="col-md-3 col-sm-6 mb-2">
+                                                    <label class="form-label">To Date <span class="text-danger">*</span></label>
+                                                    <input type="date" name="todate" value="<?=$to_date;?>" class="form-control" required>
+                                                </div>
+                                                <div class="col-md-3 col-sm-6 mb-2">
+                                                    <label class="form-label">District</label>
+                                                    <select name="district_id" id="district_filter" class="form-control">
+                                                        <option value="">All Districts</option>
+                                                        <?php
+                                                        $dist_query = "SELECT id, name FROM partner_location_nodes
+                                                                       WHERE depth = 3
+                                                                         AND parent_id = (SELECT id FROM partner_location_nodes WHERE depth = 2 AND name = 'Tamilnadu' LIMIT 1)
+                                                                       ORDER BY name ASC";
+                                                        $dist_result = mysqli_query($db_conn, $dist_query);
+                                                        if($dist_result) {
+                                                            while($dist = mysqli_fetch_assoc($dist_result)) {
+                                                                $selected_attr = ($selected_district_id == $dist['id']) ? 'selected' : '';
+                                                                echo '<option value="'.$dist['id'].'" '.$selected_attr.'>'.htmlspecialchars($dist['name']).'</option>';
+                                                            }
+                                                        }
+                                                        ?>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3 col-sm-6 mb-2">
+                                                    <label class="form-label">Firka</label>
+                                                    <select name="firka_id" id="firka_filter" class="form-control">
+                                                        <option value="">All Firkas</option>
+                                                        <?php
+                                                        if(!empty($selected_district_id)) {
+                                                            $firka_query = "SELECT f.id, f.name
+                                                                             FROM partner_location_nodes dv
+                                                                             INNER JOIN partner_location_nodes t ON t.parent_id = dv.id AND t.depth = 5
+                                                                             INNER JOIN partner_location_nodes f ON f.parent_id = t.id AND f.depth = 6
+                                                                             WHERE dv.parent_id = ? AND dv.depth = 4
+                                                                             ORDER BY f.name ASC";
+                                                            $stmt_firka = $db_conn->prepare($firka_query);
+                                                            $stmt_firka->bind_param("i", $selected_district_id);
+                                                            $stmt_firka->execute();
+                                                            $firka_result = $stmt_firka->get_result();
+                                                            while($firka = $firka_result->fetch_assoc()) {
+                                                                $selected_attr = ($selected_firka_id == $firka['id']) ? 'selected' : '';
+                                                                echo '<option value="'.$firka['id'].'" '.$selected_attr.'>'.htmlspecialchars($firka['name']).'</option>';
+                                                            }
+                                                            $stmt_firka->close();
+                                                        }
+                                                        ?>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="row mb-3">
+                                                <div class="col-md-3 col-sm-6 mb-2">
+                                                    <label class="form-label">Amount Range</label>
+                                                    <select name="amount_range" id="amount_range_filter" class="form-control">
+                                                        <option value="">All Amounts</option>
+                                                        <option value="50000-99999" <?= $selected_amount_range == '50000-99999' ? 'selected' : ''; ?>>₹50,000 - ₹99,999</option>
+                                                        <option value="100000-149999" <?= $selected_amount_range == '100000-149999' ? 'selected' : ''; ?>>₹1,00,000 - ₹1,49,999</option>
+                                                        <option value="150000-above" <?= $selected_amount_range == '150000-above' ? 'selected' : ''; ?>>Above ₹1,50,000</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3 col-sm-12 mb-2">
+                                                    <label class="form-label d-none d-md-block">&nbsp;</label>
+                                                    <div class="d-flex gap-2 flex-wrap">
+                                                        <button type="submit" name="filter_dates" class="btn btn-primary">
+                                                            <i class="material-icons">search</i> Apply Filters
+                                                        </button>
+                                                        <button type="submit" name="clear_all" class="btn btn-secondary">
+                                                            <i class="material-icons">refresh</i> Reset All
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <?php
+                                            $active_filters = [];
+                                            if(!empty($selected_district_id)) {
+                                                $dn_stmt = $db_conn->prepare("SELECT name FROM partner_location_nodes WHERE id = ?");
+                                                $dn_stmt->bind_param("i", $selected_district_id);
+                                                $dn_stmt->execute();
+                                                if($row_dn = $dn_stmt->get_result()->fetch_assoc()) {
+                                                    $active_filters[] = "District: " . $row_dn['name'];
+                                                }
+                                                $dn_stmt->close();
+                                            }
+                                            if(!empty($selected_firka_id)) {
+                                                $fn_stmt = $db_conn->prepare("SELECT name FROM partner_location_nodes WHERE id = ?");
+                                                $fn_stmt->bind_param("i", $selected_firka_id);
+                                                $fn_stmt->execute();
+                                                if($row_fn = $fn_stmt->get_result()->fetch_assoc()) {
+                                                    $active_filters[] = "Firka: " . $row_fn['name'];
+                                                }
+                                                $fn_stmt->close();
+                                            }
+                                            if(!empty($selected_amount_range)) {
+                                                $amount_labels = [
+                                                    '50000-99999' => '₹50,000 - ₹99,999',
+                                                    '100000-149999' => '₹1,00,000 - ₹1,49,999',
+                                                    '150000-above' => 'Above ₹1,50,000'
+                                                ];
+                                                $active_filters[] = "Amount: " . $amount_labels[$selected_amount_range];
+                                            }
+                                            if($search !== '') {
+                                                $active_filters[] = "Search: \"" . htmlspecialchars($search) . "\"";
+                                            }
+                                            if(!empty($active_filters)):
+                                            ?>
+                                            <div class="alert alert-success mb-0">
+                                                <strong>Active Filters:</strong> <?= implode(' | ', $active_filters); ?>
+                                            </div>
+                                            <?php endif; ?>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col">
+                                <div class="card">
+                                    <div class="card-header py-3 bg-white border-0">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <form method="post" action="<?=$_SERVER['PHP_SELF'];?>" class="d-flex align-items-center gap-2">
+                                                <input type="hidden" name="frdate" value="<?=$from_date;?>">
+                                                <input type="hidden" name="todate" value="<?=$to_date;?>">
+                                                <input type="hidden" name="district_id" value="<?=$selected_district_id;?>">
+                                                <input type="hidden" name="firka_id" value="<?=$selected_firka_id;?>">
+                                                <input type="hidden" name="amount_range" value="<?=$selected_amount_range;?>">
+                                                <input type="hidden" name="page" value="1">
+                                                <input type="hidden" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>">
+
+                                                <label class="mb-0 text-muted">Show:</label>
+                                                <select name="records_per_page" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                                                    <option value="20" <?= $records_per_page==20 ? 'selected' : '' ?>>20</option>
+                                                    <option value="40" <?= $records_per_page==40 ? 'selected' : '' ?>>40</option>
+                                                    <option value="60" <?= $records_per_page==60 ? 'selected' : '' ?>>60</option>
+                                                </select>
+                                                <label class="mb-0 text-muted">entries</label>
+                                            </form>
+
+                                            <div class="d-flex align-items-center gap-3">
+                                              <form method="get" action="<?=$_SERVER['PHP_SELF'];?>" id="searchForm" class="d-flex align-items-center gap-2">
+                                                <input type="hidden" name="page" value="1">
+                                                <input type="text" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>"
+                                                       class="form-control form-control-sm" placeholder="Search name, mobile, product..." style="min-width:280px">
+                                              </form>
+                                              <div class="text-muted small">
+                                                <?php if ($is_search): ?>
+                                                  Showing all matches
+                                                <?php else: ?>
+                                                  Page <?=$page;?> of <?=$total_pages ?? 1;?>
+                                                <?php endif; ?>
+                                              </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="card-body">
+<?php
+$products = [];
+$product_query = "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC";
+$product_result = mysqli_query($db_conn, $product_query);
+if($product_result) {
+    while($pr = mysqli_fetch_assoc($product_result)) {
+        $products[$pr['id']] = $pr['productName'];
+    }
+}
+
+// TP location filter -- Firka is most specific, takes priority if both set.
+$tp_location_condition = "";
+if(!empty($selected_firka_id)) {
+    $tp_location_condition = " AND EXISTS (
+        SELECT 1 FROM territory_partner_locations tpl
+        WHERE tpl.territory_partner_id = tp.id AND tpl.location_id = " . (int)$selected_firka_id . "
+    )";
+} elseif(!empty($selected_district_id)) {
+    $tp_location_condition = " AND EXISTS (
+        SELECT 1 FROM territory_partner_locations tpl
+        INNER JOIN partner_location_nodes f  ON f.id = tpl.location_id
+        INNER JOIN partner_location_nodes t  ON t.id = f.parent_id
+        INNER JOIN partner_location_nodes dv ON dv.id = t.parent_id
+        WHERE tpl.territory_partner_id = tp.id AND dv.parent_id = " . (int)$selected_district_id . "
+    )";
+}
+
+$sellers = [];
+$query = "SELECT tp.id as seller_id,
+                 CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci as seller_name,
+                 CONVERT(tp.mobile USING utf8mb4) COLLATE utf8mb4_general_ci as seller_mobile
+          FROM territory_partners tp
+          WHERE tp.deleted_at IS NULL" . $tp_location_condition;
+$result = mysqli_query($db_conn, $query);
+if($result) {
+    while($row = mysqli_fetch_assoc($result)) {
+        $sellers[] = $row;
+    }
+}
+
+// Sales via user_invoice (shop channel) -- same table/convention
+// Retail-Report-Details.php uses for every other seller type.
+$sellers_with_data = [];
+foreach($sellers as $seller) {
+    $total_query = "SELECT COALESCE(SUM(sub_total), 0) as sub_total,
+                    COALESCE(SUM(courier_charges), 0) as courier_charges,
+                    COALESCE(SUM(total), 0) as total_amount
+                    FROM user_invoice
+                    WHERE from_user_id = '" . $db_conn->real_escape_string($seller['seller_id']) . "'
+                    AND from_user_type = 'territory_partner'
+                    AND to_user_type = 'shop'
+                    AND date BETWEEN '" . $db_conn->real_escape_string($from_date) . "'
+                    AND '" . $db_conn->real_escape_string($to_date) . "'
+                    AND sub_total > 0";
+    $total_result = mysqli_query($db_conn, $total_query);
+    if($total_result) {
+        $total_row = mysqli_fetch_assoc($total_result);
+        $seller['total_amount'] = $total_row['total_amount'];
+        $seller['sub_total'] = $total_row['sub_total'];
+        $seller['courier_charges'] = $total_row['courier_charges'];
+
+        $include_seller = false;
+        if(!empty($selected_amount_range)) {
+            switch($selected_amount_range) {
+                case '50000-99999':
+                    $include_seller = ($seller['total_amount'] >= 50000 && $seller['total_amount'] <= 99999);
+                    break;
+                case '100000-149999':
+                    $include_seller = ($seller['total_amount'] >= 100000 && $seller['total_amount'] <= 149999);
+                    break;
+                case '150000-above':
+                    $include_seller = ($seller['total_amount'] >= 150000);
+                    break;
+            }
+        } else {
+            $include_seller = ($seller['total_amount'] > 0);
+        }
+
+        if($include_seller) {
+            if($search_esc !== '') {
+                if(stripos($seller['seller_name'], $search_esc) !== false ||
+                   stripos($seller['seller_mobile'], $search_esc) !== false) {
+                    $sellers_with_data[] = $seller;
+                }
+            } else {
+                $sellers_with_data[] = $seller;
+            }
+        }
+    }
+}
+
+usort($sellers_with_data, function($a, $b) {
+    return $b['total_amount'] <=> $a['total_amount'];
+});
+
+$total_records = count($sellers_with_data);
+$total_pages = max(1, (int)ceil($total_records / max(1, $records_per_page)));
+
+if ($is_search) {
+    $total_pages = 1;
+    $page = 1;
+    $offset = 0;
+    $sellers_paginated = $sellers_with_data;
+} else {
+    $sellers_paginated = array_slice($sellers_with_data, $offset, $records_per_page);
+}
+
+$seller_product_quantities = [];
+foreach($sellers_paginated as $seller) {
+    $seller_id = $seller['seller_id'];
+    $product_qty_query = "
+        SELECT uii.pr_id, SUM(uii.qty) as total_qty
+        FROM user_invoice ui
+        INNER JOIN user_invoice_items uii ON ui.inv_id = uii.inv_id
+        WHERE ui.from_user_id = '" . $db_conn->real_escape_string($seller_id) . "'
+        AND ui.from_user_type = 'territory_partner'
+        AND ui.to_user_type = 'shop'
+        AND ui.date BETWEEN '" . $db_conn->real_escape_string($from_date) . "'
+        AND '" . $db_conn->real_escape_string($to_date) . "'
+        AND ui.sub_total > 0
+        GROUP BY uii.pr_id
+    ";
+    $qty_result = mysqli_query($db_conn, $product_qty_query);
+    if($qty_result) {
+        while($qty_row = mysqli_fetch_assoc($qty_result)) {
+            $seller_product_quantities[$seller_id][$qty_row['pr_id']] = $qty_row['total_qty'];
+        }
+    }
+}
+
+if(!empty($sellers_paginated)) {
+?>
+
+<div id="overflowon">
+    <table class="table table-bordered table-hover table-sm">
+        <thead>
+            <tr>
+                <th rowspan="2">S.No</th>
+                <th rowspan="2">TP Name</th>
+                <th rowspan="2">Mobile Number</th>
+                <th rowspan="2">Sub Total</th>
+                <th rowspan="2">Courier</th>
+                <th rowspan="2">Total Amount</th>
+                <th colspan="<?=count($products);?>" style="text-align:center; background:#e3f2fd;">Product Quantities</th>
+            </tr>
+            <tr>
+                <?php foreach($products as $pr_id => $pr_name): ?>
+                <th class="product-col" title="<?=htmlspecialchars($pr_name);?>">
+                    <?php
+                    $short_name = strlen($pr_name) > 30 ? substr($pr_name, 0, 27) . '...' : $pr_name;
+                    echo htmlspecialchars($short_name);
+                    ?>
+                </th>
+                <?php endforeach; ?>
+            </tr>
+        </thead>
+        <tbody>
+            <?php
+                $serial = $offset + 1;
+                $grand_total = 0;
+                $grand_subtotal = 0;
+                $grand_courier = 0;
+                $product_totals = array_fill_keys(array_keys($products), 0);
+
+                foreach($sellers_paginated as $seller):
+                    $grand_total += $seller['total_amount'];
+                    $grand_subtotal += $seller['sub_total'];
+                    $grand_courier += $seller['courier_charges'];
+            ?>
+            <tr>
+                <td><?=$serial++;?></td>
+                <td><strong><?=htmlspecialchars($seller['seller_name']);?></strong></td>
+                <td><?=htmlspecialchars($seller['seller_mobile']);?></td>
+                <td align="right"><strong>₹<?=inr_format($seller['sub_total'], 2);?></strong></td>
+                <td align="right"><strong>₹<?=inr_format($seller['courier_charges'], 2);?></strong></td>
+                <td align="right"><strong>₹<?=inr_format($seller['total_amount'], 2);?></strong></td>
+
+                <?php foreach($products as $pr_id => $pr_name):
+                    $qty = $seller_product_quantities[$seller['seller_id']][$pr_id] ?? 0;
+                    $product_totals[$pr_id] += $qty;
+                ?>
+                <td align="center" class="product-col">
+                    <?php if($qty > 0): ?>
+                        <strong><?=$qty;?></strong>
+                    <?php else: ?>
+                        <span style="color:#ccc;">-</span>
+                    <?php endif; ?>
+                </td>
+                <?php endforeach; ?>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+            <tr style="background:#e9ecef; font-weight:bold;">
+                <th colspan="3" align="right">Page Total:</th>
+                <th align="right">₹<?=inr_format($grand_subtotal, 2);?></th>
+                <th align="right">₹<?=inr_format($grand_courier, 2);?></th>
+                <th align="right">₹<?=inr_format($grand_total, 2);?></th>
+                <?php foreach($product_totals as $pr_id => $total): ?>
+                <th align="center" class="product-col"><?=$total;?></th>
+                <?php endforeach; ?>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<?php if(!$is_search && $total_pages > 1): ?>
+<nav aria-label="Page navigation" class="mt-3">
+    <ul class="pagination justify-content-center">
+        <?php if($page > 1): ?>
+        <li class="page-item"><a class="page-link" href="?page=<?=($page-1);?>&q=<?=$qparam;?>">Previous</a></li>
+        <?php endif; ?>
+        <?php
+        $start_page = max(1, $page - 2);
+        $end_page = min($total_pages, $page + 2);
+        if($start_page > 1) {
+            echo '<li class="page-item"><a class="page-link" href="?page=1&q='.$qparam.'">1</a></li>';
+            if($start_page > 2) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+        for($i = $start_page; $i <= $end_page; $i++):
+        ?>
+        <li class="page-item <?=($i == $page) ? 'active' : '';?>">
+            <a class="page-link" href="?page=<?=$i;?>&q=<?=$qparam;?>"><?=$i;?></a>
+        </li>
+        <?php
+        endfor;
+        if($end_page < $total_pages) {
+            if($end_page < $total_pages - 1) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            echo '<li class="page-item"><a class="page-link" href="?page=' . $total_pages . '&q='.$qparam.'">' . $total_pages . '</a></li>';
+        }
+        ?>
+        <?php if($page < $total_pages): ?>
+        <li class="page-item"><a class="page-link" href="?page=<?=($page+1);?>&q=<?=$qparam;?>">Next</a></li>
+        <?php endif; ?>
+    </ul>
+</nav>
+<?php endif; ?>
+
+<p class="text-center text-muted mt-3">
+    <?php if ($is_search): ?>
+        Showing all <?=$total_records;?> matching entries
+    <?php else: ?>
+        Showing <?= $offset + 1; ?> to <?= min($offset + $records_per_page, $total_records); ?> of <?=$total_records;?> entries
+    <?php endif; ?>
+</p>
+<?php
+} else {
+    echo '<div class="alert alert-warning">No Territory Partners found for the selected filters and date range.</div>';
+}
+?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
+    <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
+    <script src="../../assets/plugins/pace/pace.min.js"></script>
+    <script src="../../assets/js/main.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const districtEl = document.getElementById('district_filter');
+            if (districtEl) {
+                districtEl.addEventListener('change', function() {
+                    const districtId = this.value;
+                    const firkaSelect = document.getElementById('firka_filter');
+                    if (!firkaSelect) return;
+
+                    firkaSelect.innerHTML = '<option value="">All Firkas</option>';
+
+                    if(districtId) {
+                        firkaSelect.innerHTML = '<option value="">Loading firkas...</option>';
+                        const url = `get_filter_data.php?action=get_firkas&district_id=${districtId}&_=${Date.now()}`;
+                        fetch(url)
+                            .then(response => response.json())
+                            .then(data => {
+                                firkaSelect.innerHTML = '<option value="">All Firkas</option>';
+                                if(data.success && data.data && data.data.length > 0) {
+                                    data.data.forEach(firka => {
+                                        const option = document.createElement('option');
+                                        option.value = firka.id;
+                                        option.textContent = firka.name;
+                                        firkaSelect.appendChild(option);
+                                    });
+                                }
+                            })
+                            .catch(() => {
+                                firkaSelect.innerHTML = '<option value="">Error loading firkas</option>';
+                            });
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
