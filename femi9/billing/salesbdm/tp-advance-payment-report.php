@@ -19,12 +19,11 @@ $filter_from = $_GET['from_date'] ?? date('Y-m-01');
 $filter_to   = $_GET['to_date']   ?? date('Y-m-d');
 $filter_tp   = (int)($_GET['tp_id'] ?? 0);
 if ($filter_tp > 0 && !in_array($filter_tp, $tpIds, true)) { $filter_tp = 0; }
-$filter_status = $_GET['status'] ?? '';
-$allowed_statuses = ['active','partially_adjusted','fully_adjusted',''];
-if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = '';
+$allowed_statuses = ['active','partially_adjusted','fully_adjusted'];
+$filter_statuses = array_values(array_intersect((array)($_GET['status'] ?? []), $allowed_statuses));
 $filter_type = $_GET['type'] ?? '';
 if (!in_array($filter_type, ['', 'napkin', 'diaper'], true)) $filter_type = '';
-$filter_district = trim($_GET['district'] ?? '');
+$filter_districts = array_values(array_filter(array_map('trim', (array)($_GET['district'] ?? []))));
 
 $payments = [];
 $tpTargets = [];
@@ -41,14 +40,14 @@ if ($hasTps) {
     // Distinct district names across this BDM's own TPs, for the District filter.
     $districtList = array_values(array_unique(array_filter(array_column($tps, 'district_name'))));
     sort($districtList);
-    if ($filter_district !== '' && !in_array($filter_district, $districtList, true)) { $filter_district = ''; }
+    $filter_districts = array_values(array_intersect($filter_districts, $districtList));
 
-    // Restricts the query to only TPs in the selected district — everything
+    // Restricts the query to only TPs in the selected district(s) — everything
     // else (target/invoiced lookups, the table itself) already keys off
     // territory_partner_id, so narrowing this list is enough to make the
     // whole report district-scoped.
-    $scopedTpIds = $filter_district !== ''
-        ? array_keys(array_filter($tpDistricts, fn($d) => $d === $filter_district))
+    $scopedTpIds = !empty($filter_districts)
+        ? array_keys(array_filter($tpDistricts, fn($d) => in_array($d, $filter_districts, true)))
         : $tpIds;
     $scopedTpIdList = !empty($scopedTpIds) ? implode(',', array_map('intval', $scopedTpIds)) : '0';
 
@@ -60,10 +59,9 @@ if ($hasTps) {
         $params[] = $filter_tp;
         $types .= "i";
     }
-    if ($filter_status !== '') {
-        $where[] = "tap.status = ?";
-        $params[] = $filter_status;
-        $types .= "s";
+    if (!empty($filter_statuses)) {
+        $where[] = "tap.status IN (" . implode(',', array_fill(0, count($filter_statuses), '?')) . ")";
+        foreach ($filter_statuses as $fs) { $params[] = $fs; $types .= "s"; }
     }
     if ($filter_type !== '') {
         $where[] = "tap.product_type = ?";
@@ -164,6 +162,12 @@ $i = 0;
         .status-active { background:#d1fae5; color:#065f46; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600; }
         .status-partially { background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600; }
         .status-fully { background:#dbeafe; color:#1e40af; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+        .check-dropdown .dropdown-toggle { background:#fff; }
+        .check-dropdown .dropdown-toggle:focus { box-shadow:none; }
+        .check-dropdown-menu { max-height:260px; overflow-y:auto; padding:6px; min-width:200px; }
+        .check-dropdown-item { display:block; padding:6px 8px; margin:0; font-size:13px; color:#374151; border-radius:5px; cursor:pointer; font-weight:400; }
+        .check-dropdown-item:hover { background:#f3f4f6; }
+        .check-dropdown-item input { margin-right:7px; }
         .mt { width:100%; border-collapse:collapse; font-size:13px; }
         .mt th { background:#f7f7f6; font-weight:600; color:#52514e; padding:8px 11px; text-align:left; border-bottom:1px solid #e1e0d9; white-space:nowrap; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px; }
         .mt td { padding:7px 11px; border-bottom:1px solid #e1e0d9; vertical-align:middle; }
@@ -229,12 +233,19 @@ $i = 0;
                         <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
                             <div>
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">District</label>
-                                <select name="district" class="form-control form-control-sm" style="width:180px;">
-                                    <option value="">All Districts</option>
-                                    <?php foreach ($districtList as $d): ?>
-                                        <option value="<?php echo htmlspecialchars($d); ?>" <?php echo $filter_district === $d ? 'selected' : ''; ?>><?php echo htmlspecialchars($d); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
+                                <div class="dropdown check-dropdown">
+                                    <button type="button" class="form-control form-control-sm text-start dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" style="width:180px;">
+                                        <span class="check-dropdown-label"><?= empty($filter_districts) ? 'All Districts' : count($filter_districts) . ' District(s)' ?></span>
+                                    </button>
+                                    <div class="dropdown-menu check-dropdown-menu">
+                                        <?php foreach ($districtList as $d): ?>
+                                        <label class="check-dropdown-item">
+                                            <input type="checkbox" class="check-dropdown-input" data-group="district" name="district[]" value="<?php echo htmlspecialchars($d); ?>" <?php echo in_array($d, $filter_districts, true) ? 'checked' : ''; ?>>
+                                            <?php echo htmlspecialchars($d); ?>
+                                        </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Territory Partner</label>
@@ -255,12 +266,25 @@ $i = 0;
                             </div>
                             <div>
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Status</label>
-                                <select name="status" class="form-control form-control-sm">
-                                    <option value="">All</option>
-                                    <option value="active" <?php echo $filter_status==='active'?'selected':''; ?>>Active</option>
-                                    <option value="partially_adjusted" <?php echo $filter_status==='partially_adjusted'?'selected':''; ?>>Partially Adjusted</option>
-                                    <option value="fully_adjusted" <?php echo $filter_status==='fully_adjusted'?'selected':''; ?>>Fully Adjusted</option>
-                                </select>
+                                <div class="dropdown check-dropdown">
+                                    <button type="button" class="form-control form-control-sm text-start dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" style="width:170px;">
+                                        <span class="check-dropdown-label"><?= empty($filter_statuses) ? 'All Status' : count($filter_statuses) . ' selected' ?></span>
+                                    </button>
+                                    <div class="dropdown-menu check-dropdown-menu">
+                                        <label class="check-dropdown-item">
+                                            <input type="checkbox" class="check-dropdown-input" data-group="status" name="status[]" value="active" <?php echo in_array('active', $filter_statuses, true) ? 'checked' : ''; ?>>
+                                            Active
+                                        </label>
+                                        <label class="check-dropdown-item">
+                                            <input type="checkbox" class="check-dropdown-input" data-group="status" name="status[]" value="partially_adjusted" <?php echo in_array('partially_adjusted', $filter_statuses, true) ? 'checked' : ''; ?>>
+                                            Partially Adjusted
+                                        </label>
+                                        <label class="check-dropdown-item">
+                                            <input type="checkbox" class="check-dropdown-input" data-group="status" name="status[]" value="fully_adjusted" <?php echo in_array('fully_adjusted', $filter_statuses, true) ? 'checked' : ''; ?>>
+                                            Fully Adjusted
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Type</label>
@@ -362,6 +386,24 @@ $i = 0;
 <script src="../../assets/plugins/select2/js/select2.full.min.js"></script>
 <script>
 $('#tpSelect').select2({ width: '220px', placeholder: 'All Territory Partners' });
+
+// Checkbox dropdowns (District/Status) — clicking the label text (not just
+// the tiny checkbox box) toggles it, since the checkbox sits inside the
+// <label>. Keep the button's own text in sync with how many are checked.
+function updateCheckDropdownLabel(group, defaultText) {
+    var $inputs = $('.check-dropdown-input[data-group="' + group + '"]');
+    var checked = $inputs.filter(':checked').length;
+    var $label = $inputs.first().closest('.check-dropdown-menu').siblings('.dropdown-toggle').find('.check-dropdown-label');
+    if (checked === 0) {
+        $label.text(defaultText);
+    } else if (group === 'district') {
+        $label.text(checked + ' District(s)');
+    } else {
+        $label.text(checked + ' selected');
+    }
+}
+$('.check-dropdown-input[data-group="district"]').on('change', function () { updateCheckDropdownLabel('district', 'All Districts'); });
+$('.check-dropdown-input[data-group="status"]').on('change', function () { updateCheckDropdownLabel('status', 'All Status'); });
 
 $('#advPayReportTable').DataTable({
     dom: '<"row"<"col-sm-6"l><"col-sm-6"f>><"row"<"col-sm-12"B>><"row"<"col-sm-12"tr>><"row"<"col-sm-5"i><"col-sm-7"p>>',
