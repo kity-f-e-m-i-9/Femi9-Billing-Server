@@ -30,9 +30,9 @@ class PaymentScreenshotParser {
     // if nothing in tier 1 matched, so the two never compete and cause a
     // false "found more than one" ambiguity.
     private static $referenceLabelPatternTier1 =
-        '/(?:UTR|RRN|UPI\s*(?:Ref(?:erence)?(?:\s*(?:No\.?|Number))?|Transaction\s*(?:ID|No\.?|Number)))\s*[:\-]?\s*([A-Za-z0-9]{6,25})/i';
+        '/(?:UTR|RRN|UPI\s*(?:Ref(?:erence)?\b\.?(?:\s*(?:No\.?|Number|ID))?|Transaction\s*(?:ID|No\.?|Number)))\s*[:\-]?\s*([A-Za-z0-9]{6,25})/i';
     private static $referenceLabelPatternTier2 =
-        '/(?:Ref(?:erence)?\.?\s*(?:No\.?|Number)?|Transaction\s*ID|Txn\.?\s*ID)\s*[:\-]?\s*([A-Za-z0-9]{6,25})/i';
+        '/(?:Ref(?:erence)?\b\.?\s*(?:No\.?|Number|ID)?|Transaction\s*ID|Txn\.?\s*ID)\s*[:\-]?\s*([A-Za-z0-9]{6,25})/i';
 
     private static $currencyLinePattern = '/(?:₹|Rs\.?|INR)\s*[\d,]+\.?\d*/i';
 
