@@ -65,28 +65,27 @@ if(isset($_POST['district_id'])) {
     $selected_district_ids = $prevDistrictIds;
 }
 
-// Firka filter (partner_location_nodes depth=6)
-$selected_firka_id = 0;
+// Firka filter (partner_location_nodes depth=6) -- multi-select
+$selected_firka_ids = [];
 if(isset($_POST['firka_id'])) {
-    $selected_firka_id = !empty($_POST['firka_id']) ? (int)$_POST['firka_id'] : 0;
-    if($selected_firka_id > 0) {
-        $_SESSION['tp_retail_report_firka_id'] = $selected_firka_id;
+    $selected_firka_ids = array_values(array_unique(array_map('intval', (array)$_POST['firka_id'])));
+    $selected_firka_ids = array_values(array_filter($selected_firka_ids, fn($id) => $id > 0));
+    if(!empty($selected_firka_ids)) {
+        $_SESSION['tp_retail_report_firka_ids'] = $selected_firka_ids;
     } else {
-        unset($_SESSION['tp_retail_report_firka_id']);
+        unset($_SESSION['tp_retail_report_firka_ids']);
     }
-} elseif(isset($_SESSION['tp_retail_report_firka_id'])) {
-    $selected_firka_id = (int)$_SESSION['tp_retail_report_firka_id'];
+} elseif(isset($_SESSION['tp_retail_report_firka_ids'])) {
+    $selected_firka_ids = (array)$_SESSION['tp_retail_report_firka_ids'];
 }
 
-// Clear firka if the district selection changed
-if(isset($_POST['district_id'])) {
-    $prevSorted = $prevDistrictIds; sort($prevSorted);
-    $newSorted = $selected_district_ids; sort($newSorted);
-    if($prevSorted != $newSorted) {
-        $selected_firka_id = 0;
-        unset($_SESSION['tp_retail_report_firka_id']);
-    }
-}
+// NOTE: no server-side "clear firka if district changed" here (unlike the
+// old single-select version) -- the client already clears/repopulates the
+// Firka select the moment District changes (see the change handler below),
+// so whatever firka_id[] arrives in $_POST is already consistent with the
+// submitted district_id[]. Auto-clearing here as well wiped out a firka
+// selection submitted together with a first-ever district pick (no prior
+// session value to compare against), which is a real, not a defensive, case.
 
 // Amount range filter
 $selected_amount_range = '';
@@ -258,8 +257,7 @@ $qparam = urlencode($search ?? '');
                                                 </div>
                                                 <div class="col-md-3 col-sm-6 mb-2">
                                                     <label class="form-label">Firka</label>
-                                                    <select name="firka_id" id="firka_filter" class="form-control">
-                                                        <option value="">All Firkas</option>
+                                                    <select name="firka_id[]" id="firka_filter" class="form-control" multiple="multiple" style="width:100%;">
                                                         <?php
                                                         if(!empty($selected_district_ids)) {
                                                             $placeholders = implode(',', array_fill(0, count($selected_district_ids), '?'));
@@ -275,7 +273,7 @@ $qparam = urlencode($search ?? '');
                                                             $stmt_firka->execute();
                                                             $firka_result = $stmt_firka->get_result();
                                                             while($firka = $firka_result->fetch_assoc()) {
-                                                                $selected_attr = ($selected_firka_id == $firka['id']) ? 'selected' : '';
+                                                                $selected_attr = in_array((int)$firka['id'], $selected_firka_ids, true) ? 'selected' : '';
                                                                 echo '<option value="'.$firka['id'].'" '.$selected_attr.'>'.htmlspecialchars($firka['name']).'</option>';
                                                             }
                                                             $stmt_firka->close();
@@ -290,6 +288,7 @@ $qparam = urlencode($search ?? '');
                                                     <label class="form-label">Amount Range</label>
                                                     <select name="amount_range" id="amount_range_filter" class="form-control">
                                                         <option value="">All Amounts</option>
+                                                        <option value="10000-49999" <?= $selected_amount_range == '10000-49999' ? 'selected' : ''; ?>>₹10,000 - ₹49,999</option>
                                                         <option value="50000-99999" <?= $selected_amount_range == '50000-99999' ? 'selected' : ''; ?>>₹50,000 - ₹99,999</option>
                                                         <option value="100000-149999" <?= $selected_amount_range == '100000-149999' ? 'selected' : ''; ?>>₹1,00,000 - ₹1,49,999</option>
                                                         <option value="150000-above" <?= $selected_amount_range == '150000-above' ? 'selected' : ''; ?>>Above ₹1,50,000</option>
@@ -324,17 +323,23 @@ $qparam = urlencode($search ?? '');
                                                 }
                                                 $dn_stmt->close();
                                             }
-                                            if(!empty($selected_firka_id)) {
-                                                $fn_stmt = $db_conn->prepare("SELECT name FROM partner_location_nodes WHERE id = ?");
-                                                $fn_stmt->bind_param("i", $selected_firka_id);
+                                            if(!empty($selected_firka_ids)) {
+                                                $fplaceholders = implode(',', array_fill(0, count($selected_firka_ids), '?'));
+                                                $ftypes = str_repeat('i', count($selected_firka_ids));
+                                                $fn_stmt = $db_conn->prepare("SELECT name FROM partner_location_nodes WHERE id IN ($fplaceholders) ORDER BY name ASC");
+                                                $fn_stmt->bind_param($ftypes, ...$selected_firka_ids);
                                                 $fn_stmt->execute();
-                                                if($row_fn = $fn_stmt->get_result()->fetch_assoc()) {
-                                                    $active_filters[] = "Firka: " . $row_fn['name'];
+                                                $fn_names = [];
+                                                $fn_res = $fn_stmt->get_result();
+                                                while($row_fn = $fn_res->fetch_assoc()) { $fn_names[] = $row_fn['name']; }
+                                                if(!empty($fn_names)) {
+                                                    $active_filters[] = "Firka: " . implode(', ', $fn_names);
                                                 }
                                                 $fn_stmt->close();
                                             }
                                             if(!empty($selected_amount_range)) {
                                                 $amount_labels = [
+                                                    '10000-49999' => '₹10,000 - ₹49,999',
                                                     '50000-99999' => '₹50,000 - ₹99,999',
                                                     '100000-149999' => '₹1,00,000 - ₹1,49,999',
                                                     '150000-above' => 'Above ₹1,50,000'
@@ -367,7 +372,9 @@ $qparam = urlencode($search ?? '');
                                                 <?php foreach($selected_district_ids as $did): ?>
                                                 <input type="hidden" name="district_id[]" value="<?=(int)$did;?>">
                                                 <?php endforeach; ?>
-                                                <input type="hidden" name="firka_id" value="<?=$selected_firka_id;?>">
+                                                <?php foreach($selected_firka_ids as $fid): ?>
+                                                <input type="hidden" name="firka_id[]" value="<?=(int)$fid;?>">
+                                                <?php endforeach; ?>
                                                 <input type="hidden" name="amount_range" value="<?=$selected_amount_range;?>">
                                                 <input type="hidden" name="page" value="1">
                                                 <input type="hidden" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>">
@@ -411,10 +418,11 @@ if($product_result) {
 
 // TP location filter -- Firka is most specific, takes priority if both set.
 $tp_location_condition = "";
-if(!empty($selected_firka_id)) {
+if(!empty($selected_firka_ids)) {
+    $firkaIdList = implode(',', array_map('intval', $selected_firka_ids));
     $tp_location_condition = " AND EXISTS (
         SELECT 1 FROM territory_partner_locations tpl
-        WHERE tpl.territory_partner_id = tp.id AND tpl.location_id = " . (int)$selected_firka_id . "
+        WHERE tpl.territory_partner_id = tp.id AND tpl.location_id IN ($firkaIdList)
     )";
 } elseif(!empty($selected_district_ids)) {
     $districtIdList = implode(',', array_map('intval', $selected_district_ids));
@@ -464,6 +472,9 @@ foreach($sellers as $seller) {
         $include_seller = false;
         if(!empty($selected_amount_range)) {
             switch($selected_amount_range) {
+                case '10000-49999':
+                    $include_seller = ($seller['total_amount'] >= 10000 && $seller['total_amount'] <= 49999);
+                    break;
                 case '50000-99999':
                     $include_seller = ($seller['total_amount'] >= 50000 && $seller['total_amount'] <= 99999);
                     break;
@@ -676,6 +687,17 @@ if(!empty($sellers_paginated)) {
                 closeOnSelect: false,
                 width: '100%'
             });
+            $('#firka_filter').select2({
+                placeholder: 'All Firkas',
+                allowClear: true,
+                closeOnSelect: false,
+                width: '100%'
+            });
+            $('#amount_range_filter').select2({
+                placeholder: 'All Amounts',
+                allowClear: true,
+                width: '100%'
+            });
         });
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -683,29 +705,26 @@ if(!empty($sellers_paginated)) {
             if (districtEl) {
                 $(districtEl).on('change', function() {
                     const districtIds = $(this).val() || [];
-                    const firkaSelect = document.getElementById('firka_filter');
-                    if (!firkaSelect) return;
+                    const $firkaSelect = $('#firka_filter');
+                    if (!$firkaSelect.length) return;
 
-                    firkaSelect.innerHTML = '<option value="">All Firkas</option>';
+                    $firkaSelect.empty().trigger('change');
 
                     if(districtIds.length > 0) {
-                        firkaSelect.innerHTML = '<option value="">Loading firkas...</option>';
                         const url = `get_filter_data.php?action=get_firkas&district_id=${districtIds.join(',')}&_=${Date.now()}`;
                         fetch(url)
                             .then(response => response.json())
                             .then(data => {
-                                firkaSelect.innerHTML = '<option value="">All Firkas</option>';
+                                $firkaSelect.empty();
                                 if(data.success && data.data && data.data.length > 0) {
                                     data.data.forEach(firka => {
-                                        const option = document.createElement('option');
-                                        option.value = firka.id;
-                                        option.textContent = firka.name;
-                                        firkaSelect.appendChild(option);
+                                        $firkaSelect.append(new Option(firka.name, firka.id, false, false));
                                     });
                                 }
+                                $firkaSelect.trigger('change');
                             })
                             .catch(() => {
-                                firkaSelect.innerHTML = '<option value="">Error loading firkas</option>';
+                                $firkaSelect.empty().trigger('change');
                             });
                     }
                 });
