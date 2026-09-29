@@ -18,7 +18,8 @@ if(isset($_GET['clear_filters']) || isset($_POST['clear_all'])) {
     unset($_SESSION['tp_retail_report_from_date']);
     unset($_SESSION['tp_retail_report_to_date']);
     unset($_SESSION['tp_retail_report_district_ids']);
-    unset($_SESSION['tp_retail_report_firka_id']);
+    unset($_SESSION['tp_retail_report_firka_ids']);
+    unset($_SESSION['tp_retail_report_tp_ids']);
     unset($_SESSION['tp_retail_report_amount_range']);
     unset($_SESSION['tp_retail_report_records_per_page']);
     unset($_SESSION['tp_retail_report_search']);
@@ -86,6 +87,22 @@ if(isset($_POST['firka_id'])) {
 // submitted district_id[]. Auto-clearing here as well wiped out a firka
 // selection submitted together with a first-ever district pick (no prior
 // session value to compare against), which is a real, not a defensive, case.
+
+// TP Name filter (partner_id, i.e. territory_partners.id) -- multi-select,
+// same "trust whatever arrives together" reasoning as Firka above: the
+// client repopulates this list the moment District/Firka changes.
+$selected_tp_ids = [];
+if(isset($_POST['tp_id'])) {
+    $selected_tp_ids = array_values(array_unique(array_map('intval', (array)$_POST['tp_id'])));
+    $selected_tp_ids = array_values(array_filter($selected_tp_ids, fn($id) => $id > 0));
+    if(!empty($selected_tp_ids)) {
+        $_SESSION['tp_retail_report_tp_ids'] = $selected_tp_ids;
+    } else {
+        unset($_SESSION['tp_retail_report_tp_ids']);
+    }
+} elseif(isset($_SESSION['tp_retail_report_tp_ids'])) {
+    $selected_tp_ids = (array)$_SESSION['tp_retail_report_tp_ids'];
+}
 
 // Amount range filter
 $selected_amount_range = '';
@@ -285,6 +302,43 @@ $qparam = urlencode($search ?? '');
 
                                             <div class="row mb-3">
                                                 <div class="col-md-3 col-sm-6 mb-2">
+                                                    <label class="form-label">TP Name</label>
+                                                    <select name="tp_id[]" id="tp_filter" class="form-control" multiple="multiple" style="width:100%;">
+                                                        <?php
+                                                        if(!empty($selected_district_ids) || !empty($selected_firka_ids)) {
+                                                            $tpNameCondition = "";
+                                                            if(!empty($selected_firka_ids)) {
+                                                                $fidList = implode(',', array_map('intval', $selected_firka_ids));
+                                                                $tpNameCondition = " AND EXISTS (
+                                                                    SELECT 1 FROM territory_partner_locations tpl
+                                                                    WHERE tpl.territory_partner_id = tp.id AND tpl.location_id IN ($fidList)
+                                                                )";
+                                                            } elseif(!empty($selected_district_ids)) {
+                                                                $didList = implode(',', array_map('intval', $selected_district_ids));
+                                                                $tpNameCondition = " AND EXISTS (
+                                                                    SELECT 1 FROM territory_partner_locations tpl
+                                                                    INNER JOIN partner_location_nodes f  ON f.id = tpl.location_id
+                                                                    INNER JOIN partner_location_nodes t  ON t.id = f.parent_id
+                                                                    INNER JOIN partner_location_nodes dv ON dv.id = t.parent_id
+                                                                    WHERE tpl.territory_partner_id = tp.id AND dv.parent_id IN ($didList)
+                                                                )";
+                                                            }
+                                                            $tpNameQuery = "SELECT tp.id, CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci as name
+                                                                             FROM territory_partners tp
+                                                                             WHERE tp.deleted_at IS NULL" . $tpNameCondition . "
+                                                                             ORDER BY name ASC";
+                                                            $tpNameResult = mysqli_query($db_conn, $tpNameQuery);
+                                                            if($tpNameResult) {
+                                                                while($tpRow = mysqli_fetch_assoc($tpNameResult)) {
+                                                                    $selected_attr = in_array((int)$tpRow['id'], $selected_tp_ids, true) ? 'selected' : '';
+                                                                    echo '<option value="'.$tpRow['id'].'" '.$selected_attr.'>'.htmlspecialchars($tpRow['name']).'</option>';
+                                                                }
+                                                            }
+                                                        }
+                                                        ?>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3 col-sm-6 mb-2">
                                                     <label class="form-label">Amount Range</label>
                                                     <select name="amount_range" id="amount_range_filter" class="form-control">
                                                         <option value="">All Amounts</option>
@@ -337,6 +391,20 @@ $qparam = urlencode($search ?? '');
                                                 }
                                                 $fn_stmt->close();
                                             }
+                                            if(!empty($selected_tp_ids)) {
+                                                $tplaceholders = implode(',', array_fill(0, count($selected_tp_ids), '?'));
+                                                $ttypes = str_repeat('i', count($selected_tp_ids));
+                                                $tn_stmt = $db_conn->prepare("SELECT CONVERT(name USING utf8mb4) COLLATE utf8mb4_general_ci as name FROM territory_partners WHERE id IN ($tplaceholders) ORDER BY name ASC");
+                                                $tn_stmt->bind_param($ttypes, ...$selected_tp_ids);
+                                                $tn_stmt->execute();
+                                                $tn_names = [];
+                                                $tn_res = $tn_stmt->get_result();
+                                                while($row_tn = $tn_res->fetch_assoc()) { $tn_names[] = $row_tn['name']; }
+                                                if(!empty($tn_names)) {
+                                                    $active_filters[] = "TP: " . implode(', ', $tn_names);
+                                                }
+                                                $tn_stmt->close();
+                                            }
                                             if(!empty($selected_amount_range)) {
                                                 $amount_labels = [
                                                     '10000-49999' => '₹10,000 - ₹49,999',
@@ -374,6 +442,9 @@ $qparam = urlencode($search ?? '');
                                                 <?php endforeach; ?>
                                                 <?php foreach($selected_firka_ids as $fid): ?>
                                                 <input type="hidden" name="firka_id[]" value="<?=(int)$fid;?>">
+                                                <?php endforeach; ?>
+                                                <?php foreach($selected_tp_ids as $tid): ?>
+                                                <input type="hidden" name="tp_id[]" value="<?=(int)$tid;?>">
                                                 <?php endforeach; ?>
                                                 <input type="hidden" name="amount_range" value="<?=$selected_amount_range;?>">
                                                 <input type="hidden" name="page" value="1">
@@ -435,12 +506,22 @@ if(!empty($selected_firka_ids)) {
     )";
 }
 
+// Explicit TP Name selection -- narrows further on top of any
+// District/Firka filter (a TP chosen by name is trusted as-is, same as
+// every other filter here; the client only ever offers names that
+// already match the current District/Firka selection).
+$tp_id_condition = "";
+if(!empty($selected_tp_ids)) {
+    $tpIdList = implode(',', array_map('intval', $selected_tp_ids));
+    $tp_id_condition = " AND tp.id IN ($tpIdList)";
+}
+
 $sellers = [];
 $query = "SELECT tp.id as seller_id,
                  CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci as seller_name,
                  CONVERT(tp.mobile USING utf8mb4) COLLATE utf8mb4_general_ci as seller_mobile
           FROM territory_partners tp
-          WHERE tp.deleted_at IS NULL" . $tp_location_condition;
+          WHERE tp.deleted_at IS NULL" . $tp_location_condition . $tp_id_condition;
 $result = mysqli_query($db_conn, $query);
 if($result) {
     while($row = mysqli_fetch_assoc($result)) {
@@ -698,7 +779,47 @@ if(!empty($sellers_paginated)) {
                 allowClear: true,
                 width: '100%'
             });
+            $('#tp_filter').select2({
+                placeholder: 'All TPs',
+                allowClear: true,
+                closeOnSelect: false,
+                width: '100%'
+            });
         });
+
+        // Refills the TP Name dropdown from whatever District/Firka is
+        // currently selected -- Firka wins when both are set, same
+        // priority the server's own query uses.
+        function refreshTpNames() {
+            const districtIds = $('#district_filter').val() || [];
+            const firkaIds = $('#firka_filter').val() || [];
+            const $tpSelect = $('#tp_filter');
+            if (!$tpSelect.length) return;
+
+            if (districtIds.length === 0 && firkaIds.length === 0) {
+                $tpSelect.empty().trigger('change');
+                return;
+            }
+
+            const params = firkaIds.length > 0
+                ? `firka_id=${firkaIds.join(',')}`
+                : `district_id=${districtIds.join(',')}`;
+            const url = `get_filter_data.php?action=get_tps&${params}&_=${Date.now()}`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    $tpSelect.empty();
+                    if (data.success && data.data && data.data.length > 0) {
+                        data.data.forEach(tp => {
+                            $tpSelect.append(new Option(tp.name, tp.id, false, false));
+                        });
+                    }
+                    $tpSelect.trigger('change');
+                })
+                .catch(() => {
+                    $tpSelect.empty().trigger('change');
+                });
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
             const districtEl = document.getElementById('district_filter');
@@ -729,6 +850,8 @@ if(!empty($sellers_paginated)) {
                     }
                 });
             }
+
+            $('#firka_filter').on('change', refreshTpNames);
         });
     </script>
 </body>

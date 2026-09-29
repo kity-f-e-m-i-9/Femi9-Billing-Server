@@ -161,6 +161,70 @@ if($action == 'get_firkas') {
 }
 
 // ============================================
+// GET TERRITORY PARTNERS BY DISTRICT/FIRKA (Retail-Report-Details-TP.php's
+// TP Name filter -- narrows to Firka if given, else District)
+// ============================================
+if($action == 'get_tps') {
+    $district_ids = array_values(array_filter(array_map('intval', explode(',', (string)($_GET['district_id'] ?? '')))));
+    $firka_ids    = array_values(array_filter(array_map('intval', explode(',', (string)($_GET['firka_id'] ?? '')))));
+
+    if(empty($district_ids) && empty($firka_ids)) {
+        sendJSON(['success' => true, 'data' => []]);
+    }
+
+    try {
+        mysqli_set_charset($db_conn, 'utf8mb4');
+        mysqli_query($db_conn, "SET collation_connection = 'utf8mb4_general_ci'");
+
+        if(!empty($firka_ids)) {
+            $placeholders = implode(',', array_fill(0, count($firka_ids), '?'));
+            $types = str_repeat('i', count($firka_ids));
+            $query = "SELECT tp.id, CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci as name
+                      FROM territory_partners tp
+                      WHERE tp.deleted_at IS NULL AND EXISTS (
+                          SELECT 1 FROM territory_partner_locations tpl
+                          WHERE tpl.territory_partner_id = tp.id AND tpl.location_id IN ($placeholders)
+                      )
+                      ORDER BY name ASC";
+            $ids = $firka_ids;
+        } else {
+            $placeholders = implode(',', array_fill(0, count($district_ids), '?'));
+            $types = str_repeat('i', count($district_ids));
+            $query = "SELECT tp.id, CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci as name
+                      FROM territory_partners tp
+                      WHERE tp.deleted_at IS NULL AND EXISTS (
+                          SELECT 1 FROM territory_partner_locations tpl
+                          INNER JOIN partner_location_nodes f  ON f.id = tpl.location_id
+                          INNER JOIN partner_location_nodes t  ON t.id = f.parent_id
+                          INNER JOIN partner_location_nodes dv ON dv.id = t.parent_id
+                          WHERE tpl.territory_partner_id = tp.id AND dv.parent_id IN ($placeholders)
+                      )
+                      ORDER BY name ASC";
+            $ids = $district_ids;
+        }
+
+        $stmt = $db_conn->prepare($query);
+        if(!$stmt) {
+            sendJSON(['success' => false, 'message' => 'Query preparation failed']);
+        }
+        $stmt->bind_param($types, ...$ids);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $tps = array();
+        while($row = $result->fetch_assoc()) {
+            $tps[] = array('id' => $row['id'], 'name' => $row['name']);
+        }
+        $stmt->close();
+
+        sendJSON(['success' => true, 'data' => $tps, 'count' => count($tps)]);
+
+    } catch(Exception $e) {
+        sendJSON(['success' => false, 'message' => 'Exception: ' . $e->getMessage()]);
+    }
+}
+
+// ============================================
 // GET SELLERS BY TYPE
 // ============================================
 if($action == 'get_sellers') {
