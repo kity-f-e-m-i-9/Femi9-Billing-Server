@@ -460,6 +460,10 @@ $tpDeliveryAddressParts = array_filter([
                                 </a>
                             </div>
                         </div>
+
+                        <?php if (isset($_SESSION['errorMessage'])): ?>
+                        <div class="alert alert-danger"><?=htmlspecialchars($_SESSION['errorMessage']); unset($_SESSION['errorMessage']);?></div>
+                        <?php endif; ?>
                         <br/>
 
                         <form action="purchase-order-action.php" method="post" id="uploadForm" onsubmit="return validatePoLines();">

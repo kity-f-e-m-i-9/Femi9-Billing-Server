@@ -67,6 +67,10 @@ if (!empty($salesBdmID)) {
     </li>
 
     <li>
+        <a href="<?php echo $_bdmBase; ?>tp-active-status-check"><i class="material-icons-two-tone">fact_check</i>Active TP Status Check</a>
+    </li>
+
+    <li>
         <a href="<?php echo $_bdmBase; ?>reward-points-tp"><i class="material-icons-two-tone">analytics</i>Reward Points: TPs</a>
     </li>
 

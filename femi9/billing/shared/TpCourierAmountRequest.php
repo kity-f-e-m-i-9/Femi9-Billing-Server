@@ -130,6 +130,54 @@ function tpCourierAmountRequestGetById(mysqli $db, int $requestId, int $tpId): ?
     return $row ?: null;
 }
 
+/**
+ * Fallback for when the session's own 'courier_request_id' flag is gone —
+ * e.g. a BDM/Company review can take hours, and the TP's session may expire
+ * or reset (fresh login, different device) long before they come back to
+ * actually submit. Without this, an approval that already happened just
+ * silently stops applying and the TP gets blocked demanding the full
+ * recalculated amount despite having a valid, unconsumed approval sitting
+ * in the queue.
+ *
+ * This does NOT reintroduce the box/cover-shape matching that was
+ * deliberately rejected (see tpCourierAmountRequestGetById()'s comment) —
+ * it compares the request's own stored cart_snapshot (product id + qty,
+ * courier lines only) against the CURRENT cart, item-for-item, order-
+ * independent. Two genuinely different orders landing on the same box/cover
+ * TOTAL is common (many product mixes fit the same shipment); two
+ * genuinely different orders sharing the exact same set of product+qty
+ * lines is effectively "the same order", so this is a safe identity match,
+ * not a coincidence-prone one.
+ */
+function tpCourierAmountRequestFindApprovedMatch(mysqli $db, int $tpId, string $productType, array $courierItems): ?array
+{
+    $normalize = function (array $items): array {
+        $out = array_map(fn($it) => ['pid' => (int)$it['pid'], 'qty' => (int)$it['qty']], $items);
+        usort($out, fn($a, $b) => $a['pid'] <=> $b['pid']);
+        return $out;
+    };
+    $currentCart = $normalize($courierItems);
+
+    $stmt = $db->prepare("
+        SELECT * FROM tp_courier_amount_requests
+        WHERE territory_partner_id = ? AND product_type = ? AND status = 'approved' AND applied_po_id IS NULL
+        ORDER BY created_at DESC
+    ");
+    $stmt->bind_param('is', $tpId, $productType);
+    $stmt->execute();
+    $candidates = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    foreach ($candidates as $cand) {
+        $snap = json_decode($cand['cart_snapshot'] ?? '[]', true);
+        if (!is_array($snap) || empty($snap)) continue;
+        if ($normalize($snap) === $currentCart) {
+            return $cand;
+        }
+    }
+    return null;
+}
+
 function tpCourierAmountRequestCreate(mysqli $db, int $tpId, string $productType, int $totalBoxes, int $totalCovers, float $calculatedAmount, array $cartItems, string $note): int
 {
     $snapshot = json_encode($cartItems);

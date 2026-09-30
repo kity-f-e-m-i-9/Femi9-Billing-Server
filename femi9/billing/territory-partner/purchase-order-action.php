@@ -157,8 +157,8 @@ $courierTotalBoxes = $courierShipment['boxes'];
 $courierTotalCovers = $courierShipment['covers'];
 $courierRequiredAmount = tpCourierComputeAmount($db_conn, $productType, $courierTotalBoxes, $courierTotalCovers);
 
-// A Sales BDM-approved amount-change request overrides the raw calculation
-// here too — resolved through the SAME session-draft id flag
+// A Sales BDM- or Company-approved amount-change request overrides the raw
+// calculation here too — resolved through the SAME session-draft id flag
 // pay-courier-payment.php uses (see stash-po-draft.php), never by
 // TP/type/box-cover matching, so what the TP was actually shown/charged is
 // what this gate requires. Consumed (tpCourierAmountRequestMarkApplied) once
@@ -166,6 +166,17 @@ $courierRequiredAmount = tpCourierComputeAmount($db_conn, $productType, $courier
 // order only — it must never silently reduce every future cart's fee too.
 $courierRequestId = $_SESSION['po_draft_' . $tp_id]['courier_request_id'] ?? null;
 $courierAmountRequest = $courierRequestId ? tpCourierAmountRequestGetById($db_conn, (int)$courierRequestId, $tp_id) : null;
+
+// The session flag above can be gone by the time the TP actually submits —
+// a review can take hours, during which the session may expire or reset —
+// even though the DB still has a perfectly valid, unconsumed approval. Fall
+// back to matching it by its own stored cart (exact product+qty identity,
+// not box/cover-total coincidence) rather than silently losing the approval.
+if (!$courierAmountRequest || $courierAmountRequest['status'] !== 'approved') {
+    $matchedRequest = tpCourierAmountRequestFindApprovedMatch($db_conn, $tp_id, $productType, $courierItems);
+    if ($matchedRequest) { $courierAmountRequest = $matchedRequest; }
+}
+
 if ($courierAmountRequest && $courierAmountRequest['status'] === 'approved') {
     $courierRequiredAmount = (float)$courierAmountRequest['approved_amount'];
 }

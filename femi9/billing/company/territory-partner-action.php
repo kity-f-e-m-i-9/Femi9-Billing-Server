@@ -236,10 +236,12 @@ if ($action === 'update-territory-partner') {
     $chk->close();
 
     // Fetch current photo so we can delete the old file if a new one is uploaded
-    $old_photo_res = $db_conn->prepare("SELECT photo FROM territory_partners WHERE id = ?");
+    $old_photo_res = $db_conn->prepare("SELECT photo, is_active FROM territory_partners WHERE id = ?");
     $old_photo_res->bind_param("i", $tp_db_id);
     $old_photo_res->execute();
-    $old_photo = $old_photo_res->get_result()->fetch_assoc()['photo'] ?? null;
+    $old_tp_row = $old_photo_res->get_result()->fetch_assoc();
+    $old_photo = $old_tp_row['photo'] ?? null;
+    $old_is_active = (int)($old_tp_row['is_active'] ?? $is_active);
     $old_photo_res->close();
 
     // Handle photo upload
@@ -317,6 +319,10 @@ if ($action === 'update-territory-partner') {
         }
 
         $db_conn->commit();
+
+        require_once __DIR__ . '/../shared/TpStatusHistory.php';
+        logTpStatusChange($db_conn, $tp_db_id, $old_is_active, $is_active);
+
         header("Location: manage-territory-partner?updatedSuccess=1");
         exit;
 

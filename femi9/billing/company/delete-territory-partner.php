@@ -28,7 +28,7 @@ if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
 }
 
 // Verify exists
-$stmt = $db_conn->prepare("SELECT id, photo FROM territory_partners WHERE id = ?");
+$stmt = $db_conn->prepare("SELECT id, photo, is_active FROM territory_partners WHERE id = ?");
 $stmt->bind_param("i", $tp_db_id);
 $stmt->execute();
 $tp = $stmt->get_result()->fetch_assoc();
@@ -42,6 +42,9 @@ $stmt_del = $db_conn->prepare("UPDATE territory_partners SET deleted_at = NOW(),
 $stmt_del->bind_param("i", $tp_db_id);
 $stmt_del->execute();
 $stmt_del->close();
+
+require_once __DIR__ . '/../shared/TpStatusHistory.php';
+logTpStatusChange($db_conn, $tp_db_id, (int)$tp['is_active'], 0);
 
 header("Location: manage-territory-partner?deletedDone=1");
 exit;

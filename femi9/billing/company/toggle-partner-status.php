@@ -38,9 +38,24 @@ if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
 }
 
 $table = $type === 'tp' ? 'territory_partners' : 'channel_partners';
+
+$old_status = null;
+if ($type === 'tp') {
+    require_once __DIR__ . '/../shared/TpStatusHistory.php';
+    $oldRes = $db_conn->prepare("SELECT is_active FROM territory_partners WHERE id = ?");
+    $oldRes->bind_param("i", $id);
+    $oldRes->execute();
+    $old_status = $oldRes->get_result()->fetch_assoc()['is_active'] ?? null;
+    $oldRes->close();
+}
+
 $stmt  = $db_conn->prepare("UPDATE `$table` SET is_active = ? WHERE id = ?");
 $stmt->bind_param("ii", $new_status, $id);
 $ok = $stmt->execute();
 $stmt->close();
+
+if ($ok && $type === 'tp' && $old_status !== null) {
+    logTpStatusChange($db_conn, $id, (int)$old_status, $new_status);
+}
 
 echo json_encode(['success' => $ok, 'new_status' => $new_status]);

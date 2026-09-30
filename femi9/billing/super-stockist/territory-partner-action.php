@@ -189,14 +189,16 @@ if ($action === 'update-territory-partner') {
     $delivery_line1 = $delivery_line1 ?: null;
 
     // Ownership check
-    $own = $db_conn->prepare("SELECT id FROM territory_partners WHERE id=? AND onboard_ss_id=?");
+    $own = $db_conn->prepare("SELECT id, is_active FROM territory_partners WHERE id=? AND onboard_ss_id=?");
     $own->bind_param("is", $tp_db_id, $Login_user_IDvl);
     $own->execute();
-    if ($own->get_result()->num_rows === 0) {
+    $own_row = $own->get_result()->fetch_assoc();
+    if (!$own_row) {
         $own->close();
         header("Location: manage-territory-partner?error=unauthorized");
         exit;
     }
+    $old_is_active = (int)$own_row['is_active'];
     $own->close();
 
     // Check mobile uniqueness excluding self
@@ -291,6 +293,10 @@ if ($action === 'update-territory-partner') {
         }
 
         $db_conn->commit();
+
+        require_once __DIR__ . '/../shared/TpStatusHistory.php';
+        logTpStatusChange($db_conn, $tp_db_id, $old_is_active, $is_active);
+
         header("Location: manage-territory-partner?updatedSuccess=1");
         exit;
 

@@ -643,9 +643,9 @@ foreach ($rows as $r) {
                         <button type="button" class="ata-bulk-btn" onclick="ovBulkSet(false)"><i class="material-icons-outlined">remove_done</i>Omit all</button>
                         <span class="ov-toolbar-label">Show</span>
                         <div class="ov-segmented">
-                            <button type="button" class="ov-type-filter-btn ov-type-all active" data-type="all" onclick="ovSetTypeFilter('all', this)">All (<?php echo (int) $waitingPoCount; ?>)</button>
-                            <button type="button" class="ov-type-filter-btn ov-type-napkin" data-type="napkin" onclick="ovSetTypeFilter('napkin', this)">Napkin (<?php echo (int) $waitingPoCountByType['napkin']; ?>)</button>
-                            <button type="button" class="ov-type-filter-btn ov-type-diaper" data-type="diaper" onclick="ovSetTypeFilter('diaper', this)">Lumi Diaper (<?php echo (int) $waitingPoCountByType['diaper']; ?>)</button>
+                            <button type="button" class="ov-type-filter-btn ov-type-all active" data-type="all" onclick="ovSetTypeFilter('all', this)">All (<span class="ov-type-count" id="ovCountAll"><?php echo (int) $waitingPoCount; ?></span>)</button>
+                            <button type="button" class="ov-type-filter-btn ov-type-napkin" data-type="napkin" onclick="ovSetTypeFilter('napkin', this)">Napkin (<span class="ov-type-count" id="ovCountNapkin"><?php echo (int) $waitingPoCountByType['napkin']; ?></span>)</button>
+                            <button type="button" class="ov-type-filter-btn ov-type-diaper" data-type="diaper" onclick="ovSetTypeFilter('diaper', this)">Lumi Diaper (<span class="ov-type-count" id="ovCountDiaper"><?php echo (int) $waitingPoCountByType['diaper']; ?></span>)</button>
                         </div>
                         <button type="button" class="ata-bulk-btn ov-delete-btn" onclick="ovDeleteSelected()"><i class="material-icons-outlined">delete_outline</i>Delete Selected</button>
                     </div>
@@ -1306,6 +1306,7 @@ foreach ($rows as $r) {
             ovLastData = data;
             ovRenderOrderList('ovTpList', data.tp, 'No Territory Partner orders contributing today.');
             ovRenderOrderList('ovOtList', data.ot, 'No OT channel draft orders contributing today.');
+            ovUpdateTypeCounts();
         }).fail(function () {
             var failMsg = '<div class="text-danger small" style="padding:10px 4px;">Could not load orders.</div>';
             document.getElementById('ovTpList').innerHTML = failMsg;
@@ -1327,6 +1328,7 @@ foreach ($rows as $r) {
             renderTransferredToday(ovExcludedLastData);
             renderDeletedToday(ovExcludedLastData);
         }
+        ovUpdateTypeCounts();
     }
 
     function openOrdersOverview() {
@@ -1336,6 +1338,61 @@ foreach ($rows as $r) {
         var modal = new bootstrap.Modal(document.getElementById('ordersOverviewModal'));
         modal.show();
     }
+
+    // The Show (All/Napkin/Lumi Diaper) button labels originally always
+    // showed the TP Purchase Orders' own static, server-computed counts —
+    // even while looking at OT Channel Orders, Already Transferred Today,
+    // or Deleted, which made the numbers wrong for those tabs. This
+    // recomputes the three labels purely client-side from whichever tab is
+    // currently open, using the same already-fetched data each tab renders
+    // from (ovLastData for TP/OT, ovExcludedLastData grouped by order for
+    // the other two) — counting distinct orders/POs, same unit as the
+    // original PHP get_auto_transfer_waiting_po_count*() functions.
+    function ovCountOrdersByType(orders) {
+        var counts = { all: 0, napkin: 0, diaper: 0 };
+        (orders || []).forEach(function (order) {
+            counts.all++;
+            if (order.order_type === 'napkin') counts.napkin++;
+            else if (order.order_type === 'diaper') counts.diaper++;
+        });
+        return counts;
+    }
+
+    function ovCountGroupsByType(items) {
+        var groups = ovExclGroupByOrder(items || []);
+        var counts = { all: 0, napkin: 0, diaper: 0 };
+        groups.forEach(function (group) {
+            var type = group.items.length ? group.items[0].order_type : null;
+            counts.all++;
+            if (type === 'napkin') counts.napkin++;
+            else if (type === 'diaper') counts.diaper++;
+        });
+        return counts;
+    }
+
+    function ovUpdateTypeCounts() {
+        var activePane = document.querySelector('#ordersOverviewModal .tab-pane.active');
+        if (!activePane) return;
+        var counts = { all: 0, napkin: 0, diaper: 0 };
+        if (activePane.id === 'ovTpPane') {
+            counts = ovCountOrdersByType(ovLastData.tp);
+        } else if (activePane.id === 'ovOtPane') {
+            counts = ovCountOrdersByType(ovLastData.ot);
+        } else if (activePane.id === 'ovExcludedPane') {
+            var items = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason !== 'excluded'; }) : [];
+            counts = ovCountGroupsByType(items);
+        } else if (activePane.id === 'ovDeletedPane') {
+            var delItems = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason === 'excluded'; }) : [];
+            counts = ovCountGroupsByType(delItems);
+        }
+        document.getElementById('ovCountAll').textContent = counts.all;
+        document.getElementById('ovCountNapkin').textContent = counts.napkin;
+        document.getElementById('ovCountDiaper').textContent = counts.diaper;
+    }
+
+    document.querySelectorAll('#ordersOverviewModal .ata-nav-tabs button[data-bs-toggle="tab"]').forEach(function (tabBtn) {
+        tabBtn.addEventListener('shown.bs.tab', ovUpdateTypeCounts);
+    });
 
     // ── "Already Transferred Today" and "Deleted" — two separate, read-only
     // tabs sharing one data source (get-auto-transfer-skipped.php returns
@@ -1353,6 +1410,7 @@ foreach ($rows as $r) {
         if (ovExcludedLastData) {
             renderTransferredToday(ovExcludedLastData);
             renderDeletedToday(ovExcludedLastData);
+            ovUpdateTypeCounts();
             return;
         }
         var loading = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
@@ -1363,6 +1421,7 @@ foreach ($rows as $r) {
             ovExcludedLastData = data;
             renderTransferredToday(data);
             renderDeletedToday(data);
+            ovUpdateTypeCounts();
         }).fail(function () {
             var failMsg = '<div class="text-danger small" style="padding:10px 4px;">Could not load orders.</div>';
             document.getElementById('ovExcludedList').innerHTML = failMsg;

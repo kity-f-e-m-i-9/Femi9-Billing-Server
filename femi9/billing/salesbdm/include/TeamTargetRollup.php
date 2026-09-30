@@ -14,21 +14,18 @@ function getBdmRawTargetAchieved($db_conn, int $bdmId, string $fromDate, string 
     }
     $tpIdList = implode(',', array_map('intval', $tpIds));
 
-    // "TPS" = the same "Active TPs" figure as dashboard.php's own TP
-    // coverage card: every TP assigned to this BDM's districts (including
-    // ones getBdmAssignedTpIds()'s default call already drops as inactive)
-    // re-checked here against is_active=1 AND deleted_at IS NULL, so this
-    // column always agrees with what the BDM sees on their own dashboard —
-    // not date-scoped, same as that card.
+    // "Active TPs" = every TP assigned to this BDM's districts who was
+    // active AS OF $toDate — not always "active right now", so switching
+    // the date filter to a past month shows that month's own count (a TP
+    // deactivated/deleted since then still counts for past months; one
+    // added since then does not). Uses territory_partner_status_log via
+    // getTpActiveCountAsOf(), which falls back to the TP's current
+    // is_active for any date before that log started (see
+    // shared/TpStatusHistory.php) — this still matches dashboard.php's own
+    // "Active TPs" card exactly when $toDate is today.
+    require_once __DIR__ . '/../../shared/TpStatusHistory.php';
     $tpIdsAll = getBdmAssignedTpIds($db_conn, $bdmId, true);
-    $activeTpCount = 0;
-    if (!empty($tpIdsAll)) {
-        $tpIdListAll = implode(',', array_map('intval', $tpIdsAll));
-        $activeTpCount = (int)($db_conn->query("
-            SELECT COUNT(*) FROM territory_partners
-            WHERE id IN ($tpIdListAll) AND is_active = 1 AND deleted_at IS NULL
-        ")->fetch_row()[0] ?? 0);
-    }
+    $activeTpCount = getTpActiveCountAsOf($db_conn, $tpIdsAll, $toDate);
 
     $target = (float)($db_conn->query("
         SELECT COALESCE(SUM(pln.target_amount),0) FROM territory_partner_locations tpl

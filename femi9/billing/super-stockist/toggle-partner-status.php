@@ -23,18 +23,26 @@ $id = (int)base64_decode($enc_id);
 if (!$id) { echo json_encode(['success' => false]); exit; }
 
 // Ownership check
-$own = $db_conn->prepare("SELECT id FROM territory_partners WHERE id=? AND onboard_ss_id=?");
+$own = $db_conn->prepare("SELECT id, is_active FROM territory_partners WHERE id=? AND onboard_ss_id=?");
 $own->bind_param("is", $id, $Login_user_IDvl);
 $own->execute();
-if ($own->get_result()->num_rows === 0) {
+$own_row = $own->get_result()->fetch_assoc();
+if (!$own_row) {
     $own->close();
     echo json_encode(['success' => false, 'error' => 'unauthorized']); exit;
 }
 $own->close();
+$old_status = (int)$own_row['is_active'];
+
+require_once __DIR__ . '/../shared/TpStatusHistory.php';
 
 $stmt = $db_conn->prepare("UPDATE territory_partners SET is_active = ? WHERE id = ? AND onboard_ss_id = ?");
 $stmt->bind_param("iis", $new_status, $id, $Login_user_IDvl);
 $ok = $stmt->execute();
 $stmt->close();
+
+if ($ok) {
+    logTpStatusChange($db_conn, $id, $old_status, $new_status);
+}
 
 echo json_encode(['success' => $ok, 'new_status' => $new_status]);

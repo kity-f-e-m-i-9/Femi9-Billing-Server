@@ -33,6 +33,9 @@ $zoneTps = [];
 $detailRows = [];
 $districtList = [];
 $tpEntryCounts = [];
+$tpBalanceByTp = [];
+$tpBalanceByCompany = []; // [company_id => [tp_id => ['tp_name','tp_code','balance']]]
+$tpEntryCountsByCompany = []; // [company_id => [tp_id => ['tp_name','tp_code','count']]]
 if ($selectedZoneId > 0) {
     $stmt = $db_conn->prepare("SELECT name FROM partner_zones WHERE id = ?");
     $stmt->bind_param('i', $selectedZoneId);
@@ -126,8 +129,46 @@ if ($selectedZoneId > 0) {
                     $tpEntryCounts[$tpKey] = ['tp_name' => $r['tp_name'], 'tp_code' => $r['tp_code'], 'count' => 0];
                 }
                 $tpEntryCounts[$tpKey]['count']++;
+
+                if (!isset($tpBalanceByTp[$tpKey])) {
+                    $tpBalanceByTp[$tpKey] = ['tp_name' => $r['tp_name'], 'tp_code' => $r['tp_code'], 'balance' => 0.0];
+                }
+                $tpBalanceByTp[$tpKey]['balance'] += (float)$r['balance_amount'];
+
+                // Same breakdowns, but bucketed per receiver company too —
+                // the Total Payments / Total Balance modals' "All
+                // Receivers" vs a specific company (e.g. FEMI NAYAN LLP)
+                // tabs read from these per-company buckets instead of the
+                // combined ones above.
+                $companyKey = (int)($r['company_id'] ?? 0);
+                if ($companyKey > 0) {
+                    if (!isset($tpBalanceByCompany[$companyKey][$tpKey])) {
+                        $tpBalanceByCompany[$companyKey][$tpKey] = ['tp_name' => $r['tp_name'], 'tp_code' => $r['tp_code'], 'balance' => 0.0];
+                    }
+                    $tpBalanceByCompany[$companyKey][$tpKey]['balance'] += (float)$r['balance_amount'];
+
+                    if (!isset($tpEntryCountsByCompany[$companyKey][$tpKey])) {
+                        $tpEntryCountsByCompany[$companyKey][$tpKey] = ['tp_name' => $r['tp_name'], 'tp_code' => $r['tp_code'], 'count' => 0];
+                    }
+                    $tpEntryCountsByCompany[$companyKey][$tpKey]['count']++;
+                }
             }
             usort($tpEntryCounts, fn($a, $b) => $b['count'] <=> $a['count']);
+            // Only TPs still carrying an actual balance are worth showing in
+            // the Total Balance card's modal — one that's fully adjusted
+            // (balance 0) would just be noise in that breakdown.
+            $tpBalanceByTp = array_values(array_filter($tpBalanceByTp, fn($t) => $t['balance'] > 0));
+            usort($tpBalanceByTp, fn($a, $b) => $b['balance'] <=> $a['balance']);
+            foreach ($tpBalanceByCompany as $companyKey => $rowsForCompany) {
+                $rowsForCompany = array_values(array_filter($rowsForCompany, fn($t) => $t['balance'] > 0));
+                usort($rowsForCompany, fn($a, $b) => $b['balance'] <=> $a['balance']);
+                $tpBalanceByCompany[$companyKey] = $rowsForCompany;
+            }
+            foreach ($tpEntryCountsByCompany as $companyKey => $rowsForCompany) {
+                $rowsForCompany = array_values($rowsForCompany);
+                usort($rowsForCompany, fn($a, $b) => $b['count'] <=> $a['count']);
+                $tpEntryCountsByCompany[$companyKey] = $rowsForCompany;
+            }
         }
     } else {
         $selectedZoneId = 0;
@@ -216,15 +257,10 @@ function zoneQS(array $overrides = []): string {
         }
         .check-dropdown-item:hover { background:#f3f4f6; }
         .check-dropdown-item input { margin-right:7px; }
-        .tp-count-hover { position:relative; cursor:default; }
+        .tp-balance-clickable { cursor:pointer; transition:box-shadow .15s, transform .15s; }
+        .tp-balance-clickable:hover { box-shadow:0 4px 14px rgba(0,0,0,0.10); transform:translateY(-1px); }
+        .balance-scope-btn.active { background:#667eea; color:#fff; border-color:#667eea; }
         .tp-count-badge { display:inline-block; background:#eef0ff; color:#667eea; font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:8px; margin-left:5px; vertical-align:middle; }
-        .tp-count-popover {
-            display:none; position:absolute; top:100%; left:0; margin-top:8px; z-index:50;
-            background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.12);
-            padding:12px 14px; min-width:260px; max-width:340px; max-height:280px; overflow-y:auto;
-        }
-        .tp-count-hover:hover .tp-count-popover { display:block; }
-        .tp-count-popover-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:#9ca3af; margin-bottom:8px; }
         .tp-count-popover-row { display:flex; justify-content:space-between; gap:10px; font-size:12.5px; color:#374151; padding:4px 0; border-bottom:1px solid #f3f4f6; }
         .tp-count-popover-row:last-child { border-bottom:none; }
         .tp-action-link { font-size:13px; font-weight:600; text-decoration:none; padding:6px 13px; border-radius:6px; display:inline-block; }
@@ -284,23 +320,12 @@ function zoneQS(array $overrides = []): string {
                             <!-- Stats -->
                             <div class="row">
                                 <div class="col-lg-3 col-md-6">
-                                    <div class="stats-card tp-count-hover">
+                                    <div class="stats-card<?php echo !empty($tpEntryCounts) ? ' tp-balance-clickable' : ''; ?>" <?php echo !empty($tpEntryCounts) ? 'onclick="openPaymentsBreakdownModal()"' : ''; ?>>
                                         <h3><?php echo $stats['count']; ?></h3>
                                         <p>Total Payments <span class="tp-count-badge"><?=count($tpEntryCounts)?> TP(s)</span></p>
                                         <p style="font-size:11.5px;color:#9ca3af;margin-top:4px;">
                                             <?php echo $stats_by_type['napkin']['count']; ?> Napkin &middot; <?php echo $stats_by_type['diaper']['count']; ?> Diaper
                                         </p>
-                                        <?php if (!empty($tpEntryCounts)): ?>
-                                        <div class="tp-count-popover">
-                                            <div class="tp-count-popover-title">Entries per TP</div>
-                                            <?php foreach ($tpEntryCounts as $tec): ?>
-                                            <div class="tp-count-popover-row">
-                                                <span><?=htmlspecialchars($tec['tp_name'])?> <code style="font-size:10.5px;"><?=htmlspecialchars($tec['tp_code'])?></code></span>
-                                                <b><?=(int)$tec['count']?></b>
-                                            </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 <div class="col-lg-3 col-md-6">
@@ -313,9 +338,9 @@ function zoneQS(array $overrides = []): string {
                                     </div>
                                 </div>
                                 <div class="col-lg-3 col-md-6">
-                                    <div class="stats-card">
+                                    <div class="stats-card<?php echo !empty($tpBalanceByTp) ? ' tp-balance-clickable' : ''; ?>" <?php echo !empty($tpBalanceByTp) ? 'onclick="openBalanceBreakdownModal()"' : ''; ?>>
                                         <h3>&#8377;<?php echo inr_format($stats['balance'], 2); ?></h3>
-                                        <p>Total Balance</p>
+                                        <p>Total Balance <?php if (!empty($tpBalanceByTp)): ?><span class="tp-count-badge"><?=count($tpBalanceByTp)?> TP(s)</span><?php endif; ?></p>
                                         <p style="font-size:11.5px;color:#9ca3af;margin-top:4px;">
                                             &#8377;<?php echo inr_format($stats_by_type['napkin']['balance'], 2); ?> Napkin &middot; &#8377;<?php echo inr_format($stats_by_type['diaper']['balance'], 2); ?> Diaper
                                         </p>
@@ -331,6 +356,111 @@ function zoneQS(array $overrides = []): string {
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Total Balance breakdown modal — click-to-open (not hover, so it also
+                                 works on touch), with an "All Receivers" tab plus one tab per receiver
+                                 company (e.g. FEMI NAYAN LLP), each showing that scope's own
+                                 TP-wise balance list. -->
+                            <?php if (!empty($tpBalanceByTp)): ?>
+                            <div class="modal fade" id="balanceBreakdownModal" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-scrollable">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h6 class="modal-title" style="font-weight:700;">Total Balance — by TP</h6>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="btn-group mb-3" role="group">
+                                                <?php foreach ($company_profiles as $i => $cp): ?>
+                                                <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=$i === 0 ? ' active' : ''?>" data-scope="company-<?=$cp['id']?>"><?=htmlspecialchars($cp['gname'])?></button>
+                                                <?php endforeach; ?>
+                                                <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=empty($company_profiles) ? ' active' : ''?>" data-scope="all">All Receivers</button>
+                                            </div>
+                                            <?php foreach ($company_profiles as $i => $cp): $rowsForCp = $tpBalanceByCompany[$cp['id']] ?? []; $cpTotal = array_sum(array_column($rowsForCp, 'balance')); ?>
+                                            <div class="balance-scope-pane" data-scope="company-<?=$cp['id']?>" <?=$i === 0 ? '' : 'style="display:none;"'?>>
+                                                <div class="tp-count-popover-row" style="font-weight:700;border-bottom:2px solid #e5e7eb;">
+                                                    <span>Total</span>
+                                                    <b>&#8377;<?=inr_format($cpTotal, 2)?></b>
+                                                </div>
+                                                <?php if (empty($rowsForCp)): ?>
+                                                <p class="text-muted small mb-0 mt-2">No balance under this receiver.</p>
+                                                <?php else: foreach ($rowsForCp as $tb): ?>
+                                                <div class="tp-count-popover-row">
+                                                    <span><?=htmlspecialchars($tb['tp_name'])?> <code style="font-size:10.5px;"><?=htmlspecialchars($tb['tp_code'])?></code></span>
+                                                    <b>&#8377;<?=inr_format($tb['balance'], 2)?></b>
+                                                </div>
+                                                <?php endforeach; endif; ?>
+                                            </div>
+                                            <?php endforeach; $allTotal = array_sum(array_column($tpBalanceByTp, 'balance')); ?>
+                                            <div class="balance-scope-pane" data-scope="all" <?=empty($company_profiles) ? '' : 'style="display:none;"'?>>
+                                                <div class="tp-count-popover-row" style="font-weight:700;border-bottom:2px solid #e5e7eb;">
+                                                    <span>Total</span>
+                                                    <b>&#8377;<?=inr_format($allTotal, 2)?></b>
+                                                </div>
+                                                <?php foreach ($tpBalanceByTp as $tb): ?>
+                                                <div class="tp-count-popover-row">
+                                                    <span><?=htmlspecialchars($tb['tp_name'])?> <code style="font-size:10.5px;"><?=htmlspecialchars($tb['tp_code'])?></code></span>
+                                                    <b>&#8377;<?=inr_format($tb['balance'], 2)?></b>
+                                                </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
+                            <!-- Total Payments breakdown modal — same click-to-open, company-tabs
+                                 pattern as the Total Balance modal above, but counting entries per
+                                 TP instead of summing balance. -->
+                            <?php if (!empty($tpEntryCounts)): ?>
+                            <div class="modal fade" id="paymentsBreakdownModal" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-scrollable">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h6 class="modal-title" style="font-weight:700;">Total Payments — by TP</h6>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="btn-group mb-3" role="group">
+                                                <?php foreach ($company_profiles as $i => $cp): ?>
+                                                <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=$i === 0 ? ' active' : ''?>" data-scope="company-<?=$cp['id']?>"><?=htmlspecialchars($cp['gname'])?></button>
+                                                <?php endforeach; ?>
+                                                <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=empty($company_profiles) ? ' active' : ''?>" data-scope="all">All Receivers</button>
+                                            </div>
+                                            <?php foreach ($company_profiles as $i => $cp): $rowsForCp = $tpEntryCountsByCompany[$cp['id']] ?? []; $cpTotal = array_sum(array_column($rowsForCp, 'count')); ?>
+                                            <div class="balance-scope-pane" data-scope="company-<?=$cp['id']?>" <?=$i === 0 ? '' : 'style="display:none;"'?>>
+                                                <div class="tp-count-popover-row" style="font-weight:700;border-bottom:2px solid #e5e7eb;">
+                                                    <span>Total</span>
+                                                    <b><?=(int)$cpTotal?></b>
+                                                </div>
+                                                <?php if (empty($rowsForCp)): ?>
+                                                <p class="text-muted small mb-0 mt-2">No entries under this receiver.</p>
+                                                <?php else: foreach ($rowsForCp as $tec): ?>
+                                                <div class="tp-count-popover-row">
+                                                    <span><?=htmlspecialchars($tec['tp_name'])?> <code style="font-size:10.5px;"><?=htmlspecialchars($tec['tp_code'])?></code></span>
+                                                    <b><?=(int)$tec['count']?></b>
+                                                </div>
+                                                <?php endforeach; endif; ?>
+                                            </div>
+                                            <?php endforeach; $allEntryTotal = array_sum(array_column($tpEntryCounts, 'count')); ?>
+                                            <div class="balance-scope-pane" data-scope="all" <?=empty($company_profiles) ? '' : 'style="display:none;"'?>>
+                                                <div class="tp-count-popover-row" style="font-weight:700;border-bottom:2px solid #e5e7eb;">
+                                                    <span>Total</span>
+                                                    <b><?=(int)$allEntryTotal?></b>
+                                                </div>
+                                                <?php foreach ($tpEntryCounts as $tec): ?>
+                                                <div class="tp-count-popover-row">
+                                                    <span><?=htmlspecialchars($tec['tp_name'])?> <code style="font-size:10.5px;"><?=htmlspecialchars($tec['tp_code'])?></code></span>
+                                                    <b><?=(int)$tec['count']?></b>
+                                                </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
 
                             <!-- Filters -->
                             <div class="row">
@@ -550,7 +680,34 @@ function zoneQS(array $overrides = []): string {
                 { extend: 'print', text: '<i class="material-icons" style="vertical-align:middle">print</i> Print', className: 'btn btn-info' }
             ]
         });
+
+        // Total Payments / Total Balance cards' breakdown modals — "All
+        // Receivers" vs a specific receiver company (e.g. FEMI NAYAN LLP).
+        // Both modals share this same tab markup/classes, so the switch is
+        // scoped to whichever modal-body the clicked button is actually in
+        // — otherwise clicking a tab in one modal would also flip the
+        // other modal's panes. All panes are already rendered server-side,
+        // so switching is just a show/hide, no re-fetch needed.
+        $('.balance-scope-btn').on('click', function () {
+            var $scope = $(this).closest('.modal-body');
+            var scope = $(this).data('scope');
+            $scope.find('.balance-scope-btn').removeClass('active');
+            $(this).addClass('active');
+            $scope.find('.balance-scope-pane').hide();
+            $scope.find('.balance-scope-pane[data-scope="' + scope + '"]').show();
+        });
     });
+
+    function openBalanceBreakdownModal() {
+        var modalEl = document.getElementById('balanceBreakdownModal');
+        if (!modalEl) return;
+        new bootstrap.Modal(modalEl).show();
+    }
+    function openPaymentsBreakdownModal() {
+        var modalEl = document.getElementById('paymentsBreakdownModal');
+        if (!modalEl) return;
+        new bootstrap.Modal(modalEl).show();
+    }
     </script>
     <?php endif; ?>
 </body>
