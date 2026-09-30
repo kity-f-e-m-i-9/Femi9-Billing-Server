@@ -61,8 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'undo'
 
     $db_conn->begin_transaction();
     try {
-        // Give the pieces back to the bundle first — refuses if the
-        // bundle has since been closed, before any stock is touched.
+        // Give the pieces back to the bundle first — works even if the
+        // bundle has since been closed (its totals are still corrected;
+        // status itself is untouched), before any stock is touched.
         restore_bundle_draw($db_conn, $refId);
 
         // Reverse the pack credit: closing_qty ↓, input_qty ↓ (floored at
@@ -152,13 +153,16 @@ $totalConversions = count($conversions);
                     <div class="ata-page-head">
                         <h1><i class="material-icons-outlined" style="font-size:22px;vertical-align:middle;margin-right:8px;color:var(--ata-tp-1);">sync_alt</i>Manage Conversions</h1>
                     </div>
-                    <p class="ata-intro">Every bundle-sourced Pieces &harr; Pack conversion — undo one to return the pieces to their bundle and reverse the pack credit.</p>
+                    <p class="ata-intro">Every bundle-sourced Pieces &harr; Pack conversion — delete one to reverse the pack credit and return the pieces to their bundle, even if that bundle has since been closed.</p>
 
                     <div class="ata-nav-tabs">
                         <a href="input-stock-bundles.php" class="ata-nav-tab"><i class="material-icons-outlined">add_box</i> Input Stock</a>
                         <a href="raw-material-bundles-manage.php" class="ata-nav-tab"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
                         <a href="neksomo-piece-pack-convert.php" class="ata-nav-tab"><i class="material-icons-outlined">sync_alt</i> Convert Pieces &harr; Packs</a>
                         <a href="manage-piece-pack-conversions.php" class="ata-nav-tab active"><i class="material-icons-outlined">history</i> Manage Conversions</a>
+                        <a href="raw-material-bundles-report.php" class="ata-nav-tab"><i class="material-icons-outlined">assessment</i> Bundle Report</a>
+                        <a href="manage-covers.php" class="ata-nav-tab"><i class="material-icons-outlined">layers</i> Covers</a>
+                        <a href="manage-cartons.php" class="ata-nav-tab"><i class="material-icons-outlined">inbox</i> Cartons</a>
                     </div>
 
                     <?php if (isset($_SESSION['errorMessage'])): $flashErr = htmlspecialchars($_SESSION['errorMessage'], ENT_QUOTES, 'UTF-8'); unset($_SESSION['errorMessage']); ?>
@@ -205,16 +209,12 @@ $totalConversions = count($conversions);
                                     <td style="text-align:center;"><?php echo number_format($c['pieces_used']); ?></td>
                                     <td style="color:#6b7280;"><?php echo htmlspecialchars($c['created_by'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td>
-                                        <?php if ($c['bundle_status'] === 'open'): ?>
-                                        <form method="post" style="display:inline;" onsubmit="return confirm('Undo this conversion? <?php echo (int) $c['packs_made']; ?> pack(s) will be removed from stock and <?php echo (int) $c['pieces_used']; ?> piece(s) returned to <?php echo htmlspecialchars(addslashes($c['bundle_label']), ENT_QUOTES, 'UTF-8'); ?>.');">
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('Delete this conversion? <?php echo (int) $c['packs_made']; ?> pack(s) will be removed from stock and <?php echo (int) $c['pieces_used']; ?> piece(s) returned to <?php echo htmlspecialchars(addslashes($c['bundle_label']), ENT_QUOTES, 'UTF-8'); ?><?php echo $c['bundle_status'] !== 'open' ? ' (bundle is closed — its totals will still be corrected)' : ''; ?>. This cannot be undone.');">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
                                             <input type="hidden" name="action" value="undo">
                                             <input type="hidden" name="ref_id" value="<?php echo htmlspecialchars($c['ref_id'], ENT_QUOTES, 'UTF-8'); ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">Undo</button>
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                         </form>
-                                        <?php else: ?>
-                                        <span class="text-muted small" title="The bundle this conversion drew from has been closed">Bundle closed</span>
-                                        <?php endif; ?>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
