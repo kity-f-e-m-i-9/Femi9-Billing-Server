@@ -108,7 +108,7 @@ if ($productType === null) {
 
 cpEnsurePurchaseOrderTables($db_conn);
 
-// Live headroom cap — deposit + Rs.5000 minus (held stock at MRP + this CP's
+// Live headroom cap — deposit + Rs.20000 minus (held stock at MRP + this CP's
 // own still-waiting PO carts). Always recomputed fresh, never stored; see
 // shared/CpPurchaseOrderBalance.php for the full explanation.
 $headroom = cpAvailableHeadroom($db_conn, (int)$Login_user_IDvl);

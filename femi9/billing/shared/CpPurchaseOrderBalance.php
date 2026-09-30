@@ -7,7 +7,7 @@
  * wallet, see shared/TpProductType.php + TpAdvanceService), a Channel
  * Partner has no wallet at all. Their ordering capacity is a live
  * inventory-value cap: at any moment they may hold stock (valued at MRP)
- * worth up to (their total security deposit + Rs.5000) across their
+ * worth up to (their total security deposit + Rs.20000) across their
  * assigned locations. As held stock sells out — channel_partner_stock is
  * debited elsewhere whenever Company invoices a TP from this CP's stock,
  * see company/tp-invoice-action.php — headroom reopens automatically.
@@ -140,7 +140,7 @@ function cpPendingPoValue(mysqli $db, int $cpId, ?int $excludePoId = null): floa
  * moment held stock sells out or the deposit changes. */
 function cpAvailableHeadroom(mysqli $db, int $cpId, ?int $excludePoId = null): float
 {
-    $cap = cpTotalDeposit($db, $cpId) + 5000;
+    $cap = cpTotalDeposit($db, $cpId) + 20000;
     $used = cpHeldStockValue($db, $cpId) + cpPendingPoValue($db, $cpId, $excludePoId);
     return max(0.0, round($cap - $used, 2));
 }

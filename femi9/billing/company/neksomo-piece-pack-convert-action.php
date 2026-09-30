@@ -4,6 +4,7 @@ require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/NeksomoStockBridge.php");
 require_once("include/RawMaterialBundles.php");
+require_once("include/ProductCovers.php");
 include("config.php");
 
 // Dedicated to the neksomo login (admin retained for oversight/support).
@@ -57,6 +58,14 @@ $rawDamagedReasonIds = $_POST['damaged_reason_id'] ?? [];
 $rawDamagedQtys      = $_POST['damaged_qty'] ?? [];
 $rawExtraReasonIds   = $_POST['extra_reason_id'] ?? [];
 $rawExtraQtys        = $_POST['extra_qty'] ?? [];
+
+// Damaged COVERS (packaging, not raw pieces) — same per-row entry shape,
+// submitted as cover_damaged_reason_id[rowIndex][] / cover_damaged_qty[rowIndex][]
+// (see assignAdjustEntryNames() in neksomo-piece-pack-convert.php). Reuses
+// the same damage_reason_master reason list as raw-material damage (see
+// include/ProductCovers.php's record_damaged_covers()).
+$rawCoverDamagedReasonIds = $_POST['cover_damaged_reason_id'] ?? [];
+$rawCoverDamagedQtys      = $_POST['cover_damaged_qty'] ?? [];
 
 if (!$godownId || !is_array($rawProductIds) || empty($rawProductIds)) {
     $_SESSION['errorMessage'] = "Invalid submission — please fill in every field.";
@@ -121,15 +130,16 @@ foreach ($rawProductIds as $i => $rawProductId) {
     }
 
     try {
-        $damagedEntries = parse_bundle_adjust_entries($rawDamagedReasonIds, $rawDamagedQtys, $i, 'damaged');
-        $extraEntries   = parse_bundle_adjust_entries($rawExtraReasonIds, $rawExtraQtys, $i, 'extra');
+        $damagedEntries      = parse_bundle_adjust_entries($rawDamagedReasonIds, $rawDamagedQtys, $i, 'damaged');
+        $extraEntries        = parse_bundle_adjust_entries($rawExtraReasonIds, $rawExtraQtys, $i, 'extra');
+        $coverDamagedEntries = parse_bundle_adjust_entries($rawCoverDamagedReasonIds, $rawCoverDamagedQtys, $i, 'damaged cover');
     } catch (\RuntimeException $e) {
         $_SESSION['errorMessage'] = $e->getMessage();
         header("Location: neksomo-piece-pack-convert.php");
         exit;
     }
 
-    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId, 'machine_code_id' => $machineCodeId, 'damaged_entries' => $damagedEntries, 'extra_entries' => $extraEntries];
+    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId, 'machine_code_id' => $machineCodeId, 'damaged_entries' => $damagedEntries, 'extra_entries' => $extraEntries, 'cover_damaged_entries' => $coverDamagedEntries];
 }
 
 // A product appearing twice in one batch is never a legitimate
@@ -224,6 +234,16 @@ try {
                 $totalExtra += $entry['qty'];
             }
 
+            // Cover damage is applied first too, same reasoning as the
+            // bundle's own damage/extra above — so the balance
+            // consume_covers() checks against already reflects any
+            // damage recorded in this same submission.
+            $totalCoverDamaged = 0;
+            foreach ($row['cover_damaged_entries'] as $entry) {
+                record_damaged_covers($db_conn, $row['product_id'], (int) $godownId, $warehouseId, $entry['qty'], $entry['reason_id'], null, $conversionDate, $createdBy);
+                $totalCoverDamaged += $entry['qty'];
+            }
+
             // The selected bundle's own remaining_pieces IS the hard limit
             // for this conversion — no pooled stock.closing_qty deduction
             // is involved at all. Caps at however many FULL packs the
@@ -233,6 +253,14 @@ try {
             // tracking-design.md).
             $bundleResult = convert_from_raw_material_bundle($db_conn, $row['bundle_id'], $row['product_id'], $piecesPerPack, $row['pack_count'], $refId, $createdBy);
 
+            // Packaging cover is consumed 1-per-pack, against the bundle's
+            // ACTUAL packs_made (never the requested count) — if the bundle
+            // ran short, only that many covers are needed too. A second,
+            // independent constraint from the raw material bundle: covers
+            // hard-block the whole batch if short rather than silently
+            // capping packs_made further (see include/ProductCovers.php).
+            consume_covers($db_conn, $row['product_id'], (int) $godownId, $warehouseId, $bundleResult['packs_made'], $conversionDate, $refId, $createdBy);
+
             $creditResult = $stockService->credit(
                 $row['product_id'], 'company', $godownId, $bundleResult['packs_made'],
                 'conversion', $refId, $createdBy, true, $warehouseId, $row['machine_code_id'], $conversionDate
@@ -241,6 +269,7 @@ try {
             $adjustNote = '';
             if ($totalDamaged > 0) { $adjustNote .= ", $totalDamaged pc damaged"; }
             if ($totalExtra > 0) { $adjustNote .= ", $totalExtra pc extra found"; }
+            if ($totalCoverDamaged > 0) { $adjustNote .= ", $totalCoverDamaged cover(s) damaged"; }
 
             if ($bundleResult['packs_made'] < $bundleResult['requested_packs']) {
                 $summaries[] = "$productName: only {$bundleResult['packs_made']} of {$bundleResult['requested_packs']} pack(s) could be made — selected bundle ran short ({$bundleResult['remaining_after']} pc left$adjustNote). Now {$creditResult['qty_after']} pack(s) on hand";

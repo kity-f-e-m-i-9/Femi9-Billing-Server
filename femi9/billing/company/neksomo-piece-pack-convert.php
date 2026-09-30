@@ -168,6 +168,8 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
         .ata-adjust-group { margin-top:16px; }
         .ata-adjust-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
         .ata-adjust-title { font-size:12px; font-weight:600; color:#4b5563; text-transform:uppercase; letter-spacing:.02em; }
+        .cover-balance-chip { text-transform:none; font-weight:500; color:#6b7280; font-size:11.5px; margin-left:4px; }
+        .cover-balance-chip.is-low { color:#b91c1c; font-weight:600; }
         .ata-adjust-add-btn {
             display:inline-flex; align-items:center; gap:3px; border:1px dashed #c7d2fe; background:#f5f6ff;
             color:#4338ca; font-size:12px; font-weight:600; padding:5px 10px; border-radius:7px; cursor:pointer;
@@ -246,6 +248,10 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                         <a href="input-stock-bundles.php" class="ata-nav-tab"><i class="material-icons-outlined">add_box</i> Input Stock</a>
                         <a href="raw-material-bundles-manage.php" class="ata-nav-tab"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
                         <a href="neksomo-piece-pack-convert.php" class="ata-nav-tab active"><i class="material-icons-outlined">sync_alt</i> Convert Pieces &harr; Packs</a>
+                        <a href="manage-piece-pack-conversions.php" class="ata-nav-tab"><i class="material-icons-outlined">history</i> Manage Conversions</a>
+                        <a href="raw-material-bundles-report.php" class="ata-nav-tab"><i class="material-icons-outlined">assessment</i> Bundle Report</a>
+                        <a href="manage-covers.php" class="ata-nav-tab"><i class="material-icons-outlined">layers</i> Covers</a>
+                        <a href="manage-cartons.php" class="ata-nav-tab"><i class="material-icons-outlined">inbox</i> Cartons</a>
                     </div>
 
                     <?php if (isset($_SESSION['errorMessage'])): $flashErr = htmlspecialchars($_SESSION['errorMessage'], ENT_QUOTES, 'UTF-8'); unset($_SESSION['errorMessage']); ?>
@@ -397,6 +403,16 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                                         </button>
                                     </div>
                                     <div class="ata-adjust-rows" data-adjust-type="extra"></div>
+                                </div>
+
+                                <div class="ata-adjust-group" data-adjust-type="cover_damage">
+                                    <div class="ata-adjust-head">
+                                        <span class="ata-adjust-title"><i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;color:#b91c1c;">layers</i> Damaged Covers <span class="cover-balance-chip"></span></span>
+                                        <button type="button" class="ata-adjust-add-btn" data-adjust-type="cover_damage">
+                                            <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">add</i> Add damaged cover entry
+                                        </button>
+                                    </div>
+                                    <div class="ata-adjust-rows" data-adjust-type="cover_damage"></div>
                                 </div>
                             </div>
                         </div>
@@ -624,6 +640,12 @@ var reasonCache = {
     damage: <?php echo json_encode($damageReasons, JSON_HEX_TAG | JSON_HEX_APOS); ?>,
     extra: <?php echo json_encode($extraReasons, JSON_HEX_TAG | JSON_HEX_APOS); ?>
 };
+// Cover damage reuses the same damage_reason_master list as raw-material
+// damage (it's still "damage", just of covers rather than pieces) — see
+// include/ProductCovers.php's record_damaged_covers(). Kept as its own
+// cache key so refreshReasonDropdowns('cover_damage') and the entry-name
+// stamping below can treat it as a distinct adjust type from 'damage'.
+reasonCache.cover_damage = reasonCache.damage;
 var adjustEntryRowTemplate = document.getElementById('adjustEntryRowTemplate');
 
 // Rebuilds every rendered reason <select>'s options from reasonCache[type],
@@ -700,9 +722,10 @@ function addAdjustEntryRow(rowEl, type) {
 // (see the convertForm submit handler) rather than at add-entry time,
 // so removing an earlier product row never leaves stale indices behind.
 function assignAdjustEntryNames() {
+    var namePrefixes = { damage: 'damaged', extra: 'extra', cover_damage: 'cover_damaged' };
     Array.from(rowsContainer.children).forEach(function (rowEl, rowIndex) {
-        ['damage', 'extra'].forEach(function (type) {
-            var namePrefix = type === 'damage' ? 'damaged' : 'extra';
+        Object.keys(namePrefixes).forEach(function (type) {
+            var namePrefix = namePrefixes[type];
             rowEl.querySelectorAll('.ata-adjust-rows[data-adjust-type="' + type + '"] .ata-adjust-entry-row').forEach(function (entryEl) {
                 entryEl.querySelector('.adjust-reason-select').setAttribute('name', namePrefix + '_reason_id[' + rowIndex + '][]');
                 entryEl.querySelector('.adjust-qty-input').setAttribute('name', namePrefix + '_qty[' + rowIndex + '][]');
@@ -755,6 +778,21 @@ function closeSelectedBundle(rowEl) {
         });
 }
 
+// Shows the row's current cover balance next to "Damaged Covers" so the
+// operator can see at a glance whether enough covers exist before they
+// try to convert — purely informational, consume_covers() in
+// include/ProductCovers.php is still the real (server-side) gate.
+function updateCoverBalanceChip(rowEl, mapped, coverBalance) {
+    var chip = rowEl.querySelector('.cover-balance-chip');
+    if (!mapped || coverBalance === undefined) {
+        chip.textContent = '';
+        chip.classList.remove('is-low');
+        return;
+    }
+    chip.textContent = '(' + Number(coverBalance).toLocaleString('en-IN') + ' cover(s) available)';
+    chip.classList.toggle('is-low', coverBalance <= 0);
+}
+
 function refreshRowStock(rowEl) {
     var productId = rowEl.querySelector('.product-select').value;
     var godownId = document.getElementById('godownSelect').value;
@@ -773,6 +811,7 @@ function refreshRowStock(rowEl) {
             if (data.error) { panel.classList.add('is-empty'); panel.lastChild.textContent = '—'; return; }
             updateDirectionOptions(rowEl, data.mapped);
             updateBundlePicker(rowEl, data.mapped, data.open_bundles);
+            updateCoverBalanceChip(rowEl, data.mapped, data.cover_balance);
             panel.classList.remove('is-empty');
             if (data.mapped) {
                 panel.lastChild.textContent = data.raw_pieces + ' raw pc available';
@@ -1044,15 +1083,29 @@ function loadReasonList() {
 // shows up immediately in every product row without a page reload.
 function refreshReasonCacheAndDropdowns() {
     reasonPostAction('list', {}).then(function (data) {
-        reasonCache[reasonModalType] = (data.reasons || []).filter(function (r) { return r.is_active; });
+        var active = (data.reasons || []).filter(function (r) { return r.is_active; });
+        reasonCache[reasonModalType] = active;
         refreshReasonDropdowns(reasonModalType);
+        // 'damage' and 'cover_damage' share the same underlying
+        // damage_reason_master list (see reasonCache.cover_damage's
+        // setup above) — a reason added/edited/removed via either
+        // entry's "+ Manage Reasons…" must refresh both, since the
+        // modal itself always talks to the backend as plain 'damage'.
+        if (reasonModalType === 'damage') {
+            reasonCache.cover_damage = active;
+            refreshReasonDropdowns('cover_damage');
+        }
     });
 }
 
 function openReasonManageModal(type) {
-    reasonModalType = type;
-    reasonModalTitle.textContent = type === 'damage' ? 'Manage Damage Reasons' : 'Manage Extra-Found Reasons';
-    reasonModalIcon.textContent = type === 'damage' ? 'report' : 'add_circle_outline';
+    // cover_damage has no backend reason type of its own — it reuses
+    // damage_reason_master (see reasonCache.cover_damage's setup above),
+    // so the modal always talks to the server as plain 'damage'.
+    var backendType = type === 'cover_damage' ? 'damage' : type;
+    reasonModalType = backendType;
+    reasonModalTitle.textContent = backendType === 'damage' ? 'Manage Damage Reasons' : 'Manage Extra-Found Reasons';
+    reasonModalIcon.textContent = backendType === 'damage' ? 'report' : 'add_circle_outline';
     resetReasonForm();
     loadReasonList();
     reasonModalBackdrop.style.display = 'flex';

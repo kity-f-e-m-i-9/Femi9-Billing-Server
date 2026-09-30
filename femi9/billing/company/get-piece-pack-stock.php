@@ -3,6 +3,7 @@ include("checksession.php");
 require_once("include/GodownAccess.php");
 require_once("include/NeksomoStockBridge.php");
 require_once("include/RawMaterialBundles.php");
+require_once("include/ProductCovers.php");
 header('Content-Type: application/json');
 error_reporting(0);
 
@@ -67,12 +68,14 @@ if ($rawSource) {
 
     $openBundles = get_open_raw_material_bundles($db_conn, $rawProductId, (int) $godownId, $warehouseId);
     $totalBundlePieces = array_sum(array_column($openBundles, 'remaining_pieces'));
+    $coverBalance = get_cover_balance($db_conn, $productId, (int) $godownId, $warehouseId);
 
     echo json_encode([
         'mapped'          => true,
         'raw_product_id'  => $rawProductId,
         'raw_pieces'      => $totalBundlePieces,
         'open_bundles'    => $openBundles,
+        'cover_balance'   => $coverBalance,
         'closing_qty'     => 0,
         'extra_pieces'    => 0,
         'pieces_per_pack' => $piecesPerPack,
