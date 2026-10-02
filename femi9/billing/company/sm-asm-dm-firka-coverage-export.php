@@ -1,10 +1,13 @@
 <?php
-// SM → ASM → District Manager → District firka-coverage report — for
-// EVERY district (regardless of whether it has an ASM, a District
-// Manager, both, or neither assigned), how many of that district's firkas
-// (leaf location nodes) have a Territory Partner assigned ("filled") vs
-// none at all ("vacant"), and among filled firkas, whether that TP is
-// active or inactive/deleted. One row per district.
+// SM / ASM / District Manager — Firka Coverage (Tamil Nadu) — one row per
+// district: who owns it (District Manager, walked up via manager_id to
+// ASM and SM -- marketing_staff's own hierarchy, see include/
+// MsShopCoverage.php's getMsDistrictMap()/getMsShopCoverageReport() for
+// the same rollup pattern used elsewhere), how many of its firkas (leaf
+// location nodes) are Vacant/Filled/Active/Inactive, each bucket's own
+// Target Amount (Napkin target_amount + Diaper diaper_target_amount,
+// summed across that bucket's firkas), and the actual firka names in
+// each bucket.
 ob_start();
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -41,46 +44,18 @@ function xlsx_set(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $col
     $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $row, $value);
 }
 
-// One row per FIRKA (partner_location_nodes depth=6) — not per district —
-// so every firka's own name is visible, whichever of the three buckets it
-// falls in: filled by an active TP, filled by an inactive/deleted TP, or
-// vacant. Rebuilt 2026-09-25 from the earlier per-district totals-only
-// version per request: counts alone didn't say WHICH firkas were vacant or
-// which TP had gone inactive, only how many.
-//
-// EVERY district still shows up (even ones with no ASM/DM/firka structure
-// at all — confirmed 2026-09-25 that the earlier DM-anchored version
-// silently dropped 24 such districts) via the same LEFT JOIN chain; a
-// district with genuinely no firka nodes gets one placeholder row instead
-// of vanishing. ASM and District Manager are each resolved independently
-// by looking up who (if anyone) is directly assigned to this district at
-// that level via marketing_staff_locations — NOT by walking a DM's own
-// manager_id, since that chain can be broken (e.g. a DM whose manager_id
-// points at a deleted/non-existent staff row, as found for CHENNAI's
-// Karthiban) and would otherwise silently hide a real ASM assignment or
-// fabricate a wrong one. SM is only resolved when this district's own ASM
-// exists (SM = that ASM's manager) — with no ASM directly on this
-// district, there's no reliable chain to a SM, so it's left blank rather
-// than guessed.
-//
-// Every district's location tree reaches a uniform District(3) ->
-// Division(4) -> Taluk(5) -> Firka(6) depth, confirmed against live data —
-// no district stops short at Taluk, so depth=6 is safe to treat as "the
-// firka level" everywhere, not just the Erode-style clusters this concept
-// originated in. territory_partner_locations.location_id is always a
-// depth-6 firka node, and is UNIQUE per firka (one TP slot per firka) — so
-// a firka is "filled" exactly when a row exists there, "vacant" when it
-// doesn't.
+// Matches the reference file's own convention: an empty bucket (e.g. no
+// Inactive firkas in this district) shows "—", not a blank cell.
+function namesOrDash(array $names): string {
+    return empty($names) ? '—' : implode(', ', $names);
+}
+
+// ---- Firka-level coverage data (same source query as before) ----------
 $sql = "
     SELECT
-        sm.ms_name         AS sm_name,
-        asm_direct.ms_name AS asm_name,
-        dm_direct.ms_name  AS dm_name,
         d.name             AS district_name,
-        dv.name            AS division_name,
-        t.name             AS taluk_name,
         f.name             AS firka_name,
-        tp.name            AS tp_name,
+        COALESCE(f.target_amount, 0) + COALESCE(f.diaper_target_amount, 0) AS firka_target,
         tp.is_active       AS tp_is_active,
         tp.deleted_at      AS tp_deleted_at,
         (tpl.location_id IS NOT NULL) AS is_filled
@@ -90,59 +65,166 @@ $sql = "
     LEFT JOIN partner_location_nodes f  ON f.parent_id  = t.id  AND f.depth  = 6
     LEFT JOIN territory_partner_locations tpl ON tpl.location_id = f.id
     LEFT JOIN territory_partners tp ON tp.id = tpl.territory_partner_id
-    LEFT JOIN (
-        SELECT msl.location_id, ms.id, ms.ms_name, ms.manager_id
-        FROM marketing_staff_locations msl
-        INNER JOIN marketing_staff ms ON ms.id = msl.ms_id
-        INNER JOIN marketing_team_levels mtl ON mtl.id = ms.team_level_id AND mtl.level_name = 'Assistant Sales Manager (ASM)'
-        WHERE ms.deleted_at IS NULL
-    ) asm_direct ON asm_direct.location_id = d.id
-    LEFT JOIN (
-        SELECT msl.location_id, ms.id, ms.ms_name
-        FROM marketing_staff_locations msl
-        INNER JOIN marketing_staff ms ON ms.id = msl.ms_id
-        INNER JOIN marketing_team_levels mtl ON mtl.id = ms.team_level_id AND mtl.level_name = 'District Manager'
-        WHERE ms.deleted_at IS NULL
-    ) dm_direct ON dm_direct.location_id = d.id
-    LEFT JOIN marketing_staff sm ON sm.id = asm_direct.manager_id AND sm.deleted_at IS NULL
     WHERE d.depth = 3
       AND d.parent_id = (SELECT id FROM partner_location_nodes WHERE depth = 2 AND name = 'Tamilnadu' LIMIT 1)
-    ORDER BY sm_name, asm_name, dm_name, district_name, division_name, taluk_name, firka_name
+    ORDER BY district_name, firka_name
 ";
 $firkaRows = $db_conn->query($sql)->fetch_all(MYSQLI_ASSOC);
 
+// ---- SM / ASM / District Manager resolution ----------------------------
+// Same hierarchy marketing_staff already encodes: manager_id walks up,
+// marketing_team_levels.level_rank numbers the tiers (1=SM, 2=ASM,
+// 3=District Manager as currently configured -- resolved by rank number,
+// not hardcoded level text, so a future re-numbering still works).
+$staffById = [];
+$staffRes = $db_conn->query("
+    SELECT ms.id, ms.ms_name, ms.manager_id, tl.level_rank
+    FROM marketing_staff ms
+    LEFT JOIN marketing_team_levels tl ON tl.id = ms.team_level_id
+");
+while ($row = $staffRes->fetch_assoc()) {
+    $staffById[(int) $row['id']] = [
+        'name'       => trim($row['ms_name']),
+        'manager_id' => $row['manager_id'] !== null ? (int) $row['manager_id'] : null,
+        'level_rank' => $row['level_rank'] !== null ? (int) $row['level_rank'] : null,
+    ];
+}
+
+// Every location node, to resolve an assignment (which can point at a
+// STATE/DISTRICT/TALUK/FIRKA node) up to its owning district -- same
+// resolution rule as getMsDistrictMap()/AssignedLocations.php.
+$allLocNodes = [];
+$locRes = $db_conn->query("SELECT id, parent_id, depth, name FROM partner_location_nodes WHERE is_active = 1");
+while ($row = $locRes->fetch_assoc()) {
+    $allLocNodes[(int) $row['id']] = [
+        'parent_id' => $row['parent_id'] !== null ? (int) $row['parent_id'] : null,
+        'depth'     => (int) $row['depth'],
+    ];
+}
+$districtForNode = function (int $locId) use ($allLocNodes): ?int {
+    if (!isset($allLocNodes[$locId])) return null;
+    $cur = $allLocNodes[$locId];
+    $curId = $locId;
+    if ($cur['depth'] === 2) return null; // STATE-level -- no single district
+    while ($cur !== null && $cur['depth'] !== 3) {
+        if ($cur['parent_id'] === null) return null;
+        $curId = $cur['parent_id'];
+        $cur = $allLocNodes[$curId] ?? null;
+    }
+    return $cur !== null ? $curId : null;
+};
+
+// district node id -> [ms_id, ...] of everyone with any assignment
+// resolving to that district (could be SM/ASM/DM level directly).
+$assignedByDistrictId = [];
+$assignRes = $db_conn->query("SELECT ms_id, location_id FROM marketing_staff_locations");
+while ($row = $assignRes->fetch_assoc()) {
+    $distId = $districtForNode((int) $row['location_id']);
+    if ($distId !== null) {
+        $assignedByDistrictId[$distId][] = (int) $row['ms_id'];
+    }
+}
+
+// Maps a district's own node id -> ['sm' => name|null, 'asm' => ..., 'dm' => ...].
+// Picks the most specific (highest level_rank) assigned staff as the
+// district's direct owner, then walks manager_id up for the other tiers
+// -- so a district assigned straight to an ASM (no DM underneath) shows
+// District Manager "—", matching real data (e.g. KANCHIPURAM below).
+function resolveHierarchy(array $msIds, array $staffById): array {
+    $result = ['sm' => null, 'asm' => null, 'dm' => null];
+    $best = null;
+    foreach ($msIds as $id) {
+        if (!isset($staffById[$id]) || $staffById[$id]['level_rank'] === null) continue;
+        if ($best === null || $staffById[$id]['level_rank'] > $staffById[$best]['level_rank']) {
+            $best = $id;
+        }
+    }
+    if ($best === null) return $result;
+
+    $rank = $staffById[$best]['level_rank'];
+    $chain = []; // rank => name, walking up from $best
+    $cur = $best;
+    $depth = 0;
+    while ($cur !== null && isset($staffById[$cur]) && $depth < 10) {
+        $r = $staffById[$cur]['level_rank'];
+        if ($r !== null) { $chain[$r] = $staffById[$cur]['name']; }
+        $cur = $staffById[$cur]['manager_id'];
+        $depth++;
+    }
+    $result['dm']  = $chain[3] ?? null;
+    $result['asm'] = $chain[2] ?? null;
+    $result['sm']  = $chain[1] ?? null;
+    return $result;
+}
+
 ob_end_clean();
 
-// Re-grouped back to one row per district (SM/ASM/DM/District), but unlike
-// the original counts-only version, each bucket now carries its own firka
-// NAME list, not just a count — rebuilt 2026-09-25 per request: separate,
-// named Vacant / Active / Inactive columns instead of one combined
-// per-firka Status column (tried first, but wanted split back out).
-// Grouped in PHP (not SQL GROUP_CONCAT) so a large district's name list
-// (e.g. Chennai's 115 firkas) is never silently truncated by
-// group_concat_max_len.
+// ---- Group firka rows by district, compute buckets + amounts ----------
+$districtNodeIds = [];
+$distNodeRes = $db_conn->query("
+    SELECT id, name FROM partner_location_nodes
+    WHERE depth = 3 AND parent_id = (SELECT id FROM partner_location_nodes WHERE depth = 2 AND name = 'Tamilnadu' LIMIT 1)
+");
+while ($row = $distNodeRes->fetch_assoc()) { $districtNodeIds[$row['name']] = (int) $row['id']; }
+
 $districts = [];
 $districtOrder = [];
 foreach ($firkaRows as $r) {
-    $key = ($r['sm_name'] ?? '') . '|' . ($r['asm_name'] ?? '') . '|' . ($r['dm_name'] ?? '') . '|' . $r['district_name'];
+    $key = $r['district_name'];
     if (!isset($districts[$key])) {
         $districts[$key] = [
-            'sm_name' => $r['sm_name'], 'asm_name' => $r['asm_name'], 'dm_name' => $r['dm_name'],
-            'district_name' => $r['district_name'],
-            'vacant_names' => [], 'active_names' => [], 'inactive_names' => [],
+            'district_name' => $key,
+            'total' => 0, 'total_amt' => 0.0, 'total_names' => [],
+            'vacant' => 0, 'vacant_amt' => 0.0, 'vacant_names' => [],
+            'filled' => 0, 'filled_amt' => 0.0, 'filled_names' => [],
+            'active' => 0, 'active_amt' => 0.0, 'active_names' => [],
+            'inactive' => 0, 'inactive_amt' => 0.0, 'inactive_names' => [],
         ];
         $districtOrder[] = $key;
     }
     if ($r['firka_name'] === null) continue; // district with no firka structure at all
+
+    $target = (float) $r['firka_target'];
+    $isActive = ((int) $r['tp_is_active'] === 1 && $r['tp_deleted_at'] === null);
+
+    $districts[$key]['total']++;
+    $districts[$key]['total_amt'] += $target;
+    $districts[$key]['total_names'][] = $r['firka_name'];
+
     if (!$r['is_filled']) {
+        $districts[$key]['vacant']++;
+        $districts[$key]['vacant_amt'] += $target;
         $districts[$key]['vacant_names'][] = $r['firka_name'];
-    } elseif ((int) $r['tp_is_active'] === 1 && $r['tp_deleted_at'] === null) {
-        $districts[$key]['active_names'][] = $r['firka_name'];
     } else {
-        $districts[$key]['inactive_names'][] = $r['firka_name'];
+        $districts[$key]['filled']++;
+        $districts[$key]['filled_amt'] += $target;
+        $districts[$key]['filled_names'][] = $r['firka_name'];
+        if ($isActive) {
+            $districts[$key]['active']++;
+            $districts[$key]['active_amt'] += $target;
+            $districts[$key]['active_names'][] = $r['firka_name'];
+        } else {
+            $districts[$key]['inactive']++;
+            $districts[$key]['inactive_amt'] += $target;
+            $districts[$key]['inactive_names'][] = $r['firka_name'];
+        }
     }
 }
-$rows = array_map(fn($key) => $districts[$key], $districtOrder);
+
+$rows = [];
+foreach ($districtOrder as $key) {
+    $d = $districts[$key];
+    $nodeId = $districtNodeIds[$key] ?? null;
+    $hierarchy = $nodeId !== null && isset($assignedByDistrictId[$nodeId])
+        ? resolveHierarchy($assignedByDistrictId[$nodeId], $staffById)
+        : ['sm' => null, 'asm' => null, 'dm' => null];
+
+    $rows[] = array_merge($d, [
+        'sm'  => $hierarchy['sm']  ?? '—',
+        'asm' => $hierarchy['asm'] ?? '—',
+        'dm'  => $hierarchy['dm']  ?? '—',
+    ]);
+}
 
 try {
     $spreadsheet = new Spreadsheet();
@@ -151,71 +233,80 @@ try {
 
     $today = date('Y-m-d');
     $sheet->setCellValue('A1', 'SM / ASM / District Manager — Firka Coverage — Tamil Nadu (as of ' . $today . ')');
-    $sheet->mergeCells('A1:N1');
-    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
 
     $headerRow = 3;
     $columns = [
         'SM', 'ASM', 'District Manager', 'District',
-        'Vacant Firkas', 'Vacant Firka Names',
-        'Filled Firkas', 'Filled Firka Names',
-        'Active Firkas', 'Active Firka Names',
-        'Inactive Firkas', 'Inactive Firka Names',
+        'Total Firkas', 'Total Amount', 'Total Firka Names',
+        'Vacant Firkas', 'Vacant Amount', 'Vacant Firka Names',
+        'Filled Firkas', 'Filled Amount', 'Filled Firka Names',
+        'Active Firkas', 'Active Amount', 'Active Firka Names',
+        'Inactive Firkas', 'Inactive Amount', 'Inactive Firka Names',
     ];
     $col = 1;
     foreach ($columns as $c) { xlsx_set($sheet, $col, $headerRow, $c); $col++; }
     $lastCol = $col - 1;
+    $sheet->mergeCells('A1:' . Coordinate::stringFromColumnIndex($lastCol) . '1');
+    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
     $headerRange = Coordinate::stringFromColumnIndex(1) . $headerRow . ':' . Coordinate::stringFromColumnIndex($lastCol) . $headerRow;
     $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
     $sheet->getStyle($headerRange)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4472C4');
     $sheet->getStyle($headerRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-    $sheet->getStyle($headerRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    // Vacant/Filled/Active/Inactive name-list columns hold a long
-    // comma-joined string — wrap so a big district (e.g. Chennai's 51
-    // vacant firkas) doesn't produce one unreadably wide cell.
-    foreach (['F', 'H', 'J', 'L'] as $wrapCol) {
-        $sheet->getStyle($wrapCol . ':' . $wrapCol)->getAlignment()->setWrapText(true);
-    }
+    $sheet->getStyle($headerRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
+
+    $countCols  = [5, 8, 11, 14, 17];  // Total/Vacant/Filled/Active/Inactive Firkas
+    $amountCols = [6, 9, 12, 15, 18];  // their matching Amount columns
+    $colors = ['D9D9D9', 'FFC7CE', 'BDD7EE', 'C6EFCE', 'FFEB9C']; // grey/red/blue/green/amber
 
     $row = $headerRow + 1;
     foreach ($rows as $r) {
-        // "Filled" = Active + Inactive together — every firka with a TP
-        // assigned to it, regardless of that TP's current status. Added
-        // 2026-09-25 alongside the existing Active/Inactive split, which on
-        // its own didn't answer "how many firkas are filled overall."
-        $filledNames = array_merge($r['active_names'], $r['inactive_names']);
-
-        xlsx_set($sheet, 1, $row, $r['sm_name'] ?: '—');
-        xlsx_set($sheet, 2, $row, $r['asm_name'] ?: '—');
-        xlsx_set($sheet, 3, $row, $r['dm_name'] ?: '—');
+        xlsx_set($sheet, 1, $row, $r['sm']);
+        xlsx_set($sheet, 2, $row, $r['asm']);
+        xlsx_set($sheet, 3, $row, $r['dm']);
         xlsx_set($sheet, 4, $row, $r['district_name']);
-        xlsx_set($sheet, 5, $row, count($r['vacant_names']));
-        xlsx_set($sheet, 6, $row, implode(', ', $r['vacant_names']) ?: '—');
-        xlsx_set($sheet, 7, $row, count($filledNames));
-        xlsx_set($sheet, 8, $row, implode(', ', $filledNames) ?: '—');
-        xlsx_set($sheet, 9, $row, count($r['active_names']));
-        xlsx_set($sheet, 10, $row, implode(', ', $r['active_names']) ?: '—');
-        xlsx_set($sheet, 11, $row, count($r['inactive_names']));
-        xlsx_set($sheet, 12, $row, implode(', ', $r['inactive_names']) ?: '—');
-        $sheet->getStyle('E' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFC7CE'); // Vacant count - red
-        $sheet->getStyle('G' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('BDD7EE'); // Filled count - blue
-        $sheet->getStyle('I' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6EFCE'); // Active count - green
-        $sheet->getStyle('K' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFEB9C'); // Inactive count - amber
+
+        xlsx_set($sheet, 5,  $row, $r['total']);
+        xlsx_set($sheet, 6,  $row, $r['total_amt']);
+        xlsx_set($sheet, 7,  $row, namesOrDash($r['total_names']));
+        xlsx_set($sheet, 8,  $row, $r['vacant']);
+        xlsx_set($sheet, 9,  $row, $r['vacant_amt']);
+        xlsx_set($sheet, 10, $row, namesOrDash($r['vacant_names']));
+        xlsx_set($sheet, 11, $row, $r['filled']);
+        xlsx_set($sheet, 12, $row, $r['filled_amt']);
+        xlsx_set($sheet, 13, $row, namesOrDash($r['filled_names']));
+        xlsx_set($sheet, 14, $row, $r['active']);
+        xlsx_set($sheet, 15, $row, $r['active_amt']);
+        xlsx_set($sheet, 16, $row, namesOrDash($r['active_names']));
+        xlsx_set($sheet, 17, $row, $r['inactive']);
+        xlsx_set($sheet, 18, $row, $r['inactive_amt']);
+        xlsx_set($sheet, 19, $row, namesOrDash($r['inactive_names']));
+
+        foreach ($countCols as $i => $ci) {
+            $colLetter = Coordinate::stringFromColumnIndex($ci);
+            $sheet->getStyle($colLetter . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($colors[$i]);
+        }
+        foreach ($amountCols as $ci) {
+            $sheet->getStyle(Coordinate::stringFromColumnIndex($ci) . $row)->getNumberFormat()->setFormatCode('#,##0');
+        }
+        $sheet->getStyle('A' . $row . ':' . Coordinate::stringFromColumnIndex($lastCol) . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $row++;
     }
 
     if ($row > $headerRow + 1) {
-        $dataRange = Coordinate::stringFromColumnIndex(1) . ($headerRow + 1) . ':' . Coordinate::stringFromColumnIndex($lastCol) . ($row - 1);
+        $dataRange = 'A' . ($headerRow + 1) . ':' . Coordinate::stringFromColumnIndex($lastCol) . ($row - 1);
         $sheet->getStyle($dataRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        $sheet->getStyle($dataRange)->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
     }
 
-    foreach ([1, 2, 3, 4, 5, 7, 9, 11] as $c) {
-        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setAutoSize(true);
+    foreach (range(1, $lastCol) as $ci) {
+        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($ci))->setAutoSize(true);
     }
-    foreach ([6, 8, 10, 12] as $c) {
-        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(60);
+    // Name-list columns can get very wide with autosize -- cap them.
+    foreach ([7, 10, 13, 16, 19] as $ci) {
+        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($ci))->setAutoSize(false)->setWidth(60);
     }
+
+    $sheet->freezePane('A' . ($headerRow + 1));
 
     $filename = "SM_ASM_DM_Firka_Coverage_{$today}.xlsx";
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
