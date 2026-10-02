@@ -1,12 +1,20 @@
 <?php
 // ASM -> District Manager order performance -- one sheet per ASM, one row
-// per DM under them: this month's Get Orders vs No Orders taken, how many
-// of this month's Get Orders have already been converted to an invoice
-// (via user_invoice.source_ms_order_id, same conversion link ms-order-
-// invoice-add.php writes), and last month's converted amount vs how much
-// of it has since been returned. Deleted/voided invoices are excluded
-// entirely from both the converted amount and its returns -- a removed
-// invoice shouldn't contribute to either side.
+// per DM under them.
+//
+// Primary period: 01-09-2026 to 30-09-2026 (September) -- Total/Get/No
+// Order counts, how many of that month's Get Orders are already converted
+// to an invoice (via user_invoice.source_ms_order_id, same conversion
+// link ms-order-invoice-add.php writes), and the live (non-deleted/
+// non-voided) invoiced amount for those.
+//
+// Returns/Deletions window: 01-08-2026 to 30-09-2026 (August + September)
+// -- wider on purpose, since a Get Order placed in August can convert to
+// an invoice later in September; this catches that invoice's returns/
+// deletion regardless of which of the two months it actually converted
+// in. Returned Amount and Deleted Invoice Amount are reported as two
+// separate columns (previously deleted invoices were just silently
+// excluded from the converted total -- now their amount is surfaced too).
 ob_start();
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -57,10 +65,11 @@ function excelSafeSheetName(string $name, array &$usedNames): string {
     return $final;
 }
 
-$thisMonthStart = date('Y-m-01');
-$thisMonthEnd   = date('Y-m-t');
-$lastMonthStart = date('Y-m-01', strtotime('first day of last month'));
-$lastMonthEnd   = date('Y-m-t', strtotime('last day of last month'));
+// Fixed per request -- not derived from today's date.
+$periodStart        = '2026-09-01';
+$periodEnd          = '2026-09-30';
+$returnsWindowStart = '2026-08-01';
+$returnsWindowEnd   = '2026-09-30';
 
 // ---- Staff hierarchy: DM (level_rank=3) -> ASM (manager_id) ------------
 $staffById = [];
@@ -93,20 +102,20 @@ foreach ($staffById as $id => $s) {
     if (($s['level_rank'] ?? null) === 3) { $dmIds[] = $id; }
 }
 
-// ---- This month's Get/No orders per DM ----------------------------------
-$getOrderCount  = array_fill_keys($dmIds, 0);
-$noOrderCount   = array_fill_keys($dmIds, 0);
-$getOrderIdsByDm = array_fill_keys($dmIds, []); // for the conversion check below
+// ---- September Get/No orders per DM -------------------------------------
+$getOrderCount   = array_fill_keys($dmIds, 0);
+$noOrderCount    = array_fill_keys($dmIds, 0);
+$getOrderIdsByDm = array_fill_keys($dmIds, []);
 
 $ordRes = $db_conn->query(
     "SELECT ms_id, order_id, new_order
      FROM ms_orders
-     WHERE order_date BETWEEN '$thisMonthStart' AND '$thisMonthEnd'
+     WHERE order_date BETWEEN '$periodStart' AND '$periodEnd'
      GROUP BY ms_id, order_id, new_order"
 );
 while ($row = $ordRes->fetch_assoc()) {
     $id = (int) $row['ms_id'];
-    if (!isset($getOrderCount[$id])) continue; // not a DM (e.g. an SM/ASM own visit) -- skip
+    if (!isset($getOrderCount[$id])) continue; // not a DM -- skip
     if ($row['new_order'] === 'yes') {
         $getOrderCount[$id]++;
         $getOrderIdsByDm[$id][] = $row['order_id'];
@@ -115,75 +124,81 @@ while ($row = $ordRes->fetch_assoc()) {
     }
 }
 
-// ---- Conversion: how many of this month's Get Orders are invoiced ------
-$convertedThisMonth = array_fill_keys($dmIds, 0);
-$allThisMonthOrderIds = [];
-foreach ($getOrderIdsByDm as $id => $ids) { foreach ($ids as $oid) { $allThisMonthOrderIds[$oid] = $id; } }
-if (!empty($allThisMonthOrderIds)) {
-    $placeholders = implode(',', array_fill(0, count($allThisMonthOrderIds), '?'));
-    $types = str_repeat('s', count($allThisMonthOrderIds));
-    $ids = array_keys($allThisMonthOrderIds);
+// ---- September Get Orders -> converted count + live invoiced amount ----
+$convertedCount = array_fill_keys($dmIds, 0);
+$convertedAmt   = array_fill_keys($dmIds, 0.0);
+
+$allSeptOrderIds = [];
+foreach ($getOrderIdsByDm as $id => $ids) { foreach ($ids as $oid) { $allSeptOrderIds[$oid] = $id; } }
+if (!empty($allSeptOrderIds)) {
+    $placeholders = implode(',', array_fill(0, count($allSeptOrderIds), '?'));
+    $types = str_repeat('s', count($allSeptOrderIds));
+    $ids = array_keys($allSeptOrderIds);
     $stmt = $db_conn->prepare(
-        "SELECT DISTINCT source_ms_order_id FROM user_invoice
+        "SELECT source_ms_order_id, total FROM user_invoice
          WHERE source_ms_order_id IN ($placeholders) AND deleted_at IS NULL AND voided_at IS NULL"
     );
     $stmt->bind_param($types, ...$ids);
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
-        $dmId = $allThisMonthOrderIds[$row['source_ms_order_id']] ?? null;
-        if ($dmId !== null) { $convertedThisMonth[$dmId]++; }
+        $dmId = $allSeptOrderIds[$row['source_ms_order_id']] ?? null;
+        if ($dmId === null) continue;
+        $convertedCount[$dmId]++;
+        $convertedAmt[$dmId] += (float) $row['total'];
     }
     $stmt->close();
 }
 
-// ---- Last month's Get Orders -> their converted amount + returns -------
-$lastMonthConvertedAmt = array_fill_keys($dmIds, 0.0);
-$lastMonthReturnedAmt  = array_fill_keys($dmIds, 0.0);
+// ---- Aug+Sep Get Orders -> their invoices -> returns & deletions -------
+$returnedAmt = array_fill_keys($dmIds, 0.0);
+$deletedAmt  = array_fill_keys($dmIds, 0.0);
 
-$lmOrdRes = $db_conn->query(
+$winOrdRes = $db_conn->query(
     "SELECT ms_id, order_id FROM ms_orders
-     WHERE new_order = 'yes' AND order_date BETWEEN '$lastMonthStart' AND '$lastMonthEnd'
+     WHERE new_order = 'yes' AND order_date BETWEEN '$returnsWindowStart' AND '$returnsWindowEnd'
      GROUP BY ms_id, order_id"
 );
-$lastMonthOrderIdsByDm = array_fill_keys($dmIds, []);
-while ($row = $lmOrdRes->fetch_assoc()) {
+$winOrderIdsByDm = array_fill_keys($dmIds, []);
+while ($row = $winOrdRes->fetch_assoc()) {
     $id = (int) $row['ms_id'];
-    if (isset($lastMonthOrderIdsByDm[$id])) { $lastMonthOrderIdsByDm[$id][] = $row['order_id']; }
+    if (isset($winOrderIdsByDm[$id])) { $winOrderIdsByDm[$id][] = $row['order_id']; }
 }
+$allWinOrderIds = [];
+foreach ($winOrderIdsByDm as $id => $ids) { foreach ($ids as $oid) { $allWinOrderIds[$oid] = $id; } }
 
-$allLastMonthOrderIds = [];
-foreach ($lastMonthOrderIdsByDm as $id => $ids) { foreach ($ids as $oid) { $allLastMonthOrderIds[$oid] = $id; } }
+if (!empty($allWinOrderIds)) {
+    $placeholders = implode(',', array_fill(0, count($allWinOrderIds), '?'));
+    $types = str_repeat('s', count($allWinOrderIds));
+    $ids = array_keys($allWinOrderIds);
 
-if (!empty($allLastMonthOrderIds)) {
-    $placeholders = implode(',', array_fill(0, count($allLastMonthOrderIds), '?'));
-    $types = str_repeat('s', count($allLastMonthOrderIds));
-    $ids = array_keys($allLastMonthOrderIds);
-
-    // Invoices converted from last month's Get Orders -- excludes deleted/
-    // voided invoices entirely, both from the converted total and from
-    // being eligible for a returns lookup below.
+    // Every invoice converted from this window's Get Orders, live or not --
+    // deleted/voided ones go straight into Deleted Invoice Amount instead
+    // of Returned Amount's lookup.
     $stmt = $db_conn->prepare(
-        "SELECT source_ms_order_id, inv_number, total FROM user_invoice
-         WHERE source_ms_order_id IN ($placeholders) AND deleted_at IS NULL AND voided_at IS NULL"
+        "SELECT source_ms_order_id, inv_number, total, deleted_at, voided_at FROM user_invoice
+         WHERE source_ms_order_id IN ($placeholders)"
     );
     $stmt->bind_param($types, ...$ids);
     $stmt->execute();
     $res = $stmt->get_result();
-    $invNumbersByDm = array_fill_keys($dmIds, []);
+    $liveInvNumbersByDm = array_fill_keys($dmIds, []);
     while ($row = $res->fetch_assoc()) {
-        $dmId = $allLastMonthOrderIds[$row['source_ms_order_id']] ?? null;
+        $dmId = $allWinOrderIds[$row['source_ms_order_id']] ?? null;
         if ($dmId === null) continue;
-        $lastMonthConvertedAmt[$dmId] += (float) $row['total'];
-        $invNumbersByDm[$dmId][] = $row['inv_number'];
+        if ($row['deleted_at'] !== null || $row['voided_at'] !== null) {
+            $deletedAmt[$dmId] += (float) $row['total'];
+        } else {
+            $liveInvNumbersByDm[$dmId][] = $row['inv_number'];
+        }
     }
     $stmt->close();
 
-    // Returns against those same invoices -- user_return_stock repeats the
-    // whole return's total on every line item, so dedupe by returnid
+    // Returns against the still-live invoices -- user_return_stock repeats
+    // the whole return's total on every line item, so dedupe by returnid
     // before summing (same convention mis-report.php already uses).
     $allInvNumbers = [];
-    foreach ($invNumbersByDm as $id => $nums) { foreach ($nums as $n) { $allInvNumbers[$n][] = $id; } }
+    foreach ($liveInvNumbersByDm as $id => $nums) { foreach ($nums as $n) { $allInvNumbers[$n][] = $id; } }
     if (!empty($allInvNumbers)) {
         $placeholders2 = implode(',', array_fill(0, count($allInvNumbers), '?'));
         $types2 = str_repeat('s', count($allInvNumbers));
@@ -200,7 +215,7 @@ if (!empty($allLastMonthOrderIds)) {
         while ($row = $res2->fetch_assoc()) {
             $dmIdsForInv = $allInvNumbers[$row['invnumber']] ?? [];
             foreach ($dmIdsForInv as $dmId) {
-                $lastMonthReturnedAmt[$dmId] += (float) $row['total'];
+                $returnedAmt[$dmId] += (float) $row['total'];
             }
         }
         $stmt2->close();
@@ -216,13 +231,14 @@ foreach ($dmIds as $id) {
     $asmName = resolveAsmFor($id, $staffById);
     if (!isset($rowsByAsm[$asmName])) { $rowsByAsm[$asmName] = []; $asmOrder[] = $asmName; }
     $rowsByAsm[$asmName][] = [
-        'dm_name'            => $staffById[$id]['name'],
-        'get_orders'         => $getOrderCount[$id],
-        'no_orders'          => $noOrderCount[$id],
-        'total_orders'       => $getOrderCount[$id] + $noOrderCount[$id],
-        'converted'          => $convertedThisMonth[$id],
-        'lm_converted_amt'   => $lastMonthConvertedAmt[$id],
-        'lm_returned_amt'    => $lastMonthReturnedAmt[$id],
+        'dm_name'       => $staffById[$id]['name'],
+        'total_orders'  => $getOrderCount[$id] + $noOrderCount[$id],
+        'get_orders'    => $getOrderCount[$id],
+        'no_orders'     => $noOrderCount[$id],
+        'converted_cnt' => $convertedCount[$id],
+        'converted_amt' => $convertedAmt[$id],
+        'returned_amt'  => $returnedAmt[$id],
+        'deleted_amt'   => $deletedAmt[$id],
     ];
 }
 sort($asmOrder, SORT_STRING | SORT_FLAG_CASE);
@@ -230,21 +246,21 @@ $asmOrder = array_values(array_filter($asmOrder, fn($k) => $k !== 'Unassigned'))
 $asmOrder[] = 'Unassigned';
 $asmOrder = array_values(array_filter($asmOrder, fn($k) => isset($rowsByAsm[$k]) && !empty($rowsByAsm[$k])));
 
-function writeOrderSheet(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, string $heading, array $rows, string $thisMonthLabel, string $lastMonthLabel): void {
+function writeOrderSheet(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, string $heading, array $rows): void {
     $sheet->setCellValue('A1', $heading);
 
     $headerRow = 3;
     $columns = [
         'District Manager',
-        "Get Orders ({$thisMonthLabel})", "No Orders ({$thisMonthLabel})", "Total Orders ({$thisMonthLabel})",
-        "Get Orders Converted ({$thisMonthLabel})",
-        "Converted Amount ({$lastMonthLabel})", "Returned Amount ({$lastMonthLabel})",
+        'Total Order Count', 'Get Order Count', 'No Order Count',
+        'Get Orders Converted to Invoice', 'Converted Amount',
+        'Returned Amount', 'Deleted Invoice Amount',
     ];
     $col = 1;
     foreach ($columns as $c) { xlsx_set($sheet, $col, $headerRow, $c); $col++; }
     $lastCol = $col - 1;
     $sheet->mergeCells('A1:' . Coordinate::stringFromColumnIndex($lastCol) . '1');
-    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
 
     $headerRange = Coordinate::stringFromColumnIndex(1) . $headerRow . ':' . Coordinate::stringFromColumnIndex($lastCol) . $headerRow;
     $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
@@ -255,17 +271,20 @@ function writeOrderSheet(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, s
     $row = $headerRow + 1;
     foreach ($rows as $r) {
         xlsx_set($sheet, 1, $row, $r['dm_name']);
-        xlsx_set($sheet, 2, $row, $r['get_orders']);
-        xlsx_set($sheet, 3, $row, $r['no_orders']);
-        xlsx_set($sheet, 4, $row, $r['total_orders']);
-        xlsx_set($sheet, 5, $row, $r['converted']);
-        xlsx_set($sheet, 6, $row, $r['lm_converted_amt']);
-        xlsx_set($sheet, 7, $row, $r['lm_returned_amt']);
-        $sheet->getStyle('F' . $row . ':G' . $row)->getNumberFormat()->setFormatCode('#,##0');
-        $sheet->getStyle('B' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6EFCE'); // Get Orders - green
-        $sheet->getStyle('C' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFC7CE'); // No Orders - red
-        $sheet->getStyle('E' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('BDD7EE'); // Converted - blue
+        xlsx_set($sheet, 2, $row, $r['total_orders']);
+        xlsx_set($sheet, 3, $row, $r['get_orders']);
+        xlsx_set($sheet, 4, $row, $r['no_orders']);
+        xlsx_set($sheet, 5, $row, $r['converted_cnt']);
+        xlsx_set($sheet, 6, $row, $r['converted_amt']);
+        xlsx_set($sheet, 7, $row, $r['returned_amt']);
+        xlsx_set($sheet, 8, $row, $r['deleted_amt']);
+        $sheet->getStyle('F' . $row . ':H' . $row)->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle('B' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D9D9D9'); // Total - grey
+        $sheet->getStyle('C' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6EFCE'); // Get Order - green
+        $sheet->getStyle('D' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFC7CE'); // No Order - red
+        $sheet->getStyle('E' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('BDD7EE'); // Converted count - blue
         $sheet->getStyle('G' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFEB9C'); // Returned - amber
+        $sheet->getStyle('H' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F4CCCC'); // Deleted - dusty red
         $sheet->getStyle('A' . $row . ':' . Coordinate::stringFromColumnIndex($lastCol) . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $row++;
     }
@@ -282,8 +301,6 @@ function writeOrderSheet(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, s
 
 try {
     $today = date('Y-m-d');
-    $thisMonthLabel = date('M Y');
-    $lastMonthLabel = date('M Y', strtotime('first day of last month'));
 
     $spreadsheet = new Spreadsheet();
     $spreadsheet->removeSheetByIndex(0);
@@ -293,8 +310,8 @@ try {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle(excelSafeSheetName($asmName, $usedSheetNames));
         $heading = ($asmName === 'Unassigned' ? 'DM Order Performance (No ASM Assigned)' : 'DM Order Performance — ASM: ' . $asmName)
-            . ' (as of ' . $today . ')';
-        writeOrderSheet($sheet, $heading, $rowsByAsm[$asmName], $thisMonthLabel, $lastMonthLabel);
+            . ' | Orders: 01-09-2026 to 30-09-2026 | Returns/Deletions window: 01-08-2026 to 30-09-2026';
+        writeOrderSheet($sheet, $heading, $rowsByAsm[$asmName]);
     }
     if ($spreadsheet->getSheetCount() === 0) {
         $sheet = $spreadsheet->createSheet();
