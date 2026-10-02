@@ -2,16 +2,20 @@
 // ASM -> District Manager order performance -- one sheet per ASM, one row
 // per DM under them.
 //
-// Data source: tp_orders, NOT ms_orders. A DM's "Get Order" visit is
-// captured in ms_orders against ms_shop, but that's a parallel lead-
-// capture system of its own -- confirmed against real data that it NEVER
-// actually gets invoiced (zero rows anywhere link a ms_order to an
-// invoice). The order a DM actually hands off to a Territory Partner to
-// invoice lives in tp_orders instead, tagged assigned_by_ms_id = that DM
-// (see territory-partner/manage-orders.php's "From DM: <name>" badge,
-// which reads this exact column) -- and tp_orders.invoiced_inv_id (once
-// set) is a real join key into user_invoice.inv_id, confirmed against
-// live data: 19,030 DM-assigned orders, 8,033 of them already invoiced.
+// Data source: Total/Get/No Order counts come from ms_orders (every visit
+// the DM themself logged) -- same table marketing/manage_order_product.php
+// itself reads for its own "Get Order / No Order" card, so the two stay
+// consistent. Conversion tracking (which Get Orders turned into a real
+// invoice) instead needs tp_orders: a DM's Get Order only gets a tp_orders
+// row once it's actually forwarded to a Territory Partner (tagged
+// assigned_by_ms_id = that DM -- see territory-partner/manage-orders.php's
+// "From DM: <name>" badge, which reads this exact column), and
+// tp_orders.invoiced_inv_id (once set) is a real join key into
+// user_invoice.inv_id. A "No Order" visit has nothing to forward, so it
+// never gets a tp_orders row at all -- sourcing Get/No Order counts from
+// tp_orders (an earlier version of this file did) silently produced 0 for
+// every single DM's No Order Count, and undercounted Get Orders too (only
+// ones already forwarded showed up).
 //
 // Primary period: 01-09-2026 to 30-09-2026 (September) -- Total/Get/No
 // Order counts, how many of that month's Get Orders are already converted
@@ -113,28 +117,46 @@ foreach ($staffById as $id => $s) {
     if (($s['level_rank'] ?? null) === 3) { $dmIds[] = $id; }
 }
 
-// ---- September Get/No orders per DM (tp_orders, not ms_orders) ---------
+// ---- September Get/No orders per DM -------------------------------------
+// Counts come from ms_orders (every DM visit the DM themself logged,
+// get-order or no-order) -- NOT tp_orders, which only ever gets a row once
+// a Get Order is actually forwarded to a TP. A "No Order" visit has nothing
+// to forward, so it never gets a tp_orders row at all -- sourcing No Order
+// Count from tp_orders silently produced 0 for every DM (caught by
+// comparing against marketing/manage_order_product.php's own "Get Order /
+// No Order" card, which reads ms_orders directly and showed real values).
+// invoiced_inv_id (for the conversion step below) is then looked up via the
+// same ms_orders -> tp_orders join manage_order_product.php itself uses.
+$dmIdListSql = implode(',', $dmIds);
 $getOrderCount    = array_fill_keys($dmIds, 0);
 $noOrderCount     = array_fill_keys($dmIds, 0);
 $getOrderInvIdsByDm = array_fill_keys($dmIds, []); // invoiced_inv_id values, one per distinct order
 
-$ordRes = $db_conn->query(
-    "SELECT assigned_by_ms_id, order_id, new_order, MAX(invoiced_inv_id) AS invoiced_inv_id
-     FROM tp_orders
-     WHERE assigned_by_ms_id IS NOT NULL AND voided_at IS NULL
-       AND order_date BETWEEN '$periodStart' AND '$periodEnd'
-     GROUP BY assigned_by_ms_id, order_id, new_order"
-);
-while ($row = $ordRes->fetch_assoc()) {
-    $id = (int) $row['assigned_by_ms_id'];
-    if (!isset($getOrderCount[$id])) continue; // not a DM -- skip
-    if ($row['new_order'] === 'yes') {
-        $getOrderCount[$id]++;
-        if (!empty($row['invoiced_inv_id'])) {
-            $getOrderInvIdsByDm[$id][] = $row['invoiced_inv_id'];
-        }
-    } else {
-        $noOrderCount[$id]++;
+if (!empty($dmIds)) {
+    $ordRes = $db_conn->query(
+        "SELECT ms_id, new_order, COUNT(DISTINCT order_id) c
+         FROM ms_orders
+         WHERE ms_id IN ($dmIdListSql) AND order_date BETWEEN '$periodStart' AND '$periodEnd'
+         GROUP BY ms_id, new_order"
+    );
+    while ($row = $ordRes->fetch_assoc()) {
+        $id = (int) $row['ms_id'];
+        if (!isset($getOrderCount[$id])) continue; // not a DM -- skip
+        if ($row['new_order'] === 'yes') { $getOrderCount[$id] = (int) $row['c']; }
+        else { $noOrderCount[$id] = (int) $row['c']; }
+    }
+
+    $invRes = $db_conn->query(
+        "SELECT DISTINCT o.ms_id, t.invoiced_inv_id
+         FROM ms_orders o JOIN tp_orders t ON t.order_id = o.order_id
+         WHERE o.ms_id IN ($dmIdListSql) AND o.new_order = 'yes'
+           AND o.order_date BETWEEN '$periodStart' AND '$periodEnd'
+           AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''"
+    );
+    while ($row = $invRes->fetch_assoc()) {
+        $id = (int) $row['ms_id'];
+        if (!isset($getOrderInvIdsByDm[$id])) continue;
+        $getOrderInvIdsByDm[$id][] = $row['invoiced_inv_id'];
     }
 }
 
@@ -168,18 +190,18 @@ if (!empty($allSeptInvIds)) {
 $returnedAmt = array_fill_keys($dmIds, 0.0);
 $deletedAmt  = array_fill_keys($dmIds, 0.0);
 
-$winOrdRes = $db_conn->query(
-    "SELECT assigned_by_ms_id, order_id, MAX(invoiced_inv_id) AS invoiced_inv_id
-     FROM tp_orders
-     WHERE assigned_by_ms_id IS NOT NULL AND voided_at IS NULL AND new_order = 'yes'
-       AND order_date BETWEEN '$returnsWindowStart' AND '$returnsWindowEnd'
-     GROUP BY assigned_by_ms_id, order_id"
-);
 $winInvIdsByDm = array_fill_keys($dmIds, []);
-while ($row = $winOrdRes->fetch_assoc()) {
-    $id = (int) $row['assigned_by_ms_id'];
-    if (isset($winInvIdsByDm[$id]) && !empty($row['invoiced_inv_id'])) {
-        $winInvIdsByDm[$id][] = $row['invoiced_inv_id'];
+if (!empty($dmIds)) {
+    $winOrdRes = $db_conn->query(
+        "SELECT DISTINCT o.ms_id, t.invoiced_inv_id
+         FROM ms_orders o JOIN tp_orders t ON t.order_id = o.order_id
+         WHERE o.ms_id IN ($dmIdListSql) AND o.new_order = 'yes'
+           AND o.order_date BETWEEN '$returnsWindowStart' AND '$returnsWindowEnd'
+           AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''"
+    );
+    while ($row = $winOrdRes->fetch_assoc()) {
+        $id = (int) $row['ms_id'];
+        if (isset($winInvIdsByDm[$id])) { $winInvIdsByDm[$id][] = $row['invoiced_inv_id']; }
     }
 }
 $allWinInvIds = [];
