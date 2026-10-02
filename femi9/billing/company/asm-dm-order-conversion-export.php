@@ -160,6 +160,31 @@ if (!empty($dmIds)) {
     }
 }
 
+// ---- September Get Order Value (estimated) ------------------------------
+// qty * outlet_price * (1 - discount%) per line, same formula marketing/
+// manage_order_product.php's own "Get Order Value" card uses -- what the DM
+// asked for, regardless of whether it's been forwarded/invoiced yet.
+$getOrderValue = array_fill_keys($dmIds, 0.0);
+if (!empty($dmIds)) {
+    $productPriceMap = [];
+    $resAllProd = $db_conn->query("SELECT id, outlet_price FROM products");
+    while ($pr = $resAllProd->fetch_assoc()) { $productPriceMap[(int) $pr['id']] = (float) $pr['outlet_price']; }
+
+    $valRes = $db_conn->query(
+        "SELECT ms_id, pr_id, qty, discount_percentage
+         FROM ms_orders
+         WHERE ms_id IN ($dmIdListSql) AND new_order = 'yes'
+           AND order_date BETWEEN '$periodStart' AND '$periodEnd'"
+    );
+    while ($row = $valRes->fetch_assoc()) {
+        $id = (int) $row['ms_id'];
+        if (!isset($getOrderValue[$id])) continue;
+        $price = $productPriceMap[(int) $row['pr_id']] ?? 0;
+        $discount = (float) ($row['discount_percentage'] ?? 0);
+        $getOrderValue[$id] += (int) $row['qty'] * $price * (1 - $discount / 100);
+    }
+}
+
 // ---- September Get Orders -> converted count + live invoiced amount ----
 $convertedCount = array_fill_keys($dmIds, 0);
 $convertedAmt   = array_fill_keys($dmIds, 0.0);
@@ -273,14 +298,15 @@ foreach ($dmIds as $id) {
     $asmName = resolveAsmFor($id, $staffById);
     if (!isset($rowsByAsm[$asmName])) { $rowsByAsm[$asmName] = []; $asmOrder[] = $asmName; }
     $rowsByAsm[$asmName][] = [
-        'dm_name'       => $staffById[$id]['name'],
-        'total_orders'  => $getOrderCount[$id] + $noOrderCount[$id],
-        'get_orders'    => $getOrderCount[$id],
-        'no_orders'     => $noOrderCount[$id],
-        'converted_cnt' => $convertedCount[$id],
-        'converted_amt' => $convertedAmt[$id],
-        'returned_amt'  => $returnedAmt[$id],
-        'deleted_amt'   => $deletedAmt[$id],
+        'dm_name'         => $staffById[$id]['name'],
+        'total_orders'    => $getOrderCount[$id] + $noOrderCount[$id],
+        'get_orders'      => $getOrderCount[$id],
+        'get_order_value' => $getOrderValue[$id],
+        'no_orders'       => $noOrderCount[$id],
+        'converted_cnt'   => $convertedCount[$id],
+        'converted_amt'   => $convertedAmt[$id],
+        'returned_amt'    => $returnedAmt[$id],
+        'deleted_amt'     => $deletedAmt[$id],
     ];
 }
 sort($asmOrder, SORT_STRING | SORT_FLAG_CASE);
@@ -294,7 +320,7 @@ function writeOrderSheet(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, s
     $headerRow = 3;
     $columns = [
         'District Manager',
-        'Total Order Count', 'Get Order Count', 'No Order Count',
+        'Total Order Count', 'Get Order Count', 'Get Order Value (Est.)', 'No Order Count',
         'Get Orders Converted to Invoice', 'Converted Amount',
         'Returned Amount', 'Deleted Invoice Amount',
     ];
@@ -315,18 +341,21 @@ function writeOrderSheet(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, s
         xlsx_set($sheet, 1, $row, $r['dm_name']);
         xlsx_set($sheet, 2, $row, $r['total_orders']);
         xlsx_set($sheet, 3, $row, $r['get_orders']);
-        xlsx_set($sheet, 4, $row, $r['no_orders']);
-        xlsx_set($sheet, 5, $row, $r['converted_cnt']);
-        xlsx_set($sheet, 6, $row, $r['converted_amt']);
-        xlsx_set($sheet, 7, $row, $r['returned_amt']);
-        xlsx_set($sheet, 8, $row, $r['deleted_amt']);
-        $sheet->getStyle('F' . $row . ':H' . $row)->getNumberFormat()->setFormatCode('#,##0');
+        xlsx_set($sheet, 4, $row, $r['get_order_value']);
+        xlsx_set($sheet, 5, $row, $r['no_orders']);
+        xlsx_set($sheet, 6, $row, $r['converted_cnt']);
+        xlsx_set($sheet, 7, $row, $r['converted_amt']);
+        xlsx_set($sheet, 8, $row, $r['returned_amt']);
+        xlsx_set($sheet, 9, $row, $r['deleted_amt']);
+        $sheet->getStyle('D' . $row)->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle('G' . $row . ':I' . $row)->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle('B' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D9D9D9'); // Total - grey
         $sheet->getStyle('C' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6EFCE'); // Get Order - green
-        $sheet->getStyle('D' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFC7CE'); // No Order - red
-        $sheet->getStyle('E' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('BDD7EE'); // Converted count - blue
-        $sheet->getStyle('G' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFEB9C'); // Returned - amber
-        $sheet->getStyle('H' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F4CCCC'); // Deleted - dusty red
+        $sheet->getStyle('D' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('BDD7EE'); // Get Order Value - blue
+        $sheet->getStyle('E' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFC7CE'); // No Order - red
+        $sheet->getStyle('F' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('BDD7EE'); // Converted count - blue
+        $sheet->getStyle('H' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFEB9C'); // Returned - amber
+        $sheet->getStyle('I' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F4CCCC'); // Deleted - dusty red
         $sheet->getStyle('A' . $row . ':' . Coordinate::stringFromColumnIndex($lastCol) . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $row++;
     }
