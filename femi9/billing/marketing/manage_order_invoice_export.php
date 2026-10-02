@@ -42,6 +42,20 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 function xlsx_set(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $colIndex, int $row, $value): void {
     $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $row, $value);
 }
+function excelSafeSheetName(string $name, array &$usedNames): string {
+    $clean = trim(preg_replace('/[:\\\\\/\?\*\[\]]/', ' ', $name));
+    if ($clean === '') { $clean = 'Sheet'; }
+    $base = mb_substr($clean, 0, 31);
+    $final = $base;
+    $n = 2;
+    while (isset($usedNames[mb_strtolower($final)])) {
+        $suffix = ' (' . $n . ')';
+        $final = mb_substr($base, 0, 31 - mb_strlen($suffix)) . $suffix;
+        $n++;
+    }
+    $usedNames[mb_strtolower($final)] = true;
+    return $final;
+}
 
 // ---- Same scoping/validation as manage_order_product.php ----------------
 $ownId = (int) $markeingSTFID;
@@ -75,6 +89,37 @@ if (count($viewMsIds) > 1) {
     $stmtName->close();
 }
 
+$isTeamMode = count($viewMsIds) > 1;
+
+// ---- Staff hierarchy, so a team-mode export can be split ASM-wise with
+// each row tagged by its District Manager (same pattern as company/
+// asm-dm-order-conversion-export.php). Not needed for a single-person view.
+$staffById = [];
+if ($isTeamMode) {
+    $staffRes = $db_conn->query("
+        SELECT ms.id, ms.ms_name, ms.manager_id, tl.level_rank
+        FROM marketing_staff ms
+        LEFT JOIN marketing_team_levels tl ON tl.id = ms.team_level_id
+    ");
+    while ($row = $staffRes->fetch_assoc()) {
+        $staffById[(int) $row['id']] = [
+            'name' => trim($row['ms_name']),
+            'manager_id' => $row['manager_id'] !== null ? (int) $row['manager_id'] : null,
+            'level_rank' => $row['level_rank'] !== null ? (int) $row['level_rank'] : null,
+        ];
+    }
+}
+function resolveAsmFor(int $msId, array $staffById): string {
+    $cur = $staffById[$msId]['manager_id'] ?? null;
+    $depth = 0;
+    while ($cur !== null && isset($staffById[$cur]) && $depth < 10) {
+        if (($staffById[$cur]['level_rank'] ?? null) === 2) { return $staffById[$cur]['name']; }
+        $cur = $staffById[$cur]['manager_id'];
+        $depth++;
+    }
+    return 'Unassigned';
+}
+
 // ---- Get Orders in range, with their shop + product-estimate value ------
 $productPriceMap = [];
 $resAllProd = $db_conn->query("SELECT id, outlet_price FROM products");
@@ -85,7 +130,7 @@ $orderMeta = [];
 $shopIds = [];
 $orderValueMap = [];
 $resOrders = $db_conn->query(
-    "SELECT order_id, shop_id, order_date, marketing_tool, pr_id, qty, discount_percentage
+    "SELECT order_id, ms_id, shop_id, order_date, marketing_tool, pr_id, qty, discount_percentage
      FROM ms_orders
      WHERE ms_id IN ($msIdListSql) AND new_order='yes' AND order_date BETWEEN '$from_date' AND '$to_date'
      ORDER BY order_date DESC, order_id DESC"
@@ -162,13 +207,11 @@ if (!empty($liveInvIds)) {
     $stmt->close();
 }
 
-// ---- Build one detail row per Get Order -----------------------------------
-$detailRows = [];
-$sumGetOrderValue = 0.0;
-$sumInvoiceAmount = 0.0;
-$sumReturned = 0.0;
-$sumDeleted = 0.0;
-$sumNet = 0.0;
+// ---- Build one detail row per Get Order, grouped by ASM (team mode) ------
+// Single-person view (own orders) stays as one flat group under their own
+// name so the same writer function handles both cases.
+$rowsByAsm = [];
+$sumsByAsm = [];
 
 foreach ($orderIdsInRange as $oid) {
     $o = $orderMeta[$oid];
@@ -188,7 +231,17 @@ foreach ($orderIdsInRange as $oid) {
         else { $status = 'Live'; }
     }
 
-    $detailRows[] = [
+    $dmId = (int) ($o['ms_id'] ?? 0);
+    $dmName = $isTeamMode ? ($staffById[$dmId]['name'] ?? $viewLabel) : $viewLabel;
+    $asmName = $isTeamMode ? resolveAsmFor($dmId, $staffById) : $dmName;
+
+    if (!isset($rowsByAsm[$asmName])) {
+        $rowsByAsm[$asmName] = [];
+        $sumsByAsm[$asmName] = ['get_order_value' => 0.0, 'invoice_amount' => 0.0, 'returned' => 0.0, 'deleted' => 0.0, 'net' => 0.0];
+    }
+
+    $rowsByAsm[$asmName][] = [
+        'dm_name' => $dmName,
         'date' => $o['order_date'],
         'shop_name' => $shop['name'] ?? '-',
         'shop_mobile' => $shop['mobile_number'] ?? '-',
@@ -203,26 +256,26 @@ foreach ($orderIdsInRange as $oid) {
         'net_amount' => $netAmount,
     ];
 
-    $sumGetOrderValue += $orderValueMap[$oid] ?? 0.0;
-    $sumInvoiceAmount += $invoiceAmount;
-    $sumReturned += $returnedAmount;
-    $sumDeleted += $deletedAmount;
-    $sumNet += $netAmount;
+    $sumsByAsm[$asmName]['get_order_value'] += $orderValueMap[$oid] ?? 0.0;
+    $sumsByAsm[$asmName]['invoice_amount'] += $invoiceAmount;
+    $sumsByAsm[$asmName]['returned'] += $returnedAmount;
+    $sumsByAsm[$asmName]['deleted'] += $deletedAmount;
+    $sumsByAsm[$asmName]['net'] += $netAmount;
 }
+$asmOrder = array_keys($rowsByAsm);
+sort($asmOrder);
+$asmOrder = array_values(array_filter($asmOrder, fn($k) => $k !== 'Unassigned'));
+if (isset($rowsByAsm['Unassigned'])) { $asmOrder[] = 'Unassigned'; }
 
-try {
-    $spreadsheet = new Spreadsheet();
-    $sheet = $spreadsheet->getActiveSheet();
-    $sheet->setTitle('Invoice Value Breakdown');
-
-    $heading = "Get Order -> Invoice Breakdown — {$viewLabel} | " . date('d-m-Y', strtotime($from_date)) . ' to ' . date('d-m-Y', strtotime($to_date));
+function writeInvoiceSheet(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, string $heading, array $rows, array $sums, bool $includeDmColumn): void {
     $sheet->setCellValue('A1', $heading);
-    $sheet->mergeCells('A1:L1');
-    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
 
-    // ---- Summary block --------------------------------------------------
+    $dmOffset = $includeDmColumn ? 1 : 0;
+    $lastSummaryCol = 9; // 5 label/value pairs, 2 cols each, minus 1
+
+    // ---- Summary block ----------------------------------------------------
     $summaryLabels = ['Get Order Value (Est.)', 'Invoice Amount', 'Returned Amount', 'Deleted Invoice Amount', 'Net Invoice Value'];
-    $summaryValues = [$sumGetOrderValue, $sumInvoiceAmount, $sumReturned, $sumDeleted, $sumNet];
+    $summaryValues = [$sums['get_order_value'], $sums['invoice_amount'], $sums['returned'], $sums['deleted'], $sums['net']];
     $summaryColors = ['BDD7EE', 'D9D9D9', 'FFEB9C', 'F4CCCC', 'C6EFCE'];
     $sCol = 1;
     foreach ($summaryLabels as $i => $label) {
@@ -237,16 +290,20 @@ try {
         $sCol += 2;
     }
 
-    // ---- Detail table -----------------------------------------------------
+    // ---- Detail table -------------------------------------------------------
     $headerRow = 7;
-    $columns = [
+    $columns = [];
+    if ($includeDmColumn) { $columns[] = 'District Manager'; }
+    $columns = array_merge($columns, [
         'Order Date', 'Shop Name', 'Shop Contact', 'Taluk', 'Marketing Tool',
         'Get Order Value (Est.)', 'Invoice Number', 'Invoice Amount', 'Status',
         'Returned Amount', 'Deleted Invoice Amount', 'Net Invoice Value',
-    ];
+    ]);
     $col = 1;
     foreach ($columns as $c) { xlsx_set($sheet, $col, $headerRow, $c); $col++; }
     $lastCol = $col - 1;
+    $sheet->mergeCells('A1:' . Coordinate::stringFromColumnIndex(max($lastCol, $lastSummaryCol)) . '1');
+    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
 
     $headerRange = 'A' . $headerRow . ':' . Coordinate::stringFromColumnIndex($lastCol) . $headerRow;
     $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
@@ -255,25 +312,33 @@ try {
     $sheet->getStyle($headerRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
 
     $row = $headerRow + 1;
-    foreach ($detailRows as $r) {
-        xlsx_set($sheet, 1, $row, date('d-m-Y', strtotime($r['date'])));
-        xlsx_set($sheet, 2, $row, $r['shop_name']);
-        xlsx_set($sheet, 3, $row, $r['shop_mobile']);
-        xlsx_set($sheet, 4, $row, $r['taluk']);
-        xlsx_set($sheet, 5, $row, $r['tool']);
-        xlsx_set($sheet, 6, $row, $r['get_order_value']);
-        xlsx_set($sheet, 7, $row, $r['inv_number']);
-        xlsx_set($sheet, 8, $row, $r['invoice_amount']);
-        xlsx_set($sheet, 9, $row, $r['status']);
-        xlsx_set($sheet, 10, $row, $r['returned_amount']);
-        xlsx_set($sheet, 11, $row, $r['deleted_amount']);
-        xlsx_set($sheet, 12, $row, $r['net_amount']);
-        $sheet->getStyle('F' . $row)->getNumberFormat()->setFormatCode('#,##0');
-        $sheet->getStyle('H' . $row)->getNumberFormat()->setFormatCode('#,##0');
-        $sheet->getStyle('J' . $row . ':L' . $row)->getNumberFormat()->setFormatCode('#,##0');
-        $sheet->getStyle('J' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFEB9C'); // Returned - amber
-        $sheet->getStyle('K' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F4CCCC'); // Deleted - dusty red
-        $sheet->getStyle('L' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6EFCE'); // Net - green
+    foreach ($rows as $r) {
+        $c = 1;
+        if ($includeDmColumn) { xlsx_set($sheet, $c++, $row, $r['dm_name']); }
+        xlsx_set($sheet, $c++, $row, date('d-m-Y', strtotime($r['date'])));
+        xlsx_set($sheet, $c++, $row, $r['shop_name']);
+        xlsx_set($sheet, $c++, $row, $r['shop_mobile']);
+        xlsx_set($sheet, $c++, $row, $r['taluk']);
+        xlsx_set($sheet, $c++, $row, $r['tool']);
+        $getOrderCol = $c; xlsx_set($sheet, $c++, $row, $r['get_order_value']);
+        xlsx_set($sheet, $c++, $row, $r['inv_number']);
+        $invAmtCol = $c; xlsx_set($sheet, $c++, $row, $r['invoice_amount']);
+        xlsx_set($sheet, $c++, $row, $r['status']);
+        $returnedCol = $c; xlsx_set($sheet, $c++, $row, $r['returned_amount']);
+        $deletedCol = $c; xlsx_set($sheet, $c++, $row, $r['deleted_amount']);
+        $netCol = $c; xlsx_set($sheet, $c++, $row, $r['net_amount']);
+
+        $getOrderColL = Coordinate::stringFromColumnIndex($getOrderCol);
+        $invAmtColL = Coordinate::stringFromColumnIndex($invAmtCol);
+        $returnedColL = Coordinate::stringFromColumnIndex($returnedCol);
+        $deletedColL = Coordinate::stringFromColumnIndex($deletedCol);
+        $netColL = Coordinate::stringFromColumnIndex($netCol);
+        $sheet->getStyle($getOrderColL . $row)->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle($invAmtColL . $row)->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle($returnedColL . $row . ':' . $netColL . $row)->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle($returnedColL . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFEB9C'); // Returned - amber
+        $sheet->getStyle($deletedColL . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F4CCCC'); // Deleted - dusty red
+        $sheet->getStyle($netColL . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6EFCE'); // Net - green
         $sheet->getStyle('A' . $row . ':' . Coordinate::stringFromColumnIndex($lastCol) . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $row++;
     }
@@ -286,6 +351,36 @@ try {
         $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($ci))->setAutoSize(true);
     }
     $sheet->freezePane('A' . ($headerRow + 1));
+}
+
+try {
+    $spreadsheet = new Spreadsheet();
+    $spreadsheet->removeSheetByIndex(0);
+
+    $periodLabel = date('d-m-Y', strtotime($from_date)) . ' to ' . date('d-m-Y', strtotime($to_date));
+
+    if ($isTeamMode) {
+        $usedSheetNames = [];
+        foreach ($asmOrder as $asmName) {
+            $sheet = $spreadsheet->createSheet();
+            $sheet->setTitle(excelSafeSheetName($asmName, $usedSheetNames));
+            $heading = ($asmName === 'Unassigned' ? 'Invoice Value Breakdown (No ASM Assigned)' : 'Invoice Value Breakdown — ASM: ' . $asmName) . ' | ' . $periodLabel;
+            writeInvoiceSheet($sheet, $heading, $rowsByAsm[$asmName], $sumsByAsm[$asmName], true);
+        }
+    } else {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Invoice Value Breakdown');
+        $onlyGroup = $asmOrder[0] ?? $viewLabel;
+        $heading = "Get Order -> Invoice Breakdown — {$viewLabel} | {$periodLabel}";
+        writeInvoiceSheet($sheet, $heading, $rowsByAsm[$onlyGroup] ?? [], $sumsByAsm[$onlyGroup] ?? ['get_order_value' => 0, 'invoice_amount' => 0, 'returned' => 0, 'deleted' => 0, 'net' => 0], false);
+    }
+
+    if ($spreadsheet->getSheetCount() === 0) {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('No Data');
+        $sheet->setCellValue('A1', 'No Get Orders found for this range.');
+    }
+    $spreadsheet->setActiveSheetIndex(0);
 
     $today = date('Y-m-d');
     $filename = "Invoice_Value_Breakdown_{$today}.xlsx";
