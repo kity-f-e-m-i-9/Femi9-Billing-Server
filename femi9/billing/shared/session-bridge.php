@@ -67,6 +67,28 @@ function consumeBridgeToken(mysqli $db_conn, string $token): ?array
     }
 
     $payload = json_decode($row['payload'], true);
-    return is_array($payload) ? $payload : null;
+    if (!is_array($payload)) {
+        return null;
+    }
+
+    // A stale one-time flash message from an earlier event in this same
+    // browser session (e.g. "Logout successfully" from a portal's own
+    // logout.php, or checksession.php's inactivity-timeout message) must
+    // never survive into a fresh, successful login -- session_regenerate_id()
+    // in every switch-login.php preserves $_SESSION's contents, so without
+    // this it silently resurfaces on whatever page the user opens next,
+    // looking exactly like that page itself just logged them out. Confirmed
+    // 2026-10-02 (same bug territory-partner/switch-login.php already
+    // carries its own inline fix for).
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        unset(
+            $_SESSION['successMessage'], $_SESSION['errorMessage'],
+            $_SESSION['sucMessage'], $_SESSION['SuccessMessage'], $_SESSION['ErrorMessage'],
+            $_SESSION['warningMessage'], $_SESSION['success_message'], $_SESSION['error_message'],
+            $_SESSION['errorMessageOT']
+        );
+    }
+
+    return $payload;
 }
 ?>

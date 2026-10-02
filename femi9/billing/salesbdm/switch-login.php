@@ -58,5 +58,15 @@ finalizeSalesBdmSession($db_conn, $user);
 if ($_hadExistingSalesbdmSession) {
     session_regenerate_id(true);
 }
+// A stale one-time flash message from an earlier event in this same browser
+// session (e.g. "Logout successfully") must never survive into a fresh
+// login -- see shared/session-bridge.php's consumeBridgeToken() for the
+// full history of this bug (confirmed 2026-10-02).
+unset(
+    $_SESSION['successMessage'], $_SESSION['errorMessage'],
+    $_SESSION['sucMessage'], $_SESSION['SuccessMessage'], $_SESSION['ErrorMessage'],
+    $_SESSION['warningMessage'], $_SESSION['success_message'], $_SESSION['error_message'],
+    $_SESSION['errorMessageOT']
+);
 header('Location: dashboard.php');
 exit;

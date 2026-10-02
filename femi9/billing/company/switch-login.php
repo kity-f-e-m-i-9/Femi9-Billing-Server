@@ -65,6 +65,16 @@ $_SESSION['LOGIN_USER'] = $user['username'];
 $_SESSION['LOGIN_USER_ID'] = $user['id'];
 $_SESSION['LOGIN_USER_TYPE'] = 'company';
 $_SESSION['last_activity'] = time();
+// A stale one-time flash message from an earlier event in this same browser
+// session (e.g. "Logout successfully") must never survive into a fresh
+// login -- see shared/session-bridge.php's consumeBridgeToken() for the
+// full history of this bug (confirmed 2026-10-02).
+unset(
+    $_SESSION['successMessage'], $_SESSION['errorMessage'],
+    $_SESSION['sucMessage'], $_SESSION['SuccessMessage'], $_SESSION['ErrorMessage'],
+    $_SESSION['warningMessage'], $_SESSION['success_message'], $_SESSION['error_message'],
+    $_SESSION['errorMessageOT']
+);
 
 $updateStmt = $db_conn->prepare("UPDATE admin_log SET last_login = NOW() WHERE id = ?");
 $updateStmt->bind_param('i', $user['id']);
