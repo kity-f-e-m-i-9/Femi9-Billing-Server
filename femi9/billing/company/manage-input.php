@@ -193,6 +193,7 @@ $i = $start_from;
                                                     <td><?php echo $result_product_list["input_remarks"]; ?></td>
                                                                                                         <td>
                                                         <div class="actions-group">
+                                                            <a href="edit-input?Roowid=<?php echo $RowID;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#2563eb;">edit</i></a>
                                                             <a href="delete-input?Roowid=<?php echo $RowID;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
                                                         </div>
                                                     </td>
