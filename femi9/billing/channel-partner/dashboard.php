@@ -1,6 +1,9 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/AgreementService.php';
+
+$agreementNeedsResign = agreement_needs_resign(get_or_create_cp_agreement($db_conn, (int) $Login_user_IDvl));
 
 $totalProducts = 0;
 $totalStock    = 0;
@@ -116,6 +119,13 @@ mysqli_stmt_close($s);
                                     <div class="card-body">
                                         <h1>Dashboard</h1>
                                         <h2>Welcome to <?php echo htmlspecialchars($business_name); ?></h2>
+
+                                        <?php if ($agreementNeedsResign): ?>
+                                        <div class="alert alert-warning d-flex justify-content-between align-items-center" style="margin-top:14px;">
+                                            <span><i class="material-icons-outlined" style="vertical-align:middle;font-size:18px;">warning</i> Your agreement has been updated by the company — please review the new terms and sign again.</span>
+                                            <a href="agreement.php" class="btn btn-sm btn-warning">Review &amp; Sign</a>
+                                        </div>
+                                        <?php endif; ?>
 
                                         <div class="row" style="margin-top:20px;">
 
