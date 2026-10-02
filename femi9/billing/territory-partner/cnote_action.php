@@ -2,6 +2,7 @@
 include("checksession.php");
 include("config.php");
 include("return-validation-functions.php");
+require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -24,6 +25,14 @@ if (isset($_REQUEST['add-return'])) {
     }
     if ($returnqty <= 0) {
         header("Location: cnote_new.php?error=invalid_quantity"); exit;
+    }
+
+    // Authoritative gate for a shop → TP return — the TP's Sales BDM (or
+    // Company) must have approved a Return request for THIS invoice; never
+    // trust that reaching this endpoint means the UI link was shown.
+    if ($from_usertype === 'shop' && $to_usertype === 'territory_partner'
+        && !tpShopInvoiceActionApproved($db_conn, (int)$to_userid, $invid, 'return')) {
+        header("Location: shop-manage-invoice.php"); exit;
     }
 
     // Validate available qty

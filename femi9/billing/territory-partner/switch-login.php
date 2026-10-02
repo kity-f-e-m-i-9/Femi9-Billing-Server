@@ -77,6 +77,13 @@ if ($row) {
     // back — the company session itself was never touched (different cookie
     // name, see company/login-as-tp.php), this just points the header link.
     $_SESSION['LOGGED_IN_VIA_COMPANY'] = true;
+    // A stale flash message from an earlier event in this same browser
+    // session (e.g. "Logged out successfully" from logout.php, or
+    // checksession.php's inactivity-timeout message) must never survive
+    // into a fresh, successful login — otherwise it silently resurfaces on
+    // whatever TP page the user happens to open next, looking exactly like
+    // that page itself just logged them out. Confirmed 2026-10-02.
+    unset($_SESSION['errorMessage'], $_SESSION['successMessage']);
 
     header('Location: dashboard.php');
     exit;
@@ -98,6 +105,9 @@ $_SESSION['LOGIN_USER_NAME'] = $payload['name'];
 $_SESSION['LOGIN_USER_TYPE'] = $payload['type'];
 $_SESSION['LINKED_ACCOUNTS'] = $payload['linked_accounts'] ?? [];
 $_SESSION['last_activity']   = time();
+// See the comment on the company-bridge branch above — a stale flash
+// message from an earlier event must never survive into a fresh login.
+unset($_SESSION['errorMessage'], $_SESSION['successMessage']);
 
 header('Location: dashboard.php');
 exit;

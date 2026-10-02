@@ -2,6 +2,7 @@
 include("checksession.php");
 include("config.php");
 require_once("include/ShopInvoiceHistory.php");
+require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
 error_reporting(0);
 
 $invoice_id_encode = $_REQUEST['invid']   ?? '';
@@ -15,6 +16,15 @@ if ($rowid <= 0) {
 }
 
 $inv_id_decoded = base64_decode($invoice_id_encode);
+
+// Authoritative gate — the TP's Sales BDM (or Company) must have approved a
+// Remove request for THIS invoice; never trust that the link was only
+// reachable because the UI hid it.
+if (!tpShopInvoiceActionApproved($db_conn, (int)$Login_user_IDvl, $inv_id_decoded, 'remove')) {
+    $_SESSION['errorMessage'] = "Remove isn't approved for this invoice yet. Please raise a request from the invoice first.";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID={$invoice_id_encode}&invuser={$invuser}&action={$actionEdit}';</script>";
+    exit;
+}
 
 // A voided invoice is read-only.
 $stmtVoidChk = $db_conn->prepare("SELECT status FROM user_invoice WHERE inv_id=? LIMIT 1");

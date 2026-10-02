@@ -79,10 +79,6 @@ foreach ($current_locations as $loc) {
 $preselected_json = json_encode(array_map(function($loc) {
     return ['id' => (int)$loc['id'], 'name' => $loc['name']];
 }, $primary_locations));
-$dualPreselected_json = json_encode(array_map(function($loc) {
-    return ['id' => (int)$loc['id'], 'name' => $loc['name']];
-}, $dual_locations));
-$hasDualPreselected = !empty($dual_locations);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -295,10 +291,10 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 <input type="number" step="0.01" min="0" name="monthly_target_amount" value="<?=$result_product_list['monthly_target_amount'] !== null ? htmlspecialchars($result_product_list['monthly_target_amount']) : '';?>" class="form-control" placeholder="optional">
 </br>
 
-<label class="form-label">Zone</label>
+<label class="form-label">Zone <span style="color:#dc3545;">*</span></label>
 <?php $currentZone = $result_product_list['zone'] ?? ''; ?>
-<select name="zone" class="form-control">
-    <option value="">-- optional --</option>
+<select name="zone" class="form-control" required>
+    <option value="">-- select a zone --</option>
     <?php foreach ($zonesForDropdown as $z): ?>
     <option value="<?=htmlspecialchars($z['name'])?>" <?=($currentZone === $z['name']) ? 'selected' : ''?>><?=htmlspecialchars($z['name'])?></option>
     <?php endforeach; ?>
@@ -306,6 +302,7 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
     <option value="<?=htmlspecialchars($currentZone)?>" selected><?=htmlspecialchars($currentZone)?> (old value, no matching zone)</option>
     <?php endif; ?>
 </select>
+<small class="text-muted">This BDM's own district assignment (which TPs/reports they see) comes entirely from this Zone's districts.</small>
 </br>
 
 <div class="form-group" style="display:block;">
@@ -384,53 +381,11 @@ if ($currentTeamLevelId) {
 			<br/>
 			<style type="text/css"> .hidden {display: none;}</style>
 
-<label class="form-label">Assign Location</label>
-<div class="lp-wrapper" id="locationPickerWrapper">
-    <div class="lp-control" id="locationPickerControl">
-        <div class="lp-value" id="lpValue">
-            <span class="lp-placeholder">Select locations&hellip;</span>
-        </div>
-        <div class="lp-arrow"><i class="material-icons" style="font-size:18px;color:#999;">arrow_drop_down</i></div>
-    </div>
-    <div class="lp-panel" id="locationPanel" style="display:none;">
-        <div class="lp-search-box">
-            <i class="material-icons" style="font-size:18px;color:#aaa;">search</i>
-            <input type="text" id="lpSearchInput" placeholder="Search locations&hellip;" autocomplete="off">
-        </div>
-        <div class="lp-body" id="lpBody"><div class="lp-loading">Loading&hellip;</div></div>
-    </div>
-</div>
-<div id="lpHiddenInputs"></div>
-<small class="text-muted">Already-assigned locations are shown locked and cannot be selected.</small>
-<br/><br/>
-
-<div id="dualRoleWrap" style="display:none;">
-    <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="dualRoleCheck">
-        <label class="form-check-label" for="dualRoleCheck" id="dualRoleCheckLabel">Also directly handle some locations one level down</label>
-    </div>
-    <div id="dualRolePickerBlock" style="display:none;margin-top:10px;">
-        <label class="form-label" id="dualRoleLabel">Assign Location (one level down)</label>
-        <div class="lp-wrapper" id="dualLocationPickerWrapper">
-            <div class="lp-control" id="dualLocationPickerControl">
-                <div class="lp-value" id="dualLpValue">
-                    <span class="lp-placeholder">Select locations&hellip;</span>
-                </div>
-                <div class="lp-arrow"><i class="material-icons" style="font-size:18px;color:#999;">arrow_drop_down</i></div>
-            </div>
-            <div class="lp-panel" id="dualLocationPanel" style="display:none;">
-                <div class="lp-search-box">
-                    <i class="material-icons" style="font-size:18px;color:#aaa;">search</i>
-                    <input type="text" id="dualLpSearchInput" placeholder="Search locations&hellip;" autocomplete="off">
-                </div>
-                <div class="lp-body" id="dualLpBody"><div class="lp-loading">Loading&hellip;</div></div>
-            </div>
-        </div>
-        <div id="dualLpHiddenInputs"></div>
-        <small class="text-muted">Pick the locations you personally handle within what you selected above. Already-assigned ones are shown locked.</small>
-    </div>
-    <br/>
-</div>
+<!-- Personal district assignment is entirely Zone-derived (see the Zone
+     field above) — a BDM's own district scope comes from whichever Zone
+     they're assigned. The old "Dual Role" (also handle some locations one
+     level down) concept was removed 2026-10-02 — Zone alone now drives
+     everything. -->
 
 												<button type="submit" name="update-salesbdm" class="btn btn-primary">Update</button>
 
@@ -548,7 +503,6 @@ if ($currentTeamLevelId) {
         function updateHiddenInputs() {
             var $c = $('#lpHiddenInputs').empty();
             $.each(selected, function (_, s) { $c.append('<input type="hidden" name="location_ids[]" value="' + s.id + '">'); });
-            refreshDualPickerIfOpen();
         }
 
         function clearSelection() {
@@ -804,195 +758,10 @@ if ($currentTeamLevelId) {
             loadNodes();
         });
 
-        // ---- Optional dual role: "also directly handle locations one level
-        // down" — e.g. a Chief BDM (State) who personally also owns specific
-        // Districts. Only offered when the selected Team Level's own layer has
-        // a layer one depth below it configured among the Team Levels list.
-        var dualSelected  = <?php echo $dualPreselected_json; ?>;
-        var dualOpen      = false;
-        var dualLoaded    = false;
-        var nextDepthInfo = null; // { depth, levelName }
-        var HAS_DUAL_PRESELECTED = <?php echo $hasDualPreselected ? 'true' : 'false'; ?>;
-
-        renderDualChips();
-        updateDualHiddenInputs();
-
-        function findNextDepthInfo(levelId) {
-            var cur = null;
-            $.each(teamLevels, function (_, lvl) { if (lvl.id == levelId) { cur = lvl; } });
-            if (!cur || cur.layer_depth === null || cur.layer_depth === undefined) { return null; }
-            var match = null;
-            $.each(teamLevels, function (_, lvl) {
-                if (lvl.layer_depth !== null && lvl.layer_depth !== undefined && lvl.layer_depth === cur.layer_depth + 1) {
-                    match = lvl;
-                }
-            });
-            return match ? { depth: match.layer_depth, levelName: match.name } : null;
-        }
-
-        function resetDualRole() {
-            dualSelected = [];
-            dualLoaded = false;
-            $('#dualRoleCheck').prop('checked', false);
-            $('#dualRolePickerBlock').hide();
-            renderDualChips();
-            updateDualHiddenInputs();
-        }
-
-        function updateDualRoleAvailability(levelId, keepExisting) {
-            if (!keepExisting) { resetDualRole(); }
-            if (!levelId) { $('#dualRoleWrap').hide(); nextDepthInfo = null; return; }
-            nextDepthInfo = findNextDepthInfo(levelId);
-            if (!nextDepthInfo) { $('#dualRoleWrap').hide(); return; }
-            $('#dualRoleCheckLabel').text('Also directly handle some ' + nextDepthInfo.levelName + ' locations');
-            $('#dualRoleLabel').text('Assign ' + nextDepthInfo.levelName + ' (one level down)');
-            $('#dualRoleWrap').show();
-            if (keepExisting && HAS_DUAL_PRESELECTED) {
-                $('#dualRoleCheck').prop('checked', true);
-                $('#dualRolePickerBlock').show();
-            }
-        }
-
-        function refreshDualPickerIfOpen() {
-            if (!nextDepthInfo || !$('#dualRoleCheck').is(':checked')) { return; }
-            dualLoaded = false;
-            if (dualOpen) { loadDualNodes(); }
-        }
-
-        function isDualSelected(id) {
-            for (var i = 0; i < dualSelected.length; i++) { if (dualSelected[i].id === id) return true; }
-            return false;
-        }
-
-        function toggleDualSelect(node) {
-            var idx = -1;
-            for (var i = 0; i < dualSelected.length; i++) { if (dualSelected[i].id === node.id) { idx = i; break; } }
-            if (idx >= 0) { dualSelected.splice(idx, 1); } else { dualSelected.push({ id: node.id, name: node.name }); }
-            renderDualChips();
-            renderDualList($.trim($('#dualLpSearchInput').val()));
-            updateDualHiddenInputs();
-        }
-
-        function renderDualList(q) {
-            var $body = $('#dualLpBody').empty();
-            var nodes = window.__dualAllNodes || [];
-            if (q) {
-                var ql = q.toLowerCase();
-                nodes = nodes.filter(function (n) { return n.name.toLowerCase().indexOf(ql) >= 0; });
-            }
-            if (nodes.length === 0) {
-                $body.html('<div class="lp-empty">' + (q ? 'No results for "' + escHtml(q) + '".' : 'Select a location above first.') + '</div>');
-                return;
-            }
-            $.each(nodes, function (_, node) {
-                var $row = $('<div class="lp-row"></div>');
-                if (node.is_taken) {
-                    $row.addClass('lp-row-taken');
-                    $row.append('<i class="material-icons lp-lock" style="font-size:16px;">lock</i>');
-                    $row.append($('<span>').text(node.name));
-                } else if (isDualSelected(node.id)) {
-                    $row.addClass('lp-row-selectable lp-row-selected');
-                    $row.append('<i class="material-icons lp-check" style="font-size:16px;">check</i>');
-                    $row.append($('<span>').text(node.name));
-                    $row.on('click', function () { toggleDualSelect(node); });
-                } else {
-                    $row.addClass('lp-row-selectable');
-                    $row.append($('<span>').text(node.name));
-                    $row.on('click', function () { toggleDualSelect(node); });
-                }
-                $body.append($row);
-            });
-        }
-
-        function renderDualChips() {
-            var $val = $('#dualLpValue').empty();
-            if (dualSelected.length === 0) { $val.html('<span class="lp-placeholder">Select locations&hellip;</span>'); return; }
-            $.each(dualSelected, function (_, s) {
-                var $chip = $('<span class="lp-chip"></span>');
-                $chip.append($('<span>').text(s.name));
-                var $x = $('<span class="lp-chip-remove">&times;</span>');
-                $x.on('click', function (e) {
-                    e.stopPropagation();
-                    dualSelected = dualSelected.filter(function (r) { return r.id !== s.id; });
-                    renderDualChips();
-                    renderDualList($.trim($('#dualLpSearchInput').val()));
-                    updateDualHiddenInputs();
-                });
-                $chip.append($x);
-                $val.append($chip);
-            });
-        }
-
-        function updateDualHiddenInputs() {
-            var $c = $('#dualLpHiddenInputs').empty();
-            $.each(dualSelected, function (_, s) { $c.append('<input type="hidden" name="dual_location_ids[]" value="' + s.id + '">'); });
-        }
-
-        function loadDualNodes() {
-            if (!nextDepthInfo) { return; }
-            if (!selected.length) {
-                window.__dualAllNodes = [];
-                $('#dualLpBody').html('<div class="lp-empty">Select a location above first.</div>');
-                return;
-            }
-            var qs = $.param({ target_depth: nextDepthInfo.depth, exclude_bdm_id: EXCLUDE_BDM }) +
-                     '&' + $.param({ parent_ids: selected.map(function (s) { return s.id; }) });
-            $('#dualLpBody').html('<div class="lp-loading">Loading&hellip;</div>');
-            $.getJSON('get-salesbdm-child-locations.php?' + qs, function (resp) {
-                dualLoaded = true;
-                window.__dualAllNodes = resp.nodes || [];
-                renderDualList($.trim($('#dualLpSearchInput').val()));
-            }).fail(function () {
-                $('#dualLpBody').html('<div class="lp-empty">Failed to load. Please try again.</div>');
-            });
-        }
-
-        $('#dualLocationPanel').on('click', function (e) { e.stopPropagation(); });
-        $('#dualLocationPickerControl').on('click', function (e) {
-            e.stopPropagation();
-            if (!dualOpen) {
-                dualOpen = true;
-                $('#dualLocationPickerControl').addClass('open');
-                $('#dualLocationPanel').show();
-                if (!dualLoaded) loadDualNodes();
-                setTimeout(function () { $('#dualLpSearchInput').focus(); }, 50);
-            } else {
-                dualOpen = false;
-                $('#dualLocationPickerControl').removeClass('open');
-                $('#dualLocationPanel').hide();
-            }
-        });
-        $(document).on('click', function () {
-            if (dualOpen) {
-                dualOpen = false;
-                $('#dualLocationPickerControl').removeClass('open');
-                $('#dualLocationPanel').hide();
-            }
-        });
-        $('#dualLpSearchInput').on('input', function () { renderDualList($.trim($(this).val())); });
-
-        $('#dualRoleCheck').on('change', function () {
-            if ($(this).is(':checked')) {
-                $('#dualRolePickerBlock').show();
-                dualLoaded = false;
-                loadDualNodes();
-            } else {
-                $('#dualRolePickerBlock').hide();
-                dualSelected = [];
-                renderDualChips();
-                updateDualHiddenInputs();
-            }
-        });
-
-        $('#teamLevelSelect').on('change', function () {
-            updateDualRoleAvailability($(this).val(), false);
-        });
-
         $.getJSON('get-salesbdm-team-levels.php', function (levels) {
             teamLevels = levels;
             if (CURRENT_TEAM_LEVEL_ID) {
                 loadManagerOptions(CURRENT_TEAM_LEVEL_ID, CURRENT_MANAGER_ID);
-                updateDualRoleAvailability(CURRENT_TEAM_LEVEL_ID, true);
             } else {
                 loadNodes();
             }

@@ -18,6 +18,21 @@ if (!empty($salesBdmID)) {
     $_repChk = $db_conn->query("SELECT 1 FROM sales_bdm_staff WHERE manager_id = " . (int)$salesBdmID . " LIMIT 1");
     $_hasReports = $_repChk && $_repChk->num_rows > 0;
 }
+
+// "Shop Invoice Permission Requests" only shows for a BDM Company has
+// separately marked eligible (see shared/TpShopInvoiceActionRequest.php) —
+// a BDM without this flag never sees the review queue at all. Also hidden
+// entirely while Company is viewing this BDM's dashboard read-only (see
+// checksession.php's $_companyBridgeView) — that bridge is explicitly
+// read-only and this page can Approve/Reject (a write), plus Company
+// already has its own separate review page for this. Without this check,
+// clicking it from a bridged dashboard also just bounced to a logged-out
+// page, since this page isn't on checksession.php's bridge allowlist.
+$_shopInvoiceReqEligible = false;
+if (!empty($salesBdmID) && empty($_companyBridgeView)) {
+    require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
+    $_shopInvoiceReqEligible = tpIsBdmEligibleForShopInvoiceRequests($db_conn, (int)$salesBdmID);
+}
 ?>
 <div class="app-menu">
 
@@ -136,6 +151,12 @@ if (!empty($salesBdmID)) {
     <li>
         <a href="<?php echo $_bdmBase; ?>courier-amount-requests"><i class="material-icons-two-tone">local_shipping</i>Courier Amount Requests</a>
     </li>
+
+    <?php if ($_shopInvoiceReqEligible): ?>
+    <li>
+        <a href="<?php echo $_bdmBase; ?>shop-invoice-permission-requests"><i class="material-icons-two-tone">assignment_return</i>Shop Invoice Permission Requests</a>
+    </li>
+    <?php endif; ?>
 
     <li>
         <a href=""><i class="material-icons-two-tone">security</i>Security<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>

@@ -2,6 +2,7 @@
 include("checksession.php");
 include("config.php");
 include("return-validation-functions.php");
+require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -12,6 +13,15 @@ $displaytitle = "Add Stock Return";
 $InvoiceID    = $_REQUEST['InvoiceID'] ?? '';
 $invid_decode = mysqli_real_escape_string($db_conn, base64_decode($InvoiceID));
 $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid']) : '';
+
+// Authoritative gate for shop-invoice returns — the TP's Sales BDM (or
+// Company) must have approved a Return request for THIS specific invoice;
+// never trust that reaching this page means the UI link was actually shown.
+if ($getinvuser === 'shop' && !tpShopInvoiceActionApproved($db_conn, (int)$Login_user_IDvl, $invid_decode, 'return')) {
+    $_SESSION['errorMessage'] = "Return isn't approved for this invoice yet. Please raise a request from Manage Invoice first.";
+    echo "<script>window.location='shop-manage-invoice.php';</script>";
+    exit;
+}
 
 if ($getinvuser === 'customer') {
     $inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='$invid_decode' LIMIT 1"));

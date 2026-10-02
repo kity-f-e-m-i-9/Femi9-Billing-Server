@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
 error_reporting(0);
 
 $getinvuser       = "shop";
@@ -233,8 +234,14 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                 </td>
 
                                                 <td>
-                                                <?php if ($result_product_list["sub_total"] > 0 && !$isVoided) { ?>
+                                                <?php
+                                                $returnReqStatus = tpShopInvoiceActionStatus($db_conn, (int)$Login_user_IDvl, $result_product_list["inv_id"], 'return');
+                                                if ($returnReqStatus === 'approved' && $result_product_list["sub_total"] > 0 && !$isVoided) { ?>
                                                 <a href="cnote_new.php?invuser=<?php echo $getinvuser; ?>&&InvoiceID=<?php echo $INVID_encode; ?>"><span class="badge badge-warning">Return</span></a>
+                                                <?php } elseif ($returnReqStatus === 'pending') { ?>
+                                                <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending</span>
+                                                <?php } elseif ($result_product_list["sub_total"] > 0 && !$isVoided) { ?>
+                                                <button type="button" class="badge badge-style-bordered badge-primary request-shop-action-btn" style="border:none;cursor:pointer;" data-inv-id="<?php echo htmlspecialchars($result_product_list["inv_id"]); ?>" data-action-type="return">Request to Return</button>
                                                 <?php } else { echo "---"; } ?>
                                                 </td>
 
@@ -328,6 +335,26 @@ function shareShopInvoiceDirect(btn) {
     iframe.src = 'shop-invoice-print.php?invoiceid=' + encodeURIComponent(id);
     document.body.appendChild(iframe);
 }
+
+$(document).on('click', '.request-shop-action-btn', function () {
+    var $btn = $(this);
+    var invId = $btn.data('inv-id');
+    var actionType = $btn.data('action-type');
+    if (!confirm('Send a request to your Sales BDM for this?')) return;
+    $btn.prop('disabled', true).text('Sending…');
+    $.post('request-shop-invoice-action.php', { inv_id: invId, action_type: actionType }, function (res) {
+        if (res.success) {
+            alert(res.message || 'Request sent.');
+            window.location.reload();
+        } else {
+            alert(res.message || 'Could not send the request.');
+            $btn.prop('disabled', false).text(actionType === 'return' ? 'Request to Return' : 'Request to Remove');
+        }
+    }, 'json').fail(function () {
+        alert('Request failed. Please try again.');
+        $btn.prop('disabled', false).text(actionType === 'return' ? 'Request to Return' : 'Request to Remove');
+    });
+});
 </script>
 </body>
 </html>

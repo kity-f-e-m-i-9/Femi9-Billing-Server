@@ -84,42 +84,11 @@ if(isset($_REQUEST['add-salesbdm']))
 		mysqli_query($db_conn,$insert_products);
 		$new_bdm_id = mysqli_insert_id($db_conn);
 
-		if ($new_bdm_id) {
-			$db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_locations (
-				id INT AUTO_INCREMENT PRIMARY KEY,
-				bdm_id INT NOT NULL,
-				location_id INT NOT NULL,
-				is_dual_role TINYINT(1) NOT NULL DEFAULT 0,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-				UNIQUE KEY uk_bdm_location (bdm_id, location_id)
-			)");
-			$_chkDual = $db_conn->query("SHOW COLUMNS FROM salesbdm_locations LIKE 'is_dual_role'");
-			if ($_chkDual && $_chkDual->num_rows === 0) {
-				$db_conn->query("ALTER TABLE salesbdm_locations ADD COLUMN is_dual_role TINYINT(1) NOT NULL DEFAULT 0 AFTER location_id");
-			}
-			$stmt_loc = $db_conn->prepare("INSERT IGNORE INTO salesbdm_locations (bdm_id, location_id, is_dual_role) VALUES (?, ?, ?)");
-			if (!empty($_POST['location_ids']) && is_array($_POST['location_ids'])) {
-				$is_dual = 0;
-				foreach ($_POST['location_ids'] as $loc_id) {
-					$loc_id = (int)$loc_id;
-					if ($loc_id > 0) {
-						$stmt_loc->bind_param('iii', $new_bdm_id, $loc_id, $is_dual);
-						$stmt_loc->execute();
-					}
-				}
-			}
-			if (!empty($_POST['dual_location_ids']) && is_array($_POST['dual_location_ids'])) {
-				$is_dual = 1;
-				foreach ($_POST['dual_location_ids'] as $loc_id) {
-					$loc_id = (int)$loc_id;
-					if ($loc_id > 0) {
-						$stmt_loc->bind_param('iii', $new_bdm_id, $loc_id, $is_dual);
-						$stmt_loc->execute();
-					}
-				}
-			}
-			$stmt_loc->close();
-		}
+		// District assignment is now entirely Zone-derived (see $zone above
+		// and salesbdm/include/BdmTpScope.php) — both the old manual "Assign
+		// Location" picker and the "Dual Role" picker were removed from
+		// Add/Edit Sales BDM 2026-10-02, so there's nothing left to write
+		// into salesbdm_locations from this form.
 
 		echo "<script>window.location='salesbdm_manage?addesuccess';</script>";
 		exit;
@@ -154,6 +123,17 @@ if(isset($_REQUEST['update-salesbdm']))
 	$zone=str_replace("'","&#39;",$_REQUEST['zone'] ?? '');
 	$zone = RemoveSpecialChar($zone);
 
+	// Zone is now the ONLY source of a BDM's personal district assignment
+	// (see salesbdm/include/BdmTpScope.php's getBdmAssignedDistrictNames())
+	// — the old manual "Assign Location" picker is gone, so a BDM left
+	// without a Zone would see no TPs/reports at all. The form's own
+	// <select required> already blocks this client-side; this is just the
+	// authoritative re-check.
+	if ($zone === '') {
+		echo "<script>window.location='salesbdm_edit?prid=" . urlencode(base64_encode($update_id)) . "&error=zone_required';</script>";
+		exit;
+	}
+
 	$espo_user_id = $_POST['espo_user_id'] ?? null;
 	$espo_user_id = ($espo_user_id === '' || $espo_user_id === null) ? null : $espo_user_id;
 	// Strict allowlist rather than escaping: this value round-trips into a
@@ -187,48 +167,16 @@ if(isset($_REQUEST['update-salesbdm']))
 	bdm_address='$bdm_address',country_code='$country_code',team_level_id=".($team_level_id > 0 ? $team_level_id : "NULL").",manager_id=".($manager_id > 0 ? $manager_id : "NULL").",monthly_target_amount=".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").",zone='$zone',espo_user_id=".($espo_user_id !== null ? "'$espo_user_id'" : "NULL")." where id='$update_id'";
 	mysqli_query($db_conn,$update_products);
 
-		$db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_locations (
-			id INT AUTO_INCREMENT PRIMARY KEY,
-			bdm_id INT NOT NULL,
-			location_id INT NOT NULL,
-			is_dual_role TINYINT(1) NOT NULL DEFAULT 0,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE KEY uk_bdm_location (bdm_id, location_id)
-		)");
-		$_chkDualU = $db_conn->query("SHOW COLUMNS FROM salesbdm_locations LIKE 'is_dual_role'");
-		if ($_chkDualU && $_chkDualU->num_rows === 0) {
-			$db_conn->query("ALTER TABLE salesbdm_locations ADD COLUMN is_dual_role TINYINT(1) NOT NULL DEFAULT 0 AFTER location_id");
-		}
-		$update_id_int = (int)$update_id;
-		$stmt_del_loc = $db_conn->prepare("DELETE FROM salesbdm_locations WHERE bdm_id=?");
-		$stmt_del_loc->bind_param('i', $update_id_int);
-		$stmt_del_loc->execute();
-		$stmt_del_loc->close();
-		$stmt_loc = $db_conn->prepare("INSERT IGNORE INTO salesbdm_locations (bdm_id, location_id, is_dual_role) VALUES (?, ?, ?)");
-		if (!empty($_POST['location_ids']) && is_array($_POST['location_ids'])) {
-			$is_dual = 0;
-			foreach ($_POST['location_ids'] as $loc_id) {
-				$loc_id = (int)$loc_id;
-				if ($loc_id > 0) {
-					$stmt_loc->bind_param('iii', $update_id_int, $loc_id, $is_dual);
-					$stmt_loc->execute();
-				}
-			}
-		}
-		if (!empty($_POST['dual_location_ids']) && is_array($_POST['dual_location_ids'])) {
-			$is_dual = 1;
-			foreach ($_POST['dual_location_ids'] as $loc_id) {
-				$loc_id = (int)$loc_id;
-				if ($loc_id > 0) {
-					$stmt_loc->bind_param('iii', $update_id_int, $loc_id, $is_dual);
-					$stmt_loc->execute();
-				}
-			}
-		}
-		$stmt_loc->close();
+	// District assignment is now entirely Zone-derived (see $zone above and
+	// salesbdm/include/BdmTpScope.php) — both the old manual "Assign
+	// Location" picker and the "Dual Role" picker were removed from
+	// Add/Edit Sales BDM 2026-10-02, so there's nothing left to write into
+	// salesbdm_locations from this form (any pre-existing rows for this BDM
+	// are simply left untouched rather than wiped, since they're no longer
+	// read by anything).
 
-		echo "<script>window.location='salesbdm_manage?updatedSuccess';</script>";
-		exit;
+	echo "<script>window.location='salesbdm_manage?updatedSuccess';</script>";
+	exit;
 
 }
 

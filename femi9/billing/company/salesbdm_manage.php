@@ -1,6 +1,11 @@
 <?php include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms');
 include("config.php");
+require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
+tpEnsureShopInvoiceEligibilityColumn($db_conn);
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -217,6 +222,14 @@ $i= $start_from;
 																										<td>
 													    <div class="actions-group">
 													        <a href="salesbdm_edit.php?prid=<?php echo $product_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+													        <?php $shopInvEligible = !empty($result_product_list['shop_invoice_request_eligible']); ?>
+													        <button type="button" class="action-link toggle-shop-invoice-eligible-btn"
+													                title="<?php echo $shopInvEligible ? 'Shop Invoice Permission Requests: Eligible — click to remove' : 'Shop Invoice Permission Requests: Not eligible — click to make eligible'; ?>"
+													                data-id="<?php echo (int)$result_product_list['id']; ?>"
+													                data-eligible="<?php echo $shopInvEligible ? 1 : 0; ?>"
+													                data-name="<?php echo htmlspecialchars($result_product_list['bdm_name'], ENT_QUOTES); ?>">
+													            <i class="material-icons-outlined" style="font-size:17px;color:<?php echo $shopInvEligible ? '#10b981' : '#9ca3af'; ?>;">assignment_return</i>
+													        </button>
 													        <a href="salesbdm_delete.php?prid=<?php echo $product_id;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 													</td>
@@ -273,6 +286,33 @@ $i= $start_from;
         document.body.removeChild(tempInput);
         Swal.fire({ icon:'success', title:'Copied!', text:'Password copied to clipboard', timer:1500, showConfirmButton:false, toast:true, position:'top-end' });
     }
+
+    var CSRF_TOKEN = '<?php echo $_SESSION['csrf_token']; ?>';
+    $(document).on('click', '.toggle-shop-invoice-eligible-btn', function () {
+        var $btn        = $(this);
+        var id          = $btn.data('id');
+        var name        = $btn.data('name');
+        var curEligible = parseInt($btn.data('eligible'));
+        var newEligible = curEligible === 1 ? 0 : 1;
+        var action      = newEligible === 1 ? 'Make eligible' : 'Remove eligibility';
+
+        if (!confirm(action + ' for Shop Invoice Permission Requests — "' + name + '"?')) return;
+
+        $.post('toggle-salesbdm-shop-invoice-eligibility.php', {
+            csrf_token: CSRF_TOKEN, id: id, eligible: newEligible
+        }, function (res) {
+            if (!res.success) { alert('Failed. Please try again.'); return; }
+            $btn.data('eligible', res.new_eligible);
+            var $icon = $btn.find('i');
+            if (res.new_eligible === 1) {
+                $icon.css('color', '#10b981');
+                $btn.attr('title', 'Shop Invoice Permission Requests: Eligible — click to remove');
+            } else {
+                $icon.css('color', '#9ca3af');
+                $btn.attr('title', 'Shop Invoice Permission Requests: Not eligible — click to make eligible');
+            }
+        }, 'json').fail(function () { alert('Request failed. Please try again.'); });
+    });
     </script>
 </body>
 

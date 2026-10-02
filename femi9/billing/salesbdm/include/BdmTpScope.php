@@ -2,76 +2,40 @@
 // Resolves which Territory Partners fall under a Sales BDM's own PERSONAL
 // district assignment(s) — used everywhere except "Our Team" (dashboard, TP
 // Purchase Order, Advance Payment Report, Add/Manage/Edit Territory
-// Partner). A Chief BDM's broader state-level assignment represents which
-// region their TEAM covers, not their own personal territory, so a
-// shallower-than-district entry (e.g. State) is intentionally NOT expanded
-// into every child district here — only that Chief BDM's own direct
-// district-or-deeper assignments count. Their team's combined footprint
-// still shows in full under "Our Team" (my-team.php), which walks each
-// team member's own assignment individually rather than going through this
-// function's state-node handling at all.
+// Partner).
+//
+// As of 2026-10-02, a BDM's personal district scope is derived ENTIRELY
+// from their assigned Zone (sales_bdm_staff.zone, a company-defined group
+// of districts — see company/include/PartnerZones.php). The old manual
+// "Assign Location" picker AND the "Dual Role" picker ("also personally
+// handle some locations one level down") have both been removed from
+// Add/Edit Sales BDM — Zone alone drives this now. This also means a Chief
+// BDM whose Zone covers an entire state personally sees every district in
+// it — there's no more "shallower-than-district assignment represents the
+// team, not personal territory" special case, since a Zone is always built
+// from actual district nodes (never a bare State node), so there's nothing
+// to collapse.
 //
 // There's no FK between the location tree and territory_partners — TPs only
 // carry a free-text branch_district — so this matches district NAMES
 // (case-insensitive, trimmed) rather than ids.
 
 function getBdmAssignedDistrictNames($db_conn, int $bdmId): array {
-    $db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_locations (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        bdm_id INT NOT NULL,
-        location_id INT NOT NULL,
-        is_dual_role TINYINT(1) NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY uk_bdm_location (bdm_id, location_id)
-    )");
+    require_once __DIR__ . '/../../company/include/PartnerZones.php';
+    ensurePartnerZonesTables($db_conn);
 
-    $districtDepthRow = $db_conn->query("SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'district%' ORDER BY depth ASC LIMIT 1")->fetch_assoc();
-    if (!$districtDepthRow) return [];
-    $districtDepth = (int)$districtDepthRow['depth'];
+    $zoneRow = $db_conn->query("SELECT zone FROM sales_bdm_staff WHERE id = " . (int)$bdmId)->fetch_assoc();
+    $zoneName = trim($zoneRow['zone'] ?? '');
+    if ($zoneName === '') return [];
 
-    $stmt = $db_conn->prepare("
-        SELECT n.id, n.name, n.depth, n.parent_id
-        FROM salesbdm_locations sl
-        JOIN partner_location_nodes n ON n.id = sl.location_id
-        WHERE sl.bdm_id = ?
-    ");
-    $stmt->bind_param('i', $bdmId);
+    $stmt = $db_conn->prepare("SELECT id FROM partner_zones WHERE name = ?");
+    $stmt->bind_param('s', $zoneName);
     $stmt->execute();
-    $assigned = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $zone = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    if (!$zone) return [];
 
-    $names = [];
-    foreach ($assigned as $node) {
-        $depth = (int)$node['depth'];
-        if ($depth === $districtDepth) {
-            $names[] = $node['name'];
-        } elseif ($depth < $districtDepth) {
-            // Shallower than district (e.g. State) — represents the region
-            // this person's TEAM covers, not their own personal territory,
-            // so it deliberately contributes nothing to this personal scope.
-            continue;
-        } else {
-            // Deeper than district (e.g. Taluk/Firka) — walk parent_id up to
-            // the enclosing district.
-            $currentId = (int)$node['parent_id'];
-            $currentDepth = $depth - 1;
-            $guard = 0;
-            while ($currentId > 0 && $currentDepth > $districtDepth && $guard < 10) {
-                $upStmt = $db_conn->prepare("SELECT id, name, depth, parent_id FROM partner_location_nodes WHERE id = ?");
-                $upStmt->bind_param('i', $currentId);
-                $upStmt->execute();
-                $up = $upStmt->get_result()->fetch_assoc();
-                $upStmt->close();
-                if (!$up) break;
-                $currentId = (int)$up['parent_id'];
-                $currentDepth = (int)$up['depth'] - 1;
-                $guard++;
-                if ((int)$up['depth'] === $districtDepth) { $names[] = $up['name']; break; }
-            }
-        }
-    }
-
-    return array_values(array_unique($names));
+    return getZoneDistrictNames($db_conn, (int)$zone['id']);
 }
 
 function getBdmAssignedTpIds($db_conn, int $bdmId, bool $includeInactive = false): array {
@@ -111,6 +75,27 @@ function getBdmAssignedTpIds($db_conn, int $bdmId, bool $includeInactive = false
     $stmt->close();
 
     return array_map(fn($r) => (int)$r['id'], $rows);
+}
+
+// Every TP covered by this BDM's own Zone PLUS every TP covered by any of
+// their subordinates' Zones (their whole "Our Team" subtree) — used where a
+// manager needs visibility into their team's TPs regardless of whether the
+// TP's own directly-matched BDM has some separate per-feature permission
+// flag enabled. E.g. the Shop Invoice Permission Requests review queue: a
+// Sales BDM might not be marked "eligible" to review these, but their
+// manager (Chief BDM), if eligible, should still see requests for TPs under
+// that subordinate — not just TPs the Chief BDM's own Zone happens to
+// cover directly. Confirmed 2026-10-02.
+function getBdmSubtreeAssignedTpIds($db_conn, int $bdmId, bool $includeInactive = false): array {
+    require_once __DIR__ . '/TeamSubtree.php';
+    $subtreeIds = getBdmSubtreeIds($db_conn, $bdmId);
+    $tpIds = [];
+    foreach ($subtreeIds as $memberId) {
+        foreach (getBdmAssignedTpIds($db_conn, $memberId, $includeInactive) as $tpId) {
+            $tpIds[$tpId] = true;
+        }
+    }
+    return array_keys($tpIds);
 }
 
 // Checks whether a single location node (at ANY depth — a TP is normally

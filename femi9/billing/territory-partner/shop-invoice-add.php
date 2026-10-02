@@ -3,6 +3,7 @@ include("checksession.php");
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
+require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
 
 $getinvuser    = "shop";
 $get_action    = $_REQUEST['action'] ?? '';
@@ -455,9 +456,15 @@ while ($ri = mysqli_fetch_array($res_items)) {
         <td>
         <?php
         $cnt_ret = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='$Invoice_ID' AND prid='$InV_Product_ID'"));
-        if ($cnt_ret == 0) { ?>
+        $removeReqStatus = tpShopInvoiceActionStatus($db_conn, (int)$Login_user_IDvl, $Invoice_ID, 'remove');
+        if ($cnt_ret > 0) { echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>"; }
+        elseif ($removeReqStatus === 'approved') { ?>
         <a href="shop-del-inv-product.php?invid=<?php echo $Invoice_ID_encode; ?>&&rowid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
-        <?php } else { echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>"; } ?>
+        <?php } elseif ($removeReqStatus === 'pending') { ?>
+        <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending</span>
+        <?php } else { ?>
+        <button type="button" class="badge badge-style-bordered badge-primary request-shop-action-btn" style="border:none;cursor:pointer;" data-inv-id="<?php echo htmlspecialchars($Invoice_ID); ?>" data-action-type="remove">Request to Remove</button>
+        <?php } ?>
         </td>
         <?php } ?>
     </tr>
@@ -904,5 +911,26 @@ function discamount() {
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script src="../../assets/js/pages/select2.js"></script>
+<script>
+$(document).on('click', '.request-shop-action-btn', function () {
+    var $btn = $(this);
+    var invId = $btn.data('inv-id');
+    var actionType = $btn.data('action-type');
+    if (!confirm('Send a request to your Sales BDM for this?')) return;
+    $btn.prop('disabled', true).text('Sending…');
+    $.post('request-shop-invoice-action.php', { inv_id: invId, action_type: actionType }, function (res) {
+        if (res.success) {
+            alert(res.message || 'Request sent.');
+            window.location.reload();
+        } else {
+            alert(res.message || 'Could not send the request.');
+            $btn.prop('disabled', false).text(actionType === 'return' ? 'Request to Return' : 'Request to Remove');
+        }
+    }, 'json').fail(function () {
+        alert('Request failed. Please try again.');
+        $btn.prop('disabled', false).text(actionType === 'return' ? 'Request to Return' : 'Request to Remove');
+    });
+});
+</script>
 </body>
 </html>
