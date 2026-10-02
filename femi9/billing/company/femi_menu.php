@@ -342,7 +342,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 							<li><a href="add-channel-partner">Add Channel Partner</a></li>
 							<li><a href="manage-channel-partner">Manage Channel Partner</a></li>
-							<li><a href="manage-agreements">Manage Agreements (CP/TP)</a></li>
+							<li><a href="manage-agreements">Manage Agreements (CP)</a></li>
 							<li><a href="cp-stock">CP Stock</a></li>
 							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
@@ -359,7 +359,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 							<li><a href="add-territory-partner">Add Territory Partner</a></li>
 							<li><a href="manage-territory-partner">Manage Territory Partner</a></li>
-							<li><a href="manage-agreements?tab=tp">Manage Agreements (CP/TP)</a></li>
+							<li><a href="manage-agreements?tab=tp">Manage Agreements (TP)</a></li>
 							<li><a href="tp-stock">TP Stock</a></li>
 							<li><a href="add-tp-input-stock">Add TP Input Stock</a></li>
 							<li><a href="tp-today-orders">Purchase Order</a></li>
@@ -857,7 +857,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 							<li><a href="add-channel-partner">Add Channel Partner</a></li>
 							<li><a href="manage-channel-partner">Manage Channel Partner</a></li>
-							<li><a href="manage-agreements">Manage Agreements (CP/TP)</a></li>
+							<li><a href="manage-agreements">Manage Agreements (CP)</a></li>
 							<li><a href="cp-stock">CP Stock</a></li>
 							<li><a href="cp-wallet-commission-calculator">CP Wallet Commission Calculator</a></li>
 							<li><a href="manage-cp-wallet-commission">Manage CP Wallet Commission</a></li>
@@ -878,7 +878,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 							<li><a href="add-territory-partner">Add Territory Partner</a></li>
 							<li><a href="manage-territory-partner">Manage Territory Partner</a></li>
-							<li><a href="manage-agreements?tab=tp">Manage Agreements (CP/TP)</a></li>
+							<li><a href="manage-agreements?tab=tp">Manage Agreements (TP)</a></li>
 							<li><a href="tp-stock">TP Stock</a></li>
 							<li><a href="add-tp-input-stock">Add TP Input Stock</a></li>
 							<li><a href="tp-today-orders">Purchase Order</a></li>
