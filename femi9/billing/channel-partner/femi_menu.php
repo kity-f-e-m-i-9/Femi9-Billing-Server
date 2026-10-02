@@ -32,9 +32,9 @@
             <a href="wallet-history.php"><i class="material-icons-outlined">wallet</i>Wallet History</a>
         </li>
 
-        <li>
+        <!-- <li>
             <a href="agreement.php"><i class="material-icons-two-tone">description</i>Agreement</a>
-        </li>
+        </li> -->
 
         <li>
             <a href="my-profile.php"><i class="material-icons-two-tone">manage_accounts</i>My Profile</a>
