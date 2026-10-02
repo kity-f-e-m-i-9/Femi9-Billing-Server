@@ -18,8 +18,12 @@ if (!tpIsBdmEligibleForShopInvoiceRequests($db_conn, (int)$salesBdmID)) {
 
 $id = (int)($_POST['id'] ?? 0);
 $decision = $_POST['decision'] ?? '';
+$reason = trim((string)($_POST['reason'] ?? ''));
 if ($id <= 0 || !in_array($decision, ['approved', 'rejected'], true)) {
     respond(false, 'Invalid request.');
+}
+if ($reason === '') {
+    respond(false, 'Please enter a reason for ' . ($decision === 'approved' ? 'approving' : 'rejecting') . ' this request.');
 }
 
 tpEnsureShopInvoiceActionRequestTable($db_conn);
@@ -35,9 +39,12 @@ if (empty($tpIds)) { respond(false, 'You have no assigned territory partners.');
 $row = $db_conn->query("SELECT territory_partner_id, status FROM tp_shop_invoice_action_requests WHERE id = $id")->fetch_assoc();
 if (!$row) { respond(false, 'Request not found.'); }
 if (!in_array((int)$row['territory_partner_id'], $tpIds, true)) { respond(false, 'This request is not assigned to you.'); }
-if ($row['status'] !== 'pending') { respond(false, 'This request has already been reviewed.'); }
+// Re-reviewable even if already decided (e.g. revoking an earlier
+// Approve) — only a true no-op is blocked, enforced inside
+// tpShopInvoiceActionRequestReview() itself.
+if ($row['status'] === $decision) { respond(false, 'This request is already ' . $decision . '.'); }
 
 $bdmName = $_SESSION['LOGIN_USER_NAME'] ?? '';
-$ok = tpShopInvoiceActionRequestReview($db_conn, $id, $decision, (int)$salesBdmID, $bdmName);
+$ok = tpShopInvoiceActionRequestReview($db_conn, $id, $decision, (int)$salesBdmID, $bdmName, $reason);
 
 respond($ok, $ok ? '' : 'Could not save — please refresh and try again.');

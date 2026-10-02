@@ -461,7 +461,7 @@ while ($ri = mysqli_fetch_array($res_items)) {
         elseif ($removeReqStatus === 'approved') { ?>
         <a href="shop-del-inv-product.php?invid=<?php echo $Invoice_ID_encode; ?>&&rowid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
         <?php } elseif ($removeReqStatus === 'pending') { ?>
-        <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending</span>
+        <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending Remove</span>
         <?php } else { ?>
         <button type="button" class="badge badge-style-bordered badge-primary request-shop-action-btn" style="border:none;cursor:pointer;" data-inv-id="<?php echo htmlspecialchars($Invoice_ID); ?>" data-action-type="remove">Request to Remove</button>
         <?php } ?>
