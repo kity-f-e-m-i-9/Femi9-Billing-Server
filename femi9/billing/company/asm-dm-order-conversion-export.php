@@ -2,19 +2,30 @@
 // ASM -> District Manager order performance -- one sheet per ASM, one row
 // per DM under them.
 //
+// Data source: tp_orders, NOT ms_orders. A DM's "Get Order" visit is
+// captured in ms_orders against ms_shop, but that's a parallel lead-
+// capture system of its own -- confirmed against real data that it NEVER
+// actually gets invoiced (zero rows anywhere link a ms_order to an
+// invoice). The order a DM actually hands off to a Territory Partner to
+// invoice lives in tp_orders instead, tagged assigned_by_ms_id = that DM
+// (see territory-partner/manage-orders.php's "From DM: <name>" badge,
+// which reads this exact column) -- and tp_orders.invoiced_inv_id (once
+// set) is a real join key into user_invoice.inv_id, confirmed against
+// live data: 19,030 DM-assigned orders, 8,033 of them already invoiced.
+//
 // Primary period: 01-09-2026 to 30-09-2026 (September) -- Total/Get/No
 // Order counts, how many of that month's Get Orders are already converted
-// to an invoice (via user_invoice.source_ms_order_id, same conversion
-// link ms-order-invoice-add.php writes), and the live (non-deleted/
-// non-voided) invoiced amount for those.
+// to an invoice, and the live (non-deleted/non-voided) invoiced amount
+// for those.
 //
 // Returns/Deletions window: 01-08-2026 to 30-09-2026 (August + September)
 // -- wider on purpose, since a Get Order placed in August can convert to
 // an invoice later in September; this catches that invoice's returns/
 // deletion regardless of which of the two months it actually converted
 // in. Returned Amount and Deleted Invoice Amount are reported as two
-// separate columns (previously deleted invoices were just silently
-// excluded from the converted total -- now their amount is surfaced too).
+// separate columns (a deleted/voided invoice is excluded from the
+// converted total, but its own amount is surfaced here instead of just
+// silently dropped).
 ob_start();
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -102,23 +113,26 @@ foreach ($staffById as $id => $s) {
     if (($s['level_rank'] ?? null) === 3) { $dmIds[] = $id; }
 }
 
-// ---- September Get/No orders per DM -------------------------------------
-$getOrderCount   = array_fill_keys($dmIds, 0);
-$noOrderCount    = array_fill_keys($dmIds, 0);
-$getOrderIdsByDm = array_fill_keys($dmIds, []);
+// ---- September Get/No orders per DM (tp_orders, not ms_orders) ---------
+$getOrderCount    = array_fill_keys($dmIds, 0);
+$noOrderCount     = array_fill_keys($dmIds, 0);
+$getOrderInvIdsByDm = array_fill_keys($dmIds, []); // invoiced_inv_id values, one per distinct order
 
 $ordRes = $db_conn->query(
-    "SELECT ms_id, order_id, new_order
-     FROM ms_orders
-     WHERE order_date BETWEEN '$periodStart' AND '$periodEnd'
-     GROUP BY ms_id, order_id, new_order"
+    "SELECT assigned_by_ms_id, order_id, new_order, MAX(invoiced_inv_id) AS invoiced_inv_id
+     FROM tp_orders
+     WHERE assigned_by_ms_id IS NOT NULL AND voided_at IS NULL
+       AND order_date BETWEEN '$periodStart' AND '$periodEnd'
+     GROUP BY assigned_by_ms_id, order_id, new_order"
 );
 while ($row = $ordRes->fetch_assoc()) {
-    $id = (int) $row['ms_id'];
+    $id = (int) $row['assigned_by_ms_id'];
     if (!isset($getOrderCount[$id])) continue; // not a DM -- skip
     if ($row['new_order'] === 'yes') {
         $getOrderCount[$id]++;
-        $getOrderIdsByDm[$id][] = $row['order_id'];
+        if (!empty($row['invoiced_inv_id'])) {
+            $getOrderInvIdsByDm[$id][] = $row['invoiced_inv_id'];
+        }
     } else {
         $noOrderCount[$id]++;
     }
@@ -128,21 +142,21 @@ while ($row = $ordRes->fetch_assoc()) {
 $convertedCount = array_fill_keys($dmIds, 0);
 $convertedAmt   = array_fill_keys($dmIds, 0.0);
 
-$allSeptOrderIds = [];
-foreach ($getOrderIdsByDm as $id => $ids) { foreach ($ids as $oid) { $allSeptOrderIds[$oid] = $id; } }
-if (!empty($allSeptOrderIds)) {
-    $placeholders = implode(',', array_fill(0, count($allSeptOrderIds), '?'));
-    $types = str_repeat('s', count($allSeptOrderIds));
-    $ids = array_keys($allSeptOrderIds);
+$allSeptInvIds = [];
+foreach ($getOrderInvIdsByDm as $id => $invIds) { foreach ($invIds as $invId) { $allSeptInvIds[$invId] = $id; } }
+if (!empty($allSeptInvIds)) {
+    $placeholders = implode(',', array_fill(0, count($allSeptInvIds), '?'));
+    $types = str_repeat('s', count($allSeptInvIds));
+    $ids = array_keys($allSeptInvIds);
     $stmt = $db_conn->prepare(
-        "SELECT source_ms_order_id, total FROM user_invoice
-         WHERE source_ms_order_id IN ($placeholders) AND deleted_at IS NULL AND voided_at IS NULL"
+        "SELECT inv_id, total FROM user_invoice
+         WHERE inv_id IN ($placeholders) AND deleted_at IS NULL AND voided_at IS NULL"
     );
     $stmt->bind_param($types, ...$ids);
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
-        $dmId = $allSeptOrderIds[$row['source_ms_order_id']] ?? null;
+        $dmId = $allSeptInvIds[$row['inv_id']] ?? null;
         if ($dmId === null) continue;
         $convertedCount[$dmId]++;
         $convertedAmt[$dmId] += (float) $row['total'];
@@ -155,65 +169,71 @@ $returnedAmt = array_fill_keys($dmIds, 0.0);
 $deletedAmt  = array_fill_keys($dmIds, 0.0);
 
 $winOrdRes = $db_conn->query(
-    "SELECT ms_id, order_id FROM ms_orders
-     WHERE new_order = 'yes' AND order_date BETWEEN '$returnsWindowStart' AND '$returnsWindowEnd'
-     GROUP BY ms_id, order_id"
+    "SELECT assigned_by_ms_id, order_id, MAX(invoiced_inv_id) AS invoiced_inv_id
+     FROM tp_orders
+     WHERE assigned_by_ms_id IS NOT NULL AND voided_at IS NULL AND new_order = 'yes'
+       AND order_date BETWEEN '$returnsWindowStart' AND '$returnsWindowEnd'
+     GROUP BY assigned_by_ms_id, order_id"
 );
-$winOrderIdsByDm = array_fill_keys($dmIds, []);
+$winInvIdsByDm = array_fill_keys($dmIds, []);
 while ($row = $winOrdRes->fetch_assoc()) {
-    $id = (int) $row['ms_id'];
-    if (isset($winOrderIdsByDm[$id])) { $winOrderIdsByDm[$id][] = $row['order_id']; }
+    $id = (int) $row['assigned_by_ms_id'];
+    if (isset($winInvIdsByDm[$id]) && !empty($row['invoiced_inv_id'])) {
+        $winInvIdsByDm[$id][] = $row['invoiced_inv_id'];
+    }
 }
-$allWinOrderIds = [];
-foreach ($winOrderIdsByDm as $id => $ids) { foreach ($ids as $oid) { $allWinOrderIds[$oid] = $id; } }
+$allWinInvIds = [];
+foreach ($winInvIdsByDm as $id => $invIds) { foreach ($invIds as $invId) { $allWinInvIds[$invId] = $id; } }
 
-if (!empty($allWinOrderIds)) {
-    $placeholders = implode(',', array_fill(0, count($allWinOrderIds), '?'));
-    $types = str_repeat('s', count($allWinOrderIds));
-    $ids = array_keys($allWinOrderIds);
+if (!empty($allWinInvIds)) {
+    $placeholders = implode(',', array_fill(0, count($allWinInvIds), '?'));
+    $types = str_repeat('s', count($allWinInvIds));
+    $ids = array_keys($allWinInvIds);
 
     // Every invoice converted from this window's Get Orders, live or not --
     // deleted/voided ones go straight into Deleted Invoice Amount instead
     // of Returned Amount's lookup.
     $stmt = $db_conn->prepare(
-        "SELECT source_ms_order_id, inv_number, total, deleted_at, voided_at FROM user_invoice
-         WHERE source_ms_order_id IN ($placeholders)"
+        "SELECT inv_id, total, deleted_at, voided_at FROM user_invoice
+         WHERE inv_id IN ($placeholders)"
     );
     $stmt->bind_param($types, ...$ids);
     $stmt->execute();
     $res = $stmt->get_result();
-    $liveInvNumbersByDm = array_fill_keys($dmIds, []);
+    $liveInvIdsByDm = array_fill_keys($dmIds, []);
     while ($row = $res->fetch_assoc()) {
-        $dmId = $allWinOrderIds[$row['source_ms_order_id']] ?? null;
+        $dmId = $allWinInvIds[$row['inv_id']] ?? null;
         if ($dmId === null) continue;
         if ($row['deleted_at'] !== null || $row['voided_at'] !== null) {
             $deletedAmt[$dmId] += (float) $row['total'];
         } else {
-            $liveInvNumbersByDm[$dmId][] = $row['inv_number'];
+            $liveInvIdsByDm[$dmId][] = $row['inv_id'];
         }
     }
     $stmt->close();
 
-    // Returns against the still-live invoices -- user_return_stock repeats
-    // the whole return's total on every line item, so dedupe by returnid
-    // before summing (same convention mis-report.php already uses).
-    $allInvNumbers = [];
-    foreach ($liveInvNumbersByDm as $id => $nums) { foreach ($nums as $n) { $allInvNumbers[$n][] = $id; } }
-    if (!empty($allInvNumbers)) {
-        $placeholders2 = implode(',', array_fill(0, count($allInvNumbers), '?'));
-        $types2 = str_repeat('s', count($allInvNumbers));
-        $invNums = array_keys($allInvNumbers);
+    // Returns against the still-live invoices -- user_return_stock.invnumber
+    // is confirmed (against live data) to actually hold user_invoice.inv_id,
+    // not inv_number despite the column name. Repeats the whole return's
+    // total on every line item, so dedupe by returnid before summing (same
+    // convention mis-report.php already uses).
+    $allLiveInvIds = [];
+    foreach ($liveInvIdsByDm as $id => $invIds) { foreach ($invIds as $invId) { $allLiveInvIds[$invId][] = $id; } }
+    if (!empty($allLiveInvIds)) {
+        $placeholders2 = implode(',', array_fill(0, count($allLiveInvIds), '?'));
+        $types2 = str_repeat('s', count($allLiveInvIds));
+        $invIds2 = array_keys($allLiveInvIds);
         $stmt2 = $db_conn->prepare(
             "SELECT invnumber, returnid, MAX(total) AS total
              FROM user_return_stock
              WHERE invnumber IN ($placeholders2) AND deleted_at IS NULL
              GROUP BY invnumber, returnid"
         );
-        $stmt2->bind_param($types2, ...$invNums);
+        $stmt2->bind_param($types2, ...$invIds2);
         $stmt2->execute();
         $res2 = $stmt2->get_result();
         while ($row = $res2->fetch_assoc()) {
-            $dmIdsForInv = $allInvNumbers[$row['invnumber']] ?? [];
+            $dmIdsForInv = $allLiveInvIds[$row['invnumber']] ?? [];
             foreach ($dmIdsForInv as $dmId) {
                 $returnedAmt[$dmId] += (float) $row['total'];
             }
