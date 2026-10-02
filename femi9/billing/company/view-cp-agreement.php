@@ -131,7 +131,7 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                         <p>(hereinafter referred to as the "Channel Partner" or "CP", which expression shall, unless repugnant to the context or meaning thereof, include, where applicable, its successors, legal representatives, heirs, executors, administrators and permitted assigns).</p>
                         <p>FEMI9 and the Channel Partner are hereinafter individually referred to as a "Party" and collectively as the "Parties."</p>
 
-                        <p class="text-muted" style="font-style:italic;">(Clauses 1&ndash;21 of the standard Division Channel Partner Agreement apply — identical to the copy shown to the Channel Partner. See <a href="agreement.php" onclick="return false;" style="pointer-events:none;color:inherit;">the CP-facing page</a> for the full clause text, or use Print/Save as PDF above once fully filled.)</p>
+                        <?php echo get_effective_agreement_body($db_conn, $agreement, 'channel_partner'); ?>
 
                         <h2>SCHEDULE &ndash; 1: DIVISION ALLOCATION &amp; COMMERCIAL PARTICULARS</h2>
                         <div class="agr-field-row"><label>Channel Partner Name:</label><span class="agr-value"><?php echo fv($cp['name']); ?></span></div>

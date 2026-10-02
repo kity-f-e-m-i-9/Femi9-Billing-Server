@@ -86,6 +86,82 @@ function ensure_agreement_tables(mysqli $db_conn): void
             UNIQUE KEY uq_tp_agreement (territory_partner_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+
+    // Per-partner override of the agreement's legal wording (clauses), set
+    // via manage-agreements.php's optional "custom wording for this partner
+    // only" editor. NULL/empty means "use the shared template" (see
+    // get_effective_agreement_body()). Added via ALTER on existing installs
+    // since the two tables above predate this column.
+    $cpCol = $db_conn->query("SHOW COLUMNS FROM channel_partner_agreements LIKE 'custom_body_html'");
+    if ($cpCol && $cpCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE channel_partner_agreements ADD COLUMN custom_body_html LONGTEXT NULL AFTER witness2_signature");
+    }
+    $tpCol = $db_conn->query("SHOW COLUMNS FROM territory_partner_agreements LIKE 'custom_body_html'");
+    if ($tpCol && $tpCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE territory_partner_agreements ADD COLUMN custom_body_html LONGTEXT NULL AFTER witness2_signature");
+    }
+
+    // Shared master template -- one row per agreement type ('channel_partner'
+    // / 'territory_partner'), edited via manage-agreements.php's "Edit
+    // Agreement Wording" editor. No row yet (fresh install, or nobody has
+    // edited wording so far) means "use the hardcoded default" -- see
+    // get_default_agreement_body() / get_effective_agreement_body().
+    $db_conn->query("
+        CREATE TABLE IF NOT EXISTS agreement_body_templates (
+            type VARCHAR(30) NOT NULL PRIMARY KEY,
+            body_html LONGTEXT NOT NULL,
+            updated_by VARCHAR(100) NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+}
+
+/** The original hardcoded clause text for a given agreement type, moved out
+ * of territory-partner/agreement.php and channel-partner/agreement.php
+ * verbatim into shared/agreement-templates/{cp,tp}-default.html -- this is
+ * what renders until someone actually edits the wording via
+ * manage-agreements.php (and what a fresh "Edit Agreement Wording" editor
+ * starts from). */
+function get_default_agreement_body(string $type): string
+{
+    $file = __DIR__ . '/agreement-templates/' . ($type === 'channel_partner' ? 'cp' : 'tp') . '-default.html';
+    return is_file($file) ? file_get_contents($file) : '';
+}
+
+function get_agreement_body_template(mysqli $db_conn, string $type): ?string
+{
+    ensure_agreement_tables($db_conn);
+    $stmt = $db_conn->prepare("SELECT body_html FROM agreement_body_templates WHERE type = ?");
+    $stmt->bind_param('s', $type);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row['body_html'] ?? null;
+}
+
+function save_agreement_body_template(mysqli $db_conn, string $type, string $html, string $updatedBy): void
+{
+    ensure_agreement_tables($db_conn);
+    $stmt = $db_conn->prepare(
+        "INSERT INTO agreement_body_templates (type, body_html, updated_by) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE body_html = VALUES(body_html), updated_by = VALUES(updated_by)"
+    );
+    $stmt->bind_param('sss', $type, $html, $updatedBy);
+    $stmt->execute();
+    $stmt->close();
+}
+
+/** What actually renders for a given partner's agreement: their own
+ * per-partner override if set, else the shared master template if anyone
+ * has edited it, else the original hardcoded default. $type is
+ * 'channel_partner' or 'territory_partner'. */
+function get_effective_agreement_body(mysqli $db_conn, array $agreement, string $type): string
+{
+    if (!empty($agreement['custom_body_html'])) {
+        return $agreement['custom_body_html'];
+    }
+    $template = get_agreement_body_template($db_conn, $type);
+    return $template !== null ? $template : get_default_agreement_body($type);
 }
 
 function get_agreement_settings(mysqli $db_conn): array

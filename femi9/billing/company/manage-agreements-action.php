@@ -39,6 +39,12 @@ if ($action === 'save_cp_schedule') {
     $wasSignedAndLocked = !empty($existing['signed_at']) && (int) ($existing['is_locked'] ?? 0) === 1;
     $securityDeposit = ($_POST['security_deposit'] ?? '') !== '' ? (float) $_POST['security_deposit'] : null;
     $effectiveDate   = ($_POST['effective_date'] ?? '') !== '' ? $_POST['effective_date'] : null;
+    // A per-partner wording override is optional -- the "use custom wording"
+    // checkbox decides whether this partner's own custom_body_html is kept
+    // (NULL falls back to the shared master template, see
+    // get_effective_agreement_body()).
+    $useCustomBody = ($_POST['use_custom_body'] ?? '') === '1';
+    $customBodyHtml = $useCustomBody ? ($_POST['custom_body_html'] ?? '') : null;
     // Editing an already-signed agreement's particulars auto-unlocks it --
     // the CP's own agreement.php then shows it as editable again and their
     // dashboard surfaces a "please review & sign again" banner (see
@@ -49,7 +55,7 @@ if ($action === 'save_cp_schedule') {
         "UPDATE channel_partner_agreements SET
             security_deposit = ?, approved_divisions = ?, division_codes = ?,
             approved_warehouse_address = ?, stock_holding_capacity = ?, commercial_category = ?,
-            effective_date = ?, other_particulars = ?, schedule_set_by = ?, schedule_set_at = NOW(),
+            effective_date = ?, other_particulars = ?, custom_body_html = ?, schedule_set_by = ?, schedule_set_at = NOW(),
             is_locked = 0
          WHERE channel_partner_id = ?"
     );
@@ -60,10 +66,10 @@ if ($action === 'save_cp_schedule') {
     $commercialCategory = trim($_POST['commercial_category'] ?? '');
     $otherParticulars = trim($_POST['other_particulars'] ?? '');
     $stmt->bind_param(
-        'dssssssssi',
+        'dsssssssssi',
         $securityDeposit, $approvedDivisions, $divisionCodes,
         $warehouseAddress, $stockCapacity, $commercialCategory,
-        $effectiveDate, $otherParticulars, $updatedBy, $cpId
+        $effectiveDate, $otherParticulars, $customBodyHtml, $updatedBy, $cpId
     );
     $stmt->execute();
     $stmt->close();
@@ -84,19 +90,22 @@ if ($action === 'save_tp_schedule') {
     $territoryFirka = trim($_POST['territory_firka'] ?? '');
     $territoryCode = trim($_POST['territory_code'] ?? '');
     $otherParticulars = trim($_POST['other_particulars'] ?? '');
+    // Same optional per-partner wording override as save_cp_schedule above.
+    $useCustomBodyTp = ($_POST['use_custom_body'] ?? '') === '1';
+    $customBodyHtmlTp = $useCustomBodyTp ? ($_POST['custom_body_html'] ?? '') : null;
     // Same auto-unlock-on-change reasoning as save_cp_schedule above.
     $stmt = $db_conn->prepare(
         "UPDATE territory_partner_agreements SET
             monthly_purchase_commitment = ?, taluk_block = ?, territory_firka = ?,
-            territory_code = ?, effective_date = ?, other_particulars = ?,
+            territory_code = ?, effective_date = ?, other_particulars = ?, custom_body_html = ?,
             schedule_set_by = ?, schedule_set_at = NOW(),
             is_locked = 0
          WHERE territory_partner_id = ?"
     );
     $stmt->bind_param(
-        'dssssssi',
+        'dsssssssi',
         $commitment, $talukBlock, $territoryFirka,
-        $territoryCode, $effectiveDate, $otherParticulars,
+        $territoryCode, $effectiveDate, $otherParticulars, $customBodyHtmlTp,
         $updatedBy, $tpId
     );
     $stmt->execute();
@@ -105,6 +114,23 @@ if ($action === 'save_tp_schedule') {
         ? "Territory Partner Schedule-1 particulars saved. The agreement was already signed, so it has been unlocked for re-signing with the updated terms."
         : "Territory Partner Schedule-1 particulars saved.";
     header('Location: manage-agreements.php?tp_id=' . $tpId);
+    exit;
+}
+
+if ($action === 'save_cp_body_template' || $action === 'save_tp_body_template') {
+    $type = $action === 'save_cp_body_template' ? 'channel_partner' : 'territory_partner';
+    $bodyHtml = $_POST['body_html'] ?? '';
+    save_agreement_body_template($db_conn, $type, $bodyHtml, $updatedBy);
+    // The shared wording just changed for every partner of this type --
+    // same auto-unlock-on-change reasoning as the per-partner schedule
+    // saves above, just applied in bulk: every already-signed copy on file
+    // no longer matches these new terms.
+    $table = $type === 'channel_partner' ? 'channel_partner_agreements' : 'territory_partner_agreements';
+    $db_conn->query("UPDATE {$table} SET is_locked = 0 WHERE signed_at IS NOT NULL AND is_locked = 1");
+    $_SESSION['sucMessage'] = ($type === 'channel_partner' ? 'Channel Partner' : 'Territory Partner')
+        . " agreement wording saved. Every already-signed " . ($type === 'channel_partner' ? 'CP' : 'TP')
+        . " agreement has been unlocked for re-signing with the updated wording.";
+    header('Location: manage-agreements.php' . ($type === 'channel_partner' ? '' : '?tab=tp'));
     exit;
 }
 

@@ -21,6 +21,13 @@ $selectedTpId = (int) ($_GET['tp_id'] ?? 0);
 $cpAgreement = $selectedCpId ? get_or_create_cp_agreement($db_conn, $selectedCpId) : null;
 $tpAgreement = $selectedTpId ? get_or_create_tp_agreement($db_conn, $selectedTpId) : null;
 
+// Shared wording (clauses), editable via the "Edit Agreement Wording"
+// modals below -- see shared/AgreementService.php's get_effective_agreement_body()
+// for how this, a per-partner override, and the original hardcoded default
+// all fit together.
+$cpMasterBody = get_agreement_body_template($db_conn, 'channel_partner') ?? get_default_agreement_body('channel_partner');
+$tpMasterBody = get_agreement_body_template($db_conn, 'territory_partner') ?? get_default_agreement_body('territory_partner');
+
 // Territory Partner's own menu links here with ?tab=tp (or a tp_id, e.g.
 // from a submitted TP-tab form) so it lands straight on the TP pane
 // instead of always defaulting to the CP one.
@@ -44,6 +51,8 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css">
+    <style>.ql-editor{min-height:380px;font-size:13.5px;}</style>
 </head>
 <body>
 <div class="app align-content-stretch d-flex flex-wrap">
@@ -97,8 +106,8 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     <div class="tab-content">
                         <div class="tab-pane fade<?php echo $activeTab === 'cp' ? ' show active' : ''; ?>" id="cpPane">
                             <div class="card mb-3">
-                                <div class="card-body">
-                                    <form method="get">
+                                <div class="card-body d-flex justify-content-between align-items-end flex-wrap gap-3">
+                                    <form method="get" class="mb-0">
                                         <label class="form-label">Select Channel Partner</label>
                                         <select name="cp_id" class="form-control" onchange="this.form.submit()" style="max-width:420px;">
                                             <option value="0">-- Select --</option>
@@ -109,6 +118,7 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                             <?php endforeach; ?>
                                         </select>
                                     </form>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#cpMasterWordingModal">Edit Agreement Wording (CP)</button>
                                 </div>
                             </div>
                             <?php if ($cpAgreement): ?>
@@ -127,6 +137,16 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                     <form method="post" action="manage-agreements-action.php">
                                         <input type="hidden" name="action" value="save_cp_schedule">
                                         <input type="hidden" name="cp_id" value="<?php echo (int) $selectedCpId; ?>">
+                                        <input type="hidden" name="use_custom_body" id="cpUseCustomBodyInput" value="<?php echo !empty($cpAgreement['custom_body_html']) ? '1' : '0'; ?>">
+                                        <input type="hidden" name="custom_body_html" id="cpCustomBodyHtmlInput" value="<?php echo fv($cpAgreement['custom_body_html']); ?>">
+                                        <div class="mb-3">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#cpOverrideWordingModal">
+                                                <?php echo !empty($cpAgreement['custom_body_html']) ? 'Edit This CP\'s Custom Wording (active)' : 'Set Custom Wording for This CP Only'; ?>
+                                            </button>
+                                            <?php if (!empty($cpAgreement['custom_body_html'])): ?>
+                                            <span class="badge bg-info text-dark ms-1">Using custom wording, not the shared template</span>
+                                            <?php endif; ?>
+                                        </div>
                                         <div class="row g-3">
                                             <div class="col-md-4">
                                                 <label class="form-label">Security Deposit (Rs.)</label>
@@ -179,8 +199,8 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
 
                         <div class="tab-pane fade<?php echo $activeTab === 'tp' ? ' show active' : ''; ?>" id="tpPane">
                             <div class="card mb-3">
-                                <div class="card-body">
-                                    <form method="get">
+                                <div class="card-body d-flex justify-content-between align-items-end flex-wrap gap-3">
+                                    <form method="get" class="mb-0">
                                         <label class="form-label">Select Territory Partner</label>
                                         <select name="tp_id" class="form-control" onchange="this.form.submit()" style="max-width:420px;">
                                             <option value="0">-- Select --</option>
@@ -191,6 +211,7 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                             <?php endforeach; ?>
                                         </select>
                                     </form>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#tpMasterWordingModal">Edit Agreement Wording (TP)</button>
                                 </div>
                             </div>
                             <?php if ($tpAgreement): ?>
@@ -209,6 +230,16 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                     <form method="post" action="manage-agreements-action.php">
                                         <input type="hidden" name="action" value="save_tp_schedule">
                                         <input type="hidden" name="tp_id" value="<?php echo (int) $selectedTpId; ?>">
+                                        <input type="hidden" name="use_custom_body" id="tpUseCustomBodyInput" value="<?php echo !empty($tpAgreement['custom_body_html']) ? '1' : '0'; ?>">
+                                        <input type="hidden" name="custom_body_html" id="tpCustomBodyHtmlInput" value="<?php echo fv($tpAgreement['custom_body_html']); ?>">
+                                        <div class="mb-3">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#tpOverrideWordingModal">
+                                                <?php echo !empty($tpAgreement['custom_body_html']) ? 'Edit This TP\'s Custom Wording (active)' : 'Set Custom Wording for This TP Only'; ?>
+                                            </button>
+                                            <?php if (!empty($tpAgreement['custom_body_html'])): ?>
+                                            <span class="badge bg-info text-dark ms-1">Using custom wording, not the shared template</span>
+                                            <?php endif; ?>
+                                        </div>
                                         <div class="row g-3">
                                             <div class="col-md-4">
                                                 <label class="form-label">Approved Monthly Purchase Commitment (Rs.)</label>
@@ -257,11 +288,151 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
         </div>
     </div>
 </div>
+
+<!-- Shared master wording editors (apply to every CP / TP of that type) -->
+<div class="modal fade" id="cpMasterWordingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Agreement Wording — Channel Partner <small class="text-muted">(shared by all Channel Partners)</small></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size:12.5px;">Saving this unlocks every already-signed CP agreement for re-signing, since the wording they signed no longer matches.</p>
+                <div id="cpMasterEditor"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('cpMasterBodyHtml').value = cpMasterQuill.root.innerHTML; document.getElementById('cpMasterWordingForm').submit();">Save Wording (applies to all CPs)</button>
+            </div>
+        </div>
+    </div>
+</div>
+<form method="post" action="manage-agreements-action.php" id="cpMasterWordingForm" style="display:none;">
+    <input type="hidden" name="action" value="save_cp_body_template">
+    <input type="hidden" name="body_html" id="cpMasterBodyHtml">
+</form>
+
+<div class="modal fade" id="tpMasterWordingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Agreement Wording — Territory Partner <small class="text-muted">(shared by all Territory Partners)</small></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size:12.5px;">Saving this unlocks every already-signed TP agreement for re-signing, since the wording they signed no longer matches.</p>
+                <div id="tpMasterEditor"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('tpMasterBodyHtml').value = tpMasterQuill.root.innerHTML; document.getElementById('tpMasterWordingForm').submit();">Save Wording (applies to all TPs)</button>
+            </div>
+        </div>
+    </div>
+</div>
+<form method="post" action="manage-agreements-action.php" id="tpMasterWordingForm" style="display:none;">
+    <input type="hidden" name="action" value="save_tp_body_template">
+    <input type="hidden" name="body_html" id="tpMasterBodyHtml">
+</form>
+
+<?php if ($cpAgreement): ?>
+<!-- Per-partner override -- Apply only fills the hidden fields in the main
+     Schedule-1 form above; the partner's own Save button still submits it. -->
+<div class="modal fade" id="cpOverrideWordingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Custom Wording — <?php echo fv($cps[array_search($selectedCpId, array_column($cps, 'id'))]['name'] ?? 'this Channel Partner'); ?> <small class="text-muted">(this CP only)</small></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="cpOverrideEnabled" <?php echo !empty($cpAgreement['custom_body_html']) ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="cpOverrideEnabled">Use this custom wording for this Channel Partner instead of the shared template</label>
+                </div>
+                <div id="cpOverrideEditor"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="
+                    document.getElementById('cpUseCustomBodyInput').value = document.getElementById('cpOverrideEnabled').checked ? '1' : '0';
+                    document.getElementById('cpCustomBodyHtmlInput').value = cpOverrideQuill.root.innerHTML;
+                ">Apply (then click Save on the Schedule-1 form)</button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($tpAgreement): ?>
+<div class="modal fade" id="tpOverrideWordingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Custom Wording — <?php echo fv($tps[array_search($selectedTpId, array_column($tps, 'id'))]['name'] ?? 'this Territory Partner'); ?> <small class="text-muted">(this TP only)</small></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="tpOverrideEnabled" <?php echo !empty($tpAgreement['custom_body_html']) ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="tpOverrideEnabled">Use this custom wording for this Territory Partner instead of the shared template</label>
+                </div>
+                <div id="tpOverrideEditor"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="
+                    document.getElementById('tpUseCustomBodyInput').value = document.getElementById('tpOverrideEnabled').checked ? '1' : '0';
+                    document.getElementById('tpCustomBodyHtmlInput').value = tpOverrideQuill.root.innerHTML;
+                ">Apply (then click Save on the Schedule-1 form)</button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
 <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+<script>
+// Quill editors are created lazily on each modal's first "shown" event --
+// creating them while the modal is still display:none gives Quill a
+// zero-width container to measure, which breaks its toolbar/layout.
+var cpMasterQuill, tpMasterQuill, cpOverrideQuill, tpOverrideQuill;
+
+document.getElementById('cpMasterWordingModal').addEventListener('shown.bs.modal', function () {
+    if (!cpMasterQuill) {
+        cpMasterQuill = new Quill('#cpMasterEditor', { theme: 'snow' });
+        cpMasterQuill.root.innerHTML = <?php echo json_encode($cpMasterBody); ?>;
+    }
+});
+document.getElementById('tpMasterWordingModal').addEventListener('shown.bs.modal', function () {
+    if (!tpMasterQuill) {
+        tpMasterQuill = new Quill('#tpMasterEditor', { theme: 'snow' });
+        tpMasterQuill.root.innerHTML = <?php echo json_encode($tpMasterBody); ?>;
+    }
+});
+<?php if ($cpAgreement): ?>
+document.getElementById('cpOverrideWordingModal').addEventListener('shown.bs.modal', function () {
+    if (!cpOverrideQuill) {
+        cpOverrideQuill = new Quill('#cpOverrideEditor', { theme: 'snow' });
+        cpOverrideQuill.root.innerHTML = <?php echo json_encode($cpAgreement['custom_body_html'] ?: $cpMasterBody); ?>;
+    }
+});
+<?php endif; ?>
+<?php if ($tpAgreement): ?>
+document.getElementById('tpOverrideWordingModal').addEventListener('shown.bs.modal', function () {
+    if (!tpOverrideQuill) {
+        tpOverrideQuill = new Quill('#tpOverrideEditor', { theme: 'snow' });
+        tpOverrideQuill.root.innerHTML = <?php echo json_encode($tpAgreement['custom_body_html'] ?: $tpMasterBody); ?>;
+    }
+});
+<?php endif; ?>
+</script>
 </body>
 </html>

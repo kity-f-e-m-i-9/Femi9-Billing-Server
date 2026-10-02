@@ -127,7 +127,7 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                         <p>(hereinafter referred to as the "Territory Partner" or "TP", which expression shall, unless repugnant to the context or meaning thereof, include, where applicable, its successors, legal representatives, heirs, executors, administrators and permitted assigns).</p>
                         <p>FEMI9 and the Territory Partner are hereinafter individually referred to as a "Party" and collectively as the "Parties."</p>
 
-                        <p class="text-muted" style="font-style:italic;">(Clauses 1&ndash;25 of the standard Territory Partner Agreement apply — identical to the copy shown to the Territory Partner.)</p>
+                        <?php echo get_effective_agreement_body($db_conn, $agreement, 'territory_partner'); ?>
 
                         <h2>SCHEDULE &ndash; 1: TERRITORY / FIRKA ALLOCATION &amp; COMMERCIAL PARTICULARS</h2>
                         <div class="agr-field-row"><label>Territory Partner Name:</label><span class="agr-value"><?php echo fv($tp['name']); ?></span></div>
