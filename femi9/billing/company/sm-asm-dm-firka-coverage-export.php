@@ -226,13 +226,40 @@ foreach ($districtOrder as $key) {
     ]);
 }
 
-try {
-    $spreadsheet = new Spreadsheet();
-    $sheet = $spreadsheet->getActiveSheet();
-    $sheet->setTitle('SM-ASM-DM Firka Coverage');
+// One sheet per ASM -- districts with no ASM resolved (e.g. "Modern
+// Trade", or a district assigned straight to an SM with no ASM beneath
+// them) go into a trailing "Unassigned" sheet instead of being dropped.
+$rowsByAsm = [];
+$asmOrder = [];
+foreach ($rows as $r) {
+    $key = ($r['asm'] !== '—' && $r['asm'] !== null && $r['asm'] !== '') ? $r['asm'] : 'Unassigned';
+    if (!isset($rowsByAsm[$key])) { $rowsByAsm[$key] = []; $asmOrder[] = $key; }
+    $rowsByAsm[$key][] = $r;
+}
+sort($asmOrder, SORT_STRING | SORT_FLAG_CASE);
+$asmOrder = array_values(array_filter($asmOrder, fn($k) => $k !== 'Unassigned'));
+$asmOrder[] = 'Unassigned'; // always last, if present
 
-    $today = date('Y-m-d');
-    $sheet->setCellValue('A1', 'SM / ASM / District Manager — Firka Coverage — Tamil Nadu (as of ' . $today . ')');
+// Excel sheet names: max 31 chars, no : \ / ? * [ ], and must be unique
+// (two ASMs sharing a name after truncation get a numeric suffix).
+function excelSafeSheetName(string $name, array &$usedNames): string {
+    $clean = preg_replace('/[:\\\\\/\?\*\[\]]/', ' ', $name);
+    $clean = trim($clean);
+    if ($clean === '') { $clean = 'Sheet'; }
+    $base = mb_substr($clean, 0, 31);
+    $final = $base;
+    $n = 2;
+    while (isset($usedNames[mb_strtolower($final)])) {
+        $suffix = ' (' . $n . ')';
+        $final = mb_substr($base, 0, 31 - mb_strlen($suffix)) . $suffix;
+        $n++;
+    }
+    $usedNames[mb_strtolower($final)] = true;
+    return $final;
+}
+
+function writeCoverageSheet(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, string $sheetHeading, array $rows, string $today): void {
+    $sheet->setCellValue('A1', $sheetHeading . ' — Tamil Nadu (as of ' . $today . ')');
 
     $headerRow = 3;
     $columns = [
@@ -307,6 +334,23 @@ try {
     }
 
     $sheet->freezePane('A' . ($headerRow + 1));
+}
+
+try {
+    $today = date('Y-m-d');
+    $spreadsheet = new Spreadsheet();
+    $spreadsheet->removeSheetByIndex(0); // start empty, one sheet added per ASM below
+
+    $usedSheetNames = [];
+    foreach ($asmOrder as $asmName) {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle(excelSafeSheetName($asmName, $usedSheetNames));
+        $heading = $asmName === 'Unassigned'
+            ? 'SM / ASM / District Manager — Firka Coverage (No ASM Assigned)'
+            : 'SM / ASM / District Manager — Firka Coverage — ASM: ' . $asmName;
+        writeCoverageSheet($sheet, $heading, $rowsByAsm[$asmName], $today);
+    }
+    $spreadsheet->setActiveSheetIndex(0);
 
     $filename = "SM_ASM_DM_Firka_Coverage_{$today}.xlsx";
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
