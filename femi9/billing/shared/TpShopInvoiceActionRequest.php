@@ -28,11 +28,16 @@ function tpEnsureShopInvoiceActionRequestTable(mysqli $db): void
           reviewed_by_bdm_id INT UNSIGNED NULL,
           reviewed_by_name VARCHAR(255) NULL,
           reviewed_at TIMESTAMP NULL,
+          reason VARCHAR(500) NULL,
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           UNIQUE KEY uk_tsiar_tp_inv_action (territory_partner_id, inv_id, action_type),
           KEY idx_tsiar_status (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+    $col = $db->query("SHOW COLUMNS FROM tp_shop_invoice_action_requests LIKE 'reason'");
+    if ($col && $col->num_rows === 0) {
+        $db->query("ALTER TABLE tp_shop_invoice_action_requests ADD COLUMN reason VARCHAR(500) NULL AFTER reviewed_at");
+    }
 }
 
 function tpEnsureShopInvoiceEligibilityColumn(mysqli $db): void
@@ -95,6 +100,7 @@ function tpShopInvoiceActionRequestUpsert(mysqli $db, int $tpId, string $invId, 
           reviewed_by_bdm_id = IF(status = 'rejected', NULL, reviewed_by_bdm_id),
           reviewed_by_name   = IF(status = 'rejected', NULL, reviewed_by_name),
           reviewed_at        = IF(status = 'rejected', NULL, reviewed_at),
+          reason             = IF(status = 'rejected', NULL, reason),
           created_at         = IF(status = 'rejected', CURRENT_TIMESTAMP, created_at)
     ");
     $stmt->bind_param('iss', $tpId, $invId, $actionType);
@@ -103,14 +109,20 @@ function tpShopInvoiceActionRequestUpsert(mysqli $db, int $tpId, string $invId, 
     return $ok;
 }
 
-function tpShopInvoiceActionRequestReview(mysqli $db, int $requestId, string $status, ?int $bdmId, string $reviewerName): bool
+// $status != current status is the only guard — this intentionally allows
+// re-reviewing an already-decided request (e.g. revoking an 'approved' back
+// to 'rejected' once a TP is found to have misused it, or the reverse), not
+// just the original pending->decided transition. A click that doesn't
+// actually change anything (approving an already-approved row) is a no-op.
+function tpShopInvoiceActionRequestReview(mysqli $db, int $requestId, string $status, ?int $bdmId, string $reviewerName, ?string $reason = null): bool
 {
+    $reason = ($reason !== null && trim($reason) !== '') ? trim($reason) : null;
     $stmt = $db->prepare("
         UPDATE tp_shop_invoice_action_requests
-        SET status = ?, reviewed_by_bdm_id = ?, reviewed_by_name = ?, reviewed_at = NOW()
-        WHERE id = ? AND status = 'pending'
+        SET status = ?, reviewed_by_bdm_id = ?, reviewed_by_name = ?, reviewed_at = NOW(), reason = ?
+        WHERE id = ? AND status != ?
     ");
-    $stmt->bind_param('sisi', $status, $bdmId, $reviewerName, $requestId);
+    $stmt->bind_param('sissis', $status, $bdmId, $reviewerName, $reason, $requestId, $status);
     $stmt->execute();
     $ok = $stmt->affected_rows > 0;
     $stmt->close();

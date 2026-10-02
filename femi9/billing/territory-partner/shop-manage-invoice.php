@@ -91,6 +91,7 @@ $i          = $start_from;
                                                 <th>Status</th>
                                                 <th>Edit</th>
                                                 <th>Return (Credit&nbsp;Note)</th>
+                                                <th>Remove</th>
                                                 <th>History</th>
                                                 <th>Void</th>
                                                 <th>Delete</th>
@@ -239,9 +240,21 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                 if ($returnReqStatus === 'approved' && $result_product_list["sub_total"] > 0 && !$isVoided) { ?>
                                                 <a href="cnote_new.php?invuser=<?php echo $getinvuser; ?>&&InvoiceID=<?php echo $INVID_encode; ?>"><span class="badge badge-warning">Return</span></a>
                                                 <?php } elseif ($returnReqStatus === 'pending') { ?>
-                                                <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending</span>
+                                                <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending Return</span>
                                                 <?php } elseif ($result_product_list["sub_total"] > 0 && !$isVoided) { ?>
                                                 <button type="button" class="badge badge-style-bordered badge-primary request-shop-action-btn" style="border:none;cursor:pointer;" data-inv-id="<?php echo htmlspecialchars($result_product_list["inv_id"]); ?>" data-action-type="return">Request to Return</button>
+                                                <?php } else { echo "---"; } ?>
+                                                </td>
+
+                                                <td>
+                                                <?php
+                                                $removeReqStatus = tpShopInvoiceActionStatus($db_conn, (int)$Login_user_IDvl, $result_product_list["inv_id"], 'remove');
+                                                if ($removeReqStatus === 'approved' && $result_product_list["sub_total"] > 0 && !$isVoided) { ?>
+                                                <a href="shop-invoice-add.php?invuser=<?php echo $getinvuser; ?>&&action=edit&&InvoiceID=<?php echo $INVID_encode; ?>" title="Open this invoice to pick which product line(s) to remove"><span class="badge badge-danger">Approved to Remove</span></a>
+                                                <?php } elseif ($removeReqStatus === 'pending') { ?>
+                                                <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending Remove</span>
+                                                <?php } elseif ($result_product_list["sub_total"] > 0 && !$isVoided) { ?>
+                                                <button type="button" class="badge badge-style-bordered badge-primary request-shop-action-btn" style="border:none;cursor:pointer;" data-inv-id="<?php echo htmlspecialchars($result_product_list["inv_id"]); ?>" data-action-type="remove">Request to Remove</button>
                                                 <?php } else { echo "---"; } ?>
                                                 </td>
 

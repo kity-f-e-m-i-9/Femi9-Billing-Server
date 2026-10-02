@@ -150,17 +150,22 @@ if (empty($_SESSION['csrf_token'])) {
                                         ?></td>
                                         <td><span class="sir-badge <?php echo $r['action_type']; ?>"><?php echo ucfirst($r['action_type']); ?></span></td>
                                         <td><span class="sir-badge <?php echo $r['status']; ?>"><?php echo ucfirst($r['status']); ?></span></td>
-                                        <td style="font-size:11.5px;">
+                                        <td style="font-size:11.5px;max-width:200px;">
                                             <?php if ($r['reviewed_by_name']): ?>
                                                 <?php echo htmlspecialchars($r['reviewed_by_name']); ?><br>
                                                 <span class="text-muted"><?php echo date('d M Y h:i A', strtotime($r['reviewed_at'])); ?></span>
+                                                <?php if (!empty($r['reason'])): ?>
+                                                <br><span class="text-muted" style="font-style:italic;white-space:normal;">&ldquo;<?php echo htmlspecialchars($r['reason']); ?>&rdquo;</span>
+                                                <?php endif; ?>
                                             <?php else: ?>
                                                 <span class="text-muted">&mdash;</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
+                                        <td style="white-space:nowrap;">
                                             <?php if ($r['status'] === 'pending'): ?>
                                             <button type="button" class="btn btn-success btn-sm" onclick="sirReview(<?php echo $r['id']; ?>, 'approved')">Approve</button>
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="sirReview(<?php echo $r['id']; ?>, 'rejected')">Reject</button>
+                                            <?php elseif ($r['status'] === 'approved'): ?>
                                             <button type="button" class="btn btn-danger btn-sm" onclick="sirReview(<?php echo $r['id']; ?>, 'rejected')">Reject</button>
                                             <?php endif; ?>
                                         </td>
@@ -185,10 +190,14 @@ if (empty($_SESSION['csrf_token'])) {
 <script>
 var CSRF_TOKEN = '<?php echo $_SESSION['csrf_token']; ?>';
 function sirReview(id, decision) {
-    if (!confirm((decision === 'approved' ? 'Approve' : 'Reject') + ' this request?')) return;
+    var reason = prompt('Reason for ' + (decision === 'approved' ? 'approving' : 'rejecting') + ' this request:');
+    if (reason === null) return; // cancelled
+    reason = reason.trim();
+    if (!reason) { alert('Please enter a reason for ' + (decision === 'approved' ? 'approving' : 'rejecting') + ' this request.'); return; }
     fetch('shop-invoice-request-review-ajax.php', {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'id=' + encodeURIComponent(id) + '&decision=' + encodeURIComponent(decision) + '&csrf_token=' + encodeURIComponent(CSRF_TOKEN)
+        body: 'id=' + encodeURIComponent(id) + '&decision=' + encodeURIComponent(decision)
+            + '&reason=' + encodeURIComponent(reason) + '&csrf_token=' + encodeURIComponent(CSRF_TOKEN)
     })
         .then(function (r) { return r.json(); })
         .then(function (data) {
