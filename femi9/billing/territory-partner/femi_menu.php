@@ -113,9 +113,9 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
             </ul>
         </li>
 
-        <li>
+        <!-- <li>
             <a href="agreement.php"><i class="material-icons-two-tone">description</i>Agreement</a>
-        </li>
+        </li> -->
 
         <li>
             <a href="account-manager.php"><i class="material-icons-two-tone">info</i>Account Manager</a>
