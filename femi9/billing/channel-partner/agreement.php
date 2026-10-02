@@ -17,6 +17,8 @@ $stmtCp->close();
 $settings  = get_agreement_settings($db_conn);
 $agreement = get_or_create_cp_agreement($db_conn, $cp_id);
 $isLocked  = (int) ($agreement['is_locked'] ?? 0) === 1;
+// See territory-partner/agreement.php's identical $scheduleChanged for why.
+$scheduleChanged = agreement_needs_resign($agreement);
 
 if (isset($_SESSION['sucMessage'])) { $flashMsg = $_SESSION['sucMessage']; unset($_SESSION['sucMessage']); }
 if (isset($_SESSION['errorMessage'])) { $flashErr = $_SESSION['errorMessage']; unset($_SESSION['errorMessage']); }
@@ -52,6 +54,8 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
         .agr-sig-img { max-width:200px; max-height:44px; object-fit:contain; border-bottom:1px solid #9ca3af; }
         @media print { .no-print { display:none !important; } .agr-doc { border:none; } }
         .agr-locked-banner { background:#f0fdf4; border:1px solid #bbf7d0; color:#065f46; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:13px; }
+        .agr-schedule-changed { background:#fff9db; border:1px solid #ffe066; border-radius:8px; padding:12px 16px; margin:10px 0; }
+        .agr-schedule-changed .agr-field-row { margin:8px 0; }
         @media (max-width: 575.98px) {
             .agr-doc { padding:18px 16px; font-size:13px; }
             .agr-field-row { flex-direction:column; align-items:flex-start; gap:2px; }
@@ -244,15 +248,22 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                         <div class="agr-field-row"><label>Business / Entity Name:</label><span class="agr-value<?php echo empty($cp['company_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['company_name'] ?: 'Not applicable'); ?></span></div>
                         <div class="agr-field-row"><label>State:</label><span class="agr-value<?php echo empty($cp['branch_state']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['branch_state'] ?: '—'); ?></span></div>
                         <div class="agr-field-row"><label>District:</label><span class="agr-value<?php echo empty($cp['branch_district']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['branch_district'] ?: '—'); ?></span></div>
+                        <?php if ($scheduleChanged): ?>
+                        <p style="color:#92600a;font-size:12.5px;font-weight:600;margin:14px 0 2px;">&#9998; Updated by Company since your last signature &mdash; please review before signing again:</p>
+                        <div class="agr-schedule-changed">
+                        <?php endif; ?>
                         <div class="agr-field-row"><label>Approved Division(s):</label><span class="agr-value<?php echo empty($agreement['approved_divisions']) ? ' agr-blank' : ''; ?>"><?php echo nl2br(fv($agreement['approved_divisions'] ?: 'To be set by Company')); ?></span></div>
                         <div class="agr-field-row"><label>Division Code(s):</label><span class="agr-value<?php echo empty($agreement['division_codes']) ? ' agr-blank' : ''; ?>"><?php echo nl2br(fv($agreement['division_codes'] ?: '—')); ?></span></div>
                         <div class="agr-field-row"><label>Approved Warehouse Address:</label><span class="agr-value<?php echo empty($agreement['approved_warehouse_address']) ? ' agr-blank' : ''; ?>"><?php echo nl2br(fv($agreement['approved_warehouse_address'] ?: 'To be set by Company')); ?></span></div>
                         <div class="agr-field-row"><label>Applicable Security Deposit:</label><span class="agr-value<?php echo $agreement['security_deposit'] === null ? ' agr-blank' : ''; ?>"><?php echo $agreement['security_deposit'] !== null ? 'Rs. ' . fv(number_format((float)$agreement['security_deposit'], 2)) : 'To be set by Company'; ?></span></div>
                         <div class="agr-field-row"><label>Approved Stock Holding Capacity:</label><span class="agr-value<?php echo empty($agreement['stock_holding_capacity']) ? ' agr-blank' : ''; ?>"><?php echo fv($agreement['stock_holding_capacity'] ?: 'To be set by Company'); ?></span></div>
                         <div class="agr-field-row"><label>Applicable Commercial / Purchase Category:</label><span class="agr-value<?php echo empty($agreement['commercial_category']) ? ' agr-blank' : ''; ?>"><?php echo fv($agreement['commercial_category'] ?: 'To be set by Company'); ?></span></div>
-                        <div class="agr-field-row"><label>Monthly Business Return:</label><span class="agr-value">As per Clause 6 of this Agreement and the Company's prevailing Commercial Commitment Policy.</span></div>
                         <div class="agr-field-row"><label>Effective Date:</label><span class="agr-value<?php echo empty($agreement['effective_date']) ? ' agr-blank' : ''; ?>"><?php echo $agreement['effective_date'] ? fv(date('d-m-Y', strtotime($agreement['effective_date']))) : 'To be set by Company'; ?></span></div>
                         <div class="agr-field-row"><label>Other Approved Commercial Particulars:</label><span class="agr-value<?php echo empty($agreement['other_particulars']) ? ' agr-blank' : ''; ?>"><?php echo nl2br(fv($agreement['other_particulars'] ?: '—')); ?></span></div>
+                        <?php if ($scheduleChanged): ?>
+                        </div>
+                        <?php endif; ?>
+                        <div class="agr-field-row"><label>Monthly Business Return:</label><span class="agr-value">As per Clause 6 of this Agreement and the Company's prevailing Commercial Commitment Policy.</span></div>
                         <p>The above particulars shall remain valid subject to the Channel Partner's continued compliance with this Agreement, satisfactory operational performance and ongoing approval by FEMI9. Any modification to the above particulars shall be effective only upon written approval issued through the Company's authorized communication process.</p>
 
                         <h2>FINAL DECLARATION &amp; ACCEPTANCE</h2>

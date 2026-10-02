@@ -17,6 +17,12 @@ $stmtTp->close();
 $settings  = get_agreement_settings($db_conn);
 $agreement = get_or_create_tp_agreement($db_conn, $tp_id);
 $isLocked  = (int) ($agreement['is_locked'] ?? 0) === 1;
+// Signed once, then company edited Schedule-1 after that signature --
+// highlight it so the TP notices what needs re-review instead of having to
+// spot the change themselves (see agreement_needs_resign() for the exact
+// condition; same one driving the dashboard's "please review & sign again"
+// banner).
+$scheduleChanged = agreement_needs_resign($agreement);
 
 if (isset($_SESSION['sucMessage'])) { $flashMsg = $_SESSION['sucMessage']; unset($_SESSION['sucMessage']); }
 if (isset($_SESSION['errorMessage'])) { $flashErr = $_SESSION['errorMessage']; unset($_SESSION['errorMessage']); }
@@ -52,6 +58,8 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
         .agr-sig-img { max-width:200px; max-height:44px; object-fit:contain; border-bottom:1px solid #9ca3af; }
         @media print { .no-print { display:none !important; } .agr-doc { border:none; } }
         .agr-locked-banner { background:#f0fdf4; border:1px solid #bbf7d0; color:#065f46; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:13px; }
+        .agr-schedule-changed { background:#fff9db; border:1px solid #ffe066; border-radius:8px; padding:12px 16px; margin:10px 0; }
+        .agr-schedule-changed .agr-field-row { margin:8px 0; }
         @media (max-width: 575.98px) {
             .agr-doc { padding:18px 16px; font-size:13px; }
             .agr-field-row { flex-direction:column; align-items:flex-start; gap:2px; }
@@ -214,12 +222,19 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                         <div class="agr-field-row"><label>Territory Partner ID / Code:</label><span class="agr-value"><?php echo fv($tp['tp_id']); ?></span></div>
                         <div class="agr-field-row"><label>State:</label><span class="agr-value<?php echo empty($tp['branch_state']) ? ' agr-blank' : ''; ?>"><?php echo fv($tp['branch_state'] ?: '—'); ?></span></div>
                         <div class="agr-field-row"><label>District:</label><span class="agr-value<?php echo empty($tp['assigned_district']) ? ' agr-blank' : ''; ?>"><?php echo fv($tp['assigned_district'] ?: '—'); ?></span></div>
+                        <?php if ($scheduleChanged): ?>
+                        <p style="color:#92600a;font-size:12.5px;font-weight:600;margin:14px 0 2px;">&#9998; Updated by Company since your last signature &mdash; please review before signing again:</p>
+                        <div class="agr-schedule-changed">
+                        <?php endif; ?>
                         <div class="agr-field-row"><label>Taluk / Block:</label><span class="agr-value<?php echo empty($agreement['taluk_block']) ? ' agr-blank' : ''; ?>"><?php echo fv($agreement['taluk_block'] ?: 'To be set by Company'); ?></span></div>
                         <div class="agr-field-row"><label>Allotted Firka / Territory:</label><span class="agr-value<?php echo empty($agreement['territory_firka']) ? ' agr-blank' : ''; ?>"><?php echo nl2br(fv($agreement['territory_firka'] ?: 'To be set by Company')); ?></span></div>
                         <div class="agr-field-row"><label>Territory Code:</label><span class="agr-value<?php echo empty($agreement['territory_code']) ? ' agr-blank' : ''; ?>"><?php echo nl2br(fv($agreement['territory_code'] ?: '—')); ?></span></div>
                         <div class="agr-field-row"><label>Effective Date:</label><span class="agr-value<?php echo empty($agreement['effective_date']) ? ' agr-blank' : ''; ?>"><?php echo $agreement['effective_date'] ? fv(date('d-m-Y', strtotime($agreement['effective_date']))) : 'To be set by Company'; ?></span></div>
                         <div class="agr-field-row"><label>Approved Monthly Purchase Commitment:</label><span class="agr-value<?php echo $agreement['monthly_purchase_commitment'] === null ? ' agr-blank' : ''; ?>"><?php echo $agreement['monthly_purchase_commitment'] !== null ? 'Rs. ' . fv(number_format((float)$agreement['monthly_purchase_commitment'], 2)) . ' per Month' : 'To be set by Company'; ?></span></div>
                         <div class="agr-field-row"><label>Other Approved Commercial Particulars:</label><span class="agr-value<?php echo empty($agreement['other_particulars']) ? ' agr-blank' : ''; ?>"><?php echo nl2br(fv($agreement['other_particulars'] ?: '—')); ?></span></div>
+                        <?php if ($scheduleChanged): ?>
+                        </div>
+                        <?php endif; ?>
                         <p>The above Territory / Firka allocation is granted exclusively for the purpose of carrying on authorised business activities under this Agreement and shall remain subject to the Territory Partner's continued performance, compliance and fulfilment of all obligations set out in this Agreement. Any modification to the above particulars shall be valid only if approved and communicated by FEMI9 through an authorised written process.</p>
 
                         <h2>FINAL DECLARATION &amp; ACCEPTANCE</h2>
