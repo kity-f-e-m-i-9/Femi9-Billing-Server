@@ -21,6 +21,11 @@ $selectedTpId = (int) ($_GET['tp_id'] ?? 0);
 $cpAgreement = $selectedCpId ? get_or_create_cp_agreement($db_conn, $selectedCpId) : null;
 $tpAgreement = $selectedTpId ? get_or_create_tp_agreement($db_conn, $selectedTpId) : null;
 
+// Territory Partner's own menu links here with ?tab=tp (or a tp_id, e.g.
+// from a submitted TP-tab form) so it lands straight on the TP pane
+// instead of always defaulting to the CP one.
+$activeTab = ($_GET['tab'] ?? '') === 'tp' || $selectedTpId ? 'tp' : 'cp';
+
 if (isset($_SESSION['sucMessage'])) { $flashMsg = $_SESSION['sucMessage']; unset($_SESSION['sucMessage']); }
 
 function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, 'UTF-8'); }
@@ -85,12 +90,12 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     </div>
 
                     <ul class="nav nav-tabs mb-3" role="tablist">
-                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cpPane" type="button">Channel Partners</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tpPane" type="button">Territory Partners</button></li>
+                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'cp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#cpPane" type="button">Channel Partners</button></li>
+                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'tp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#tpPane" type="button">Territory Partners</button></li>
                     </ul>
 
                     <div class="tab-content">
-                        <div class="tab-pane fade show active" id="cpPane">
+                        <div class="tab-pane fade<?php echo $activeTab === 'cp' ? ' show active' : ''; ?>" id="cpPane">
                             <div class="card mb-3">
                                 <div class="card-body">
                                     <form method="get">
@@ -172,7 +177,7 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                             <?php endif; ?>
                         </div>
 
-                        <div class="tab-pane fade" id="tpPane">
+                        <div class="tab-pane fade<?php echo $activeTab === 'tp' ? ' show active' : ''; ?>" id="tpPane">
                             <div class="card mb-3">
                                 <div class="card-body">
                                     <form method="get">

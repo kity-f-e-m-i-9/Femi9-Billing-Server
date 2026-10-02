@@ -359,6 +359,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 							<li><a href="add-territory-partner">Add Territory Partner</a></li>
 							<li><a href="manage-territory-partner">Manage Territory Partner</a></li>
+							<li><a href="manage-agreements?tab=tp">Manage Agreements (CP/TP)</a></li>
 							<li><a href="tp-stock">TP Stock</a></li>
 							<li><a href="add-tp-input-stock">Add TP Input Stock</a></li>
 							<li><a href="tp-today-orders">Purchase Order</a></li>
@@ -877,6 +878,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
 							<li><a href="add-territory-partner">Add Territory Partner</a></li>
 							<li><a href="manage-territory-partner">Manage Territory Partner</a></li>
+							<li><a href="manage-agreements?tab=tp">Manage Agreements (CP/TP)</a></li>
 							<li><a href="tp-stock">TP Stock</a></li>
 							<li><a href="add-tp-input-stock">Add TP Input Stock</a></li>
 							<li><a href="tp-today-orders">Purchase Order</a></li>
