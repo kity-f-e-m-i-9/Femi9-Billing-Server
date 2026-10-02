@@ -210,11 +210,12 @@ $voidedCount = 0; $voidedValue = 0; $voidedInvIds = [];
 if (!empty($invoiceIds)) {
     $idList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $invoiceIds)) . "'";
 
-    $resVal = $db_conn->query("SELECT inv_id, total, status FROM user_invoice WHERE inv_id IN ($idList)");
-    $invTotals = []; $invStatus = [];
+    $resVal = $db_conn->query("SELECT inv_id, total, status, deleted_at FROM user_invoice WHERE inv_id IN ($idList)");
+    $invTotals = []; $invStatus = []; $invDeletedAt = [];
     while ($vr = mysqli_fetch_assoc($resVal)) {
         $invTotals[$vr['inv_id']] = (float)$vr['total'];
         $invStatus[$vr['inv_id']] = $vr['status'];
+        $invDeletedAt[$vr['inv_id']] = $vr['deleted_at'];
         $totalInvoiceValue += (float)$vr['total'];
     }
 
@@ -234,6 +235,36 @@ if (!empty($invoiceIds)) {
             $partiallyPaidCount++; $partiallyPaidReceived += $rec; $partiallyPaidInvIds[] = $iid;
         }
     }
+}
+
+// ── Returned Amount / Deleted Invoice Amount ────────────────────────────────
+// Total Invoice Value above is raw (includes deleted/cancelled, doesn't
+// subtract returns) -- these two cards surface what's hiding inside it.
+// Same convention as company/asm-dm-order-conversion-export.php:
+// user_return_stock.invnumber actually matches user_invoice.inv_id (not
+// inv_number, despite the column name), confirmed against live data.
+$deletedInvoiceAmt = 0.0;
+$liveInvIdsForReturns = [];
+foreach ($invTotals as $iid => $tot) {
+    if (!empty($invDeletedAt[$iid])) { $deletedInvoiceAmt += $tot; continue; }
+    if (($invStatus[$iid] ?? '') === 'cancelled') { continue; }
+    $liveInvIdsForReturns[] = $iid;
+}
+$returnedAmt = 0.0;
+if (!empty($liveInvIdsForReturns)) {
+    $placeholdersR = implode(',', array_fill(0, count($liveInvIdsForReturns), '?'));
+    $typesR = str_repeat('s', count($liveInvIdsForReturns));
+    $stmtR = $db_conn->prepare(
+        "SELECT invnumber, returnid, MAX(total) AS total
+         FROM user_return_stock
+         WHERE invnumber IN ($placeholdersR) AND deleted_at IS NULL
+         GROUP BY invnumber, returnid"
+    );
+    $stmtR->bind_param($typesR, ...$liveInvIdsForReturns);
+    $stmtR->execute();
+    $resR = $stmtR->get_result();
+    while ($rr2 = $resR->fetch_assoc()) { $returnedAmt += (float)$rr2['total']; }
+    $stmtR->close();
 }
 
 // Product-wise qty breakdown for a set of invoice ids — used by both the
@@ -453,7 +484,8 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
 									<tr>
 									<td>Manage Orders <font size="3">(<?php echo $showAllOrders ? 'All Get Orders, incl. TP-assigned' : 'Product Orders'; ?>)</font><?php if ($isTeamMode): ?> &mdash; <?php echo htmlspecialchars($teamRootName ?: 'Team'); ?>'s team (<?php echo count($viewMsIds); ?>)<?php endif; ?></td>
 									<td>
-									<a href="manager_order_csv?frd=<?=$from_date;?>&&tod=<?=$to_date;?><?=!$viewingSelf ? ($isTeamMode ? '&&view_ms_ids='.htmlspecialchars(implode(',', $viewMsIds)) : '&&view_ms_id='.(int)$viewMsId) : '';?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
+									<a href="manager_order_csv?frd=<?=$from_date;?>&&tod=<?=$to_date;?><?=!$viewingSelf ? ($isTeamMode ? '&&view_ms_ids='.htmlspecialchars(implode(',', $viewMsIds)) : '&&view_ms_id='.(int)$viewMsId) : '';?>" title="Export order list (products)"><img src="../../assets/images/excel-3-32.png"></a>
+									<a href="manage_order_invoice_export.php?frd=<?=$from_date;?>&&tod=<?=$to_date;?><?=!$viewingSelf ? ($isTeamMode ? '&&view_ms_ids='.htmlspecialchars(implode(',', $viewMsIds)) : '&&view_ms_id='.(int)$viewMsId) : '';?>" title="Export invoice value breakdown (incl. returns &amp; deletions)" style="margin-left:6px;"><img src="../../assets/images/excel-3-32.png"></a>
 									</td>
 									</tr>
 									</table>
@@ -552,6 +584,23 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
             <i class="material-icons-outlined kpi-ico">payments</i>
             <div class="kpi-t">Total Invoice Value</div>
             <div class="kpi-v">&#8377;<?php echo inr_format($totalInvoiceValue, 2); ?></div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="kpi-card">
+            <i class="material-icons-outlined kpi-ico">assignment_return</i>
+            <div class="kpi-t">Returned Amount</div>
+            <div class="kpi-v">&#8377;<?php echo inr_format($returnedAmt, 2); ?></div>
+            <div class="kpi-sub">Against live invoices in this range</div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="kpi-card">
+            <i class="material-icons-outlined kpi-ico">delete_outline</i>
+            <div class="kpi-t">Deleted Invoice Amount</div>
+            <div class="kpi-v">&#8377;<?php echo inr_format($deletedInvoiceAmt, 2); ?></div>
         </div>
     </div>
 
