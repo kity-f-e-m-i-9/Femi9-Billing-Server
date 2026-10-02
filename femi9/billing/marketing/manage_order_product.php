@@ -484,8 +484,7 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
 									<tr>
 									<td>Manage Orders <font size="3">(<?php echo $showAllOrders ? 'All Get Orders, incl. TP-assigned' : 'Product Orders'; ?>)</font><?php if ($isTeamMode): ?> &mdash; <?php echo htmlspecialchars($teamRootName ?: 'Team'); ?>'s team (<?php echo count($viewMsIds); ?>)<?php endif; ?></td>
 									<td>
-									<a href="manager_order_csv?frd=<?=$from_date;?>&&tod=<?=$to_date;?><?=!$viewingSelf ? ($isTeamMode ? '&&view_ms_ids='.htmlspecialchars(implode(',', $viewMsIds)) : '&&view_ms_id='.(int)$viewMsId) : '';?>" title="Export order list (products)"><img src="../../assets/images/excel-3-32.png"></a>
-									<a href="manage_order_invoice_export.php?frd=<?=$from_date;?>&&tod=<?=$to_date;?><?=!$viewingSelf ? ($isTeamMode ? '&&view_ms_ids='.htmlspecialchars(implode(',', $viewMsIds)) : '&&view_ms_id='.(int)$viewMsId) : '';?>" title="Export invoice value breakdown (incl. returns &amp; deletions)" style="margin-left:6px;"><img src="../../assets/images/excel-3-32.png"></a>
+									<a href="manager_order_csv?frd=<?=$from_date;?>&&tod=<?=$to_date;?><?=!$viewingSelf ? ($isTeamMode ? '&&view_ms_ids='.htmlspecialchars(implode(',', $viewMsIds)) : '&&view_ms_id='.(int)$viewMsId) : '';?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
 									</td>
 									</tr>
 									</table>
