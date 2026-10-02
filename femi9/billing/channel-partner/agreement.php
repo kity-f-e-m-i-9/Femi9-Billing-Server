@@ -54,7 +54,8 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
         .agr-sig-img { max-width:200px; max-height:44px; object-fit:contain; border-bottom:1px solid #9ca3af; }
         @media print { .no-print { display:none !important; } .agr-doc { border:none; } }
         .agr-locked-banner { background:#f0fdf4; border:1px solid #bbf7d0; color:#065f46; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:13px; }
-        .agr-schedule-changed { background:#fff9db; border:1px solid #ffe066; border-radius:8px; padding:12px 16px; margin:10px 0; }
+        .agr-schedule-changed { background:#ffd400; border:1px solid #c9a600; border-radius:8px; padding:12px 16px; margin:10px 0; }
+        .agr-schedule-changed .agr-field-row label, .agr-schedule-changed .agr-value { color:#1f2937; }
         .agr-schedule-changed .agr-field-row { margin:8px 0; }
         @media (max-width: 575.98px) {
             .agr-doc { padding:18px 16px; font-size:13px; }
