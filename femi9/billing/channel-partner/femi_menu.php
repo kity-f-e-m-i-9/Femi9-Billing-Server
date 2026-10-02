@@ -33,6 +33,10 @@
         </li>
 
         <li>
+            <a href="agreement.php"><i class="material-icons-two-tone">description</i>Agreement</a>
+        </li>
+
+        <li>
             <a href="my-profile.php"><i class="material-icons-two-tone">manage_accounts</i>My Profile</a>
         </li>
 
