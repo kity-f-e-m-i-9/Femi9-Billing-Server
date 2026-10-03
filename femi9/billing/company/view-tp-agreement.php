@@ -156,6 +156,13 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                 <span class="agr-value agr-blank">Not yet signed</span>
                             <?php endif; ?>
                         </div>
+                        <div class="agr-field-row"><label>PAN Card:</label>
+                            <?php if (!empty($agreement['pan_card_path'])): ?>
+                                <a href="../territory-partner/kyc_documents/<?php echo fv($agreement['pan_card_path']); ?>" target="_blank" class="agr-value">View Uploaded PAN Card</a>
+                            <?php else: ?>
+                                <span class="agr-value agr-blank">Not uploaded</span>
+                            <?php endif; ?>
+                        </div>
 
                         <div class="agr-witness-box">
                             <p style="font-weight:700;">WITNESS &ndash; 1</p>

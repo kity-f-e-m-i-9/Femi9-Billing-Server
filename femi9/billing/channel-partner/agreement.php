@@ -20,6 +20,9 @@ $isLocked  = (int) ($agreement['is_locked'] ?? 0) === 1;
 // See territory-partner/agreement.php's identical $scheduleChanged for why.
 $scheduleChanged = agreement_needs_resign($agreement);
 
+// See territory-partner/agreement.php's identical $profileChanged for why.
+$profileChanged = get_profile_change_flags($cp, $agreement);
+
 if (isset($_SESSION['sucMessage'])) { $flashMsg = $_SESSION['sucMessage']; unset($_SESSION['sucMessage']); }
 if (isset($_SESSION['errorMessage'])) { $flashErr = $_SESSION['errorMessage']; unset($_SESSION['errorMessage']); }
 
@@ -57,6 +60,10 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
         .agr-schedule-changed { background:#ffd400; border:1px solid #c9a600; border-radius:8px; padding:12px 16px; margin:10px 0; }
         .agr-schedule-changed .agr-field-row label, .agr-schedule-changed .agr-value { color:#1f2937; }
         .agr-schedule-changed .agr-field-row { margin:8px 0; }
+        .agr-field-row.agr-row-changed { background:#ffd400; border:1px solid #c9a600; border-radius:8px; padding:8px 12px; }
+        .agr-field-row.agr-row-changed label, .agr-field-row.agr-row-changed .agr-value { color:#1f2937; }
+        .agr-wording-changed { background:#ffd400; border:1px solid #c9a600; border-radius:8px; padding:4px 14px; margin:10px 0; }
+        .agr-word-changed { background:#ffd400; border-radius:3px; padding:0 2px; box-shadow:0 0 0 1px #c9a600; }
         @media (max-width: 575.98px) {
             .agr-doc { padding:18px 16px; font-size:13px; }
             .agr-field-row { flex-direction:column; align-items:flex-start; gap:2px; }
@@ -99,7 +106,7 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     </div>
                     <?php endif; ?>
 
-                    <form method="post" action="agreement-action.php" id="agreementForm" onsubmit="return prepareSignaturesAndValidate();">
+                    <form method="post" action="agreement-action.php" id="agreementForm" enctype="multipart/form-data" onsubmit="return prepareSignaturesAndValidate();">
                     <input type="hidden" name="csrf_token" value="<?php echo fv($_SESSION['csrf_token']); ?>">
                     <div class="agr-doc">
                         <h1>FEMI9 LLP DIVISION CHANNEL PARTNER AGREEMENT</h1>
@@ -140,21 +147,26 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
 
                         <h2>AND</h2>
                         <p><strong>CHANNEL PARTNER</strong></p>
-                        <div class="agr-field-row"><label>Name:</label><span class="agr-value"><?php echo fv($cp['name']); ?></span></div>
-                        <div class="agr-field-row"><label>Business / Entity Name:</label><span class="agr-value<?php echo empty($cp['company_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['company_name'] ?: 'Not applicable'); ?></span></div>
-                        <div class="agr-field-row"><label>Address:</label><span class="agr-value"><?php echo fv($cp['address']); ?></span></div>
-                        <div class="agr-field-row"><label>Mobile Number:</label><span class="agr-value"><?php echo fv($cp['mobile']); ?></span></div>
-                        <div class="agr-field-row"><label>Email Address:</label><span class="agr-value<?php echo empty($cp['email']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['email'] ?: '—'); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['name'] ? ' agr-row-changed' : ''; ?>"><label>Name:</label><span class="agr-value"><?php echo fv($cp['name']); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['company_name'] ? ' agr-row-changed' : ''; ?>"><label>Business / Entity Name:</label><span class="agr-value<?php echo empty($cp['company_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['company_name'] ?: 'Not applicable'); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['address'] ? ' agr-row-changed' : ''; ?>"><label>Address:</label><span class="agr-value"><?php echo fv($cp['address']); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['mobile'] ? ' agr-row-changed' : ''; ?>"><label>Mobile Number:</label><span class="agr-value"><?php echo fv($cp['mobile']); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['email'] ? ' agr-row-changed' : ''; ?>"><label>Email Address:</label><span class="agr-value<?php echo empty($cp['email']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['email'] ?: '—'); ?></span></div>
                         <p>(hereinafter referred to as the "Channel Partner" or "CP", which expression shall, unless repugnant to the context or meaning thereof, include, where applicable, its successors, legal representatives, heirs, executors, administrators and permitted assigns).</p>
                         <p>FEMI9 and the Channel Partner are hereinafter individually referred to as a "Party" and collectively as the "Parties."</p>
 
-                        <?php echo get_effective_agreement_body($db_conn, $agreement, 'channel_partner'); ?>
+                        <?php
+                        $effectiveBody = get_effective_agreement_body($db_conn, $agreement, 'channel_partner');
+                        echo (!empty($agreement['signed_at']))
+                            ? diff_highlight_agreement_body($agreement['snap_body_html'] ?? null, $effectiveBody)
+                            : $effectiveBody;
+                        ?>
 
                         <h2>SCHEDULE &ndash; 1: DIVISION ALLOCATION &amp; COMMERCIAL PARTICULARS</h2>
                         <p>The particulars contained in this Schedule shall form an integral part of this Division Channel Partner Agreement and shall be read together with all the terms and conditions contained herein.</p>
-                        <div class="agr-field-row"><label>Channel Partner Name:</label><span class="agr-value"><?php echo fv($cp['name']); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['name'] ? ' agr-row-changed' : ''; ?>"><label>Channel Partner Name:</label><span class="agr-value"><?php echo fv($cp['name']); ?></span></div>
                         <div class="agr-field-row"><label>Channel Partner ID / Code:</label><span class="agr-value"><?php echo fv($cp['cp_id']); ?></span></div>
-                        <div class="agr-field-row"><label>Business / Entity Name:</label><span class="agr-value<?php echo empty($cp['company_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['company_name'] ?: 'Not applicable'); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['company_name'] ? ' agr-row-changed' : ''; ?>"><label>Business / Entity Name:</label><span class="agr-value<?php echo empty($cp['company_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['company_name'] ?: 'Not applicable'); ?></span></div>
                         <div class="agr-field-row"><label>State:</label><span class="agr-value<?php echo empty($cp['branch_state']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['branch_state'] ?: '—'); ?></span></div>
                         <div class="agr-field-row"><label>District:</label><span class="agr-value<?php echo empty($cp['branch_district']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['branch_district'] ?: '—'); ?></span></div>
                         <?php if ($scheduleChanged): ?>
@@ -197,8 +209,8 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                         <div class="agr-field-row"><label>Designation:</label><span class="agr-value<?php echo empty($settings['authorized_signatory_designation']) ? ' agr-blank' : ''; ?>"><?php echo fv($settings['authorized_signatory_designation'] ?: 'To be set by Company'); ?></span></div>
 
                         <p style="margin-top:18px;"><strong>FOR THE CHANNEL PARTNER</strong></p>
-                        <div class="agr-field-row"><label>Name:</label><span class="agr-value"><?php echo fv($cp['name']); ?></span></div>
-                        <div class="agr-field-row"><label>Business / Entity Name:</label><span class="agr-value<?php echo empty($cp['company_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['company_name'] ?: 'Not applicable'); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['name'] ? ' agr-row-changed' : ''; ?>"><label>Name:</label><span class="agr-value"><?php echo fv($cp['name']); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['company_name'] ? ' agr-row-changed' : ''; ?>"><label>Business / Entity Name:</label><span class="agr-value<?php echo empty($cp['company_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['company_name'] ?: 'Not applicable'); ?></span></div>
                         <div class="agr-field-row"><label>Designation:</label>
                             <?php if ($isLocked): ?><span class="agr-value"><?php echo fv($agreement['cp_designation']); ?></span>
                             <?php else: ?><input type="text" name="cp_designation" value="<?php echo fv($agreement['cp_designation']); ?>" placeholder="e.g. Proprietor">
@@ -212,6 +224,19 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                 <span class="agr-value agr-blank">&mdash;</span>
                             <?php endif; ?>
                         </div>
+                        <?php elseif (!empty($agreement['cp_signature'])): ?>
+                        <div class="agr-sig-block no-print">
+                            <label style="font-weight:600;display:block;margin-bottom:6px;">Signature:</label>
+                            <label style="font-weight:normal;display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                                <input type="radio" name="sig_choice" id="sigChoiceReuse" checked> Use my previous signature
+                            </label>
+                            <img src="<?php echo fv($agreement['cp_signature']); ?>" class="agr-sig-img" style="margin-bottom:10px;">
+                            <label style="font-weight:normal;display:flex;align-items:center;gap:6px;">
+                                <input type="radio" name="sig_choice" id="sigChoiceNew"> Draw a new signature instead
+                            </label>
+                            <div id="cpSigContainer" style="display:none;margin-top:8px;"></div>
+                            <input type="hidden" name="cp_signature" id="cp_signature_input" value="<?php echo fv($agreement['cp_signature']); ?>">
+                        </div>
                         <?php else: ?>
                         <div class="agr-sig-block">
                             <label style="font-weight:600;display:block;margin-bottom:6px;">Signature:</label>
@@ -219,6 +244,23 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                             <input type="hidden" name="cp_signature" id="cp_signature_input">
                         </div>
                         <?php endif; ?>
+
+                        <div class="agr-field-row"><label>PAN Card:</label>
+                            <?php if ($isLocked): ?>
+                                <?php if (!empty($agreement['pan_card_path'])): ?>
+                                    <a href="kyc_documents/<?php echo fv($agreement['pan_card_path']); ?>" target="_blank" class="agr-value">View Uploaded PAN Card</a>
+                                <?php else: ?>
+                                    <span class="agr-value agr-blank">Not uploaded</span>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <?php if (!empty($agreement['pan_card_path'])): ?>
+                                    <a href="kyc_documents/<?php echo fv($agreement['pan_card_path']); ?>" target="_blank" class="agr-value no-print">Currently uploaded — view</a>
+                                    <div class="form-text no-print">Choose a file below only if you want to replace it.</div>
+                                <?php endif; ?>
+                                <input type="file" name="pan_card" id="pan_card_input" accept=".jpg,.jpeg,.png,.pdf" class="no-print">
+                                <div class="form-text no-print">JPG, PNG or PDF, up to 5 MB.</div>
+                            <?php endif; ?>
+                        </div>
 
                         <div class="agr-witness-box">
                             <p style="font-weight:700;">WITNESS &ndash; 1</p>
@@ -308,12 +350,39 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
     initSignaturePad('witness1SigContainer', 'witness1_signature_input');
     initSignaturePad('witness2SigContainer', 'witness2_signature_input');
 
+    // Re-sign flow: default to reusing the signature already on file instead
+    // of forcing a fresh draw every time the Company edits the schedule or
+    // wording — switching to "Draw a new signature" clears it so a stale
+    // value can never be submitted alongside an unfinished new drawing.
+    (function () {
+        var reuse = document.getElementById('sigChoiceReuse');
+        var fresh = document.getElementById('sigChoiceNew');
+        var sigContainer = document.getElementById('cpSigContainer');
+        var sigInput = document.getElementById('cp_signature_input');
+        if (!reuse || !fresh) return;
+        var previousSignature = sigInput.value;
+        reuse.addEventListener('change', function () {
+            if (this.checked) { sigContainer.style.display = 'none'; sigInput.value = previousSignature; }
+        });
+        fresh.addEventListener('change', function () {
+            if (this.checked) { sigContainer.style.display = ''; sigInput.value = ''; }
+        });
+    })();
+
     function prepareSignaturesAndValidate() {
         // Only the Channel Partner's own signature is mandatory — witnesses
         // are optional, and filling in just one of the two is fine (not
         // both required). Confirmed 2026-09-28.
         var cpSig = document.getElementById('cp_signature_input').value;
         if (!cpSig) { alert('Please provide your signature (draw or type) before submitting.'); return false; }
+
+        var panInput = document.getElementById('pan_card_input');
+        var hasExistingPan = <?php echo !empty($agreement['pan_card_path']) ? 'true' : 'false'; ?>;
+        if (panInput && !panInput.files.length && !hasExistingPan) {
+            alert('Please upload your PAN card before submitting.');
+            return false;
+        }
+
         return confirm('Once submitted, this agreement cannot be edited. Do you want to submit it now?');
     }
 </script>

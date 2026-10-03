@@ -10,6 +10,10 @@ femi9/billing/territory-partner/courier_payment_screenshots/*
 !femi9/billing/territory-partner/courier_payment_screenshots/.gitkeep
 femi9/billing/territory-partner/courier_qr/*
 !femi9/billing/territory-partner/courier_qr/.gitkeep
+femi9/billing/territory-partner/kyc_documents/*
+!femi9/billing/territory-partner/kyc_documents/.gitkeep
+femi9/billing/channel-partner/kyc_documents/*
+!femi9/billing/channel-partner/kyc_documents/.gitkeep
 
 # Local DB credentials — must never be reverted by git checkout/reset/pull.
 femi9/billing/shared/.env
