@@ -89,6 +89,7 @@ if (!empty($allTpIds)) {
     $stmtRows = $db_conn->prepare(
         "SELECT ui.inv_id, ui.inv_number, ui.date, ui.total, ui.to_user_id,
                 tp.id AS tp_pk, tp.name AS tp_name, tp.tp_id AS tp_code, tp.mobile AS tp_mobile,
+                COALESCE(NULLIF(tp.assigned_district,''), tp.branch_district) AS tp_district,
                 COALESCE((
                     SELECT SUM(pln.target_amount) FROM territory_partner_locations tpl
                     JOIN partner_location_nodes pln ON pln.id = tpl.location_id
@@ -378,7 +379,15 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                         </form>
                                     </div>
 
-                                    <div style="padding:14px 20px 0;display:flex;justify-content:flex-end;">
+                                    <div style="padding:14px 20px 0;display:flex;justify-content:flex-end;gap:10px;">
+                                        <?php if (count($districtNames) > 1): ?>
+                                        <select id="shopInvDistrictFilter" class="dash-search" style="max-width:220px;">
+                                            <option value="all">All Districts</option>
+                                            <?php foreach ($districtNames as $dn): ?>
+                                            <option value="<?php echo htmlspecialchars($dn); ?>"><?php echo htmlspecialchars($dn); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <?php endif; ?>
                                         <input type="text" id="shopInvSearch" class="dash-search" placeholder="Search invoices…">
                                     </div>
 
@@ -412,6 +421,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                     'tp_name'   => ucwords(strtolower($r['tp_name'])),
                                     'tp_code'   => $r['tp_code'],
                                     'tp_mobile' => $r['tp_mobile'],
+                                    'tp_district'=> $r['tp_district'],
                                     'tp_target' => (float)$r['tp_target'],
                                     'inv_number'=> $r['inv_number'],
                                     'inv_id'    => base64_encode($r['inv_id']),
@@ -421,15 +431,17 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                             var pageSize = 10;
                             var currentPage = 1;
                             var searchTerm = '';
+                            var currentDistrict = 'all';
 
                             var escDiv = document.createElement('div');
                             function esc(s) { escDiv.textContent = (s == null ? '' : s); return escDiv.innerHTML; }
                             function money(n) { return '&#8377;' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
 
                             function filteredRows() {
-                                if (!searchTerm) return allRows;
                                 return allRows.filter(function (r) {
-                                    return (r.tp_name + ' ' + r.tp_code + ' ' + r.tp_mobile + ' ' + r.inv_number).toLowerCase().indexOf(searchTerm) > -1;
+                                    if (currentDistrict !== 'all' && (r.tp_district || '').toLowerCase() !== currentDistrict.toLowerCase()) return false;
+                                    if (searchTerm && (r.tp_name + ' ' + r.tp_code + ' ' + r.tp_mobile + ' ' + r.inv_number).toLowerCase().indexOf(searchTerm) === -1) return false;
+                                    return true;
                                 });
                             }
 
@@ -462,7 +474,11 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
 
                                 var pHtml = '<span class="mis-pg-info">' + (start + 1) + '–' + Math.min(start + pageSize, rows.length) + ' of ' + rows.length + '</span>';
                                 pHtml += '<button type="button" data-pg="prev"' + (currentPage === 1 ? ' disabled' : '') + '>Prev</button>';
-                                for (var p = 1; p <= totalPages; p++) {
+                                var winSize = 5;
+                                var winStart = Math.max(1, currentPage - Math.floor(winSize / 2));
+                                var winEnd = Math.min(totalPages, winStart + winSize - 1);
+                                winStart = Math.max(1, winEnd - winSize + 1);
+                                for (var p = winStart; p <= winEnd; p++) {
                                     pHtml += '<button type="button" data-pg="' + p + '" class="' + (p === currentPage ? 'active' : '') + '">' + p + '</button>';
                                 }
                                 pHtml += '<button type="button" data-pg="next"' + (currentPage === totalPages ? ' disabled' : '') + '>Next</button>';
@@ -485,6 +501,15 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                 currentPage = 1;
                                 render();
                             });
+
+                            var shopInvDistrictFilter = document.getElementById('shopInvDistrictFilter');
+                            if (shopInvDistrictFilter) {
+                                shopInvDistrictFilter.addEventListener('change', function () {
+                                    currentDistrict = this.value;
+                                    currentPage = 1;
+                                    render();
+                                });
+                            }
 
                             render();
                         })();
@@ -581,7 +606,15 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                             <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
                                 <div class="modal-content">
                                     <div class="modal-header">
-                                        <h6 class="modal-title" style="font-weight:700;">Vacant Firkas — <?php echo htmlspecialchars($districtLabel); ?></h6>
+                                        <h6 class="modal-title" style="font-weight:700;">
+                                            Vacant Firkas —
+                                            <?php if (count($districtNames) > 2): ?>
+                                            <span id="vfDistrictShort"><?php echo htmlspecialchars(implode(', ', array_slice($districtNames, 0, 2))); ?>, <a href="#" id="vfReadMoreBtn" style="font-weight:600;">+<?php echo count($districtNames) - 2; ?> more</a></span>
+                                            <span id="vfDistrictFull" style="display:none;"><?php echo htmlspecialchars($districtLabel); ?> <a href="#" id="vfShowLessBtn" style="font-weight:600;">Show less</a></span>
+                                            <?php else: ?>
+                                            <?php echo htmlspecialchars($districtLabel); ?>
+                                            <?php endif; ?>
+                                        </h6>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body" style="padding:0;">
@@ -592,6 +625,16 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                             <p>Every Firka in your district already has a TP.</p>
                                         </div>
                                         <?php else: ?>
+                                        <?php if (count($districtNames) > 1): ?>
+                                        <div style="padding:14px 20px 0;">
+                                            <select id="vacantFirkaDistrictFilter" class="dash-search" style="max-width:220px;">
+                                                <option value="all">All Districts</option>
+                                                <?php foreach ($districtNames as $dn): ?>
+                                                <option value="<?php echo htmlspecialchars($dn); ?>"><?php echo htmlspecialchars($dn); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <?php endif; ?>
                                         <table class="tp-table">
                                             <thead>
                                                 <tr>
@@ -600,9 +643,9 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                                     <th style="text-align:right;">Target Amount</th>
                                                 </tr>
                                             </thead>
-                                            <tbody>
+                                            <tbody id="vacantFirkaTbody">
                                             <?php foreach ($vacantFirkas as $vf): ?>
-                                                <tr>
+                                                <tr data-district="<?php echo htmlspecialchars($vf['district_name']); ?>" data-amount="<?php echo (float)$vf['target_amount']; ?>">
                                                     <td><span class="mobile-text"><?php echo htmlspecialchars($vf['district_name']); ?></span></td>
                                                     <td><span class="tp-name"><?php echo htmlspecialchars($vf['firka_name']); ?></span></td>
                                                     <td style="text-align:right;">
@@ -616,13 +659,54 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                     </div>
                                     <?php if (!empty($vacantFirkas)): ?>
                                     <div class="modal-footer" style="justify-content:space-between;">
-                                        <span style="font-size:12.5px;color:#6b7280;"><?php echo count($vacantFirkas); ?> vacant Firka(s)</span>
-                                        <span style="font-weight:700;color:#ef4444;">&#8377;<?php echo inr_format($districtStats['target_unassigned_amount'], 0); ?> total</span>
+                                        <span id="vacantFirkaCount" style="font-size:12.5px;color:#6b7280;"><?php echo count($vacantFirkas); ?> vacant Firka(s)</span>
+                                        <span id="vacantFirkaTotal" style="font-weight:700;color:#ef4444;">&#8377;<?php echo inr_format($districtStats['target_unassigned_amount'], 0); ?> total</span>
                                     </div>
                                     <?php endif; ?>
                                 </div>
                             </div>
                         </div>
+
+                        <script>
+                        (function () {
+                            var vfReadMoreBtn = document.getElementById('vfReadMoreBtn');
+                            var vfShowLessBtn = document.getElementById('vfShowLessBtn');
+                            var vfDistrictShort = document.getElementById('vfDistrictShort');
+                            var vfDistrictFull = document.getElementById('vfDistrictFull');
+                            if (vfReadMoreBtn) {
+                                vfReadMoreBtn.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    vfDistrictShort.style.display = 'none';
+                                    vfDistrictFull.style.display = '';
+                                });
+                            }
+                            if (vfShowLessBtn) {
+                                vfShowLessBtn.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    vfDistrictFull.style.display = 'none';
+                                    vfDistrictShort.style.display = '';
+                                });
+                            }
+
+                            var vfFilter = document.getElementById('vacantFirkaDistrictFilter');
+                            if (!vfFilter) return;
+                            var vfRows = Array.prototype.slice.call(document.querySelectorAll('#vacantFirkaTbody tr'));
+                            var vfCountEl = document.getElementById('vacantFirkaCount');
+                            var vfTotalEl = document.getElementById('vacantFirkaTotal');
+                            function moneyVf(n) { return '&#8377;' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
+                            vfFilter.addEventListener('change', function () {
+                                var val = this.value;
+                                var count = 0, total = 0;
+                                vfRows.forEach(function (tr) {
+                                    var match = (val === 'all' || tr.getAttribute('data-district') === val);
+                                    tr.style.display = match ? '' : 'none';
+                                    if (match) { count++; total += parseFloat(tr.getAttribute('data-amount')) || 0; }
+                                });
+                                if (vfCountEl) vfCountEl.textContent = count + ' vacant Firka(s)';
+                                if (vfTotalEl) vfTotalEl.innerHTML = moneyVf(total) + ' total';
+                            });
+                        })();
+                        </script>
 
                         <script>
                         (function () {
@@ -685,7 +769,11 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
 
                                 var pHtml = '<span class="mis-pg-info">' + (start + 1) + '–' + Math.min(start + pageSize, rows.length) + ' of ' + rows.length + '</span>';
                                 pHtml += '<button type="button" data-pg="prev"' + (currentPage === 1 ? ' disabled' : '') + '>Prev</button>';
-                                for (var p = 1; p <= totalPages; p++) {
+                                var winSize = 5;
+                                var winStart = Math.max(1, currentPage - Math.floor(winSize / 2));
+                                var winEnd = Math.min(totalPages, winStart + winSize - 1);
+                                winStart = Math.max(1, winEnd - winSize + 1);
+                                for (var p = winStart; p <= winEnd; p++) {
                                     pHtml += '<button type="button" data-pg="' + p + '" class="' + (p === currentPage ? 'active' : '') + '">' + p + '</button>';
                                 }
                                 pHtml += '<button type="button" data-pg="next"' + (currentPage === totalPages ? ' disabled' : '') + '>Next</button>';

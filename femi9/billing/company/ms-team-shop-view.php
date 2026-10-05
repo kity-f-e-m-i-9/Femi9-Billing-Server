@@ -125,7 +125,8 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
 
     $html = '<tr' . ($indentLevel === 0 ? ' style="background:#f8fafc;"' : '') . '>';
     $html .= '<td>' . ($rank > 0 ? $rank : '') . '</td>';
-    $html .= '<td style="padding-left:' . (12 + $indentPx) . 'px;">' . ($indentLevel > 0 ? '&#8618;&nbsp;' : '') . ($indentLevel === 0 ? '<b>' : '') . htmlspecialchars($row['ms_name']) . ($indentLevel === 0 ? '</b>' : '') . '</td>';
+    $nameLink = '<a href="login-as-ms.php?msid=' . base64_encode((string)$id) . '" target="_blank" rel="noopener" title="Login as this staff member" style="color:inherit;text-decoration:none;">' . htmlspecialchars($row['ms_name']) . '</a>';
+    $html .= '<td style="padding-left:' . (12 + $indentPx) . 'px;">' . ($indentLevel > 0 ? '&#8618;&nbsp;' : '') . ($indentLevel === 0 ? '<b>' : '') . $nameLink . ($indentLevel === 0 ? '</b>' : '') . '</td>';
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['shops'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['oldshops'] . '</span></td>';
