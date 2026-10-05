@@ -4,49 +4,34 @@ include("config.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
+// Reuses the exact same data loader / HTML renderer territory-partner's
+// shop-invoice-print.php uses — this page used to have its own duplicate
+// (older, incomplete) markup with no HSN tax breakdown or amount-in-words
+// and no PDF/WhatsApp-share support at all. $Login_user_IDvl resolves to
+// the same territory_partners.id either way, so the shared loader works
+// unchanged here.
+require_once __DIR__ . '/../shared/ShopInvoiceData.php';
+require_once __DIR__ . '/../shared/ShopInvoiceHtml.php';
+require_once __DIR__ . '/../shared/InvoiceShareLink.php';
+
 $Invoice_ID = base64_decode($_REQUEST['invoiceid'] ?? '');
-
-// Needed early for the Tax Invoice / Bill of Supply heading, as well as
-// later in the GST summary section — computed once here rather than twice.
-$totalgst = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id='$Invoice_ID'"))[0];
-$invoice_heading = $totalgst > 0 ? 'Tax Invoice' : 'Bill of Supply';
-
-$inv        = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='$Invoice_ID' LIMIT 1"));
-$getinvuser = $inv['to_user_type'] ?? 'shop';
-
-// TP (seller) details
-$tp_id   = (int)$Login_user_IDvl;
-$tpRow   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM territory_partners WHERE id='$tp_id' LIMIT 1"));
-
-// Customer (shop) details
-$customer_id = $inv['to_user_id'] ?? '';
-$shop        = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='$customer_id' LIMIT 1"));
-$state_row   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT st_name FROM state WHERE id='{$shop['state_id']}' LIMIT 1"));
-$state_name  = $state_row['st_name'] ?? '';
-
-// Currency
-$Currency_symbol = "&#8377;";
-$Currency_Name   = "INR";
-if (!empty($_REQUEST['crcode']) && $_REQUEST['crcode'] !== 'Default') {
-    $cc_id = base64_decode($_REQUEST['crcode']);
-    $cr = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM country WHERE id='$cc_id' LIMIT 1"));
-    if ($cr) { $Currency_symbol = "&#".$cr['currency_ascii_code'].";"; $Currency_Name = $cr['currency_name']; }
+$tp_id      = (int)$Login_user_IDvl;
+$invData    = load_shop_invoice_data($db_conn, $Invoice_ID, $tp_id, $_REQUEST['crcode'] ?? '');
+if (!$invData) {
+    die('Invoice not found.');
 }
-
-// Delivery note
-$dlnote = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM delivery_note WHERE inv_id='$Invoice_ID' LIMIT 1"));
-
-// Profile / logo
-$profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profile WHERE user_tempid='$Login_user_IDvl' AND usertype='territory_partner' LIMIT 1"));
+extract($invData);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Invoice : <?php echo $business_name; ?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
     <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="../../assets/plugins/perfectscroll/perfect-scrollbar.css" rel="stylesheet">
@@ -61,195 +46,178 @@ $profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profil
     <div class="app-container">
         <?php include("app-header.php"); ?>
         <div class="app-content">
-            <script>
-            function PrintDiv() {
-                var d = document.getElementById('divToPrint');
-                var w = window.open('','_blank','width=990,height=540,left=200,top=80');
-                w.document.open();
-                w.document.write('<html><body onload="window.print()">' + d.innerHTML + '</html>');
-                w.document.close();
-            }
-            </script>
-            <br/><br/>
-            <div align="center">
-                <button type="button" id="butonwidth" onclick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print Invoice</button><br/>
-                <button type="button" onclick="window.location='shop-invoice-add.php?invuser=<?php echo $getinvuser; ?>';" class="btn btn-success m-b-xs m-r-xs" id="butonwidth">+ New Invoice</button><br/>
-                <button type="button" onclick="window.location='shop-manage-invoice.php?invuser=<?php echo $getinvuser; ?>';" class="btn btn-primary m-b-xs m-r-xs" id="butonwidth">Manage Invoice</button>
-            </div>
 
-            <div align="center" style="margin-top:10px;">
-            <select class="form-control" style="width:180px;" onchange="window.location='shop-invoice-print.php?invoiceid=<?php echo $_REQUEST['invoiceid']; ?>&crcode='+this.value;">
-                <option value="Default">Default (INR)</option>
-                <?php $crs = mysqli_query($db_conn, "SELECT * FROM country WHERE currency_name!='' ORDER BY c_name ASC");
-                while ($cr = mysqli_fetch_array($crs)) { ?>
-                <option value="<?php echo base64_encode($cr['id']); ?>"><?php echo $cr['c_name']; ?> - <?php echo $cr['currency_name']; ?></option>
-                <?php } ?>
-            </select>
-            </div>
+<script type="text/javascript">
+function PrintDiv() {
+    // A popup window (the old approach) gets silently blocked or opened as a
+    // tiny unstyled tab on most mobile browsers, and never picks up the
+    // page's external stylesheets — only whatever's inside #divToPrint's own
+    // <style> block — so mobile prints came out misaligned or didn't appear
+    // at all. Printing the current page directly with an @media print rule
+    // (below) that hides everything except #divToPrint works identically on
+    // desktop and mobile and needs no popup.
+    window.print();
+}
+</script>
 
-            <div style="display:none;"><div id="divToPrint">
-<style>
-#butonwidth{width:180px!important;}
-.maincontainar{width:100%;height:auto;border:1px solid #000;}
-.maincontainar hr{border-bottom:1px solid #000;}
-#toptl{width:100%;padding:5px;font-family:arial;font-weight:bold;border-bottom:1px solid #000;text-align:center;font-size:22px;}
-.second_containar{width:100%;border-collapse:collapse;}
-.second_containar td:nth-child(1){border-right:1px solid #000;padding:0px;}
-#second_topvl{width:100%;padding:5px;font-family:arial;border-bottom:1px solid #000;border-collapse:collapse;}
-#second_topvl td{padding:5px;}
-#border_nbottom td{border-bottom:1px solid #000;}
-#noneborder td{border:0px!important;font-family:arial;font-size:14px;line-height:20px;}
-.item_list{width:100%;border-top:1px solid #000;border-collapse:collapse;font-family:arial;}
-.item_list td{border-right:1px solid #000;padding:5px;font-size:14px;vertical-align:top;}
-#bordervl td{border-bottom:1px solid #000;padding:5px;}
-#rightlaign{text-align:right;}
-#bottombordervl{border-top:1px solid #000;border-bottom:1px solid #000;}
-#cmpname{font-size:17px;font-weight:bold;}
-.cusdetaiis{margin-left:10px;font-family:arial;font-size:14px;line-height:20px;}
-#sealsign{border-collapse:collapse;}
-#sealsign td{padding:3px;}
-#sealsign tr:nth-child(1){border-top:1px solid #000;}
-#sealsign tr td:nth-child(1){border-right:1px solid #000;}
-</style>
-
-<div class="maincontainar">
-<table id="toptl"><tr><td><?=htmlspecialchars($invoice_heading);?></td></tr></table>
-
-<table class="second_containar">
-<tr valign="top">
-<td width="50%">
-<table id="noneborder"><tr valign="top">
-<td><?php if (!empty($profile['logo'])): ?><img src="<?php echo $profile['logo']; ?>" style="width:95px;border-radius:10px;"/><?php endif; ?></td>
-<td valign="top">
-<span id="cmpname"><?php echo htmlspecialchars($tpRow['company_name'] ?: $tpRow['name']); ?></span><br/>
-<?php echo htmlspecialchars($tpRow['branch_line1'] . ' ' . $tpRow['branch_city']); ?><br/>
-<b>GSTIN/UIN:</b> <?php echo htmlspecialchars($tpRow['gstin']); ?><br/>
-<b>State:</b> <?php echo htmlspecialchars($tpRow['branch_state']); ?><br/>
-<b>Contact:</b> <?php echo htmlspecialchars($tpRow['mobile']); ?>
-</td>
-</tr></table>
-<hr/>
-<p class="cusdetaiis">
-Consignee (Ship to):<br/>
-<b><?php echo ucwords(htmlspecialchars($shop['name'])); ?></b><br/>
-<?php echo htmlspecialchars($shop['address']); ?><br/>
-<?php if (!empty($shop['gstin'])): ?>GSTIN: <?php echo $shop['gstin']; ?><br/><?php endif; ?>
-Mobile: <?php echo $shop['mobile_number']; ?><br/>
-State: <?php echo $state_name; ?>
-</p>
-<hr/>
-<p class="cusdetaiis">
-Buyer (Bill to):<br/>
-<b><?php echo ucwords(htmlspecialchars($shop['name'])); ?></b><br/>
-<?php echo htmlspecialchars($shop['address']); ?><br/>
-<?php if (!empty($shop['gstin'])): ?>GSTIN: <?php echo $shop['gstin']; ?><br/><?php endif; ?>
-Mobile: <?php echo $shop['mobile_number']; ?>
-</p>
-</td>
-<td valign="top">
-<table id="second_topvl">
-<tr id="border_nbottom">
-<td>Invoice #<br/><b><?php echo $inv['inv_number']; ?></b></td>
-<td>Invoice Date:<br/><b><?php echo date("d M Y", strtotime($inv['date'])); ?></b></td>
-</tr>
-<tr id="border_nbottom" valign="top">
-<td height="50">Delivery Note<br/><?php echo $dlnote['dl_note'] ?? ''; ?></td>
-<td>Mode/Terms of Payment<br/><?php echo $dlnote['mode_pmnt'] ?? ''; ?></td>
-</tr>
-<tr id="border_nbottom" valign="top">
-<td height="50">Reference No. &amp; Date<br/><?php if (!empty($dlnote['ref_no'])) echo $dlnote['ref_no'].','; if (!empty($dlnote['ref_date'])) echo date("d/m/Y",strtotime($dlnote['ref_date'])); ?></td>
-<td>Other References<br/><?php echo $dlnote['ot_ref'] ?? ''; ?></td>
-</tr>
-<tr id="border_nbottom" valign="top">
-<td height="50">Dispatched through<br/><?php echo $dlnote['dispatch_through'] ?? ''; ?></td>
-<td>Destination<br/><?php echo $dlnote['destination'] ?? ''; ?></td>
-</tr>
-</table>
-<p style="margin-left:10px;">Terms of Delivery<br/><?php echo $dlnote['terms'] ?? ''; ?></p>
-</td>
-</tr>
-</table>
-
-<!-- Items -->
-<table class="item_list">
-<tr id="bordervl">
-<td>Sl No.</td><td>Description of Goods</td><td id="rightlaign">HSN/SAC</td>
-<td id="rightlaign">Quantity</td><td id="rightlaign">MRP</td><td id="rightlaign">Rate</td>
-<td id="rightlaign">per</td><td id="rightlaign">GST(%)</td><td id="rightlaign">Disc</td><td id="rightlaign">Amount</td>
-</tr>
 <?php
-$invno = 0; $TotalAMount123 = 0; $Totalquantity123 = 0;
-$items = mysqli_query($db_conn, "SELECT * FROM user_invoice_items WHERE inv_id='$Invoice_ID' ORDER BY id DESC");
-while ($ri = mysqli_fetch_array($items)) {
-    $pr = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='{$ri['pr_id']}' LIMIT 1"));
-    $lineTotal = ($ri['qty'] * $ri['amount']) - $ri['discount_amount'];
-    $TotalAMount123 += $lineTotal;
-    $Totalquantity123 += $ri['qty'];
+// Signed link to the invoice's own PDF (see shop-invoice-pdf.php) —
+// paper/margin/scale query params get appended by the PDF Options dialog
+// below so the CP user can control the downloaded/shared PDF's layout.
+$__pdf_url = invoice_share_url('/femi9/billing/channel-partner/shop-invoice-pdf.php', 'shop', $_REQUEST['invoiceid'] ?? '');
+$__wa_text = 'Invoice #' . ($inv['inv_number'] ?? '') . ' from ' . $seller_display_name . ': ';
+$__pdf_filename = 'Invoice_' . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $inv['inv_number'] ?? 'invoice') . '.pdf';
 ?>
-<tr>
-<td><?php echo ++$invno; ?></td>
-<td><b><?php echo $pr['productName']; ?></b></td>
-<td id="rightlaign"><?php echo $pr['hsn']; ?></td>
-<td id="rightlaign"><?php echo $ri['qty']; ?> Packs</td>
-<td id="rightlaign"><?php echo inr_format($pr['mrp'], 2); ?></td>
-<td id="rightlaign"><?php echo inr_format($ri['amount'], 2); ?></td>
-<td id="rightlaign">Packs</td>
-<td id="rightlaign"><?php echo $ri['gst_percentage']; ?>%</td>
-<td id="rightlaign"><?php echo inr_format($ri['discount_amount'], 2); ?> (<?php echo inr_format($ri['discount_percentage'], 0); ?>%)</td>
-<td id="rightlaign"><?php echo inr_format($lineTotal, 2); ?></td>
-</tr>
-<?php } ?>
-<tr id="bottombordervl">
-<td></td><td id="rightlaign"><b></b></td><td></td>
-<td id="rightlaign"><b><?php echo $Totalquantity123; ?> Packs</b></td>
-<td></td><td></td><td></td><td></td><td></td>
-<td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($TotalAMount123, 2); ?></b></td>
-</tr>
-
-<!-- GST -->
-<?php
-$gsttype = $inv['gst_type'];
-// $totalgst already computed near the top of the file (needed early for the
-// Tax Invoice / Bill of Supply heading).
-if ($totalgst > 0):
-    if ($gsttype === 'inner'): $half = inr_format($totalgst/2, 2); ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>SGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo $half; ?></b></td></tr>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>CGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo $half; ?></b></td></tr>
-<?php else: ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>IGST</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($totalgst, 2); ?></b></td></tr>
-<?php endif; endif; ?>
-
-<?php if ($inv['discount'] > 0): ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Discount</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['discount'], 2); ?></b></td></tr>
-<?php endif; ?>
-<?php if ($inv['courier_charges'] > 0): ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['courier_charges'], 2); ?></b></td></tr>
-<?php endif; ?>
-<tr id="bottombordervl"><td></td><td id="rightlaign"><b><i>Total</i></b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td id="rightlaign"><b><?php echo $Currency_symbol; ?>&nbsp;<?php echo inr_format($inv['total'], 2); ?></b></td></tr>
-</table>
-
-<?php if (!empty($profile['acname'])): ?>
-<table width="100%">
-<tr>
-<td width="50%"></td>
-<td>
-<table align="right">
-<tr><td>A/c Name</td><td>&nbsp;:&nbsp;<?php echo htmlspecialchars($profile['acname']); ?></td></tr>
-<tr><td>A/c Number</td><td>&nbsp;:&nbsp;<?php echo htmlspecialchars($profile['acnumber']); ?></td></tr>
-<tr><td>Bank Name</td><td>&nbsp;:&nbsp;<?php echo htmlspecialchars($profile['bankname']); ?></td></tr>
-<tr><td>Branch Name</td><td>&nbsp;:&nbsp;<?php echo htmlspecialchars($profile['branchname']); ?></td></tr>
-<tr><td>IFS Code</td><td>&nbsp;:&nbsp;<?php echo htmlspecialchars($profile['ifsc']); ?></td></tr>
-<tr><td>UPI Number</td><td>&nbsp;:&nbsp;<?php echo htmlspecialchars($profile['upinumber']); ?></td></tr>
-</table>
-</td>
-</tr>
-</table>
-<?php endif; ?>
-<table id="sealsign" style="width:100%;">
-<tr><td width="50%" style="padding:60px 10px 10px 10px;">Receiver's Signature</td><td style="padding:60px 10px 10px 10px;text-align:right;">for <?php echo htmlspecialchars($tpRow['company_name'] ?: $tpRow['name']); ?><br/><br/>Authorised Signatory</td></tr>
-</table>
+<div id="invoiceActionBar" class="d-flex flex-wrap justify-content-end">
+<button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button>
+<button type="button" onClick="openPdfOptions();" class="btn btn-success m-b-xs m-r-xs"><i class="material-icons" style="font-size:16px;vertical-align:middle;">picture_as_pdf</i> PDF / Share</button>
+<button type="button" onClick="javascript:window.location='shop-invoice-add.php?invuser=<?php echo $getinvuser; ?>';" class="btn btn-success m-b-xs m-r-xs">+ New Invoice</button>
+<button type="button" onClick="javascript:window.location='shop-manage-invoice.php?invuser=<?php echo $getinvuser; ?>';" class="btn btn-primary m-b-xs m-r-xs">Manage Invoice</button>
 </div>
-</div></div><!-- /divToPrint -->
+
+<!-- PDF Options dialog — mirrors the browser Print dialog's own "More
+     settings" (paper size / margins / scale) but actually controls the
+     server-rendered PDF (shop-invoice-pdf.php), for both the Download and
+     Share-to-WhatsApp actions below. Same markup/JS as
+     territory-partner/shop-invoice-print.php. -->
+<div class="modal fade" id="pdfOptionsModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog" role="document" style="max-width:420px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">PDF Options</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="pdfOptPaper">Paper size</label>
+          <select id="pdfOptPaper" class="form-control">
+            <option value="a4" selected>A4</option>
+            <option value="a5">A5</option>
+            <option value="letter">Letter</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="pdfOptMargin">Margins</label>
+          <select id="pdfOptMargin" class="form-control">
+            <option value="6" selected>Default</option>
+            <option value="0">None</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group" id="pdfOptMarginCustomWrap" style="display:none;">
+          <label for="pdfOptMarginCustom">Custom margin (mm)</label>
+          <input type="number" id="pdfOptMarginCustom" class="form-control" min="0" max="30" value="6">
+        </div>
+        <div class="form-group m-b-0">
+          <label for="pdfOptScale">Scale: <span id="pdfOptScaleVal">100%</span></label>
+          <input type="range" id="pdfOptScale" min="50" max="150" value="100" step="5" style="width:100%;">
+        </div>
+      </div>
+      <div class="modal-footer flex-wrap justify-content-between">
+        <button type="button" class="btn btn-dark" onclick="pdfOptionsDownload();" style="flex:1 1 auto;margin:3px;">Download PDF</button>
+        <button type="button" class="btn btn-success" onclick="pdfOptionsShareWhatsApp();" style="flex:1 1 auto;margin:3px;"><i class="material-icons" style="font-size:16px;vertical-align:middle;">share</i> Share to WhatsApp</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openPdfOptions() {
+    $('#pdfOptionsModal').modal('show');
+}
+document.getElementById('pdfOptMargin').addEventListener('change', function() {
+    document.getElementById('pdfOptMarginCustomWrap').style.display = (this.value === 'custom') ? '' : 'none';
+});
+document.getElementById('pdfOptScale').addEventListener('input', function() {
+    document.getElementById('pdfOptScaleVal').textContent = this.value + '%';
+});
+
+function pdfOptionsUrl() {
+    var paper     = document.getElementById('pdfOptPaper').value;
+    var marginSel = document.getElementById('pdfOptMargin').value;
+    var margin    = (marginSel === 'custom') ? (document.getElementById('pdfOptMarginCustom').value || 6) : marginSel;
+    var scale     = document.getElementById('pdfOptScale').value;
+    var base      = <?php echo json_encode($__pdf_url); ?>;
+    var sep       = (base.indexOf('?') === -1) ? '?' : '&';
+    return base + sep + 'paper=' + encodeURIComponent(paper) + '&margin=' + encodeURIComponent(margin) + '&scale=' + encodeURIComponent(scale);
+}
+
+function pdfOptionsDownload() {
+    window.location = pdfOptionsUrl();
+    $('#pdfOptionsModal').modal('hide');
+}
+
+function pdfOptionsShareWhatsApp() {
+    var url      = pdfOptionsUrl();
+    var waText   = <?php echo json_encode($__wa_text); ?>;
+    var fileName = <?php echo json_encode($__pdf_filename); ?>;
+
+    // No wa.me link, ever — the shop/customer must receive the actual PDF
+    // file, never a URL to tap. The PDF is always downloaded to the device
+    // first; the native share sheet (where supported) is then offered on
+    // top of that download so the CP user can pick WhatsApp directly, but
+    // the download itself never depends on it.
+    function downloadBlob(blob) {
+        var blobUrl = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 10000);
+    }
+
+    fetch(url).then(function(res) {
+        if (!res.ok) { throw new Error('PDF fetch failed'); }
+        return res.blob();
+    }).then(function(blob) {
+        var file = new File([blob], fileName, {type: 'application/pdf'});
+        if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
+            navigator.share({files: [file], text: waText}).catch(function() {});
+        } else {
+            alert('PDF downloaded as ' + fileName + '. Open WhatsApp and attach it from your Downloads.');
+        }
+        downloadBlob(blob);
+    }).catch(function() {
+        alert('Could not generate the PDF. Please try again.');
+    });
+    $('#pdfOptionsModal').modal('hide');
+}
+</script>
+
+<div style="clear:both;"></div>
+<div id="currencySelectWrap" style="width:100%;margin-bottom:10px;text-align:right;">
+<select name="currency_code" class="form-control" style="width:150px;max-width:100%;display:inline-block;" id="currencySelect">
+<?php if ($result_currency223 == null): ?>
+    <option value="" hidden>Currency</option>
+<?php else: ?>
+    <option hidden><?php echo ucwords($result_currency223['c_name']); ?> - <?php echo ucwords($result_currency223['currency_name']); ?></option>
+<?php endif; ?>
+    <option value="Default">Default</option>
+    <?php
+    $fetch_currency = mysqli_query($db_conn, "SELECT * FROM country WHERE currency_name!='' ORDER BY c_name ASC");
+    while ($result_currency = mysqli_fetch_array($fetch_currency)) {
+    ?>
+    <option value="<?php echo base64_encode($result_currency['id']); ?>"><?php echo ucwords($result_currency['c_name']); ?> - <?php echo ucwords($result_currency['currency_name']); ?></option>
+    <?php } ?>
+</select>
+</div>
+<script>
+document.getElementById("currencySelect").addEventListener("change", function() {
+    let selectedValue = this.value;
+    if (selectedValue) {
+        window.location.href = "shop-invoice-print.php?invoiceid=<?php echo urlencode($_REQUEST['invoiceid'] ?? ''); ?>&crcode=" + selectedValue;
+    }
+});
+</script>
+
+<div style="clear:both;"></div>
+
+<div id="divToPrint"><!--Print content start-->
+<?php echo render_shop_invoice_html($invData); ?>
+</div><!--divToPrint-->
+
         </div>
     </div>
 </div>
