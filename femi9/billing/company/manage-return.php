@@ -1,5 +1,4 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); ?>
-require_once("include/PermissionCheck.php"); requirePermission('debit_note');
+<?php include("checksession.php"); require_once("include/GodownAccess.php"); require_once("include/PermissionCheck.php"); requirePermission('debit_note'); $canDeleteDebitNoteReturn = hasPermission('debit_note_delete');?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -139,7 +138,7 @@ $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 													
 								<td>
 				    <div class="actions-group">
-				        <a href="delete-return?Roowid=<?=$RowID;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+				        <?php if ($canDeleteDebitNoteReturn): ?><a href="delete-return?Roowid=<?=$RowID;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a><?php endif; ?>
 				    </div>
 				</td>
                                                 </tr>

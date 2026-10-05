@@ -456,15 +456,19 @@ while ($ri = mysqli_fetch_array($res_items)) {
         <td>
         <?php
         $cnt_ret = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='$Invoice_ID' AND prid='$InV_Product_ID'"));
-        $removeReqStatus = tpShopInvoiceActionStatus($db_conn, (int)$Login_user_IDvl, $Invoice_ID, 'remove');
+        // Still a draft (never submitted) — Remove is the TP's own call, no BDM approval needed.
         if ($cnt_ret > 0) { echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>"; }
-        elseif ($removeReqStatus === 'approved') { ?>
+        elseif (!$hasReceipt) { ?>
+        <a href="shop-del-inv-product.php?invid=<?php echo $Invoice_ID_encode; ?>&&rowid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+        <?php } else {
+        $removeReqStatus = tpShopInvoiceActionStatus($db_conn, (int)$Login_user_IDvl, $Invoice_ID, 'remove');
+        if ($removeReqStatus === 'approved') { ?>
         <a href="shop-del-inv-product.php?invid=<?php echo $Invoice_ID_encode; ?>&&rowid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
         <?php } elseif ($removeReqStatus === 'pending') { ?>
         <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending Remove</span>
         <?php } else { ?>
         <button type="button" class="badge badge-style-bordered badge-primary request-shop-action-btn" style="border:none;cursor:pointer;" data-inv-id="<?php echo htmlspecialchars($Invoice_ID); ?>" data-action-type="remove">Request to Remove</button>
-        <?php } ?>
+        <?php } } ?>
         </td>
         <?php } ?>
     </tr>

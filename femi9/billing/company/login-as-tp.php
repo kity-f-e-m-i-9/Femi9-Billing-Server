@@ -12,7 +12,7 @@
 // admin's own company session at all — both stay logged in independently in
 // the same browser, same as the salesbdm bridge.
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
+require_once("include/PermissionCheck.php"); requirePermission('territory_partner_edit');
 
 $tpid = (int) base64_decode($_GET['tpid'] ?? '');
 if ($tpid <= 0) {

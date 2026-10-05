@@ -1,5 +1,5 @@
 <?php include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('ms');
+require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage_edit');
 require_once("include/PartnerZones.php");
 $zonesForDropdown = getAllZonesWithCounts($db_conn);
 

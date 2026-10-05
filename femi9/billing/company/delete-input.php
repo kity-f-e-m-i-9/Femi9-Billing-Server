@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('manage_input_stock_delete');
 include("config.php");
 require_once("include/StockService.php");
 

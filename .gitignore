@@ -10,6 +10,10 @@ femi9/billing/territory-partner/courier_payment_screenshots/*
 !femi9/billing/territory-partner/courier_payment_screenshots/.gitkeep
 femi9/billing/territory-partner/courier_qr/*
 !femi9/billing/territory-partner/courier_qr/.gitkeep
+femi9/billing/territory-partner/kyc_documents/*
+!femi9/billing/territory-partner/kyc_documents/.gitkeep
+femi9/billing/channel-partner/kyc_documents/*
+!femi9/billing/channel-partner/kyc_documents/.gitkeep
 
 # Local DB credentials — must never be reverted by git checkout/reset/pull.
 femi9/billing/shared/.env
@@ -17,3 +21,8 @@ femi9/billing/super-stockist/.env
 
 # Local DB backup dumps from data migrations - not source code
 /db_backups/
+
+# Runtime login-attempt logs — contain real user mobile numbers, not source code.
+femi9/billing/company/logs/login_attempts.log
+femi9/billing/login/logs/login_attempts.log
+femi9/billing/salesbdm/logs/login_attempts.log

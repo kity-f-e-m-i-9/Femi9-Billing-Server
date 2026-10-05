@@ -3,6 +3,8 @@ include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('sdt');
 error_reporting(0);
 include("config.php");
+$canEditSdt   = hasPermission('sdt_edit');
+$canDeleteSdt = hasPermission('sdt_delete');
 
 $Coupon_category="Super-Distributor";
 ?>
@@ -321,20 +323,24 @@ $Coupon_category="Super-Distributor";
                                                     </td>
                                                     
                                                     <td class="text-center">
-                                                        <a href="super_Distributor_edit?prid=<?php echo $rowid;?>&&actionupdate" 
-                                                           class="action-btn" 
+                                                        <?php if ($canEditSdt): ?>
+                                                        <a href="super_Distributor_edit?prid=<?php echo $rowid;?>&&actionupdate"
+                                                           class="action-btn"
                                                            title="Edit Details">
                                                             <i class="material-icons-outlined">edit</i>
                                                         </a>
+                                                        <?php endif; ?>
                                                     </td>
-                                                    
+
                                                     <td class="text-center">
-                                                        <a href="super_Distributor_delete?prid=<?php echo $rowid;?>&&couponcat=<?php echo $Coupon_category;?>&&actionremove" 
-                                                           onclick="return confirm('You want to delete confirm?');" 
-                                                           class="action-btn action-btn-delete" 
+                                                        <?php if ($canDeleteSdt): ?>
+                                                        <a href="super_Distributor_delete?prid=<?php echo $rowid;?>&&couponcat=<?php echo $Coupon_category;?>&&actionremove"
+                                                           onclick="return confirm('You want to delete confirm?');"
+                                                           class="action-btn action-btn-delete"
                                                            title="Delete Details">
                                                             <i class="material-icons-outlined">delete</i>
                                                         </a>
+                                                        <?php endif; ?>
                                                     </td>
                                                 </tr>
                                            

@@ -1,5 +1,6 @@
-<?php 
+<?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('st_edit');
 
 // Page Configuration
 $title = "Edit Stockist";

@@ -8,9 +8,11 @@ if ($_ppcCol && $_ppcCol->num_rows === 0) {
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
+require_once("include/PermissionCheck.php"); requirePermission('products');
+$canEditProducts   = hasPermission('products_edit');
+$canDeleteProducts = hasPermission('products_delete');
 $_overallPacksSettings = dispatchSlipGetOverallSettings($db_conn);
 ?>
-require_once("include/PermissionCheck.php"); requirePermission('products');
 <!DOCTYPE html>
 <html lang="en">
 
@@ -172,8 +174,8 @@ $i= $start_from;
 													
 																										<td>
 													    <div class="actions-group">
-													        <a href="edit-product?prid=<?php echo $product_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
-													        <a href="delete-product?prid=<?php echo $product_id;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <?php if ($canEditProducts): ?><a href="edit-product?prid=<?php echo $product_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a><?php endif; ?>
+													        <?php if ($canDeleteProducts): ?><a href="delete-product?prid=<?php echo $product_id;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a><?php endif; ?>
 													    </div>
 													</td>
                                                 </tr>

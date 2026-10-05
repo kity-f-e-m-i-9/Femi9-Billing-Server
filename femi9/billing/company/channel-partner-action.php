@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php");
 error_reporting(0);
 
 // CSRF check
@@ -50,6 +51,7 @@ $action = $_POST['action'] ?? '';
 
 // ── INSERT ────────────────────────────────────────────────────────────────────
 if ($action === 'insert-channel-partner') {
+    requirePermission('channel_partner_edit');
 
     $name                 = trim($_POST['cp_name']                ?? '');
     $company_name         = trim($_POST['cp_company_name']        ?? '');
@@ -183,6 +185,7 @@ if ($action === 'insert-channel-partner') {
 
 // ── UPDATE ────────────────────────────────────────────────────────────────────
 if ($action === 'update-channel-partner') {
+    requirePermission('channel_partner_edit');
 
     $cp_id_raw            = $_POST['cp_db_id'] ?? '';
     $cp_db_id             = (int)base64_decode($cp_id_raw);

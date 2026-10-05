@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage_edit');
 include("config.php");
 include("RemoveSpecialChar.php");
 

@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('sdt_edit');
 include("config.php");
 
 $title="Edit Super-Distributor";

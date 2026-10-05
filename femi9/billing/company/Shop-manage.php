@@ -1,6 +1,8 @@
 <?php include("checksession.php"); error_reporting(0);
 require_once("include/PermissionCheck.php"); requirePermission('shop');
 include("config.php");
+$canEditShop   = hasPermission('shop_edit');
+$canDeleteShop = hasPermission('shop_delete');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -187,8 +189,12 @@ $shopcat_name=$result_shopcatt['catlable'];
 			
 						<td>
 			    <div class="actions-group">
+			        <?php if ($canEditShop): ?>
 			        <a href="Shop-edit?prid=<?php echo $rowid;?>&&actionupdate" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+			        <?php endif; ?>
+			        <?php if ($canDeleteShop): ?>
 			        <a href="Shop-delete?prid=<?php echo $rowid;?>&&actionremove" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+			        <?php endif; ?>
 			    </div>
 			</td>
                                                 </tr>

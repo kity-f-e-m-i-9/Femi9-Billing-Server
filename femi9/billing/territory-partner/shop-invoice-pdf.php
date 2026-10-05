@@ -59,8 +59,29 @@ if (!$invData) {
     exit;
 }
 
+// Paper size / margin / scale, driven by the "PDF options" dialog on
+// shop-invoice-print.php (mirrors the browser's own Print "More settings"
+// panel) so the TP can actually control how the downloaded/shared PDF looks
+// instead of always getting one fixed layout. Every value is clamped
+// server-side since these arrive as plain query params.
+$__paperWidthsMm = ['a4' => 210, 'a5' => 148, 'letter' => 215.9];
+$__paper = strtolower($_GET['paper'] ?? 'a4');
+if (!isset($__paperWidthsMm[$__paper])) {
+    $__paper = 'a4';
+}
+$__paperWidthMm = $__paperWidthsMm[$__paper];
+
+$__marginMm = (float)($_GET['margin'] ?? 6);
+if ($__marginMm < 0) { $__marginMm = 0; }
+if ($__marginMm > 30) { $__marginMm = 30; }
+
+$__scalePct = (int)($_GET['scale'] ?? 100);
+if ($__scalePct < 50) { $__scalePct = 50; }
+if ($__scalePct > 150) { $__scalePct = 150; }
+$__scale = $__scalePct / 100;
+
 $html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>'
-    . render_shop_invoice_html($invData, true)
+    . render_shop_invoice_html($invData, true, $__scale, $__marginMm)
     . '</body></html>';
 
 $options = new Options();
@@ -89,17 +110,23 @@ $options->set('isRemoteEnabled', true);   // logo images are fetched by URL
 // the layout that DOESN'T grow with item count (seller/buyer/meta blocks,
 // the item table's own header + subtotal/GST/discount/total rows, amount-
 // in-words, HSN summary header+total, declaration+bank details, seal/
-// signature, footer line, @page margins). Never goes below A4's own height
-// so a short invoice still looks like a normal page, not a stub.
+// signature, footer line, @page margins). Never goes below the chosen
+// paper's own A-series height so a short invoice still looks like a normal
+// page, not a stub. Scaled by $__scale (the Scale option) and widened/
+// narrowed by $__paperWidthMm (the Paper size option) — a smaller paper
+// width wraps the item table onto more lines, a larger Scale enlarges the
+// fonts, and both make the content taller, so the estimate accounts for
+// both instead of just the item count.
 $__itemCount = count($invData['invoice_items'] ?? []);
 $__hsnCount  = count($invData['hsn_totals'] ?? []);
-$__baseMm      = 210;
-$__perItemMm   = 7;
-$__perHsnRowMm = 5; // beyond the first HSN row, which $__baseMm already covers
+$__baseMm      = 210 * $__scale * (210 / $__paperWidthMm);
+$__perItemMm   = 7 * $__scale * (210 / $__paperWidthMm);
+$__perHsnRowMm = 5 * $__scale; // beyond the first HSN row, which $__baseMm already covers
 $__estimatedMm = $__baseMm + ($__itemCount * $__perItemMm) + (max(0, $__hsnCount - 1) * $__perHsnRowMm);
-$__pageHeightMm = max(297, $__estimatedMm); // never shorter than a real A4 page
+$__minPageHeightMm = $__paperWidthMm * (297 / 210); // same aspect ratio as A4 for the chosen width
+$__pageHeightMm = max($__minPageHeightMm, $__estimatedMm);
 $__mmToPt = 72 / 25.4;
-$__pageWidthPt  = 210 * $__mmToPt;
+$__pageWidthPt  = $__paperWidthMm * $__mmToPt;
 $__pageHeightPt = $__pageHeightMm * $__mmToPt;
 
 $dompdf = new Dompdf($options);
@@ -117,7 +144,7 @@ $fileName = 'Invoice_' . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invData['inv'][
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 
-// inline (not attachment) so tapping the WhatsApp link opens the PDF
-// straight in the phone's browser/PDF viewer instead of forcing a download
-// prompt first.
-$dompdf->stream($fileName, ['Attachment' => false]);
+// Attachment so tapping the WhatsApp link downloads the PDF straight to the
+// device instead of just opening a view-only tab — the TP asked for a real
+// downloaded file, not a link the recipient has to view-then-save themselves.
+$dompdf->stream($fileName, ['Attachment' => true]);

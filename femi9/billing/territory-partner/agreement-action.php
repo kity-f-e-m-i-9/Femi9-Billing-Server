@@ -44,23 +44,73 @@ if ($agreementPlace === '' || $tpSignature === '') {
     exit;
 }
 
-get_or_create_tp_agreement($db_conn, $tp_id);
+$existingAgreement = get_or_create_tp_agreement($db_conn, $tp_id);
+
+// PAN card: required once, kept as-is on re-sign if no new file is chosen.
+$panCardPath = $existingAgreement['pan_card_path'] ?? null;
+if (!empty($_FILES['pan_card']['name'])) {
+    $ext = strtolower(pathinfo($_FILES['pan_card']['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'pdf'], true)) {
+        $_SESSION['errorMessage'] = "PAN card must be a JPG, PNG or PDF file.";
+        header('Location: agreement.php');
+        exit;
+    }
+    if ($_FILES['pan_card']['size'] > 5 * 1024 * 1024) {
+        $_SESSION['errorMessage'] = "PAN card file must be under 5 MB.";
+        header('Location: agreement.php');
+        exit;
+    }
+    $uploadDir = __DIR__ . '/kyc_documents/';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+    $newName = 'pan_tp_' . $tp_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    if (move_uploaded_file($_FILES['pan_card']['tmp_name'], $uploadDir . $newName)) {
+        $panCardPath = $newName;
+    }
+}
+if (empty($panCardPath)) {
+    $_SESSION['errorMessage'] = "Please upload your PAN card before submitting.";
+    header('Location: agreement.php');
+    exit;
+}
+
+// Snapshot the TP's own profile fields as they stand right now, so a later
+// edit by the Company (e.g. via Manage Territory Partner) can be detected
+// and highlighted on this page next time it's opened.
+$stmtTp = $db_conn->prepare("SELECT name, company_name, address, mobile, email FROM territory_partners WHERE id = ?");
+$stmtTp->bind_param('i', $tp_id);
+$stmtTp->execute();
+$tpProfile = $stmtTp->get_result()->fetch_assoc() ?: [];
+$stmtTp->close();
+$snapName        = $tpProfile['name'] ?? '';
+$snapCompanyName = $tpProfile['company_name'] ?? '';
+$snapAddress     = $tpProfile['address'] ?? '';
+$snapMobile      = $tpProfile['mobile'] ?? '';
+$snapEmail       = $tpProfile['email'] ?? '';
+
+// Snapshot the wording as currently effective (shared template or this TP's
+// own override) too, so a later edit to the clauses can be highlighted
+// paragraph-by-paragraph next time this page renders.
+$snapBodyHtml = get_effective_agreement_body($db_conn, $existingAgreement, 'territory_partner');
 
 $stmt = $db_conn->prepare(
     "UPDATE territory_partner_agreements SET
         agreement_date = ?, agreement_place = ?,
-        tp_designation = ?, tp_signature = ?,
+        tp_designation = ?, tp_signature = ?, pan_card_path = ?,
         witness1_name = ?, witness1_address = ?, witness1_signature = ?,
         witness2_name = ?, witness2_address = ?, witness2_signature = ?,
+        snap_name = ?, snap_company_name = ?, snap_address = ?, snap_mobile = ?, snap_email = ?,
+        snap_body_html = ?,
         signed_at = NOW(), is_locked = 1
      WHERE territory_partner_id = ?"
 );
 $stmt->bind_param(
-    'ssssssssssi',
+    'sssssssssssssssssi',
     $agreementDate, $agreementPlace,
-    $tpDesignation, $tpSignature,
+    $tpDesignation, $tpSignature, $panCardPath,
     $w1Name, $w1Address, $w1Signature,
     $w2Name, $w2Address, $w2Signature,
+    $snapName, $snapCompanyName, $snapAddress, $snapMobile, $snapEmail,
+    $snapBodyHtml,
     $tp_id
 );
 $stmt->execute();

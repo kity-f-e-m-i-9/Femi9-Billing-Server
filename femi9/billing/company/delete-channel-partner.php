@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('channel_partner_delete');
 error_reporting(0);
 
 $enc_id   = $_GET['cpid'] ?? '';

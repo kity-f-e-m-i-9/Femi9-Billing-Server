@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('st_delete');
 include("config.php");
 
 $prid=$_REQUEST['prid'];

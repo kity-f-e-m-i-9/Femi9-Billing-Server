@@ -2,6 +2,8 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('channel_partner');
 error_reporting(0);
+$canEditCp   = hasPermission('channel_partner_edit');
+$canDeleteCp = hasPermission('channel_partner_delete');
 require_once __DIR__ . '/../shared/EncryptionService.php';
 $_enc = new EncryptionService();
 function decryptPassword($enc, $hash) {
@@ -132,7 +134,9 @@ $i = 0;
                                         <tr>
                                             <td>Channel Partners</td>
                                             <td>
+                                                <?php if ($canEditCp): ?>
                                                 <a href="add-channel-partner" title="Add Channel Partner">&#10011;</a>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                     </table>
@@ -253,6 +257,7 @@ $i = 0;
                                                     </td>
                                                     <td>
                                                         <div class="actions-group">
+                                                            <?php if ($canEditCp): ?>
                                                             <a href="edit-channel-partner?cpid=<?php echo $enc_id; ?>" class="action-link" title="Edit">
                                                                 <i class="material-icons-outlined" style="font-size:17px;color:#5c6bc0;">edit</i>
                                                             </a>
@@ -264,11 +269,14 @@ $i = 0;
                                                                     data-name="<?php echo htmlspecialchars($cp['name'], ENT_QUOTES); ?>">
                                                                 <i class="material-icons-outlined" style="font-size:17px;color:<?php echo $cp['is_active'] ? '#10b981' : '#9ca3af'; ?>;">power_settings_new</i>
                                                             </button>
+                                                            <?php endif; ?>
+                                                            <?php if ($canDeleteCp): ?>
                                                             <a href="delete-channel-partner?cpid=<?php echo $enc_id; ?>"
                                                                class="action-link delete" title="Delete"
                                                                onclick="return confirm('Delete \'<?php echo addslashes(htmlspecialchars($cp['name'])); ?>\'? Their location assignments will also be removed.');">
                                                                 <i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i>
                                                             </a>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </td>
                                                 </tr>

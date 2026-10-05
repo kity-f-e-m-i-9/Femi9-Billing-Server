@@ -1,6 +1,6 @@
 <?php
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('ms');
+require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage_edit');
 require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
 header('Content-Type: application/json');
 error_reporting(0);

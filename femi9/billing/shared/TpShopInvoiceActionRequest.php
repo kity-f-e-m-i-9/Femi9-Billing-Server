@@ -83,6 +83,34 @@ function tpShopInvoiceActionApproved(mysqli $db, int $tpId, string $invId, strin
 }
 
 /**
+ * Whether this invoice has ever been submitted — i.e. a receipt row exists
+ * for it. Same "Continue Invoice vs Completed Invoice" signal already used
+ * by shop-manage-invoice.php's $isCompleted / Void gate.
+ */
+function tpShopInvoiceIsSubmitted(mysqli $db, string $invId): bool
+{
+    $stmt = $db->prepare("SELECT 1 FROM receipt WHERE inv_id = ? LIMIT 1");
+    $stmt->bind_param('s', $invId);
+    $stmt->execute();
+    $exists = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+    return $exists;
+}
+
+/**
+ * Whether the TP may Return/Remove on this invoice right now: before the
+ * invoice is ever submitted it's still their own draft, so no BDM approval
+ * is needed; once submitted, the normal request/approve flow applies.
+ */
+function tpShopInvoiceActionAllowed(mysqli $db, int $tpId, string $invId, string $actionType): bool
+{
+    if (!tpShopInvoiceIsSubmitted($db, $invId)) {
+        return true;
+    }
+    return tpShopInvoiceActionApproved($db, $tpId, $invId, $actionType);
+}
+
+/**
  * Raises a new request, or — if this TP/invoice/action combo was already
  * requested and since rejected — resets it back to 'pending' for a fresh
  * look (never silently reuses a stale decision). An already-pending or

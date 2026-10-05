@@ -11,6 +11,14 @@
 session_start();
 
 include("checksession.php");
+require_once("include/PermissionCheck.php");
+// Shared by both manage-advance-payments.php (manage_payment_entry) and
+// consolidated-manage-advance-payments.php (consolidated_payment_entry) —
+// either module's Edit permission is accepted.
+if (!hasPermission('manage_payment_entry_edit') && !hasPermission('consolidated_payment_entry_edit')) {
+    echo '<div class="alert alert-danger">You do not have permission to edit payments</div>';
+    exit;
+}
 include("config.php");
 
 // Check if user is logged in

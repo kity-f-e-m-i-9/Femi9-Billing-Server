@@ -1,6 +1,6 @@
 <?php
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('ms');
+require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage');
 include("config.php");
 require_once __DIR__ . '/../shared/ShopLocationChangeRequest.php';
 error_reporting(0);

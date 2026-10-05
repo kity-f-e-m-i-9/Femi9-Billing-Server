@@ -236,6 +236,10 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
 
                                                 <td>
                                                 <?php
+                                                // Still a draft (never submitted) — Return is the TP's own call, no BDM approval needed.
+                                                if (!$isCompleted && $result_product_list["sub_total"] > 0 && !$isVoided) { ?>
+                                                <a href="cnote_new.php?invuser=<?php echo $getinvuser; ?>&&InvoiceID=<?php echo $INVID_encode; ?>"><span class="badge badge-warning">Return</span></a>
+                                                <?php } else {
                                                 $returnReqStatus = tpShopInvoiceActionStatus($db_conn, (int)$Login_user_IDvl, $result_product_list["inv_id"], 'return');
                                                 if ($returnReqStatus === 'approved' && $result_product_list["sub_total"] > 0 && !$isVoided) { ?>
                                                 <a href="cnote_new.php?invuser=<?php echo $getinvuser; ?>&&InvoiceID=<?php echo $INVID_encode; ?>"><span class="badge badge-warning">Return</span></a>
@@ -243,11 +247,15 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                 <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending Return</span>
                                                 <?php } elseif ($result_product_list["sub_total"] > 0 && !$isVoided) { ?>
                                                 <button type="button" class="badge badge-style-bordered badge-primary request-shop-action-btn" style="border:none;cursor:pointer;" data-inv-id="<?php echo htmlspecialchars($result_product_list["inv_id"]); ?>" data-action-type="return">Request to Return</button>
-                                                <?php } else { echo "---"; } ?>
+                                                <?php } else { echo "---"; } } ?>
                                                 </td>
 
                                                 <td>
                                                 <?php
+                                                // Still a draft (never submitted) — Remove is the TP's own call, no BDM approval needed.
+                                                if (!$isCompleted && $result_product_list["sub_total"] > 0 && !$isVoided) { ?>
+                                                <a href="shop-invoice-add.php?invuser=<?php echo $getinvuser; ?>&&action=edit&&InvoiceID=<?php echo $INVID_encode; ?>" title="Open this invoice to pick which product line(s) to remove"><span class="badge badge-danger">Remove</span></a>
+                                                <?php } else {
                                                 $removeReqStatus = tpShopInvoiceActionStatus($db_conn, (int)$Login_user_IDvl, $result_product_list["inv_id"], 'remove');
                                                 if ($removeReqStatus === 'approved' && $result_product_list["sub_total"] > 0 && !$isVoided) { ?>
                                                 <a href="shop-invoice-add.php?invuser=<?php echo $getinvuser; ?>&&action=edit&&InvoiceID=<?php echo $INVID_encode; ?>" title="Open this invoice to pick which product line(s) to remove"><span class="badge badge-danger">Approved to Remove</span></a>
@@ -255,7 +263,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                 <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending Remove</span>
                                                 <?php } elseif ($result_product_list["sub_total"] > 0 && !$isVoided) { ?>
                                                 <button type="button" class="badge badge-style-bordered badge-primary request-shop-action-btn" style="border:none;cursor:pointer;" data-inv-id="<?php echo htmlspecialchars($result_product_list["inv_id"]); ?>" data-action-type="remove">Request to Remove</button>
-                                                <?php } else { echo "---"; } ?>
+                                                <?php } else { echo "---"; } } ?>
                                                 </td>
 
                                                 <td>

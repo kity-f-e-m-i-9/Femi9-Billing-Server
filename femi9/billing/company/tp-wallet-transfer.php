@@ -13,7 +13,7 @@
  * via tp_invoice_advance_log) — only balance_amount can move.
  */
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
+require_once("include/PermissionCheck.php"); requirePermission('territory_partner_edit');
 require_once __DIR__ . '/../shared/TpProductType.php';
 require_once __DIR__ . '/../shared/TpApproverContext.php';
 error_reporting(0);

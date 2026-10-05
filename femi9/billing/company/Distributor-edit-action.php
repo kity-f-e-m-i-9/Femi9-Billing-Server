@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('dt_edit');
 error_reporting(0);
 
 include("RemoveSpecialChar.php");

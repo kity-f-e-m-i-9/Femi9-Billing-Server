@@ -1,5 +1,5 @@
 <?php include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('ms');
+require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
 
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);

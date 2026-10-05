@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php");
 header('Content-Type: application/json');
 error_reporting(0);
 
@@ -21,6 +22,14 @@ if (!in_array($type, ['tp', 'cp']) || empty($enc_id) || !in_array($new_status, [
 
 $id = (int)base64_decode($enc_id);
 if (!$id) { echo json_encode(['success' => false]); exit; }
+
+// Company-side sessions need the matching Edit permission (Sales BDM is
+// scoped separately below instead, since it has no admin_log row).
+if (($Login_user_TYPEvl ?? '') !== 'salesbdm') {
+    if (!hasPermission($type === 'tp' ? 'territory_partner_edit' : 'channel_partner_edit')) {
+        echo json_encode(['success' => false]); exit;
+    }
+}
 
 // A Sales BDM session may only toggle a TP/CP inside their own assigned districts.
 if (($Login_user_TYPEvl ?? '') === 'salesbdm') {

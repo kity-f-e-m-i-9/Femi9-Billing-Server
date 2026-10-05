@@ -1,7 +1,7 @@
 <?php
 ob_start();
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
+require_once("include/PermissionCheck.php"); requirePermission('territory_partner_edit');
 include("config.php");
 
 // Clear all filters

@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage_edit');
 include("config.php");
 include("RemoveSpecialChar.php");
 error_reporting(1);

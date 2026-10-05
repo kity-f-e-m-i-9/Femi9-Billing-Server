@@ -1,5 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
-require_once("include/PermissionCheck.php"); requirePermission('manage_input_stock_users');
+<?php include("checksession.php"); error_reporting(0); require_once("include/PermissionCheck.php"); requirePermission('manage_input_stock_users'); $canEditInputStockUsers = hasPermission('manage_input_stock_users_edit'); $canDeleteInputStockUsers = hasPermission('manage_input_stock_users_delete');?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -242,7 +241,7 @@ else
 													
 																										<td>
 													    <div class="actions-group">
-													        <a href="delete-input-users?Roowid=<?php echo $RowID;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <?php if ($canDeleteInputStockUsers): ?><a href="delete-input-users?Roowid=<?php echo $RowID;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a><?php endif; ?>
 													    </div>
 													</td>
                                                 </tr>

@@ -1,5 +1,5 @@
 <?php include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
+require_once("include/PermissionCheck.php"); requirePermission('territory_partner_edit');
 require_once __DIR__ . '/../shared/TpStatusHistory.php';
 error_reporting(0);
 include("config.php");

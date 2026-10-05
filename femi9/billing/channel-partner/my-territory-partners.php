@@ -12,31 +12,95 @@ $cpRow->execute();
 $cp_text_id = $cpRow->get_result()->fetch_assoc()['cp_id'] ?? '';
 $cpRow->close();
 
-// All TPs formally assigned under this CP (referral_type = 'CP', referral_id = cp_id text)
-// Invoice stats are included where available
-$stmt = $db_conn->prepare("
-    SELECT
-        tp.id,
-        tp.tp_id                            AS tp_code,
-        tp.name,
-        tp.mobile,
-        tp.is_active,
-        COUNT(tpi.id)                       AS invoice_count,
-        COALESCE(SUM(tpi.total_amount), 0)  AS total_sales,
-        MAX(tpi.invoice_date)               AS last_invoice_date
-    FROM territory_partners tp
-    LEFT JOIN tp_invoices tpi
-           ON tpi.territory_partner_id = tp.id
-          AND tpi.source_cp_id = ?
-    WHERE tp.referral_type = 'CP'
-      AND tp.referral_id   = ?
-    GROUP BY tp.id
-    ORDER BY tp.is_active DESC, tp.name ASC
-");
-$stmt->bind_param('is', $cp_id, $cp_text_id);
-$stmt->execute();
-$tps = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+// TP ids directly referred under this CP (referral_type = 'CP', referral_id = cp_id text).
+$referredTpIds = [];
+$stmtRef = $db_conn->prepare("SELECT id FROM territory_partners WHERE referral_type = 'CP' AND referral_id = ?");
+$stmtRef->bind_param('s', $cp_text_id);
+$stmtRef->execute();
+foreach ($stmtRef->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+    $referredTpIds[] = (int)$r['id'];
+}
+$stmtRef->close();
+
+// TP ids whose own location falls under whichever area (Division, District,
+// Firka — whatever depth it is) this CP has been assigned to. A CP's
+// assignment may sit at any depth, so we walk the node tree down from each
+// of the CP's assigned locations (same ancestor/descendant-walk technique as
+// include/CompanyOrderInvoice.php's resolveCpForMsShop()) and match any TP
+// whose own assigned location is anywhere in that subtree.
+$geoTpIds = [];
+$cpLocRes = $db_conn->prepare("SELECT location_id FROM channel_partner_locations WHERE channel_partner_id = ?");
+$cpLocRes->bind_param('i', $cp_id);
+$cpLocRes->execute();
+$cpLocationIds = array_map(fn($r) => (int)$r['location_id'], $cpLocRes->get_result()->fetch_all(MYSQLI_ASSOC));
+$cpLocRes->close();
+
+if (!empty($cpLocationIds)) {
+    $allNodes = [];
+    $resNodes = $db_conn->query("SELECT id, parent_id FROM partner_location_nodes WHERE is_active = 1");
+    while ($n = $resNodes->fetch_assoc()) {
+        $allNodes[(int)$n['id']] = $n['parent_id'] !== null ? (int)$n['parent_id'] : null;
+    }
+
+    $childrenOf = [];
+    foreach ($allNodes as $id => $parent) {
+        if ($parent !== null) { $childrenOf[$parent][] = $id; }
+    }
+
+    $allowed = [];
+    $queue = array_values(array_filter($cpLocationIds, fn($id) => isset($allNodes[$id])));
+    while (!empty($queue)) {
+        $c = array_shift($queue);
+        if (isset($allowed[$c])) { continue; }
+        $allowed[$c] = true;
+        foreach ($childrenOf[$c] ?? [] as $child) { $queue[] = $child; }
+    }
+
+    if (!empty($allowed)) {
+        $idList = implode(',', array_keys($allowed));
+        $resTpLoc = $db_conn->query(
+            "SELECT DISTINCT territory_partner_id FROM territory_partner_locations WHERE location_id IN ($idList)"
+        );
+        while ($r = $resTpLoc->fetch_assoc()) {
+            $geoTpIds[] = (int)$r['territory_partner_id'];
+        }
+    }
+}
+
+$tpIds = array_values(array_unique(array_merge($referredTpIds, $geoTpIds)));
+
+if (empty($tpIds)) {
+    $tps = [];
+} else {
+    $idPlaceholders = implode(',', array_fill(0, count($tpIds), '?'));
+    $types = 'i' . str_repeat('i', count($tpIds));
+    $params = array_merge([$cp_id], $tpIds);
+
+    // All TPs referred under or geographically scoped to this CP.
+    // Invoice stats are included where available.
+    $stmt = $db_conn->prepare("
+        SELECT
+            tp.id,
+            tp.tp_id                            AS tp_code,
+            tp.name,
+            tp.mobile,
+            tp.is_active,
+            COUNT(tpi.id)                       AS invoice_count,
+            COALESCE(SUM(tpi.total_amount), 0)  AS total_sales,
+            MAX(tpi.invoice_date)               AS last_invoice_date
+        FROM territory_partners tp
+        LEFT JOIN tp_invoices tpi
+               ON tpi.territory_partner_id = tp.id
+              AND tpi.source_cp_id = ?
+        WHERE tp.id IN ($idPlaceholders)
+        GROUP BY tp.id
+        ORDER BY tp.is_active DESC, tp.name ASC
+    ");
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $tps = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+}
 
 $total_tps     = count($tps);
 $active_tps    = count(array_filter($tps, fn($r) => $r['is_active']));
@@ -252,7 +316,7 @@ $total_sales   = array_sum(array_column($tps, 'total_sales'));
                                 <i class="material-icons-two-tone" style="vertical-align:middle;font-size:22px;">people</i>
                                 My Territory Partners
                             </h4>
-                            <p style="color:#6b7280;font-size:13px;margin:0;">TPs who have received stock invoices from your account</p>
+                            <p style="color:#6b7280;font-size:13px;margin:0;">TPs referred under you, or in your assigned division/district</p>
                         </div>
                     </div>
 
@@ -316,7 +380,7 @@ $total_sales   = array_sum(array_column($tps, 'total_sales'));
                                         </div>
                                         <div>
                                             <p class="header-title">Territory Partners Under You</p>
-                                            <p class="header-sub">Stock invoices raised from your account</p>
+                                            <p class="header-sub">Referral + geography-matched TPs</p>
                                         </div>
                                     </div>
                                     <?php if (!empty($tps)): ?>
@@ -335,7 +399,7 @@ $total_sales   = array_sum(array_column($tps, 'total_sales'));
                                         <i class="material-icons-outlined">person_search</i>
                                     </div>
                                     <h6>No Territory Partners Assigned</h6>
-                                    <p>TPs referred under your CP ID will appear here.</p>
+                                    <p>TPs referred under your CP ID, or falling under your assigned division/district, will appear here.</p>
                                 </div>
 
                                 <?php else: ?>

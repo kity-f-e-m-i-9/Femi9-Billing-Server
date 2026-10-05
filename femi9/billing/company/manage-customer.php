@@ -1,6 +1,8 @@
 <?php include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('cus');
 include("config.php");
+$canEditCus   = hasPermission('cus_edit');
+$canDeleteCus = hasPermission('cus_delete');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -136,8 +138,12 @@ $i= $start_from;
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["marketing_date"]));?></td>
 																										<td>
 													    <div class="actions-group">
+													        <?php if ($canEditCus): ?>
 													        <a href="edit-customer.php?prid=<?php echo $product_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+													        <?php endif; ?>
+													        <?php if ($canDeleteCus): ?>
 													        <a href="delete-customer.php?prid=<?php echo $product_id;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <?php endif; ?>
 													    </div>
 													</td>
                                                 </tr>

@@ -45,23 +45,73 @@ if ($agreementPlace === '' || $cpSignature === '') {
     exit;
 }
 
-get_or_create_cp_agreement($db_conn, $cp_id); // ensures a row exists to UPDATE
+$existingAgreement = get_or_create_cp_agreement($db_conn, $cp_id); // ensures a row exists to UPDATE
+
+// PAN card: required once, kept as-is on re-sign if no new file is chosen.
+$panCardPath = $existingAgreement['pan_card_path'] ?? null;
+if (!empty($_FILES['pan_card']['name'])) {
+    $ext = strtolower(pathinfo($_FILES['pan_card']['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'pdf'], true)) {
+        $_SESSION['errorMessage'] = "PAN card must be a JPG, PNG or PDF file.";
+        header('Location: agreement.php');
+        exit;
+    }
+    if ($_FILES['pan_card']['size'] > 5 * 1024 * 1024) {
+        $_SESSION['errorMessage'] = "PAN card file must be under 5 MB.";
+        header('Location: agreement.php');
+        exit;
+    }
+    $uploadDir = __DIR__ . '/kyc_documents/';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+    $newName = 'pan_cp_' . $cp_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    if (move_uploaded_file($_FILES['pan_card']['tmp_name'], $uploadDir . $newName)) {
+        $panCardPath = $newName;
+    }
+}
+if (empty($panCardPath)) {
+    $_SESSION['errorMessage'] = "Please upload your PAN card before submitting.";
+    header('Location: agreement.php');
+    exit;
+}
+
+// Snapshot the CP's own profile fields as they stand right now, so a later
+// edit by the Company (e.g. via Manage Channel Partner) can be detected
+// and highlighted on this page next time it's opened.
+$stmtCp = $db_conn->prepare("SELECT name, company_name, address, mobile, email FROM channel_partners WHERE id = ?");
+$stmtCp->bind_param('i', $cp_id);
+$stmtCp->execute();
+$cpProfile = $stmtCp->get_result()->fetch_assoc() ?: [];
+$stmtCp->close();
+$snapName        = $cpProfile['name'] ?? '';
+$snapCompanyName = $cpProfile['company_name'] ?? '';
+$snapAddress     = $cpProfile['address'] ?? '';
+$snapMobile      = $cpProfile['mobile'] ?? '';
+$snapEmail       = $cpProfile['email'] ?? '';
+
+// Snapshot the wording as currently effective (shared template or this CP's
+// own override) too, so a later edit to the clauses can be highlighted
+// paragraph-by-paragraph next time this page renders.
+$snapBodyHtml = get_effective_agreement_body($db_conn, $existingAgreement, 'channel_partner');
 
 $stmt = $db_conn->prepare(
     "UPDATE channel_partner_agreements SET
         agreement_date = ?, agreement_place = ?, deposit_mode = ?, deposit_txn_ref = ?,
-        cp_designation = ?, cp_signature = ?,
+        cp_designation = ?, cp_signature = ?, pan_card_path = ?,
         witness1_name = ?, witness1_address = ?, witness1_signature = ?,
         witness2_name = ?, witness2_address = ?, witness2_signature = ?,
+        snap_name = ?, snap_company_name = ?, snap_address = ?, snap_mobile = ?, snap_email = ?,
+        snap_body_html = ?,
         signed_at = NOW(), is_locked = 1
      WHERE channel_partner_id = ?"
 );
 $stmt->bind_param(
-    'ssssssssssssi',
+    'sssssssssssssssssssi',
     $agreementDate, $agreementPlace, $depositMode, $depositRef,
-    $cpDesignation, $cpSignature,
+    $cpDesignation, $cpSignature, $panCardPath,
     $w1Name, $w1Address, $w1Signature,
     $w2Name, $w2Address, $w2Signature,
+    $snapName, $snapCompanyName, $snapAddress, $snapMobile, $snapEmail,
+    $snapBodyHtml,
     $cp_id
 );
 $stmt->execute();
