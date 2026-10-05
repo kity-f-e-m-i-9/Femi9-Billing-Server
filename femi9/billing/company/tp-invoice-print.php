@@ -226,6 +226,17 @@ $show_carton_cols = $has_carton_data;
                     });
                     $('#pdfOptionsModal').modal('hide');
                 }
+
+                // manage-tp-invoices.php's row-level WhatsApp icon links here
+                // with a #pdfShare fragment instead of hitting a raw wa.me
+                // link directly, so it opens straight into this same dialog
+                // rather than just landing on the plain Print page. Deferred
+                // to window 'load' since jQuery/bootstrap (needed by
+                // openPdfOptions' modal('show')) are loaded at the bottom of
+                // the page, after this script block runs.
+                if (window.location.hash === '#pdfShare') {
+                    window.addEventListener('load', openPdfOptions);
+                }
                 </script>
 
                 <div id="divToPrint"><!--Print content start-->
