@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php");
 error_reporting(0);
 
 // CSRF check
@@ -56,6 +57,7 @@ $action = $_POST['action'] ?? '';
 
 // ── INSERT ────────────────────────────────────────────────────────────────────
 if ($action === 'insert-territory-partner') {
+    requirePermission('territory_partner_edit');
 
     $name                = trim($_POST['tp_name']                ?? '');
     $company_name        = trim($_POST['tp_company_name']        ?? '');
@@ -181,6 +183,7 @@ if ($action === 'insert-territory-partner') {
 
 // ── UPDATE ────────────────────────────────────────────────────────────────────
 if ($action === 'update-territory-partner') {
+    requirePermission('territory_partner_edit');
 
     $tp_id_raw           = $_POST['tp_db_id'] ?? '';
     $tp_db_id            = (int)base64_decode($tp_id_raw);

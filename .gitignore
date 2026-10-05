@@ -21,3 +21,8 @@ femi9/billing/super-stockist/.env
 
 # Local DB backup dumps from data migrations - not source code
 /db_backups/
+
+# Runtime login-attempt logs — contain real user mobile numbers, not source code.
+femi9/billing/company/logs/login_attempts.log
+femi9/billing/login/logs/login_attempts.log
+femi9/billing/salesbdm/logs/login_attempts.log

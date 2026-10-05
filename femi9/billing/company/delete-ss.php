@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('ss_delete');
 
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);

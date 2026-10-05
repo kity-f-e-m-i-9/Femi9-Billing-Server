@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php");
 include("config.php");
 include("RemoveSpecialChar.php");
 error_reporting(0);
@@ -61,6 +62,7 @@ if(isset($_REQUEST['add-customer']))
 //update customer details
 if(isset($_REQUEST['update-customer']))
 {
+	requirePermission('cus_edit');
 	$update_id=$_REQUEST['update_id'];
 	
 	$name=str_replace("'","&#39;",$_REQUEST['name']);

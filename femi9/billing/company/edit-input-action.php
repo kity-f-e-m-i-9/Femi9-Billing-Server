@@ -10,7 +10,7 @@
 
 ob_start();
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('add_input_stock');
+require_once("include/PermissionCheck.php"); requirePermission('manage_input_stock_edit');
 include("config.php");
 require_once("include/StockService.php");
 require_once("include/GodownAccess.php");

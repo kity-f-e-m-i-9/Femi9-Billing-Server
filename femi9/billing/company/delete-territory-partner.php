@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('territory_partner_delete');
 error_reporting(0);
 
 // Soft delete — hard-deleting territory_partners had no DB-level cascade to

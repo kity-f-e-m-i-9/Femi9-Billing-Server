@@ -4,6 +4,9 @@ require_once("include/PermissionCheck.php"); requirePermission('manage_input_sto
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
+$canEditInputStock   = hasPermission('manage_input_stock_edit');
+$canDeleteInputStock = hasPermission('manage_input_stock_delete');
+
 // ── Date resolution (needed before export) ────────────────────────────
 if(!empty($_REQUEST['frdate'])){
     $from_date = $_REQUEST['frdate'];
@@ -193,8 +196,15 @@ $i = $start_from;
                                                     <td><?php echo $result_product_list["input_remarks"]; ?></td>
                                                                                                         <td>
                                                         <div class="actions-group">
+                                                            <?php if ($canEditInputStock): ?>
                                                             <a href="edit-input?Roowid=<?php echo $RowID;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#2563eb;">edit</i></a>
+                                                            <?php endif; ?>
+                                                            <?php if ($canDeleteInputStock): ?>
                                                             <a href="delete-input?Roowid=<?php echo $RowID;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+                                                            <?php endif; ?>
+                                                            <?php if (!$canEditInputStock && !$canDeleteInputStock): ?>
+                                                            <span style="color:#9ca3af;font-size:12px;">View only</span>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </td>
                                                 </tr>

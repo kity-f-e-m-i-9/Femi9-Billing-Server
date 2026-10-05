@@ -1,8 +1,10 @@
 <?php 
-include("checksession.php"); 
+include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ss');
 error_reporting(0);
 include("config.php");
+$canEditSs   = hasPermission('ss_edit');
+$canDeleteSs = hasPermission('ss_delete');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -403,20 +405,24 @@ include("config.php");
                                                     </td>
                                                     
                                                     <td class="text-center">
-                                                        <a href="edit-ss.php?prid=<?php echo $rowid;?>" 
-                                                           class="action-btn" 
+                                                        <?php if ($canEditSs): ?>
+                                                        <a href="edit-ss.php?prid=<?php echo $rowid;?>"
+                                                           class="action-btn"
                                                            title="Edit Details">
                                                             <i class="material-icons-outlined">edit</i>
                                                         </a>
+                                                        <?php endif; ?>
                                                     </td>
-                                                    
+
                                                     <td class="text-center">
-                                                        <a href="delete-ss.php?prid=<?php echo $rowid;?>" 
-                                                           onclick="return confirm('You want to delete confirm?');" 
-                                                           class="action-btn action-btn-delete" 
+                                                        <?php if ($canDeleteSs): ?>
+                                                        <a href="delete-ss.php?prid=<?php echo $rowid;?>"
+                                                           onclick="return confirm('You want to delete confirm?');"
+                                                           class="action-btn action-btn-delete"
                                                            title="Delete Details">
                                                             <i class="material-icons-outlined">delete</i>
                                                         </a>
+                                                        <?php endif; ?>
                                                     </td>
                                                 </tr>
                                            

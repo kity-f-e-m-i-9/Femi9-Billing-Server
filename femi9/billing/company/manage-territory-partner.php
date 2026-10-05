@@ -2,6 +2,8 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 error_reporting(0);
+$canEditTp   = hasPermission('territory_partner_edit');
+$canDeleteTp = hasPermission('territory_partner_delete');
 require_once __DIR__ . '/../shared/EncryptionService.php';
 $_enc = new EncryptionService();
 function decryptPassword($enc, $hash) {
@@ -341,10 +343,12 @@ $i = 0;
                                 <i class="material-icons-outlined">people</i>
                                 All Territory Partners
                             </span>
+                            <?php if ($canEditTp): ?>
                             <a href="add-territory-partner" class="btn-add">
                                 <i class="material-icons" style="font-size:16px;">add</i>
                                 Add Partner
                             </a>
+                            <?php endif; ?>
                         </div>
                         <div class="card-body">
                             <div style="overflow-x:auto;">
@@ -518,6 +522,7 @@ $i = 0;
                                             </td>
                                             <td>
                                                 <div class="actions-group">
+                                                    <?php if ($canEditTp): ?>
                                                     <a href="edit-territory-partner?tpid=<?php echo $enc_id; ?>" class="action-link" title="Edit">
                                                         <i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i>
                                                     </a>
@@ -534,11 +539,14 @@ $i = 0;
                                                             data-name="<?php echo htmlspecialchars($tp['name'], ENT_QUOTES); ?>">
                                                         <i class="material-icons-outlined" style="font-size:17px;color:<?php echo $tp['is_active'] ? '#10b981' : '#9ca3af'; ?>;">power_settings_new</i>
                                                     </button>
+                                                    <?php endif; ?>
+                                                    <?php if ($canDeleteTp): ?>
                                                     <a href="delete-territory-partner?tpid=<?php echo $enc_id; ?>"
                                                        class="action-link delete" title="Delete"
                                                        onclick="return confirm('Delete \'<?php echo addslashes(htmlspecialchars($tp['name'])); ?>\'? Location assignments will also be removed.');">
                                                         <i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i>
                                                     </a>
+                                                    <?php endif; ?>
                                                 </div>
                                             </td>
                                         </tr>

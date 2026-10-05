@@ -1,6 +1,7 @@
-<?php 
+<?php
 error_reporting(0);
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('sdt_delete');
 include("config.php");
 $prid=base64_decode($_REQUEST['prid']);
 
