@@ -22,7 +22,17 @@ if (!function_exists('fmt_gst_pct')) {
     }
 }
 
-function load_tp_invoice_data($db_conn, int $inv_id): ?array {
+function load_tp_invoice_data($db_conn, int $inv_id, ?int $cp_id = null): ?array {
+    // $cp_id (optional, default null = no restriction, company's existing
+    // unrestricted behavior) scopes the invoice to one sourced through that
+    // specific channel partner — channel-partner/tp-invoice-print.php's own
+    // pre-refactor query had this exact "AND tpi.source_cp_id = ?" filter
+    // as a genuine authorization boundary (a CP must not be able to view
+    // another CP's TP invoices by guessing ?id= in the URL). The no-login
+    // PDF endpoints (company and channel-partner's tp-invoice-pdf.php) both
+    // omit it since a valid signed link is itself the authorization there.
+    $__cpFilterSql = ($cp_id !== null) ? ' AND tpi.source_cp_id = ?' : '';
+
     // Invoice header
     $stmt = $db_conn->prepare("
         SELECT tpi.*,
@@ -50,9 +60,13 @@ function load_tp_invoice_data($db_conn, int $inv_id): ?array {
         LEFT JOIN channel_partners cp_old       ON cp_old.id = cpl.channel_partner_id
         LEFT JOIN channel_partners cp_src       ON cp_src.id = tpi.source_cp_id
         LEFT JOIN company_godown gd             ON gd.id = tpi.source_godown_id AND (" . godown_finance_filter_sql($db_conn, 'gd') . ")
-        WHERE tpi.id = ?
+        WHERE tpi.id = ?" . $__cpFilterSql . "
     ");
-    $stmt->bind_param("i", $inv_id);
+    if ($cp_id !== null) {
+        $stmt->bind_param("ii", $inv_id, $cp_id);
+    } else {
+        $stmt->bind_param("i", $inv_id);
+    }
     $stmt->execute();
     $result_Invoice_Details = $stmt->get_result()->fetch_assoc();
     $stmt->close();
