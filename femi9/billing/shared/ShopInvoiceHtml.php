@@ -27,7 +27,7 @@
  * widths for layout/wrapping — matching the Print page — and only drops
  * to DejaVu Sans for the handful of characters (₹) missing from it.
  */
-function render_shop_invoice_html(array $ctx, bool $forPdf = false): string {
+function render_shop_invoice_html(array $ctx, bool $forPdf = false, float $pdfScale = 1.0, float $pdfMarginMm = 6.0): string {
     extract($ctx, EXTR_SKIP);
     // Expected keys in $ctx: invoice_heading, profile, seller_display_name,
     // tpRow, shop, state_name, district_name, inv, Result_DLDetails,
@@ -35,6 +35,15 @@ function render_shop_invoice_html(array $ctx, bool $forPdf = false): string {
     // Currency_Name, gsttype, totalgstamount, __inv_gst_pct, hsn_totals,
     // hsn_gst_totals, hsn_gst_pct, result (amount-in-words),
     // TAXresult (tax-amount-in-words).
+
+    // $pdfScale/$pdfMarginMm let shop-invoice-pdf.php's Paper size/Margins/
+    // Scale dialog actually change the rendered PDF instead of being a fake
+    // no-op control — every $forPdf font-size/padding px value below is
+    // multiplied by $pdfScale so "150%" really renders bigger text, not
+    // just a bigger blank page.
+    $px = function (float $basePx) use ($pdfScale): string {
+        return round($basePx * $pdfScale, 1) . 'px';
+    };
 
     ob_start();
     ?>
@@ -97,17 +106,17 @@ function render_shop_invoice_html(array $ctx, bool $forPdf = false): string {
       for the PDF, so every column stays readable while giving the table
       enough headroom that its own right border reliably lands inside the
       outer box border instead of crowding or clipping it. */
-@page { margin: 6mm; }
-.item_list td{font-size:11px;padding:3px;}
-.item_list td:last-child{padding-right:6px;}
-#noneborder td{font-size:12px;line-height:16px;}
-.cusdetaiis{font-size:12px;line-height:16px;margin:6px 0;}
-#second_topvl td{padding:3px;font-size:12px;}
-#hsnsac{font-size:11px;}
-#hsnsac td{padding:2px 4px;}
-#sealsign td{padding:2px;font-size:12px;}
-#toptl{font-size:17px;padding:3px;}
-.amount_word,.amount_payable{padding:2px;font-size:12px;}
+@page { margin: <?php echo $pdfMarginMm; ?>mm; }
+.item_list td{font-size:<?php echo $px(11); ?>;padding:<?php echo $px(3); ?>;}
+.item_list td:last-child{padding-right:<?php echo $px(6); ?>;}
+#noneborder td{font-size:<?php echo $px(12); ?>;line-height:<?php echo $px(16); ?>;}
+.cusdetaiis{font-size:<?php echo $px(12); ?>;line-height:<?php echo $px(16); ?>;margin:6px 0;}
+#second_topvl td{padding:<?php echo $px(3); ?>;font-size:<?php echo $px(12); ?>;}
+#hsnsac{font-size:<?php echo $px(11); ?>;}
+#hsnsac td{padding:<?php echo $px(2); ?> <?php echo $px(4); ?>;}
+#sealsign td{padding:<?php echo $px(2); ?>;font-size:<?php echo $px(12); ?>;}
+#toptl{font-size:<?php echo $px(17); ?>;padding:<?php echo $px(3); ?>;}
+.amount_word,.amount_payable{padding:<?php echo $px(2); ?>;font-size:<?php echo $px(12); ?>;}
 /* The details table on the right (Invoice #/Delivery Note/Reference No./
    etc.) hardcodes height="50" per row in the markup — sized for a browser
    tab with room to spare, not a fixed A4 page. Each row's actual content
@@ -115,8 +124,8 @@ function render_shop_invoice_html(array $ctx, bool $forPdf = false): string {
    otherwise-empty vertical space, the single biggest reason a normal
    4-line-item invoice spilled onto a second PDF page. CSS height overrides
    the HTML attribute's (lower-specificity) height. */
-#second_topvl td[height]{height:24px !important;}
-#shiippingaddress{margin:4px 0;font-size:12px;}
+#second_topvl td[height]{height:<?php echo $px(24); ?> !important;}
+#shiippingaddress{margin:4px 0;font-size:<?php echo $px(12); ?>;}
 hr{margin:3px 0;}
 /* Several sections below the item table are separate <table width="100%">
    blocks stacked one after another — a browser's UA stylesheet gives every
@@ -163,11 +172,33 @@ hr{margin:3px 0;}
 /* Printing the page directly (window.print()) instead of a popup — hide
    everything except the invoice itself, on any screen size. */
 @media print {
+    @page { size: A4; margin: 6mm; }
     body * { visibility: hidden; }
     #divToPrint, #divToPrint * { visibility: visible; }
     #divToPrint { position: absolute; left: 0; top: 0; width: 100%; }
     #divToPrintScroll { overflow: visible !important; }
     .maincontainar { width: 100% !important; min-width: 0 !important; }
+
+    /* Same size-tightening as the WhatsApp PDF ($forPdf above) — the
+       on-screen 14px/5px-padding sizing plus the browser's default ~0.5in
+       page margin was running the invoice just past one A4 page, so a
+       1-item invoice split its last couple of rows onto a near-empty
+       second page. Shrinking fonts/padding/row heights here the same way
+       the PDF does keeps everything on one printed page. */
+    .item_list td{font-size:11px;padding:3px;}
+    .item_list td:last-child{padding-right:6px;}
+    #noneborder td{font-size:12px;line-height:16px;}
+    .cusdetaiis{font-size:12px;line-height:16px;margin:6px 0;}
+    #second_topvl td{padding:3px;font-size:12px;}
+    #hsnsac{font-size:11px;}
+    #hsnsac td{padding:2px 4px;}
+    #sealsign td{padding:2px;font-size:12px;}
+    #toptl{font-size:17px;padding:3px;}
+    .amount_word,.amount_payable{padding:2px;font-size:12px;}
+    #second_topvl td[height]{height:24px !important;}
+    #shiippingaddress{margin:4px 0;font-size:12px;}
+    hr{margin:3px 0;}
+    #divToPrintScroll table{margin:0;}
 }
 <?php endif; ?>
 </style>
