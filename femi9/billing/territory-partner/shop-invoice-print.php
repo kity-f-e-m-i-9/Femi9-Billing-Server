@@ -146,33 +146,48 @@ function pdfOptionsDownload() {
 }
 
 function pdfOptionsShareWhatsApp() {
-    var url    = pdfOptionsUrl();
-    var waText = <?php echo json_encode($__wa_text); ?>;
+    var url      = pdfOptionsUrl();
+    var waText   = <?php echo json_encode($__wa_text); ?>;
     var fileName = <?php echo json_encode($__pdf_filename); ?>;
 
-    function fallbackToLink() {
-        window.open('https://wa.me/?text=' + encodeURIComponent(waText + url), '_blank');
+    // No wa.me link, ever — per explicit instruction, the shop/customer
+    // must receive the actual PDF file, never a URL to tap. The PDF is
+    // always downloaded to the device first; the native share sheet (where
+    // supported) is then offered on top of that download so the TP can
+    // pick WhatsApp directly, but the download itself never depends on it.
+    function downloadBlob(blob) {
+        var blobUrl = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 10000);
     }
 
-    // Native file share (Android Chrome / iOS Safari) hands WhatsApp an
-    // actual attached PDF document instead of a link card. Desktop
-    // browsers, and any mobile browser without this API, have no way to
-    // attach a file through a webpage — they fall back to the wa.me link,
-    // the only thing that works there.
-    if (navigator.share && navigator.canShare && window.fetch) {
-        fetch(url).then(function(res) {
-            if (!res.ok) { throw new Error('PDF fetch failed'); }
-            return res.blob();
-        }).then(function(blob) {
-            var file = new File([blob], fileName, {type: 'application/pdf'});
-            if (navigator.canShare({files: [file]})) {
-                return navigator.share({files: [file], text: waText});
-            }
-            throw new Error('File sharing not supported');
-        }).catch(fallbackToLink);
-    } else {
-        fallbackToLink();
-    }
+    fetch(url).then(function(res) {
+        if (!res.ok) { throw new Error('PDF fetch failed'); }
+        return res.blob();
+    }).then(function(blob) {
+        var file = new File([blob], fileName, {type: 'application/pdf'});
+        // Try the native share sheet first (Android Chrome / iOS Safari) —
+        // if the TP picks WhatsApp there, it attaches the real file
+        // directly. Either way the PDF is already downloaded below, so
+        // there's always a local copy to attach manually in WhatsApp
+        // Desktop/Web if the share sheet isn't available or gets cancelled.
+        if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
+            navigator.share({files: [file], text: waText}).catch(function() {
+                // User cancelled the share sheet, or it failed — the file
+                // is downloaded regardless (below), nothing more to do.
+            });
+        } else {
+            alert('PDF downloaded as ' + fileName + '. Open WhatsApp and attach it from your Downloads.');
+        }
+        downloadBlob(blob);
+    }).catch(function() {
+        alert('Could not generate the PDF. Please try again.');
+    });
     $('#pdfOptionsModal').modal('hide');
 }
 </script>
