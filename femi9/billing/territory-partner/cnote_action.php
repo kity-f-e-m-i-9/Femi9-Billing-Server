@@ -27,11 +27,13 @@ if (isset($_REQUEST['add-return'])) {
         header("Location: cnote_new.php?error=invalid_quantity"); exit;
     }
 
-    // Authoritative gate for a shop → TP return — the TP's Sales BDM (or
-    // Company) must have approved a Return request for THIS invoice; never
-    // trust that reaching this endpoint means the UI link was shown.
+    // Authoritative gate for a shop → TP return — before the invoice is ever
+    // submitted it's still the TP's own draft, so Return is always allowed;
+    // once submitted, the TP's Sales BDM (or Company) must have approved a
+    // Return request for THIS invoice. Never trust that reaching this
+    // endpoint means the UI link was shown.
     if ($from_usertype === 'shop' && $to_usertype === 'territory_partner'
-        && !tpShopInvoiceActionApproved($db_conn, (int)$to_userid, $invid, 'return')) {
+        && !tpShopInvoiceActionAllowed($db_conn, (int)$to_userid, $invid, 'return')) {
         header("Location: shop-manage-invoice.php"); exit;
     }
 

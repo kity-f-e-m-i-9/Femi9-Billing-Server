@@ -17,10 +17,11 @@ if ($rowid <= 0) {
 
 $inv_id_decoded = base64_decode($invoice_id_encode);
 
-// Authoritative gate — the TP's Sales BDM (or Company) must have approved a
-// Remove request for THIS invoice; never trust that the link was only
-// reachable because the UI hid it.
-if (!tpShopInvoiceActionApproved($db_conn, (int)$Login_user_IDvl, $inv_id_decoded, 'remove')) {
+// Authoritative gate — before the invoice is ever submitted it's still the
+// TP's own draft, so Remove is always allowed; once submitted, the TP's
+// Sales BDM (or Company) must have approved a Remove request for THIS
+// invoice. Never trust that the link was only reachable because the UI hid it.
+if (!tpShopInvoiceActionAllowed($db_conn, (int)$Login_user_IDvl, $inv_id_decoded, 'remove')) {
     $_SESSION['errorMessage'] = "Remove isn't approved for this invoice yet. Please raise a request from the invoice first.";
     echo "<script>window.location='shop-invoice-add.php?InvoiceID={$invoice_id_encode}&invuser={$invuser}&action={$actionEdit}';</script>";
     exit;

@@ -14,10 +14,12 @@ $InvoiceID    = $_REQUEST['InvoiceID'] ?? '';
 $invid_decode = mysqli_real_escape_string($db_conn, base64_decode($InvoiceID));
 $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid']) : '';
 
-// Authoritative gate for shop-invoice returns — the TP's Sales BDM (or
-// Company) must have approved a Return request for THIS specific invoice;
-// never trust that reaching this page means the UI link was actually shown.
-if ($getinvuser === 'shop' && !tpShopInvoiceActionApproved($db_conn, (int)$Login_user_IDvl, $invid_decode, 'return')) {
+// Authoritative gate for shop-invoice returns — before the invoice is ever
+// submitted it's still the TP's own draft, so Return is always allowed; once
+// submitted, the TP's Sales BDM (or Company) must have approved a Return
+// request for THIS specific invoice. Never trust that reaching this page
+// means the UI link was actually shown.
+if ($getinvuser === 'shop' && !tpShopInvoiceActionAllowed($db_conn, (int)$Login_user_IDvl, $invid_decode, 'return')) {
     $_SESSION['errorMessage'] = "Return isn't approved for this invoice yet. Please raise a request from Manage Invoice first.";
     echo "<script>window.location='shop-manage-invoice.php';</script>";
     exit;
