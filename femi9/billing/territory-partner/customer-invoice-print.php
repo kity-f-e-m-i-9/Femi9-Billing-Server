@@ -60,26 +60,126 @@ function PrintDiv() {
 </script>
 
 <?php
-// wa.me click-to-chat link carrying a link to the invoice's own PDF (see
-// customer-invoice-pdf.php) — opens WhatsApp's own contact/chat picker with
-// a prefilled message already selected, so the TP picks who to send it to
-// (no fixed number — the customer's on-file mobile number may not even be
-// on WhatsApp, or the TP may want to send it to someone else entirely).
-// No file attach step, no PDF library in the browser, works on every
-// device including desktop, and doesn't depend on the Web Share API (which
-// requires HTTPS and isn't reachable at all on this deployment's mobile
-// browsers). The TP still has to tap Send themselves — WhatsApp doesn't
-// allow a webpage to submit a chat message on the user's behalf.
-$__pdf_url   = invoice_share_url('/femi9/billing/territory-partner/customer-invoice-pdf.php', 'customer', $_REQUEST['invoiceid'] ?? '');
-$__wa_text   = 'Invoice #' . ($inv['inv_number'] ?? '') . ' from ' . $seller_display_name . ': ' . $__pdf_url;
-$__wa_url    = 'https://wa.me/?text=' . rawurlencode($__wa_text);
+// Signed link to the invoice's own PDF (see customer-invoice-pdf.php) —
+// paper/margin/scale query params get appended by the PDF Options dialog
+// below so the TP can control the downloaded/shared PDF's layout.
+$__pdf_url = invoice_share_url('/femi9/billing/territory-partner/customer-invoice-pdf.php', 'customer', $_REQUEST['invoiceid'] ?? '');
+$__wa_text = 'Invoice #' . ($inv['inv_number'] ?? '') . ' from ' . $seller_display_name . ': ';
+$__pdf_filename = 'Invoice_' . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $inv['inv_number'] ?? 'invoice') . '.pdf';
 ?>
 <div id="invoiceActionBar" class="d-flex flex-wrap justify-content-end">
 <button type="button" onClick="PrintDiv();" class="btn btn-dark m-b-xs m-r-xs">Print</button>
-<a href="<?php echo htmlspecialchars($__wa_url, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="btn btn-success m-b-xs m-r-xs"><i class="material-icons" style="font-size:16px;vertical-align:middle;">share</i> Share to WhatsApp</a>
+<button type="button" onClick="openPdfOptions();" class="btn btn-success m-b-xs m-r-xs"><i class="material-icons" style="font-size:16px;vertical-align:middle;">picture_as_pdf</i> PDF / Share</button>
 <button type="button" onClick="javascript:window.location='customer-invoice-add.php';" class="btn btn-success m-b-xs m-r-xs">+ New Invoice</button>
 <button type="button" onClick="javascript:window.location='customer-manage-invoice.php';" class="btn btn-primary m-b-xs m-r-xs">Manage Invoice</button>
 </div>
+
+<!-- PDF Options dialog — same pattern as shop-invoice-print.php: paper
+     size / margins / scale actually drive the server-rendered PDF
+     (customer-invoice-pdf.php), for both Download and Share-to-WhatsApp. -->
+<div class="modal fade" id="pdfOptionsModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog" role="document" style="max-width:420px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">PDF Options</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="pdfOptPaper">Paper size</label>
+          <select id="pdfOptPaper" class="form-control">
+            <option value="a4" selected>A4</option>
+            <option value="a5">A5</option>
+            <option value="letter">Letter</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="pdfOptMargin">Margins</label>
+          <select id="pdfOptMargin" class="form-control">
+            <option value="6" selected>Default</option>
+            <option value="0">None</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group" id="pdfOptMarginCustomWrap" style="display:none;">
+          <label for="pdfOptMarginCustom">Custom margin (mm)</label>
+          <input type="number" id="pdfOptMarginCustom" class="form-control" min="0" max="30" value="6">
+        </div>
+        <div class="form-group m-b-0">
+          <label for="pdfOptScale">Scale: <span id="pdfOptScaleVal">100%</span></label>
+          <input type="range" id="pdfOptScale" min="50" max="150" value="100" step="5" style="width:100%;">
+        </div>
+      </div>
+      <div class="modal-footer flex-wrap justify-content-between">
+        <button type="button" class="btn btn-dark" onclick="pdfOptionsDownload();" style="flex:1 1 auto;margin:3px;">Download PDF</button>
+        <button type="button" class="btn btn-success" onclick="pdfOptionsShareWhatsApp();" style="flex:1 1 auto;margin:3px;"><i class="material-icons" style="font-size:16px;vertical-align:middle;">share</i> Share to WhatsApp</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openPdfOptions() {
+    $('#pdfOptionsModal').modal('show');
+}
+document.getElementById('pdfOptMargin').addEventListener('change', function() {
+    document.getElementById('pdfOptMarginCustomWrap').style.display = (this.value === 'custom') ? '' : 'none';
+});
+document.getElementById('pdfOptScale').addEventListener('input', function() {
+    document.getElementById('pdfOptScaleVal').textContent = this.value + '%';
+});
+
+function pdfOptionsUrl() {
+    var paper     = document.getElementById('pdfOptPaper').value;
+    var marginSel = document.getElementById('pdfOptMargin').value;
+    var margin    = (marginSel === 'custom') ? (document.getElementById('pdfOptMarginCustom').value || 6) : marginSel;
+    var scale     = document.getElementById('pdfOptScale').value;
+    var base      = <?php echo json_encode($__pdf_url); ?>;
+    var sep       = (base.indexOf('?') === -1) ? '?' : '&';
+    return base + sep + 'paper=' + encodeURIComponent(paper) + '&margin=' + encodeURIComponent(margin) + '&scale=' + encodeURIComponent(scale);
+}
+
+function pdfOptionsDownload() {
+    window.location = pdfOptionsUrl();
+    $('#pdfOptionsModal').modal('hide');
+}
+
+function pdfOptionsShareWhatsApp() {
+    var url      = pdfOptionsUrl();
+    var waText   = <?php echo json_encode($__wa_text); ?>;
+    var fileName = <?php echo json_encode($__pdf_filename); ?>;
+
+    // No wa.me link — the PDF is always downloaded to the device first; the
+    // native share sheet (where supported) is offered on top of that so the
+    // TP can pick WhatsApp directly, but the download never depends on it.
+    function downloadBlob(blob) {
+        var blobUrl = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 10000);
+    }
+
+    fetch(url).then(function(res) {
+        if (!res.ok) { throw new Error('PDF fetch failed'); }
+        return res.blob();
+    }).then(function(blob) {
+        var file = new File([blob], fileName, {type: 'application/pdf'});
+        if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
+            navigator.share({files: [file], text: waText}).catch(function() {});
+        } else {
+            alert('PDF downloaded as ' + fileName + '. Open WhatsApp and attach it from your Downloads.');
+        }
+        downloadBlob(blob);
+    }).catch(function() {
+        alert('Could not generate the PDF. Please try again.');
+    });
+    $('#pdfOptionsModal').modal('hide');
+}
+</script>
 
 <div style="clear:both;"></div>
 <div id="currencySelectWrap" style="width:100%;margin-bottom:10px;text-align:right;">

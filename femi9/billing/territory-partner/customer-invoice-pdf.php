@@ -60,8 +60,28 @@ if (!$invData) {
     exit;
 }
 
+// Paper size / margin / scale, driven by the "PDF options" dialog on
+// customer-invoice-print.php (same pattern as shop-invoice-pdf.php) so the
+// TP can control how the downloaded/shared PDF looks. Clamped server-side
+// since these arrive as plain query params.
+$__paperWidthsMm = ['a4' => 210, 'a5' => 148, 'letter' => 215.9];
+$__paper = strtolower($_GET['paper'] ?? 'a4');
+if (!isset($__paperWidthsMm[$__paper])) {
+    $__paper = 'a4';
+}
+$__paperWidthMm = $__paperWidthsMm[$__paper];
+
+$__marginMm = (float)($_GET['margin'] ?? 6);
+if ($__marginMm < 0) { $__marginMm = 0; }
+if ($__marginMm > 30) { $__marginMm = 30; }
+
+$__scalePct = (int)($_GET['scale'] ?? 100);
+if ($__scalePct < 50) { $__scalePct = 50; }
+if ($__scalePct > 150) { $__scalePct = 150; }
+$__scale = $__scalePct / 100;
+
 $html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>'
-    . render_customer_invoice_html($invData, true)
+    . render_customer_invoice_html($invData, true, $__scale, $__marginMm)
     . '</body></html>';
 
 $options = new Options();
@@ -75,8 +95,23 @@ $options->set('isRemoteEnabled', true);   // logo images are fetched by URL
 // defaultFont here previously replaced the typeface for ALL text, not
 // just the missing glyph, making every column wider than the Print page.
 
+// Dynamic page height so the invoice always renders as ONE continuous page
+// regardless of item count — same approach as shop-invoice-pdf.php. See
+// that file's own comment for the full rationale.
+$__itemCount = count($invData['invoice_items'] ?? []);
+$__hsnCount  = count($invData['hsn_totals'] ?? []);
+$__baseMm      = 210 * $__scale * (210 / $__paperWidthMm);
+$__perItemMm   = 7 * $__scale * (210 / $__paperWidthMm);
+$__perHsnRowMm = 5 * $__scale;
+$__estimatedMm = $__baseMm + ($__itemCount * $__perItemMm) + (max(0, $__hsnCount - 1) * $__perHsnRowMm);
+$__minPageHeightMm = $__paperWidthMm * (297 / 210);
+$__pageHeightMm = max($__minPageHeightMm, $__estimatedMm);
+$__mmToPt = 72 / 25.4;
+$__pageWidthPt  = $__paperWidthMm * $__mmToPt;
+$__pageHeightPt = $__pageHeightMm * $__mmToPt;
+
 $dompdf = new Dompdf($options);
-$dompdf->setPaper('A4', 'portrait');
+$dompdf->setPaper([0, 0, $__pageWidthPt, $__pageHeightPt]);
 $dompdf->loadHtml($html);
 $dompdf->render();
 
@@ -90,7 +125,7 @@ $fileName = 'Invoice_' . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invData['inv'][
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 
-// inline (not attachment) so tapping the WhatsApp link opens the PDF
-// straight in the phone's browser/PDF viewer instead of forcing a download
-// prompt first.
-$dompdf->stream($fileName, ['Attachment' => false]);
+// Attachment so Download PDF / Share to WhatsApp always gets a real
+// downloaded file, never a view-only link — same reasoning as
+// shop-invoice-pdf.php.
+$dompdf->stream($fileName, ['Attachment' => true]);

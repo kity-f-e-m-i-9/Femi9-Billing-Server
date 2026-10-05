@@ -27,13 +27,20 @@
  * widths for layout/wrapping — matching the Print page — and only drops
  * to DejaVu Sans for the handful of characters (₹) missing from it.
  */
-function render_customer_invoice_html(array $ctx, bool $forPdf = false): string {
+function render_customer_invoice_html(array $ctx, bool $forPdf = false, float $pdfScale = 1.0, float $pdfMarginMm = 6.0): string {
     extract($ctx, EXTR_SKIP);
     // Expected keys in $ctx: invoice_heading, profile, seller_display_name,
     // seller, buyer, inv, Result_DLDetails, invoice_items, Totalquantity123,
     // TotalAMount123, Currency_symbol, Currency_Name, gsttype,
     // totalgstamount, __inv_gst_pct, hsn_totals, hsn_gst_totals,
     // hsn_gst_pct, result (amount-in-words), TAXresult (tax-amount-in-words).
+
+    // $pdfScale/$pdfMarginMm let customer-invoice-pdf.php's Paper size/
+    // Margins/Scale dialog actually change the rendered PDF — see
+    // ShopInvoiceHtml.php's render_shop_invoice_html() for the same pattern.
+    $px = function (float $basePx) use ($pdfScale): string {
+        return round($basePx * $pdfScale, 1) . 'px';
+    };
 
     ob_start();
     ?>
@@ -96,13 +103,21 @@ function render_customer_invoice_html(array $ctx, bool $forPdf = false): string 
       for the PDF, so every column stays readable while giving the table
       enough headroom that its own right border reliably lands inside the
       outer box border instead of crowding or clipping it. */
-@page { margin: 6mm; }
-.item_list td{font-size:11px;padding:3px;}
-.item_list td:last-child{padding-right:6px;}
-#noneborder td{font-size:12px;line-height:16px;}
-.cusdetaiis{font-size:12px;line-height:16px;}
-#second_topvl td{padding:3px;font-size:12px;}
-#hsnsac{font-size:11px;}
+@page { margin: <?php echo $pdfMarginMm; ?>mm; }
+.item_list td{font-size:<?php echo $px(11); ?>;padding:<?php echo $px(3); ?>;}
+.item_list td:last-child{padding-right:<?php echo $px(6); ?>;}
+#noneborder td{font-size:<?php echo $px(12); ?>;line-height:<?php echo $px(16); ?>;}
+.cusdetaiis{font-size:<?php echo $px(12); ?>;line-height:<?php echo $px(16); ?>;margin:6px 0;}
+#second_topvl td{padding:<?php echo $px(3); ?>;font-size:<?php echo $px(12); ?>;}
+#hsnsac{font-size:<?php echo $px(11); ?>;}
+#hsnsac td{padding:<?php echo $px(2); ?> <?php echo $px(4); ?>;}
+#sealsign td{padding:<?php echo $px(2); ?>;font-size:<?php echo $px(12); ?>;}
+#toptl{font-size:<?php echo $px(17); ?>;padding:<?php echo $px(3); ?>;}
+.amount_word,.amount_payable{padding:<?php echo $px(2); ?>;font-size:<?php echo $px(12); ?>;}
+#second_topvl td[height]{height:<?php echo $px(24); ?> !important;}
+#shiippingaddress{margin:4px 0;font-size:<?php echo $px(12); ?>;}
+hr{margin:3px 0;}
+#divToPrintScroll table{margin:0;}
 <?php endif; ?>
 <?php if (!$forPdf): ?>
 
@@ -143,11 +158,30 @@ function render_customer_invoice_html(array $ctx, bool $forPdf = false): string 
 /* Printing the page directly (window.print()) instead of a popup — hide
    everything except the invoice itself, on any screen size. */
 @media print {
+    @page { size: A4; margin: 6mm; }
     body * { visibility: hidden; }
     #divToPrint, #divToPrint * { visibility: visible; }
     #divToPrint { position: absolute; left: 0; top: 0; width: 100%; }
     #divToPrintScroll { overflow: visible !important; }
     .maincontainar { width: 100% !important; min-width: 0 !important; }
+
+    /* Same size-tightening as the WhatsApp PDF ($forPdf above) so a
+       browser Print/Save-as-PDF fits on one page instead of spilling a
+       couple of rows onto a near-empty second page. */
+    .item_list td{font-size:11px;padding:3px;}
+    .item_list td:last-child{padding-right:6px;}
+    #noneborder td{font-size:12px;line-height:16px;}
+    .cusdetaiis{font-size:12px;line-height:16px;margin:6px 0;}
+    #second_topvl td{padding:3px;font-size:12px;}
+    #hsnsac{font-size:11px;}
+    #hsnsac td{padding:2px 4px;}
+    #sealsign td{padding:2px;font-size:12px;}
+    #toptl{font-size:17px;padding:3px;}
+    .amount_word,.amount_payable{padding:2px;font-size:12px;}
+    #second_topvl td[height]{height:24px !important;}
+    #shiippingaddress{margin:4px 0;font-size:12px;}
+    hr{margin:3px 0;}
+    #divToPrintScroll table{margin:0;}
 }
 <?php endif; ?>
 </style>
