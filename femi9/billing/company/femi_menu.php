@@ -855,7 +855,9 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li>
                         <a href="#"><i class="material-icons-two-tone">handshake</i>Channel Partner<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
+							<?php if(($resultusertypeGET['channel_partner_edit']??0)==1){?>
 							<li><a href="add-channel-partner">Add Channel Partner</a></li>
+							<?php }?>
 							<li><a href="manage-channel-partner">Manage Channel Partner</a></li>
 							<li><a href="manage-agreements">Manage Agreements (CP)</a></li>
 							<li><a href="cp-stock">CP Stock</a></li>
@@ -876,8 +878,11 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li>
                         <a href="#"><i class="material-icons-two-tone">map</i>Territory Partner<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
+							<?php if(($resultusertypeGET['territory_partner_edit']??0)==1){?>
 							<li><a href="add-territory-partner">Add Territory Partner</a></li>
+							<?php }?>
 							<li><a href="manage-territory-partner">Manage Territory Partner</a></li>
+							<?php if(($resultusertypeGET['territory_partner_edit']??0)==1){?>
 							<li><a href="manage-agreements?tab=tp">Manage Agreements (TP)</a></li>
 							<li><a href="tp-stock">TP Stock</a></li>
 							<li><a href="add-tp-input-stock">Add TP Input Stock</a></li>
@@ -894,6 +899,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="tp-bonus-advance-payments">Manage TP Bonus Points</a></li>
 							<li><a href="tp-wallet-referral-calculator">TP Wallet Referral Calculator</a></li>
 							<li><a href="manage-zones">Manage Zones</a></li>
+							<?php }?>
                         </ul>
                     </li>
 					<?php }?>
@@ -1226,8 +1232,28 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         </ul>
                     </li>
 					<?php }?>
-					
-					<?php if($resultusertypeGET['unassigned']==1){?>					
+
+					<?php if(($resultusertypeGET['salesbdm_manage']??0)==1){?>
+					<li>
+                        <a href="#"><i class="material-icons-two-tone">badge</i>Sales BDM<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+                            <li><a href="salesbdm_add">Add Sales BDM</a></li>
+                            <li><a href="salesbdm_manage">Manage Sales BDM</a></li>
+                            <li>
+                                <a href="#">Manage Team<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                                <ul class="sub-menu">
+                                    <li><a href="manage-salesbdm-team-levels">Manage Team Levels</a></li>
+                                    <li><a href="salesbdm-team-view">Tree View</a></li>
+                                    <li><a href="salesbdm-team-report">Our Team Report</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="manage-district-notes">District Notes</a></li>
+                            <li><a href="location-change-requests">Location Change Requests</a></li>
+                        </ul>
+                    </li>
+					<?php }?>
+
+					<?php if($resultusertypeGET['unassigned']==1){?>
 					<li>
                         <a href="#"><i class="material-icons-two-tone">sentiment_satisfied_alt</i>Unassigned<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">

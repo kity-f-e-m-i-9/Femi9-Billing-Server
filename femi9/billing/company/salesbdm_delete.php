@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage_delete');
 
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);

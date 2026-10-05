@@ -1,6 +1,6 @@
 <?php
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
+require_once("include/PermissionCheck.php"); requirePermission('territory_partner_edit');
 require_once("include/PartnerZones.php");
 error_reporting(0);
 ensurePartnerZonesTables($db_conn);

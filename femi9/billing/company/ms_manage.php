@@ -1,5 +1,7 @@
 <?php include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms');
+$canEditMs   = hasPermission('ms_edit');
+$canDeleteMs = hasPermission('ms_delete');
 include("config.php");
 
 require_once __DIR__ . '/../shared/env-loader.php';
@@ -88,7 +90,7 @@ $encryption = new EncryptionService();
 									<table class="headertble">
 									<tr>
 									<td>Manage Marketing Staff</td>
-									<td><a href="ms_add.php" title="Add Customer">&#10011;</a></td>
+									<td><?php if ($canEditMs): ?><a href="ms_add.php" title="Add Customer">&#10011;</a><?php endif; ?></td>
 									</tr>
 									</table>
 									</h1>
@@ -210,8 +212,8 @@ $select_product_list="select * from marketing_staff where deleted_at is null ord
 													
 																										<td>
 													    <div class="actions-group">
-													        <a href="ms_edit.php?prid=<?php echo $product_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
-													        <a href="ms_delete.php?prid=<?php echo $product_id;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <?php if ($canEditMs): ?><a href="ms_edit.php?prid=<?php echo $product_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a><?php endif; ?>
+													        <?php if ($canDeleteMs): ?><a href="ms_delete.php?prid=<?php echo $product_id;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a><?php endif; ?>
 													    </div>
 													</td>
                                                 </tr>

@@ -1,6 +1,6 @@
 <?php
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('ms');
+require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage');
 error_reporting(0);
 
 $bdmId = (int)($_GET['bdm_id'] ?? 0);

@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage_delete');
 error_reporting(0);
 
 $prid     = isset($_GET['prid']) ? trim($_GET['prid']) : '';

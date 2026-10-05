@@ -1,4 +1,5 @@
 <?php include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('demo_free_edit');
 
 $tempid=$_REQUEST['tempid'];
 //fetch product details

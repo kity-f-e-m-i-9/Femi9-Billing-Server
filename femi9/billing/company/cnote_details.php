@@ -1,7 +1,9 @@
-<?php include("checksession.php"); 
-date_default_timezone_set("Asia/Kolkata"); 
+<?php include("checksession.php");
+date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
+require_once("include/PermissionCheck.php");
+$canEditReturn = hasPermission('manage_return_edit');
 
 	$displaytitle="Stock Return (Credit Note) Details";
 	$returnid=base64_decode($_REQUEST['returnid']);
@@ -153,7 +155,9 @@ include("config.php");
 <td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?>&nbsp;(<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
+<?php if ($canEditReturn): ?>
 <a href="cnote_delete.php?returnid=<?=$_REQUEST['returnid'];?>&&rowid=<?=$ItemRowid;?>&&redirurl=cnote_details&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<?php endif; ?>
 </td>
                                                         </tr>
                                                         
@@ -171,7 +175,9 @@ include("config.php");
                                             
                                               <?php if($count_products_return==0){?>	
 											  <div class="col-lg-12" style="text-align:center;">
+							<?php if ($canEditReturn): ?>
 							<a href="cnote_del?returnid=<?=$_REQUEST['returnid'];?>" class="btn btn-primary badge badge-style-bordered badge-danger" type="button" style="width:auto;">Delete Credit Note</a>
+							<?php endif; ?>
 							 </div>
 									<?php }?>
                                            
@@ -188,8 +194,8 @@ include("config.php");
                                             <div class="col-lg-3">
                                                 <div class="invoice-info">
 												
-<?php if($result_invoicedtails['status']=="pending" && $count_products_return>0){?>
-												
+<?php if($result_invoicedtails['status']=="pending" && $count_products_return>0 && $canEditReturn){?>
+
 <form action="cnote_finish.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
 <input type="hidden" name="returnid" value="<?=$_REQUEST['returnid'];?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>

@@ -20,9 +20,11 @@ header("X-XSS-Protection: 1; mode=block");
 header("Referrer-Policy: strict-origin-when-cross-origin");
 header("Content-Security-Policy: default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.datatables.net https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdn.datatables.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.datatables.net;");
 
-require_once("checksession.php"); 
+require_once("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('manage_payment_entry');
-require_once("config.php"); 
+$canEditPaymentEntry   = hasPermission('manage_payment_entry_edit');
+$canDeletePaymentEntry = hasPermission('manage_payment_entry_delete');
+require_once("config.php");
 
 date_default_timezone_set("Asia/Kolkata");
 
@@ -880,12 +882,17 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                     width: '160px',
                     render: function(d, t, row) {
                         const id = escapeHtml(row.id);
-                        return '<button class="btn btn-sm btn-primary btn-action view-btn me-1" data-id="' + id + '" title="View Details">' +
-                               '<i class="material-icons">visibility</i></button>' +
-                               '<button class="btn btn-sm btn-warning btn-action edit-btn me-1" data-id="' + id + '" title="Edit Payment">' +
-                               '<i class="material-icons">edit</i></button>' +
-                               '<button class="btn btn-sm btn-danger btn-action delete-btn" data-id="' + id + '" title="Delete Payment">' +
+                        let actionsHtml = '<button class="btn btn-sm btn-primary btn-action view-btn me-1" data-id="' + id + '" title="View Details">' +
+                               '<i class="material-icons">visibility</i></button>';
+                        <?php if ($canEditPaymentEntry): ?>
+                        actionsHtml += '<button class="btn btn-sm btn-warning btn-action edit-btn me-1" data-id="' + id + '" title="Edit Payment">' +
+                               '<i class="material-icons">edit</i></button>';
+                        <?php endif; ?>
+                        <?php if ($canDeletePaymentEntry): ?>
+                        actionsHtml += '<button class="btn btn-sm btn-danger btn-action delete-btn" data-id="' + id + '" title="Delete Payment">' +
                                '<i class="material-icons">delete</i></button>';
+                        <?php endif; ?>
+                        return actionsHtml;
                     }
                 }
             ],

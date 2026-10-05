@@ -1,5 +1,6 @@
 <?php
 include("checksession.php");
+require_once("include/PermissionCheck.php");
 include("config.php");
 require_once("include/StockService.php");
 include("RemoveSpecialChar.php");
@@ -8,6 +9,7 @@ error_reporting(0);
 
 // ── INSERT ────────────────────────────────────────────────────────────────────
 if (isset($_REQUEST['add-record'])) {
+    requirePermission('demo_free');
 
     $tempid   = preg_replace('/[^A-Z0-9\/]/', '', strtoupper($_REQUEST['tempid'] ?? ''));
     $usertype = htmlspecialchars(strip_tags(trim($_REQUEST['usertype'] ?? '')), ENT_QUOTES, 'UTF-8');
@@ -125,6 +127,7 @@ if (isset($_REQUEST['add-record'])) {
 
 // ── UPDATE (header details only — no stock impact) ────────────────────────────
 if (isset($_REQUEST['update-record'])) {
+    requirePermission('demo_free_edit');
 
     $tempid   = preg_replace('/[^A-Z0-9\/]/', '', strtoupper($_REQUEST['update_tempid'] ?? ''));
     $date     = date("Y-m-d", strtotime($_REQUEST['date'] ?? 'now'));

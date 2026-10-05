@@ -1,6 +1,6 @@
 <?php
 include("checksession.php");
-require_once("include/PermissionCheck.php"); requirePermission('ms');
+require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage');
 require_once("include/TeamLevelColors.php");
 require_once __DIR__ . '/../salesbdm/include/TeamTargetRollup.php';
 error_reporting(0);

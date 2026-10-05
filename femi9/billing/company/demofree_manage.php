@@ -1,5 +1,6 @@
 <?php include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('demo_free');
+$canEditDemoFree = hasPermission('demo_free_edit');
 include("config.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
@@ -229,7 +230,7 @@ $i= $start_from;
 													
 																										<td>
 													    <div class="actions-group">
-													        <a href="demofree_edit?tempid=<?=$tempid;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+													        <?php if ($canEditDemoFree): ?><a href="demofree_edit?tempid=<?=$tempid;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a><?php endif; ?>
 													    </div>
 													</td>
 													

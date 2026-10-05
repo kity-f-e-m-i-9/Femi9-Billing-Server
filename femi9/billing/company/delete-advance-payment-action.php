@@ -16,6 +16,15 @@ header("X-Content-Type-Options: nosniff");
 header("Content-Type: application/json; charset=utf-8");
 
 require_once("checksession.php");
+require_once("include/PermissionCheck.php");
+// Shared by both manage-advance-payments.php (manage_payment_entry) and
+// consolidated-manage-advance-payments.php (consolidated_payment_entry) —
+// either module's Delete permission is accepted.
+if (!hasPermission('manage_payment_entry_delete') && !hasPermission('consolidated_payment_entry_delete')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'You do not have permission to delete payments']);
+    exit;
+}
 require_once("config.php");
 
 date_default_timezone_set("Asia/Kolkata");

@@ -1,5 +1,4 @@
-<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata");?>
-require_once("include/PermissionCheck.php"); requirePermission('cus');
+<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata"); require_once("include/PermissionCheck.php"); requirePermission('cus_edit');?>
 <!DOCTYPE html>
 <html lang="en">
 

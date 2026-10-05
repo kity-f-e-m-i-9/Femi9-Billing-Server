@@ -1,4 +1,4 @@
-<?php include("checksession.php"); require_once("include/StockService.php"); error_reporting(0);
+<?php include("checksession.php"); require_once("include/StockService.php"); require_once("include/PermissionCheck.php"); requirePermission('manage_input_stock_users_delete'); error_reporting(0);
 
 $Roowid=$_REQUEST['Roowid'];
 $Roowid=base64_decode($Roowid);
