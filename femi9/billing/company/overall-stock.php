@@ -391,9 +391,13 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
         $DfdQty=(int)(mysqli_fetch_row($Fetch_dfdQty)[0] ?? 0);
         $total_dfd+=$DfdQty;
     }
-    // Sales Qty now shows only actual sales — Demo/Free/Damage is its own
-    // column (previously folded together, see $DfdQty above).
-    $SalesQtyShown=(int)$Result_OPStock['sales_qty'];
+    // Sales Qty — computed fresh from stock_ledger (deduct + ot_deduct),
+    // NOT the stored stock.sales_qty column, which StockService.php
+    // decrements on every return (see datewiseGrossSalesTotal()'s own
+    // note). A return already has its own Return Qty column below; it
+    // shouldn't also silently shrink Sales. Demo/Free/Damage is its own
+    // column too (previously folded together, see $DfdQty above).
+    $SalesQtyShown = datewiseGrossSalesTotal($db_conn, (int)$StockProductID, '2000-01-01', date('Y-m-d'), (string)$user_id_Loginvl, true, $cardWarehouseCond);
 ?>
 												<tr class="product-row" data-product-name="<?php echo htmlspecialchars(strtolower($Result_productDetils['productName']), ENT_QUOTES, 'UTF-8'); ?>">
 													<td><?php echo $Result_productDetils["productName"];?></td>

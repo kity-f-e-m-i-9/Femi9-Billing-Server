@@ -243,6 +243,35 @@ function datewiseReturnTotal($db_conn, int $prid, string $fromDate, string $toDa
     return $reverseDed + $otReverse;
 }
 
+// Gross Sales Qty for one product, scoped to a single warehouse condition —
+// deduct + ot_deduct, NOT netted against reverse_deduct/ot_reverse. Lets the
+// Current Stock tab show the same "Sales isn't reduced by a later Return"
+// figure as the Datewise tab's $total_sales (see computeStockMovement()'s
+// own note on this), computed fresh from stock_ledger here instead of
+// trusting the stored stock.sales_qty column — StockService.php's
+// reverseDeduct()/otReverse() both floor-decrement that stored column on
+// every return (see reverseDeduct()'s own "Floors sales_qty at 0"
+// docblock), so it carries the same net-of-returns problem the Datewise fix
+// corrected. Fixing
+// it at the display layer here, same as that fix, rather than touching
+// StockService's core write path — stock.sales_qty likely backs other
+// reports beyond this one tab, and changing its stored meaning system-wide
+// is a materially bigger, riskier change than recomputing it for display on
+// this one page.
+function datewiseGrossSalesTotal($db_conn, int $prid, string $fromDate, string $toDate, string $companyIdsSql, bool $filterByGodown, string $warehouseCond): int {
+    $fromDate = mysqli_real_escape_string($db_conn, $fromDate);
+    $toDate   = mysqli_real_escape_string($db_conn, $toDate);
+    $godownCond = $filterByGodown ? " AND user_id IN ($companyIdsSql)" : '';
+    $dateCond   = " AND created_at >= '$fromDate 00:00:00' AND created_at <= '$toDate 23:59:59'";
+    $base       = "product_id=$prid AND user_type='company'$godownCond$warehouseCond$dateCond";
+    $sum = function($sql) use ($db_conn) {
+        return (int)(mysqli_fetch_row(mysqli_query($db_conn, $sql))[0] ?? 0);
+    };
+    $deduct   = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='deduct'");
+    $otDeduct = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='ot_deduct'");
+    return $deduct + $otDeduct;
+}
+
 // Internal Transfer Qty for one product, scoped to a single warehouse
 // condition (a bare "warehouse_id" fragment — see warehouseLedgerCondition())
 // — the same stock_ledger transfer_out total that feeds
