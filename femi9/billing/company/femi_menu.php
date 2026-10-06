@@ -140,6 +140,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="ot-sale-import">Import Sales</a></li>
 						<li><a href="ot-sale-view">Manage Sales</a></li>
 						<li><a href="ot-sale-manage-return">Manage Return</a></li>
+						<li><a href="ot-order-whatsapp-pdf">WhatsApp Order PDF</a></li>
                         </ul>
                     </li>
 					<li>
@@ -284,6 +285,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="ot-sale-import">Import Sales</a></li>
 						<li><a href="ot-sale-view">Manage Sales</a></li>
 						<li><a href="ot-sale-manage-return">Manage Return</a></li>
+						<li><a href="ot-order-whatsapp-pdf">WhatsApp Order PDF</a></li>
                         </ul>
                     </li>
 					<li>
@@ -554,6 +556,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="ot-sale-import">Import Sales</a></li>
 						<li><a href="ot-sale-view">Manage Sales</a></li>
 						<li><a href="ot-sale-manage-return">Manage Return</a></li>
+						<li><a href="ot-order-whatsapp-pdf">WhatsApp Order PDF</a></li>
                         </ul>
                     </li>
 
@@ -1095,6 +1098,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="ot-sale-import">Import Sales</a></li>
 						<li><a href="ot-sale-view">Manage Sales</a></li>
 						<li><a href="ot-sale-manage-return">Manage Return</a></li>
+						<li><a href="ot-order-whatsapp-pdf">WhatsApp Order PDF</a></li>
                         </ul>
                     </li>
 					<?php }?>
