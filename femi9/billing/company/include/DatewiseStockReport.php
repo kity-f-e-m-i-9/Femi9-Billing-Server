@@ -39,14 +39,27 @@ function computeStockMovement($db_conn, $prid, $fromDate, $toDate, $companyIdsSq
 
     // Sales Qty — every deduction from this godown that represents an
     // actual sale: ordinary deduct (customer/TP/user invoices) and
-    // ot_deduct (OT sales). Net of reverse_deduct and ot_reverse.
-    // Demo/Free/Damage is tracked and reported separately below (dfd_qty),
-    // not folded into Sales.
+    // ot_deduct (OT sales). Demo/Free/Damage is tracked and reported
+    // separately below (dfd_qty), not folded into Sales.
+    //
+    // Deliberately gross, NOT netted against reverse_deduct/ot_reverse — a
+    // return doesn't erase the fact that a sale happened, so Sales Qty
+    // should keep showing what was actually sold regardless of later
+    // returns. Return Qty (below) already reports returns as their own
+    // column; a return should only ever reduce Closing Stock (via
+    // $net_sales_for_closing below), never the displayed Sales figure
+    // itself. Per explicit user correction — Sales was previously net of
+    // returns here, which could show a negative/understated Sales Qty on
+    // a day with more returns than fresh sales.
     $deduct      = $sumAction('deduct');
     $reverseDed  = $sumAction('reverse_deduct');
     $otDeduct    = $sumAction('ot_deduct');
     $otReverse   = $sumAction('ot_reverse');
-    $total_sales = $deduct - $reverseDed + $otDeduct - $otReverse;
+    $total_sales = $deduct + $otDeduct;
+    // Stock impact only — returns still reduce the sale's effect on
+    // Closing Stock, exactly as before; this value isn't shown anywhere,
+    // only fed into net_change below.
+    $net_sales_for_closing = $deduct - $reverseDed + $otDeduct - $otReverse;
 
     // Demo/Free/Damage Qty — goods that left as demo, free giveaway, or
     // damage (demofree's transfer_out), net of transfer_out_reverse. Still
@@ -55,9 +68,10 @@ function computeStockMovement($db_conn, $prid, $fromDate, $toDate, $companyIdsSq
     $dfd_qty     = (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out' AND ref_type='demofree'")
                  - (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out_reverse' AND ref_type='demofree'");
 
-    // Return Qty — reverse_deduct entries are already netted into Sales
-    // above (a return of a prior sale reduces net sales), but this page
-    // also shows the gross return amount as its own column, same as before.
+    // Return Qty — reverse_deduct/ot_reverse entries shown as their own
+    // column. No longer netted into the displayed Sales Qty (see
+    // $total_sales above) — only still subtracted from Closing Stock via
+    // $net_sales_for_closing.
     $total_sales_return = $reverseDed + $otReverse;
 
     // Movement to CP — the godown -> Channel Partner leg of Partner-
@@ -108,10 +122,11 @@ function computeStockMovement($db_conn, $prid, $fromDate, $toDate, $companyIdsSq
         // Credits add to stock; sales, Demo/Free/Damage, internal transfer,
         // and Movement to CP remove from it (movement_to_cp is reported in
         // its own column but is a real stock deduction, not folded into
-        // internal_transfer any more — see above). Return Qty is
-        // informational only — its effect is already netted into
-        // total_sales via reverse_deduct.
-        'net_change'         => $input_qty - $total_sales - $dfd_qty - $internal_transfer - $movement_to_cp,
+        // internal_transfer any more — see above). Uses
+        // $net_sales_for_closing (sales net of returns), NOT the displayed
+        // $total_sales — Closing Stock still correctly reflects returns
+        // even though the Sales Qty column no longer does.
+        'net_change'         => $input_qty - $net_sales_for_closing - $dfd_qty - $internal_transfer - $movement_to_cp,
     ];
 }
 
