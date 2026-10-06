@@ -117,9 +117,17 @@ function requirePermission(string $perm): void
     // the perms those pages check ('territory_partner', 'channel_partner') is
     // always allowed here. ms_edit/ms_delete are included alongside 'ms' so
     // splitting Marketing Staff into View/Edit/Delete for company "users"
-    // sub-accounts doesn't change what a BDM could already reach.
+    // sub-accounts doesn't change what a BDM could already reach. Likewise
+    // territory_partner_edit/_delete and channel_partner_edit/_delete are
+    // included alongside their base perms — the View/Edit/Delete split
+    // (79a582e) must not silently revoke the Add/Edit/Delete access a BDM
+    // already had via the base perm.
     if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
-        if (in_array($perm, ['territory_partner', 'channel_partner', 'ms', 'ms_edit', 'ms_delete'], true)) { return; }
+        if (in_array($perm, [
+            'territory_partner', 'territory_partner_edit', 'territory_partner_delete',
+            'channel_partner', 'channel_partner_edit', 'channel_partner_delete',
+            'ms', 'ms_edit', 'ms_delete',
+        ], true)) { return; }
         denyAccess();
     }
 
@@ -165,7 +173,11 @@ function hasPermission(string $perm): bool
     }
 
     if (($Login_user_TYPEvl ?? '') === 'salesbdm') {
-        return in_array($perm, ['territory_partner', 'channel_partner', 'ms', 'ms_edit', 'ms_delete'], true);
+        return in_array($perm, [
+            'territory_partner', 'territory_partner_edit', 'territory_partner_delete',
+            'channel_partner', 'channel_partner_edit', 'channel_partner_delete',
+            'ms', 'ms_edit', 'ms_delete',
+        ], true);
     }
 
     $username = $_SESSION['LOGIN_USER'] ?? '';
