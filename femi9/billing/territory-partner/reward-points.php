@@ -115,6 +115,20 @@ $dailyPoints    = (float)($dailyResult['daily_points'] ?? 0);
 $daysRewarded   = (int)($dailyResult['days_rewarded'] ?? 0);
 $lastRewardDate = !empty($dailyResult['last_reward_date']) ? date('d M Y', strtotime($dailyResult['last_reward_date'])) : 'N/A';
 
+// 2b. Date-wise rows behind the "Daily Login Points" card — one row per day
+// this TP was rewarded, for the click-to-expand modal below. Bounded by the
+// same From/To Date range as everything else on this page (31 days at most
+// for the default full-month view), so this never needs its own cap.
+$dailyRowsStmt = mysqli_prepare($db_conn,
+    "SELECT reward_date, points_awarded FROM daily_login_rewards
+     WHERE user_type = ? AND user_id = ? AND reward_date BETWEEN ? AND ?
+     ORDER BY reward_date DESC"
+);
+mysqli_stmt_bind_param($dailyRowsStmt, 'ssss', $userType, $userId, $currentFromDate, $currentToDate);
+mysqli_stmt_execute($dailyRowsStmt);
+$dailyRewardRows = mysqli_stmt_get_result($dailyRowsStmt)->fetch_all(MYSQLI_ASSOC);
+mysqli_stmt_close($dailyRowsStmt);
+
 // 3. Return Deductions — returns against tp_invoices received in this date range
 $returnQuery = "
     SELECT COALESCE(SUM(r.subtotal) / 100, 0) AS return_points, COUNT(DISTINCT r.invnumber) AS return_count
@@ -275,11 +289,11 @@ $safeBusinessName = htmlspecialchars($business_name, ENT_QUOTES, 'UTF-8');
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="stats-card">
+                            <div class="stats-card" style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#dailyLoginModal" title="Click to see the date-wise breakdown">
                                 <i class="material-icons stats-icon">card_giftcard</i>
                                 <div class="stats-label">Daily Login Points</div>
                                 <div class="stats-value"><?php echo $formattedDaily; ?></div>
-                                <div class="stats-meta"><?php echo $daysRewarded; ?> day<?php echo $daysRewarded !== 1 ? 's' : ''; ?> rewarded</div>
+                                <div class="stats-meta"><?php echo $daysRewarded; ?> day<?php echo $daysRewarded !== 1 ? 's' : ''; ?> rewarded &middot; <u>view date-wise</u></div>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -383,6 +397,47 @@ $safeBusinessName = htmlspecialchars($business_name, ENT_QUOTES, 'UTF-8');
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="teamPointsModalBody" style="min-height:120px;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Daily Login Points — date-wise breakdown -->
+<div class="modal fade" id="dailyLoginModal" tabindex="-1" aria-labelledby="dailyLoginModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="dailyLoginModalLabel" style="font-weight:700;">
+                    <i class="material-icons" style="vertical-align:middle;font-size:19px;color:#2563eb;">card_giftcard</i>
+                    Daily Login Points — <?php echo $displayFrom; ?> – <?php echo $displayTo; ?>
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="min-height:80px;">
+                <?php if (empty($dailyRewardRows)): ?>
+                <p class="text-muted text-center mb-0">No daily login points in this date range.</p>
+                <?php else: ?>
+                <table class="table table-sm">
+                    <thead><tr><th>Date</th><th class="text-right">Points</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($dailyRewardRows as $r): ?>
+                        <tr>
+                            <td><?php echo date('d M Y (D)', strtotime($r['reward_date'])); ?></td>
+                            <td class="text-right">+<?php echo inr_format((float)$r['points_awarded'], 2); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td><b>Total</b></td>
+                            <td class="text-right"><b><?php echo $formattedDaily; ?></b></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                <?php endif; ?>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
