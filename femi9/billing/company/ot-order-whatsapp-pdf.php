@@ -60,9 +60,13 @@ function render_product_options($all_products) {
         .session-title { font-size: 15px; font-weight: 600; color: #667eea; }
         #printArea { display: none; }
         @media print {
-            body * { visibility: hidden; }
-            #printArea, #printArea * { visibility: visible; }
-            #printArea { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
+            /* display:none (not visibility:hidden) so the hidden sidebar/menu
+               doesn't still reserve layout height — visibility:hidden keeps
+               an element's space in the flow, which was leaving a trailing
+               blank page whenever the hidden menu was taller than the
+               printed content. */
+            .app { display: none !important; }
+            #printArea { display: block !important; }
         }
         /* Each session only breaks to a new page if it doesn't fit on the
            current one — no forced break-after, so two short sessions share
