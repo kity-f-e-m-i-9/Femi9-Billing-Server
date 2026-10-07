@@ -64,8 +64,11 @@ function render_product_options($all_products) {
             #printArea, #printArea * { visibility: visible; }
             #printArea { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
         }
-        #printArea .order-doc { page-break-after: always; }
-        #printArea .order-doc:last-child { page-break-after: auto; }
+        /* Each session only breaks to a new page if it doesn't fit on the
+           current one — no forced break-after, so two short sessions share
+           a page instead of leaving half a blank page between them. */
+        #printArea .order-doc { page-break-inside: avoid; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px dashed #999; }
+        #printArea .order-doc:last-child { border-bottom: none; }
         #printArea .doc-table th, #printArea .doc-table td {
             border: 1px solid #000;
             padding: 6px 8px;
