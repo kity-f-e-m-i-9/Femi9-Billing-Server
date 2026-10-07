@@ -31,12 +31,18 @@ $filters_active = $filter_tp_id || $filter_date_from || $filter_date_to || $filt
 $po_waiting = 0; $po_completed = 0; $po_cancelled = 0;
 
 if ($hasTps) {
-    // TPs with at least one PO request (for the filter dropdown)
+    // TPs with at least one PO request OR at least one direct (no-PO)
+    // invoice — otherwise a TP whose company billed them directly, with no
+    // purchase-order request ever raised, would never appear in this filter
+    // even though their direct invoices now show up in the "All TPs" list.
     $stmtTp = $db_conn->query("
         SELECT DISTINCT tp.id, tp.name, tp.tp_id AS tp_code
-        FROM tp_purchase_orders po
-        JOIN territory_partners tp ON tp.id = po.territory_partner_id
-        WHERE po.territory_partner_id IN ($tpIdList)
+        FROM territory_partners tp
+        WHERE tp.id IN ($tpIdList)
+          AND (
+            EXISTS (SELECT 1 FROM tp_purchase_orders po WHERE po.territory_partner_id = tp.id)
+            OR EXISTS (SELECT 1 FROM tp_invoices ti WHERE ti.territory_partner_id = tp.id)
+          )
         ORDER BY tp.name
     ");
     $tps = $stmtTp ? $stmtTp->fetch_all(MYSQLI_ASSOC) : [];
@@ -133,6 +139,85 @@ if ($hasTps) {
     } else {
         $res = $db_conn->query($sql);
         $orders = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
+    }
+
+    // Invoices the company (or an approving Super Stockist) created directly
+    // for one of this BDM's TPs, with no originating tp_purchase_orders row
+    // — e.g. territory-partner/manage-purchase-orders.php's own "direct
+    // invoices" case. Without this, a BDM's TP Purchase Order list silently
+    // dropped these while the TP's own "My Purchase Orders" page showed
+    // them, so totals/row counts never matched between the two. Only
+    // relevant when the status filter isn't narrowed to waiting/cancelled,
+    // mirroring that page's own gate — a direct invoice has no "waiting" or
+    // "cancelled" state, it's always already billed.
+    if ($filter_status === '' || $filter_status === 'completed') {
+        // Self-healing: tp_invoices.product_type is lazily added by various
+        // other TP-invoice pages (e.g. company/tp-invoice-action.php) —
+        // guard here too so this page never 500s on a host that hasn't hit
+        // one of those yet.
+        $_ptCol = $db_conn->query("SHOW COLUMNS FROM tp_invoices LIKE 'product_type'");
+        if ($_ptCol && $_ptCol->num_rows === 0) {
+            $db_conn->query("ALTER TABLE tp_invoices ADD COLUMN product_type ENUM('napkin','diaper') NOT NULL DEFAULT 'napkin' AFTER territory_partner_id");
+        }
+
+        $directWhere  = ["ti.territory_partner_id IN ($tpIdList)", "ti.id NOT IN (SELECT tp_invoice_id FROM tp_purchase_orders WHERE tp_invoice_id IS NOT NULL)"];
+        $directParams = [];
+        $directTypes  = '';
+        if ($filter_tp_id > 0) {
+            $directWhere[]  = "ti.territory_partner_id = ?";
+            $directParams[] = $filter_tp_id;
+            $directTypes   .= 'i';
+        }
+        if ($filter_date_from !== '') {
+            $directWhere[]  = "ti.invoice_date >= ?";
+            $directParams[] = $filter_date_from;
+            $directTypes   .= 's';
+        }
+        if ($filter_date_to !== '') {
+            $directWhere[]  = "ti.invoice_date <= ?";
+            $directParams[] = $filter_date_to;
+            $directTypes   .= 's';
+        }
+        if ($filter_type !== '') {
+            $directWhere[] = "EXISTS (SELECT 1 FROM tp_invoice_items tii3 JOIN products p ON p.id = tii3.product_id WHERE tii3.tp_invoice_id = ti.id $typeWhere)";
+        }
+
+        $directSql = "
+            SELECT NULL AS po_id, ti.invoice_date AS order_date, 'completed' AS status, NULL AS cancel_reason,
+                   ti.id AS tp_invoice_id, ti.product_type,
+                   tp.name AS tp_name, tp.tp_id AS tp_code,
+                   ti.invoice_number,
+                   COALESCE(tinv3.item_total, 0) AS invoice_total,
+                   COALESCE(tinv3.item_count, 0) AS invoice_item_count,
+                   0 AS po_item_count,
+                   0 AS po_item_total,
+                   1 AS is_direct
+            FROM tp_invoices ti
+            JOIN territory_partners tp ON tp.id = ti.territory_partner_id
+            LEFT JOIN (
+                SELECT tii.tp_invoice_id, COUNT(*) item_count, SUM(tii.amount) item_total
+                FROM tp_invoice_items tii
+                JOIN products p ON p.id = tii.product_id
+                WHERE 1=1 $typeWhere
+                GROUP BY tii.tp_invoice_id
+            ) tinv3 ON tinv3.tp_invoice_id = ti.id
+            WHERE " . implode(' AND ', $directWhere) . "
+            ORDER BY ti.invoice_date DESC, ti.id DESC
+            LIMIT 200
+        ";
+        if ($directTypes) {
+            $directStmt = $db_conn->prepare($directSql);
+            $directStmt->bind_param($directTypes, ...$directParams);
+            $directStmt->execute();
+            $directOrders = $directStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $directStmt->close();
+        } else {
+            $directRes = $db_conn->query($directSql);
+            $directOrders = $directRes ? $directRes->fetch_all(MYSQLI_ASSOC) : [];
+        }
+
+        $orders = array_merge($orders, $directOrders);
+        usort($orders, fn($a, $b) => strcmp($b['order_date'], $a['order_date']));
     }
 
     $grand_total = array_sum(array_map(fn($o) => $o['status']==='completed' ? (float)$o['invoice_total'] : (float)$o['po_item_total'], $orders));
@@ -443,7 +528,9 @@ if ($hasTps) {
                                                         <span class="po-status-pill <?php echo htmlspecialchars($o['status']); ?>" <?php echo $o['status']==='cancelled' && $o['cancel_reason'] ? 'title="'.htmlspecialchars($o['cancel_reason'], ENT_QUOTES).'"' : ''; ?>><?php echo ucfirst($o['status']); ?></span>
                                                     </td>
                                                     <td>
-                                                        <?php
+                                                        <?php if (!empty($o['is_direct'])): ?>
+                                                        <span class="text-muted">&mdash;</span>
+                                                        <?php else:
                                                         $cp = $courierByPo[(int)$o['po_id']] ?? ['has_courier' => true, 'status' => null, 'amount' => null];
                                                         if (!$cp['has_courier']) {
                                                             echo '<span class="po-status-pill" style="background:#f3f4f6;color:#6b7280;">Pickup</span>';
@@ -456,7 +543,7 @@ if ($hasTps) {
                                                         } else {
                                                             echo '<span class="po-status-pill" style="background:#f3f4f6;color:#6b7280;">Not Paid</span>';
                                                         }
-                                                        ?>
+                                                        endif; ?>
                                                     </td>
                                                     <td>
                                                         <?php if ($isCompleted): ?>
@@ -467,7 +554,7 @@ if ($hasTps) {
                                                             <i class="material-icons" style="font-size:14px;vertical-align:middle;">print</i> Print
                                                         </a>
                                                         <?php endif; ?>
-                                                        <?php if (!empty($rowItems)): ?>
+                                                        <?php if (!empty($rowItems) && empty($o['is_direct'])): ?>
                                                         <a href="dispatch-slip-print.php?po_id=<?php echo (int)$o['po_id']; ?>" target="_blank" class="btn btn-sm btn-outline-dark">
                                                             <i class="material-icons" style="font-size:14px;vertical-align:middle;">local_shipping</i> Dispatch Slip
                                                         </a>
