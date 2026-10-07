@@ -400,12 +400,13 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                                     <th>TP ID</th>
                                                     <th>Phone</th>
                                                     <th style="text-align:right;">Target Amount</th>
+                                                    <th>Shop Name</th>
                                                     <th>Invoice Number</th>
                                                     <th style="text-align:right;">Invoice Amount</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="shopInvTbody">
-                                                <tr><td colspan="7" class="text-muted" style="text-align:center;padding:30px;">Loading…</td></tr>
+                                                <tr><td colspan="8" class="text-muted" style="text-align:center;padding:30px;">Loading…</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -423,6 +424,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                     'tp_mobile' => $r['tp_mobile'],
                                     'tp_district'=> $r['tp_district'],
                                     'tp_target' => (float)$r['tp_target'],
+                                    'shop_name' => $r['shop_name'],
                                     'inv_number'=> $r['inv_number'],
                                     'inv_id'    => base64_encode($r['inv_id']),
                                     'total'     => (float)$r['total'],
@@ -440,7 +442,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                             function filteredRows() {
                                 return allRows.filter(function (r) {
                                     if (currentDistrict !== 'all' && (r.tp_district || '').toLowerCase() !== currentDistrict.toLowerCase()) return false;
-                                    if (searchTerm && (r.tp_name + ' ' + r.tp_code + ' ' + r.tp_mobile + ' ' + r.inv_number).toLowerCase().indexOf(searchTerm) === -1) return false;
+                                    if (searchTerm && (r.tp_name + ' ' + r.tp_code + ' ' + r.tp_mobile + ' ' + r.inv_number + ' ' + (r.shop_name || '')).toLowerCase().indexOf(searchTerm) === -1) return false;
                                     return true;
                                 });
                             }
@@ -450,7 +452,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                 var tbody = document.getElementById('shopInvTbody');
                                 var pager = document.getElementById('shopInvPagination');
                                 if (!rows.length) {
-                                    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon-wrap"><i class="material-icons-outlined">inbox</i></div><h6>No Invoices Found</h6><p>No shop invoices match this filter.</p></div></td></tr>';
+                                    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon-wrap"><i class="material-icons-outlined">inbox</i></div><h6>No Invoices Found</h6><p>No shop invoices match this filter.</p></div></td></tr>';
                                     pager.innerHTML = '';
                                     return;
                                 }
@@ -466,6 +468,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                         '<td><span class="tp-code-pill">' + esc(r.tp_code) + '</span></td>' +
                                         '<td><div class="mobile-cell"><i class="material-icons-outlined">phone_iphone</i><span class="mobile-text">' + esc(r.tp_mobile) + '</span></div></td>' +
                                         '<td style="text-align:right;"><span class="sales-amount">' + money(r.tp_target) + '</span></td>' +
+                                        '<td>' + esc(r.shop_name || '—') + '</td>' +
                                         '<td><a class="inv-number-link" target="_blank" href="view-shop-invoice.php?invoiceid=' + encodeURIComponent(r.inv_id) + '">' + esc(r.inv_number) + '</a></td>' +
                                         '<td style="text-align:right;"><span class="sales-amount">' + money(r.total) + '</span></td>' +
                                         '</tr>';
