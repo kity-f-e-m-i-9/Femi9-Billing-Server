@@ -82,26 +82,21 @@ $successMessage = $_SESSION['successMessage'];
                     <div class="container-fluid">
                         <div class="row">
                             <div class="col">
-                                <div class="card todo-container">
-                                    <div class="row">
+                                <div class="card todo-container wh-card">
+                                    <div class="row wh-row">
 									
 									
 									
-                                        <div class="col-xl-4 col-xxl-3">
-                                            <div class="todo-menu" style="text-align:center;">
+                                        <div class="col-12 wh-page">
+                                            <div class="todo-menu wh-menu" style="padding:0;text-align:left;">
 
-                                                <h5 class="todo-menu-title">Wallet - Available Amount</h5>
-                                                <ul class="list-unstyled todo-status-filter">
-                                                    
-                                                    <li><a><i class="material-icons-outlined">wallet</i> <b>&#8377;<?=inr_format($Average_available_walletAmount_ST, 2);?></b></a></li>
-                                                   
-                                                </ul>
+                                                <div class="wh-balance-box"><div class="wh-bal"><span class="wh-bal-label">Wallet - Available Amount</span><span class="wh-bal-amt">&#8377;<?=inr_format($Average_available_walletAmount_ST, 2);?></span></div><div class="wh-bal-action">
 												
 												<?php if($Average_available_walletAmount_ST>0){?>
 												<a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive">
 												<button type="button" class="btn btn-primary">Send Withdraw Request</button>
 												</a>
-												<?php }?>
+												<?php }?></div></div>
 												
 												<?php 
 $select_admin_settings2233="select tds_percentage from admin_settings where id='1'";
@@ -110,10 +105,7 @@ $result_admin_settings2233=mysqli_fetch_array($fetch_admin_settings2233);
 $tds_percentage=$result_admin_settings2233['tds_percentage'];
 ?>
 												
-												<br/><br/>
-												<div style="color:red;text-align:left;">
-												Note:-<br/><b><?=$tds_percentage;?>% TDS will be deducted for all withdrawals by Femi9, and it will be reflected in your PAN card only if it is linked with your aadhar.</b>
-												</div>
+												<div class="wh-note"><b>Note:</b> <?=$tds_percentage;?>% TDS will be deducted for all withdrawals by Femi9, and it will be reflected in your PAN card only if it is linked with your aadhar.</div>
 
 												
 												<!----------------------------------------------------------------->
@@ -208,17 +200,61 @@ $wh_to   = (isset($_GET['to_date'])   && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_G
 $wh_from = (isset($_GET['from_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from_date'])) ? $_GET['from_date'] : date('Y-m-d', strtotime('-7 months'));
 if ($wh_from > $wh_to) { $t = $wh_from; $wh_from = $wh_to; $wh_to = $t; }
 ?>
-<div class="col-12 mb-3">
-<form method="get" class="row g-2 align-items-end">
-<div class="col-auto"><label class="form-label mb-0">From</label><input type="date" name="from_date" value="<?=$wh_from;?>" class="form-control" required></div>
-<div class="col-auto"><label class="form-label mb-0">To</label><input type="date" name="to_date" value="<?=$wh_to;?>" class="form-control" required></div>
-<div class="col-auto"><button type="submit" class="btn btn-primary">Filter</button> <a href="wallet-history" class="btn btn-light">Last 7 months</a></div>
+<style>
+.wh-page{padding:0}
+.wh-balance-box{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:22px 26px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff}
+.wh-bal{display:flex;flex-direction:column;gap:4px}
+.wh-bal-label{font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;opacity:.85}
+.wh-bal-amt{font-size:32px;font-weight:700;line-height:1.1}
+.wh-bal-action .btn{background:#fff;color:#4f46e5;border:0;font-weight:600;padding:10px 22px;border-radius:8px}
+.wh-note{margin:14px 0 0;padding:12px 16px;border-radius:10px;background:#fff7e6;border:1px solid #ffe2a8;color:#8a5a00;font-size:13px;line-height:1.5}
+.wh-section-title{font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#6b7280;margin:26px 0 10px}
+.wh-filter{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;padding:14px 18px;background:#f6f8fb;border:1px solid #e4e8ef;border-radius:10px}
+.wh-filter .wh-f{display:flex;flex-direction:column;gap:4px}
+.wh-filter label{font-size:12px;font-weight:600;color:#6b7280;margin:0}
+.wh-filter input[type=date]{height:40px;min-width:170px;border-radius:8px}
+.wh-filter .wh-actions{display:flex;gap:8px;margin-left:auto}
+.wh-filter .btn{height:40px;border-radius:8px;display:inline-flex;align-items:center}
+.wh-col{margin-top:22px}
+.wh-col .todo-list{height:100%}
+.wh-col .todo-menu-title{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;padding:0 0 10px;margin:0 0 14px;border-bottom:2px solid #eef0f4}
+.wh-col .todo-menu-title:before{content:"";width:10px;height:10px;border-radius:50%;background:#22c55e}
+.wh-col.wh-debit .todo-menu-title:before{background:#4f46e5}
+.wh-col .todo-list>ul{max-height:620px;overflow-y:auto;padding:0 4px 0 0;margin:0}
+.wh-col .todo-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;background:#fff;border:1px solid #e9ecf1;border-radius:10px;padding:14px 16px;margin:0 0 10px}
+.wh-col .todo-item:hover{box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.wh-col .todo-item-content{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.wh-col .todo-item-title{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:17px;font-weight:700}
+.wh-col .todo-item-subtitle{display:block;font-size:12px;color:#8a93a2}
+.wh-col .todo-item-actions{flex:none}
+.wh-empty{display:block;text-align:center;padding:34px 16px;border:1px dashed #d5dae3;border-radius:10px;color:#8a93a2;font-size:14px;list-style:none}
+.wh-empty .material-icons-outlined{display:block;font-size:34px;margin-bottom:6px;color:#c3c9d4}
+@media(max-width:767px){.wh-bal-amt{font-size:26px}.wh-filter .wh-actions{margin-left:0;width:100%}.wh-filter .wh-f{flex:1 1 140px}}
+</style>
+<style>
+.wh-card{height:auto!important;min-height:0;overflow:visible;padding:24px}
+.wh-card>.wh-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin:0;height:auto}
+.wh-card>.wh-row>div{width:auto;max-width:none;height:auto;padding:0;margin:0}
+.wh-card>.wh-row>.wh-page,.wh-card>.wh-row>.wh-filter-wrap{grid-column:1/-1}
+.wh-card .wh-menu{margin:0!important;padding:0!important;height:auto!important;overflow:visible;border:0!important}
+.wh-card .wh-col .todo-list{margin:0;height:auto;overflow:visible}
+.wh-card .wh-col .todo-list>ul{padding:0 6px 0 0}
+.wh-card .wh-section-title{margin-top:24px}
+.wh-card>.wh-row>.wh-col{margin-top:32px}
+@media(max-width:991px){.wh-card{padding:16px}.wh-card>.wh-row{grid-template-columns:minmax(0,1fr)}}
+</style>
+<div class="col-12 wh-filter-wrap">
+<div class="wh-section-title">Filter by date</div>
+<form method="get" class="wh-filter">
+<div class="wh-f"><label>From</label><input type="date" name="from_date" value="<?=$wh_from;?>" max="<?=date('Y-m-d');?>" class="form-control" required></div>
+<div class="wh-f"><label>To</label><input type="date" name="to_date" value="<?=$wh_to;?>" max="<?=date('Y-m-d');?>" class="form-control" required></div>
+<div class="wh-actions"><button type="submit" class="btn btn-primary">Apply</button><a href="wallet-history" class="btn btn-outline-secondary">Last 7 months</a></div>
 </form>
 </div>
 										
 										
 										
-                      <div class="col-xl-4 col-xxl-9" style="border-right:1px solid #ddd !important;">
+                      <div class="col-lg-6 wh-col wh-credit">
                               <div class="todo-list">
 							  <h5 class="todo-menu-title">Credit History</h5>
                                     <ul class="list-unstyled">		
@@ -277,13 +313,13 @@ Cashback : <?php echo $result_wallet_History1234['commission_percentage'];?>%<br
                                                         </div>---->
                                                     </li>
 													
-<?php }?>
+<?php }?><?php if(mysqli_num_rows($fetch_wallet_History1234)==0){?><li class="wh-empty"><i class="material-icons-outlined">inbox</i>No credits found from <?=date("d M Y",strtotime($wh_from));?> to <?=date("d M Y",strtotime($wh_to));?>.<br/>Try a different date range.</li><?php }?>
                                                 </ul>
                                             </div>
                                         </div>
 										
 										
-										<div class="col-xl-4 col-xxl-9">
+										<div class="col-lg-6 wh-col wh-debit">
                                             <div class="todo-list">
 											<h5 class="todo-menu-title">Debit History</h5>
                                                 <ul class="list-unstyled">
@@ -313,7 +349,7 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
                                                             <!----<a href="#" class="todo-item-done"><i class="material-icons-outlined no-m">done</i></a>---->
                                                         </div>
                                                     </li>
-<?php }?>
+<?php }?><?php if(mysqli_num_rows($fetch_wallet_History1234)==0){?><li class="wh-empty"><i class="material-icons-outlined">inbox</i>No withdrawals found from <?=date("d M Y",strtotime($wh_from));?> to <?=date("d M Y",strtotime($wh_to));?>.<br/>Try a different date range.</li><?php }?>
 												</ul>
 												</div>
 												</div>
