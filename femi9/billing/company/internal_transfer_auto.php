@@ -1486,6 +1486,8 @@ foreach ($rows as $r) {
         var counts = { all: 0, napkin: 0, diaper: 0 };
         if (activePane.id === 'ovTpPane') {
             counts = ovCountOrdersByType(ovLastData.tp);
+        } else if (activePane.id === 'ovCpPane') {
+            counts = ovCountOrdersByType(ovLastData.cp);
         } else if (activePane.id === 'ovOtPane') {
             counts = ovCountOrdersByType(ovLastData.ot);
         } else if (activePane.id === 'ovExcludedPane') {
