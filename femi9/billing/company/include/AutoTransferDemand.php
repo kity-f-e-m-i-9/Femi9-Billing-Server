@@ -246,15 +246,23 @@ function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, s
  * filter was tried and reverted 2026-09-24 after it hid genuinely-today
  * transfers whose PO happened to be raised on an earlier date.
  */
-function get_auto_transfer_skipped_today(mysqli $db_conn): array
+function get_auto_transfer_skipped_today(mysqli $db_conn, ?string $date = null): array
 {
     ensure_auto_transfer_skip_table($db_conn);
     $skipped = ['tp' => [], 'ot' => [], 'cp' => []];
 
+    // Defaults to today (the function's original, still-literal behavior)
+    // but accepts any past date so the "Already Transferred Today" tab can
+    // be pointed at an earlier day instead of being stuck on today only.
+    if ($date === null || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        $date = date('Y-m-d');
+    }
+
     $stmt = $db_conn->prepare(
         "SELECT source_type, source_ref, reason FROM auto_transfer_skip_today
-         WHERE skip_date = CURDATE() AND source_type IN ('tp', 'ot', 'cp') AND reason IN ('transferred', 'excluded') ORDER BY id"
+         WHERE skip_date = ? AND source_type IN ('tp', 'ot', 'cp') AND reason IN ('transferred', 'excluded') ORDER BY id"
     );
+    $stmt->bind_param('s', $date);
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();

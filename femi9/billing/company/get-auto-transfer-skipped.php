@@ -17,4 +17,5 @@ if ($__usertype !== 'finance') {
 }
 error_reporting(0);
 
-echo json_encode(get_auto_transfer_skipped_today($db_conn));
+$date = $_GET['date'] ?? null;
+echo json_encode(get_auto_transfer_skipped_today($db_conn, $date));

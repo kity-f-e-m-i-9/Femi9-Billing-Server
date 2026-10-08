@@ -714,16 +714,24 @@ foreach ($rows as $r) {
                     <div class="tab-pane fade" id="ovOtPane"><div id="ovOtList"></div></div>
                     <div class="tab-pane fade" id="ovExcludedPane">
                         <p class="text-muted small">
-                            Orders whose stock already moved earlier today via Transfer Now —
+                            Orders whose stock already moved via Transfer Now on the selected date —
                             grouped by order, for reference only.
                         </p>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <label for="ovExcludedDateInput" style="font-size:12px;color:#6b7280;font-weight:600;margin:0;">Date</label>
+                            <input type="date" id="ovExcludedDateInput" class="form-control form-control-sm" style="width:auto;" max="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d'); ?>" onchange="onOvExcludedDateChange()">
+                        </div>
                         <div id="ovExcludedList"></div>
                     </div>
                     <div class="tab-pane fade" id="ovDeletedPane">
                         <p class="text-muted small">
-                            Orders soft-deleted from today's Auto Transfer via "Delete Selected" —
+                            Orders soft-deleted from the selected date's Auto Transfer via "Delete Selected" —
                             stock was never touched for these, and they can be re-added below.
                         </p>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <label for="ovDeletedDateInput" style="font-size:12px;color:#6b7280;font-weight:600;margin:0;">Date</label>
+                            <input type="date" id="ovDeletedDateInput" class="form-control form-control-sm" style="width:auto;" max="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d'); ?>" onchange="onOvExcludedDateChange()">
+                        </div>
                         <div id="ovDeletedList"></div>
                     </div>
                 </div>
@@ -1481,10 +1489,10 @@ foreach ($rows as $r) {
         } else if (activePane.id === 'ovOtPane') {
             counts = ovCountOrdersByType(ovLastData.ot);
         } else if (activePane.id === 'ovExcludedPane') {
-            var items = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason !== 'excluded'; }) : [];
+            var items = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.cp || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason !== 'excluded'; }) : [];
             counts = ovCountGroupsByType(items);
         } else if (activePane.id === 'ovDeletedPane') {
-            var delItems = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason === 'excluded'; }) : [];
+            var delItems = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.cp || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason === 'excluded'; }) : [];
             counts = ovCountGroupsByType(delItems);
         }
         document.getElementById('ovCountAll').textContent = counts.all;
@@ -1507,6 +1515,11 @@ foreach ($rows as $r) {
     // "Already Transferred Today" tab still read as a second, confusing
     // sub-tab.
     var ovExcludedLastData = null;
+    // Defaults to today, same as the server's own default when no date is
+    // passed — but either date input (shared between the two tabs, kept
+    // in sync by onOvExcludedDateChange()) can point this at an earlier
+    // day instead of being stuck on "today" only.
+    var ovExcludedDate = document.getElementById('ovExcludedDateInput').value;
 
     function loadExcludedAndDeletedToday() {
         if (ovExcludedLastData) {
@@ -1519,7 +1532,7 @@ foreach ($rows as $r) {
         document.getElementById('ovExcludedList').innerHTML = loading;
         document.getElementById('ovDeletedList').innerHTML = loading;
 
-        $.getJSON('get-auto-transfer-skipped.php', {}, function (data) {
+        $.getJSON('get-auto-transfer-skipped.php', { date: ovExcludedDate }, function (data) {
             ovExcludedLastData = data;
             renderTransferredToday(data);
             renderDeletedToday(data);
@@ -1529,6 +1542,20 @@ foreach ($rows as $r) {
             document.getElementById('ovExcludedList').innerHTML = failMsg;
             document.getElementById('ovDeletedList').innerHTML = failMsg;
         });
+    }
+
+    // Both date pickers (Already Transferred Today / Deleted) share one
+    // underlying fetch, so changing either one re-syncs the other and
+    // forces a fresh load for the new date.
+    function onOvExcludedDateChange() {
+        var el = event && event.target ? event.target : document.getElementById('ovExcludedDateInput');
+        var newDate = el.value;
+        if (!newDate) return;
+        ovExcludedDate = newDate;
+        document.getElementById('ovExcludedDateInput').value = newDate;
+        document.getElementById('ovDeletedDateInput').value = newDate;
+        ovExcludedLastData = null;
+        loadExcludedAndDeletedToday();
     }
 
     // Groups a flat item list by order (source_id up to the trailing
