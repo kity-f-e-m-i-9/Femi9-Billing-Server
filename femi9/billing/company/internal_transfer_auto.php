@@ -1025,13 +1025,21 @@ foreach ($rows as $r) {
             var remembered = lineState[it.source_id];
             var isChecked = remembered ? remembered.checked : true;
             var qtyVal = remembered ? remembered.qty : it.qty;
+            // already_transferred > 0 means a prior (partial) Auto Transfer
+            // run already moved some of this order's own qty — shown so
+            // staff never mistake the reduced number for the order's full
+            // original demand and type the full amount back in by hand.
+            var alreadyNote = (it.already_transferred > 0)
+                ? '<div style="font-size:11px;color:#b45309;width:100%;margin-top:2px;">' + it.already_transferred + ' already transferred earlier (order\'s full qty was ' + (it.qty + it.already_transferred) + ')</div>'
+                : '';
             html += '<div class="bd-row' + (isChecked ? '' : ' ata-line-off') + '" data-source-id="' + it.source_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;padding:8px 4px;flex-wrap:wrap;">' +
                 '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:160px;">' +
                     '<input type="checkbox" class="bd-check" data-source-id="' + it.source_id + '"' + (isChecked ? ' checked' : '') + ' style="margin-right:8px;flex-shrink:0;">' +
                     '<span style="overflow-wrap:anywhere;">' + escBd(it.label) + '</span>' +
                 '</label>' +
                 '<input type="number" min="0" max="' + it.qty + '" class="form-control form-control-sm bd-qty-input" data-source-id="' + it.source_id + '" ' +
-                    'value="' + qtyVal + '" style="width:80px;flex-shrink:0;" title="Max ' + it.qty + ' — this order\'s own qty">' +
+                    'value="' + qtyVal + '" style="width:80px;flex-shrink:0;" title="Max ' + it.qty + ' — this order\'s own remaining qty">' +
+                alreadyNote +
             '</div>';
         });
         el.innerHTML = html;
@@ -1191,13 +1199,22 @@ foreach ($rows as $r) {
                 var remembered = lineState[sourceId];
                 var isChecked = remembered ? remembered.checked : true;
                 var qtyVal = remembered ? remembered.qty : p.qty;
-                return '<div class="ov-product-row' + (isChecked ? '' : ' ata-line-off') + '" data-source-id="' + sourceId + '" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;">' +
+                // already_transferred > 0 means a prior (partial) Auto
+                // Transfer run already moved some of this order's own
+                // qty — shown so staff never mistake the reduced number
+                // for the order's full original demand and type the full
+                // amount back in by hand.
+                var alreadyNote = (p.already_transferred > 0)
+                    ? '<div style="font-size:11px;color:#b45309;width:100%;padding-left:26px;">' + p.already_transferred + ' already transferred earlier (full qty was ' + (p.qty + p.already_transferred) + ')</div>'
+                    : '';
+                return '<div class="ov-product-row' + (isChecked ? '' : ' ata-line-off') + '" data-source-id="' + sourceId + '" data-product-id="' + p.product_id + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#4b5563;flex-wrap:wrap;">' +
                     '<label style="display:flex;align-items:center;flex:1;cursor:pointer;margin:0;min-width:0;">' +
                         '<input type="checkbox" class="ov-product-check"' + (isChecked ? ' checked' : '') + ' style="margin-right:8px;flex-shrink:0;">' +
                         '<span style="overflow-wrap:anywhere;">' + escBd(p.product_name) + '</span>' +
                     '</label>' +
                     '<input type="number" min="0" max="' + p.qty + '" class="form-control form-control-sm ov-product-qty" ' +
-                        'value="' + qtyVal + '" style="width:75px;flex-shrink:0;" title="Max ' + p.qty + '">' +
+                        'value="' + qtyVal + '" style="width:75px;flex-shrink:0;" title="Max ' + p.qty + ' remaining">' +
+                    alreadyNote +
                 '</div>';
             }).join('');
             // Whole-order checkbox reflects the current state too — checked

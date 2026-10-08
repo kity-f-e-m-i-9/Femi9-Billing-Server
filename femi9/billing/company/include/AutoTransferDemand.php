@@ -656,7 +656,7 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     // the same way in get_auto_transfer_requirements(). Skip-matching is
     // only against reason='excluded' — see that function's own comment.
     $tpStmt = $db_conn->prepare(
-        "SELECT poi.po_id, (poi.qty - poi.transferred_qty) AS qty, tp.name AS tp_name, tp.tp_id AS tp_code
+        "SELECT poi.po_id, (poi.qty - poi.transferred_qty) AS qty, poi.transferred_qty AS already_transferred, tp.name AS tp_name, tp.tp_id AS tp_code
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
@@ -673,15 +673,16 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     $res = $tpStmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $breakdown['tp'][] = [
-            'source_id' => 'tp:' . $row['po_id'] . ':' . $productId,
-            'label'     => $row['tp_name'] . ' (' . $row['tp_code'] . ') — PO #' . $row['po_id'],
-            'qty'       => (int) $row['qty'],
+            'source_id'          => 'tp:' . $row['po_id'] . ':' . $productId,
+            'label'              => $row['tp_name'] . ' (' . $row['tp_code'] . ') — PO #' . $row['po_id'],
+            'qty'                => (int) $row['qty'],
+            'already_transferred'=> (int) $row['already_transferred'],
         ];
     }
     $tpStmt->close();
 
     $cpStmt = $db_conn->prepare(
-        "SELECT cpi.po_id, (cpi.qty - cpi.transferred_qty) AS qty, cp.name AS cp_name, cp.cp_id AS cp_code
+        "SELECT cpi.po_id, (cpi.qty - cpi.transferred_qty) AS qty, cpi.transferred_qty AS already_transferred, cp.name AS cp_name, cp.cp_id AS cp_code
          FROM channel_partner_purchase_order_items cpi
          INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
          INNER JOIN channel_partners cp ON cp.id = po.channel_partner_id
@@ -698,15 +699,16 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     $res = $cpStmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $breakdown['cp'][] = [
-            'source_id' => 'cp:' . $row['po_id'] . ':' . $productId,
-            'label'     => $row['cp_name'] . ' (' . $row['cp_code'] . ') — PO #' . $row['po_id'],
-            'qty'       => (int) $row['qty'],
+            'source_id'          => 'cp:' . $row['po_id'] . ':' . $productId,
+            'label'              => $row['cp_name'] . ' (' . $row['cp_code'] . ') — PO #' . $row['po_id'],
+            'qty'                => (int) $row['qty'],
+            'already_transferred'=> (int) $row['already_transferred'],
         ];
     }
     $cpStmt->close();
 
     $otStmt = $db_conn->prepare(
-        "SELECT os.tempid, (os.qty - os.transferred_qty) AS qty, os.customer_name, osi.cat
+        "SELECT os.tempid, (os.qty - os.transferred_qty) AS qty, os.transferred_qty AS already_transferred, os.customer_name, osi.cat
          FROM ot_sales os
          INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
          WHERE osi.status = 'draft' AND os.godownid = ? AND os.prid = ?
@@ -722,9 +724,10 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     $res = $otStmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $breakdown['ot'][] = [
-            'source_id' => 'ot:' . $row['tempid'] . ':' . $productId,
-            'label'     => (($row['customer_name'] ?: 'Draft Order')) . ' (' . $row['cat'] . ')',
-            'qty'       => (int) $row['qty'],
+            'source_id'          => 'ot:' . $row['tempid'] . ':' . $productId,
+            'label'              => (($row['customer_name'] ?: 'Draft Order')) . ' (' . $row['cat'] . ')',
+            'qty'                => (int) $row['qty'],
+            'already_transferred'=> (int) $row['already_transferred'],
         ];
     }
     $otStmt->close();
@@ -760,7 +763,7 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     // comment. Skip-matching is only against reason='excluded'.
     $tpStmt = $db_conn->prepare(
         "SELECT po.id AS po_id, po.product_type, tp.name AS tp_name, tp.tp_id AS tp_code,
-                poi.product_id, (poi.qty - poi.transferred_qty) AS qty, p.productName
+                poi.product_id, (poi.qty - poi.transferred_qty) AS qty, poi.transferred_qty AS already_transferred, p.productName
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
@@ -790,9 +793,10 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
             ];
         }
         $tpByPo[$poId]['products'][] = [
-            'product_id'   => (int) $row['product_id'],
-            'product_name' => $row['productName'],
-            'qty'          => (int) $row['qty'],
+            'product_id'          => (int) $row['product_id'],
+            'product_name'        => $row['productName'],
+            'qty'                 => (int) $row['qty'],
+            'already_transferred' => (int) $row['already_transferred'],
         ];
     }
     $tpStmt->close();
@@ -800,7 +804,7 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
 
     $cpStmt = $db_conn->prepare(
         "SELECT po.id AS po_id, po.product_type, cp.name AS cp_name, cp.cp_id AS cp_code,
-                cpi.product_id, (cpi.qty - cpi.transferred_qty) AS qty, p.productName
+                cpi.product_id, (cpi.qty - cpi.transferred_qty) AS qty, cpi.transferred_qty AS already_transferred, p.productName
          FROM channel_partner_purchase_order_items cpi
          INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
          INNER JOIN channel_partners cp ON cp.id = po.channel_partner_id
@@ -827,16 +831,17 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
             ];
         }
         $cpByPo[$poId]['products'][] = [
-            'product_id'   => (int) $row['product_id'],
-            'product_name' => $row['productName'],
-            'qty'          => (int) $row['qty'],
+            'product_id'          => (int) $row['product_id'],
+            'product_name'        => $row['productName'],
+            'qty'                 => (int) $row['qty'],
+            'already_transferred' => (int) $row['already_transferred'],
         ];
     }
     $cpStmt->close();
     $overview['cp'] = array_values($cpByPo);
 
     $otStmt = $db_conn->prepare(
-        "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id, (os.qty - os.transferred_qty) AS qty, p.productName, p.category
+        "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id, (os.qty - os.transferred_qty) AS qty, os.transferred_qty AS already_transferred, p.productName, p.category
          FROM ot_sales os
          INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
          INNER JOIN products p ON p.id = os.prid
@@ -867,9 +872,10 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
             ];
         }
         $otByTempid[$tempid]['products'][] = [
-            'product_id'   => (int) $row['product_id'],
-            'product_name' => $row['productName'],
-            'qty'          => (int) $row['qty'],
+            'product_id'          => (int) $row['product_id'],
+            'product_name'        => $row['productName'],
+            'qty'                 => (int) $row['qty'],
+            'already_transferred' => (int) $row['already_transferred'],
         ];
     }
     $otStmt->close();
