@@ -296,35 +296,40 @@ try {
 
         save_auto_transfer_default_rate($db_conn, $pid, $row['rate1'], $row['rate2'], $createdBy);
 
-        // Only mark an order 'transferred' once its own qty actually fit
-        // within what was really moved ($legTwoQty) — TP orders claim their
-        // share first (real, completable purchase orders), then CP, then OT
-        // drafts get whatever's left over. Walking each source's own list
-        // cumulatively means an order past the point stock ran out is left
-        // unmarked, so it correctly reappears as outstanding demand next
-        // time instead of being silently marked done with nothing moved
-        // for it (previously every contributing order was marked
-        // regardless of whether the cap actually covered it).
+        // Credits each contributing order with however much of its own
+        // (already-remaining) qty actually fit within what was really
+        // moved ($legTwoQty) — TP orders claim their share first (real,
+        // completable purchase orders), then CP, then OT drafts get
+        // whatever's left over. Unlike before, an order that doesn't get
+        // FULLY covered this run is now given PARTIAL credit instead of
+        // none at all — record_auto_transfer_partial() permanently bumps
+        // that order line's own transferred_qty, so next time (today or
+        // any later day) it correctly shows only its own remainder as
+        // still required, not its full original qty again. Walking each
+        // source's own list in order and stopping once $remaining hits 0
+        // means an order past that point is left untouched (0 credited),
+        // so it stays fully outstanding.
         //
         // Orders the user explicitly unchecked in the Order Breakdown /
         // View All Orders popups ($excludedSourceIds) are skipped entirely
-        // here — never marked 'transferred' and never allowed to consume
-        // from $remaining. Without this, the walk had no idea which order
-        // the popups' checkboxes referred to (that choice was never part
-        // of the submitted product_id[]/qty[] totals) and could mark the
-        // WRONG order "done" purely by PO-id order, leaving the order the
-        // user actually meant to exclude falsely shown as fulfilled while
-        // the one they wanted transferred stayed outstanding.
+        // here — never credited and never allowed to consume from
+        // $remaining. Without this, the walk had no idea which order the
+        // popups' checkboxes referred to (that choice was never part of
+        // the submitted product_id[]/qty[] totals) and could credit the
+        // WRONG order purely by PO-id order, leaving the order the user
+        // actually meant to exclude falsely shown as (partly) fulfilled
+        // while the one they wanted transferred stayed untouched.
         $remaining = $legTwoQty;
         foreach (['tp', 'cp', 'ot'] as $sourceType) {
             foreach ($contributingOrders[$sourceType] as $order) {
+                if ($remaining <= 0) { break 2; } // nothing left to credit to any further order, any source
                 if (isset($excludedSourceIds[$order['source_id']])) { continue; }
-                $orderQty = (int) $order['qty'];
+                $orderQty = (int) $order['qty']; // already this line's own REMAINING qty (qty - transferred_qty), not its full original
                 if ($orderQty <= 0) continue;
-                if ($remaining < $orderQty) break; // this and every later (non-excluded) order in this source's list stay unmarked
-                $remaining -= $orderQty;
+                $creditQty = min($orderQty, $remaining);
+                $remaining -= $creditQty;
                 $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"cp:"/"ot:" prefix
-                mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy, $tempid2);
+                record_auto_transfer_partial($db_conn, $sourceType, $sourceRef, $creditQty, $createdBy, $tempid2);
             }
         }
     }

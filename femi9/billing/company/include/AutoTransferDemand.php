@@ -66,6 +66,41 @@ function ensure_auto_transfer_skip_table(mysqli $db_conn): void
     if ($typeCol && strpos($typeCol['Type'], "'cp'") === false) {
         $db_conn->query("ALTER TABLE auto_transfer_skip_today MODIFY COLUMN source_type ENUM('tp','ot','wa','cp') NOT NULL");
     }
+
+    // How much of this specific order+product this ONE event actually
+    // moved — needed now that a 'transferred' row can represent a PARTIAL
+    // fulfillment (see *_transferred_qty columns below), not just "this
+    // order is fully done." Old rows (all full-order marks from before
+    // partial tracking existed) have no way to know their own original
+    // qty retroactively, so they're left NULL — get_auto_transfer_skipped_
+    // today() falls back to the order's current full qty for those.
+    $qtyCol = $db_conn->query("SHOW COLUMNS FROM auto_transfer_skip_today LIKE 'qty'");
+    if ($qtyCol && $qtyCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE auto_transfer_skip_today ADD COLUMN qty INT NULL AFTER transfer_tempid");
+    }
+}
+
+// Self-migrating. How much of this order LINE's own qty has actually been
+// moved by Auto Transfer so far, across every run/day — unlike the
+// skip-table above (which only ever meant "don't recount today," reset
+// daily), this is permanent running progress toward the line's full qty,
+// since a partial transfer (operator reduces the popup's qty input for
+// just this run) must still correctly reduce what's required NEXT time,
+// today or any later day. transferred_qty is never allowed to exceed the
+// line's own qty (enforced at the call site, not by a DB constraint).
+function ensure_auto_transfer_transferred_qty_columns(mysqli $db_conn): void
+{
+    $targets = [
+        'tp_purchase_order_items'          => 'qty',
+        'channel_partner_purchase_order_items' => 'qty',
+        'ot_sales'                          => 'qty',
+    ];
+    foreach ($targets as $table => $afterCol) {
+        $col = $db_conn->query("SHOW COLUMNS FROM `$table` LIKE 'transferred_qty'");
+        if ($col && $col->num_rows === 0) {
+            $db_conn->query("ALTER TABLE `$table` ADD COLUMN transferred_qty INT NOT NULL DEFAULT 0 AFTER `$afterCol`");
+        }
+    }
 }
 
 // Self-migrating — same guard as ot-sale-action.php's own (must stay in
@@ -213,6 +248,78 @@ function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, s
 }
 
 /**
+ * Records a PARTIAL (or full) fulfillment of one order line by Auto
+ * Transfer — called instead of mark_auto_transfer_order_skipped(...,
+ * 'transferred', ...) now that an order doesn't have to be fully covered
+ * in one run to make progress. Two things happen:
+ *
+ *  1. The order line's own transferred_qty (tp_purchase_order_items /
+ *     channel_partner_purchase_order_items / ot_sales) is bumped by
+ *     $qtyMoved, capped at the line's own qty — this is PERMANENT
+ *     progress, not scoped to today, since a 10-of-50 partial transfer
+ *     must still correctly show only 40 remaining tomorrow, not the
+ *     full 50 again.
+ *  2. A dated log row is written/accumulated in auto_transfer_skip_today
+ *     (reason='transferred', carrying $qtyMoved) purely for the
+ *     "Already Transferred Today"/date-picker history view — demand
+ *     calculation itself (get_auto_transfer_requirements() etc.) no
+ *     longer reads this table for 'transferred' rows at all, only for
+ *     'excluded' (Delete Selected) ones, so this log is historical
+ *     only. If more than one run touches the same order+product on the
+ *     same day, their qty accumulates into one row (transfer_tempid
+ *     reflects whichever run touched it last) — a rare edge case where
+ *     undo_auto_transfer() can't cleanly isolate one specific run's
+ *     share for an order+product touched by two runs the same day;
+ *     acceptable since the running transferred_qty itself (which
+ *     actually gates demand) is still correctly adjusted by undo either way.
+ *
+ * $sourceRef is "<po_id>:<product_id>" for tp/cp, "<tempid>:<product_id>"
+ * for ot — same shape callers already build for mark_auto_transfer_
+ * order_skipped().
+ */
+function record_auto_transfer_partial(mysqli $db_conn, string $sourceType, string $sourceRef, int $qtyMoved, ?string $createdBy, string $transferTempid): void
+{
+    if ($qtyMoved <= 0) { return; }
+    ensure_auto_transfer_skip_table($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
+
+    $parts = explode(':', $sourceRef, 2);
+    if (count($parts) !== 2) { return; }
+    [$orderKey, $productIdStr] = $parts;
+    $productId = (int) $productIdStr;
+
+    if ($sourceType === 'ot') {
+        $stmt = $db_conn->prepare(
+            "UPDATE ot_sales SET transferred_qty = LEAST(qty, transferred_qty + ?) WHERE tempid = ? AND prid = ?"
+        );
+        $stmt->bind_param('isi', $qtyMoved, $orderKey, $productId);
+    } elseif ($sourceType === 'cp') {
+        $poId = (int) $orderKey;
+        $stmt = $db_conn->prepare(
+            "UPDATE channel_partner_purchase_order_items SET transferred_qty = LEAST(qty, transferred_qty + ?) WHERE po_id = ? AND product_id = ?"
+        );
+        $stmt->bind_param('iii', $qtyMoved, $poId, $productId);
+    } else {
+        $poId = (int) $orderKey;
+        $stmt = $db_conn->prepare(
+            "UPDATE tp_purchase_order_items SET transferred_qty = LEAST(qty, transferred_qty + ?) WHERE po_id = ? AND product_id = ?"
+        );
+        $stmt->bind_param('iii', $qtyMoved, $poId, $productId);
+    }
+    $stmt->execute();
+    $stmt->close();
+
+    $logStmt = $db_conn->prepare(
+        "INSERT INTO auto_transfer_skip_today (source_type, source_ref, skip_date, reason, transfer_tempid, qty, created_by)
+         VALUES (?, ?, CURDATE(), 'transferred', ?, ?, ?)
+         ON DUPLICATE KEY UPDATE qty = COALESCE(qty, 0) + VALUES(qty), transfer_tempid = VALUES(transfer_tempid), created_by = VALUES(created_by)"
+    );
+    $logStmt->bind_param('sssis', $sourceType, $sourceRef, $transferTempid, $qtyMoved, $createdBy);
+    $logStmt->execute();
+    $logStmt->close();
+}
+
+/**
  * Everything already transferred today — the "Excluded Today" tab's data
  * source, so a completed transfer's orders are visible and explainable
  * (why a product no longer shows up in Required Qty) even though there's
@@ -259,7 +366,7 @@ function get_auto_transfer_skipped_today(mysqli $db_conn, ?string $date = null):
     }
 
     $stmt = $db_conn->prepare(
-        "SELECT source_type, source_ref, reason FROM auto_transfer_skip_today
+        "SELECT source_type, source_ref, reason, qty FROM auto_transfer_skip_today
          WHERE skip_date = ? AND source_type IN ('tp', 'ot', 'cp') AND reason IN ('transferred', 'excluded') ORDER BY id"
     );
     $stmt->bind_param('s', $date);
@@ -307,7 +414,7 @@ function get_auto_transfer_skipped_today(mysqli $db_conn, ?string $date = null):
             );
             $qtyStmt->bind_param('ii', $poId, $productId);
             $qtyStmt->execute();
-            $qty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
+            $derivedQty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
             $qtyStmt->close();
         } elseif ($sourceType === 'cp') {
             $poId = (int) $orderKey;
@@ -329,7 +436,7 @@ function get_auto_transfer_skipped_today(mysqli $db_conn, ?string $date = null):
             );
             $qtyStmt->bind_param('ii', $poId, $productId);
             $qtyStmt->execute();
-            $qty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
+            $derivedQty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
             $qtyStmt->close();
         } else {
             $otStmt = $db_conn->prepare(
@@ -348,9 +455,21 @@ function get_auto_transfer_skipped_today(mysqli $db_conn, ?string $date = null):
             );
             $qtyStmt->bind_param('si', $orderKey, $productId);
             $qtyStmt->execute();
-            $qty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
+            $derivedQty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
             $qtyStmt->close();
         }
+
+        // A 'transferred' row's own logged qty (see record_auto_transfer_
+        // partial()) is the ACTUAL amount this specific event moved, which
+        // may be less than the order line's full/current qty now that
+        // partial transfers exist — show that, not the derived full
+        // amount. Falls back to the derived full qty for 'excluded' rows
+        // (never carry a logged qty, Delete Selected always excludes the
+        // whole line) and for any 'transferred' row predating this column
+        // (qty still NULL there).
+        $qty = ($row['reason'] === 'transferred' && $row['qty'] !== null)
+            ? (int) $row['qty']
+            : $derivedQty;
 
         $skipped[$sourceType][] = [
             'source_id'    => $sourceType . ':' . $row['source_ref'],
@@ -401,20 +520,30 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     ensure_auto_transfer_skip_table($db_conn);
     ensure_ot_sales_invoice_status_column($db_conn);
     ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
     $requirements = [];
 
+    // Demand is the order line's own REMAINING qty (qty - transferred_qty),
+    // not its full original qty — a prior partial Auto Transfer run
+    // permanently reduces what's still required, today or any later day
+    // (see record_auto_transfer_partial()). Skip-matching here is only
+    // against reason='excluded' (staff's "Delete Selected") — a prior
+    // 'transferred' row no longer gates anything, since transferred_qty
+    // itself already reflects that progress.
+    //
     // Skip-matching is per (PO, product) — CONCAT'd since a single PO can
     // carry multiple products, and excluding one product from it must
     // never also exclude the PO's other products (see the matching
     // comment on get_auto_transfer_breakdown_for_product()).
     $tpStmt = $db_conn->prepare(
-        "SELECT poi.product_id AS product_id, SUM(poi.qty) AS total_qty
+        "SELECT poi.product_id AS product_id, SUM(poi.qty - poi.transferred_qty) AS total_qty
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL
+           AND poi.qty > poi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          GROUP BY poi.product_id"
     );
@@ -432,13 +561,14 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     // preferred_cp_id equivalent here: a CP PO is always sourced from the
     // company's own Neksomo/Healthcare/LLP chain, never routed elsewhere.
     $cpStmt = $db_conn->prepare(
-        "SELECT cpi.product_id AS product_id, SUM(cpi.qty) AS total_qty
+        "SELECT cpi.product_id AS product_id, SUM(cpi.qty - cpi.transferred_qty) AS total_qty
          FROM channel_partner_purchase_order_items cpi
          INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
          WHERE po.status = 'waiting'
+           AND cpi.qty > cpi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          GROUP BY cpi.product_id"
     );
@@ -452,13 +582,14 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     $cpStmt->close();
 
     $otStmt = $db_conn->prepare(
-        "SELECT os.prid AS product_id, SUM(os.qty) AS total_qty
+        "SELECT os.prid AS product_id, SUM(os.qty - os.transferred_qty) AS total_qty
          FROM ot_sales os
          INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
          WHERE osi.status = 'draft' AND os.godownid = ?
+           AND os.qty > os.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'ot' AND s.source_ref = CONCAT(os.tempid, ':', os.prid) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'ot' AND s.source_ref = CONCAT(os.tempid, ':', os.prid) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          GROUP BY os.prid"
     );
@@ -511,22 +642,29 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     ensure_auto_transfer_skip_table($db_conn);
     ensure_ot_sales_invoice_status_column($db_conn);
     ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
     $breakdown = ['tp' => [], 'ot' => [], 'cp' => []];
 
-    // source_id/source_ref carry the product too ("tp:<po_id>:<product_id>",
-    // "ot:<tempid>:<product_id>") — a single PO or OT invoice can carry
-    // several different products, and excluding one product's line via
-    // "Not Today" must never also exclude that same PO/invoice's OTHER
-    // products. Matches CONCAT(...) the same way in get_auto_transfer_requirements().
+    // 'qty' here is each order's REMAINING qty (qty - transferred_qty),
+    // same as get_auto_transfer_requirements() — a partially-transferred
+    // order still shows, just for whatever's left of it, not its full
+    // original amount. source_id/source_ref carry the product too
+    // ("tp:<po_id>:<product_id>", "ot:<tempid>:<product_id>") — a single
+    // PO or OT invoice can carry several different products, and
+    // excluding one product's line via "Not Today" must never also
+    // exclude that same PO/invoice's OTHER products. Matches CONCAT(...)
+    // the same way in get_auto_transfer_requirements(). Skip-matching is
+    // only against reason='excluded' — see that function's own comment.
     $tpStmt = $db_conn->prepare(
-        "SELECT poi.po_id, poi.qty, tp.name AS tp_name, tp.tp_id AS tp_code
+        "SELECT poi.po_id, (poi.qty - poi.transferred_qty) AS qty, tp.name AS tp_name, tp.tp_id AS tp_code
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
          WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL AND poi.product_id = ?
+           AND poi.qty > poi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          ORDER BY po.id"
     );
@@ -543,14 +681,15 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     $tpStmt->close();
 
     $cpStmt = $db_conn->prepare(
-        "SELECT cpi.po_id, cpi.qty, cp.name AS cp_name, cp.cp_id AS cp_code
+        "SELECT cpi.po_id, (cpi.qty - cpi.transferred_qty) AS qty, cp.name AS cp_name, cp.cp_id AS cp_code
          FROM channel_partner_purchase_order_items cpi
          INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
          INNER JOIN channel_partners cp ON cp.id = po.channel_partner_id
          WHERE po.status = 'waiting' AND cpi.product_id = ?
+           AND cpi.qty > cpi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          ORDER BY po.id"
     );
@@ -567,13 +706,14 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     $cpStmt->close();
 
     $otStmt = $db_conn->prepare(
-        "SELECT os.tempid, os.qty, os.customer_name, osi.cat
+        "SELECT os.tempid, (os.qty - os.transferred_qty) AS qty, os.customer_name, osi.cat
          FROM ot_sales os
          INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
          WHERE osi.status = 'draft' AND os.godownid = ? AND os.prid = ?
+           AND os.qty > os.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'ot' AND s.source_ref = CONCAT(os.tempid, ':', os.prid) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'ot' AND s.source_ref = CONCAT(os.tempid, ':', os.prid) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          ORDER BY os.id"
     );
@@ -613,19 +753,23 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     ensure_auto_transfer_skip_table($db_conn);
     ensure_ot_sales_invoice_status_column($db_conn);
     ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
     $overview = ['tp' => [], 'ot' => [], 'cp' => []];
 
+    // 'qty' is each line's REMAINING qty — see get_auto_transfer_requirements()'s
+    // comment. Skip-matching is only against reason='excluded'.
     $tpStmt = $db_conn->prepare(
         "SELECT po.id AS po_id, po.product_type, tp.name AS tp_name, tp.tp_id AS tp_code,
-                poi.product_id, poi.qty, p.productName
+                poi.product_id, (poi.qty - poi.transferred_qty) AS qty, p.productName
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          INNER JOIN territory_partners tp ON tp.id = po.territory_partner_id
          INNER JOIN products p ON p.id = poi.product_id
          WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL
+           AND poi.qty > poi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          ORDER BY po.id, poi.product_id"
     );
@@ -656,15 +800,16 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
 
     $cpStmt = $db_conn->prepare(
         "SELECT po.id AS po_id, po.product_type, cp.name AS cp_name, cp.cp_id AS cp_code,
-                cpi.product_id, cpi.qty, p.productName
+                cpi.product_id, (cpi.qty - cpi.transferred_qty) AS qty, p.productName
          FROM channel_partner_purchase_order_items cpi
          INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
          INNER JOIN channel_partners cp ON cp.id = po.channel_partner_id
          INNER JOIN products p ON p.id = cpi.product_id
          WHERE po.status = 'waiting'
+           AND cpi.qty > cpi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          ORDER BY po.id, cpi.product_id"
     );
@@ -691,14 +836,15 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     $overview['cp'] = array_values($cpByPo);
 
     $otStmt = $db_conn->prepare(
-        "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id, os.qty, p.productName, p.category
+        "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id, (os.qty - os.transferred_qty) AS qty, p.productName, p.category
          FROM ot_sales os
          INNER JOIN ot_sales_invoice osi ON osi.tempid = os.tempid
          INNER JOIN products p ON p.id = os.prid
          WHERE osi.status = 'draft' AND os.godownid = ?
+           AND os.qty > os.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'ot' AND s.source_ref = CONCAT(os.tempid, ':', os.prid) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'ot' AND s.source_ref = CONCAT(os.tempid, ':', os.prid) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          ORDER BY os.tempid, os.prid"
     );
@@ -748,14 +894,16 @@ function get_auto_transfer_waiting_po_count(mysqli $db_conn): int
 {
     ensure_auto_transfer_skip_table($db_conn);
     ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
     $stmt = $db_conn->prepare(
         "SELECT COUNT(DISTINCT po.id) AS n
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL
+           AND poi.qty > poi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )"
     );
     $stmt->execute();
@@ -782,14 +930,16 @@ function get_auto_transfer_waiting_po_count_by_type(mysqli $db_conn): array
 {
     ensure_auto_transfer_skip_table($db_conn);
     ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
     $stmt = $db_conn->prepare(
         "SELECT po.product_type, COUNT(DISTINCT po.id) AS n
          FROM tp_purchase_order_items poi
          INNER JOIN tp_purchase_orders po ON po.id = poi.po_id
          WHERE po.status = 'waiting' AND po.approver_type = 'company' AND po.preferred_cp_id IS NULL
+           AND poi.qty > poi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          GROUP BY po.product_type"
     );
@@ -812,14 +962,16 @@ function get_auto_transfer_waiting_po_count_by_type(mysqli $db_conn): array
 function get_auto_transfer_waiting_cp_count(mysqli $db_conn): int
 {
     ensure_auto_transfer_skip_table($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
     $stmt = $db_conn->prepare(
         "SELECT COUNT(DISTINCT po.id) AS n
          FROM channel_partner_purchase_order_items cpi
          INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
          WHERE po.status = 'waiting'
+           AND cpi.qty > cpi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )"
     );
     $stmt->execute();
@@ -835,14 +987,16 @@ function get_auto_transfer_waiting_cp_count(mysqli $db_conn): int
 function get_auto_transfer_waiting_cp_count_by_type(mysqli $db_conn): array
 {
     ensure_auto_transfer_skip_table($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
     $stmt = $db_conn->prepare(
         "SELECT po.product_type, COUNT(DISTINCT po.id) AS n
          FROM channel_partner_purchase_order_items cpi
          INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
          WHERE po.status = 'waiting'
+           AND cpi.qty > cpi.transferred_qty
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
-               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
            )
          GROUP BY po.product_type"
     );
@@ -1175,22 +1329,68 @@ function undo_auto_transfer(mysqli $db_conn, string $tempidN2, int $productId, s
             $countStmt->close();
         }
 
-        // Un-skip every order this run's product line marked 'transferred'
-        // (see internal_transfer_auto_action.php) — otherwise those orders
-        // stay invisibly excluded from Required Qty forever even though
-        // their stock just moved back, undercounting every later run today.
-        // Scoped to (transfer_tempid, product) so undoing one product from
-        // a multi-product run never touches another product's own rows.
+        // Reverses the partial-fulfillment credit this run's product line
+        // gave each contributing order (see record_auto_transfer_partial())
+        // — otherwise an order's transferred_qty would stay bumped even
+        // though its stock just moved back, permanently under-counting it
+        // as "required" from here on (not just today). Scoped to
+        // (transfer_tempid, product) so undoing one product from a
+        // multi-product run never touches another product's own rows.
+        // NOTE: if this same order+product was ALSO touched by a second,
+        // separate Auto Transfer run the same day, this row's qty is their
+        // combined total (see record_auto_transfer_partial()'s own note)
+        // — undoing either run then reverses the full combined amount,
+        // which can over-reverse the other run's still-valid share. Rare
+        // in practice (same order+product transferred twice in one day);
+        // reconcile manually if it comes up.
         ensure_auto_transfer_skip_table($db_conn);
-        $unskip = $db_conn->prepare(
-            "DELETE FROM auto_transfer_skip_today
+        ensure_auto_transfer_transferred_qty_columns($db_conn);
+        $logStmt = $db_conn->prepare(
+            "SELECT id, source_type, source_ref, qty FROM auto_transfer_skip_today
              WHERE transfer_tempid = ? AND reason = 'transferred'
                AND source_ref LIKE CONCAT('%:', ?)"
         );
         $productIdStr = (string) $productId;
-        $unskip->bind_param('ss', $tempidN2, $productIdStr);
-        $unskip->execute();
-        $unskip->close();
+        $logStmt->bind_param('ss', $tempidN2, $productIdStr);
+        $logStmt->execute();
+        $logRows = $logStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $logStmt->close();
+
+        foreach ($logRows as $logRow) {
+            $loggedQty = $logRow['qty'] !== null ? (int) $logRow['qty'] : 0;
+            if ($loggedQty > 0) {
+                $parts = explode(':', $logRow['source_ref'], 2);
+                if (count($parts) === 2) {
+                    [$orderKey, $undoProductIdStr] = $parts;
+                    $undoProductId = (int) $undoProductIdStr;
+                    if ($logRow['source_type'] === 'ot') {
+                        $revStmt = $db_conn->prepare(
+                            "UPDATE ot_sales SET transferred_qty = GREATEST(0, transferred_qty - ?) WHERE tempid = ? AND prid = ?"
+                        );
+                        $revStmt->bind_param('isi', $loggedQty, $orderKey, $undoProductId);
+                    } elseif ($logRow['source_type'] === 'cp') {
+                        $poId = (int) $orderKey;
+                        $revStmt = $db_conn->prepare(
+                            "UPDATE channel_partner_purchase_order_items SET transferred_qty = GREATEST(0, transferred_qty - ?) WHERE po_id = ? AND product_id = ?"
+                        );
+                        $revStmt->bind_param('iii', $loggedQty, $poId, $undoProductId);
+                    } else {
+                        $poId = (int) $orderKey;
+                        $revStmt = $db_conn->prepare(
+                            "UPDATE tp_purchase_order_items SET transferred_qty = GREATEST(0, transferred_qty - ?) WHERE po_id = ? AND product_id = ?"
+                        );
+                        $revStmt->bind_param('iii', $loggedQty, $poId, $undoProductId);
+                    }
+                    $revStmt->execute();
+                    $revStmt->close();
+                }
+            }
+
+            $delLog = $db_conn->prepare("DELETE FROM auto_transfer_skip_today WHERE id = ?");
+            $delLog->bind_param('i', $logRow['id']);
+            $delLog->execute();
+            $delLog->close();
+        }
 
         $db_conn->commit();
         return ['success' => true];
