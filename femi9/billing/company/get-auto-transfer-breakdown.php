@@ -18,9 +18,9 @@ if ($__usertype !== 'finance') {
 error_reporting(0);
 
 $productId = (int) ($_GET['product_id'] ?? 0);
-if (!$productId) { echo json_encode(['tp' => [], 'ot' => []]); exit; }
+if (!$productId) { echo json_encode(['tp' => [], 'ot' => [], 'cp' => []]); exit; }
 
 $llpId = resolve_godown_id_by_gname($db_conn, 'FEMI NAYAN LLP');
-if (!$llpId) { echo json_encode(['tp' => [], 'ot' => []]); exit; }
+if (!$llpId) { echo json_encode(['tp' => [], 'ot' => [], 'cp' => []]); exit; }
 
 echo json_encode(get_auto_transfer_breakdown_for_product($db_conn, $productId, $llpId));

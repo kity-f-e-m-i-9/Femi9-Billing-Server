@@ -40,7 +40,7 @@ function ensure_auto_transfer_skip_table(mysqli $db_conn): void
     $db_conn->query("
         CREATE TABLE IF NOT EXISTS auto_transfer_skip_today (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            source_type ENUM('tp','ot','wa') NOT NULL,
+            source_type ENUM('tp','ot','wa','cp') NOT NULL,
             source_ref VARCHAR(64) NOT NULL,
             skip_date DATE NOT NULL,
             reason ENUM('excluded','transferred') NOT NULL DEFAULT 'excluded',
@@ -57,6 +57,14 @@ function ensure_auto_transfer_skip_table(mysqli $db_conn): void
     $col = $db_conn->query("SHOW COLUMNS FROM auto_transfer_skip_today LIKE 'transfer_tempid'");
     if ($col && $col->num_rows === 0) {
         $db_conn->query("ALTER TABLE auto_transfer_skip_today ADD COLUMN transfer_tempid VARCHAR(64) NULL AFTER reason");
+    }
+
+    // Widen source_type for environments where 'cp' didn't exist yet —
+    // Channel Partner purchase orders joining TP/OT as a third Auto
+    // Transfer demand source.
+    $typeCol = $db_conn->query("SHOW COLUMNS FROM auto_transfer_skip_today LIKE 'source_type'")->fetch_assoc();
+    if ($typeCol && strpos($typeCol['Type'], "'cp'") === false) {
+        $db_conn->query("ALTER TABLE auto_transfer_skip_today MODIFY COLUMN source_type ENUM('tp','ot','wa','cp') NOT NULL");
     }
 }
 
@@ -241,11 +249,11 @@ function mark_auto_transfer_order_skipped(mysqli $db_conn, string $sourceType, s
 function get_auto_transfer_skipped_today(mysqli $db_conn): array
 {
     ensure_auto_transfer_skip_table($db_conn);
-    $skipped = ['tp' => [], 'ot' => []];
+    $skipped = ['tp' => [], 'ot' => [], 'cp' => []];
 
     $stmt = $db_conn->prepare(
         "SELECT source_type, source_ref, reason FROM auto_transfer_skip_today
-         WHERE skip_date = CURDATE() AND source_type IN ('tp', 'ot') AND reason IN ('transferred', 'excluded') ORDER BY id"
+         WHERE skip_date = CURDATE() AND source_type IN ('tp', 'ot', 'cp') AND reason IN ('transferred', 'excluded') ORDER BY id"
     );
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -288,6 +296,28 @@ function get_auto_transfer_skipped_today(mysqli $db_conn): array
 
             $qtyStmt = $db_conn->prepare(
                 "SELECT SUM(qty) AS qty FROM tp_purchase_order_items WHERE po_id = ? AND product_id = ?"
+            );
+            $qtyStmt->bind_param('ii', $poId, $productId);
+            $qtyStmt->execute();
+            $qty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
+            $qtyStmt->close();
+        } elseif ($sourceType === 'cp') {
+            $poId = (int) $orderKey;
+            $poStmt = $db_conn->prepare(
+                "SELECT cp.name AS cp_name, cp.cp_id AS cp_code, po.product_type
+                 FROM channel_partner_purchase_orders po
+                 INNER JOIN channel_partners cp ON cp.id = po.channel_partner_id
+                 WHERE po.id = ?"
+            );
+            $poStmt->bind_param('i', $poId);
+            $poStmt->execute();
+            $poRow = $poStmt->get_result()->fetch_assoc();
+            $poStmt->close();
+            $label = $poRow ? ($poRow['cp_name'] . ' (' . $poRow['cp_code'] . ') — PO #' . $poId) : ('PO #' . $poId);
+            if ($poRow) $orderType = $poRow['product_type'] === 'diaper' ? 'diaper' : 'napkin';
+
+            $qtyStmt = $db_conn->prepare(
+                "SELECT SUM(qty) AS qty FROM channel_partner_purchase_order_items WHERE po_id = ? AND product_id = ?"
             );
             $qtyStmt->bind_param('ii', $poId, $productId);
             $qtyStmt->execute();
@@ -384,10 +414,34 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     $tpResult = $tpStmt->get_result();
     while ($row = $tpResult->fetch_assoc()) {
         $pid = (int) $row['product_id'];
-        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0];
+        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0];
         $requirements[$pid]['tp'] += (int) $row['total_qty'];
     }
     $tpStmt->close();
+
+    // Channel Partner purchase orders — same shape as TP's own, just
+    // against channel_partner_purchase_orders/_items. No approver_type/
+    // preferred_cp_id equivalent here: a CP PO is always sourced from the
+    // company's own Neksomo/Healthcare/LLP chain, never routed elsewhere.
+    $cpStmt = $db_conn->prepare(
+        "SELECT cpi.product_id AS product_id, SUM(cpi.qty) AS total_qty
+         FROM channel_partner_purchase_order_items cpi
+         INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
+         WHERE po.status = 'waiting'
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
+           )
+         GROUP BY cpi.product_id"
+    );
+    $cpStmt->execute();
+    $cpResult = $cpStmt->get_result();
+    while ($row = $cpResult->fetch_assoc()) {
+        $pid = (int) $row['product_id'];
+        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0];
+        $requirements[$pid]['cp'] += (int) $row['total_qty'];
+    }
+    $cpStmt->close();
 
     $otStmt = $db_conn->prepare(
         "SELECT os.prid AS product_id, SUM(os.qty) AS total_qty
@@ -405,27 +459,31 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     $otResult = $otStmt->get_result();
     while ($row = $otResult->fetch_assoc()) {
         $pid = (int) $row['product_id'];
-        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0];
+        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0];
         $requirements[$pid]['ot'] += (int) $row['total_qty'];
     }
     $otStmt->close();
 
-    return array_filter($requirements, fn($r) => ($r['tp'] + $r['ot']) > 0);
+    return array_filter($requirements, fn($r) => ($r['tp'] + $r['ot'] + $r['cp']) > 0);
 }
 
 /**
- * Splits one product's available stock between TP and OT-draft demand,
- * TP first — real, completable purchase orders are never starved by
- * OT drafts that (until confirmed) can sit indefinitely. Returns
- * ['tp' => qtyForTp, 'ot' => qtyForOt], each capped so tp+ot never
- * exceeds $available and neither source gets a negative share.
+ * Splits one product's available stock between TP, CP, and OT-draft
+ * demand — TP first, then CP, then OT last. TP and CP are both real,
+ * completable purchase orders (never starved by OT drafts that, until
+ * confirmed, can sit indefinitely); TP keeps first claim ahead of CP
+ * since that priority already existed before CP joined this split.
+ * Returns ['tp' => qtyForTp, 'cp' => qtyForCp, 'ot' => qtyForOt], each
+ * capped so tp+cp+ot never exceeds $available and no source gets a
+ * negative share.
  */
-function cap_auto_transfer_qty_by_source(int $tpRequired, int $otRequired, int $available): array
+function cap_auto_transfer_qty_by_source(int $tpRequired, int $cpRequired, int $otRequired, int $available): array
 {
     $available = max(0, $available);
     $tpCapped  = max(0, min($tpRequired, $available));
-    $otCapped  = max(0, min($otRequired, $available - $tpCapped));
-    return ['tp' => $tpCapped, 'ot' => $otCapped];
+    $cpCapped  = max(0, min($cpRequired, $available - $tpCapped));
+    $otCapped  = max(0, min($otRequired, $available - $tpCapped - $cpCapped));
+    return ['tp' => $tpCapped, 'cp' => $cpCapped, 'ot' => $otCapped];
 }
 
 /**
@@ -445,7 +503,7 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     ensure_auto_transfer_skip_table($db_conn);
     ensure_ot_sales_invoice_status_column($db_conn);
     ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
-    $breakdown = ['tp' => [], 'ot' => []];
+    $breakdown = ['tp' => [], 'ot' => [], 'cp' => []];
 
     // source_id/source_ref carry the product too ("tp:<po_id>:<product_id>",
     // "ot:<tempid>:<product_id>") — a single PO or OT invoice can carry
@@ -475,6 +533,30 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
         ];
     }
     $tpStmt->close();
+
+    $cpStmt = $db_conn->prepare(
+        "SELECT cpi.po_id, cpi.qty, cp.name AS cp_name, cp.cp_id AS cp_code
+         FROM channel_partner_purchase_order_items cpi
+         INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
+         INNER JOIN channel_partners cp ON cp.id = po.channel_partner_id
+         WHERE po.status = 'waiting' AND cpi.product_id = ?
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
+           )
+         ORDER BY po.id"
+    );
+    $cpStmt->bind_param('i', $productId);
+    $cpStmt->execute();
+    $res = $cpStmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $breakdown['cp'][] = [
+            'source_id' => 'cp:' . $row['po_id'] . ':' . $productId,
+            'label'     => $row['cp_name'] . ' (' . $row['cp_code'] . ') — PO #' . $row['po_id'],
+            'qty'       => (int) $row['qty'],
+        ];
+    }
+    $cpStmt->close();
 
     $otStmt = $db_conn->prepare(
         "SELECT os.tempid, os.qty, os.customer_name, osi.cat
@@ -523,7 +605,7 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     ensure_auto_transfer_skip_table($db_conn);
     ensure_ot_sales_invoice_status_column($db_conn);
     ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
-    $overview = ['tp' => [], 'ot' => []];
+    $overview = ['tp' => [], 'ot' => [], 'cp' => []];
 
     $tpStmt = $db_conn->prepare(
         "SELECT po.id AS po_id, po.product_type, tp.name AS tp_name, tp.tp_id AS tp_code,
@@ -563,6 +645,42 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     }
     $tpStmt->close();
     $overview['tp'] = array_values($tpByPo);
+
+    $cpStmt = $db_conn->prepare(
+        "SELECT po.id AS po_id, po.product_type, cp.name AS cp_name, cp.cp_id AS cp_code,
+                cpi.product_id, cpi.qty, p.productName
+         FROM channel_partner_purchase_order_items cpi
+         INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
+         INNER JOIN channel_partners cp ON cp.id = po.channel_partner_id
+         INNER JOIN products p ON p.id = cpi.product_id
+         WHERE po.status = 'waiting'
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
+           )
+         ORDER BY po.id, cpi.product_id"
+    );
+    $cpStmt->execute();
+    $res = $cpStmt->get_result();
+    $cpByPo = [];
+    while ($row = $res->fetch_assoc()) {
+        $poId = (int) $row['po_id'];
+        if (!isset($cpByPo[$poId])) {
+            $cpByPo[$poId] = [
+                'order_key'   => (string) $poId,
+                'label'       => $row['cp_name'] . ' (' . $row['cp_code'] . ') — PO #' . $poId,
+                'order_type'  => $row['product_type'] === 'diaper' ? 'diaper' : 'napkin',
+                'products'    => [],
+            ];
+        }
+        $cpByPo[$poId]['products'][] = [
+            'product_id'   => (int) $row['product_id'],
+            'product_name' => $row['productName'],
+            'qty'          => (int) $row['qty'],
+        ];
+    }
+    $cpStmt->close();
+    $overview['cp'] = array_values($cpByPo);
 
     $otStmt = $db_conn->prepare(
         "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id, os.qty, p.productName, p.category
@@ -664,6 +782,59 @@ function get_auto_transfer_waiting_po_count_by_type(mysqli $db_conn): array
            AND NOT EXISTS (
                SELECT 1 FROM auto_transfer_skip_today s
                WHERE s.source_type = 'tp' AND s.source_ref = CONCAT(po.id, ':', poi.product_id) AND s.skip_date = CURDATE()
+           )
+         GROUP BY po.product_type"
+    );
+    $stmt->execute();
+    $counts = ['napkin' => 0, 'diaper' => 0];
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $type = $row['product_type'] === 'diaper' ? 'diaper' : 'napkin';
+        $counts[$type] += (int) $row['n'];
+    }
+    $stmt->close();
+    return $counts;
+}
+
+/**
+ * Same as get_auto_transfer_waiting_po_count(), for Channel Partner
+ * purchase orders instead of TP's — powers a "Total CP PO" stat card
+ * alongside the existing "Total PO" (TP) one.
+ */
+function get_auto_transfer_waiting_cp_count(mysqli $db_conn): int
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    $stmt = $db_conn->prepare(
+        "SELECT COUNT(DISTINCT po.id) AS n
+         FROM channel_partner_purchase_order_items cpi
+         INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
+         WHERE po.status = 'waiting'
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
+           )"
+    );
+    $stmt->execute();
+    $n = (int) ($stmt->get_result()->fetch_assoc()['n'] ?? 0);
+    $stmt->close();
+    return $n;
+}
+
+/**
+ * Same as get_auto_transfer_waiting_po_count_by_type(), for Channel
+ * Partner purchase orders. Returns ['napkin' => int, 'diaper' => int].
+ */
+function get_auto_transfer_waiting_cp_count_by_type(mysqli $db_conn): array
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    $stmt = $db_conn->prepare(
+        "SELECT po.product_type, COUNT(DISTINCT po.id) AS n
+         FROM channel_partner_purchase_order_items cpi
+         INNER JOIN channel_partner_purchase_orders po ON po.id = cpi.po_id
+         WHERE po.status = 'waiting'
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'cp' AND s.source_ref = CONCAT(po.id, ':', cpi.product_id) AND s.skip_date = CURDATE()
            )
          GROUP BY po.product_type"
     );

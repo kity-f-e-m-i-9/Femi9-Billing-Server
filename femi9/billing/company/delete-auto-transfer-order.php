@@ -30,7 +30,7 @@ error_reporting(0);
 // the same shape get_auto_transfer_orders_overview() hands the client.
 $sourceId = (string) ($_POST['source_id'] ?? '');
 $parts = explode(':', $sourceId, 2);
-if (count($parts) !== 2 || !in_array($parts[0], ['tp', 'ot'], true)) {
+if (count($parts) !== 2 || !in_array($parts[0], ['tp', 'ot', 'cp'], true)) {
     echo json_encode(['success' => false, 'reason' => 'invalid_source_id']);
     exit;
 }

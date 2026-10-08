@@ -20,6 +20,6 @@ header('Content-Type: application/json');
 error_reporting(0);
 
 $llpId = resolve_godown_id_by_gname($db_conn, 'FEMI NAYAN LLP');
-if (!$llpId) { echo json_encode(['tp' => [], 'ot' => []]); exit; }
+if (!$llpId) { echo json_encode(['tp' => [], 'ot' => [], 'cp' => []]); exit; }
 
 echo json_encode(get_auto_transfer_orders_overview($db_conn, $llpId));

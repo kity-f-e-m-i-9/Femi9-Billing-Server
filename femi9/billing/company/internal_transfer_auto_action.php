@@ -288,7 +288,7 @@ try {
         // for it (previously every contributing order was marked
         // regardless of whether the cap actually covered it).
         $remaining = $legTwoQty;
-        foreach (['tp', 'ot'] as $sourceType) {
+        foreach (['tp', 'cp', 'ot'] as $sourceType) {
             foreach ($contributingOrders[$sourceType] as $order) {
                 $orderQty = (int) $order['qty'];
                 if ($orderQty <= 0) continue;

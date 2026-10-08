@@ -64,6 +64,8 @@ $defaultRates = get_auto_transfer_default_rates($db_conn);
 $otDraftsOutsideLlp = get_ot_drafts_outside_llp_godown($db_conn, $llpId);
 $waitingPoCount = get_auto_transfer_waiting_po_count($db_conn);
 $waitingPoCountByType = get_auto_transfer_waiting_po_count_by_type($db_conn);
+$waitingCpCount = get_auto_transfer_waiting_cp_count($db_conn);
+$waitingCpCountByType = get_auto_transfer_waiting_cp_count_by_type($db_conn);
 
 $rows = [];
 if (!empty($requirements)) {
@@ -85,6 +87,7 @@ if (!empty($requirements)) {
     foreach ($requirements as $pid => $required) {
         $tpRequired      = (int) $required['tp'];
         $otRequired      = (int) $required['ot'];
+        $cpRequired      = (int) ($required['cp'] ?? 0);
         $neksomoAvail    = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $neksomoId, $defaultSourceWarehouseId) ?? 0);
         $healthcareAvail = (int) ($stockService->getClosingQty($pid, $Login_user_TYPEvl, (string) $healthcareId, $defaultIntermediateWarehouseId) ?? 0);
         // Capped by Neksomo (leg 1 source) alone — Healthcare's own balance
@@ -92,18 +95,20 @@ if (!empty($requirements)) {
         // newly move today; adding it in was inflating the capped qty past
         // what Neksomo actually has to send.
         $available       = $neksomoAvail;
-        $split           = cap_auto_transfer_qty_by_source($tpRequired, $otRequired, $available);
-        $cappedQty       = $split['tp'] + $split['ot'];
+        $split           = cap_auto_transfer_qty_by_source($tpRequired, $cpRequired, $otRequired, $available);
+        $cappedQty       = $split['tp'] + $split['cp'] + $split['ot'];
 
         $rows[] = [
             'product_id'      => $pid,
             'product_name'    => $productNames[$pid] ?? "Product #$pid",
-            'required'        => $tpRequired + $otRequired,
+            'required'        => $tpRequired + $otRequired + $cpRequired,
             'required_tp'     => $tpRequired,
             'required_ot'     => $otRequired,
+            'required_cp'     => $cpRequired,
             'capped'          => $cappedQty,
             'capped_tp'       => $split['tp'],
             'capped_ot'       => $split['ot'],
+            'capped_cp'       => $split['cp'],
             'neksomo_avail'   => $neksomoAvail,
             'healthcare_avail'=> $healthcareAvail,
             'rate_healthcare' => $defaultRates[$pid]['healthcare'] ?? null,
@@ -385,6 +390,18 @@ foreach ($rows as $r) {
                                                 </div>
                                             </div>
                                         </div>
+                                        <?php if ($waitingCpCount > 0): ?>
+                                        <div class="ata-stat ata-stat-hoverable" tabindex="0">
+                                            <div class="num"><?php echo $waitingCpCount; ?></div>
+                                            <div class="lbl">Total CP PO</div>
+                                            <div class="ata-stat-tooltip">
+                                                <div class="ata-stat-tooltip-summary">
+                                                    <span class="ata-stat-chip ata-stat-chip-napkin">Napkin: <b><?php echo (int) $waitingCpCountByType['napkin']; ?></b> PO</span>
+                                                    <span class="ata-stat-chip ata-stat-chip-diaper">Lumi Diaper: <b><?php echo (int) $waitingCpCountByType['diaper']; ?></b> PO</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
                                         <div class="ata-stat ata-stat-hoverable" tabindex="0">
                                             <div class="num"><?php echo $totalProducts; ?></div>
                                             <div class="lbl">Products</div>
@@ -481,6 +498,9 @@ foreach ($rows as $r) {
                                                             <div class="ata-split-row">
                                                                 <span style="font-size:12px;color:#6b7280;">Required: <b id="req_<?php echo (int) $row['product_id']; ?>_num" style="color:#1f2937;"><?php echo (int) $row['required']; ?></b></span>
                                                                 <span class="ata-tag ata-tag-tp" title="TP purchase order demand, capped by available stock"><span class="ata-tag-dot"></span>TP <b id="capped_tp_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['capped_tp']; ?></b>/<?php echo (int) $row['required_tp']; ?></span>
+                                                                <?php if ((int) $row['required_cp'] > 0): ?>
+                                                                <span class="ata-tag ata-tag-tp" style="background:#ecfdf5;color:#065f46;" title="CP purchase order demand, capped by available stock"><span class="ata-tag-dot"></span>CP <b id="capped_cp_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['capped_cp']; ?></b>/<?php echo (int) $row['required_cp']; ?></span>
+                                                                <?php endif; ?>
                                                                 <span class="ata-tag ata-tag-ot" title="OT channel draft demand, capped by available stock"><span class="ata-tag-dot"></span>OT <b id="capped_ot_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['capped_ot']; ?></b>/<?php echo (int) $row['required_ot']; ?></span>
                                                                 <span id="req_<?php echo (int) $row['product_id']; ?>" style="display:none;"><?php echo (int) $row['required']; ?></span>
                                                             </div>
