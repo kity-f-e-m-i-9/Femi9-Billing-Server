@@ -54,6 +54,24 @@ $warehouseSourceArr       = $_REQUEST['warehouse_source'] ?? [];
 $warehouseIntermediateArr = $_REQUEST['warehouse_intermediate'] ?? [];
 $warehouseDestArr         = $_REQUEST['warehouse_dest'] ?? [];
 
+// Which specific orders the user unchecked in the Order Breakdown / View
+// All Orders popups (see internal_transfer_auto.php's collectExcludedSourceIds())
+// — a flat list of "tp:<po_id>:<product_id>" / "cp:<po_id>:<product_id>" /
+// "ot:<tempid>:<product_id>" strings. Without this, the marking loop below
+// had no way to know which order the user meant to leave out, and could
+// mark a DIFFERENT (non-excluded) order "transferred" instead — silently
+// mislabeling it as fulfilled when its stock never actually moved, while
+// the order the user genuinely wanted to skip stays wrongly outstanding.
+// $excludedSourceIds is validated as a flat array of strings only; never
+// trusted beyond that shape.
+$excludedSourceIds = [];
+$rawExcluded = json_decode((string) ($_REQUEST['excluded_source_ids'] ?? '[]'), true);
+if (is_array($rawExcluded)) {
+    foreach ($rawExcluded as $sid) {
+        if (is_string($sid)) { $excludedSourceIds[$sid] = true; }
+    }
+}
+
 if (!is_array($productIds) || count($productIds) === 0) {
     $_SESSION['errorMessage'] = "No products submitted.";
     echo "<script>window.location='internal_transfer_auto?invalid';</script>";
@@ -280,21 +298,32 @@ try {
 
         // Only mark an order 'transferred' once its own qty actually fit
         // within what was really moved ($legTwoQty) — TP orders claim their
-        // share first (real, completable purchase orders), OT drafts only
-        // get whatever's left over. Walking each source's own list
+        // share first (real, completable purchase orders), then CP, then OT
+        // drafts get whatever's left over. Walking each source's own list
         // cumulatively means an order past the point stock ran out is left
         // unmarked, so it correctly reappears as outstanding demand next
         // time instead of being silently marked done with nothing moved
         // for it (previously every contributing order was marked
         // regardless of whether the cap actually covered it).
+        //
+        // Orders the user explicitly unchecked in the Order Breakdown /
+        // View All Orders popups ($excludedSourceIds) are skipped entirely
+        // here — never marked 'transferred' and never allowed to consume
+        // from $remaining. Without this, the walk had no idea which order
+        // the popups' checkboxes referred to (that choice was never part
+        // of the submitted product_id[]/qty[] totals) and could mark the
+        // WRONG order "done" purely by PO-id order, leaving the order the
+        // user actually meant to exclude falsely shown as fulfilled while
+        // the one they wanted transferred stayed outstanding.
         $remaining = $legTwoQty;
         foreach (['tp', 'cp', 'ot'] as $sourceType) {
             foreach ($contributingOrders[$sourceType] as $order) {
+                if (isset($excludedSourceIds[$order['source_id']])) { continue; }
                 $orderQty = (int) $order['qty'];
                 if ($orderQty <= 0) continue;
-                if ($remaining < $orderQty) break; // this and every later order in this source's list stay unmarked
+                if ($remaining < $orderQty) break; // this and every later (non-excluded) order in this source's list stay unmarked
                 $remaining -= $orderQty;
-                $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"ot:"/"wa:" prefix
+                $sourceRef = substr($order['source_id'], strlen($sourceType) + 1); // strip "tp:"/"cp:"/"ot:" prefix
                 mark_auto_transfer_order_skipped($db_conn, $sourceType, $sourceRef, 'transferred', $createdBy, $tempid2);
             }
         }
