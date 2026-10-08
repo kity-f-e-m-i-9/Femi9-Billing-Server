@@ -203,15 +203,27 @@ $user_acc_PAN=$resultcountprofileDetails['pannumber'];
 												<!--------------------------Popup Closed--------------------------->
                                             </div>
                                         </div>
+<?php
+$wh_to   = (isset($_GET['to_date'])   && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['to_date']))   ? $_GET['to_date']   : date('Y-m-d');
+$wh_from = (isset($_GET['from_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from_date'])) ? $_GET['from_date'] : date('Y-m-d', strtotime('-7 months'));
+if ($wh_from > $wh_to) { $t = $wh_from; $wh_from = $wh_to; $wh_to = $t; }
+?>
+<div class="col-12 mb-3">
+<form method="get" class="row g-2 align-items-end">
+<div class="col-auto"><label class="form-label mb-0">From</label><input type="date" name="from_date" value="<?=$wh_from;?>" class="form-control" required></div>
+<div class="col-auto"><label class="form-label mb-0">To</label><input type="date" name="to_date" value="<?=$wh_to;?>" class="form-control" required></div>
+<div class="col-auto"><button type="submit" class="btn btn-primary">Filter</button> <a href="wallet-history" class="btn btn-light">Last 7 months</a></div>
+</form>
+</div>
 										
 										
 										
                       <div class="col-xl-4 col-xxl-9" style="border-right:1px solid #ddd !important;">
                               <div class="todo-list">
-							  <h5 class="todo-menu-title">Last 10 Credit</h5>
+							  <h5 class="todo-menu-title">Credit History</h5>
                                     <ul class="list-unstyled">		
 <?php 
-$select_wallet_History1234="select * from wallet_monthly_sls_report where refer_by_usertype='$Login_user_TYPEvl' and refer_by_userid='$Login_user_IDvl' order by from_date desc LIMIT 0,10";
+$select_wallet_History1234="select * from wallet_monthly_sls_report where refer_by_usertype='$Login_user_TYPEvl' and refer_by_userid='$Login_user_IDvl' and DATE(from_date) between '$wh_from' and '$wh_to' order by from_date desc";
 $fetch_wallet_History1234=mysqli_query($db_conn,$select_wallet_History1234);
 while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 {
@@ -273,11 +285,11 @@ Cashback : <?php echo $result_wallet_History1234['commission_percentage'];?>%<br
 										
 										<div class="col-xl-4 col-xxl-9">
                                             <div class="todo-list">
-											<h5 class="todo-menu-title">Last 10 Debit</h5>
+											<h5 class="todo-menu-title">Debit History</h5>
                                                 <ul class="list-unstyled">
 												
 <?php 
-$select_wallet_History1234="select * from wallet_withdraw where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' order by date desc LIMIT 0,10";
+$select_wallet_History1234="select * from wallet_withdraw where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and DATE(date) between '$wh_from' and '$wh_to' order by date desc";
 $fetch_wallet_History1234=mysqli_query($db_conn,$select_wallet_History1234);
 while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 {

@@ -147,14 +147,26 @@ $tempID = GeraHash_tp(20) . date("dmyHis");
                                         </div>
                                     </div>
 
-                                    <!-- Last 10 Credits -->
+                                    <!-- Credit History -->
+<?php
+$wh_to   = (isset($_GET['to_date'])   && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['to_date']))   ? $_GET['to_date']   : date('Y-m-d');
+$wh_from = (isset($_GET['from_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from_date'])) ? $_GET['from_date'] : date('Y-m-d', strtotime('-7 months'));
+if ($wh_from > $wh_to) { $t = $wh_from; $wh_from = $wh_to; $wh_to = $t; }
+?>
+<div class="col-12 mb-3">
+<form method="get" class="row g-2 align-items-end">
+<div class="col-auto"><label class="form-label mb-0">From</label><input type="date" name="from_date" value="<?=$wh_from;?>" class="form-control" required></div>
+<div class="col-auto"><label class="form-label mb-0">To</label><input type="date" name="to_date" value="<?=$wh_to;?>" class="form-control" required></div>
+<div class="col-auto"><button type="submit" class="btn btn-primary">Filter</button> <a href="wallet-history" class="btn btn-light">Last 7 months</a></div>
+</form>
+</div>
                                     <div class="col-xl-4 col-xxl-9" style="border-right:1px solid #ddd;">
                                         <div class="todo-list">
-                                            <h5 class="todo-menu-title">Last 10 Credit</h5>
+                                            <h5 class="todo-menu-title">Credit History</h5>
                                             <ul class="list-unstyled">
 <?php
 $creditRes = mysqli_query($db_conn,
-    "SELECT * FROM wallet_monthly_sls_report WHERE refer_by_usertype='$utype' AND refer_by_userid='$uid' ORDER BY from_date DESC LIMIT 10");
+    "SELECT * FROM wallet_monthly_sls_report WHERE refer_by_usertype='$utype' AND refer_by_userid='$uid' AND DATE(from_date) BETWEEN '$wh_from' AND '$wh_to' ORDER BY from_date DESC");
 $hasCredits = false;
 while ($credit = mysqli_fetch_array($creditRes)):
     $hasCredits = true;
@@ -213,14 +225,14 @@ if (!$hasCredits) echo '<li class="todo-item"><div class="todo-item-content"><sp
                                         </div>
                                     </div>
 
-                                    <!-- Last 10 Debits -->
+                                    <!-- Debit History -->
                                     <div class="col-xl-4 col-xxl-9">
                                         <div class="todo-list">
-                                            <h5 class="todo-menu-title">Last 10 Debit</h5>
+                                            <h5 class="todo-menu-title">Debit History</h5>
                                             <ul class="list-unstyled">
 <?php
 $debitRes = mysqli_query($db_conn,
-    "SELECT * FROM wallet_withdraw WHERE user_type='$utype' AND user_id='$uid' ORDER BY date DESC LIMIT 10");
+    "SELECT * FROM wallet_withdraw WHERE user_type='$utype' AND user_id='$uid' AND DATE(date) BETWEEN '$wh_from' AND '$wh_to' ORDER BY date DESC");
 $hasDebits = false;
 while ($debit = mysqli_fetch_array($debitRes)):
     $hasDebits = true;
