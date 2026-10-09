@@ -47,7 +47,7 @@ $roundoff           = (float) ($result_Invoice['round_off'] ?? 0);
 $gross_before_wallet = $subtotal + $Courier_Charges + $roundoff;
 
 // Net payable = gross - wallet
-$Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
+$Total_amount_show   = round($gross_before_wallet - $wallet_amount_show, 2);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -341,7 +341,7 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
         $totalgstamount = round($totalgstamount, 2);
         // Grand total from the same taxable + GST parts shown on the page.
         $gross_before_wallet = $TotalAMount123 + $totalgstamount + $Courier_Charges + $roundoff;
-        $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
+        $Total_amount_show   = round($gross_before_wallet - $wallet_amount_show, 2);
         if ($totalgstamount > 0):
             $SGST = inr_format($totalgstamount / 2, 2);
             $CGST = inr_format($totalgstamount / 2, 2);
@@ -452,8 +452,8 @@ $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
         return implode('', array_reverse($str));
     }
 
-    $amountWords = amountToWords($Total_amount_show);
-    $taxWords    = amountToWords($totalgstamount);
+    $amountWords = amountToWords(floor(round($Total_amount_show, 2)));
+    $taxWords    = amountToWords(floor(round($totalgstamount, 2)));
     ?>
 
     <table width="100%">

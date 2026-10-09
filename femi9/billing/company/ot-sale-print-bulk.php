@@ -206,7 +206,7 @@ foreach ($tempids as $tempid):
     $subtotal           = (float) ($result_Invoice['subtotal'] ?? 0);
     $roundoff           = (float) ($result_Invoice['round_off'] ?? 0);
     $gross_before_wallet = $subtotal + $Courier_Charges + $roundoff;
-    $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
+    $Total_amount_show   = round($gross_before_wallet - $wallet_amount_show, 2);
 ?>
 <div class="maincontainar">
 
@@ -400,7 +400,7 @@ foreach ($tempids as $tempid):
         $totalgstamount = round($totalgstamount, 2);
         // Grand total from the same taxable + GST parts shown on the page.
         $gross_before_wallet = $TotalAMount123 + $totalgstamount + $Courier_Charges + $roundoff;
-        $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
+        $Total_amount_show   = round($gross_before_wallet - $wallet_amount_show, 2);
         if ($totalgstamount > 0):
             $SGST = inr_format($totalgstamount / 2, 2);
             $CGST = inr_format($totalgstamount / 2, 2);
@@ -473,8 +473,8 @@ foreach ($tempids as $tempid):
     <div style="clear:both;"></div>
 
     <?php
-    $amountWords = amountToWords($Total_amount_show);
-    $taxWords    = amountToWords($totalgstamount);
+    $amountWords = amountToWords(floor(round($Total_amount_show, 2)));
+    $taxWords    = amountToWords(floor(round($totalgstamount, 2)));
     ?>
 
     <table width="100%">
