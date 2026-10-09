@@ -1632,9 +1632,9 @@ if ($is_neksomo_view) {
                     -- Real invoiced amount for the day (GST-inclusive as
                     -- stored) — de-taxed against the company product's own
                     -- gst% in the outer SELECT above, once `p` is joined.
-                    -- NULL when nothing sellable priced that day (only
-                    -- Demo/Free/Damage rows), which correctly excludes it
-                    -- from Sold Value while still counting toward Pack Qty.
+                    -- Demo/Free/Damage rows carry 0 (not NULL) so they add
+                    -- nothing to Sold Value but aren't miscounted as 'unrated'
+                    -- (NULL is reserved for a real sale line with no amount).
                     SUM(d.line_total) day_line_total,
                     -- Diaper cost basis: neksomo_llp_piece_rates (Neksomo's
                     -- Sale to Femi9 LLP rate), not
@@ -1672,7 +1672,7 @@ if ($is_neksomo_view) {
                  FROM tp_invoice_items tpii JOIN tp_invoices tpi ON tpi.id=tpii.tp_invoice_id
                  WHERE tpi.invoice_date BETWEEN ? AND ?{$pcs_tpi_cond}
                  UNION ALL
-                 SELECT dfd.product_id, dfd.qty, NULL AS line_total, dfd.date
+                 SELECT dfd.product_id, dfd.qty, 0 AS line_total, dfd.date
                  FROM demofreedamage dfd
                  WHERE dfd.usertype=? AND dfd.category IN ('Demo','Free','Damage') AND dfd.date BETWEEN ? AND ?{$pcs_dfd_cond}
              ) d
