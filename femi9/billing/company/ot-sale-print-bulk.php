@@ -317,19 +317,22 @@ foreach ($tempids as $tempid):
             <td id="rightlaign">HSN/SAC</td>
             <td id="rightlaign">Quantity</td>
             <td id="rightlaign">MRP</td>
-            <td id="rightlaign">Rate</td>
+            <td id="rightlaign">Rate (Excl. Tax)</td>
+            <td id="rightlaign">Rate (Incl. Tax)</td>
             <td id="rightlaign">per</td>
             <td id="rightlaign">GST(%)</td>
             <td id="rightlaign">Disc</td>
-            <td id="rightlaign">Amount</td>
+            <td id="rightlaign">Taxable Value</td>
         </tr>
 
         <?php
         $ots              = 0;
         $TotalAMount123   = 0;
         $Totalquantity123 = 0;
+        $totalgstamount   = 0;
+        $hsnTaxable       = [];
 
-        $stmt = $db_conn->prepare("SELECT os.*, p.productName, p.hsn, p.mrp, p.gst AS product_gst
+        $stmt = $db_conn->prepare("SELECT os.*, p.productName, p.hsn, p.mrp, p.gst AS product_gst, p.gst_type AS product_gst_type
                                    FROM ot_sales os
                                    LEFT JOIN products p ON p.id = os.prid
                                    WHERE os.tempid = ?
@@ -340,7 +343,23 @@ foreach ($tempids as $tempid):
 
         while ($row = $res_items->fetch_assoc()):
             $ots++;
-            $TotalAMount      = ($row['qty'] * $row['price']) - $row['discount'];
+            // Entered rate is GST-inclusive for 'inclusive' products (GST is
+            // carved out), pre-GST for 'exclusive' ones (GST added on top).
+            $gstPct    = (float)($row['gst'] ?? 0);
+            $isIncl    = (($row['product_gst_type'] ?? 'exclusive') === 'inclusive') && $gstPct > 0;
+            $lineGross = ($row['qty'] * $row['price']) - $row['discount'];
+            if ($isIncl) {
+                $TotalAMount = $lineGross * 100 / (100 + $gstPct);
+                $rateExcl    = $row['price'] * 100 / (100 + $gstPct);
+                $rateIncl    = (float)$row['price'];
+            } else {
+                $TotalAMount = $lineGross;
+                $rateExcl    = (float)$row['price'];
+                $rateIncl    = $row['price'] * (1 + $gstPct / 100);
+            }
+            $totalgstamount  += $TotalAMount * $gstPct / 100;
+            $hsnKey           = (string)$row['hsn'];
+            $hsnTaxable[$hsnKey] = ($hsnTaxable[$hsnKey] ?? 0) + $TotalAMount;
             $TotalAMount123  += $TotalAMount;
             $Totalquantity123 += $row['qty'];
             $discountPercentage = ($row['qty'] * $row['price']) > 0
@@ -353,7 +372,8 @@ foreach ($tempids as $tempid):
             <td id="rightlaign"><?= htmlspecialchars($row['hsn'], ENT_QUOTES) ?></td>
             <td id="rightlaign"><?= (int)$row['qty'] ?> Packs</td>
             <td id="rightlaign"><?= inr_format($row['mrp'], 2) ?></td>
-            <td id="rightlaign"><?= inr_format($row['price'], 2) ?></td>
+            <td id="rightlaign"><?= inr_format($rateExcl, 2) ?></td>
+            <td id="rightlaign"><?= inr_format($rateIncl, 2) ?></td>
             <td id="rightlaign">Packs</td>
             <td id="rightlaign"><?= $row['gst'] ?>%</td>
             <td id="rightlaign">
@@ -364,42 +384,55 @@ foreach ($tempids as $tempid):
         </tr>
         <?php endwhile; $stmt->close(); ?>
 
-        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 
         <tr id="bottombordervl">
             <td></td>
             <td id="rightlaign"><b></b></td>
             <td></td>
             <td id="rightlaign"><b><?= $Totalquantity123 ?> Packs</b></td>
-            <td></td><td></td><td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
             <td id="rightlaign"><b>&#8377; <?= inr_format($TotalAMount123, 2) ?></b></td>
         </tr>
 
         <?php
-        $totalgstamount = (float) ($result_Invoice_Details['gst_amount'] ?? 0);
+        $isInterState = (($result_Invoice_Details['gst_type'] ?? 'inner') === 'outer');
+        $totalgstamount = round($totalgstamount, 2);
+        // Grand total from the same taxable + GST parts shown on the page.
+        $gross_before_wallet = $TotalAMount123 + $totalgstamount + $Courier_Charges + $roundoff;
+        $Total_amount_show   = $gross_before_wallet - $wallet_amount_show;
         if ($totalgstamount > 0):
             $SGST = inr_format($totalgstamount / 2, 2);
             $CGST = inr_format($totalgstamount / 2, 2);
         ?>
+        <?php if ($isInterState): ?>
+        <tr id="bottombordervl">
+            <td></td><td id="rightlaign"><b><i>IGST</i></b></td>
+            <td></td><td id="rightlaign"></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
+            <td id="rightlaign"><b>&#8377; <?= inr_format($totalgstamount, 2) ?></b></td>
+        </tr>
+        <?php else: ?>
         <tr id="bottombordervl">
             <td></td><td id="rightlaign"><b><i>SGST</i></b></td>
             <td></td><td id="rightlaign"></td>
-            <td></td><td></td><td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
             <td id="rightlaign"><b>&#8377; <?= $SGST ?></b></td>
         </tr>
         <tr id="bottombordervl">
             <td></td><td id="rightlaign"><b><i>CGST</i></b></td>
             <td></td><td id="rightlaign"></td>
-            <td></td><td></td><td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
             <td id="rightlaign"><b>&#8377; <?= $CGST ?></b></td>
         </tr>
+        <?php endif; ?>
         <?php endif; ?>
 
         <?php if ($Courier_Charges != 0): ?>
         <tr id="bottombordervl">
             <td></td><td id="rightlaign"><b><i>Courier Charges</i></b></td>
             <td></td><td id="rightlaign"></td>
-            <td></td><td></td><td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
             <td id="rightlaign"><b>&#8377; <?= inr_format($Courier_Charges, 2) ?></b></td>
         </tr>
         <?php endif; ?>
@@ -408,7 +441,7 @@ foreach ($tempids as $tempid):
         <tr id="bottombordervl">
             <td></td><td id="rightlaign"><b><i>Round off</i></b></td>
             <td></td><td id="rightlaign"></td>
-            <td></td><td></td><td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
             <td id="rightlaign"><b>&#8377; <?= inr_format($result_Invoice['round_off'], 2) ?></b></td>
         </tr>
         <?php endif; ?>
@@ -417,14 +450,14 @@ foreach ($tempids as $tempid):
         <tr id="bottombordervl">
             <td></td><td id="rightlaign"><b><i>Gross Total</i></b></td>
             <td></td><td id="rightlaign"></td>
-            <td></td><td></td><td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
             <td id="rightlaign"><b>&#8377; <?= inr_format($gross_before_wallet, 2) ?></b></td>
         </tr>
         <tr id="bottombordervl">
             <td></td>
             <td id="rightlaign"><b><i class="wallet-deduction">Wallet Deduction</i></b></td>
             <td></td><td id="rightlaign"></td>
-            <td></td><td></td><td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
             <td id="rightlaign" class="wallet-deduction"><b>- &#8377; <?= inr_format($wallet_amount_show, 2) ?></b></td>
         </tr>
         <?php endif; ?>
@@ -432,7 +465,7 @@ foreach ($tempids as $tempid):
         <tr id="bottombordervl">
             <td></td><td id="rightlaign"><b><i>Total</i></b></td>
             <td></td><td id="rightlaign"></td>
-            <td></td><td></td><td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
             <td id="rightlaign"><b>&#8377; <?= inr_format($Total_amount_show, 2) ?></b></td>
         </tr>
 
@@ -461,32 +494,14 @@ foreach ($tempids as $tempid):
             <td align="right">Taxable Value</td>
         </tr>
         <?php
-        $stmt = $db_conn->prepare("SELECT DISTINCT hsn FROM ot_sales WHERE tempid = ?");
-        $stmt->bind_param("s", $tempid);
-        $stmt->execute();
-        $hsn_rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-
-        $stmt_hsn_sum = $db_conn->prepare("SELECT SUM(total) FROM ot_sales WHERE tempid = ? AND hsn = ?");
-        foreach ($hsn_rows as $hrow):
-            $hsncode = $hrow['hsn'];
-            $stmt_hsn_sum->bind_param("ss", $tempid, $hsncode);
-            $stmt_hsn_sum->execute();
-            $hsn_total = $stmt_hsn_sum->get_result()->fetch_row()[0];
+        foreach ($hsnTaxable as $hsncode => $hsn_total):
         ?>
         <tr>
             <td><?= htmlspecialchars($hsncode, ENT_QUOTES) ?></td>
             <td align="right"><?= inr_format($hsn_total, 2) ?></td>
         </tr>
-        <?php endforeach; $stmt_hsn_sum->close(); ?>
+        <?php endforeach; $hsn_grand = $TotalAMount123; ?>
 
-        <?php
-        $stmt = $db_conn->prepare("SELECT SUM(total) FROM ot_sales WHERE tempid = ?");
-        $stmt->bind_param("s", $tempid);
-        $stmt->execute();
-        $hsn_grand = $stmt->get_result()->fetch_row()[0];
-        $stmt->close();
-        ?>
         <tr>
             <td align="right"><b>Total&nbsp;</b></td>
             <td align="right"><b><?= inr_format($hsn_grand, 2) ?></b></td>
