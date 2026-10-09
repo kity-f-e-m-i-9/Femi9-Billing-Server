@@ -114,9 +114,7 @@ if ($editZoneId > 0) {
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label">State</label>
-                                                    <select id="stateSelect" class="form-control">
-                                                        <option value="">-- Select State --</option>
-                                                    </select>
+                                                    <div id="stateList" class="picker-col"><p class="text-muted small px-2 mb-0">Select a Country first.</p></div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label">District</label>
@@ -124,7 +122,7 @@ if ($editZoneId > 0) {
                                                     <div id="districtList" class="picker-col"><p class="text-muted small px-2 mb-0">Select a State first.</p></div>
                                                 </div>
                                             </div>
-                                            <p class="text-muted small mt-2">Select a Country, then a State, then check the Districts for this zone (you can go back and pick another State to add more districts — earlier picks stay checked). A district already used by another zone is shown struck-through and can't be picked.</p>
+                                            <p class="text-muted small mt-2">Select a Country, then check one or more States, then check the Districts for this zone — earlier picks stay checked even if you change the State selection afterward. A district already used by another zone is shown struck-through and can't be picked.</p>
 
                                             <div id="selectedDistrictsBox"></div>
 
@@ -177,9 +175,9 @@ if ($editZoneId > 0) {
         echo json_encode($seed, JSON_FORCE_OBJECT);
     ?>;
 
-    function loadChildren(parentIds, targetSelector, isDistrict) {
+    function loadChildren(parentIds, targetSelector, mode) {
         $.getJSON('get-zone-location-children.php', { parent_ids: parentIds.join(','), exclude_zone_id: EDIT_ZONE_ID }, function (rows) {
-            if (isDistrict) {
+            if (mode === 'district') {
                 var html = '';
                 rows.forEach(function (r) {
                     var isAssigned = !!r.assigned_zone_name;
@@ -194,9 +192,18 @@ if ($editZoneId > 0) {
                 $(targetSelector).html(html || '<p class="text-muted small px-2">No districts here.</p>');
                 bindDistrictChecks();
                 $('#districtSearch').prop('disabled', rows.length === 0).val('').trigger('input');
+            } else if (mode === 'state') {
+                var html = '';
+                rows.forEach(function (r) {
+                    html += '<label class="district-label">' +
+                        '<input type="checkbox" class="state-check" value="' + r.id + '"> ' +
+                        $('<div>').text(r.name).html() +
+                        '</label>';
+                });
+                $(targetSelector).html(html || '<p class="text-muted small px-2">No states here.</p>');
+                bindStateChecks();
             } else {
-                var placeholder = targetSelector === '#countrySelect' ? '-- Select Country --' : '-- Select State --';
-                var html = '<option value="">' + placeholder + '</option>';
+                var html = '<option value="">-- Select Country --</option>';
                 rows.forEach(function (r) {
                     html += '<option value="' + r.id + '">' + $('<div>').text(r.name).html() + '</option>';
                 });
@@ -217,6 +224,15 @@ if ($editZoneId > 0) {
         });
     }
 
+    function bindStateChecks() {
+        $('.state-check').off('change').on('change', function () {
+            var ids = $('.state-check:checked').map(function () { return parseInt($(this).val(), 10); }).get();
+            $('#districtList').html(districtPlaceholder);
+            $('#districtSearch').prop('disabled', true).val('');
+            if (ids.length) loadChildren(ids, '#districtList', 'district');
+        });
+    }
+
     function renderSelectedSummary() {
         var ids = Object.keys(checkedDistricts);
         var html = '<input type="hidden" name="district_ids[]" value="">'; // keeps the key present even if empty
@@ -229,19 +245,14 @@ if ($editZoneId > 0) {
             (names.length ? '<p class="small mt-2"><strong>Selected districts:</strong> ' + names.map(function(n){return $('<div>').text(n).html();}).join(', ') + '</p>' : ''));
     }
 
+    var statePlaceholder = '<p class="text-muted small px-2 mb-0">Select a Country first.</p>';
     var districtPlaceholder = '<p class="text-muted small px-2 mb-0">Select a State first.</p>';
     $('#countrySelect').on('change', function () {
         var id = parseInt($(this).val(), 10);
-        $('#stateSelect').html('<option value="">-- Select State --</option>');
+        $('#stateList').html(statePlaceholder);
         $('#districtList').html(districtPlaceholder);
         $('#districtSearch').prop('disabled', true).val('');
-        if (id) loadChildren([id], '#stateSelect', false);
-    });
-    $('#stateSelect').on('change', function () {
-        var id = parseInt($(this).val(), 10);
-        $('#districtList').html(districtPlaceholder);
-        $('#districtSearch').prop('disabled', true).val('');
-        if (id) loadChildren([id], '#districtList', true);
+        if (id) loadChildren([id], '#stateList', 'state');
     });
 
     $('#districtSearch').on('input', function () {
@@ -253,7 +264,7 @@ if ($editZoneId > 0) {
     });
 
     $(document).ready(function () {
-        loadChildren([], '#countrySelect', false);
+        loadChildren([], '#countrySelect', 'country');
         renderSelectedSummary();
     });
     </script>

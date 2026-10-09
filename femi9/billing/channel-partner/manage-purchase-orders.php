@@ -304,6 +304,9 @@ $headroom       = cpAvailableHeadroom($db_conn, (int)$Login_user_IDvl);
                                                         <i class="material-icons" style="font-size:14px;">visibility</i> View
                                                     </button>
                                                     <?php if ($o['status'] === 'waiting'): ?>
+                                                    <a href="edit-purchase-order.php?po_id=<?=(int)$o['po_id']?>" class="po-view-btn" style="background:#dbeafe;color:#1e40af;" title="Edit this order">
+                                                        <i class="material-icons" style="font-size:14px;">edit</i> Edit
+                                                    </a>
                                                     <form method="post" action="delete-purchase-order.php" onsubmit="return confirm('Delete this purchase order? This cannot be undone.');">
                                                         <input type="hidden" name="po_id" value="<?=(int)$o['po_id']?>">
                                                         <button type="submit" class="po-delete-btn"><i class="material-icons" style="font-size:14px;">delete</i> Delete</button>
