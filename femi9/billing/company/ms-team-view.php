@@ -144,7 +144,13 @@ $_rawTargetStats = getRawTargetAchievedStats($db_conn, $_allMsIds, $targetFromDa
 
 function msTeamViewSubtreeTargetSum(int $id, array $byManager, array $rawTargetStats): array {
     $sum = $rawTargetStats[$id] ?? ['target' => 0.0, 'achieved' => 0.0];
-    foreach (($byManager[$id] ?? []) as $child) {
+    $children = $byManager[$id] ?? [];
+    // Same leaf-only rule as marketing/my-team.php's subtreeSumAndIds(): a
+    // manager's own monthly_target_amount only counts when they have no team
+    // below them. Otherwise it would double-count on top of the team's own
+    // rolled-up district targets.
+    if (!empty($children)) { $sum['target'] = 0.0; }
+    foreach ($children as $child) {
         $childSum = msTeamViewSubtreeTargetSum((int)$child['id'], $byManager, $rawTargetStats);
         $sum['target']   += $childSum['target'];
         $sum['achieved'] += $childSum['achieved'];

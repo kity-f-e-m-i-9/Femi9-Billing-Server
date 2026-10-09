@@ -121,8 +121,15 @@ foreach ($subtreeIds as $id) {
 // that "View Shop List" should link to.
 function subtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
     $sum = $rawStats[$id] ?? ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0];
+    $children = $byManager[$id] ?? [];
+    // Target is a quota, not a performance stat — once someone has a team
+    // below them, their own monthly_target_amount (if anyone mistakenly set
+    // one) must NOT be added on top of the team's targets, or the district
+    // quotas get double-counted a level up. Only a leaf (no direct reports,
+    // e.g. a District Manager) contributes its own target.
+    if (!empty($children)) { $sum['target'] = 0.0; }
     $ids = [$id];
-    foreach (($byManager[$id] ?? []) as $child) {
+    foreach ($children as $child) {
         [$childSum, $childIds] = subtreeSumAndIds((int)$child['id'], $byManager, $rawStats);
         $sum['shops']    += $childSum['shops'];
         $sum['oldshops'] += $childSum['oldshops'];

@@ -45,15 +45,15 @@ $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Invoice Report');
 
 $sheet->setCellValue('A1', 'Invoice Report');
-$sheet->mergeCells('A1:L1');
+$sheet->mergeCells('A1:M1');
 $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(15);
 
 $sheet->setCellValue('A2', 'Period: ' . date('d-M-Y', strtotime($from)) . ' to ' . date('d-M-Y', strtotime($to)));
-$sheet->mergeCells('A2:L2');
+$sheet->mergeCells('A2:M2');
 $sheet->getStyle('A2')->getFont()->setItalic(true)->setSize(10);
 
 $headerRow = 4;
-$columns = ['S.No', 'Date', 'Invoice No.', 'Type', 'Party Name', 'Mobile', 'Shop Address', 'GST Number', 'Billed', 'Received', 'Due', 'Status'];
+$columns = ['S.No', 'Date', 'Invoice No.', 'Type', 'Party Name', 'Mobile', 'Shop Address', 'GST Number', 'Billed', 'Received', 'Credit Note', 'Due', 'Status'];
 $colIndex = 1;
 foreach ($columns as $title) {
     xlsx_set($sheet, $colIndex, $headerRow, $title);
@@ -66,11 +66,11 @@ $sheet->getStyle($headerRange)->getFill()->setFillType(Fill::FILL_SOLID)->getSta
 $sheet->getStyle($headerRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 $sheet->getStyle($headerRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-$statusLabels = ['fully_paid' => 'Fully Paid', 'partially_paid' => 'Partially Paid', 'not_paid' => 'Not Paid'];
+$statusLabels = ['fully_paid' => 'Fully Paid', 'partially_paid' => 'Partially Paid', 'not_paid' => 'Not Paid', 'returned' => 'Returned (CN)'];
 
 $row = $headerRow + 1;
 $serial = 1;
-$grand_total = 0; $grand_received = 0; $grand_due = 0;
+$grand_total = 0; $grand_received = 0; $grand_cn = 0; $grand_due = 0;
 foreach ($rows as $inv) {
     xlsx_set($sheet, 1, $row, $serial++);
     xlsx_set($sheet, 2, $row, date('d-m-Y', strtotime($inv['date'])));
@@ -81,12 +81,14 @@ foreach ($rows as $inv) {
     xlsx_set($sheet, 7, $row, $inv['address'] ?? '');
     xlsx_set($sheet, 8, $row, $inv['gstin'] ?? '');
     xlsx_set($sheet, 9, $row, $inv['total']);
-    xlsx_set($sheet, 10, $row, $inv['received']);
-    xlsx_set($sheet, 11, $row, $inv['due']);
-    xlsx_set($sheet, 12, $row, $statusLabels[$inv['status']] ?? $inv['status']);
+    xlsx_set($sheet, 10, $row, $inv['cash']);
+    xlsx_set($sheet, 11, $row, $inv['cn']);
+    xlsx_set($sheet, 12, $row, $inv['due']);
+    xlsx_set($sheet, 13, $row, $statusLabels[$inv['status']] ?? $inv['status']);
 
     $grand_total    += $inv['total'];
-    $grand_received += $inv['received'];
+    $grand_received += $inv['cash'];
+    $grand_cn       += $inv['cn'];
     $grand_due      += $inv['due'];
     $row++;
 }
@@ -94,19 +96,20 @@ foreach ($rows as $inv) {
 if ($row > $headerRow + 1) {
     $dataRange = Coordinate::stringFromColumnIndex(1) . ($headerRow + 1) . ':' . Coordinate::stringFromColumnIndex($lastCol) . ($row - 1);
     $sheet->getStyle($dataRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-    $sheet->getStyle('I' . ($headerRow + 1) . ':K' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+    $sheet->getStyle('I' . ($headerRow + 1) . ':L' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 }
 
 xlsx_set($sheet, 5, $row, 'GRAND TOTAL');
 xlsx_set($sheet, 9, $row, $grand_total);
 xlsx_set($sheet, 10, $row, $grand_received);
-xlsx_set($sheet, 11, $row, $grand_due);
+xlsx_set($sheet, 11, $row, $grand_cn);
+xlsx_set($sheet, 12, $row, $grand_due);
 $totalsRange = Coordinate::stringFromColumnIndex(1) . $row . ':' . Coordinate::stringFromColumnIndex($lastCol) . $row;
 $sheet->getStyle($totalsRange)->getFont()->setBold(true);
 $sheet->getStyle($totalsRange)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E6F7F5');
-$sheet->getStyle('I' . $row . ':K' . $row)->getNumberFormat()->setFormatCode('#,##0.00');
+$sheet->getStyle('I' . $row . ':L' . $row)->getNumberFormat()->setFormatCode('#,##0.00');
 
-foreach (range('A', 'L') as $letter) {
+foreach (range('A', 'M') as $letter) {
     $sheet->getColumnDimension($letter)->setAutoSize(true);
 }
 

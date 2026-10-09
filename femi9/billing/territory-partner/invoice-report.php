@@ -47,6 +47,7 @@ $report      = tp_invoice_report_fetch($db_conn, $uid, $utype, $from, $to, $type
 $filtered    = $report['rows'];
 $grand_total = $report['grand_total'];
 $grand_received = $report['grand_received'];
+$grand_cn    = $report['grand_cn'];
 $grand_due   = $report['grand_due'];
 $shop_count  = $report['shop_count'];
 $cust_count  = $report['cust_count'];
@@ -143,6 +144,7 @@ $exportQuery = http_build_query([
         .badge-paid    { background: var(--green-soft); color: var(--green); }
         .badge-partial { background: var(--amber-soft); color: var(--amber); }
         .badge-unpaid  { background: var(--rose-soft); color: var(--rose); }
+        .badge-cn      { background: #f1f0fb; color: #6b5fd6; }
         .empty-state { text-align: center; padding: 36px 20px; color: var(--ink-faint); }
         .empty-state .material-icons-outlined { font-size: 32px; opacity: .4; display: block; margin: 0 auto 8px; }
         .view-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 8px;
@@ -252,6 +254,14 @@ $exportQuery = http_build_query([
                                 <div class="kpi-sub">outstanding</div>
                             </div>
                         </div>
+                        <div class="col-xl-3 col-md-6 col-6 mb-3">
+                            <div class="kpi-card">
+                                <span class="kpi-icon-chip" style="background:#f1f0fb;color:#6b5fd6;"><i class="material-icons-outlined">assignment_return</i></span>
+                                <div class="kpi-title">Credit Note</div>
+                                <div class="kpi-value">&#x20B9;<?php echo inr_format($grand_cn, 0); ?></div>
+                                <div class="kpi-sub">returned against invoices — not cash received, excluded from Total Received</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- ── INVOICE TABLE ───────────────────────────────────────── -->
@@ -279,6 +289,7 @@ $exportQuery = http_build_query([
                                                 <th>Mobile</th>
                                                 <th>Billed</th>
                                                 <th>Received</th>
+                                                <th>Credit Note</th>
                                                 <th>Due</th>
                                                 <th>Status</th>
                                                 <th>Print</th>
@@ -297,10 +308,13 @@ $exportQuery = http_build_query([
                                                 <td><?php echo htmlspecialchars(ucwords($inv['party'])); ?></td>
                                                 <td><?php echo htmlspecialchars($inv['mobile']); ?></td>
                                                 <td>&#x20B9;<?php echo inr_format($inv['total'], 2); ?></td>
-                                                <td><span class="badge-rev">&#x20B9;<?php echo inr_format($inv['received'], 2); ?></span></td>
+                                                <td><span class="badge-rev">&#x20B9;<?php echo inr_format($inv['cash'], 2); ?></span></td>
+                                                <td><?php if ($inv['cn'] > 0): ?><span class="status-badge badge-cn">&#x20B9;<?php echo inr_format($inv['cn'], 2); ?></span><?php else: ?>&mdash;<?php endif; ?></td>
                                                 <td><?php if ($inv['due'] > 0): ?><span class="badge-due">&#x20B9;<?php echo inr_format($inv['due'], 2); ?></span><?php else: ?>&mdash;<?php endif; ?></td>
                                                 <td>
-                                                    <?php if ($inv['status'] === 'fully_paid'): ?>
+                                                    <?php if ($inv['status'] === 'returned'): ?>
+                                                        <span class="status-badge badge-cn">Returned (CN)</span>
+                                                    <?php elseif ($inv['status'] === 'fully_paid'): ?>
                                                         <span class="status-badge badge-paid">Fully Paid</span>
                                                     <?php elseif ($inv['status'] === 'partially_paid'): ?>
                                                         <span class="status-badge badge-partial">Partial</span>
