@@ -997,7 +997,16 @@ foreach ($rows as $r) {
         var zeroStockNames = [];
         document.querySelectorAll('.auto-transfer-row').forEach(function (row) {
             var avail = parseInt(row.getAttribute('data-neksomo-avail'), 10) || 0;
-            if (avail <= 0) zeroStockNames.push(row.getAttribute('data-product-name'));
+            // A row stays in the DOM (with Required zeroed) when its product
+            // type is filtered out via the Napkin/Lumi Diaper toggle + Apply
+            // — see applyOrdersOverview()'s "otherTypeHidden" comment above.
+            // Warning about THAT product's missing Neksomo stock is noise:
+            // nothing of it is actually being transferred (Qty to Transfer
+            // is 0), so only flag rows that both lack stock AND still have a
+            // qty queued up.
+            var qtyInput = row.querySelector('input[name="qty[]"]');
+            var qty = qtyInput ? parseInt(qtyInput.value, 10) || 0 : 0;
+            if (avail <= 0 && qty > 0) zeroStockNames.push(row.getAttribute('data-product-name'));
         });
 
         if (zeroStockNames.length > 0) {
