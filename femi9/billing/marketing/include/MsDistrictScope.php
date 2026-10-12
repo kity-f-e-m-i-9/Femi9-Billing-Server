@@ -177,3 +177,59 @@ function getMsVacantFirkas($db_conn, array $districtNames): array {
 
     return $rows;
 }
+
+// Firka(s) a TP actually covers, from territory_partner_locations (one TP
+// can hold several Firkas — up to a dozen+ in practice), plus the combined
+// target_amount of those Firkas — for the "Firka" / "Target Amount" columns
+// on the dashboard's Territory Partners roster. District itself is NOT
+// resolved here; callers already have it cheaper from
+// territory_partners.assigned_district / branch_district (see
+// PartnerLocationDistrict.php's doc comment on why that's the canonical
+// source, not a tree walk).
+function getTpTalukFirkaLabels($db_conn, array $tpIds): array {
+    $out = [];
+    if (empty($tpIds)) return $out;
+
+    $talukDepthRow = $db_conn->query(
+        "SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'taluk%' ORDER BY depth ASC LIMIT 1"
+    )->fetch_assoc();
+    $firkaDepthRow = $db_conn->query(
+        "SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'firka%' ORDER BY depth ASC LIMIT 1"
+    )->fetch_assoc();
+    $talukDepth = (int)($talukDepthRow['depth'] ?? 0);
+    $firkaDepth = (int)($firkaDepthRow['depth'] ?? 0);
+    if (!$talukDepth && !$firkaDepth) return $out;
+
+    $idList = implode(',', array_map('intval', $tpIds));
+    $rows = $db_conn->query(
+        "SELECT tpl.territory_partner_id, n.id AS loc_id, n.depth, n.name, n.parent_id, n.target_amount
+         FROM territory_partner_locations tpl
+         JOIN partner_location_nodes n ON n.id = tpl.location_id
+         WHERE tpl.territory_partner_id IN ($idList)"
+    )->fetch_all(MYSQLI_ASSOC);
+    if (empty($rows)) return $out;
+
+    $taluks = [];
+    $firkas = [];
+    $targets = [];
+    foreach ($rows as $r) {
+        $tpId = (int)$r['territory_partner_id'];
+        $depth = (int)$r['depth'];
+        if ($depth === $firkaDepth) {
+            $firkas[$tpId][$r['name']] = true;
+            $targets[$tpId] = ($targets[$tpId] ?? 0.0) + (float)$r['target_amount'];
+        } elseif ($depth === $talukDepth) {
+            $taluks[$tpId][$r['name']] = true;
+        }
+    }
+
+    foreach ($tpIds as $tpId) {
+        $tpId = (int)$tpId;
+        $tList = !empty($taluks[$tpId]) ? array_keys($taluks[$tpId]) : [];
+        $fList = !empty($firkas[$tpId]) ? array_keys($firkas[$tpId]) : [];
+        sort($tList);
+        sort($fList);
+        $out[$tpId] = ['taluks' => $tList, 'firkas' => $fList, 'target' => $targets[$tpId] ?? 0.0];
+    }
+    return $out;
+}

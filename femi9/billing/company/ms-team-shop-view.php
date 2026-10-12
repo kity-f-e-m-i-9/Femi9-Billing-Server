@@ -2,6 +2,7 @@
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms');
 require_once("include/TeamLevelColors.php");
+require_once("include/TeamTargetRollup.php");
 error_reporting(0);
 
 $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
@@ -30,6 +31,12 @@ $hasDateFilter = ($fromDate !== '' && $toDate !== '');
 $dateParam = $hasDateFilter ? ('&from_date=' . urlencode($fromDate) . '&to_date=' . urlencode($toDate)) : '';
 // ms_prorders.php (company-side order view) uses frdate/todate, not from_date/to_date.
 $ordersDateParam = $hasDateFilter ? ('&frdate=' . urlencode($fromDate) . '&todate=' . urlencode($toDate)) : '';
+
+// Target/Achieved period — same filter dates when applied, otherwise defaults
+// to the current calendar month (matching company/ms-team-view.php's own
+// default) so the figures are always for a real, prorated period.
+$targetFromDate = $hasDateFilter ? $fromDate : date('Y-m-01');
+$targetToDate   = $hasDateFilter ? $toDate   : date('Y-m-t');
 
 function msInitials(string $name): string {
     $words = array_filter(preg_split('/\s+/', trim($name)));
@@ -63,7 +70,7 @@ $smRoots = $byManager[0] ?? [];
 
 // ── Raw per-person shop/order counts, in one pass ───────────────────────────
 $rawStats = [];
-foreach ($allIds as $id) { $rawStats[$id] = ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0]; }
+foreach ($allIds as $id) { $rawStats[$id] = ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0]; }
 if (!empty($allIds)) {
     $idList = implode(',', $allIds);
     $shopDateWhere = $hasDateFilter ? " AND DATE(created_at) BETWEEN '$fromDate' AND '$toDate'" : '';
@@ -89,31 +96,47 @@ if (!empty($allIds)) {
     if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['got'] = (int)$r['cnt']; } }
     $_rs = $db_conn->query("SELECT ms_id, COUNT(*) AS cnt FROM ms_orders WHERE ms_id IN ($idList) AND new_order='no'$orderDateWhere GROUP BY ms_id");
     if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['no'] = (int)$r['cnt']; } }
+
+    $_rawTargetStats = getRawTargetAchievedStats($db_conn, $allIds, $targetFromDate, $targetToDate);
+    foreach ($_rawTargetStats as $id => $t) {
+        $rawStats[$id]['target']   = $t['target'];
+        $rawStats[$id]['achieved'] = $t['achieved'];
+    }
 }
 
 function subtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
-    $sum = $rawStats[$id] ?? ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0];
+    $sum = $rawStats[$id] ?? ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0];
     $ids = [$id];
-    foreach (($byManager[$id] ?? []) as $child) {
+    $children = $byManager[$id] ?? [];
+    // A manager's own raw target only counts when they have no team below
+    // them — otherwise it would double-count on top of the team's rolled-up
+    // district targets. Same convention as company/ms-team-view.php.
+    if (!empty($children)) { $sum['target'] = 0.0; }
+    foreach ($children as $child) {
         [$childSum, $childIds] = subtreeSumAndIds((int)$child['id'], $byManager, $rawStats);
         $sum['shops']    += $childSum['shops'];
         $sum['oldshops'] += $childSum['oldshops'];
         $sum['got']      += $childSum['got'];
         $sum['no']       += $childSum['no'];
+        $sum['target']   += $childSum['target'];
+        $sum['achieved'] += $childSum['achieved'];
         $ids = array_merge($ids, $childIds);
     }
     return [$sum, $ids];
 }
 
 // ── Company-wide KPI totals ─────────────────────────────────────────────────
-$kpiShops = 0; $kpiOldShops = 0; $kpiGot = 0; $kpiNo = 0;
+$kpiShops = 0; $kpiOldShops = 0; $kpiGot = 0; $kpiNo = 0; $kpiTarget = 0.0; $kpiAchieved = 0.0;
 foreach ($smRoots as $sm) {
     [$sum] = subtreeSumAndIds((int)$sm['id'], $byManager, $rawStats);
     $kpiShops    += $sum['shops'];
     $kpiOldShops += $sum['oldshops'];
     $kpiGot      += $sum['got'];
     $kpiNo       += $sum['no'];
+    $kpiTarget   += $sum['target'];
+    $kpiAchieved += $sum['achieved'];
 }
+$kpiBalance = max(0, $kpiTarget - $kpiAchieved);
 $teamCount = count($allIds);
 
 function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, int $rank = 0, int $indentLevel = 0, string $dateParam = '', string $ordersDateParam = ''): string {
@@ -128,7 +151,10 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
     $nameLink = '<a href="login-as-ms.php?msid=' . base64_encode((string)$id) . '" target="_blank" rel="noopener" title="Login as this staff member" style="color:inherit;text-decoration:none;">' . htmlspecialchars($row['ms_name']) . '</a>';
     $html .= '<td style="padding-left:' . (12 + $indentPx) . 'px;">' . ($indentLevel > 0 ? '&#8618;&nbsp;' : '') . ($indentLevel === 0 ? '<b>' : '') . $nameLink . ($indentLevel === 0 ? '</b>' : '') . '</td>';
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . $sum['shops'] . '</span></td>';
+    $balance = max(0, $sum['target'] - $sum['achieved']);
+    $html .= '<td><span class="stat-pill">&#8377;' . number_format($sum['target'], 0) . '</span></td>';
+    $html .= '<td><span class="stat-pill" style="color:#0ca30c;">&#8377;' . number_format($sum['achieved'], 0) . '</span></td>';
+    $html .= '<td><span class="stat-pill" style="color:' . ($balance > 0 ? '#dc2626' : '#0ca30c') . ';">&#8377;' . number_format($balance, 0) . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['oldshops'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['got'] . '</span></td>';
     $html .= '<td><span class="stat-pill">' . $sum['no'] . '</span></td>';
@@ -277,11 +303,25 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <div class="kpi-card">
-                                <i class="material-icons-outlined kpi-ico">storefront</i>
-                                <div class="kpi-t">New Shop</div>
-                                <div class="kpi-v"><?php echo (int)$kpiShops; ?></div>
-                                <?php if ($hasDateFilter): ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Added in this date range</div><?php endif; ?>
+                            <div class="kpi-card" style="--kpi-accent:#667eea;--kpi-tint:#eef1fd;">
+                                <i class="material-icons-outlined kpi-ico">flag</i>
+                                <div class="kpi-t">Total Target</div>
+                                <div class="kpi-v">&#8377;<?php echo number_format($kpiTarget, 0); ?></div>
+                                <div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;"><?php echo date('d M', strtotime($targetFromDate)); ?> &ndash; <?php echo date('d M Y', strtotime($targetToDate)); ?></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="kpi-card" style="--kpi-accent:#0ca30c;--kpi-tint:#e8f8e8;">
+                                <i class="material-icons-outlined kpi-ico">trending_up</i>
+                                <div class="kpi-t">Total Achieved</div>
+                                <div class="kpi-v" style="color:#0ca30c;">&#8377;<?php echo number_format($kpiAchieved, 0); ?></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="kpi-card" style="--kpi-accent:#dc2626;--kpi-tint:#fdeaea;">
+                                <i class="material-icons-outlined kpi-ico">pending_actions</i>
+                                <div class="kpi-t">Balance</div>
+                                <div class="kpi-v" style="color:#dc2626;">&#8377;<?php echo number_format($kpiBalance, 0); ?></div>
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
@@ -290,6 +330,14 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                                 <div class="kpi-t">Old Shop</div>
                                 <div class="kpi-v"><?php echo (int)$kpiOldShops; ?></div>
                                 <?php if ($hasDateFilter): ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Existing shops that got an order in this range</div><?php else: ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Apply a date filter to see this</div><?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="kpi-card" style="--kpi-accent:#0ca30c;--kpi-tint:#e8f8e8;">
+                                <i class="material-icons-outlined kpi-ico">add_business</i>
+                                <div class="kpi-t">New Shop</div>
+                                <div class="kpi-v"><?php echo $hasDateFilter ? (int)$kpiShops : 0; ?></div>
+                                <?php if ($hasDateFilter): ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Shops added in this range</div><?php else: ?><div class="kpi-sub" style="font-size:11px;color:#6b7280;margin-top:4px;">Apply a date filter to see this</div><?php endif; ?>
                             </div>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
@@ -334,7 +382,9 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                                                     <th>#</th>
                                                     <th>Name</th>
                                                     <th>Level</th>
-                                                    <th>New Shop</th>
+                                                    <th>Target</th>
+                                                    <th>Achieved</th>
+                                                    <th>Balance</th>
                                                     <th>Old Shop</th>
                                                     <th>Get Order</th>
                                                     <th>No Order</th>

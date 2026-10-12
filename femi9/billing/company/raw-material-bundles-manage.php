@@ -6,7 +6,7 @@ include("config.php");
 // Dedicated to the neksomo login (admin retained for oversight/support),
 // matching the Convert Pieces<->Packs page this feature feeds into.
 $__usertype = get_login_usertype($db_conn);
-if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
+if (!in_array($__usertype, ['neksomo', 'admin', 'stockviewer'], true)) {
     header("Location: dashboard.php");
     exit;
 }
@@ -134,6 +134,16 @@ $warehouseCodes = array_keys($warehouseCodes);
 sort($productNames);
 sort($godownNames);
 sort($warehouseCodes);
+
+// Grouped by product so the grid reads as one cluster per product instead
+// of every bundle scattered in creation order — same cards, same filters,
+// just visually consolidated. Alphabetical so the grouping is stable
+// regardless of when each bundle was created.
+$bundlesByProduct = [];
+foreach ($bundles as $b) {
+    $bundlesByProduct[$b['product_name']][] = $b;
+}
+ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -210,6 +220,10 @@ sort($warehouseCodes);
         .ata-empty-state { text-align:center; padding:40px 20px; color:#9ca3af; font-size:13.5px; display:none; }
         .ata-empty-state i { font-size:32px; display:block; margin-bottom:8px; color:#d1d5db; }
 
+        .ata-product-group { margin-bottom:26px; }
+        .ata-product-group-header { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:12px; padding-bottom:8px; border-bottom:1.5px solid #eef0f3; }
+        .ata-product-group-header h3 { font-size:14.5px; font-weight:700; color:#1f2937; margin:0; }
+        .ata-product-group-count { font-size:12px; color:#9ca3af; white-space:nowrap; }
         .ata-bundle-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:14px; }
         .ata-bundle-card { border:1px solid #eef0f3; border-radius:14px; padding:16px 18px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.04); transition:box-shadow .15s; }
         .ata-bundle-card:hover { box-shadow:0 4px 14px rgba(0,0,0,.07); }
@@ -245,6 +259,7 @@ sort($warehouseCodes);
 
                     <div class="ata-nav-tabs">
                         <a href="input-stock-bundles.php" class="ata-nav-tab"><i class="material-icons-outlined">add_box</i> Input Stock</a>
+                        <a href="raw-material-bundles-by-product.php" class="ata-nav-tab"><i class="material-icons-outlined">inventory_2</i> Manage Bundles by Product</a>
                         <a href="raw-material-bundles-manage.php" class="ata-nav-tab active"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
                         <a href="neksomo-piece-pack-convert.php" class="ata-nav-tab"><i class="material-icons-outlined">sync_alt</i> Convert Pieces &harr; Packs</a>
                         <a href="manage-piece-pack-conversions.php" class="ata-nav-tab"><i class="material-icons-outlined">history</i> Manage Conversions</a>
@@ -334,8 +349,17 @@ sort($warehouseCodes);
                         No bundles match your filters.
                     </div>
 
-                    <div class="ata-bundle-grid" id="bundleGrid">
-                        <?php foreach ($bundles as $b):
+                    <div id="bundleGroups">
+                        <?php foreach ($bundlesByProduct as $productName => $productBundles):
+                            $groupOpenCount = count(array_filter($productBundles, fn($pb) => $pb['status'] === 'open'));
+                        ?>
+                        <div class="ata-product-group" data-group-product="<?php echo htmlspecialchars($productName, ENT_QUOTES, 'UTF-8'); ?>">
+                            <div class="ata-product-group-header">
+                                <h3><?php echo htmlspecialchars($productName, ENT_QUOTES, 'UTF-8'); ?></h3>
+                                <span class="ata-product-group-count"><?php echo count($productBundles); ?> bundle<?php echo count($productBundles) === 1 ? '' : 's'; ?><?php echo $groupOpenCount > 0 ? ' &middot; ' . $groupOpenCount . ' open' : ''; ?></span>
+                            </div>
+                            <div class="ata-bundle-grid">
+                        <?php foreach ($productBundles as $b):
                             $isCarried = $b['carried_to_bundle_id'] !== null;
                             $isExcess = $b['variance_label'] !== null && strpos($b['variance_label'], 'Excess') !== false;
                             $cardExtraClass = $isCarried ? ' is-short' : ($isExcess ? ' is-excess' : '');
@@ -427,6 +451,9 @@ sort($warehouseCodes);
                                         </form>
                                     </div>
                                 <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
                             </div>
                         </div>
                         <?php endforeach; ?>
@@ -593,6 +620,16 @@ function applyFilters() {
         var show = matchesStatus && matchesProduct && matchesGodown && matchesWarehouse && matchesSearch;
         card.style.display = show ? '' : 'none';
         if (show) visibleCount++;
+    });
+
+    // A product's whole group hides once every card inside it is filtered
+    // out — otherwise an empty heading with no cards beneath it would hang
+    // around whenever a filter narrows a product down to zero matches.
+    document.querySelectorAll('.ata-product-group').forEach(function (group) {
+        var anyVisible = Array.prototype.some.call(group.querySelectorAll('.ata-bundle-card'), function (card) {
+            return card.style.display !== 'none';
+        });
+        group.style.display = anyVisible ? '' : 'none';
     });
 
     emptyState.style.display = visibleCount === 0 ? 'block' : 'none';

@@ -625,7 +625,7 @@ $tpDeliveryAddressParts = array_filter([
                                         <?php if ($allowSelfPickup): ?>
                                         <div class="col-auto">
                                             <label class="form-label" style="display:block;">&nbsp;</label>
-                                            <label id="po_pickup_now_label" for="po_pickup_now" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;white-space:nowrap;height:38px;padding:0 14px;border-radius:8px;cursor:pointer;user-select:none;border:1.5px solid #fde68a;background:#fffbeb;color:#92400e;transition:background .15s,border-color .15s,color .15s;">
+                                            <label id="po_pickup_now_label" for="po_pickup_now" style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:600;white-space:nowrap;height:38px;padding:0 14px;border-radius:8px;cursor:pointer;user-select:none;border:1.5px solid #fde68a;background:#fffbeb;color:#92400e;transition:background .15s,border-color .15s,color .15s;width:100%;box-sizing:border-box;">
                                                 <input type="checkbox" id="po_pickup_now" onchange="document.getElementById('po_pickup_now_label').classList.toggle('active', this.checked)" style="width:16px;height:16px;accent-color:#f59e0b;">
                                                 <i class="material-icons-outlined" style="font-size:16px;">storefront</i> Pick up myself
                                             </label>
@@ -1454,6 +1454,46 @@ $tpDeliveryAddressParts = array_filter([
             return false;
         }
         return true;
+    }
+    </script>
+
+    <script src="../../assets/js/tp-ai-order-agent.js"></script>
+    <script>
+    if (document.getElementById('pr_select')) {
+        TpAiOrderAgent.init({
+            flow: 'po',
+            productType: <?php echo json_encode($productType); ?>,
+            productSelectSelector: '#pr_select',
+            qtyInputSelector: '#po_qty',
+            cpIdSelector: '#preferred_cp_id_input',
+            endpoint: 'ai-order-agent.php',
+            // A follow-up correction for a product already in the cart
+            // (e.g. "I meant 3 boxes not 3 pieces") hits addPoLine()'s own
+            // "already added" guard and silently fails to update — so
+            // update the existing line's qty directly here instead of
+            // re-adding when the product is already present.
+            onLineFilled: function (productId, qty) {
+                var prIdStr = String(productId);
+                for (var i = 0; i < poLines.length; i++) {
+                    if (poLines[i].pr_id === prIdStr) {
+                        poLines[i].qty = qty;
+                        renderPoLines();
+                        $('#pr_select').val('').trigger('change');
+                        document.getElementById('po_qty').value = '';
+                        document.getElementById('po_price').value = '';
+                        document.getElementById('po_total').value = '';
+                        return { ok: true };
+                    }
+                }
+                addPoLine();
+                // addPoLine() can still fail past this point (carton-multiple
+                // rule, stock cap) via its own alert() + early return, with
+                // nothing added — check the REAL cart state rather than
+                // assuming the call succeeded just because it returned.
+                var added = poLines.some(function (l) { return l.pr_id === prIdStr; });
+                return added ? { ok: true } : { ok: false, reason: 'Could not add — check the quantity against carton size / stock, then add it manually.' };
+            },
+        });
     }
     </script>
 </body>
