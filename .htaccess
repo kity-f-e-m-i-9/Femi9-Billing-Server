@@ -7,6 +7,14 @@
 
 RewriteEngine On
 
+# Force HTTPS on the live domain only, so plain http:// links/downloads
+# (e.g. Chrome's "Insecure download blocked" on file downloads) get bounced
+# to https:// automatically. Scoped to femi9billing.com so localhost/XAMPP
+# testing over http:// is unaffected.
+RewriteCond %{HTTP_HOST} ^(www\.)?femi9billing\.com$ [NC]
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [L,R=301]
+
 # Serve the central login page at the bare domain root, without redirecting
 # the browser away from it (internal rewrite — URL bar stays on "/").
 RewriteRule ^$ femi9/billing/login/index.php [L]

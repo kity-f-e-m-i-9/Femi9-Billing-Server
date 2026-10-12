@@ -8,7 +8,7 @@ date_default_timezone_set("Asia/Kolkata");
 // unlike Internal Stock Transfer/Manage Godowns, raw material bundle
 // tracking is a Neksomo production concern, not a finance one.
 $__usertype = get_login_usertype($db_conn);
-if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
+if (!in_array($__usertype, ['neksomo', 'admin', 'stockviewer'], true)) {
     header("Location: dashboard.php");
     exit;
 }

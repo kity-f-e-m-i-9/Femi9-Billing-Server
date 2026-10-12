@@ -1122,6 +1122,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             echo "</div>"; return;
                                         }
                                         $grand_rev = array_sum(array_map(fn($r) => ($r['cust'] ?? 0) + ($r['shop'] ?? 0), $data));
+                                        $total_cust = 0; $total_cust_cnt = 0; $total_shop = 0; $total_shop_cnt = 0; $total_cnt = 0;
                                         echo "<div style='overflow-x:auto'><table class='mis-table'>";
                                         echo "<thead><tr><th>Period</th><th>Customer Sales</th><th>Shop Sales</th><th>Total Revenue</th><th>Total Invoices</th><th>Share</th></tr></thead><tbody>";
                                         foreach ($data as $g => $r) {
@@ -1131,6 +1132,11 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             $lbl  = $r['lbl'] ?? $g;
                                             $cust_cnt = $r['cust_cnt'] ?? 0;
                                             $shop_cnt = $r['shop_cnt'] ?? 0;
+                                            $total_cust     += $r['cust'] ?? 0;
+                                            $total_cust_cnt += $cust_cnt;
+                                            $total_shop     += $r['shop'] ?? 0;
+                                            $total_shop_cnt += $shop_cnt;
+                                            $total_cnt      += $cnt;
                                             echo "<tr>
                                                 <td><b>$lbl</b></td>
                                                 <td>&#x20B9;" . inr_format($r['cust'] ?? 0, 2) . " <small>($cust_cnt)</small></td>
@@ -1143,7 +1149,14 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                                 </div></td>
                                             </tr>";
                                         }
-                                        echo "</tbody></table></div></div>";
+                                        echo "</tbody><tfoot><tr style='font-weight:700;background:#f5f6fb;'>
+                                            <td>Total</td>
+                                            <td>&#x20B9;" . inr_format($total_cust, 2) . " <small>($total_cust_cnt)</small></td>
+                                            <td>&#x20B9;" . inr_format($total_shop, 2) . " <small>($total_shop_cnt)</small></td>
+                                            <td>&#x20B9;" . inr_format($grand_rev, 2) . "</td>
+                                            <td>$total_cnt</td>
+                                            <td>100%</td>
+                                        </tr></tfoot></table></div></div>";
                                     }
                                     render_period_table($daily_periods, 'daily');
                                     render_period_table($weekly_periods, 'weekly');

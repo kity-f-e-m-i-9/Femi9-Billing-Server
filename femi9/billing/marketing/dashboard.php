@@ -142,12 +142,22 @@ while (!empty($_queue)) {
 }
 if (!empty($_dmCandidates)) {
     $_dmIds = array_column($_dmCandidates, 'id');
+    // "Achieved" stays period-bound (Napkin-category converted sales in the
+    // selected from/to range) — that part of getRawTargetAchievedStats is
+    // genuinely a performance-for-this-period number. "Target" is NOT taken
+    // from there, though: that figure is prorated to the date range (see
+    // TeamTargetRollup.php), which silently disagreed with the plain,
+    // un-prorated district total this same DM sees as their own "District
+    // Total Target" card when they log in directly — same number the top
+    // cards above use. Pulled fresh here via getMsDistrictTargetAndFirkaStats
+    // instead, so a DM's chip always matches what that DM actually sees.
     $_dmTargetStats = getRawTargetAchievedStats($db_conn, $_dmIds, $from, $to);
     foreach ($_dmCandidates as $_dm) {
         $_dmId = (int)$_dm['id'];
         $_dmDistricts = getMsAssignedDistricts($db_conn, $_dmId);
-        $_dmDistrictLabel = !empty($_dmDistricts) ? implode(', ', array_column($_dmDistricts, 'name')) : 'No District Assigned';
-        $_t = $_dmTargetStats[$_dmId]['target'] ?? 0.0;
+        $_dmDistrictNames = array_column($_dmDistricts, 'name');
+        $_dmDistrictLabel = !empty($_dmDistrictNames) ? implode(', ', $_dmDistrictNames) : 'No District Assigned';
+        $_t = !empty($_dmDistrictNames) ? getMsDistrictTargetAndFirkaStats($db_conn, $_dmDistrictNames)['district_total_target'] : 0.0;
         $_a = $_dmTargetStats[$_dmId]['achieved'] ?? 0.0;
         $myDms[] = [
             'id'       => $_dmId,
@@ -161,18 +171,66 @@ if (!empty($_dmCandidates)) {
     usort($myDms, fn($a, $b) => strcmp($a['name'], $b['name']));
 }
 
-// TP roster for the tabs — All / Active / Inactive.
+// TP roster for the tabs — All / Active / Inactive. Scoped to this person's
+// OWN assigned district(s) for a DM, but for an ASM/SM (who may have no
+// district of their own, or a narrower direct assignment than their actual
+// team) widened to every district any of their District Managers covers —
+// same union $myDms above was already built from — so the roster, and the
+// "Team Districts" breakdown below, reflect the whole team, not just
+// whatever happens to be assigned straight to the ASM/SM themselves.
+$teamDistrictNames = $districtNames;
+foreach ($myDms as $_dm) {
+    foreach (explode(', ', $_dm['district']) as $_dn) {
+        $_dn = trim($_dn);
+        if ($_dn !== '' && $_dn !== 'No District Assigned') { $teamDistrictNames[] = $_dn; }
+    }
+}
+$teamDistrictNames = array_values(array_unique($teamDistrictNames));
+sort($teamDistrictNames);
+
+$teamTpIds = !empty($teamDistrictNames) ? getMsDistrictTpIds($db_conn, $teamDistrictNames, true) : $allTpIds;
+
 $tpRoster = [];
-if (!empty($allTpIds)) {
-    $idList = implode(',', $allTpIds);
+if (!empty($teamTpIds)) {
+    $idList = implode(',', $teamTpIds);
     $resTp = $db_conn->query(
-        "SELECT id, tp_id AS tp_code, name, mobile, is_active FROM territory_partners
+        "SELECT id, tp_id AS tp_code, name, mobile, is_active,
+                COALESCE(NULLIF(assigned_district,''), branch_district) AS district
+         FROM territory_partners
          WHERE id IN ($idList) ORDER BY is_active DESC, name ASC"
     );
     $tpRoster = $resTp ? $resTp->fetch_all(MYSQLI_ASSOC) : [];
+
+    $tpLocLabels = getTpTalukFirkaLabels($db_conn, $teamTpIds);
+    foreach ($tpRoster as &$_tpRow) {
+        $_labels = $tpLocLabels[(int)$_tpRow['id']] ?? ['taluks' => [], 'firkas' => [], 'target' => 0.0];
+        $_tpRow['firka']  = implode(', ', $_labels['firkas']);
+        $_tpRow['target'] = $_labels['target'];
+    }
+    unset($_tpRow);
 }
 $activeTpRoster   = array_values(array_filter($tpRoster, fn($r) => $r['is_active']));
 $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_active']));
+
+// Per-district target total (sum of each TP's own target, once per TP) —
+// feeds the top stat cards when the Shop Invoices district filter narrows
+// to a single district, so Target/Invoiced/Balance all agree with the table.
+$districtTargetTotals = [];
+foreach ($tpRoster as $_tp) {
+    $_d = $_tp['district'] ?: 'Unassigned';
+    $districtTargetTotals[$_d] = ($districtTargetTotals[$_d] ?? 0) + (float)$_tp['target'];
+}
+
+// District-wise Active/Inactive TP counts, for the clickable "Team Districts"
+// chips — only shown when there's more than one district to break down
+// (a single-district DM already sees everything in the roster below).
+$districtTpCounts = [];
+foreach ($tpRoster as $_r) {
+    $_dn = $_r['district'] ?: 'Unassigned';
+    if (!isset($districtTpCounts[$_dn])) { $districtTpCounts[$_dn] = ['active' => 0, 'inactive' => 0]; }
+    $districtTpCounts[$_dn][$_r['is_active'] ? 'active' : 'inactive']++;
+}
+ksort($districtTpCounts);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -261,6 +319,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
         .tp-table tbody tr:last-child { border-bottom: none; }
         .tp-table tbody tr:hover { background: #fafbff; }
         .tp-table tbody td { padding: 14px 20px; vertical-align: middle; }
+        .tp-table tfoot td { padding: 14px 20px; vertical-align: middle; }
 
         .tp-avatar { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; text-transform: uppercase; }
         .tp-info { display: flex; align-items: center; gap: 12px; }
@@ -329,7 +388,12 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
             .date-filter-form input[type=date] { flex: 1 1 auto; min-width: 0; }
             .date-filter-form .btn { flex: 0 0 auto; }
 
-            .dash-search, #tpSearch { width: 100%; }
+            .dash-search, #tpSearch { width: 100%; max-width: none; }
+            .main-card-header-left { width: 100%; }
+            .main-card-header > div:not(.main-card-header-left) { width: 100%; }
+
+            #districtDashboardLabel { font-size: 12px; word-break: break-word; }
+            .district-chip, .dm-name-chip { font-size: 12px; padding: 6px 10px; }
 
             .status-filter-tabs { padding: 0 10px; overflow-x: auto; white-space: nowrap; flex-wrap: nowrap; }
             .status-filter-btn { padding: 12px 8px; font-size: 12.5px; flex-shrink: 0; }
@@ -369,7 +433,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                     <i class="material-icons-two-tone" style="vertical-align:middle;font-size:22px;">dashboard</i>
                                     District Dashboard
                                 </h4>
-                                <p style="color:#6b7280;font-size:13px;margin:0;">
+                                <p id="districtDashboardLabel" style="color:#6b7280;font-size:13px;margin:0;">
                                     <?php echo htmlspecialchars($districtLabel); ?>
                                 </p>
                             </div>
@@ -377,28 +441,28 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
 
                         <!-- Top Stat Cards -->
                         <div class="row">
-                            <div class="col-xl-4 col-md-6">
+                            <div class="col-12 col-md-6 col-xl-4">
                                 <div class="stat-card purple">
                                     <div>
-                                        <h3>&#8377;<?php echo inr_format($districtStats['district_total_target'], 0); ?></h3>
+                                        <h3 id="statDistrictTarget">&#8377;<?php echo inr_format($districtStats['district_total_target'], 0); ?></h3>
                                         <p>District Total Target</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">flag</i></div>
                                 </div>
                             </div>
-                            <div class="col-xl-4 col-md-6">
+                            <div class="col-12 col-md-6 col-xl-4">
                                 <div class="stat-card green">
                                     <div>
-                                        <h3>&#8377;<?php echo inr_format($invoicedAmount, 0); ?></h3>
+                                        <h3 id="statInvoiceAmount">&#8377;<?php echo inr_format($invoicedAmount, 0); ?></h3>
                                         <p>Your TPs' Invoice Amount</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">receipt_long</i></div>
                                 </div>
                             </div>
-                            <div class="col-xl-4 col-md-6">
+                            <div class="col-12 col-md-6 col-xl-4">
                                 <div class="stat-card red">
                                     <div>
-                                        <h3>&#8377;<?php echo inr_format($balanceTarget, 0); ?></h3>
+                                        <h3 id="statBalanceTarget">&#8377;<?php echo inr_format($balanceTarget, 0); ?></h3>
                                         <p>Balance Target Amount</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">trending_up</i></div>
@@ -479,7 +543,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                         </form>
                                     </div>
 
-                                    <div style="padding:14px 20px 0;display:flex;justify-content:flex-end;gap:10px;">
+                                    <div style="padding:14px 20px 0;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
                                         <?php if (count($districtNames) > 1): ?>
                                         <select id="shopInvDistrictFilter" class="dash-search" style="max-width:220px;">
                                             <option value="all">All Districts</option>
@@ -535,9 +599,34 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                             var searchTerm = '';
                             var currentDistrict = 'all';
 
+                            var districtTargetTotals = <?php echo json_encode($districtTargetTotals); ?>;
+                            var overallTarget = <?php echo (float)$districtStats['district_total_target']; ?>;
+
                             var escDiv = document.createElement('div');
                             function esc(s) { escDiv.textContent = (s == null ? '' : s); return escDiv.innerHTML; }
                             function money(n) { return '&#8377;' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
+
+                            // District-only filter (ignores the search box) — the amount in
+                            // the top stat cards should track the district picked, not whatever
+                            // is currently typed into the invoice search field.
+                            function districtOnlyRows(district) {
+                                return allRows.filter(function (r) {
+                                    return district === 'all' || (r.tp_district || '').toLowerCase() === district.toLowerCase();
+                                });
+                            }
+
+                            function updateStatCards() {
+                                var targetEl = document.getElementById('statDistrictTarget');
+                                var invoiceEl = document.getElementById('statInvoiceAmount');
+                                var balanceEl = document.getElementById('statBalanceTarget');
+                                if (!targetEl || !invoiceEl || !balanceEl) return;
+                                var target = currentDistrict === 'all' ? overallTarget : (districtTargetTotals[currentDistrict] || 0);
+                                var invoiced = districtOnlyRows(currentDistrict).reduce(function (sum, r) { return sum + (r.total || 0); }, 0);
+                                var balance = Math.max(0, target - invoiced);
+                                targetEl.innerHTML = money(target);
+                                invoiceEl.innerHTML = money(invoiced);
+                                balanceEl.innerHTML = money(balance);
+                            }
 
                             function filteredRows() {
                                 return allRows.filter(function (r) {
@@ -554,6 +643,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                 if (!rows.length) {
                                     tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon-wrap"><i class="material-icons-outlined">inbox</i></div><h6>No Invoices Found</h6><p>No shop invoices match this filter.</p></div></td></tr>';
                                     pager.innerHTML = '';
+                                    updateStatCards();
                                     return;
                                 }
                                 var totalPages = Math.ceil(rows.length / pageSize);
@@ -586,6 +676,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                 }
                                 pHtml += '<button type="button" data-pg="next"' + (currentPage === totalPages ? ' disabled' : '') + '>Next</button>';
                                 pager.innerHTML = pHtml;
+                                updateStatCards();
                             }
 
                             document.getElementById('shopInvPagination').addEventListener('click', function (e) {
@@ -620,7 +711,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
 
                         <!-- Territory Partners (left) + Firka Coverage (right) -->
                         <div class="row">
-                            <div class="col-xl-8">
+                            <div class="col-12 col-xl-8">
                                 <div class="main-card">
                                     <div class="main-card-header">
                                         <div class="main-card-header-left">
@@ -630,7 +721,15 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                                 <p class="header-sub">In your assigned district(s)</p>
                                             </div>
                                         </div>
-                                        <div style="display:flex;align-items:center;gap:12px;">
+                                        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                                            <?php if (count($districtTpCounts) > 1): ?>
+                                            <select id="tpRosterDistrictFilter" class="dash-search" style="max-width:200px;">
+                                                <option value="all">All Districts</option>
+                                                <?php foreach (array_keys($districtTpCounts) as $_dn): ?>
+                                                <option value="<?php echo htmlspecialchars($_dn, ENT_QUOTES); ?>"><?php echo htmlspecialchars($_dn); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <?php endif; ?>
                                             <input type="text" id="tpSearch" class="dash-search" placeholder="Search TPs…">
                                         </div>
                                     </div>
@@ -648,11 +747,14 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                                     <th style="width:48px;text-align:center;">#</th>
                                                     <th>Territory Partner</th>
                                                     <th>Mobile</th>
+                                                    <th>District</th>
+                                                    <th>Firka</th>
+                                                    <th style="text-align:right;">Target Amount</th>
                                                     <th style="text-align:center;">Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="tpRosterTbody">
-                                                <tr><td colspan="4" class="text-muted" style="text-align:center;padding:30px;">Loading…</td></tr>
+                                                <tr><td colspan="7" class="text-muted" style="text-align:center;padding:30px;">Loading…</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -661,7 +763,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                             </div>
 
                             <!-- Right: Firka coverage -->
-                            <div class="col-xl-4">
+                            <div class="col-12 col-xl-4">
                                 <div class="main-card" style="padding:4px 0;">
                                     <div class="main-card-header">
                                         <div class="main-card-header-left">
@@ -701,6 +803,87 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                         </div>
                                     </div>
                                 </div>
+
+                                <?php if (count($districtTpCounts) > 1):
+                                    $_totalActive = 0; $_totalInactive = 0;
+                                    foreach ($districtTpCounts as $_cnt) { $_totalActive += $_cnt['active']; $_totalInactive += $_cnt['inactive']; }
+                                ?>
+                                <!-- Team Districts — every district this person's team (or they themselves)
+                                     covers, with Active/Inactive TP counts; clicking one filters the
+                                     Territory Partners roster above to just that district. -->
+                                <div class="main-card" style="margin-top:20px;">
+                                    <div class="main-card-header">
+                                        <div class="main-card-header-left">
+                                            <div class="header-icon-box"><i class="material-icons-outlined">map</i></div>
+                                            <div>
+                                                <p class="header-title">Team Districts</p>
+                                                <p class="header-sub">Click a district to filter Territory Partners above</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="padding:4px 18px 0;">
+                                        <table class="tp-table" style="width:100%;">
+                                            <thead>
+                                                <tr>
+                                                    <th>District</th>
+                                                    <th style="text-align:right;">Active</th>
+                                                    <th style="text-align:right;">Inactive</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="teamDistrictRows">
+                                                <?php foreach ($districtTpCounts as $_dn => $_cnt): ?>
+                                                <tr class="district-chip" data-district="<?php echo htmlspecialchars($_dn, ENT_QUOTES); ?>" style="cursor:pointer;">
+                                                    <td><b style="color:#1f2937;"><?php echo htmlspecialchars($_dn); ?></b></td>
+                                                    <td style="text-align:right;color:#059669;font-weight:600;"><?php echo $_cnt['active']; ?></td>
+                                                    <td style="text-align:right;color:#dc2626;font-weight:600;"><?php echo $_cnt['inactive']; ?></td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                            <tfoot>
+                                                <tr style="border-top:2px solid #e2e8f0;">
+                                                    <td><b style="color:#1f2937;">Total</b></td>
+                                                    <td style="text-align:right;color:#059669;font-weight:700;"><?php echo $_totalActive; ?></td>
+                                                    <td style="text-align:right;color:#dc2626;font-weight:700;"><?php echo $_totalInactive; ?></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                    <div id="teamDistrictPagination" class="mis-pagination" style="padding:8px 18px 16px;"></div>
+                                </div>
+                                <script>
+                                (function () {
+                                    var PAGE_SIZE = 6;
+                                    var rows = Array.prototype.slice.call(document.querySelectorAll('#teamDistrictRows .district-chip'));
+                                    var pager = document.getElementById('teamDistrictPagination');
+                                    var totalPages = Math.ceil(rows.length / PAGE_SIZE);
+                                    var currentPage = 1;
+
+                                    function render() {
+                                        rows.forEach(function (row, idx) {
+                                            var page = Math.floor(idx / PAGE_SIZE) + 1;
+                                            row.style.display = (page === currentPage) ? '' : 'none';
+                                        });
+                                        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+                                        var html = '';
+                                        html += '<button type="button" class="btn btn-sm btn-outline-secondary" id="tdPrev"' + (currentPage === 1 ? ' disabled' : '') + '>Prev</button> ';
+                                        for (var p = 1; p <= totalPages; p++) {
+                                            html += '<button type="button" class="btn btn-sm ' + (p === currentPage ? 'btn-primary' : 'btn-outline-secondary') + ' td-page-btn" data-page="' + p + '">' + p + '</button> ';
+                                        }
+                                        html += '<button type="button" class="btn btn-sm btn-outline-secondary" id="tdNext"' + (currentPage === totalPages ? ' disabled' : '') + '>Next</button>';
+                                        pager.innerHTML = html;
+
+                                        var prevBtn = document.getElementById('tdPrev');
+                                        if (prevBtn) prevBtn.addEventListener('click', function () { if (currentPage > 1) { currentPage--; render(); } });
+                                        var nextBtn = document.getElementById('tdNext');
+                                        if (nextBtn) nextBtn.addEventListener('click', function () { if (currentPage < totalPages) { currentPage++; render(); } });
+                                        pager.querySelectorAll('.td-page-btn').forEach(function (btn) {
+                                            btn.addEventListener('click', function () { currentPage = parseInt(this.getAttribute('data-page'), 10); render(); });
+                                        });
+                                    }
+                                    render();
+                                })();
+                                </script>
+                                <?php endif; ?>
                             </div>
                         </div>
 
@@ -818,13 +1001,26 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                     'tp_code'   => $tp['tp_code'],
                                     'name'      => ucwords(strtolower($tp['name'])),
                                     'mobile'    => $tp['mobile'],
+                                    'district'  => $tp['district'],
+                                    'firka'     => $tp['firka'],
+                                    'target'    => (float)$tp['target'],
                                     'is_active' => (int)$tp['is_active'],
                                 ];
                             }, $tpRoster)); ?>;
                             var pageSize = 10;
                             var currentPage = 1;
                             var currentStatus = 'all';
+                            var currentDistrict = 'all';
                             var searchTerm = '';
+
+                            // "+N more" so a TP covering a dozen Firkas doesn't blow out the row.
+                            function shortList(str) {
+                                if (!str) return '—';
+                                var parts = str.split(', ');
+                                if (parts.length <= 2) return esc(str);
+                                return esc(parts.slice(0, 2).join(', ')) + ' <span style="color:#9ca3af;">+' + (parts.length - 2) + ' more</span>';
+                            }
+                            function money(n) { return '&#8377;' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
 
                             var escDiv = document.createElement('div');
                             function esc(s) { escDiv.textContent = (s == null ? '' : s); return escDiv.innerHTML; }
@@ -838,7 +1034,8 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                 return allRows.filter(function (r) {
                                     if (currentStatus === 'active' && !r.is_active) return false;
                                     if (currentStatus === 'inactive' && r.is_active) return false;
-                                    if (searchTerm && (r.name + ' ' + r.tp_code + ' ' + r.mobile).toLowerCase().indexOf(searchTerm) === -1) return false;
+                                    if (currentDistrict !== 'all' && (r.district || '').toLowerCase() !== currentDistrict.toLowerCase()) return false;
+                                    if (searchTerm && (r.name + ' ' + r.tp_code + ' ' + r.mobile + ' ' + (r.district || '') + ' ' + (r.firka || '')).toLowerCase().indexOf(searchTerm) === -1) return false;
                                     return true;
                                 });
                             }
@@ -848,7 +1045,7 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                 var tbody = document.getElementById('tpRosterTbody');
                                 var pager = document.getElementById('tpRosterPagination');
                                 if (!rows.length) {
-                                    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-icon-wrap"><i class="material-icons-outlined">person_search</i></div><h6>No Territory Partners</h6><p>None found for this filter.</p></div></td></tr>';
+                                    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon-wrap"><i class="material-icons-outlined">person_search</i></div><h6>No Territory Partners</h6><p>None found for this filter.</p></div></td></tr>';
                                     pager.innerHTML = '';
                                     return;
                                 }
@@ -865,6 +1062,9 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                         '<td style="text-align:center;"><span class="serial-num">' + (start + i + 1) + '</span></td>' +
                                         '<td><div class="tp-info"><div class="tp-avatar">' + esc(initialsOf(r.name)) + '</div><div class="tp-info-text"><span class="tp-name">' + esc(r.name) + '</span><span class="tp-code-pill">' + esc(r.tp_code) + '</span></div></div></td>' +
                                         '<td><div class="mobile-cell"><i class="material-icons-outlined">phone_iphone</i><span class="mobile-text">' + esc(r.mobile) + '</span></div></td>' +
+                                        '<td><span class="mobile-text">' + esc(r.district || '—') + '</span></td>' +
+                                        '<td><span class="mobile-text">' + shortList(r.firka) + '</span></td>' +
+                                        '<td style="text-align:right;"><span class="sales-amount">' + money(r.target) + '</span></td>' +
                                         '<td style="text-align:center;">' + statusHtml + '</td>' +
                                         '</tr>';
                                 });
@@ -908,6 +1108,28 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                 searchTerm = this.value.toLowerCase().trim();
                                 currentPage = 1;
                                 render();
+                            });
+
+                            var tpRosterDistrictFilter = document.getElementById('tpRosterDistrictFilter');
+                            if (tpRosterDistrictFilter) {
+                                tpRosterDistrictFilter.addEventListener('change', function () {
+                                    currentDistrict = this.value;
+                                    currentPage = 1;
+                                    render();
+                                });
+                            }
+
+                            // "Team Districts" chips (above) drive this same table — clicking one
+                            // sets the dropdown, filters the roster, and scrolls it into view.
+                            document.querySelectorAll('.district-chip').forEach(function (chip) {
+                                chip.addEventListener('click', function () {
+                                    var district = this.getAttribute('data-district');
+                                    currentDistrict = district;
+                                    currentPage = 1;
+                                    if (tpRosterDistrictFilter) { tpRosterDistrictFilter.value = district; }
+                                    render();
+                                    document.getElementById('tpRosterTbody').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                });
                             });
 
                             render();

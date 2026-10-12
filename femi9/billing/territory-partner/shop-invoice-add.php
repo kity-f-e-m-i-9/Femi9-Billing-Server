@@ -936,5 +936,20 @@ $(document).on('click', '.request-shop-action-btn', function () {
     });
 });
 </script>
+
+<script src="../../assets/js/tp-ai-order-agent.js"></script>
+<script>
+if (document.querySelector('select[name="pr_id"]')) {
+    // Only fills Product + Qty and triggers the page's own showPrice()/
+    // totalkm() — price, MRP, total and discount still need the TP's own
+    // review before clicking "Add", same as if they'd picked manually.
+    TpAiOrderAgent.init({
+        flow: 'invoice',
+        productSelectSelector: 'select[name="pr_id"]',
+        qtyInputSelector: '#qty',
+        endpoint: 'ai-order-agent.php',
+    });
+}
+</script>
 </body>
 </html>

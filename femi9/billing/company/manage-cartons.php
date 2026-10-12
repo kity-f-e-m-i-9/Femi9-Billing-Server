@@ -8,7 +8,7 @@ include("config.php");
 // alongside. Deliberately standalone — never touched by Convert Pieces
 // <-> Packs (see include/CartonBoxes.php's file header).
 $__usertype = get_login_usertype($db_conn);
-if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
+if (!in_array($__usertype, ['neksomo', 'admin', 'stockviewer'], true)) {
     header("Location: dashboard.php");
     exit;
 }

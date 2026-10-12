@@ -7,7 +7,7 @@ include("config.php");
 // Dedicated to the neksomo login (admin retained for oversight/support),
 // matching the other Raw Bundles pages this feature sits alongside.
 $__usertype = get_login_usertype($db_conn);
-if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
+if (!in_array($__usertype, ['neksomo', 'admin', 'stockviewer'], true)) {
     header("Location: dashboard.php");
     exit;
 }

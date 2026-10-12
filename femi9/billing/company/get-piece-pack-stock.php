@@ -7,10 +7,13 @@ require_once("include/ProductCovers.php");
 header('Content-Type: application/json');
 error_reporting(0);
 
-// Dedicated to the neksomo login (admin retained for oversight/support),
-// matching every other Neksomo-only page's gate.
+// Dedicated to the neksomo login (admin retained for oversight/support) —
+// also stockviewer, since neksomo-piece-pack-convert.php itself lets that
+// role view the page (read-only), and this is the endpoint that fills in
+// its "Current Stock" chip; leaving stockviewer out here made every lookup
+// silently 403 and the chip get stuck on "—".
 $__usertype = get_login_usertype($db_conn);
-if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
+if (!in_array($__usertype, ['neksomo', 'admin', 'stockviewer'], true)) {
     http_response_code(403);
     echo json_encode(['error' => 'unauthorized']);
     exit;

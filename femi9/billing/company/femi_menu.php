@@ -11,13 +11,20 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <a href="stock-viewer-dashboard.php"><i class="material-icons-two-tone">dashboard</i>Dashboard</a>
                     </li>
                     <li>
-                        <a href="stock-viewer-by-profile.php"><i class="material-icons-two-tone">store</i>Stock by Company Profile</a>
+                        <a href="stock-viewer-by-profile.php"><i class="material-icons-two-tone">store</i>Stock Viewer</a>
                     </li>
                     <li>
-                        <a href="stock-viewer-by-product.php"><i class="material-icons-two-tone">inventory_2</i>Stock by Product</a>
-                    </li>
-                    <li>
-                        <a href="stock-viewer-by-warehouse.php"><i class="material-icons-two-tone">warehouse</i>Stock by Warehouse</a>
+                        <a href="#"><i class="material-icons-two-tone">inventory_2</i>Bundle<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+                        <ul class="sub-menu">
+                            <li><a href="input-stock-bundles.php">Input Stock</a></li>
+                            <li><a href="raw-material-bundles-manage.php">Manage Bundles</a></li>
+                            <li><a href="raw-material-bundles-by-product.php">Manage Bundles by Product</a></li>
+                            <li><a href="neksomo-piece-pack-convert.php">Convert Pieces &harr; Packs</a></li>
+                            <li><a href="manage-piece-pack-conversions.php">Manage Conversions</a></li>
+                            <li><a href="raw-material-bundles-report.php">Bundle Report</a></li>
+                            <li><a href="manage-covers.php">Covers</a></li>
+                            <li><a href="manage-cartons.php">Cartons</a></li>
+                        </ul>
                     </li>
                     <li>
                         <a href="logout" onclick="return confirm('You want to logout confirm?');"><i class="material-icons-two-tone">power_settings_new</i>Logout</a>
@@ -215,6 +222,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="neksomo-purchase-stock.php">Purchase Stock</a></li>
 						<li><a href="input-stock-bundles.php">Input Stock — Raw Bundles</a></li>
 						<li><a href="raw-material-bundles-manage.php">Manage Bundles</a></li>
+						<li><a href="raw-material-bundles-by-product.php">Manage Bundles by Product</a></li>
 						<li><a href="neksomo-piece-pack-convert.php">Convert Pieces &harr; Packs</a></li>
 						<li><a href="manage-piece-pack-conversions.php">Manage Conversions</a></li>
 						<li><a href="raw-material-bundles-report.php">Bundle Report</a></li>
@@ -365,6 +373,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="tp-stock">TP Stock</a></li>
 							<li><a href="add-tp-input-stock">Add TP Input Stock</a></li>
 							<li><a href="tp-today-orders">Purchase Order</a></li>
+							<li><a href="tp-emergency-stock-requests.php">TP Emergency Stock Requests</a></li>
 							<li><a href="manage-tp-invoices">TP Invoices</a></li>
 								<li><a href="tp-cnote-manage">TP Return Invoice</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
@@ -890,6 +899,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="tp-stock">TP Stock</a></li>
 							<li><a href="add-tp-input-stock">Add TP Input Stock</a></li>
 							<li><a href="tp-today-orders">Purchase Order</a></li>
+							<li><a href="tp-emergency-stock-requests.php">TP Emergency Stock Requests</a></li>
 							<li><a href="manage-tp-invoices">TP Invoices</a></li>
 								<li><a href="tp-cnote-manage">TP Return Invoice</a></li>
 							<li><a href="manage-tp-advance-payments">TP Advance Payments</a></li>
