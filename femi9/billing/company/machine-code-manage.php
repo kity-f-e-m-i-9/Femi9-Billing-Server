@@ -13,10 +13,10 @@ include("config.php");
 header('Content-Type: application/json');
 error_reporting(0);
 
-// Dedicated to the neksomo login (admin retained for oversight/support),
-// matching Convert Pieces<->Packs' own gate.
+// Same gate as Convert Pieces<->Packs: neksomo + stockviewer (Godown) logins
+// share this one global list; admin retained for oversight/support.
 $__usertype = get_login_usertype($db_conn);
-if (!in_array($__usertype, ['neksomo', 'admin'], true)) {
+if (!in_array($__usertype, ['neksomo', 'admin', 'stockviewer'], true)) {
     http_response_code(403);
     echo json_encode(['error' => 'unauthorized']);
     exit;
