@@ -32,6 +32,7 @@ $topProducts = get_stock_viewer_top_products($db_conn, 10);
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
+    <?php include("include/stock-viewer-style.php"); ?>
 </head>
 <body>
 <div class="app align-content-stretch d-flex flex-wrap">
@@ -46,51 +47,51 @@ $topProducts = get_stock_viewer_top_products($db_conn, 10);
                 <div class="container-fluid">
                     <div class="page-description">
                         <h1>Stock Dashboard</h1>
+                        <span>Company-wide closing stock overview</span>
                     </div>
 
                     <div class="row">
-                        <div class="col-md-2-4 col-sm-6 mb-4" style="flex:1;min-width:180px;">
-                            <div class="card"><div class="card-body text-center">
-                                <div class="text-muted">Total Closing Qty</div>
-                                <h2><?=number_format($summary['total_closing_qty']);?></h2>
+                        <div class="col-xl col-md-6 mb-4" style="min-width:200px;">
+                            <div class="card wh-card wh-kpi"><div class="card-body">
+                                <div class="wh-kpi-icon" style="background:#e8eaf6;color:#3f51b5;"><i class="material-icons-outlined">stacked_bar_chart</i></div>
+                                <div><p class="wh-kpi-label">Total Closing Qty</p><p class="wh-kpi-value"><?=number_format($summary['total_closing_qty']);?></p></div>
                             </div></div>
                         </div>
-                        <div class="col-md-2-4 col-sm-6 mb-4" style="flex:1;min-width:180px;">
-                            <div class="card"><div class="card-body text-center">
-                                <div class="text-muted">SKUs in Stock</div>
-                                <h2><?=number_format($summary['sku_count']);?></h2>
+                        <div class="col-xl col-md-6 mb-4" style="min-width:200px;">
+                            <div class="card wh-card wh-kpi"><div class="card-body">
+                                <div class="wh-kpi-icon" style="background:#e8eaf6;color:#3f51b5;"><i class="material-icons-outlined">inventory_2</i></div>
+                                <div><p class="wh-kpi-label">SKUs in Stock</p><p class="wh-kpi-value"><?=number_format($summary['sku_count']);?></p></div>
                             </div></div>
                         </div>
-                        <div class="col-md-2-4 col-sm-6 mb-4" style="flex:1;min-width:180px;">
-                            <div class="card"><div class="card-body text-center">
-                                <div class="text-muted">Company Profiles</div>
-                                <h2><?=number_format($summary['company_profile_count']);?></h2>
+                        <div class="col-xl col-md-6 mb-4" style="min-width:200px;">
+                            <div class="card wh-card wh-kpi"><div class="card-body">
+                                <div class="wh-kpi-icon" style="background:#fef3c7;color:#d97706;"><i class="material-icons-outlined">store</i></div>
+                                <div><p class="wh-kpi-label">Company Profiles</p><p class="wh-kpi-value"><?=number_format($summary['company_profile_count']);?></p></div>
                             </div></div>
                         </div>
-                        <div class="col-md-2-4 col-sm-6 mb-4" style="flex:1;min-width:180px;">
-                            <div class="card"><div class="card-body text-center">
-                                <div class="text-muted">Warehouses</div>
-                                <h2><?=number_format($summary['warehouse_count']);?></h2>
+                        <div class="col-xl col-md-6 mb-4" style="min-width:200px;">
+                            <div class="card wh-card wh-kpi"><div class="card-body">
+                                <div class="wh-kpi-icon" style="background:#e8eaf6;color:#5c6bc0;"><i class="material-icons-outlined">warehouse</i></div>
+                                <div><p class="wh-kpi-label">Warehouses</p><p class="wh-kpi-value"><?=number_format($summary['warehouse_count']);?></p></div>
                             </div></div>
                         </div>
-                        <div class="col-md-2-4 col-sm-6 mb-4" style="flex:1;min-width:180px;">
-                            <div class="card" style="<?=$summary['low_stock_count'] > 0 ? 'border-color:#dc3545;' : '';?>">
-                                <div class="card-body text-center">
-                                <div class="text-muted">Low Stock Products (&lt;<?=STOCK_VIEWER_LOW_STOCK_THRESHOLD;?>)</div>
-                                <h2 style="<?=$summary['low_stock_count'] > 0 ? 'color:#dc3545;' : '';?>"><?=number_format($summary['low_stock_count']);?></h2>
+                        <div class="col-xl col-md-6 mb-4" style="min-width:200px;">
+                            <div class="card wh-card wh-kpi"><div class="card-body">
+                                <div class="wh-kpi-icon" style="background:#fee2e2;color:#dc2626;"><i class="material-icons-outlined">warning_amber</i></div>
+                                <div><p class="wh-kpi-label">Low Stock (&lt;<?=STOCK_VIEWER_LOW_STOCK_THRESHOLD;?>)</p><p class="wh-kpi-value" style="<?=$summary['low_stock_count'] > 0 ? 'color:#dc2626;' : '';?>"><?=number_format($summary['low_stock_count']);?></p></div>
                             </div></div>
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-4">
-                            <div class="card"><div class="card-body">
+                            <div class="card wh-card"><div class="card-body">
                                 <h5>Stock by Company Profile</h5>
                                 <div id="chartByProfile"></div>
                             </div></div>
                         </div>
                         <div class="col-md-6 mb-4">
-                            <div class="card"><div class="card-body">
+                            <div class="card wh-card"><div class="card-body">
                                 <h5>Stock by Warehouse</h5>
                                 <div id="chartByWarehouse"></div>
                             </div></div>
@@ -99,7 +100,7 @@ $topProducts = get_stock_viewer_top_products($db_conn, 10);
 
                     <div class="row">
                         <div class="col-md-12 mb-4">
-                            <div class="card"><div class="card-body">
+                            <div class="card wh-card"><div class="card-body">
                                 <h5>Top 10 Products by Closing Qty</h5>
                                 <div id="chartTopProducts"></div>
                             </div></div>
@@ -108,11 +109,11 @@ $topProducts = get_stock_viewer_top_products($db_conn, 10);
 
                     <div class="row">
                         <div class="col-md-12 mb-4">
-                            <div class="card"><div class="card-body">
+                            <div class="card wh-card"><div class="card-body">
                                 <h5>Explore Further</h5>
-                                <a href="stock-viewer-by-profile.php" class="btn btn-outline-primary me-2 mb-2">Stock by Company Profile</a>
-                                <a href="stock-viewer-by-product.php" class="btn btn-outline-primary me-2 mb-2">Stock by Product</a>
-                                <a href="stock-viewer-by-warehouse.php" class="btn btn-outline-primary mb-2">Stock by Warehouse</a>
+                                <a href="stock-viewer-by-profile.php" class="btn btn-outline-success me-2 mb-2">Stock by Company Profile</a>
+                                <a href="stock-viewer-by-product.php" class="btn btn-outline-success me-2 mb-2">Stock by Product</a>
+                                <a href="stock-viewer-by-warehouse.php" class="btn btn-outline-success mb-2">Stock by Warehouse</a>
                             </div></div>
                         </div>
                     </div>
@@ -141,14 +142,16 @@ function barChart(elId, categories, series, color) {
         chart: { type: 'bar', height: 300, toolbar: { show: false } },
         series: [{ name: 'Closing Qty', data: series }],
         xaxis: { categories: categories, labels: { rotate: -30 } },
-        colors: [color || '#3699FF'],
-        dataLabels: { enabled: false }
+        colors: [color || '#3f51b5'],
+        plotOptions: { bar: { borderRadius: 6, columnWidth: '40%' } },
+        dataLabels: { enabled: false },
+        grid: { borderColor: '#eef2f6' }
     }).render();
 }
 
-barChart('#chartByProfile', Object.keys(byProfile), Object.values(byProfile), '#3699FF');
-barChart('#chartByWarehouse', Object.keys(byWarehouse), Object.values(byWarehouse), '#1BC5BD');
-barChart('#chartTopProducts', topProducts.map(function(p){return p.productName;}), topProducts.map(function(p){return p.total_qty;}), '#F64E60');
+barChart('#chartByProfile', Object.keys(byProfile), Object.values(byProfile), '#3f51b5');
+barChart('#chartByWarehouse', Object.keys(byWarehouse), Object.values(byWarehouse), '#3f51b5');
+barChart('#chartTopProducts', topProducts.map(function(p){return p.productName;}), topProducts.map(function(p){return p.total_qty;}), '#5c6bc0');
 </script>
 </body>
 </html>

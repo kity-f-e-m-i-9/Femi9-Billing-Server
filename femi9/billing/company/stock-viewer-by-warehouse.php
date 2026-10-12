@@ -44,6 +44,7 @@ foreach ($rows as $row) {
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
+    <?php include("include/stock-viewer-style.php"); ?>
 </head>
 <body>
 <div class="app align-content-stretch d-flex flex-wrap">
@@ -62,7 +63,7 @@ foreach ($rows as $row) {
 
                     <div class="row">
                         <div class="col">
-                            <div class="card">
+                            <div class="card wh-card">
                                 <div class="card-body">
                                     <form method="get" class="row g-3 align-items-end">
                                         <div class="col-md-6">
@@ -84,7 +85,7 @@ foreach ($rows as $row) {
 <?php if ($selectedWarehouseId !== null && !empty($rows)): ?>
                     <div class="row">
                         <div class="col-md-12 mb-4">
-                            <div class="card"><div class="card-body">
+                            <div class="card wh-card"><div class="card-body">
                                 <h5>Closing Qty by Company Profile</h5>
                                 <div id="chartByProfile"></div>
                             </div></div>
@@ -93,10 +94,10 @@ foreach ($rows as $row) {
 
                     <div class="row">
                         <div class="col">
-                            <div class="card">
+                            <div class="card wh-card">
                                 <div class="card-body">
-                                    <div style="background:#fff;overflow:scroll;width:100%;">
-                                    <table class="table">
+                                    <div class="table-responsive">
+                                    <table class="table table-hover wh-table">
                                         <thead>
                                             <tr>
                                                 <th>Company Profile</th>
@@ -122,7 +123,7 @@ foreach ($rows as $row) {
                         </div>
                     </div>
 <?php elseif ($selectedWarehouseId !== null): ?>
-                    <div class="row"><div class="col"><div class="alert alert-info">No stock recorded for this warehouse yet.</div></div></div>
+                    <div class="row"><div class="col"><div class="card wh-card"><div class="card-body"><div class="wh-empty"><i class="material-icons-outlined">inventory_2</i>No stock recorded for this warehouse yet.</div></div></div></div></div>
 <?php endif; ?>
 
                 </div>
@@ -146,8 +147,10 @@ new ApexCharts(document.querySelector('#chartByProfile'), {
     chart: { type: 'bar', height: 280, toolbar: { show: false } },
     series: [{ name: 'Closing Qty', data: Object.values(byProfile) }],
     xaxis: { categories: Object.keys(byProfile) },
-    colors: ['#1BC5BD'],
-    dataLabels: { enabled: false }
+    colors: ['#3f51b5'],
+    plotOptions: { bar: { borderRadius: 6, columnWidth: '40%' } },
+        dataLabels: { enabled: false },
+        grid: { borderColor: '#eef2f6' }
 }).render();
 </script>
 <?php endif; ?>

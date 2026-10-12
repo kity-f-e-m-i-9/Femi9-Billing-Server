@@ -2,7 +2,15 @@
     <ul class="accordion-menu">
 
         <li>
-            <a href="dashboard.php"><i class="material-icons-two-tone">dashboard</i>Stock by Godown</a>
+            <a href="dashboard.php"><i class="material-icons-two-tone">warehouse</i>Stock by Godown</a>
+        </li>
+
+        <li>
+            <a href="stock-by-profile.php"><i class="material-icons-two-tone">store</i>Stock by Company Profile</a>
+        </li>
+
+        <li>
+            <a href="stock-by-product.php"><i class="material-icons-two-tone">inventory_2</i>Stock by Product</a>
         </li>
 
         <li>

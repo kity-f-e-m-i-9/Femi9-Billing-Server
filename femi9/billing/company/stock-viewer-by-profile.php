@@ -41,6 +41,7 @@ foreach ($rows as $row) {
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
+    <?php include("include/stock-viewer-style.php"); ?>
 </head>
 <body>
 <div class="app align-content-stretch d-flex flex-wrap">
@@ -59,7 +60,7 @@ foreach ($rows as $row) {
 
                     <div class="row">
                         <div class="col">
-                            <div class="card">
+                            <div class="card wh-card">
                                 <div class="card-body">
                                     <div class="row g-3 align-items-end">
                                         <div class="col-md-4">
@@ -108,13 +109,13 @@ foreach ($rows as $row) {
             $cardFilterWh = 'wh-' . $whKey;
         }
 ?>
-                    <div class="row wh-card" data-profile="cp-<?=$profileId;?>" data-warehouse="<?=$cardFilterWh;?>">
+                    <div class="row stock-card" data-profile="cp-<?=$profileId;?>" data-warehouse="<?=$cardFilterWh;?>">
                         <div class="col">
-                            <div class="card">
+                            <div class="card wh-card">
                                 <div class="card-body">
-                                    <h1><?=htmlspecialchars($profile['gname'], ENT_QUOTES, 'UTF-8');?> &mdash; <?=htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8');?></h1>
-                                    <div style="background:#fff;overflow:scroll;width:100%;">
-                                    <table class="table">
+                                    <h5 class="mb-2"><i class="material-icons-outlined" style="vertical-align:middle;margin-right:6px;color:#3f51b5;">store</i><?=htmlspecialchars($profile['gname'], ENT_QUOTES, 'UTF-8');?> &mdash; <?=htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8');?></h5>
+                                    <div class="table-responsive">
+                                    <table class="table table-hover wh-table">
                                         <thead>
                                             <tr>
                                                 <th>Product Name</th>
@@ -125,7 +126,7 @@ foreach ($rows as $row) {
 <?php foreach ($bucket['rows'] as $row): ?>
                                             <tr class="product-row" data-product-name="<?=htmlspecialchars(strtolower($row['productName']), ENT_QUOTES, 'UTF-8');?>">
                                                 <td><?=htmlspecialchars($row['productName'], ENT_QUOTES, 'UTF-8');?></td>
-                                                <td align="right"><b><?=(int)$row['closing_qty'];?></b></td>
+                                                <td align="right"><b><?=number_format((int)$row['closing_qty']);?></b><?=((int)$row['closing_qty'] < STOCK_VIEWER_LOW_STOCK_THRESHOLD) ? ' <span class="wh-badge-low">Low</span>' : '';?></td>
                                             </tr>
 <?php endforeach; ?>
                                         </tbody>
@@ -159,7 +160,7 @@ function applyStockFilters() {
     var checkedProfiles = Array.prototype.slice.call(document.querySelectorAll('.profile-filter-check:checked')).map(function (cb) { return cb.value; });
     var checkedWarehouses = Array.prototype.slice.call(document.querySelectorAll('.warehouse-filter-check:checked')).map(function (cb) { return cb.value; });
 
-    document.querySelectorAll('.wh-card').forEach(function (card) {
+    document.querySelectorAll('.stock-card').forEach(function (card) {
         var profileVisible = checkedProfiles.indexOf(card.getAttribute('data-profile')) !== -1;
         var warehouseVisible = checkedWarehouses.indexOf(card.getAttribute('data-warehouse')) !== -1;
         if (!profileVisible || !warehouseVisible) {
