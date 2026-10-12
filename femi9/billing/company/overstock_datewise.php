@@ -319,10 +319,14 @@ $renderMovementTable = function($thisDate, $idsSqlForLeaf, $warehouseCondForBuck
 						<?php // Opening stock, like Closing Stock, is only meaningful once scoped
 						// to specific company godown(s) — see the Closing Stock column's note
 						// below for the full rationale. ?>
-						<td align="right"><?php echo $filterByGodown ? $openingStock : '—'; ?></td>
-						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $filterByGodown ? $openingStock*$PiecesPerPack : '—'; ?></td><?php endif; ?>
-						<td align="right"><?php echo $m['input_qty'];?></td>
-						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['input_qty']*$PiecesPerPack;?></td><?php endif; ?>
+						<td align="right"<?php if ($filterByGodown && $openingStock < 0): ?> title="Net figure is <?=$openingStock;?> (an earlier reversal outweighed input at the time); shown as 0"<?php endif; ?>><?php echo $filterByGodown ? max(0, $openingStock) : '—'; ?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $filterByGodown ? max(0, $openingStock)*$PiecesPerPack : '—'; ?></td><?php endif; ?>
+						<?php // A same-day reversal can outweigh a same-day fresh transfer-in,
+						// making the net figure negative — mathematically correct (Closing
+						// below already accounts for it) but reads oddly as "input". Shown
+						// as 0 with a tooltip instead of a bare negative number. ?>
+						<td align="right"<?php if ($m['input_qty'] < 0): ?> title="Net figure is <?=$m['input_qty'];?> (a same-day reversal outweighed new input); shown as 0"<?php endif; ?>><?php echo max(0, $m['input_qty']);?></td>
+						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo max(0, $m['input_qty'])*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $m['total_sales'];?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sales']*$PiecesPerPack;?></td><?php endif; ?>
 						<td align="right"><?php echo $m['dfd_qty'];?></td>

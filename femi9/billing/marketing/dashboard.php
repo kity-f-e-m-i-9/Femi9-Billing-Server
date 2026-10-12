@@ -111,6 +111,56 @@ if (!empty($allTpIds)) {
 
 $balanceTarget = max($districtStats['district_total_target'] - $invoicedAmount, 0);
 
+// ── District Managers under this person — clickable list, each showing their
+// own assigned district(s) + target/achieved/balance for the same period.
+// "DM" = whichever marketing_team_levels row has "District" in its name, same
+// convention ms-team-view.php uses for the "District" label under a branch.
+require_once __DIR__ . '/../company/include/TeamTargetRollup.php';
+$myDms = [];
+$_staffRows = $db_conn->query("
+    SELECT ms.id, ms.ms_name, ms.manager_id, tl.level_name
+    FROM marketing_staff ms
+    LEFT JOIN marketing_team_levels tl ON tl.id = ms.team_level_id
+    WHERE ms.deleted_at IS NULL
+")->fetch_all(MYSQLI_ASSOC);
+$_byManager = [];
+foreach ($_staffRows as $row) {
+    $_byManager[$row['manager_id'] ? (int)$row['manager_id'] : 0][] = $row;
+}
+// BFS from the logged-in person down through every level (not just direct
+// reports) to collect every DM anywhere below them in the chain.
+$_queue = [$msId];
+$_dmCandidates = [];
+while (!empty($_queue)) {
+    $_cur = array_shift($_queue);
+    foreach ($_byManager[$_cur] ?? [] as $_child) {
+        if (stripos($_child['level_name'] ?? '', 'District') !== false) {
+            $_dmCandidates[] = $_child;
+        }
+        $_queue[] = (int)$_child['id'];
+    }
+}
+if (!empty($_dmCandidates)) {
+    $_dmIds = array_column($_dmCandidates, 'id');
+    $_dmTargetStats = getRawTargetAchievedStats($db_conn, $_dmIds, $from, $to);
+    foreach ($_dmCandidates as $_dm) {
+        $_dmId = (int)$_dm['id'];
+        $_dmDistricts = getMsAssignedDistricts($db_conn, $_dmId);
+        $_dmDistrictLabel = !empty($_dmDistricts) ? implode(', ', array_column($_dmDistricts, 'name')) : 'No District Assigned';
+        $_t = $_dmTargetStats[$_dmId]['target'] ?? 0.0;
+        $_a = $_dmTargetStats[$_dmId]['achieved'] ?? 0.0;
+        $myDms[] = [
+            'id'       => $_dmId,
+            'name'     => $_dm['ms_name'],
+            'district' => $_dmDistrictLabel,
+            'target'   => $_t,
+            'achieved' => $_a,
+            'balance'  => max($_t - $_a, 0),
+        ];
+    }
+    usort($myDms, fn($a, $b) => strcmp($a['name'], $b['name']));
+}
+
 // TP roster for the tabs — All / Active / Inactive.
 $tpRoster = [];
 if (!empty($allTpIds)) {
@@ -355,6 +405,56 @@ $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_activ
                                 </div>
                             </div>
                         </div>
+
+                        <?php if (!empty($myDms)): ?>
+                        <!-- District Managers under this person -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="main-card">
+                                    <div class="main-card-header">
+                                        <div class="main-card-header-left">
+                                            <div class="header-icon-box"><i class="material-icons-outlined">groups</i></div>
+                                            <div>
+                                                <p class="header-title">My District Managers</p>
+                                                <p class="header-sub">Click a name to see their district + target/achieved/balance</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="padding:14px 18px;">
+                                        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                                            <?php foreach ($myDms as $_i => $_dm): ?>
+                                            <span class="dm-name-chip" data-dm-idx="<?php echo $_i; ?>"
+                                                  style="cursor:pointer;padding:6px 14px;border-radius:20px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:600;">
+                                                <?php echo htmlspecialchars($_dm['name']); ?>
+                                            </span>
+                                            <?php endforeach; ?>
+                                        </div>
+                                        <?php foreach ($myDms as $_i => $_dm): ?>
+                                        <div class="dm-detail-card" data-dm-idx="<?php echo $_i; ?>" style="display:none;margin-top:14px;padding:14px 16px;border:1px solid #e5e7eb;border-radius:10px;background:#fafafa;">
+                                            <p style="margin:0 0 10px;font-weight:700;color:#1f2937;"><?php echo htmlspecialchars($_dm['name']); ?></p>
+                                            <p style="margin:0 0 10px;font-size:12.5px;color:#6b7280;">District: <b style="color:#374151;"><?php echo htmlspecialchars($_dm['district']); ?></b></p>
+                                            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                                                <span class="chain-pill" style="background:#eee;color:#333;padding:5px 12px;border-radius:14px;font-size:12.5px;">Target: &#8377;<?php echo inr_format($_dm['target'], 0); ?></span>
+                                                <span class="chain-pill" style="background:#eee;color:#333;padding:5px 12px;border-radius:14px;font-size:12.5px;">Achieved: &#8377;<?php echo inr_format($_dm['achieved'], 0); ?></span>
+                                                <span class="chain-pill" style="background:#eee;color:#333;padding:5px 12px;border-radius:14px;font-size:12.5px;">Balance: &#8377;<?php echo inr_format($_dm['balance'], 0); ?></span>
+                                            </div>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <script>
+                        document.querySelectorAll('.dm-name-chip').forEach(function(chip) {
+                            chip.addEventListener('click', function() {
+                                var idx = this.getAttribute('data-dm-idx');
+                                document.querySelectorAll('.dm-detail-card').forEach(function(card) {
+                                    card.style.display = (card.getAttribute('data-dm-idx') === idx && card.style.display === 'none') ? 'block' : 'none';
+                                });
+                            });
+                        });
+                        </script>
+                        <?php endif; ?>
 
                         <!-- Shop Invoices (full width) -->
                         <div class="row">

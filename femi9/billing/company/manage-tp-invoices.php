@@ -56,6 +56,16 @@ $filter_date_from   = trim($_GET['date_from'] ?? '');
 $filter_date_to     = trim($_GET['date_to']   ?? '');
 $filter_type        = $_GET['type_filter'] ?? '';
 if (!in_array($filter_type, ['napkin', 'diaper'], true)) $filter_type = '';
+// Source = a specific Channel Partner or Company Godown the invoice was
+// billed through — a distinct dimension from "Location" above, which only
+// ever filters tpi.source_location_id and leaves godown-sourced invoices
+// (source_location_id NULL, see the godown LEFT JOIN below) unreachable.
+// Encoded as "cp:<id>" or "gd:<id>" in one dropdown/link since the two live
+// in different columns (source_cp_id / source_godown_id).
+$filter_src_raw = trim($_GET['src'] ?? '');
+$filter_src_cp_id = 0; $filter_src_godown_id = 0;
+if (preg_match('/^cp:(\d+)$/', $filter_src_raw, $m)) { $filter_src_cp_id = (int)$m[1]; }
+elseif (preg_match('/^gd:(\d+)$/', $filter_src_raw, $m)) { $filter_src_godown_id = (int)$m[1]; }
 
 // ── Filter dropdown data ───────────────────────────────────────────────────────
 // States = depth-2 nodes that are ancestors of (or equal to) any source_location used in invoices
@@ -84,6 +94,39 @@ $locations_res = $db_conn->query("
     ORDER BY pln.name
 ");
 $locations = $locations_res ? $locations_res->fetch_all(MYSQLI_ASSOC) : [];
+
+// Sources (Channel Partners + Godowns) that actually have invoices within
+// the CURRENT date filter — scoped to the date range (not the Location/TP
+// filters) so the dropdown always answers "who got invoiced in this
+// period", same question the date filter itself is already answering.
+$srcDateWhere = '';
+$srcParams = []; $srcTypes = '';
+if ($filter_date_from !== '') { $srcDateWhere .= ' AND tpi.invoice_date >= ?'; $srcParams[] = $filter_date_from; $srcTypes .= 's'; }
+if ($filter_date_to   !== '') { $srcDateWhere .= ' AND tpi.invoice_date <= ?'; $srcParams[] = $filter_date_to;   $srcTypes .= 's'; }
+// channel_partners.name (utf8mb4_unicode_ci) and company_godown.gname
+// (utf8mb4_general_ci) have different collations — a bare UNION ALL across
+// them errors with "Illegal mix of collations"; COLLATE normalizes both
+// sides to the same one for ordering/comparison purposes only.
+$srcSql = "
+    SELECT 'cp' AS src_type, cp.id AS src_id, cp.name COLLATE utf8mb4_general_ci AS src_name, cp.cp_id AS src_code
+    FROM channel_partners cp
+    WHERE EXISTS (SELECT 1 FROM tp_invoices tpi WHERE tpi.source_cp_id = cp.id $srcDateWhere)
+    UNION ALL
+    SELECT 'gd' AS src_type, gd.id AS src_id, gd.gname COLLATE utf8mb4_general_ci AS src_name, '' AS src_code
+    FROM company_godown gd
+    WHERE " . godown_finance_filter_sql($db_conn, 'gd') . "
+      AND EXISTS (SELECT 1 FROM tp_invoices tpi WHERE tpi.source_godown_id = gd.id $srcDateWhere)
+    ORDER BY src_name
+";
+if ($srcParams) {
+    $stmtSrc = $db_conn->prepare($srcSql);
+    $stmtSrc->bind_param(str_repeat($srcTypes, 2), ...array_merge($srcParams, $srcParams));
+    $stmtSrc->execute();
+    $sources = $stmtSrc->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmtSrc->close();
+} else {
+    $sources = $db_conn->query($srcSql)->fetch_all(MYSQLI_ASSOC);
+}
 
 // TPs with invoices — collect all location_ids per TP for cascade
 // (company-issued only — see $where below for why)
@@ -159,13 +202,24 @@ if ($filter_type !== '') {
     $types   .= 's';
 }
 
+if ($filter_src_cp_id > 0) {
+    $where[]  = "tpi.source_cp_id = ?";
+    $params[] = $filter_src_cp_id;
+    $types   .= 'i';
+} elseif ($filter_src_godown_id > 0) {
+    $where[]  = "tpi.source_godown_id = ?";
+    $params[] = $filter_src_godown_id;
+    $types   .= 'i';
+}
+
 $where_sql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
 $sql = "
     SELECT tpi.id, tpi.invoice_number, tpi.invoice_date, tpi.total_amount,
            tpi.rwpoints_enable, tpi.product_type,
            COALESCE(tpi.courier_charges, 0) AS courier_charges,
-           tpi.created_by, tpi.created_at,
+           tpi.created_by, tpi.created_by_user_type, tpi.created_at,
+           tpi.source_cp_id, tpi.source_godown_id,
            tp.name AS tp_name, tp.tp_id AS tp_code, tp.mobile AS tp_mobile,
            COALESCE(cp_src.name, gd.gname, pln.name) AS source_location,
            COALESCE(cp_src.name, cp_old.name) AS cp_name,
@@ -433,13 +487,27 @@ $i = 0;
                                     </select>
                                 </div>
                                 <div class="col-lg-3 col-sm-6">
+                                    <label class="form-label">
+                                        <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">store</i>
+                                        Source (CP / Godown)
+                                    </label>
+                                    <select name="src" class="form-control">
+                                        <option value="">All Sources</option>
+                                        <?php foreach ($sources as $src): $srcVal = $src['src_type'] . ':' . $src['src_id']; ?>
+                                        <option value="<?php echo htmlspecialchars($srcVal); ?>" <?php echo $filter_src_raw === $srcVal ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($src['src_name']); ?><?php echo $src['src_code'] ? ' (' . htmlspecialchars($src['src_code']) . ')' : ''; ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-lg-3 col-sm-6">
                                     <label class="form-label" style="visibility:hidden;">.</label>
                                     <div style="display:flex;gap:8px;align-items:center;">
                                         <button type="submit" class="btn-filter">
                                             <i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">filter_list</i>
                                             Filter
                                         </button>
-                                        <?php if ($filter_state_id || !empty($filter_location_ids) || $filter_tp_id || $filter_date_from || $filter_date_to || $filter_type): ?>
+                                        <?php if ($filter_state_id || !empty($filter_location_ids) || $filter_tp_id || $filter_date_from || $filter_date_to || $filter_type || $filter_src_raw): ?>
                                         <a href="manage-tp-invoices" class="btn-clear">
                                             <i class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:3px;">close</i>
                                             Clear
@@ -485,15 +553,15 @@ $i = 0;
                             <span class="card-header-title">
                                 <i class="material-icons-outlined">receipt_long</i>
                                 All TP Invoices
-                                <?php if ($filter_state_id || !empty($filter_location_ids) || $filter_tp_id || $filter_date_from || $filter_date_to): ?>
+                                <?php if ($filter_state_id || !empty($filter_location_ids) || $filter_tp_id || $filter_date_from || $filter_date_to || $filter_src_raw): ?>
                                 <span class="filter-active-badge">Filtered</span>
                                 <?php endif; ?>
                             </span>
                             <span style="display:flex;gap:8px;">
                                 <?php
                                 // Same filters currently applied to the on-screen list (state/location(s)/
-                                // TP/date range/type) get carried straight into the export, so what's
-                                // downloaded always matches what's showing.
+                                // TP/date range/type/source) get carried straight into the export and the
+                                // bulk-print page, so what's downloaded/printed always matches what's showing.
                                 $exportQuery = http_build_query(array_filter([
                                     'state_id'    => $filter_state_id ?: null,
                                     'location_id' => $filter_location_ids ?: null,
@@ -501,8 +569,15 @@ $i = 0;
                                     'date_from'   => $filter_date_from ?: null,
                                     'date_to'     => $filter_date_to ?: null,
                                     'type_filter' => $filter_type ?: null,
+                                    'src'         => $filter_src_raw ?: null,
                                 ]));
                                 ?>
+                                <?php if ($total_count > 0): ?>
+                                <a href="manage-tp-invoices-bulk-print.php?<?php echo htmlspecialchars($exportQuery); ?>" target="_blank" rel="noopener" class="btn-add" style="background:linear-gradient(135deg,#0369a1 0%,#0284c7 100%);">
+                                    <i class="material-icons-outlined" style="font-size:16px;">print</i>
+                                    Print All (<?php echo $total_count; ?>)
+                                </a>
+                                <?php endif; ?>
                                 <a href="export-tp-invoices-xlsx.php?<?php echo htmlspecialchars($exportQuery); ?>" class="btn-add" style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);">
                                     <i class="material-icons-outlined" style="font-size:16px;">download</i>
                                     Export Excel
@@ -550,7 +625,27 @@ $i = 0;
                                                 <span style="font-weight:600;font-size:13.5px;"><?php echo htmlspecialchars($inv['tp_name']); ?></span><br>
                                                 <small style="color:#9ca3af;font-size:11px;"><?php echo htmlspecialchars($inv['tp_code']); ?></small>
                                             </td>
-                                            <td style="font-size:13.5px;"><?php echo htmlspecialchars($inv['source_location']); ?></td>
+                                            <td style="font-size:13.5px;">
+                                                <?php
+                                                // Clicking the source name re-filters the whole list (and
+                                                // "Print All") down to just that CP/Godown, for the currently
+                                                // applied date range — same encoding as the Source dropdown above.
+                                                $_srcVal = '';
+                                                if ((int)($inv['source_cp_id'] ?? 0) > 0) { $_srcVal = 'cp:' . (int)$inv['source_cp_id']; }
+                                                elseif ((int)($inv['source_godown_id'] ?? 0) > 0) { $_srcVal = 'gd:' . (int)$inv['source_godown_id']; }
+                                                $_srcHref = htmlspecialchars('manage-tp-invoices?' . http_build_query(array_filter([
+                                                    'date_from' => $filter_date_from ?: null,
+                                                    'date_to'   => $filter_date_to ?: null,
+                                                    'type_filter' => $filter_type ?: null,
+                                                    'src'       => $_srcVal ?: null,
+                                                ])));
+                                                ?>
+                                                <?php if ($_srcVal): ?>
+                                                    <a href="<?php echo $_srcHref; ?>" style="color:#4338ca;text-decoration:none;" title="Filter to this source"><?php echo htmlspecialchars($inv['source_location']); ?></a>
+                                                <?php else: ?>
+                                                    <?php echo htmlspecialchars($inv['source_location']); ?>
+                                                <?php endif; ?>
+                                            </td>
                                             <td style="font-size:13.5px;">
                                                 <?php if ($inv['cp_name']): ?>
                                                     <?php echo htmlspecialchars($inv['cp_name']); ?><br>
@@ -596,7 +691,12 @@ $i = 0;
                                                     </span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td style="font-size:13px;color:#6b7280;"><?php echo htmlspecialchars($inv['created_by']); ?></td>
+                                            <td style="font-size:13px;color:#6b7280;">
+                                                <?php echo htmlspecialchars($inv['created_by']); ?>
+                                                <?php if (($inv['created_by_user_type'] ?? '') === 'super_stockiest'): ?>
+                                                    <br><span class="badge badge-style-bordered badge-warning" style="font-size:10px;">Super Stockist</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td style="white-space:nowrap;font-size:12.5px;color:#4b5563;">
                                                 <?php if (!empty($inv['created_at'])): ?>
                                                 <?php echo date('d M Y', strtotime($inv['created_at'])); ?><br>

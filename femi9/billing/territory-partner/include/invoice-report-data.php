@@ -15,10 +15,16 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
             "SELECT ui.inv_id, ui.inv_number, ui.date, ui.sub_total, ui.total,
                     s.name AS party_name, s.mobile_number AS party_mobile, s.country_code, s.address AS party_address,
                     s.gstin AS party_gstin,
-                    COALESCE(r.received,0) AS received
+                    COALESCE(r.cash_received,0) AS cash_received,
+                    COALESCE(r.cn_received,0) AS cn_received
              FROM user_invoice ui
              LEFT JOIN shop s ON s.temp_id = ui.to_user_id
-             LEFT JOIN (SELECT inv_id, SUM(received) received FROM receipt GROUP BY inv_id) r ON r.inv_id = ui.inv_id
+             LEFT JOIN (
+                 SELECT inv_id,
+                        SUM(CASE WHEN payment_type = 'credit_note' THEN 0 ELSE received END) AS cash_received,
+                        SUM(CASE WHEN payment_type = 'credit_note' THEN received ELSE 0 END) AS cn_received
+                 FROM receipt GROUP BY inv_id
+             ) r ON r.inv_id = ui.inv_id
              WHERE ui.from_user_id = ? AND ui.from_user_type = ? AND ui.to_user_type = 'shop'
                AND ui.sub_total > 0 AND ui.date BETWEEN ? AND ?
              ORDER BY ui.date DESC, ui.id DESC"
@@ -36,7 +42,9 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
                 'address'  => $r['party_address'] ?? '',
                 'gstin'    => $r['party_gstin'] ?? '',
                 'total'    => (float)$r['total'],
-                'received' => (float)$r['received'],
+                'cash'     => (float)$r['cash_received'],
+                'cn'       => (float)$r['cn_received'],
+                'received' => (float)$r['cash_received'] + (float)$r['cn_received'],
             ];
         }
         $stmt->close();
@@ -46,10 +54,16 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
         $stmt = $db_conn->prepare(
             "SELECT i.inv_id, i.inv_number, i.date, i.sub_total, i.total,
                     c.name AS party_name, c.mobile AS party_mobile, c.gstin AS party_gstin,
-                    COALESCE(r.received,0) AS received
+                    COALESCE(r.cash_received,0) AS cash_received,
+                    COALESCE(r.cn_received,0) AS cn_received
              FROM invoice i
              LEFT JOIN customers c ON c.id = i.customer_id
-             LEFT JOIN (SELECT inv_id, SUM(received) received FROM receipt GROUP BY inv_id) r ON r.inv_id = i.inv_id
+             LEFT JOIN (
+                 SELECT inv_id,
+                        SUM(CASE WHEN payment_type = 'credit_note' THEN 0 ELSE received END) AS cash_received,
+                        SUM(CASE WHEN payment_type = 'credit_note' THEN received ELSE 0 END) AS cn_received
+                 FROM receipt GROUP BY inv_id
+             ) r ON r.inv_id = i.inv_id
              WHERE i.user_id = ? AND i.user_type = ?
                AND i.sub_total > 0 AND i.date BETWEEN ? AND ?
              ORDER BY i.date DESC, i.id DESC"
@@ -67,7 +81,9 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
                 'address'  => '',
                 'gstin'    => $r['party_gstin'] ?? '',
                 'total'    => (float)$r['total'],
-                'received' => (float)$r['received'],
+                'cash'     => (float)$r['cash_received'],
+                'cn'       => (float)$r['cn_received'],
+                'received' => (float)$r['cash_received'] + (float)$r['cn_received'],
             ];
         }
         $stmt->close();
@@ -76,10 +92,17 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
     usort($invoices, fn($a, $b) => strtotime($b['date']) <=> strtotime($a['date']));
 
     $filtered = [];
-    $grand_total = 0; $grand_received = 0;
+    $grand_total = 0; $grand_received = 0; $grand_cn = 0;
     foreach ($invoices as $inv) {
         $due = max(0, $inv['total'] - $inv['received']);
-        if ($inv['received'] <= 0) {
+        // 'received' here is cash + credit-note credit combined (see $inv['cash'] /
+        // $inv['cn'] above) — an invoice settled purely by a credit note (no real
+        // cash) still reads 'fully_paid' here so Due/filter behaviour is unchanged,
+        // but 'returned' flags that case separately so a GST-filing read of this
+        // report doesn't mistake a return for an actual payment collected.
+        if ($inv['cash'] <= 0 && $inv['cn'] > 0 && ($inv['received'] + 0.01) >= $inv['total']) {
+            $status = 'returned';
+        } elseif ($inv['received'] <= 0) {
             $status = 'not_paid';
         } elseif (($inv['received'] + 0.01) >= $inv['total']) {
             $status = 'fully_paid';
@@ -87,7 +110,7 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
             $status = 'partially_paid';
         }
 
-        if ($statusFilter !== 'all' && $status !== $statusFilter) continue;
+        if ($statusFilter !== 'all' && $status !== $statusFilter && !($statusFilter === 'fully_paid' && $status === 'returned')) continue;
         if ($searchTerm !== '' && stripos($inv['party'] . ' ' . $inv['mobile'] . ' ' . $inv['inv_no'], $searchTerm) === false) continue;
 
         $inv['due']    = $due;
@@ -95,14 +118,16 @@ function tp_invoice_report_fetch(mysqli $db_conn, int $uid, string $utype, strin
         $filtered[] = $inv;
 
         $grand_total    += $inv['total'];
-        $grand_received += $inv['received'];
+        $grand_received += $inv['cash'];
+        $grand_cn       += $inv['cn'];
     }
 
     return [
         'rows'           => $filtered,
         'grand_total'    => $grand_total,
         'grand_received' => $grand_received,
-        'grand_due'      => max(0, $grand_total - $grand_received),
+        'grand_cn'       => $grand_cn,
+        'grand_due'      => max(0, $grand_total - $grand_received - $grand_cn),
         'shop_count'     => count(array_filter($filtered, fn($i) => $i['kind'] === 'shop')),
         'cust_count'     => count(array_filter($filtered, fn($i) => $i['kind'] === 'customer')),
     ];
