@@ -41,7 +41,7 @@ if ($tab === 'transactions') {
         fputcsv($out, [
             date('d-M-Y H:i', strtotime($r['created_at'])),
             ucfirst($r['type']),
-            'Bundle #' . $r['bundle_id'],
+            'Bundle #' . ($r['bundle_no'] ?? $r['bundle_id']),
             $r['product_name'],
             $r['gname'],
             $r['warehouse_code'] ?? '',

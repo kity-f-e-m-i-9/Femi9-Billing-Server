@@ -192,6 +192,7 @@ $totalExcess   = array_sum(array_column($byProduct, 'excess'));
                     <div class="ata-nav-tabs">
                         <a href="raw-material-bundles-by-product.php" class="ata-nav-tab active"><i class="material-icons-outlined">inventory_2</i> Manage Bundles by Product</a>
                         <a href="raw-material-bundles-manage.php" class="ata-nav-tab"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
+                        <a href="raw-material-bundle-transfer.php" class="ata-nav-tab"><i class="material-icons-outlined">swap_horiz</i> Bundle Transfer</a>
                     </div>
 
                     <?php if ($totalBundles > 0): ?>

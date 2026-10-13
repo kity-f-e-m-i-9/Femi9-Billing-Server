@@ -66,6 +66,10 @@ function ensure_raw_material_bundles_table(mysqli $db_conn): void
             input_ref_id VARCHAR(64) NULL,
             carried_to_bundle_id INT NULL,
             carried_from_bundle_id INT NULL,
+            transferred_to_bundle_id INT NULL,
+            transferred_from_bundle_id INT NULL,
+            transfer_ref_id VARCHAR(64) NULL,
+            bundle_no INT NULL,
             closed_by VARCHAR(100) NULL,
             closed_at TIMESTAMP NULL,
             created_by VARCHAR(100) NULL,
@@ -82,12 +86,79 @@ function ensure_raw_material_bundles_table(mysqli $db_conn): void
         'added_extra_pieces'     => "INT NOT NULL DEFAULT 0 AFTER damaged_pieces",
         'carried_to_bundle_id'   => "INT NULL AFTER input_ref_id",
         'carried_from_bundle_id' => "INT NULL AFTER carried_to_bundle_id",
+        'transferred_to_bundle_id'   => "INT NULL AFTER carried_from_bundle_id",
+        'transferred_from_bundle_id' => "INT NULL AFTER transferred_to_bundle_id",
+        'transfer_ref_id'            => "VARCHAR(64) NULL AFTER transferred_from_bundle_id",
+        'bundle_no'                  => "INT NULL AFTER transfer_ref_id",
     ] as $columnName => $definition) {
         $col = $db_conn->query("SHOW COLUMNS FROM raw_material_bundles LIKE '$columnName'");
         if ($col && $col->num_rows === 0) {
             $db_conn->query("ALTER TABLE raw_material_bundles ADD COLUMN $columnName $definition");
         }
     }
+
+    backfill_raw_material_bundle_numbers($db_conn);
+}
+
+/**
+ * Bundle numbers (the "#N" operators see) restart at 1 for every
+ * (company profile, warehouse) — the table's own auto-increment id stays
+ * the internal key. Gives any row without a bundle_no the next number in
+ * its location, oldest first, continuing after the highest existing one.
+ */
+function backfill_raw_material_bundle_numbers(mysqli $db_conn): void
+{
+    $probe = $db_conn->query("SELECT 1 FROM raw_material_bundles WHERE bundle_no IS NULL LIMIT 1");
+    if (!$probe || $probe->num_rows === 0) {
+        return;
+    }
+    $counters = [];
+    $res = $db_conn->query(
+        "SELECT company_godown_id, warehouse_id, MAX(bundle_no) AS m
+         FROM raw_material_bundles WHERE bundle_no IS NOT NULL GROUP BY company_godown_id, warehouse_id"
+    );
+    while ($r = $res->fetch_assoc()) {
+        $counters[$r['company_godown_id'] . '|' . ($r['warehouse_id'] ?? 'N')] = (int) $r['m'];
+    }
+    $upd = $db_conn->prepare("UPDATE raw_material_bundles SET bundle_no = ? WHERE id = ?");
+    $rows = $db_conn->query(
+        "SELECT id, company_godown_id, warehouse_id FROM raw_material_bundles WHERE bundle_no IS NULL ORDER BY id ASC"
+    )->fetch_all(MYSQLI_ASSOC);
+    foreach ($rows as $r) {
+        $k = $r['company_godown_id'] . '|' . ($r['warehouse_id'] ?? 'N');
+        $counters[$k] = ($counters[$k] ?? 0) + 1;
+        $no = $counters[$k];
+        $id = (int) $r['id'];
+        $upd->bind_param('ii', $no, $id);
+        $upd->execute();
+    }
+    $upd->close();
+}
+
+/** Next bundle number within one (company profile, warehouse). */
+function next_raw_material_bundle_no(mysqli $db_conn, int $companyGodownId, ?int $warehouseId): int
+{
+    $stmt = $db_conn->prepare(
+        "SELECT COALESCE(MAX(bundle_no), 0) + 1 AS n FROM raw_material_bundles
+         WHERE company_godown_id = ? AND warehouse_id <=> ? FOR UPDATE"
+    );
+    $stmt->bind_param('ii', $companyGodownId, $warehouseId);
+    $stmt->execute();
+    $n = (int) $stmt->get_result()->fetch_assoc()['n'];
+    $stmt->close();
+    return $n;
+}
+
+/** Display number for one bundle id (falls back to the id). */
+function raw_material_bundle_display_no(mysqli $db_conn, ?int $bundleId): string
+{
+    if (!$bundleId) return '?';
+    $stmt = $db_conn->prepare("SELECT bundle_no FROM raw_material_bundles WHERE id = ?");
+    $stmt->bind_param('i', $bundleId);
+    $stmt->execute();
+    $r = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $r && $r['bundle_no'] !== null ? (string) $r['bundle_no'] : (string) $bundleId;
 }
 
 /**
@@ -195,14 +266,15 @@ function create_raw_material_bundles(
     ensure_raw_material_bundles_table($db_conn);
     $stmt = $db_conn->prepare(
         "INSERT INTO raw_material_bundles
-            (raw_product_id, company_godown_id, warehouse_id, nominal_pieces, remaining_pieces, input_ref_id, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
+            (raw_product_id, company_godown_id, warehouse_id, nominal_pieces, remaining_pieces, input_ref_id, created_by, bundle_no)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $ids = [];
     for ($i = 0; $i < $bundleCount; $i++) {
+        $bundleNo = next_raw_material_bundle_no($db_conn, $companyGodownId, $warehouseId);
         $stmt->bind_param(
-            'iiiiiss',
-            $rawProductId, $companyGodownId, $warehouseId, $nominalPieces, $nominalPieces, $inputRefId, $createdBy
+            'iiiiissi',
+            $rawProductId, $companyGodownId, $warehouseId, $nominalPieces, $nominalPieces, $inputRefId, $createdBy, $bundleNo
         );
         $stmt->execute();
         $ids[] = (int) $db_conn->insert_id;
@@ -224,7 +296,7 @@ function get_open_raw_material_bundles(mysqli $db_conn, int $rawProductId, int $
 {
     ensure_raw_material_bundles_table($db_conn);
     $stmt = $db_conn->prepare(
-        "SELECT b.id, b.remaining_pieces, b.nominal_pieces, b.created_at, p.productName
+        "SELECT b.id, b.bundle_no, b.remaining_pieces, b.nominal_pieces, b.created_at, p.productName
          FROM raw_material_bundles b
          INNER JOIN products p ON p.id = b.raw_product_id
          WHERE b.raw_product_id = ? AND b.company_godown_id = ? AND b.warehouse_id <=> ? AND b.status = 'open'
@@ -239,7 +311,7 @@ function get_open_raw_material_bundles(mysqli $db_conn, int $rawProductId, int $
         $date = date('d-M-Y', strtotime($row['created_at']));
         return [
             'id'               => (int) $row['id'],
-            'label'            => "Bundle #{$row['id']} — {$row['productName']} ($date)",
+            'label'            => "Bundle #" . ($row['bundle_no'] ?? $row['id']) . " — {$row['productName']} ($date)",
             'remaining_pieces' => (int) $row['remaining_pieces'],
             'nominal_pieces'   => (int) $row['nominal_pieces'],
         ];
@@ -614,12 +686,13 @@ function close_raw_material_bundle(mysqli $db_conn, int $bundleId, ?string $clos
             // to hold the carried-forward leftover. nominal_pieces = 0
             // since this isn't a new nominal intake, just relocated
             // material; its own remaining_pieces starts at $leftover.
+            $carryNo = next_raw_material_bundle_no($db_conn, $companyGodownId, $warehouseId);
             $createStmt = $db_conn->prepare(
                 "INSERT INTO raw_material_bundles
-                    (raw_product_id, company_godown_id, warehouse_id, nominal_pieces, remaining_pieces, carried_from_bundle_id, created_by)
-                 VALUES (?, ?, ?, 0, ?, ?, ?)"
+                    (raw_product_id, company_godown_id, warehouse_id, nominal_pieces, remaining_pieces, carried_from_bundle_id, created_by, bundle_no)
+                 VALUES (?, ?, ?, 0, ?, ?, ?, ?)"
             );
-            $createStmt->bind_param('iiiiis', $rawProductId, $companyGodownId, $warehouseId, $leftover, $bundleId, $closedBy);
+            $createStmt->bind_param('iiiiisi', $rawProductId, $companyGodownId, $warehouseId, $leftover, $bundleId, $closedBy, $carryNo);
             $createStmt->execute();
             $carriedToBundleId = (int) $db_conn->insert_id;
             $createStmt->close();
@@ -661,7 +734,7 @@ function reopen_raw_material_bundle(mysqli $db_conn, int $bundleId): bool
     ensure_raw_material_bundle_adjustments_table($db_conn);
 
     $lockStmt = $db_conn->prepare(
-        "SELECT status, carried_to_bundle_id, remaining_pieces FROM raw_material_bundles WHERE id = ? FOR UPDATE"
+        "SELECT status, carried_to_bundle_id, transferred_to_bundle_id, remaining_pieces FROM raw_material_bundles WHERE id = ? FOR UPDATE"
     );
     $lockStmt->bind_param('i', $bundleId);
     $lockStmt->execute();
@@ -673,6 +746,9 @@ function reopen_raw_material_bundle(mysqli $db_conn, int $bundleId): bool
     }
     if ($bundle['status'] !== 'closed') {
         throw new StockException("Only a closed bundle can be reopened.");
+    }
+    if ($bundle['transferred_to_bundle_id'] !== null) {
+        throw new StockException("This bundle was transferred to another company profile/warehouse — undo the transfer from Bundle Transfer instead of reopening it.");
     }
 
     $carriedToBundleId = $bundle['carried_to_bundle_id'] !== null ? (int) $bundle['carried_to_bundle_id'] : null;
@@ -863,10 +939,15 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
     $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
     $stmt = $db_conn->prepare(
-        "SELECT b.id, b.raw_product_id, p.productName, b.company_godown_id, cg.gname,
+        "SELECT b.id, b.bundle_no, b.raw_product_id, p.productName, b.company_godown_id, cg.gname,
+                (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.carried_to_bundle_id) AS carried_to_no,
+                (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.carried_from_bundle_id) AS carried_from_no,
+                (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.transferred_to_bundle_id) AS transferred_to_no,
+                (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.transferred_from_bundle_id) AS transferred_from_no,
                 w.code AS warehouse_code, b.nominal_pieces, b.remaining_pieces,
                 b.damaged_pieces, b.added_extra_pieces, b.status,
                 b.carried_to_bundle_id, b.carried_from_bundle_id,
+                b.transferred_to_bundle_id, b.transferred_from_bundle_id,
                 b.created_by, b.created_at, b.closed_by, b.closed_at
          FROM raw_material_bundles b
          INNER JOIN products p ON p.id = b.raw_product_id
@@ -896,8 +977,13 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
         // material. Excess is independently signaled by added_extra_pieces
         // having been used at least once. Both can apply to the same
         // bundle — shown together when that happens.
+        $transferredToBundleId = $row['transferred_to_bundle_id'] !== null ? (int) $row['transferred_to_bundle_id'] : null;
         $varianceLabel = null;
-        if ($row['status'] === 'closed') {
+        if ($row['status'] === 'closed' && $transferredToBundleId !== null) {
+            // Moved whole to another company profile/warehouse — not a
+            // variance; the fresh bundle there carries on from here.
+            $varianceLabel = "Transferred: $remaining → #" . ($row['transferred_to_no'] ?? $transferredToBundleId);
+        } elseif ($row['status'] === 'closed') {
             $parts = [];
             if ($remaining > 0 && $carriedToBundleId !== null) $parts[] = "Carried forward: $remaining";
             elseif ($remaining > 0) $parts[] = "Short by $remaining"; // defensive fallback — shouldn't happen under current close logic
@@ -907,7 +993,12 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
 
         return [
             'id'                     => (int) $row['id'],
-            'label'                  => "Bundle #{$row['id']} ($date)",
+            'label'                  => "Bundle #" . ($row['bundle_no'] ?? $row['id']) . " ($date)",
+            'bundle_no'              => (int) ($row['bundle_no'] ?? $row['id']),
+            'carried_to_bundle_no'   => $row['carried_to_no'] !== null ? (int) $row['carried_to_no'] : null,
+            'carried_from_bundle_no' => $row['carried_from_no'] !== null ? (int) $row['carried_from_no'] : null,
+            'transferred_to_bundle_no'   => $row['transferred_to_no'] !== null ? (int) $row['transferred_to_no'] : null,
+            'transferred_from_bundle_no' => $row['transferred_from_no'] !== null ? (int) $row['transferred_from_no'] : null,
             'raw_product_id'         => (int) $row['raw_product_id'],
             'product_name'           => $row['productName'],
             'company_godown_id'      => (int) $row['company_godown_id'],
@@ -921,6 +1012,8 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
             'variance_label'         => $varianceLabel,
             'carried_to_bundle_id'   => $carriedToBundleId,
             'carried_from_bundle_id' => $row['carried_from_bundle_id'] !== null ? (int) $row['carried_from_bundle_id'] : null,
+            'transferred_to_bundle_id'   => $transferredToBundleId,
+            'transferred_from_bundle_id' => $row['transferred_from_bundle_id'] !== null ? (int) $row['transferred_from_bundle_id'] : null,
             'created_by'             => $row['created_by'],
             'created_at'             => $row['created_at'],
             'closed_by'              => $row['closed_by'],
@@ -950,7 +1043,7 @@ function get_bundle_conversions(mysqli $db_conn): array
     $rows = $db_conn->query(
         "SELECT d.id AS draw_id, d.ref_id, d.bundle_id, d.pieces_used, d.packs_made,
                 d.created_by, d.created_at,
-                b.status AS bundle_status, b.company_godown_id,
+                b.status AS bundle_status, b.company_godown_id, b.bundle_no,
                 cg.gname, w.code AS warehouse_code,
                 p.id AS product_id, p.productName
          FROM raw_material_bundle_draws d
@@ -967,7 +1060,7 @@ function get_bundle_conversions(mysqli $db_conn): array
             'draw_id'            => (int) $row['draw_id'],
             'ref_id'             => $row['ref_id'],
             'bundle_id'          => (int) $row['bundle_id'],
-            'bundle_label'       => "Bundle #{$row['bundle_id']}",
+            'bundle_label'       => "Bundle #" . ($row['bundle_no'] ?? $row['bundle_id']),
             'bundle_status'      => $row['bundle_status'],
             'product_id'         => (int) $row['product_id'],
             'product_name'       => $row['productName'],
@@ -1026,7 +1119,7 @@ function get_bundle_transaction_history(mysqli $db_conn, int $bundleId): array
             'created_at' => $bundle['created_at'],
             'created_by' => $bundle['created_by'],
             'qty'        => (int) $bundle['nominal_pieces'],
-            'detail'     => "Carried forward from Bundle #{$bundle['carried_from_bundle_id']}",
+            'detail'     => "Carried forward from Bundle #" . raw_material_bundle_display_no($db_conn, (int) $bundle['carried_from_bundle_id']),
             'ref_id'     => null,
         ];
     } else {
@@ -1094,7 +1187,7 @@ function get_bundle_transaction_history(mysqli $db_conn, int $bundleId): array
     if ($bundle['status'] === 'closed' && $bundle['closed_at']) {
         $detail = 'Bundle closed';
         if ($bundle['carried_to_bundle_id'] !== null) {
-            $detail .= " — leftover carried forward into Bundle #{$bundle['carried_to_bundle_id']}";
+            $detail .= " — leftover carried forward into Bundle #" . raw_material_bundle_display_no($db_conn, (int) $bundle['carried_to_bundle_id']);
         }
         $events[] = [
             'type'       => 'closed',
@@ -1172,10 +1265,15 @@ function get_bundle_report_summary(
     $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
     $stmt = $db_conn->prepare(
-        "SELECT b.id, b.raw_product_id, p.productName, b.company_godown_id, cg.gname,
+        "SELECT b.id, b.bundle_no, b.raw_product_id, p.productName, b.company_godown_id, cg.gname,
+                (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.carried_to_bundle_id) AS carried_to_no,
+                (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.carried_from_bundle_id) AS carried_from_no,
+                (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.transferred_to_bundle_id) AS transferred_to_no,
+                (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.transferred_from_bundle_id) AS transferred_from_no,
                 w.code AS warehouse_code, b.nominal_pieces, b.remaining_pieces,
                 b.damaged_pieces, b.added_extra_pieces, b.status,
                 b.carried_to_bundle_id, b.carried_from_bundle_id,
+                b.transferred_to_bundle_id, b.transferred_from_bundle_id,
                 b.created_by, b.created_at, b.closed_by, b.closed_at,
                 COUNT(d.id) AS conversions_count,
                 COALESCE(SUM(d.packs_made), 0) AS packs_made_total,
@@ -1202,8 +1300,13 @@ function get_bundle_report_summary(
         $addedExtra = (int) $row['added_extra_pieces'];
         $carriedToBundleId = $row['carried_to_bundle_id'] !== null ? (int) $row['carried_to_bundle_id'] : null;
 
+        $transferredToBundleId = $row['transferred_to_bundle_id'] !== null ? (int) $row['transferred_to_bundle_id'] : null;
         $varianceLabel = null;
-        if ($row['status'] === 'closed') {
+        if ($row['status'] === 'closed' && $transferredToBundleId !== null) {
+            // Moved whole to another company profile/warehouse — not a
+            // variance; the fresh bundle there carries on from here.
+            $varianceLabel = "Transferred: $remaining → #" . ($row['transferred_to_no'] ?? $transferredToBundleId);
+        } elseif ($row['status'] === 'closed') {
             $parts = [];
             if ($remaining > 0 && $carriedToBundleId !== null) $parts[] = "Carried forward: $remaining";
             elseif ($remaining > 0) $parts[] = "Short by $remaining";
@@ -1213,7 +1316,12 @@ function get_bundle_report_summary(
 
         return [
             'id'                     => (int) $row['id'],
-            'label'                  => "Bundle #{$row['id']}",
+            'label'                  => "Bundle #" . ($row['bundle_no'] ?? $row['id']),
+            'bundle_no'              => (int) ($row['bundle_no'] ?? $row['id']),
+            'carried_to_bundle_no'   => $row['carried_to_no'] !== null ? (int) $row['carried_to_no'] : null,
+            'carried_from_bundle_no' => $row['carried_from_no'] !== null ? (int) $row['carried_from_no'] : null,
+            'transferred_to_bundle_no'   => $row['transferred_to_no'] !== null ? (int) $row['transferred_to_no'] : null,
+            'transferred_from_bundle_no' => $row['transferred_from_no'] !== null ? (int) $row['transferred_from_no'] : null,
             'raw_product_id'         => (int) $row['raw_product_id'],
             'product_name'           => $row['productName'],
             'company_godown_id'      => (int) $row['company_godown_id'],
@@ -1234,6 +1342,8 @@ function get_bundle_report_summary(
             'closed_at'              => $row['closed_at'],
             'carried_to_bundle_id'   => $carriedToBundleId,
             'carried_from_bundle_id' => $row['carried_from_bundle_id'] !== null ? (int) $row['carried_from_bundle_id'] : null,
+            'transferred_to_bundle_id'   => $transferredToBundleId,
+            'transferred_from_bundle_id' => $row['transferred_from_bundle_id'] !== null ? (int) $row['transferred_from_bundle_id'] : null,
         ];
     }, $rows);
 }
@@ -1277,7 +1387,7 @@ function get_bundle_report_transactions(
         if ($dateTo !== null) { $where[] = 'DATE(d.created_at) <= ?'; $types .= 's'; $params[] = $dateTo; }
 
         $stmt = $db_conn->prepare(
-            "SELECT d.bundle_id, d.pieces_used, d.packs_made, d.ref_id, d.created_by, d.created_at,
+            "SELECT d.bundle_id, b.bundle_no, d.pieces_used, d.packs_made, d.ref_id, d.created_by, d.created_at,
                     p.productName, cg.gname, w.code AS warehouse_code
              FROM raw_material_bundle_draws d
              INNER JOIN raw_material_bundles b ON b.id = d.bundle_id
@@ -1292,6 +1402,7 @@ function get_bundle_report_transactions(
             $rows[] = [
                 'type'            => 'conversion',
                 'bundle_id'       => (int) $r['bundle_id'],
+                'bundle_no'       => (int) ($r['bundle_no'] ?? $r['bundle_id']),
                 'product_name'    => $r['productName'],
                 'gname'           => $r['gname'],
                 'warehouse_code'  => $r['warehouse_code'],
@@ -1316,7 +1427,7 @@ function get_bundle_report_transactions(
         if ($dateTo !== null) { $where[] = 'DATE(a.created_at) <= ?'; $types .= 's'; $params[] = $dateTo; }
 
         $stmt = $db_conn->prepare(
-            "SELECT a.type, a.bundle_id, a.qty, a.note, a.ref_id, a.created_by, a.created_at,
+            "SELECT a.type, a.bundle_id, b.bundle_no, a.qty, a.note, a.ref_id, a.created_by, a.created_at,
                     COALESCE(dr.label, er.label) AS reason_label,
                     p.productName, cg.gname, w.code AS warehouse_code
              FROM raw_material_bundle_adjustments a
@@ -1338,6 +1449,7 @@ function get_bundle_report_transactions(
             $rows[] = [
                 'type'            => $r['type'],
                 'bundle_id'       => (int) $r['bundle_id'],
+                'bundle_no'       => (int) ($r['bundle_no'] ?? $r['bundle_id']),
                 'product_name'    => $r['productName'],
                 'gname'           => $r['gname'],
                 'warehouse_code'  => $r['warehouse_code'],
@@ -1356,4 +1468,389 @@ function get_bundle_report_transactions(
     });
 
     return $rows;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Bundle transfer — whole open bundles moved from one (company profile,
+// warehouse) to another. The source bundle is closed as "Transferred"
+// (no variance) and a FRESH bundle (new id, nominal = remaining = the
+// pieces moved) is created at the destination. Raw stock moves with it
+// via StockService::transferOut/transferIn under one shared ref_id, so
+// the pooled stock row and the bundle layer stay in step. Undo is per
+// ref_id (one batch) and only allowed while every new bundle is still
+// untouched.
+// ─────────────────────────────────────────────────────────────────────
+
+function ensure_raw_material_bundle_transfers_table(mysqli $db_conn): void
+{
+    $db_conn->query(
+        "CREATE TABLE IF NOT EXISTS raw_material_bundle_transfers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ref_id VARCHAR(64) NOT NULL,
+            raw_product_id INT NOT NULL,
+            from_company_godown_id INT NOT NULL,
+            from_warehouse_id INT NULL,
+            to_company_godown_id INT NOT NULL,
+            to_warehouse_id INT NULL,
+            source_bundle_id INT NOT NULL,
+            new_bundle_id INT NOT NULL,
+            pieces INT NOT NULL,
+            status ENUM('active','undone') NOT NULL DEFAULT 'active',
+            created_by VARCHAR(100) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            undone_by VARCHAR(100) NULL,
+            undone_at TIMESTAMP NULL,
+            KEY idx_rmbt_ref (ref_id),
+            KEY idx_rmbt_source (source_bundle_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+/**
+ * Open bundles at one (raw product, company profile, warehouse) that are
+ * eligible to transfer (open, remaining > 0), NEWEST FIRST (LIFO).
+ * Also returns open bundles that are NOT eligible (remaining <= 0) so the
+ * UI can show them greyed out.
+ *
+ * @return array<int, array{id:int, product_name:string, nominal_pieces:int, remaining_pieces:int, created_at:string, eligible:bool}>
+ */
+function get_transferable_raw_material_bundles(mysqli $db_conn, int $rawProductId, int $companyGodownId, ?int $warehouseId): array
+{
+    ensure_raw_material_bundles_table($db_conn);
+    $stmt = $db_conn->prepare(
+        "SELECT b.id, b.bundle_no, p.productName, b.nominal_pieces, b.remaining_pieces, b.created_at
+         FROM raw_material_bundles b
+         INNER JOIN products p ON p.id = b.raw_product_id
+         WHERE b.raw_product_id = ? AND b.company_godown_id = ? AND b.warehouse_id <=> ? AND b.status = 'open'
+         ORDER BY b.created_at DESC, b.id DESC"
+    );
+    $stmt->bind_param('iii', $rawProductId, $companyGodownId, $warehouseId);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    return array_map(function ($r) {
+        return [
+            'id'               => (int) $r['id'],
+            'bundle_no'        => (int) ($r['bundle_no'] ?? $r['id']),
+            'product_name'     => $r['productName'],
+            'nominal_pieces'   => (int) $r['nominal_pieces'],
+            'remaining_pieces' => (int) $r['remaining_pieces'],
+            'created_at'       => $r['created_at'],
+            'eligible'         => (int) $r['remaining_pieces'] > 0,
+        ];
+    }, $rows);
+}
+
+/**
+ * Transfers whole open bundles to another (company profile, warehouse).
+ * Must run inside the caller's transaction (stock legs use
+ * externalTransaction = true).
+ *
+ * @param int[] $bundleIds all must be open, remaining > 0, same raw
+ *   product and same source company profile + warehouse.
+ * @throws StockException on any validation or stock failure.
+ * @return array{ref_id:string, bundles:int, pieces:int, map:array<int,int>} map = source id => new id
+ */
+function transfer_raw_material_bundles(
+    mysqli $db_conn,
+    StockService $stockService,
+    string $stockUserType,
+    array $bundleIds,
+    int $toCompanyGodownId,
+    ?int $toWarehouseId,
+    string $createdBy
+): array {
+    // Tables are ensured by the caller BEFORE begin_transaction() — DDL
+    // here would implicitly commit and silently break the rollback.
+    $bundleIds = array_values(array_unique(array_filter(array_map('intval', $bundleIds), fn($v) => $v > 0)));
+    if (!$bundleIds) {
+        throw new StockException("Select at least one bundle to transfer.");
+    }
+
+    $placeholders = implode(',', array_fill(0, count($bundleIds), '?'));
+    $lockStmt = $db_conn->prepare(
+        "SELECT id, raw_product_id, company_godown_id, warehouse_id, remaining_pieces, status
+         FROM raw_material_bundles WHERE id IN ($placeholders)
+         ORDER BY created_at ASC, id ASC FOR UPDATE"
+    );
+    $lockStmt->bind_param(str_repeat('i', count($bundleIds)), ...$bundleIds);
+    $lockStmt->execute();
+    $bundles = $lockStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $lockStmt->close();
+
+    if (count($bundles) !== count($bundleIds)) {
+        throw new StockException("One or more selected bundles no longer exist.");
+    }
+
+    $rawProductId = (int) $bundles[0]['raw_product_id'];
+    $fromCg = (int) $bundles[0]['company_godown_id'];
+    $fromWh = $bundles[0]['warehouse_id'] !== null ? (int) $bundles[0]['warehouse_id'] : null;
+
+    $total = 0;
+    foreach ($bundles as $b) {
+        $bWh = $b['warehouse_id'] !== null ? (int) $b['warehouse_id'] : null;
+        if ((int) $b['raw_product_id'] !== $rawProductId || (int) $b['company_godown_id'] !== $fromCg || $bWh !== $fromWh) {
+            throw new StockException("All selected bundles must be the same product at the same company profile and warehouse.");
+        }
+        if ($b['status'] !== 'open') {
+            throw new StockException("Bundle #" . raw_material_bundle_display_no($db_conn, (int) $b['id']) . " is not open — only open bundles can be transferred.");
+        }
+        if ((int) $b['remaining_pieces'] <= 0) {
+            throw new StockException("Bundle #" . raw_material_bundle_display_no($db_conn, (int) $b['id']) . " has no pieces remaining — nothing to transfer.");
+        }
+        $total += (int) $b['remaining_pieces'];
+    }
+
+    if ($fromCg === $toCompanyGodownId && $fromWh === $toWarehouseId) {
+        throw new StockException("Destination must differ from the source company profile + warehouse.");
+    }
+
+    $refId = 'BUNDLETR' . date('YmdHis') . str_pad((string) random_int(0, 999), 3, '0', STR_PAD_LEFT);
+
+    $outResult = $stockService->transferOut(
+        $rawProductId, $stockUserType, (string) $fromCg, $total,
+        'transfer', $refId, $createdBy, true, $fromWh
+    );
+    $stockService->transferIn(
+        $rawProductId, $stockUserType, (string) $toCompanyGodownId, $total,
+        'transfer', $refId, $createdBy, true,
+        $outResult['consumed_rate'] ?? null, $toWarehouseId
+    );
+
+    $newStmt = $db_conn->prepare(
+        "INSERT INTO raw_material_bundles
+            (raw_product_id, company_godown_id, warehouse_id, nominal_pieces, remaining_pieces,
+             input_ref_id, transferred_from_bundle_id, transfer_ref_id, created_by, bundle_no)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    $closeStmt = $db_conn->prepare(
+        "UPDATE raw_material_bundles
+         SET status = 'closed', closed_by = ?, closed_at = NOW(), transferred_to_bundle_id = ?, transfer_ref_id = ?
+         WHERE id = ? AND status = 'open'"
+    );
+    $logStmt = $db_conn->prepare(
+        "INSERT INTO raw_material_bundle_transfers
+            (ref_id, raw_product_id, from_company_godown_id, from_warehouse_id,
+             to_company_godown_id, to_warehouse_id, source_bundle_id, new_bundle_id, pieces, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+
+    $map = [];
+    foreach ($bundles as $b) {
+        $srcId  = (int) $b['id'];
+        $pieces = (int) $b['remaining_pieces'];
+
+        // Numbering restarts at 1 in every (company profile, warehouse):
+        // the new bundle takes the next number at the DESTINATION.
+        $newNo = next_raw_material_bundle_no($db_conn, $toCompanyGodownId, $toWarehouseId);
+        $newStmt->bind_param(
+            'iiiiisissi',
+            $rawProductId, $toCompanyGodownId, $toWarehouseId, $pieces, $pieces,
+            $refId, $srcId, $refId, $createdBy, $newNo
+        );
+        $newStmt->execute();
+        $newId = (int) $db_conn->insert_id;
+
+        $closeStmt->bind_param('sisi', $createdBy, $newId, $refId, $srcId);
+        $closeStmt->execute();
+        if ($closeStmt->affected_rows < 1) {
+            throw new StockException("Bundle #" . raw_material_bundle_display_no($db_conn, $srcId) . " changed while transferring — please retry.");
+        }
+
+        $logStmt->bind_param(
+            'siiiiiiiis',
+            $refId, $rawProductId, $fromCg, $fromWh, $toCompanyGodownId, $toWarehouseId, $srcId, $newId, $pieces, $createdBy
+        );
+        $logStmt->execute();
+        $map[$srcId] = $newId;
+    }
+    $newStmt->close();
+    $closeStmt->close();
+    $logStmt->close();
+
+    return ['ref_id' => $refId, 'bundles' => count($bundles), 'pieces' => $total, 'map' => $map];
+}
+
+/**
+ * Undoes one whole transfer batch (by ref_id). Only allowed while every
+ * new bundle is untouched: open, remaining == nominal, no damage/extra,
+ * no conversion draws, not carried. Reverses the destination stock leg
+ * first (refuses cleanly if that stock was since used), then the source
+ * leg, deletes the new bundles and reopens the sources with their
+ * original pieces. Must run inside the caller's transaction.
+ *
+ * @throws StockException when the batch can't be cleanly undone.
+ */
+function undo_raw_material_bundle_transfer(
+    mysqli $db_conn,
+    StockService $stockService,
+    string $stockUserType,
+    string $refId,
+    string $undoneBy
+): void {
+    // Tables are ensured by the caller BEFORE begin_transaction().
+    $stmt = $db_conn->prepare(
+        "SELECT * FROM raw_material_bundle_transfers WHERE ref_id = ? AND status = 'active' FOR UPDATE"
+    );
+    $stmt->bind_param('s', $refId);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    if (!$rows) {
+        throw new StockException("Transfer not found or already undone.");
+    }
+
+    $total = 0;
+    foreach ($rows as $r) {
+        $newId = (int) $r['new_bundle_id'];
+        $total += (int) $r['pieces'];
+
+        $bStmt = $db_conn->prepare(
+            "SELECT nominal_pieces, remaining_pieces, damaged_pieces, added_extra_pieces, status,
+                    carried_to_bundle_id, carried_from_bundle_id
+             FROM raw_material_bundles WHERE id = ? FOR UPDATE"
+        );
+        $bStmt->bind_param('i', $newId);
+        $bStmt->execute();
+        $nb = $bStmt->get_result()->fetch_assoc();
+        $bStmt->close();
+
+        $untouched = $nb
+            && $nb['status'] === 'open'
+            && (int) $nb['remaining_pieces'] === (int) $nb['nominal_pieces']
+            && (int) $nb['remaining_pieces'] === (int) $r['pieces']
+            && (int) $nb['damaged_pieces'] === 0
+            && (int) $nb['added_extra_pieces'] === 0
+            && $nb['carried_to_bundle_id'] === null
+            && $nb['carried_from_bundle_id'] === null;
+
+        if ($untouched) {
+            foreach (['raw_material_bundle_draws', 'raw_material_bundle_adjustments'] as $tbl) {
+                $cStmt = $db_conn->prepare("SELECT COUNT(*) AS c FROM $tbl WHERE bundle_id = ?");
+                $cStmt->bind_param('i', $newId);
+                $cStmt->execute();
+                $cnt = (int) $cStmt->get_result()->fetch_assoc()['c'];
+                $cStmt->close();
+                if ($cnt > 0) { $untouched = false; break; }
+            }
+        }
+        if (!$untouched) {
+            throw new StockException("Cannot undo — Bundle #" . raw_material_bundle_display_no($db_conn, $newId) . " has been used or changed since the transfer. Reconcile manually.");
+        }
+    }
+
+    $first = $rows[0];
+    $rawProductId = (int) $first['raw_product_id'];
+    $fromCg = (int) $first['from_company_godown_id'];
+    $fromWh = $first['from_warehouse_id'] !== null ? (int) $first['from_warehouse_id'] : null;
+    $toCg   = (int) $first['to_company_godown_id'];
+    $toWh   = $first['to_warehouse_id'] !== null ? (int) $first['to_warehouse_id'] : null;
+
+    $inRes = $stockService->reverseTransferIn(
+        $rawProductId, $stockUserType, (string) $toCg, $total,
+        'transfer', $refId, $undoneBy, true, $toWh
+    );
+    if (empty($inRes['success'])) {
+        $why = ($inRes['reason'] ?? '') === 'insufficient_stock_to_reverse'
+            ? "the destination only has {$inRes['available']} pieces in stock but {$inRes['requested']} must be returned"
+            : "the destination stock record could not be found";
+        throw new StockException("Cannot undo — $why.");
+    }
+    $outRes = $stockService->reverseTransferOut(
+        $rawProductId, $stockUserType, (string) $fromCg, $total,
+        'transfer', $refId, $undoneBy, true, $fromWh
+    );
+    if (empty($outRes['success'])) {
+        throw new StockException("Cannot undo — the source stock record could not be found.");
+    }
+
+    $delStmt = $db_conn->prepare("DELETE FROM raw_material_bundles WHERE id = ?");
+    $reopenStmt = $db_conn->prepare(
+        "UPDATE raw_material_bundles
+         SET status = 'open', closed_by = NULL, closed_at = NULL, transferred_to_bundle_id = NULL, transfer_ref_id = NULL
+         WHERE id = ? AND transferred_to_bundle_id = ?"
+    );
+    foreach ($rows as $r) {
+        $newId = (int) $r['new_bundle_id'];
+        $srcId = (int) $r['source_bundle_id'];
+        $delStmt->bind_param('i', $newId);
+        $delStmt->execute();
+        $reopenStmt->bind_param('ii', $srcId, $newId);
+        $reopenStmt->execute();
+    }
+    $delStmt->close();
+    $reopenStmt->close();
+
+    $updStmt = $db_conn->prepare(
+        "UPDATE raw_material_bundle_transfers SET status = 'undone', undone_by = ?, undone_at = NOW() WHERE ref_id = ? AND status = 'active'"
+    );
+    $updStmt->bind_param('ss', $undoneBy, $refId);
+    $updStmt->execute();
+    $updStmt->close();
+}
+
+/**
+ * Transfer history grouped by batch (ref_id), newest first, with an
+ * `undoable` flag computed from the same untouched-check the undo itself
+ * enforces (the undo re-checks under lock regardless).
+ *
+ * @return array<int, array<string,mixed>>
+ */
+function get_raw_material_bundle_transfer_batches(mysqli $db_conn, int $limit = 100): array
+{
+    ensure_raw_material_bundles_table($db_conn);
+    ensure_raw_material_bundle_transfers_table($db_conn);
+    ensure_raw_material_bundle_draws_table($db_conn);
+    ensure_raw_material_bundle_adjustments_table($db_conn);
+
+    $stmt = $db_conn->prepare(
+        "SELECT t.ref_id, t.status, MAX(t.created_by) AS created_by, MIN(t.created_at) AS created_at,
+                MAX(t.undone_by) AS undone_by, MAX(t.undone_at) AS undone_at,
+                MAX(p.productName) AS productName, MAX(cf.gname) AS from_gname, MAX(wf.code) AS from_wh,
+                MAX(ct.gname) AS to_gname, MAX(wt.code) AS to_wh,
+                COUNT(*) AS bundle_count, SUM(t.pieces) AS pieces,
+                GROUP_CONCAT(t.source_bundle_id ORDER BY t.id SEPARATOR ',') AS source_ids,
+                GROUP_CONCAT(t.new_bundle_id ORDER BY t.id SEPARATOR ',') AS new_ids,
+                GROUP_CONCAT(COALESCE(sb.bundle_no, t.source_bundle_id) ORDER BY t.id SEPARATOR ',') AS source_nos,
+                GROUP_CONCAT(COALESCE(nb.bundle_no, t.new_bundle_id) ORDER BY t.id SEPARATOR ',') AS new_nos
+         FROM raw_material_bundle_transfers t
+         INNER JOIN products p ON p.id = t.raw_product_id
+         LEFT JOIN raw_material_bundles sb ON sb.id = t.source_bundle_id
+         LEFT JOIN raw_material_bundles nb ON nb.id = t.new_bundle_id
+         INNER JOIN company_godown cf ON cf.id = t.from_company_godown_id
+         INNER JOIN company_godown ct ON ct.id = t.to_company_godown_id
+         LEFT JOIN warehouses wf ON wf.id = t.from_warehouse_id
+         LEFT JOIN warehouses wt ON wt.id = t.to_warehouse_id
+         GROUP BY t.ref_id, t.status
+         ORDER BY MAX(t.id) DESC
+         LIMIT ?"
+    );
+    $stmt->bind_param('i', $limit);
+    $stmt->execute();
+    $batches = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    foreach ($batches as &$b) {
+        $b['undoable'] = false;
+        if ($b['status'] !== 'active') continue;
+        $ids = array_map('intval', explode(',', $b['new_ids']));
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $q = $db_conn->prepare(
+            "SELECT COUNT(*) AS c FROM raw_material_bundles x
+             WHERE x.id IN ($ph) AND x.status = 'open' AND x.remaining_pieces = x.nominal_pieces
+               AND x.damaged_pieces = 0 AND x.added_extra_pieces = 0
+               AND x.carried_to_bundle_id IS NULL AND x.carried_from_bundle_id IS NULL
+               AND NOT EXISTS (SELECT 1 FROM raw_material_bundle_draws d WHERE d.bundle_id = x.id)
+               AND NOT EXISTS (SELECT 1 FROM raw_material_bundle_adjustments a WHERE a.bundle_id = x.id)"
+        );
+        $q->bind_param(str_repeat('i', count($ids)), ...$ids);
+        $q->execute();
+        $b['undoable'] = (int) $q->get_result()->fetch_assoc()['c'] === count($ids);
+        $q->close();
+    }
+    unset($b);
+
+    return $batches;
 }

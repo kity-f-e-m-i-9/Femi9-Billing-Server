@@ -261,6 +261,7 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                         <a href="input-stock-bundles.php" class="ata-nav-tab"><i class="material-icons-outlined">add_box</i> Input Stock</a>
                         <a href="raw-material-bundles-by-product.php" class="ata-nav-tab"><i class="material-icons-outlined">inventory_2</i> Manage Bundles by Product</a>
                         <a href="raw-material-bundles-manage.php" class="ata-nav-tab active"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
+                        <a href="raw-material-bundle-transfer.php" class="ata-nav-tab"><i class="material-icons-outlined">swap_horiz</i> Bundle Transfer</a>
                         <a href="neksomo-piece-pack-convert.php" class="ata-nav-tab"><i class="material-icons-outlined">sync_alt</i> Convert Pieces &harr; Packs</a>
                         <a href="manage-piece-pack-conversions.php" class="ata-nav-tab"><i class="material-icons-outlined">history</i> Manage Conversions</a>
                         <a href="raw-material-bundles-report.php" class="ata-nav-tab"><i class="material-icons-outlined">assessment</i> Bundle Report</a>
@@ -407,12 +408,12 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
 
                             <?php if ($isCarried): ?>
                             <div style="font-size:11.5px;color:#6b7280;margin-bottom:8px;">
-                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</i> Carried into Bundle #<?php echo (int) $b['carried_to_bundle_id']; ?>
+                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</i> Carried into Bundle #<?php echo (int) ($b['carried_to_bundle_no'] ?? $b['carried_to_bundle_id']); ?>
                             </div>
                             <?php endif; ?>
                             <?php if ($b['carried_from_bundle_id'] !== null): ?>
                             <div style="font-size:11.5px;color:#6b7280;margin-bottom:8px;">
-                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</i> Carried from Bundle #<?php echo (int) $b['carried_from_bundle_id']; ?>
+                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</i> Carried from Bundle #<?php echo (int) ($b['carried_from_bundle_no'] ?? $b['carried_from_bundle_id']); ?>
                             </div>
                             <?php endif; ?>
 
@@ -441,7 +442,8 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                                 <?php else: ?>
                                     <div style="display:flex;align-items:center;gap:8px;" onclick="event.stopPropagation();">
                                         <span class="text-muted small"><?php echo htmlspecialchars($b['closed_by'] ?? '', ENT_QUOTES, 'UTF-8'); ?></span>
-                                        <form method="post" style="display:inline;" onsubmit="return confirm('Reopen <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>?<?php echo $b['carried_to_bundle_id'] !== null ? ' This will also pull back the leftover pieces that were carried forward to Bundle #' . (int) $b['carried_to_bundle_id'] . '.' : ''; ?>');">
+                                        <?php if ($b['transferred_to_bundle_id'] === null): ?>
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('Reopen <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>?<?php echo $b['carried_to_bundle_id'] !== null ? ' This will also pull back the leftover pieces that were carried forward to Bundle #' . (int) ($b['carried_to_bundle_no'] ?? $b['carried_to_bundle_id']) . '.' : ''; ?>');">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
                                             <input type="hidden" name="action" value="reopen">
                                             <input type="hidden" name="bundle_id" value="<?php echo (int) $b['id']; ?>">
@@ -449,6 +451,7 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                                                 <i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">lock_open</i> Reopen
                                             </button>
                                         </form>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
                             </div>
