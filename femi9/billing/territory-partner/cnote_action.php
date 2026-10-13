@@ -90,7 +90,7 @@ if (isset($_REQUEST['add-return'])) {
     $gst_type        = $inv['gst_type'];
 
     // Product details
-    $stmt = $db_conn->prepare("SELECT gst, hsn, rwpoints FROM products WHERE id=? LIMIT 1");
+    $stmt = $db_conn->prepare("SELECT gst, gst_type, hsn, rwpoints FROM products WHERE id=? LIMIT 1");
     $stmt->bind_param('s', $prid);
     $stmt->execute();
     $product = $stmt->get_result()->fetch_assoc();
@@ -106,9 +106,24 @@ if (isset($_REQUEST['add-return'])) {
     $stmt->close();
     if (!$inv_item) { header("Location: cnote_new.php?error=product_not_in_invoice_items"); exit; }
 
-    $subtotal   = (float)$inv_item['amount'] * $returnqty;
-    $gst_amt    = ($subtotal * (float)$product['gst']) / 100;
-    $total      = $subtotal + $gst_amt;
+    $gst_percentage = (float)$product['gst'];
+    $gst_type_item  = $product['gst_type'] ?: 'exclusive';
+    $lineAmount     = (float)$inv_item['amount'] * $returnqty;
+
+    // Same convention as order-to-invoice.php/shop-invoice-action.php:
+    // inclusive-tax products already have GST baked into the per-unit
+    // amount, so tax is carved OUT of it (not added again) — otherwise a
+    // return on an inclusive-tax item overstates the credit by charging
+    // GST twice on the same price.
+    if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
+        $subtotal = $lineAmount * 100 / (100 + $gst_percentage);
+        $gst_amt  = $lineAmount - $subtotal;
+        $total    = $lineAmount;
+    } else {
+        $subtotal = $lineAmount;
+        $gst_amt  = ($subtotal * $gst_percentage) / 100;
+        $total    = $subtotal + $gst_amt;
+    }
     $rwpoints   = (float)$product['rwpoints'] * $returnqty;
     $return_date = date('Y-m-d');
 
