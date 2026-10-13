@@ -50,11 +50,13 @@ if ($terms !== '') {
         $stmtDnUpd->execute();
         $stmtDnUpd->close();
     } else {
+        // '0000-00-00' is rejected under strict SQL mode (production), so
+        // use a real, always-valid placeholder date instead.
         $stmtDnIns = $db_conn->prepare(
             "INSERT INTO delivery_note
              (inv_id, inv_number, inv_table, dl_note, mode_pmnt, ref_no, ref_date, ot_ref,
               order_no, dated, dispatch_doc_no, dlnote_date, dispatch_through, destination, terms)
-             VALUES (?, ?, ?, '', '', '', '0000-00-00', '', '', '0000-00-00', '', '0000-00-00', '', '', ?)"
+             VALUES (?, ?, ?, '', '', '', '1970-01-01', '', '', '1970-01-01', '', '1970-01-01', '', '', ?)"
         );
         $stmtDnIns->bind_param('ssss', $invid, $inv_number_dn, $dn_table_tag, $terms);
         $stmtDnIns->execute();
