@@ -290,6 +290,11 @@ $TotalAMount123 = 0; $rd = 0;
             <?php $td = $TotalAMount123 - ($ret_master['discount'] ?: 0); ?>
             <input type="number" value="<?php echo $td; ?>" id="outputTotal2" disabled>
         </span></p>
+        <div class="form-floating mb-3" style="margin-top:12px;">
+            <input type="text" name="terms" class="form-control" id="termsOfDelivery"
+                   placeholder="Terms of Delivery">
+            <label for="termsOfDelivery">Terms of Delivery</label>
+        </div>
         <div style="clear:both;"></div>
         <div class="invoice-info-actions">
             <button class="btn btn-primary" type="submit" name="invoice-submit" style="width:100%;">

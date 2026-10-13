@@ -153,6 +153,11 @@ while ($item = mysqli_fetch_array($items)) {
                                id="outputTotalamount" disabled>
                     </span>
                 </p>
+                <div class="form-floating mb-3" style="margin-top:12px;">
+                    <input type="text" name="terms" class="form-control" id="termsOfDelivery"
+                           placeholder="Terms of Delivery">
+                    <label for="termsOfDelivery">Terms of Delivery</label>
+                </div>
                 <div style="clear:both;"></div>
                 <div class="invoice-info-actions">
                     <button class="btn btn-primary" type="submit" name="invoice-submit" style="width:100%;">
@@ -163,6 +168,33 @@ while ($item = mysqli_fetch_array($items)) {
         </div>
     </div>
     <?php } ?>
+
+    <?php if ($ret['status'] !== 'pending') {
+        $cn_receiptid = 'CN-' . $returnid;
+        $cn_row = mysqli_fetch_array(mysqli_query($db_conn,
+            "SELECT id FROM receipt WHERE receiptid='$cn_receiptid' AND payment_type='credit_note' LIMIT 1"));
+        if ($cn_row) {
+            $cn_print_page = ($user === 'customer') ? 'customer-invoice-print.php' : 'shop-invoice-print.php';
+            $cn_dlrow = mysqli_fetch_array(mysqli_query($db_conn,
+                "SELECT terms FROM delivery_note WHERE inv_id='" . mysqli_real_escape_string($db_conn, $invid) . "' LIMIT 1"));
+    ?>
+    <?php if (isset($_GET['termsUpdated'])): ?>
+    <div class="col-lg-12"><div class="alert alert-success" style="text-align:center;">Terms of Delivery updated.</div></div>
+    <?php endif; ?>
+    <div class="col-lg-12" style="text-align:center;margin-top:12px;">
+        <form action="cnote_terms_action.php?returnid=<?php echo urlencode($_REQUEST['returnid']); ?>" method="post"
+              style="display:inline-flex;gap:8px;align-items:center;max-width:420px;margin:0 auto 12px;">
+            <input type="text" name="terms" class="form-control" placeholder="Terms of Delivery"
+                   value="<?php echo htmlspecialchars($cn_dlrow['terms'] ?? ''); ?>">
+            <button type="submit" class="btn btn-secondary" style="white-space:nowrap;">Save Terms</button>
+        </form>
+        <br/>
+        <a href="<?php echo $cn_print_page; ?>?invoiceid=<?php echo base64_encode($invid); ?>"
+           target="_blank" class="btn btn-primary badge badge-style-bordered badge-success">
+           Generate Invoice
+        </a>
+    </div>
+    <?php } } ?>
 </div>
 </div>
 

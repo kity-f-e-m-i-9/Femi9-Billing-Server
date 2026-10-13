@@ -7,6 +7,7 @@ date_default_timezone_set("Asia/Kolkata");
 $returnid     = mysqli_real_escape_string($db_conn, base64_decode($_REQUEST['returnid'] ?? ''));
 $SubTotal     = (float)($_REQUEST['SubTotal'] ?? 0);
 $discount     = (float)($_REQUEST['discount'] ?? 0);
+$terms        = trim($_REQUEST['terms'] ?? '');
 $total_amount = $SubTotal - $discount;
 $created_by   = $_SESSION['LOGIN_USER'] ?? 'system';
 
@@ -164,6 +165,47 @@ try {
         );
         $stmtRcpt->execute();
         $stmtRcpt->close();
+    }
+
+    // 5. TP-typed Terms of Delivery for this return carries onto the ORIGINAL
+    // invoice's own Terms of Delivery (same field shop-manage-invoice.php's
+    // delivery-note modal edits) — only touch that one column, never blank
+    // out dl_note/mode_pmnt/etc. that may already be set on the invoice.
+    if ($terms !== '') {
+        $inv_table_dn = ($from_usertype === 'customer') ? 'invoice' : 'user_invoice';
+        $stmtInvNum = $db_conn->prepare("SELECT inv_number FROM $inv_table_dn WHERE inv_id=? LIMIT 1");
+        $stmtInvNum->bind_param('s', $invid);
+        $stmtInvNum->execute();
+        $inv_number_dn = $stmtInvNum->get_result()->fetch_assoc()['inv_number'] ?? $invid;
+        $stmtInvNum->close();
+
+        $dn_table_tag = ($from_usertype === 'customer') ? 'customer' : 'shop';
+
+        $stmtDnChk = $db_conn->prepare("SELECT id FROM delivery_note WHERE inv_id=? LIMIT 1");
+        $stmtDnChk->bind_param('s', $invid);
+        $stmtDnChk->execute();
+        $dnRow = $stmtDnChk->get_result()->fetch_assoc();
+        $stmtDnChk->close();
+
+        if ($dnRow) {
+            $stmtDnUpd = $db_conn->prepare("UPDATE delivery_note SET terms=? WHERE inv_id=?");
+            $stmtDnUpd->bind_param('ss', $terms, $invid);
+            $stmtDnUpd->execute();
+            $stmtDnUpd->close();
+        } else {
+            // Matches dlnote_action.php's INSERT shape — delivery_note's date
+            // columns (ref_date/dated/dlnote_date) are NOT NULL with no
+            // default, so every column must be supplied even when blank.
+            $stmtDnIns = $db_conn->prepare(
+                "INSERT INTO delivery_note
+                 (inv_id, inv_number, inv_table, dl_note, mode_pmnt, ref_no, ref_date, ot_ref,
+                  order_no, dated, dispatch_doc_no, dlnote_date, dispatch_through, destination, terms)
+                 VALUES (?, ?, ?, '', '', '', '0000-00-00', '', '', '0000-00-00', '', '0000-00-00', '', '', ?)"
+            );
+            $stmtDnIns->bind_param('ssss', $invid, $inv_number_dn, $dn_table_tag, $terms);
+            $stmtDnIns->execute();
+            $stmtDnIns->close();
+        }
     }
 
     $db_conn->commit();
