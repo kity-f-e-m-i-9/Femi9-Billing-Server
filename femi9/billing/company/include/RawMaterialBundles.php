@@ -616,8 +616,8 @@ function delete_bundle_adjustment(mysqli $db_conn, int $adjustmentId): array
  * Marks one bundle closed. If it still has remaining_pieces > 0, that
  * leftover is NEVER recorded as a lost shortage — it automatically
  * carries forward into another bundle for the same (raw_product_id,
- * company_godown_id, warehouse_id): merged onto the oldest other open
- * bundle if one exists, otherwise a brand-new bundle is created
+ * company_godown_id, warehouse_id): merged onto the NEXT open bundle
+ * (next higher bundle number, never an earlier one) if one exists, otherwise a brand-new bundle is created
  * (nominal_pieces=0, since it's carried-over material rather than a
  * fresh nominal intake) to hold it. carried_to_bundle_id/
  * carried_from_bundle_id link the two records for traceability. A
@@ -638,7 +638,7 @@ function close_raw_material_bundle(mysqli $db_conn, int $bundleId, ?string $clos
     ensure_raw_material_bundles_table($db_conn);
 
     $lockStmt = $db_conn->prepare(
-        "SELECT raw_product_id, company_godown_id, warehouse_id, remaining_pieces, status
+        "SELECT raw_product_id, company_godown_id, warehouse_id, remaining_pieces, status, bundle_no
          FROM raw_material_bundles WHERE id = ? FOR UPDATE"
     );
     $lockStmt->bind_param('i', $bundleId);
@@ -658,16 +658,20 @@ function close_raw_material_bundle(mysqli $db_conn, int $bundleId, ?string $clos
         $companyGodownId = (int) $bundle['company_godown_id'];
         $warehouseId     = $bundle['warehouse_id'] !== null ? (int) $bundle['warehouse_id'] : null;
 
-        // Oldest other OPEN bundle for the same (raw product, company
-        // profile, warehouse) — locked so a concurrent close/convert
-        // against it can't race with this merge.
+        // The NEXT open bundle after this one (higher bundle number) for the
+        // same (raw product, company profile, warehouse) — never an earlier
+        // one. Closed bundles are skipped, so closing #2 with #3 closed
+        // carries into #4. If nothing later is open, a fresh bundle is
+        // created below. Locked so a concurrent close/convert against it
+        // can't race with this merge.
+        $thisNo = $bundle['bundle_no'] !== null ? (int) $bundle['bundle_no'] : $bundleId;
         $targetStmt = $db_conn->prepare(
             "SELECT id FROM raw_material_bundles
              WHERE raw_product_id = ? AND company_godown_id = ? AND warehouse_id <=> ?
-               AND status = 'open' AND id != ?
-             ORDER BY created_at ASC, id ASC LIMIT 1 FOR UPDATE"
+               AND status = 'open' AND id != ? AND COALESCE(bundle_no, id) > ?
+             ORDER BY COALESCE(bundle_no, id) ASC, id ASC LIMIT 1 FOR UPDATE"
         );
-        $targetStmt->bind_param('iiii', $rawProductId, $companyGodownId, $warehouseId, $bundleId);
+        $targetStmt->bind_param('iiiii', $rawProductId, $companyGodownId, $warehouseId, $bundleId, $thisNo);
         $targetStmt->execute();
         $targetRow = $targetStmt->get_result()->fetch_assoc();
         $targetStmt->close();
