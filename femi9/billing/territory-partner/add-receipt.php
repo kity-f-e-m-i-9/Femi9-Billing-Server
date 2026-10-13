@@ -153,7 +153,7 @@ $receipts    = mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='$invi
                                 <td><b>&#8377;<?php echo inr_format((float)$r['received'], 2); ?></b></td>
                                 <td><?php echo htmlspecialchars($r['receipt_method']); ?></td>
                                 <td><?php echo htmlspecialchars($r['receipt_remarks']); ?></td>
-                                <td><?php if (($r['payment_type'] ?? '') !== 'credit_note'): ?><a href="add-receipt.php?invid=<?php echo urlencode($invid); ?>&invuser=<?php echo $getinvuser; ?>&delreceiptact=1&rcptid=<?php echo base64_encode($r['id']); ?>" onclick="return confirm('Delete this receipt?');" style="color:red;">Remove</a><?php else: ?><span style="color:#888;font-size:12px;">CN Credit</span><?php endif; ?></td>
+                                <td><?php if (($r['payment_type'] ?? '') !== 'credit_note'): ?><a href="add-receipt.php?invid=<?php echo urlencode($invid); ?>&invuser=<?php echo $getinvuser; ?>&delreceiptact=1&rcptid=<?php echo base64_encode($r['id']); ?>" onclick="return confirm('Delete this receipt?');" style="color:red;">Remove</a><?php else: $cn_print_page = ($getinvuser === 'customer') ? 'customer-invoice-print.php' : 'shop-invoice-print.php'; ?><a href="<?php echo $cn_print_page; ?>?invoiceid=<?php echo base64_encode($invid); ?>" target="_blank" style="color:#7c3aed;font-size:12px;">📄 <?php echo htmlspecialchars($r['receiptid']); ?></a><?php endif; ?></td>
                             </tr>
                             <?php } ?>
                             </tbody>

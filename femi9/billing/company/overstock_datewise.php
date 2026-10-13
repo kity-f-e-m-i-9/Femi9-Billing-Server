@@ -4,6 +4,12 @@ require_once("include/GodownAccess.php");
 require_once("include/DatewiseStockReport.php");
 error_reporting(0);
 
+// This AJAX fragment carries live, fast-changing stock figures — never let
+// the browser serve a stale cached copy for a repeated identical query
+// string (e.g. re-opening the same date range after a stock correction).
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+
 // AJAX fragment mode — called from overall-stock.php's Datewise tab. Skips
 // the page shell (head/sidebar/header) and renders just the results block,
 // with each date as a collapsible <details> section instead of a stacked
