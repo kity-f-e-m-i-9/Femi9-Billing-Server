@@ -1713,6 +1713,147 @@ function get_bundle_report_transactions(
 // untouched.
 // ─────────────────────────────────────────────────────────────────────
 
+// Hard cap on bundles moved in ONE transfer (keeps a single request's
+// runtime and row locks bounded; larger moves are repeated in batches).
+const RM_BUNDLE_TRANSFER_CAP = 2000;
+// Cap on individually hand-picked bundles (each is a posted form field).
+const RM_BUNDLE_TRANSFER_PICK_CAP = 200;
+
+/**
+ * Resolves a transfer "rule" to bundle ids on the SERVER, so a transfer
+ * of thousands of bundles never depends on posting thousands of
+ * checkboxes (PHP's max_input_vars would silently drop most of them).
+ *
+ * @param string $mode 'newest' | 'oldest' (take $n, LIFO / FIFO) | 'range' (bundle_no $from..$to)
+ * @return array{ids:int[], pieces:int, overflow:bool} overflow = more than the cap matched
+ */
+function select_transferable_raw_material_bundles(
+    mysqli $db_conn, int $rawProductId, int $companyGodownId, ?int $warehouseId,
+    string $mode, int $n = 0, int $from = 0, int $to = 0
+): array {
+    $cap = RM_BUNDLE_TRANSFER_CAP;
+    $where = "raw_product_id = ? AND company_godown_id = ? AND warehouse_id <=> ? AND status = 'open' AND remaining_pieces > 0";
+    $types = 'iii';
+    $params = [$rawProductId, $companyGodownId, $warehouseId];
+
+    if ($mode === 'range') {
+        if ($from < 1 || $to < $from) {
+            throw new StockException("Enter a valid bundle number range (from ≤ to).");
+        }
+        $where .= " AND COALESCE(bundle_no, id) BETWEEN ? AND ?";
+        $types .= 'ii';
+        $params[] = $from;
+        $params[] = $to;
+        $order = "COALESCE(bundle_no, id) ASC, id ASC";
+        $limit = $cap + 1;
+    } elseif ($mode === 'newest' || $mode === 'oldest') {
+        if ($n < 1) {
+            throw new StockException("Enter how many bundles to transfer.");
+        }
+        if ($n > $cap) {
+            throw new StockException("You can transfer at most " . number_format($cap) . " bundles at once — transfer that many, then repeat.");
+        }
+        $order = $mode === 'newest' ? "created_at DESC, id DESC" : "created_at ASC, id ASC";
+        $limit = $n;
+    } else {
+        throw new StockException("Unknown selection mode.");
+    }
+
+    $sql = "SELECT id, remaining_pieces FROM raw_material_bundles WHERE $where ORDER BY $order LIMIT $limit";
+    $stmt = $db_conn->prepare($sql);
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $overflow = count($rows) > $cap;
+    if ($overflow) {
+        $rows = array_slice($rows, 0, $cap);
+    }
+    return [
+        'ids'      => array_map(fn($r) => (int) $r['id'], $rows),
+        'pieces'   => (int) array_sum(array_column($rows, 'remaining_pieces')),
+        'overflow' => $overflow,
+    ];
+}
+
+/**
+ * Headline numbers for a source: how many open bundles, how many can
+ * actually be transferred (pieces > 0) and their total pieces.
+ *
+ * @return array{open_total:int, eligible_count:int, eligible_pieces:int}
+ */
+function get_transferable_bundle_summary(mysqli $db_conn, int $rawProductId, int $companyGodownId, ?int $warehouseId): array
+{
+    ensure_raw_material_bundles_table($db_conn);
+    $stmt = $db_conn->prepare(
+        "SELECT COUNT(*) AS open_total,
+                SUM(remaining_pieces > 0) AS eligible_count,
+                COALESCE(SUM(CASE WHEN remaining_pieces > 0 THEN remaining_pieces END), 0) AS eligible_pieces
+         FROM raw_material_bundles
+         WHERE raw_product_id = ? AND company_godown_id = ? AND warehouse_id <=> ? AND status = 'open'"
+    );
+    $stmt->bind_param('iii', $rawProductId, $companyGodownId, $warehouseId);
+    $stmt->execute();
+    $r = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return [
+        'open_total'      => (int) $r['open_total'],
+        'eligible_count'  => (int) ($r['eligible_count'] ?? 0),
+        'eligible_pieces' => (int) $r['eligible_pieces'],
+    ];
+}
+
+/**
+ * One page of the transferable list (newest first), optionally filtered
+ * to one bundle number — used by the "Pick individually" mode so even a
+ * source with 10,000 bundles only ever sends ~100 rows to the browser.
+ *
+ * @return array{rows:array, total:int, has_more:bool}
+ */
+function get_transferable_raw_material_bundles_page(
+    mysqli $db_conn, int $rawProductId, int $companyGodownId, ?int $warehouseId,
+    ?int $bundleNo, int $limit, int $offset
+): array {
+    ensure_raw_material_bundles_table($db_conn);
+    $limit = max(1, min(200, $limit));
+    $offset = max(0, $offset);
+    $where = "b.raw_product_id = ? AND b.company_godown_id = ? AND b.warehouse_id <=> ? AND b.status = 'open' AND b.remaining_pieces > 0";
+    $types = 'iii';
+    $params = [$rawProductId, $companyGodownId, $warehouseId];
+    if ($bundleNo !== null && $bundleNo > 0) {
+        $where .= " AND COALESCE(b.bundle_no, b.id) = ?";
+        $types .= 'i';
+        $params[] = $bundleNo;
+    }
+
+    $cnt = $db_conn->prepare("SELECT COUNT(*) AS c FROM raw_material_bundles b WHERE $where");
+    $cnt->bind_param($types, ...$params);
+    $cnt->execute();
+    $total = (int) $cnt->get_result()->fetch_assoc()['c'];
+    $cnt->close();
+
+    $stmt = $db_conn->prepare(
+        "SELECT b.id, b.bundle_no, b.nominal_pieces, b.remaining_pieces, b.created_at
+         FROM raw_material_bundles b WHERE $where
+         ORDER BY b.created_at DESC, b.id DESC LIMIT $limit OFFSET $offset"
+    );
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $rows = array_map(function ($r) {
+        return [
+            'id'               => (int) $r['id'],
+            'bundle_no'        => (int) ($r['bundle_no'] ?? $r['id']),
+            'nominal_pieces'   => (int) $r['nominal_pieces'],
+            'remaining_pieces' => (int) $r['remaining_pieces'],
+            'created_at'       => $r['created_at'],
+        ];
+    }, $stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+    $stmt->close();
+
+    return ['rows' => $rows, 'total' => $total, 'has_more' => ($offset + count($rows)) < $total];
+}
+
 function ensure_raw_material_bundle_transfers_table(mysqli $db_conn): void
 {
     rm_create_table_if_missing($db_conn, 'raw_material_bundle_transfers',

@@ -36,14 +36,27 @@ ensure_raw_material_bundle_draws_table($db_conn);
 ensure_raw_material_bundle_adjustments_table($db_conn);
 
 if ($action === 'transfer') {
+    $selectionMode = (string) ($_POST['selection_mode'] ?? 'ids');
+    $rawProductId  = filter_var($_POST['raw_product_id'] ?? '', FILTER_VALIDATE_INT) ?: 0;
     $bundleIds = $_POST['bundle_ids'] ?? [];
     $toCg = filter_var($_POST['to_company_godown_id'] ?? '', FILTER_VALIDATE_INT) ?: 0;
     $toWh = filter_var($_POST['to_warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: 0;
     $fromCg = filter_var($_POST['from_company_godown_id'] ?? '', FILTER_VALIDATE_INT) ?: 0;
     $fromWh = filter_var($_POST['from_warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: 0;
 
-    if (!is_array($bundleIds) || !$bundleIds || !$toCg || !$toWh || !$fromCg || !$fromWh) {
-        $_SESSION['errorMessage'] = "Please choose the source, destination and at least one bundle.";
+    if (!in_array($selectionMode, ['ids', 'newest', 'oldest', 'range'], true)) {
+        $selectionMode = 'ids';
+    }
+    $hasSelection = $selectionMode === 'ids'
+        ? (is_array($bundleIds) && count($bundleIds) > 0)
+        : $rawProductId > 0;
+    if (!$hasSelection || !$toCg || !$toWh || !$fromCg || !$fromWh) {
+        $_SESSION['errorMessage'] = "Please choose the source, destination and the bundles to transfer.";
+        header("Location: $back");
+        exit;
+    }
+    if ($selectionMode === 'ids' && count($bundleIds) > RM_BUNDLE_TRANSFER_PICK_CAP) {
+        $_SESSION['errorMessage'] = "You can hand-pick at most " . RM_BUNDLE_TRANSFER_PICK_CAP . " bundles — use Newest N, Oldest N or Number range for larger transfers.";
         header("Location: $back");
         exit;
     }
@@ -71,6 +84,21 @@ if ($action === 'transfer') {
         // The source the form claims must match where the bundles really
         // are — transfer_raw_material_bundles() derives the true source
         // from the locked rows, so re-check the claim against it.
+        // Rule-based selection is resolved HERE, on the server, from the
+        // source the form claims — never from thousands of posted ids.
+        if ($selectionMode !== 'ids') {
+            $sel = select_transferable_raw_material_bundles(
+                $db_conn, $rawProductId, $fromCg, $fromWh, $selectionMode,
+                (int) ($_POST['count_n'] ?? 0), (int) ($_POST['range_from'] ?? 0), (int) ($_POST['range_to'] ?? 0)
+            );
+            if ($sel['overflow']) {
+                throw new StockException("More than " . number_format(RM_BUNDLE_TRANSFER_CAP) . " bundles match — narrow the range, then repeat.");
+            }
+            if (!$sel['ids']) {
+                throw new StockException("No transferable bundles match that selection.");
+            }
+            $bundleIds = $sel['ids'];
+        }
         $result = transfer_raw_material_bundles(
             $db_conn, $stockService, $Login_user_TYPEvl,
             $bundleIds, $toCg, $toWh, $actingUser

@@ -45,6 +45,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
     <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link href="../../assets/css/bundle-mobile.css?v=20261014" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
@@ -186,6 +187,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                                     </div>
 
                                     <div style="padding:0 20px 20px;">
+                                        <span class="bm-bar-summary" id="barSummary"></span>
                                         <button type="submit" class="ata-btn ata-btn-tp ata-btn-submit">
                                             <i class="material-icons" style="font-size:17px;">add_box</i> Record Bundles
                                         </button>
@@ -208,6 +210,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script src="../../assets/js/bundle-mobile.js?v=20261014"></script>
 <script>
 function updateTotalPreview() {
     var nominal = parseInt(document.getElementById('nominalPieces').value, 10) || 0;
@@ -217,8 +220,10 @@ function updateTotalPreview() {
         document.getElementById('totalPreviewValue').textContent = (nominal * count).toLocaleString('en-IN');
         document.getElementById('totalPreviewBundles').textContent = count;
         preview.hidden = false;
+        document.getElementById('barSummary').textContent = count + ' × ' + nominal.toLocaleString('en-IN') + ' = ' + (nominal * count).toLocaleString('en-IN') + ' pc';
     } else {
         preview.hidden = true;
+        document.getElementById('barSummary').textContent = '';
     }
 }
 document.getElementById('nominalPieces').addEventListener('input', updateTotalPreview);

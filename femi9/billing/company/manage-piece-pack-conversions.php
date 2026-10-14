@@ -117,6 +117,7 @@ $totalConversions = count($conversions);
     <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link href="../../assets/css/bundle-mobile.css?v=20261014" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
@@ -241,5 +242,6 @@ $totalConversions = count($conversions);
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script src="../../assets/js/bundle-mobile.js?v=20261014"></script>
 </body>
 </html>

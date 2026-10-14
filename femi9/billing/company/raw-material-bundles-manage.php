@@ -28,7 +28,7 @@ ensure_raw_material_bundle_draws_table($db_conn);
 ensure_raw_material_bundle_adjustments_table($db_conn);
 ensure_raw_material_bucket_tables($db_conn);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['close', 'damage', 'add_extra', 'reopen', 'delete_adjustment'], true)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['close', 'close_many', 'damage', 'add_extra', 'reopen', 'delete_adjustment'], true)) {
     if (empty($_POST['csrf_token']) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
         $_SESSION['errorMessage'] = "Invalid form submission. Please try again.";
         header("Location: raw-material-bundles-manage.php");
@@ -57,6 +57,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['
                 $_SESSION['sucMessage'] = "Bundle closed.";
             } else {
                 $_SESSION['errorMessage'] = "Could not close that bundle — it may already be closed.";
+            }
+        } elseif ($_POST['action'] === 'close_many') {
+            // Bulk close: every selected bundle in ONE all-or-nothing
+            // transaction. Each follows close_raw_material_bundle()'s
+            // normal rules (leftover pieces move to that location's
+            // loose-pieces bucket); already-closed ids are skipped, not
+            // treated as errors.
+            $rawIds = $_POST['bundle_ids'] ?? [];
+            $ids = is_array($rawIds)
+                ? array_values(array_unique(array_filter(array_map('intval', $rawIds), fn($v) => $v > 0)))
+                : [];
+            if (!$ids) {
+                $_SESSION['errorMessage'] = "Select at least one open bundle to close.";
+            } elseif (count($ids) > 200) {
+                $_SESSION['errorMessage'] = "Too many bundles selected at once (max 200).";
+            } else {
+                $closedCount = 0;
+                $skipped = 0;
+                $movedPieces = 0;
+                $db_conn->begin_transaction();
+                try {
+                    $peek = $db_conn->prepare("SELECT status, remaining_pieces FROM raw_material_bundles WHERE id = ? FOR UPDATE");
+                    foreach ($ids as $id) {
+                        $peek->bind_param('i', $id);
+                        $peek->execute();
+                        $row = $peek->get_result()->fetch_assoc();
+                        if (!$row || $row['status'] !== 'open') {
+                            $skipped++;
+                            continue;
+                        }
+                        if (close_raw_material_bundle($db_conn, $id, $actingUser)) {
+                            $closedCount++;
+                            if ((int) $row['remaining_pieces'] > 0) {
+                                $movedPieces += (int) $row['remaining_pieces'];
+                            }
+                        } else {
+                            $skipped++;
+                        }
+                    }
+                    $peek->close();
+                    $db_conn->commit();
+                } catch (\Throwable $e) {
+                    $db_conn->rollback();
+                    throw $e;
+                }
+                $msg = "$closedCount bundle(s) closed";
+                if ($movedPieces > 0) $msg .= ", " . number_format($movedPieces) . " pc moved to the loose-pieces bucket";
+                if ($skipped > 0) $msg .= " ($skipped skipped — already closed)";
+                $_SESSION['sucMessage'] = $msg . ".";
             }
         } elseif ($_POST['action'] === 'damage') {
             $qty = filter_var($_POST['qty'] ?? '', FILTER_VALIDATE_INT) ?: 0;
@@ -376,8 +425,7 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                             </select>
                         </div>
                         <div class="ata-filter-status-group">
-                            <button type="button" class="ata-filter-btn active" data-filter="all">All (<?php echo $totalBundles; ?>)</button>
-                            <button type="button" class="ata-filter-btn" data-filter="open">Open (<?php echo $openCount; ?>)</button>
+                            <button type="button" class="ata-filter-btn active" data-filter="open">Open (<?php echo $openCount; ?>)</button>
                             <button type="button" class="ata-filter-btn" data-filter="closed">Closed (<?php echo $totalBundles - $openCount; ?>)</button>
                         </div>
                         <button type="button" class="ata-filter-clear-btn" id="bundleFilterClearBtn">
@@ -390,6 +438,27 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                         No bundles match your filters.
                     </div>
 
+                    <div class="ata-bulk-strip" id="bulkStrip">
+                        <label style="display:inline-flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:13px;font-weight:600;color:#374151;">
+                            <input type="checkbox" id="selectAllOpen" style="width:18px;height:18px;">
+                            Select all open bundles in view
+                        </label>
+                        <span class="text-muted small" id="bulkStripHint">Tick bundles to close several at once.</span>
+                        <div class="ata-chip-row">
+                            <button type="button" class="ata-chip" data-quick="oldest" data-n="10">Oldest 10</button>
+                            <button type="button" class="ata-chip" data-quick="oldest" data-n="20">Oldest 20</button>
+                            <button type="button" class="ata-chip" data-quick="empty">Empty only (0 pc)</button>
+                            <button type="button" class="ata-chip" id="rangeToggleChip">Number range</button>
+                        </div>
+                        <div class="ata-range-row" id="rangeRow" hidden>
+                            <span>Bundle no.</span>
+                            <input type="number" min="1" id="rangeFrom" placeholder="from">
+                            <span>to</span>
+                            <input type="number" min="1" id="rangeTo" placeholder="to">
+                            <button type="button" class="ata-chip is-solid" id="rangeApply">Select in each location</button>
+                        </div>
+                    </div>
+
                     <div id="bundleGroups">
                         <?php foreach ($bundlesByProduct as $productName => $productBundles):
                             $groupOpenCount = count(array_filter($productBundles, fn($pb) => $pb['status'] === 'open'));
@@ -399,8 +468,30 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                                 <h3><?php echo htmlspecialchars($productName, ENT_QUOTES, 'UTF-8'); ?></h3>
                                 <span class="ata-product-group-count"><?php echo count($productBundles); ?> bundle<?php echo count($productBundles) === 1 ? '' : 's'; ?><?php echo $groupOpenCount > 0 ? ' &middot; ' . $groupOpenCount . ' open' : ''; ?></span>
                             </div>
+                        <?php
+                        $byLoc = [];
+                        foreach ($productBundles as $pb) {
+                            $byLoc[$pb['gname'] . '|' . ($pb['warehouse_code'] ?? '')][] = $pb;
+                        }
+                        foreach ($byLoc as $locBundles):
+                            $locFirst = $locBundles[0];
+                            $locOpenList = array_filter($locBundles, fn($lb) => $lb['status'] === 'open');
+                            $locPcs = array_sum(array_map(fn($lb) => max(0, $lb['remaining_pieces']), $locOpenList));
+                        ?>
+                            <div class="ata-loc-group">
+                                <div class="ata-loc-head" role="button" tabindex="0">
+                                    <label class="ata-loc-check" onclick="event.stopPropagation();" title="Select every open bundle here">
+                                        <input type="checkbox" class="loc-select-cb" aria-label="Select all open bundles at this location">
+                                    </label>
+                                    <div class="ata-loc-title">
+                                        <strong><?php echo htmlspecialchars($locFirst['gname'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                                        <?php if ($locFirst['warehouse_code']): ?><span class="ata-loc-wh"><?php echo htmlspecialchars($locFirst['warehouse_code'], ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+                                    </div>
+                                    <span class="ata-loc-meta" data-total="<?php echo count($locBundles); ?>"><?php echo count($locOpenList); ?> open &middot; <?php echo number_format($locPcs); ?> pc</span>
+                                    <i class="material-icons-outlined ata-loc-chevron">expand_more</i>
+                                </div>
                             <div class="ata-bundle-grid">
-                        <?php foreach ($productBundles as $b):
+                        <?php foreach ($locBundles as $b):
                             $isCarried = $b['carried_to_bundle_id'] !== null;
                             $isExcess = $b['variance_label'] !== null && strpos($b['variance_label'], 'Excess') !== false;
                             $cardExtraClass = $isCarried ? ' is-short' : ($isExcess ? ' is-excess' : '');
@@ -415,6 +506,8 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                              data-warehouse="<?php echo htmlspecialchars($b['warehouse_code'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
                              data-search="<?php echo htmlspecialchars($searchBlob, ENT_QUOTES, 'UTF-8'); ?>"
                              data-bundle-id="<?php echo (int) $b['id']; ?>"
+                             data-no="<?php echo (int) $b['bundle_no']; ?>"
+                             data-remaining="<?php echo (int) $b['remaining_pieces']; ?>"
                              data-bundle-label="<?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>"
                              role="button" tabindex="0"
                              onclick="openBundleHistoryModal(event, <?php echo (int) $b['id']; ?>, '<?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>')"
@@ -422,10 +515,12 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                              style="cursor:pointer;">
                             <div class="ata-bc-top">
                                 <div>
-                                    <div class="ata-bc-title"><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                    <div class="ata-bc-title"><?php if ($b['status'] === 'open'): ?><input type="checkbox" class="bundle-select-cb" value="<?php echo (int) $b['id']; ?>" data-no="<?php echo (int) $b['bundle_no']; ?>" data-remaining="<?php echo max(0, (int) $b['remaining_pieces']); ?>" onclick="event.stopPropagation();" aria-label="Select <?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?>" style="width:18px;height:18px;margin-right:8px;vertical-align:-3px;cursor:pointer;"><?php endif; ?><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></div>
                                     <div class="ata-bc-product"><?php echo htmlspecialchars($b['product_name'], ENT_QUOTES, 'UTF-8'); ?></div>
                                 </div>
                                 <span class="<?php echo $b['status'] === 'open' ? 'badge-open' : 'badge-closed'; ?>"><?php echo ucfirst($b['status']); ?></span>
+                                <span class="ata-bc-rowqty"><?php echo $b['status'] === 'open' ? number_format(max(0, $b['remaining_pieces'])) . ' pc' : 'Closed'; ?></span>
+                                <button type="button" class="ata-bc-expand" aria-label="Show details" onclick="event.stopPropagation(); this.closest('.ata-bundle-card').classList.toggle('is-expanded');"><i class="material-icons-outlined">expand_more</i></button>
                             </div>
 
                             <div class="ata-bc-meta">
@@ -498,6 +593,8 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                         </div>
                         <?php endforeach; ?>
                             </div>
+                            </div>
+                        <?php endforeach; ?>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -622,7 +719,104 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
     .ata-tl-del-btn { border:none; background:transparent; color:#d1d5db; cursor:pointer; padding:0 0 0 6px; vertical-align:middle; line-height:1; }
     .ata-tl-del-btn:hover { color:#ef4444; }
     .ata-tl-del-btn i { font-size:16px; vertical-align:middle; }
+
+    .ata-bulk-strip { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:10px 14px; margin-bottom:14px; background:#f8f9fc; border:1px solid #eaecf5; border-radius:10px; }
+    .ata-bundle-card.is-selected { border-color:#818cf8; box-shadow:0 0 0 3px rgba(102,126,234,.18); }
+    .ata-bulk-bar { position:fixed; left:0; right:0; bottom:0; z-index:1040; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 20px calc(12px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e5e7eb; box-shadow:0 -6px 18px rgba(16,24,40,.12); }
+    .ata-bulk-bar[hidden] { display:none; }
+    .ata-bulk-summary { font-size:14px; font-weight:600; color:#1f2937; }
+    .ata-bulk-summary small { display:block; font-weight:400; font-size:12px; color:#6b7280; }
+    .ata-bulk-actions { display:flex; gap:8px; }
+    .ata-bulk-actions .btn { min-height:44px; }
+    @media (max-width: 575px) {
+        .ata-bulk-bar { padding-left:14px; padding-right:14px; }
+        .ata-bulk-actions { width:100%; }
+        .ata-bulk-actions .btn { flex:1 1 0; }
+    }
+
+    /* Location sub-groups (collapsible) */
+    .ata-loc-group { margin-bottom:12px; border:1px solid #eef0f3; border-radius:12px; background:#fcfcfd; }
+    .ata-loc-head { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; min-height:52px; }
+    .ata-loc-check { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; margin:0; cursor:pointer; }
+    .ata-loc-check input { width:20px; height:20px; cursor:pointer; }
+    .ata-loc-title { flex:1 1 auto; min-width:0; font-size:13.5px; color:#1f2937; }
+    .ata-loc-title strong { font-weight:600; }
+    .ata-loc-wh { margin-left:8px; font-size:11.5px; font-weight:700; color:#4338ca; background:#eef2ff; border-radius:999px; padding:2px 9px; }
+    .ata-loc-meta { font-size:12px; color:#6b7280; white-space:nowrap; }
+    .ata-loc-chevron { color:#9ca3af; transition:transform .15s; }
+    .ata-loc-group.is-collapsed .ata-loc-chevron { transform:rotate(-90deg); }
+    .ata-loc-group.is-collapsed > .ata-bundle-grid { display:none; }
+    .ata-loc-group > .ata-bundle-grid { padding:4px 12px 12px; }
+
+    .ata-chip-row { display:flex; gap:8px; flex-wrap:wrap; width:100%; }
+    .ata-chip { border:1px solid #c7d2fe; background:#f5f6ff; color:#4338ca; border-radius:999px; font-size:12.5px; font-weight:600; padding:7px 14px; min-height:36px; cursor:pointer; white-space:nowrap; }
+    .ata-chip:hover { background:#eaecff; }
+    .ata-chip.is-solid { background:#4338ca; color:#fff; border-color:#4338ca; }
+    .ata-range-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; font-size:13px; color:#374151; }
+    .ata-range-row[hidden] { display:none; }
+    .ata-range-row input { width:84px; height:38px; border:1px solid #dde1ea; border-radius:8px; padding:0 10px; }
+
+    .ata-review-link { border:none; background:none; color:#4338ca; font-weight:600; font-size:13.5px; padding:8px 10px; cursor:pointer; text-decoration:underline; }
+    .ata-review-backdrop { position:fixed; inset:0; z-index:1060; background:rgba(15,23,42,.45); display:flex; align-items:flex-end; justify-content:center; }
+    .ata-review-backdrop[hidden] { display:none; }
+    .ata-review-sheet { background:#fff; width:100%; max-width:560px; max-height:80vh; border-radius:16px 16px 0 0; display:flex; flex-direction:column; }
+    .ata-review-head { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid #eef0f3; }
+    .ata-review-head button { border:none; background:none; color:#6b7280; cursor:pointer; }
+    .ata-review-list { overflow-y:auto; padding:6px 12px calc(14px + env(safe-area-inset-bottom)); }
+    .ata-review-item { display:flex; align-items:center; gap:10px; padding:10px 6px; border-bottom:1px solid #f3f4f6; font-size:13.5px; }
+    .ata-review-item .ri-main { flex:1 1 auto; min-width:0; }
+    .ata-review-item .ri-sub { font-size:12px; color:#6b7280; }
+    .ata-review-item .ri-qty { font-weight:600; white-space:nowrap; }
+    .ata-review-item button { border:1px solid #fecdd3; background:#fff; color:#e11d48; border-radius:8px; width:36px; height:36px; cursor:pointer; }
+
+    .ata-bc-rowqty, .ata-bc-expand { display:none; }
+
+    /* Phones: bundle cards collapse into slim, tappable list rows */
+    @media (max-width: 767px) {
+        .ata-loc-group > .ata-bundle-grid { padding:2px 8px 8px; display:block; }
+        .ata-bundle-card { padding:0; margin-bottom:6px; border-radius:10px; box-shadow:none; }
+        .ata-bundle-card:not(.is-expanded) > :not(.ata-bc-top) { display:none; }
+        .ata-bundle-card:not(.is-expanded) .ata-bc-top { margin-bottom:0; }
+        .ata-bundle-card:not(.is-expanded) .ata-bc-top { padding:10px 12px; align-items:center; min-height:54px; }
+        .ata-bundle-card:not(.is-expanded) .ata-bc-product { font-size:12px; }
+        .ata-bundle-card:not(.is-expanded) .badge-open,
+        .ata-bundle-card:not(.is-expanded) .badge-closed { display:none; }
+        .ata-bundle-card.is-expanded { padding:12px 14px; }
+        .ata-bc-rowqty { display:inline-block; margin-left:auto; padding-left:10px; font-size:13px; font-weight:700; color:#1e40af; white-space:nowrap; }
+        .ata-bundle-card.is-expanded .ata-bc-rowqty { display:none; }
+        .ata-bc-expand { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; margin-left:4px; border:none; background:transparent; color:#9ca3af; border-radius:8px; cursor:pointer; }
+        .ata-bundle-card.is-expanded .ata-bc-expand i { transform:rotate(180deg); }
+        .ata-bundle-card .bundle-select-cb { width:22px !important; height:22px !important; margin-right:10px !important; }
+        .ata-bc-top { gap:4px; }
+        .ata-chip-row { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+        .ata-chip-row::-webkit-scrollbar { display:none; }
+        .ata-review-link { padding:8px 4px; }
+        .ata-bulk-bar { flex-wrap:wrap; }
+    }
 </style>
+
+<form method="post" id="bulkCloseForm" style="display:none;">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+    <input type="hidden" name="action" value="close_many">
+    <div id="bulkCloseIds"></div>
+</form>
+<div class="ata-review-backdrop" id="bulkReviewBackdrop" hidden>
+    <div class="ata-review-sheet" role="dialog" aria-label="Selected bundles">
+        <div class="ata-review-head">
+            <strong id="bulkReviewTitle">Selected bundles</strong>
+            <button type="button" id="bulkReviewClose" aria-label="Close"><i class="material-icons">close</i></button>
+        </div>
+        <div class="ata-review-list" id="bulkReviewList"></div>
+    </div>
+</div>
+<div class="ata-bulk-bar" id="bulkCloseBar" hidden>
+    <div class="ata-bulk-summary" id="bulkCloseSummary"></div>
+    <button type="button" class="ata-review-link" id="bulkReviewBtn">Review</button>
+    <div class="ata-bulk-actions">
+        <button type="button" class="btn btn-outline-secondary" id="bulkClearBtn">Clear</button>
+        <button type="button" class="btn btn-danger" id="bulkCloseBtn">Close selected</button>
+    </div>
+</div>
 
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
@@ -639,7 +833,7 @@ var reasonCache = {
 };
 var currentActionModalType = 'damage';
 
-var statusFilter = 'all';
+var statusFilter = 'open';
 var searchInput = document.getElementById('bundleSearchInput');
 var productFilter = document.getElementById('bundleProductFilter');
 var godownFilter = document.getElementById('bundleGodownFilter');
@@ -655,7 +849,7 @@ function applyFilters() {
     var visibleCount = 0;
 
     bundleCards.forEach(function (card) {
-        var matchesStatus = statusFilter === 'all' || card.getAttribute('data-status') === statusFilter;
+        var matchesStatus = card.getAttribute('data-status') === statusFilter;
         var matchesProduct = !product || card.getAttribute('data-product') === product;
         var matchesGodown = !godown || card.getAttribute('data-godown') === godown;
         var matchesWarehouse = !warehouse || card.getAttribute('data-warehouse') === warehouse;
@@ -668,6 +862,12 @@ function applyFilters() {
     // A product's whole group hides once every card inside it is filtered
     // out — otherwise an empty heading with no cards beneath it would hang
     // around whenever a filter narrows a product down to zero matches.
+    document.querySelectorAll('.ata-loc-group').forEach(function (loc) {
+        var any = Array.prototype.some.call(loc.querySelectorAll('.ata-bundle-card'), function (card) {
+            return card.style.display !== 'none';
+        });
+        loc.style.display = any ? '' : 'none';
+    });
     document.querySelectorAll('.ata-product-group').forEach(function (group) {
         var anyVisible = Array.prototype.some.call(group.querySelectorAll('.ata-bundle-card'), function (card) {
             return card.style.display !== 'none';
@@ -676,6 +876,7 @@ function applyFilters() {
     });
 
     emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+    if (typeof syncBulkSelection === 'function') syncBulkSelection();
 }
 
 document.querySelectorAll('.ata-filter-btn').forEach(function (btn) {
@@ -697,9 +898,9 @@ document.getElementById('bundleFilterClearBtn').addEventListener('click', functi
     productFilter.value = '';
     godownFilter.value = '';
     warehouseFilter.value = '';
-    statusFilter = 'all';
+    statusFilter = 'open';
     document.querySelectorAll('.ata-filter-btn').forEach(function (b) { b.classList.remove('active'); });
-    document.querySelector('.ata-filter-btn[data-filter="all"]').classList.add('active');
+    document.querySelector('.ata-filter-btn[data-filter="open"]').classList.add('active');
     applyFilters();
 });
 
@@ -998,6 +1199,240 @@ function deleteBundleAdjustment(adjustmentId, btnEl) {
     document.body.appendChild(form);
     form.submit();
 }
+
+// ── Bulk close ───────────────────────────────────────────────────────
+var bulkBar = document.getElementById('bulkCloseBar');
+var bulkSummary = document.getElementById('bulkCloseSummary');
+var selectAllOpen = document.getElementById('selectAllOpen');
+
+function cardIsVisible(card) {
+    var group = card.closest('.ata-product-group');
+    return card.style.display !== 'none' && (!group || group.style.display !== 'none');
+}
+function allOpenCbs() { return Array.from(document.querySelectorAll('.bundle-select-cb')); }
+function visibleOpenCbs() { return allOpenCbs().filter(function (cb) { return cardIsVisible(cb.closest('.ata-bundle-card')); }); }
+
+function updateLocGroups() {
+    document.querySelectorAll('.ata-loc-group').forEach(function (loc) {
+        var cards = Array.prototype.filter.call(loc.querySelectorAll('.ata-bundle-card'), function (c) { return c.style.display !== 'none'; });
+        var cbs = Array.prototype.filter.call(loc.querySelectorAll('.bundle-select-cb'), function (cb) {
+            return cb.closest('.ata-bundle-card').style.display !== 'none';
+        });
+        var pcs = 0, sel = 0;
+        cbs.forEach(function (cb) {
+            pcs += parseInt(cb.getAttribute('data-remaining'), 10) || 0;
+            if (cb.checked) sel++;
+        });
+        var meta = loc.querySelector('.ata-loc-meta');
+        if (meta) {
+            meta.textContent = cbs.length
+                ? (cbs.length + ' open · ' + pcs.toLocaleString('en-IN') + ' pc' + (sel ? ' · ' + sel + ' selected' : ''))
+                : (cards.length + ' closed');
+        }
+        var lc = loc.querySelector('.loc-select-cb');
+        if (lc) {
+            lc.disabled = cbs.length === 0;
+            lc.style.visibility = cbs.length === 0 ? 'hidden' : '';
+            lc.checked = cbs.length > 0 && sel === cbs.length;
+            lc.indeterminate = sel > 0 && sel < cbs.length;
+        }
+    });
+}
+
+function updateBulkBar() {
+    updateLocGroups();
+    var checked = allOpenCbs().filter(function (cb) { return cb.checked; });
+    var pcs = 0;
+    checked.forEach(function (cb) { pcs += parseInt(cb.getAttribute('data-remaining'), 10) || 0; });
+    allOpenCbs().forEach(function (cb) { cb.closest('.ata-bundle-card').classList.toggle('is-selected', cb.checked); });
+    var visible = visibleOpenCbs();
+    if (selectAllOpen) {
+        selectAllOpen.disabled = visible.length === 0;
+        selectAllOpen.checked = visible.length > 0 && visible.every(function (cb) { return cb.checked; });
+    }
+    if (!checked.length) { bulkBar.hidden = true; return; }
+    bulkBar.hidden = false;
+    bulkSummary.innerHTML = checked.length + ' bundle' + (checked.length === 1 ? '' : 's') + ' selected'
+        + '<small>' + pcs.toLocaleString('en-IN') + ' pc will move to the loose-pieces bucket</small>';
+}
+
+// Selections never include cards a filter has hidden — what you see
+// ticked is exactly what gets closed.
+function syncBulkSelection() {
+    allOpenCbs().forEach(function (cb) {
+        if (!cardIsVisible(cb.closest('.ata-bundle-card'))) cb.checked = false;
+    });
+    updateBulkBar();
+}
+
+document.addEventListener('change', function (e) {
+    if (e.target.classList && e.target.classList.contains('bundle-select-cb')) updateBulkBar();
+});
+if (selectAllOpen) {
+    selectAllOpen.addEventListener('change', function () {
+        visibleOpenCbs().forEach(function (cb) { cb.checked = selectAllOpen.checked; });
+        updateBulkBar();
+    });
+}
+document.getElementById('bulkClearBtn').addEventListener('click', function () {
+    allOpenCbs().forEach(function (cb) { cb.checked = false; });
+    updateBulkBar();
+});
+document.getElementById('bulkCloseBtn').addEventListener('click', function () {
+    var checked = allOpenCbs().filter(function (cb) { return cb.checked; });
+    if (!checked.length) return;
+    var pcs = 0;
+    checked.forEach(function (cb) { pcs += parseInt(cb.getAttribute('data-remaining'), 10) || 0; });
+    var msg = 'Close ' + checked.length + ' bundle(s)?'
+        + (pcs > 0 ? '\n\n' + pcs.toLocaleString('en-IN') + ' pc remaining will move to the loose-pieces bucket for each bundle\'s company profile + warehouse.' : '')
+        + '\n\nEach bundle can be reopened later individually.';
+    if (!confirm(msg)) return;
+    var holder = document.getElementById('bulkCloseIds');
+    holder.innerHTML = '';
+    checked.forEach(function (cb) {
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'bundle_ids[]'; inp.value = cb.value;
+        holder.appendChild(inp);
+    });
+    this.disabled = true;
+    document.getElementById('bulkCloseForm').submit();
+});
+
+// ── Location groups: collapse + group select ─────────────────────────
+var isPhone = function () { return window.matchMedia('(max-width: 767px)').matches; };
+
+document.querySelectorAll('.ata-loc-head').forEach(function (head) {
+    function toggle() { head.parentElement.classList.toggle('is-collapsed'); }
+    head.addEventListener('click', toggle);
+    head.addEventListener('keydown', function (e) {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target === head) { e.preventDefault(); toggle(); }
+    });
+});
+document.querySelectorAll('.loc-select-cb').forEach(function (lc) {
+    lc.addEventListener('change', function () {
+        var loc = lc.closest('.ata-loc-group');
+        loc.querySelectorAll('.bundle-select-cb').forEach(function (cb) {
+            if (cb.closest('.ata-bundle-card').style.display !== 'none') cb.checked = lc.checked;
+        });
+        if (lc.checked) loc.classList.remove('is-collapsed');
+        updateBulkBar();
+    });
+});
+// On phones start with every location collapsed: a short list of headers
+// (open count + pieces each) instead of 40 rows.
+if (isPhone()) {
+    document.querySelectorAll('.ata-loc-group').forEach(function (g) { g.classList.add('is-collapsed'); });
+}
+
+// Phones: tapping a row toggles its checkbox (fast multi-select); the
+// chevron expands it into the full card. Closed rows just expand.
+document.querySelectorAll('.ata-bundle-card').forEach(function (card) {
+    card.addEventListener('click', function (e) {
+        if (!isPhone()) return;
+        if (e.target.closest('input, button, a, form, label, select, textarea')) return;
+        var expanded = card.classList.contains('is-expanded');
+        if (!expanded) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            var cb = card.querySelector('.bundle-select-cb');
+            if (cb) {
+                cb.checked = !cb.checked;
+                updateBulkBar();
+            } else {
+                card.classList.add('is-expanded');
+            }
+        } else if (e.target.closest('.ata-bc-top')) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            card.classList.remove('is-expanded');
+        }
+    }, true);
+});
+
+// ── Quick-select chips ───────────────────────────────────────────────
+function clearAllSelection() { allOpenCbs().forEach(function (cb) { cb.checked = false; }); }
+
+document.querySelectorAll('.ata-chip[data-quick]').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+        var visible = visibleOpenCbs();
+        var kind = chip.getAttribute('data-quick');
+        if (kind === 'oldest') {
+            // DOM order inside each location is oldest-first, so the first
+            // N visible open bundles per location are that location's oldest.
+            var n = parseInt(chip.getAttribute('data-n'), 10) || 0;
+            clearAllSelection();
+            document.querySelectorAll('.ata-loc-group').forEach(function (loc) {
+                var taken = 0;
+                loc.querySelectorAll('.bundle-select-cb').forEach(function (cb) {
+                    if (!cardIsVisible(cb.closest('.ata-bundle-card'))) return;
+                    if (taken < n) { cb.checked = true; taken++; }
+                });
+            });
+        } else if (kind === 'empty') {
+            clearAllSelection();
+            visible.forEach(function (cb) {
+                if ((parseInt(cb.getAttribute('data-remaining'), 10) || 0) === 0) cb.checked = true;
+            });
+        }
+        document.querySelectorAll('.ata-loc-group').forEach(function (g) { if (g.querySelector('.bundle-select-cb:checked')) g.classList.remove('is-collapsed'); });
+        updateBulkBar();
+    });
+});
+document.getElementById('rangeToggleChip').addEventListener('click', function () {
+    var row = document.getElementById('rangeRow');
+    row.hidden = !row.hidden;
+});
+document.getElementById('rangeApply').addEventListener('click', function () {
+    var from = parseInt(document.getElementById('rangeFrom').value, 10);
+    var to = parseInt(document.getElementById('rangeTo').value, 10);
+    if (!(from > 0) || !(to >= from)) { alert('Enter a valid bundle number range (from ≤ to).'); return; }
+    clearAllSelection();
+    visibleOpenCbs().forEach(function (cb) {
+        var no = parseInt(cb.getAttribute('data-no'), 10) || 0;
+        if (no >= from && no <= to) cb.checked = true;
+    });
+    document.querySelectorAll('.ata-loc-group').forEach(function (g) { if (g.querySelector('.bundle-select-cb:checked')) g.classList.remove('is-collapsed'); });
+    updateBulkBar();
+});
+
+// ── Review sheet ─────────────────────────────────────────────────────
+var reviewBackdrop = document.getElementById('bulkReviewBackdrop');
+function renderReview() {
+    var list = document.getElementById('bulkReviewList');
+    var checked = allOpenCbs().filter(function (cb) { return cb.checked; });
+    document.getElementById('bulkReviewTitle').textContent = checked.length + ' bundle' + (checked.length === 1 ? '' : 's') + ' selected';
+    list.innerHTML = '';
+    if (!checked.length) { reviewBackdrop.hidden = true; return; }
+    checked.forEach(function (cb) {
+        var card = cb.closest('.ata-bundle-card');
+        var item = document.createElement('div');
+        item.className = 'ata-review-item';
+        var main = document.createElement('div');
+        main.className = 'ri-main';
+        var t = document.createElement('div');
+        t.textContent = card.getAttribute('data-bundle-label') || ('Bundle #' + cb.getAttribute('data-no'));
+        var sub = document.createElement('div');
+        sub.className = 'ri-sub';
+        sub.textContent = card.getAttribute('data-product') + ' · ' + card.getAttribute('data-godown')
+            + (card.getAttribute('data-warehouse') ? ' · ' + card.getAttribute('data-warehouse') : '');
+        main.appendChild(t); main.appendChild(sub);
+        var q = document.createElement('div');
+        q.className = 'ri-qty';
+        q.textContent = (parseInt(cb.getAttribute('data-remaining'), 10) || 0).toLocaleString('en-IN') + ' pc';
+        var rm = document.createElement('button');
+        rm.type = 'button';
+        rm.setAttribute('aria-label', 'Remove from selection');
+        rm.innerHTML = '<i class="material-icons-outlined" style="font-size:18px;">close</i>';
+        rm.addEventListener('click', function () { cb.checked = false; updateBulkBar(); renderReview(); });
+        item.appendChild(main); item.appendChild(q); item.appendChild(rm);
+        list.appendChild(item);
+    });
+}
+document.getElementById('bulkReviewBtn').addEventListener('click', function () { renderReview(); reviewBackdrop.hidden = false; });
+document.getElementById('bulkReviewClose').addEventListener('click', function () { reviewBackdrop.hidden = true; });
+reviewBackdrop.addEventListener('click', function (e) { if (e.target === reviewBackdrop) reviewBackdrop.hidden = true; });
+// Page opens on the Open filter — apply it now that everything it touches exists.
+applyFilters();
 </script>
 </body>
 </html>

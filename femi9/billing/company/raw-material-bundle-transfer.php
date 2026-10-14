@@ -16,18 +16,41 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// AJAX: open bundles at a source (product + company profile + warehouse),
-// newest first (LIFO).
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'list') {
+// AJAX endpoints (JSON): source summary + a page of the list, and a
+// server-side preview of what a count/range rule would transfer.
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && in_array($_GET['action'] ?? '', ['list', 'preview'], true)) {
     header('Content-Type: application/json');
     $rp = filter_var($_GET['raw_product_id'] ?? '', FILTER_VALIDATE_INT) ?: 0;
     $cg = filter_var($_GET['company_godown_id'] ?? '', FILTER_VALIDATE_INT) ?: 0;
     $wh = filter_var($_GET['warehouse_id'] ?? '', FILTER_VALIDATE_INT) ?: null;
     if (!$rp || !$cg || !is_godown_allowed($db_conn, $cg)) {
-        echo json_encode([]);
+        echo json_encode(['error' => 'invalid_source']);
         exit;
     }
-    echo json_encode(get_transferable_raw_material_bundles($db_conn, $rp, $cg, $wh));
+    if ($_GET['action'] === 'list') {
+        $q = filter_var($_GET['q'] ?? '', FILTER_VALIDATE_INT) ?: null;
+        $page = get_transferable_raw_material_bundles_page(
+            $db_conn, $rp, $cg, $wh, $q,
+            (int) ($_GET['limit'] ?? 100), (int) ($_GET['offset'] ?? 0)
+        );
+        echo json_encode([
+            'summary'  => get_transferable_bundle_summary($db_conn, $rp, $cg, $wh),
+            'rows'     => $page['rows'],
+            'total'    => $page['total'],
+            'has_more' => $page['has_more'],
+            'cap'      => RM_BUNDLE_TRANSFER_CAP,
+        ]);
+        exit;
+    }
+    try {
+        $sel = select_transferable_raw_material_bundles(
+            $db_conn, $rp, $cg, $wh, (string) ($_GET['mode'] ?? ''),
+            (int) ($_GET['n'] ?? 0), (int) ($_GET['from'] ?? 0), (int) ($_GET['to'] ?? 0)
+        );
+        echo json_encode(['count' => count($sel['ids']), 'pieces' => $sel['pieces'], 'overflow' => $sel['overflow'], 'cap' => RM_BUNDLE_TRANSFER_CAP]);
+    } catch (StockException $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+    }
     exit;
 }
 
@@ -59,6 +82,7 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
     <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link href="../../assets/css/bundle-mobile.css?v=20261014" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
@@ -97,6 +121,33 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
         .ata-btn:hover { filter:brightness(1.06); color:#fff; }
         .ata-btn-tp { background:linear-gradient(135deg, var(--ata-tp-1) 0%, var(--ata-tp-2) 100%); box-shadow:0 2px 6px rgba(102,126,234,.3); }
         .ata-btn-submit { font-size:14px; padding:10px 22px; }
+
+        .bt-source-summary { font-size:14px; font-weight:600; color:#1f2937; margin-bottom:12px; }
+        .bt-source-summary small { display:block; font-weight:400; color:#6b7280; font-size:12.5px; }
+        .bt-modes { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+        .bt-mode { margin:0; cursor:pointer; }
+        .bt-mode input { position:absolute; opacity:0; pointer-events:none; }
+        .bt-mode span { display:inline-block; padding:9px 16px; min-height:40px; border:1px solid #dde1ea; border-radius:999px; font-size:13.5px; font-weight:600; color:#4b5563; background:#fff; }
+        .bt-mode input:checked + span { background:linear-gradient(135deg, var(--ata-tp-1) 0%, var(--ata-tp-2) 100%); color:#fff; border-color:transparent; }
+        .bt-mode input:focus-visible + span { outline:2px solid var(--ata-tp-1); outline-offset:2px; }
+        .bt-panel[hidden] { display:none; }
+        .bt-range { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 220px)); gap:12px; }
+        .bt-preview { margin-top:14px; padding:10px 14px; border-radius:10px; background:#eef2ff; color:#4338ca; font-size:13.5px; font-weight:600; }
+        .bt-preview:empty { display:none; }
+        .bt-preview.is-error { background:#fef2f2; color:#b91c1c; }
+        .bt-list-scroll { max-height:52vh; overflow:auto; border:1px solid #eef0f3; border-radius:10px; }
+        .bt-list-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; }
+        .ata-chip { border:1px solid #c7d2fe; background:#f5f6ff; color:#4338ca; border-radius:999px; font-size:12.5px; font-weight:600; padding:7px 14px; min-height:36px; cursor:pointer; }
+        .bt-bar { position:sticky; bottom:0; z-index:20; margin-top:14px; padding:10px 14px; background:#fff; border:1px solid #eef0f3; border-radius:12px; box-shadow:0 -4px 14px rgba(16,24,40,.08); }
+        .bt-bar .bt-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+        .bt-bar .bt-bar-summary { display:block; font-size:13.5px; font-weight:600; color:#4338ca; }
+        .bt-bar .ata-btn-submit:disabled { opacity:.5; cursor:not-allowed; }
+        @media (max-width: 767px) {
+            .bt-bar { padding:0; border:0; box-shadow:none; margin:0; background:transparent; }
+            .bt-modes { gap:6px; }
+            .bt-mode span { padding:9px 12px; }
+            .bt-list-scroll { max-height:46vh; }
+        }
     </style>
 </head>
 <body>
@@ -193,30 +244,62 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
                                     <div style="padding:0 20px 20px;">
                                         <div class="ata-hint-box" id="btHint">
                                             <i class="material-icons-outlined">info</i>
-                                            <div>Pick the product, source and destination. The source's open bundles will be listed newest first (last in, first out).</div>
+                                            <div>Pick the product and the source company profile + warehouse to see what can be transferred.</div>
                                         </div>
 
-                                        <div id="btListWrap" hidden>
-                                            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
-                                                <div class="ata-field" style="max-width:220px;">
-                                                    <label>Select newest N bundles</label>
-                                                    <input type="number" min="0" id="btNewestN" placeholder="e.g. 3">
+                                        <div id="btSelectWrap" hidden>
+                                            <div class="bt-source-summary" id="btSourceSummary"></div>
+
+                                            <div class="bt-modes" role="radiogroup" aria-label="How to choose bundles">
+                                                <label class="bt-mode"><input type="radio" name="selection_mode" value="newest" checked><span>Newest N</span></label>
+                                                <label class="bt-mode"><input type="radio" name="selection_mode" value="oldest"><span>Oldest N</span></label>
+                                                <label class="bt-mode"><input type="radio" name="selection_mode" value="range"><span>Number range</span></label>
+                                                <label class="bt-mode"><input type="radio" name="selection_mode" value="ids"><span>Pick individually</span></label>
+                                            </div>
+
+                                            <div class="bt-panel" data-mode="newest oldest">
+                                                <div class="ata-field" style="max-width:260px;">
+                                                    <label id="btCountLabel">How many bundles (newest first)</label>
+                                                    <input type="number" inputmode="numeric" min="1" max="2000" name="count_n" id="btCountN" placeholder="e.g. 300">
                                                 </div>
-                                                <div style="font-size:13px;color:#4338ca;font-weight:500;" id="btSummary"></div>
                                             </div>
-                                            <div style="overflow-x:auto;">
-                                                <table class="table table-sm" style="font-size:13px;">
-                                                    <thead><tr><th style="width:40px;"></th><th>Bundle</th><th style="text-align:right;">Nominal</th><th style="text-align:right;">Remaining</th><th>Created</th></tr></thead>
-                                                    <tbody id="btRows"></tbody>
-                                                </table>
+                                            <div class="bt-panel" data-mode="range" hidden>
+                                                <div class="bt-range">
+                                                    <div class="ata-field"><label>From bundle no.</label><input type="number" inputmode="numeric" min="1" name="range_from" id="btRangeFrom" placeholder="e.g. 12"></div>
+                                                    <div class="ata-field"><label>To bundle no.</label><input type="number" inputmode="numeric" min="1" name="range_to" id="btRangeTo" placeholder="e.g. 480"></div>
+                                                </div>
                                             </div>
-                                        </div>
+                                            <div class="bt-panel" data-mode="ids" hidden>
+                                                <div class="ata-field" style="max-width:260px;margin-bottom:10px;">
+                                                    <label>Find bundle no.</label>
+                                                    <input type="number" inputmode="numeric" min="1" id="btSearch" placeholder="Type a bundle number">
+                                                </div>
+                                                <div class="bt-list-scroll">
+                                                    <table class="table table-sm" style="font-size:13px;">
+                                                        <thead><tr><th style="width:40px;"></th><th>Bundle</th><th style="text-align:right;">Nominal</th><th style="text-align:right;">Remaining</th><th>Created</th></tr></thead>
+                                                        <tbody id="btRows"></tbody>
+                                                    </table>
+                                                </div>
+                                                <div class="bt-list-foot">
+                                                    <span id="btListInfo" class="text-muted small"></span>
+                                                    <button type="button" class="ata-chip" id="btMore" hidden>Show 100 more</button>
+                                                </div>
+                                            </div>
 
-                                        <button type="submit" class="ata-btn ata-btn-tp ata-btn-submit" id="btSubmit" disabled>
-                                            <i class="material-icons" style="font-size:17px;">swap_horiz</i> Transfer Selected Bundles
-                                        </button>
+                                            <div class="bt-preview" id="btPreview"></div>
+                                        </div>
+                                        <div id="btPickedInputs"></div>
                                     </div>
                                 </form>
+                            </div>
+
+                            <div class="bt-bar">
+                                <div class="bt-actions">
+                                    <span class="bm-bar-summary bt-bar-summary" id="btBarSummary">Nothing selected yet</span>
+                                    <button type="submit" form="btForm" class="ata-btn ata-btn-tp ata-btn-submit" id="btSubmit" disabled>
+                                        <i class="material-icons" style="font-size:17px;">swap_horiz</i> Transfer
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="ata-card card" style="margin-top:20px;">
@@ -281,71 +364,189 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script src="../../assets/js/bundle-mobile.js?v=20261014"></script>
 <script>
 (function () {
     var $ = function (id) { return document.getElementById(id); };
     var product = $('btProduct'), fromCg = $('btFromCg'), fromWh = $('btFromWh'),
-        toCg = $('btToCg'), toWh = $('btToWh'), rows = $('btRows'), wrap = $('btListWrap'),
-        hint = $('btHint'), submit = $('btSubmit'), summary = $('btSummary'), newestN = $('btNewestN');
+        toCg = $('btToCg'), toWh = $('btToWh'), rows = $('btRows'),
+        hint = $('btHint'), selectWrap = $('btSelectWrap'), sourceSummary = $('btSourceSummary'),
+        preview = $('btPreview'), submit = $('btSubmit'), barSummary = $('btBarSummary'),
+        countN = $('btCountN'), rangeFrom = $('btRangeFrom'), rangeTo = $('btRangeTo'),
+        search = $('btSearch'), moreBtn = $('btMore'), listInfo = $('btListInfo'),
+        pickedInputs = $('btPickedInputs');
 
+    var CAP = 2000, PICK_CAP = 200, PAGE = 100;
+    var selected = new Map();           // id -> remaining (Pick individually)
+    var listOffset = 0, listQuery = '', listToken = 0, previewToken = 0, previewTimer = null;
+    var previewState = { count: 0, pieces: 0, ok: false };
+
+    function fmt(n) { return Number(n).toLocaleString('en-IN'); }
     function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-    function checkboxes() { return rows.querySelectorAll('input.bt-check'); }
-
-    function updateSummary() {
-        var n = 0, pcs = 0;
-        checkboxes().forEach(function (c) { if (c.checked) { n++; pcs += parseInt(c.dataset.remaining, 10); } });
-        summary.textContent = n ? (n + ' bundle(s) selected · ' + pcs.toLocaleString('en-IN') + ' pieces') : '';
-        submit.disabled = n === 0 || !toCg.value || !toWh.value;
+    function mode() { return document.querySelector('input[name="selection_mode"]:checked').value; }
+    function sourceReady() { return !!(product.value && fromCg.value && fromWh.value); }
+    function qs(extra) {
+        return 'raw-material-bundle-transfer.php?raw_product_id=' + encodeURIComponent(product.value)
+            + '&company_godown_id=' + encodeURIComponent(fromCg.value)
+            + '&warehouse_id=' + encodeURIComponent(fromWh.value) + (extra || '');
     }
 
-    function load() {
-        wrap.hidden = true; rows.innerHTML = ''; submit.disabled = true;
-        if (!product.value || !fromCg.value || !fromWh.value) {
-            hint.hidden = false; return;
+    // ── bar + submit state ───────────────────────────────────────────
+    function refreshBar() {
+        var m = mode(), text = 'Nothing selected yet', ok = false;
+        if (m === 'ids') {
+            if (selected.size) {
+                var pcs = 0; selected.forEach(function (v) { pcs += v; });
+                text = selected.size + ' bundle(s) · ' + fmt(pcs) + ' pc';
+                ok = selected.size <= PICK_CAP;
+            }
+        } else if (previewState.ok && previewState.count > 0) {
+            text = previewState.count + ' bundle(s) · ' + fmt(previewState.pieces) + ' pc';
+            ok = true;
         }
-        fetch('raw-material-bundle-transfer.php?action=list&raw_product_id=' + encodeURIComponent(product.value)
-            + '&company_godown_id=' + encodeURIComponent(fromCg.value)
-            + '&warehouse_id=' + encodeURIComponent(fromWh.value), { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
-            .then(function (list) {
-                hint.hidden = list.length > 0;
-                if (!list.length) {
-                    hint.querySelector('div').textContent = 'No open bundles at this source for the selected product.';
+        barSummary.textContent = text;
+        submit.disabled = !(ok && toCg.value && toWh.value && sourceReady());
+    }
+
+    // ── rule modes: server-side preview ──────────────────────────────
+    function showPreview(msg, isError) {
+        preview.textContent = msg || '';
+        preview.classList.toggle('is-error', !!isError);
+    }
+    function schedulePreview() {
+        clearTimeout(previewTimer);
+        previewState = { count: 0, pieces: 0, ok: false };
+        var m = mode();
+        if (m === 'ids' || !sourceReady()) { showPreview(''); refreshBar(); return; }
+        var extra;
+        if (m === 'range') {
+            var f = parseInt(rangeFrom.value, 10), t = parseInt(rangeTo.value, 10);
+            if (!(f > 0) || !(t >= f)) { showPreview(''); refreshBar(); return; }
+            extra = '&action=preview&mode=range&from=' + f + '&to=' + t;
+        } else {
+            var n = parseInt(countN.value, 10);
+            if (!(n > 0)) { showPreview(''); refreshBar(); return; }
+            extra = '&action=preview&mode=' + m + '&n=' + n;
+        }
+        refreshBar();
+        var token = ++previewToken;
+        previewTimer = setTimeout(function () {
+            fetch(qs(extra), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (token !== previewToken) return;
+                    if (d.error) { showPreview(d.error, true); previewState = { count: 0, pieces: 0, ok: false }; }
+                    else if (d.overflow) {
+                        showPreview('More than ' + fmt(d.cap) + ' bundles match — narrow the range or lower the count (max ' + fmt(d.cap) + ' per transfer).', true);
+                        previewState = { count: 0, pieces: 0, ok: false };
+                    } else if (d.count === 0) {
+                        showPreview('No transferable bundles match.', true);
+                        previewState = { count: 0, pieces: 0, ok: false };
+                    } else {
+                        showPreview('Will transfer ' + fmt(d.count) + ' bundle(s) · ' + fmt(d.pieces) + ' pieces.');
+                        previewState = { count: d.count, pieces: d.pieces, ok: true };
+                    }
+                    refreshBar();
+                })
+                .catch(function () { if (token === previewToken) { showPreview('Could not check — try again.', true); refreshBar(); } });
+        }, 300);
+    }
+
+    // ── pick-individually list (paged) ───────────────────────────────
+    function renderRow(b) {
+        var tr = document.createElement('tr');
+        var date = b.created_at ? b.created_at.substring(0, 10) : '';
+        var isSel = selected.has(b.id);
+        tr.innerHTML = '<td><input type="checkbox" class="bt-check" value="' + b.id + '" data-remaining="' + b.remaining_pieces + '"' + (isSel ? ' checked' : '') + '></td>'
+            + '<td>Bundle #' + b.bundle_no + '</td>'
+            + '<td style="text-align:right;">' + fmt(b.nominal_pieces) + '</td>'
+            + '<td style="text-align:right;">' + fmt(b.remaining_pieces) + '</td>'
+            + '<td>' + esc(date) + '</td>';
+        tr.querySelector('.bt-check').addEventListener('change', function (e) {
+            if (e.target.checked) {
+                if (selected.size >= PICK_CAP) {
+                    e.target.checked = false;
+                    alert('You can hand-pick at most ' + PICK_CAP + ' bundles. Use "Newest N", "Oldest N" or "Number range" for larger transfers.');
                     return;
                 }
-                list.forEach(function (b) {
-                    var tr = document.createElement('tr');
-                    var date = b.created_at ? b.created_at.substring(0, 10) : '';
-                    tr.innerHTML = '<td>' + (b.eligible
-                        ? '<input type="checkbox" class="bt-check" name="bundle_ids[]" value="' + b.id + '" data-remaining="' + b.remaining_pieces + '">'
-                        : '') + '</td>'
-                        + '<td>Bundle #' + b.bundle_no + (b.eligible ? '' : ' <span class="text-muted small">(no pieces — not transferable)</span>') + '</td>'
-                        + '<td style="text-align:right;">' + b.nominal_pieces.toLocaleString('en-IN') + '</td>'
-                        + '<td style="text-align:right;">' + b.remaining_pieces.toLocaleString('en-IN') + '</td>'
-                        + '<td>' + esc(date) + '</td>';
-                    if (!b.eligible) tr.style.opacity = '.5';
-                    rows.appendChild(tr);
-                });
-                wrap.hidden = false;
-                checkboxes().forEach(function (c) { c.addEventListener('change', updateSummary); });
-                updateSummary();
-            })
-            .catch(function () {
-                hint.hidden = false;
-                hint.querySelector('div').textContent = 'Could not load bundles. Please try again.';
+                selected.set(b.id, b.remaining_pieces);
+            } else {
+                selected.delete(b.id);
+            }
+            refreshBar();
+        });
+        return tr;
+    }
+    function loadList(append) {
+        if (!sourceReady()) return;
+        if (!append) { listOffset = 0; rows.innerHTML = ''; }
+        var token = ++listToken;
+        fetch(qs('&action=list&limit=' + PAGE + '&offset=' + listOffset + (listQuery ? '&q=' + encodeURIComponent(listQuery) : '')), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (token !== listToken || d.error) return;
+                d.rows.forEach(function (b) { rows.appendChild(renderRow(b)); });
+                listOffset += d.rows.length;
+                moreBtn.hidden = !d.has_more;
+                listInfo.textContent = d.total
+                    ? ('Showing ' + fmt(Math.min(listOffset, d.total)) + ' of ' + fmt(d.total) + ' (newest first)')
+                    : 'No matching bundles.';
             });
     }
 
-    [product, fromCg, fromWh].forEach(function (el) { el.addEventListener('change', load); });
-    [toCg, toWh].forEach(function (el) { el.addEventListener('change', updateSummary); });
+    // ── source load ──────────────────────────────────────────────────
+    function loadSource() {
+        selected.clear(); rows.innerHTML = ''; selectWrap.hidden = true; showPreview('');
+        previewState = { count: 0, pieces: 0, ok: false };
+        refreshBar();
+        if (!sourceReady()) { hint.hidden = false; hint.querySelector('div').textContent = 'Pick the product and the source company profile + warehouse to see what can be transferred.'; return; }
+        fetch(qs('&action=list&limit=' + PAGE + '&offset=0'), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.error) { hint.hidden = false; hint.querySelector('div').textContent = 'You are not authorized for this source.'; return; }
+                var s = d.summary;
+                if (!s.eligible_count) {
+                    hint.hidden = false;
+                    hint.querySelector('div').textContent = s.open_total
+                        ? ('This source has ' + fmt(s.open_total) + ' open bundle(s), but none have pieces remaining.')
+                        : 'No open bundles at this source for the selected product.';
+                    return;
+                }
+                hint.hidden = true;
+                selectWrap.hidden = false;
+                sourceSummary.innerHTML = fmt(s.eligible_count) + ' transferable bundle' + (s.eligible_count === 1 ? '' : 's') + ' · ' + fmt(s.eligible_pieces) + ' pc'
+                    + (s.open_total > s.eligible_count ? '<small>' + fmt(s.open_total - s.eligible_count) + ' more open bundle(s) have no pieces left.</small>' : '');
+                listOffset = 0;
+                d.rows.forEach(function (b) { rows.appendChild(renderRow(b)); });
+                listOffset = d.rows.length;
+                moreBtn.hidden = !d.has_more;
+                listInfo.textContent = 'Showing ' + fmt(listOffset) + ' of ' + fmt(d.total) + ' (newest first)';
+                applyMode();
+            })
+            .catch(function () { hint.hidden = false; hint.querySelector('div').textContent = 'Could not load bundles. Please try again.'; });
+    }
 
-    // LIFO helper: the list is already newest-first, so ticking the first N
-    // eligible rows selects the newest N.
-    newestN.addEventListener('input', function () {
-        var n = parseInt(newestN.value, 10) || 0, i = 0;
-        checkboxes().forEach(function (c) { c.checked = i < n; i++; });
-        updateSummary();
+    function applyMode() {
+        var m = mode();
+        document.querySelectorAll('.bt-panel').forEach(function (p) {
+            p.hidden = p.getAttribute('data-mode').split(' ').indexOf(m) === -1;
+        });
+        $('btCountLabel').textContent = m === 'oldest' ? 'How many bundles (oldest first)' : 'How many bundles (newest first)';
+        // Rule modes never post per-bundle checkboxes.
+        pickedInputs.innerHTML = '';
+        schedulePreview();
+        refreshBar();
+    }
+
+    [product, fromCg, fromWh].forEach(function (el) { el.addEventListener('change', loadSource); });
+    [toCg, toWh].forEach(function (el) { el.addEventListener('change', refreshBar); });
+    document.querySelectorAll('input[name="selection_mode"]').forEach(function (r) { r.addEventListener('change', applyMode); });
+    [countN, rangeFrom, rangeTo].forEach(function (el) { el.addEventListener('input', schedulePreview); });
+    moreBtn.addEventListener('click', function () { loadList(true); });
+    var searchTimer = null;
+    search.addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () { listQuery = search.value.trim(); loadList(false); }, 300);
     });
 
     $('btForm').addEventListener('submit', function (e) {
@@ -354,7 +555,18 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
             alert('Destination must differ from the source company profile + warehouse.');
             return;
         }
-        var txt = summary.textContent || 'the selected bundles';
+        var m = mode();
+        if (m === 'ids') {
+            pickedInputs.innerHTML = '';
+            selected.forEach(function (_, id) {
+                var i = document.createElement('input');
+                i.type = 'hidden'; i.name = 'bundle_ids[]'; i.value = id;
+                pickedInputs.appendChild(i);
+            });
+        } else {
+            pickedInputs.innerHTML = '';
+        }
+        var txt = barSummary.textContent || 'the selected bundles';
         if (!confirm('Transfer ' + txt + '? Each bundle will be closed here and recreated with a new number at the destination.')) {
             e.preventDefault();
         }

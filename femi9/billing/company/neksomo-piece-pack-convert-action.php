@@ -150,17 +150,35 @@ foreach ($rawProductIds as $i => $rawProductId) {
     $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId, 'from_bucket' => $fromBucket, 'machine_code_id' => $machineCodeId, 'damaged_entries' => $damagedEntries, 'extra_entries' => $extraEntries, 'cover_damaged_entries' => $coverDamagedEntries];
 }
 
-// A product appearing twice in one batch is never a legitimate
-// request — reject up front rather than silently applying two
-// conversions to the same row in sequence.
-$seenProductIds = array_column($rows, 'product_id');
-if (count($seenProductIds) !== count(array_unique($seenProductIds))) {
-    $_SESSION['errorMessage'] = "Each product can only appear once per conversion batch.";
-    header("Location: neksomo-piece-pack-convert.php");
-    exit;
+// A product may appear on several rows ONLY as separate bundle lines of
+// a mapped product's Pieces -> Pack conversion (each line its own bundle
+// or the bucket) — anything else repeating a product is rejected rather
+// than silently applying two conversions to the same row in sequence.
+$seenSources = [];
+foreach ($rows as $row) {
+    $pid = $row['product_id'];
+    $isBundleLine = $row['direction'] === 'pieces_to_pack'
+        && ($row['bundle_id'] || !empty($row['from_bucket']))
+        && get_neksomo_source_for_company_product($db_conn, $pid);
+    $key = $row['from_bucket'] ? 'bucket' : (string) $row['bundle_id'];
+    if (isset($seenSources[$pid])) {
+        if (!$isBundleLine || !$seenSources[$pid]['bundle_line']) {
+            $_SESSION['errorMessage'] = "Each product can only appear once per conversion batch (use \"Another bundle\" only for bundle-sourced Pieces → Pack).";
+            header("Location: neksomo-piece-pack-convert.php");
+            exit;
+        }
+        if (isset($seenSources[$pid]['keys'][$key])) {
+            $_SESSION['errorMessage'] = "The same bundle (or the bucket) is picked twice for one product — combine them into a single line.";
+            header("Location: neksomo-piece-pack-convert.php");
+            exit;
+        }
+    } else {
+        $seenSources[$pid] = ['bundle_line' => $isBundleLine, 'keys' => []];
+    }
+    $seenSources[$pid]['keys'][$key] = true;
 }
 
-$productIds = array_column($rows, 'product_id');
+$productIds = array_values(array_unique(array_column($rows, 'product_id')));
 $placeholders = implode(',', array_fill(0, count($productIds), '?'));
 $stmt = $db_conn->prepare("SELECT id, productName, pieces_per_pack FROM products WHERE id IN ($placeholders) AND pieces_per_pack > 1");
 $stmt->bind_param(str_repeat('i', count($productIds)), ...$productIds);

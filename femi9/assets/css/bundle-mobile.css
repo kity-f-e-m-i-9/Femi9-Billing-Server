@@ -1,0 +1,94 @@
+/* Bundle pages — shared mobile-first layer.
+   Loaded by Input Stock, Manage Bundles pages, Bundle Transfer, Manage
+   Conversions, Bundle Report, Covers and Cartons. Everything that changes
+   layout lives inside the phone media query; desktop is untouched. */
+
+.bm-bar-summary { display: none; }
+.bm-filter-toggle { display: none; }
+
+@media (max-width: 767px) {
+    /* ── Quick-access tabs: one scrollable row ─────────────────── */
+    .ata-nav-tabs {
+        flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; margin-left: -4px; margin-right: -4px; padding: 0 4px 6px;
+        scroll-snap-type: x proximity;
+    }
+    .ata-nav-tabs::-webkit-scrollbar { display: none; }
+    .ata-nav-tab { white-space: nowrap; flex: 0 0 auto; padding: 10px 14px !important; scroll-snap-align: start; }
+
+    /* ── Page chrome ────────────────────────────────────────────── */
+    .ata-page-head h1 { font-size: 18px; }
+    .ata-intro { font-size: 13px; }
+    .ata-section-head { padding: 12px 14px !important; }
+    .ata-section-head > div[style*="display:flex"] { width: 100%; }
+    .ata-card { border-radius: 12px; }
+
+    /* ── Forms: one column, 46px controls, 16px text (no iOS zoom) ─ */
+    .ata-form-grid, .ata-scope-grid { grid-template-columns: 1fr !important; padding: 14px !important; gap: 12px !important; }
+    .ata-field select, .ata-field input, .ata-field textarea,
+    .ata-filter-field select, .ata-filter-field input {
+        min-height: 46px; font-size: 16px !important;
+    }
+    .ata-field label { font-size: 11.5px; }
+
+    /* ── Filters stack ─────────────────────────────────────────── */
+    .ata-filters { flex-direction: column; align-items: stretch !important; gap: 10px !important; padding: 12px !important; }
+    .ata-filters .ata-filter-field, .ata-filters > * { width: 100%; }
+
+    /* ── Buttons: comfortable touch targets ────────────────────── */
+    .ata-btn, .btn { min-height: 44px; }
+    .ata-btn { justify-content: center; }
+
+    /* ── Tables -> stacked cards ───────────────────────────────── */
+    table.bm-cards { display: block; width: 100% !important; min-width: 0 !important; border: 0 !important; }
+    table.bm-cards thead { display: none; }
+    table.bm-cards tbody, table.bm-cards tfoot { display: block; width: 100%; }
+    table.bm-cards tr {
+        display: block; width: 100%; margin: 0 0 10px; padding: 8px 12px;
+        border: 1px solid #eef0f3 !important; border-radius: 12px; background: #fff;
+        box-shadow: 0 1px 2px rgba(16,24,40,.04);
+    }
+    table.bm-cards td {
+        display: flex; align-items: center; justify-content: space-between; gap: 14px;
+        width: 100% !important; padding: 7px 0 !important; border: 0 !important;
+        border-bottom: 1px dashed #f1f2f6 !important; text-align: right !important; font-size: 13.5px;
+        word-break: break-word;
+    }
+    table.bm-cards td:last-child { border-bottom: 0 !important; }
+    table.bm-cards td::before {
+        content: attr(data-label); flex: 0 0 38%; max-width: 38%; text-align: left;
+        font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: #9ca3af;
+    }
+    table.bm-cards td[data-label=""]::before { display: none; }
+    table.bm-cards td[data-label=""] { justify-content: flex-end; }
+    table.bm-cards td:empty { display: none; }
+    table.bm-cards .btn, table.bm-cards button { min-height: 40px; }
+    div:has(> table.bm-cards) { overflow-x: visible !important; }
+
+    /* ── Fixed bottom action bar for the primary button ────────── */
+    .bm-fixed-actions {
+        position: fixed !important; left: 0; right: 0; bottom: 0; z-index: 1030;
+        margin: 0 !important; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)) !important;
+        background: #fff; border-top: 1px solid #e5e7eb; box-shadow: 0 -4px 14px rgba(16,24,40,.1);
+        display: flex; align-items: center; gap: 12px;
+    }
+    .bm-fixed-actions .ata-btn, .bm-fixed-actions button[type="submit"] { flex: 1 1 auto; min-height: 48px; justify-content: center; }
+    .bm-fixed-actions .bm-bar-summary { display: block; flex: 0 1 45%; font-size: 12.5px; font-weight: 600; color: #4338ca; line-height: 1.25; }
+    body.bm-has-bar .app-content { padding-bottom: 84px; }
+
+    /* Collapsible filters (opt-in via data-bm-collapsible) */
+    .bm-filter-toggle {
+        display: flex; align-items: center; justify-content: space-between; width: 100%;
+        min-height: 46px; padding: 0 14px; margin-bottom: 10px; border: 1px solid #e5e7eb;
+        border-radius: 10px; background: #fff; font-size: 14px; font-weight: 600; color: #374151; cursor: pointer;
+    }
+    .bm-filter-toggle .bm-count { background: #4338ca; color: #fff; border-radius: 999px; font-size: 11px; padding: 1px 8px; margin-left: 8px; }
+    .ata-filters[data-bm-collapsible].bm-collapsed { display: none !important; }
+
+    /* ── Modals become bottom sheets ───────────────────────────── */
+    .modal-dialog { margin: 0 !important; max-width: none !important; min-height: 100%; display: flex; align-items: flex-end; }
+    .modal-content { width: 100%; border-radius: 16px 16px 0 0 !important; max-height: 88vh; overflow-y: auto; }
+    .modal-footer { position: sticky; bottom: 0; background: #fff; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+    .modal-footer .btn { flex: 1 1 0; }
+    .modal-body input, .modal-body select, .modal-body textarea { font-size: 16px; min-height: 44px; }
+}
