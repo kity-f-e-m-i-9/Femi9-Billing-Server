@@ -59,6 +59,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'undo'
 
     $stockService = new StockService($db_conn);
 
+    // DDL implicitly commits, so make sure every table exists BEFORE the
+    // transaction begins (the helpers skip DDL when tables already exist).
+    ensure_raw_material_bundles_table($db_conn);
+    ensure_raw_material_bundle_draws_table($db_conn);
+    ensure_raw_material_bucket_tables($db_conn);
     $db_conn->begin_transaction();
     try {
         // Give the pieces back to the bundle first — works even if the

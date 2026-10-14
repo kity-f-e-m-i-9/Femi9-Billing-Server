@@ -49,10 +49,24 @@ require_once __DIR__ . '/StockService.php'; // for StockException
  * discovery, not a leftover-routing concern.
  */
 
+// DDL (even CREATE TABLE IF NOT EXISTS) implicitly COMMITS the open
+// transaction in MySQL, silently breaking rollback for callers that run
+// ensure_*() inside begin_transaction(). Checking existence first (a plain
+// SHOW TABLES, no implicit commit) means DDL only runs the one time a
+// table is genuinely missing.
+function rm_create_table_if_missing(mysqli $db_conn, string $table, string $createSql): void
+{
+    $res = $db_conn->query("SHOW TABLES LIKE '" . $db_conn->real_escape_string($table) . "'");
+    if ($res && $res->num_rows > 0) {
+        return;
+    }
+    $db_conn->query($createSql);
+}
+
 // Self-migrating — same convention as every other table in this project.
 function ensure_raw_material_bundles_table(mysqli $db_conn): void
 {
-    $db_conn->query(
+    rm_create_table_if_missing($db_conn, 'raw_material_bundles',
         "CREATE TABLE IF NOT EXISTS raw_material_bundles (
             id INT AUTO_INCREMENT PRIMARY KEY,
             raw_product_id INT NOT NULL,
@@ -70,6 +84,7 @@ function ensure_raw_material_bundles_table(mysqli $db_conn): void
             transferred_from_bundle_id INT NULL,
             transfer_ref_id VARCHAR(64) NULL,
             bundle_no INT NULL,
+            to_bucket_pieces INT NULL,
             closed_by VARCHAR(100) NULL,
             closed_at TIMESTAMP NULL,
             created_by VARCHAR(100) NULL,
@@ -90,6 +105,7 @@ function ensure_raw_material_bundles_table(mysqli $db_conn): void
         'transferred_from_bundle_id' => "INT NULL AFTER transferred_to_bundle_id",
         'transfer_ref_id'            => "VARCHAR(64) NULL AFTER transferred_from_bundle_id",
         'bundle_no'                  => "INT NULL AFTER transfer_ref_id",
+        'to_bucket_pieces'           => "INT NULL AFTER bundle_no",
     ] as $columnName => $definition) {
         $col = $db_conn->query("SHOW COLUMNS FROM raw_material_bundles LIKE '$columnName'");
         if ($col && $col->num_rows === 0) {
@@ -172,7 +188,7 @@ function raw_material_bundle_display_no(mysqli $db_conn, ?int $bundleId): string
  */
 function ensure_raw_material_bundle_draws_table(mysqli $db_conn): void
 {
-    $db_conn->query(
+    rm_create_table_if_missing($db_conn, 'raw_material_bundle_draws',
         "CREATE TABLE IF NOT EXISTS raw_material_bundle_draws (
             id INT AUTO_INCREMENT PRIMARY KEY,
             bundle_id INT NOT NULL,
@@ -186,6 +202,182 @@ function ensure_raw_material_bundle_draws_table(mysqli $db_conn): void
             KEY idx_rmbd_ref (ref_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
     );
+    // bucket_id: set (and bundle_id = 0) when the draw came from a
+    // loose-pieces bucket rather than a bundle.
+    $col = $db_conn->query("SHOW COLUMNS FROM raw_material_bundle_draws LIKE 'bucket_id'");
+    if ($col && $col->num_rows === 0) {
+        $db_conn->query("ALTER TABLE raw_material_bundle_draws ADD COLUMN bucket_id INT NULL AFTER bundle_id");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Loose-pieces bucket. Closing a bundle with pieces left no longer merges
+// them into another bundle — the leftover is added to ONE bucket per
+// (raw product, company profile, warehouse), and a Pieces -> Pack
+// conversion can pick "Loose pieces bucket" as its source, exactly like
+// picking a bundle (whole packs only, capped by the balance). Balance
+// lives on raw_material_bucket; every movement is also logged in
+// raw_material_bucket_entries for audit/history.
+// ─────────────────────────────────────────────────────────────────────
+
+function ensure_raw_material_bucket_tables(mysqli $db_conn): void
+{
+    rm_create_table_if_missing($db_conn, 'raw_material_bucket',
+        "CREATE TABLE IF NOT EXISTS raw_material_bucket (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            raw_product_id INT NOT NULL,
+            company_godown_id INT NOT NULL,
+            warehouse_id INT NULL,
+            pieces INT NOT NULL DEFAULT 0,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_rmbk_key (raw_product_id, company_godown_id, warehouse_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+    rm_create_table_if_missing($db_conn, 'raw_material_bucket_entries',
+        "CREATE TABLE IF NOT EXISTS raw_material_bucket_entries (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            bucket_id INT NOT NULL,
+            type ENUM('close_in','conversion_out','reopen_out','undo_in') NOT NULL,
+            qty INT NOT NULL,
+            bundle_id INT NULL,
+            ref_id VARCHAR(64) NULL,
+            created_by VARCHAR(100) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_rmbke_bucket (bucket_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+/** Locks (creating if missing) the bucket row for one location. */
+function lock_raw_material_bucket(mysqli $db_conn, int $rawProductId, int $companyGodownId, ?int $warehouseId): array
+{
+    $sel = "SELECT id, pieces FROM raw_material_bucket
+            WHERE raw_product_id = ? AND company_godown_id = ? AND warehouse_id <=> ? FOR UPDATE";
+    $stmt = $db_conn->prepare($sel);
+    $stmt->bind_param('iii', $rawProductId, $companyGodownId, $warehouseId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ($row) {
+        return ['id' => (int) $row['id'], 'pieces' => (int) $row['pieces']];
+    }
+    $ins = $db_conn->prepare(
+        "INSERT INTO raw_material_bucket (raw_product_id, company_godown_id, warehouse_id, pieces) VALUES (?, ?, ?, 0)"
+    );
+    $ins->bind_param('iii', $rawProductId, $companyGodownId, $warehouseId);
+    $ins->execute();
+    $id = (int) $db_conn->insert_id;
+    $ins->close();
+    return ['id' => $id, 'pieces' => 0];
+}
+
+/** Applies a signed movement to a locked bucket and logs it. */
+function apply_raw_material_bucket_entry(mysqli $db_conn, int $bucketId, string $type, int $qty, ?int $bundleId, ?string $refId, ?string $by): void
+{
+    $upd = $db_conn->prepare("UPDATE raw_material_bucket SET pieces = pieces + ? WHERE id = ?");
+    $upd->bind_param('ii', $qty, $bucketId);
+    $upd->execute();
+    $upd->close();
+    $log = $db_conn->prepare(
+        "INSERT INTO raw_material_bucket_entries (bucket_id, type, qty, bundle_id, ref_id, created_by) VALUES (?, ?, ?, ?, ?, ?)"
+    );
+    $log->bind_param('isiiss', $bucketId, $type, $qty, $bundleId, $refId, $by);
+    $log->execute();
+    $log->close();
+}
+
+/** Current bucket balance (no lock) — for pickers and display. */
+function get_raw_material_bucket_balance(mysqli $db_conn, int $rawProductId, int $companyGodownId, ?int $warehouseId): int
+{
+    ensure_raw_material_bucket_tables($db_conn);
+    $stmt = $db_conn->prepare(
+        "SELECT COALESCE(SUM(pieces), 0) AS p FROM raw_material_bucket
+         WHERE raw_product_id = ? AND company_godown_id = ? AND warehouse_id <=> ?"
+    );
+    $stmt->bind_param('iii', $rawProductId, $companyGodownId, $warehouseId);
+    $stmt->execute();
+    $p = (int) $stmt->get_result()->fetch_assoc()['p'];
+    $stmt->close();
+    return $p;
+}
+
+/**
+ * Converts whole packs out of the loose-pieces bucket — same rules as
+ * convert_from_raw_material_bundle(): whole packs only, capped at what
+ * the bucket holds, never negative. Logs a draw (bundle_id = 0,
+ * bucket_id set) so the conversion shows in Manage Conversions and can
+ * be undone via restore_bundle_draw().
+ *
+ * @throws StockException if the bucket can't cover even one pack.
+ * @return array{packs_made:int, pieces_used:int, remaining_after:int, requested_packs:int}
+ */
+function convert_from_raw_material_bucket(mysqli $db_conn, int $rawProductId, int $companyGodownId, ?int $warehouseId, int $productId, int $piecesPerPack, int $requestedPacks, string $refId, ?string $createdBy = null): array
+{
+    $bucket = lock_raw_material_bucket($db_conn, $rawProductId, $companyGodownId, $warehouseId);
+    $remaining = $bucket['pieces'];
+    if ($remaining <= 0) {
+        throw new StockException("The loose-pieces bucket is empty — nothing to convert from.");
+    }
+    $packsMade = min($requestedPacks, intdiv($remaining, $piecesPerPack));
+    if ($packsMade <= 0) {
+        throw new StockException("The loose-pieces bucket ($remaining pc) doesn't have enough for even one full pack.");
+    }
+    $piecesUsed = $packsMade * $piecesPerPack;
+
+    apply_raw_material_bucket_entry($db_conn, $bucket['id'], 'conversion_out', -$piecesUsed, null, $refId, $createdBy);
+
+    $zero = 0;
+    $drawStmt = $db_conn->prepare(
+        "INSERT INTO raw_material_bundle_draws (bundle_id, bucket_id, ref_id, product_id, pieces_used, packs_made, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    $drawStmt->bind_param('iisiiis', $zero, $bucket['id'], $refId, $productId, $piecesUsed, $packsMade, $createdBy);
+    $drawStmt->execute();
+    $drawStmt->close();
+
+    return [
+        'packs_made'      => $packsMade,
+        'pieces_used'     => $piecesUsed,
+        'remaining_after' => $remaining - $piecesUsed,
+        'requested_packs' => $requestedPacks,
+    ];
+}
+
+/**
+ * Every bucket with a balance or any history, for the Manage Bundles
+ * page, each with its most recent movements.
+ *
+ * @return array<int, array<string,mixed>>
+ */
+function get_raw_material_buckets(mysqli $db_conn): array
+{
+    ensure_raw_material_bucket_tables($db_conn);
+    $rows = $db_conn->query(
+        "SELECT k.id, k.raw_product_id, p.productName, k.company_godown_id, cg.gname,
+                w.code AS warehouse_code, k.pieces
+         FROM raw_material_bucket k
+         INNER JOIN products p ON p.id = k.raw_product_id
+         INNER JOIN company_godown cg ON cg.id = k.company_godown_id
+         LEFT JOIN warehouses w ON w.id = k.warehouse_id
+         ORDER BY p.productName ASC, cg.gname ASC, w.code ASC"
+    )->fetch_all(MYSQLI_ASSOC);
+
+    $entryStmt = $db_conn->prepare(
+        "SELECT e.type, e.qty, e.ref_id, e.created_by, e.created_at, b.bundle_no
+         FROM raw_material_bucket_entries e
+         LEFT JOIN raw_material_bundles b ON b.id = e.bundle_id
+         WHERE e.bucket_id = ? ORDER BY e.id DESC LIMIT 10"
+    );
+    foreach ($rows as &$r) {
+        $bid = (int) $r['id'];
+        $entryStmt->bind_param('i', $bid);
+        $entryStmt->execute();
+        $r['entries'] = $entryStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $r['pieces'] = (int) $r['pieces'];
+    }
+    unset($r);
+    $entryStmt->close();
+    return $rows;
 }
 
 // Global, manageable reason lists for bundle adjustments — same pattern
@@ -226,7 +418,7 @@ function get_active_bundle_reasons(mysqli $db_conn, string $type): array
  */
 function ensure_raw_material_bundle_adjustments_table(mysqli $db_conn): void
 {
-    $db_conn->query(
+    rm_create_table_if_missing($db_conn, 'raw_material_bundle_adjustments',
         "CREATE TABLE IF NOT EXISTS raw_material_bundle_adjustments (
             id INT AUTO_INCREMENT PRIMARY KEY,
             bundle_id INT NOT NULL,
@@ -613,7 +805,13 @@ function delete_bundle_adjustment(mysqli $db_conn, int $adjustmentId): array
 }
 
 /**
- * Marks one bundle closed. If it still has remaining_pieces > 0, that
+ * Marks one bundle closed. NOTE: leftover pieces now move to the
+ * loose-pieces bucket (see lock_raw_material_bucket()) instead of being
+ * carried into another bundle; the text below describes the legacy
+ * carry-forward that older closed bundles still reflect (their
+ * carried_to_bundle_id) and that reopen still knows how to reverse.
+ *
+ * Legacy behaviour: If it still has remaining_pieces > 0, that
  * leftover is NEVER recorded as a lost shortage — it automatically
  * carries forward into another bundle for the same (raw_product_id,
  * company_godown_id, warehouse_id): merged onto the NEXT open bundle
@@ -652,62 +850,29 @@ function close_raw_material_bundle(mysqli $db_conn, int $bundleId, ?string $clos
 
     $leftover = (int) $bundle['remaining_pieces'];
     $carriedToBundleId = null;
+    $toBucket = null;
 
     if ($leftover > 0) {
-        $rawProductId    = (int) $bundle['raw_product_id'];
-        $companyGodownId = (int) $bundle['company_godown_id'];
-        $warehouseId     = $bundle['warehouse_id'] !== null ? (int) $bundle['warehouse_id'] : null;
-
-        // The NEXT open bundle after this one (higher bundle number) for the
-        // same (raw product, company profile, warehouse) — never an earlier
-        // one. Closed bundles are skipped, so closing #2 with #3 closed
-        // carries into #4. If nothing later is open, a fresh bundle is
-        // created below. Locked so a concurrent close/convert against it
-        // can't race with this merge.
-        $thisNo = $bundle['bundle_no'] !== null ? (int) $bundle['bundle_no'] : $bundleId;
-        $targetStmt = $db_conn->prepare(
-            "SELECT id FROM raw_material_bundles
-             WHERE raw_product_id = ? AND company_godown_id = ? AND warehouse_id <=> ?
-               AND status = 'open' AND id != ? AND COALESCE(bundle_no, id) > ?
-             ORDER BY COALESCE(bundle_no, id) ASC, id ASC LIMIT 1 FOR UPDATE"
+        // Leftover goes to the loose-pieces bucket for this (raw product,
+        // company profile, warehouse) — usable later as a conversion
+        // source. remaining_pieces is left as-is on the closed bundle
+        // (record of what moved; reopen reclaims exactly this amount).
+        ensure_raw_material_bucket_tables($db_conn);
+        $bucket = lock_raw_material_bucket(
+            $db_conn,
+            (int) $bundle['raw_product_id'],
+            (int) $bundle['company_godown_id'],
+            $bundle['warehouse_id'] !== null ? (int) $bundle['warehouse_id'] : null
         );
-        $targetStmt->bind_param('iiiii', $rawProductId, $companyGodownId, $warehouseId, $bundleId, $thisNo);
-        $targetStmt->execute();
-        $targetRow = $targetStmt->get_result()->fetch_assoc();
-        $targetStmt->close();
-
-        if ($targetRow) {
-            $carriedToBundleId = (int) $targetRow['id'];
-            $mergeStmt = $db_conn->prepare(
-                "UPDATE raw_material_bundles SET remaining_pieces = remaining_pieces + ?, carried_from_bundle_id = ?
-                 WHERE id = ?"
-            );
-            $mergeStmt->bind_param('iii', $leftover, $bundleId, $carriedToBundleId);
-            $mergeStmt->execute();
-            $mergeStmt->close();
-        } else {
-            // No other open bundle to merge into — create a fresh one
-            // to hold the carried-forward leftover. nominal_pieces = 0
-            // since this isn't a new nominal intake, just relocated
-            // material; its own remaining_pieces starts at $leftover.
-            $carryNo = next_raw_material_bundle_no($db_conn, $companyGodownId, $warehouseId);
-            $createStmt = $db_conn->prepare(
-                "INSERT INTO raw_material_bundles
-                    (raw_product_id, company_godown_id, warehouse_id, nominal_pieces, remaining_pieces, carried_from_bundle_id, created_by, bundle_no)
-                 VALUES (?, ?, ?, 0, ?, ?, ?, ?)"
-            );
-            $createStmt->bind_param('iiiiisi', $rawProductId, $companyGodownId, $warehouseId, $leftover, $bundleId, $closedBy, $carryNo);
-            $createStmt->execute();
-            $carriedToBundleId = (int) $db_conn->insert_id;
-            $createStmt->close();
-        }
+        apply_raw_material_bucket_entry($db_conn, $bucket['id'], 'close_in', $leftover, $bundleId, null, $closedBy);
+        $toBucket = $leftover;
     }
 
     $stmt = $db_conn->prepare(
-        "UPDATE raw_material_bundles SET status = 'closed', closed_by = ?, closed_at = NOW(), carried_to_bundle_id = ?
+        "UPDATE raw_material_bundles SET status = 'closed', closed_by = ?, closed_at = NOW(), carried_to_bundle_id = ?, to_bucket_pieces = ?
          WHERE id = ? AND status = 'open'"
     );
-    $stmt->bind_param('sii', $closedBy, $carriedToBundleId, $bundleId);
+    $stmt->bind_param('siii', $closedBy, $carriedToBundleId, $toBucket, $bundleId);
     $stmt->execute();
     $affected = $stmt->affected_rows;
     $stmt->close();
@@ -738,7 +903,9 @@ function reopen_raw_material_bundle(mysqli $db_conn, int $bundleId): bool
     ensure_raw_material_bundle_adjustments_table($db_conn);
 
     $lockStmt = $db_conn->prepare(
-        "SELECT status, carried_to_bundle_id, transferred_to_bundle_id, remaining_pieces FROM raw_material_bundles WHERE id = ? FOR UPDATE"
+        "SELECT status, carried_to_bundle_id, transferred_to_bundle_id, remaining_pieces,
+                raw_product_id, company_godown_id, warehouse_id, to_bucket_pieces
+         FROM raw_material_bundles WHERE id = ? FOR UPDATE"
     );
     $lockStmt->bind_param('i', $bundleId);
     $lockStmt->execute();
@@ -753,6 +920,27 @@ function reopen_raw_material_bundle(mysqli $db_conn, int $bundleId): bool
     }
     if ($bundle['transferred_to_bundle_id'] !== null) {
         throw new StockException("This bundle was transferred to another company profile/warehouse — undo the transfer from Bundle Transfer instead of reopening it.");
+    }
+
+    // Closed into the loose-pieces bucket: take the same pieces back out.
+    // Refuses if the bucket has since been drawn below that amount.
+    if ($bundle['to_bucket_pieces'] !== null && (int) $bundle['to_bucket_pieces'] > 0) {
+        ensure_raw_material_bucket_tables($db_conn);
+        $toReclaim = (int) $bundle['to_bucket_pieces'];
+        $bucket = lock_raw_material_bucket(
+            $db_conn,
+            (int) $bundle['raw_product_id'],
+            (int) $bundle['company_godown_id'],
+            $bundle['warehouse_id'] !== null ? (int) $bundle['warehouse_id'] : null
+        );
+        if ($bucket['pieces'] < $toReclaim) {
+            throw new StockException("Cannot reopen — the loose-pieces bucket has only {$bucket['pieces']} pc left but {$toReclaim} pc must be returned (some were already used in conversions).");
+        }
+        apply_raw_material_bucket_entry($db_conn, $bucket['id'], 'reopen_out', -$toReclaim, $bundleId, null, null);
+        $clr = $db_conn->prepare("UPDATE raw_material_bundles SET to_bucket_pieces = NULL WHERE id = ?");
+        $clr->bind_param('i', $bundleId);
+        $clr->execute();
+        $clr->close();
     }
 
     $carriedToBundleId = $bundle['carried_to_bundle_id'] !== null ? (int) $bundle['carried_to_bundle_id'] : null;
@@ -858,7 +1046,7 @@ function restore_bundle_draw(mysqli $db_conn, string $refId): array
     ensure_raw_material_bundle_draws_table($db_conn);
 
     $stmt = $db_conn->prepare(
-        "SELECT id, bundle_id, product_id, pieces_used, packs_made FROM raw_material_bundle_draws WHERE ref_id = ? LIMIT 1 FOR UPDATE"
+        "SELECT id, bundle_id, bucket_id, product_id, pieces_used, packs_made FROM raw_material_bundle_draws WHERE ref_id = ? LIMIT 1 FOR UPDATE"
     );
     $stmt->bind_param('s', $refId);
     $stmt->execute();
@@ -871,6 +1059,31 @@ function restore_bundle_draw(mysqli $db_conn, string $refId): array
 
     $bundleId   = (int) $draw['bundle_id'];
     $piecesUsed = (int) $draw['pieces_used'];
+
+    if ($draw['bucket_id'] !== null && (int) $draw['bucket_id'] > 0) {
+        // Bucket-sourced conversion: pieces go back into the bucket.
+        ensure_raw_material_bucket_tables($db_conn);
+        $bkId = (int) $draw['bucket_id'];
+        $bkLock = $db_conn->prepare("SELECT id FROM raw_material_bucket WHERE id = ? FOR UPDATE");
+        $bkLock->bind_param('i', $bkId);
+        $bkLock->execute();
+        $bk = $bkLock->get_result()->fetch_assoc();
+        $bkLock->close();
+        if (!$bk) {
+            throw new StockException("The loose-pieces bucket this conversion drew from no longer exists.");
+        }
+        apply_raw_material_bucket_entry($db_conn, $bkId, 'undo_in', $piecesUsed, null, $refId, null);
+        $delB = $db_conn->prepare("DELETE FROM raw_material_bundle_draws WHERE id = ?");
+        $delB->bind_param('i', $draw['id']);
+        $delB->execute();
+        $delB->close();
+        return [
+            'bundle_id'   => 0,
+            'product_id'  => (int) $draw['product_id'],
+            'pieces_used' => $piecesUsed,
+            'packs_made'  => (int) $draw['packs_made'],
+        ];
+    }
 
     $lockStmt = $db_conn->prepare(
         "SELECT status FROM raw_material_bundles WHERE id = ? FOR UPDATE"
@@ -950,7 +1163,7 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
                 (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.transferred_from_bundle_id) AS transferred_from_no,
                 w.code AS warehouse_code, b.nominal_pieces, b.remaining_pieces,
                 b.damaged_pieces, b.added_extra_pieces, b.status,
-                b.carried_to_bundle_id, b.carried_from_bundle_id,
+                b.carried_to_bundle_id, b.carried_from_bundle_id, b.to_bucket_pieces,
                 b.transferred_to_bundle_id, b.transferred_from_bundle_id,
                 b.created_by, b.created_at, b.closed_by, b.closed_at
          FROM raw_material_bundles b
@@ -989,7 +1202,9 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
             $varianceLabel = "Transferred: $remaining → #" . ($row['transferred_to_no'] ?? $transferredToBundleId);
         } elseif ($row['status'] === 'closed') {
             $parts = [];
-            if ($remaining > 0 && $carriedToBundleId !== null) $parts[] = "Carried forward: $remaining";
+            $toBucketPieces = $row['to_bucket_pieces'] !== null ? (int) $row['to_bucket_pieces'] : 0;
+            if ($toBucketPieces > 0) $parts[] = "To bucket: $toBucketPieces";
+            elseif ($remaining > 0 && $carriedToBundleId !== null) $parts[] = "Carried forward: $remaining";
             elseif ($remaining > 0) $parts[] = "Short by $remaining"; // defensive fallback — shouldn't happen under current close logic
             if ($addedExtra > 0) $parts[] = "Excess $addedExtra";
             $varianceLabel = $parts ? implode(', ', $parts) : 'Exact';
@@ -999,6 +1214,7 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
             'id'                     => (int) $row['id'],
             'label'                  => "Bundle #" . ($row['bundle_no'] ?? $row['id']) . " ($date)",
             'bundle_no'              => (int) ($row['bundle_no'] ?? $row['id']),
+            'to_bucket_pieces'       => $row['to_bucket_pieces'] !== null ? (int) $row['to_bucket_pieces'] : null,
             'carried_to_bundle_no'   => $row['carried_to_no'] !== null ? (int) $row['carried_to_no'] : null,
             'carried_from_bundle_no' => $row['carried_from_no'] !== null ? (int) $row['carried_from_no'] : null,
             'transferred_to_bundle_no'   => $row['transferred_to_no'] !== null ? (int) $row['transferred_to_no'] : null,
@@ -1043,17 +1259,20 @@ function get_raw_material_bundles(mysqli $db_conn, ?int $rawProductId = null, ?s
 function get_bundle_conversions(mysqli $db_conn): array
 {
     ensure_raw_material_bundle_draws_table($db_conn);
+    ensure_raw_material_bucket_tables($db_conn);
 
     $rows = $db_conn->query(
         "SELECT d.id AS draw_id, d.ref_id, d.bundle_id, d.pieces_used, d.packs_made,
-                d.created_by, d.created_at,
-                b.status AS bundle_status, b.company_godown_id, b.bundle_no,
+                d.created_by, d.created_at, d.bucket_id,
+                COALESCE(b.status, 'open') AS bundle_status,
+                COALESCE(b.company_godown_id, k.company_godown_id) AS company_godown_id, b.bundle_no,
                 cg.gname, w.code AS warehouse_code,
                 p.id AS product_id, p.productName
          FROM raw_material_bundle_draws d
-         INNER JOIN raw_material_bundles b ON b.id = d.bundle_id
-         INNER JOIN company_godown cg ON cg.id = b.company_godown_id
-         LEFT JOIN warehouses w ON w.id = b.warehouse_id
+         LEFT JOIN raw_material_bundles b ON b.id = d.bundle_id
+         LEFT JOIN raw_material_bucket k ON k.id = d.bucket_id
+         INNER JOIN company_godown cg ON cg.id = COALESCE(b.company_godown_id, k.company_godown_id)
+         LEFT JOIN warehouses w ON w.id = COALESCE(b.warehouse_id, k.warehouse_id)
          INNER JOIN products p ON p.id = d.product_id
          ORDER BY d.created_at DESC, d.id DESC"
     )->fetch_all(MYSQLI_ASSOC);
@@ -1064,7 +1283,7 @@ function get_bundle_conversions(mysqli $db_conn): array
             'draw_id'            => (int) $row['draw_id'],
             'ref_id'             => $row['ref_id'],
             'bundle_id'          => (int) $row['bundle_id'],
-            'bundle_label'       => "Bundle #" . ($row['bundle_no'] ?? $row['bundle_id']),
+            'bundle_label'       => $row['bucket_id'] !== null ? "Loose pieces bucket" : "Bundle #" . ($row['bundle_no'] ?? $row['bundle_id']),
             'bundle_status'      => $row['bundle_status'],
             'product_id'         => (int) $row['product_id'],
             'product_name'       => $row['productName'],
@@ -1103,7 +1322,7 @@ function get_bundle_transaction_history(mysqli $db_conn, int $bundleId): array
 
     $stmt = $db_conn->prepare(
         "SELECT id, nominal_pieces, input_ref_id, created_by, created_at,
-                status, closed_by, closed_at, carried_from_bundle_id, carried_to_bundle_id
+                status, closed_by, closed_at, carried_from_bundle_id, carried_to_bundle_id, to_bucket_pieces
          FROM raw_material_bundles WHERE id = ?"
     );
     $stmt->bind_param('i', $bundleId);
@@ -1190,6 +1409,9 @@ function get_bundle_transaction_history(mysqli $db_conn, int $bundleId): array
 
     if ($bundle['status'] === 'closed' && $bundle['closed_at']) {
         $detail = 'Bundle closed';
+        if ($bundle['to_bucket_pieces'] !== null && (int) $bundle['to_bucket_pieces'] > 0) {
+            $detail .= " — {$bundle['to_bucket_pieces']} leftover piece(s) moved to the loose-pieces bucket";
+        }
         if ($bundle['carried_to_bundle_id'] !== null) {
             $detail .= " — leftover carried forward into Bundle #" . raw_material_bundle_display_no($db_conn, (int) $bundle['carried_to_bundle_id']);
         }
@@ -1276,7 +1498,7 @@ function get_bundle_report_summary(
                 (SELECT x.bundle_no FROM raw_material_bundles x WHERE x.id = b.transferred_from_bundle_id) AS transferred_from_no,
                 w.code AS warehouse_code, b.nominal_pieces, b.remaining_pieces,
                 b.damaged_pieces, b.added_extra_pieces, b.status,
-                b.carried_to_bundle_id, b.carried_from_bundle_id,
+                b.carried_to_bundle_id, b.carried_from_bundle_id, b.to_bucket_pieces,
                 b.transferred_to_bundle_id, b.transferred_from_bundle_id,
                 b.created_by, b.created_at, b.closed_by, b.closed_at,
                 COUNT(d.id) AS conversions_count,
@@ -1312,7 +1534,9 @@ function get_bundle_report_summary(
             $varianceLabel = "Transferred: $remaining → #" . ($row['transferred_to_no'] ?? $transferredToBundleId);
         } elseif ($row['status'] === 'closed') {
             $parts = [];
-            if ($remaining > 0 && $carriedToBundleId !== null) $parts[] = "Carried forward: $remaining";
+            $toBucketPieces = $row['to_bucket_pieces'] !== null ? (int) $row['to_bucket_pieces'] : 0;
+            if ($toBucketPieces > 0) $parts[] = "To bucket: $toBucketPieces";
+            elseif ($remaining > 0 && $carriedToBundleId !== null) $parts[] = "Carried forward: $remaining";
             elseif ($remaining > 0) $parts[] = "Short by $remaining";
             if ($addedExtra > 0) $parts[] = "Excess $addedExtra";
             $varianceLabel = $parts ? implode(', ', $parts) : 'Exact';
@@ -1322,6 +1546,7 @@ function get_bundle_report_summary(
             'id'                     => (int) $row['id'],
             'label'                  => "Bundle #" . ($row['bundle_no'] ?? $row['id']),
             'bundle_no'              => (int) ($row['bundle_no'] ?? $row['id']),
+            'to_bucket_pieces'       => $row['to_bucket_pieces'] !== null ? (int) $row['to_bucket_pieces'] : null,
             'carried_to_bundle_no'   => $row['carried_to_no'] !== null ? (int) $row['carried_to_no'] : null,
             'carried_from_bundle_no' => $row['carried_from_no'] !== null ? (int) $row['carried_from_no'] : null,
             'transferred_to_bundle_no'   => $row['transferred_to_no'] !== null ? (int) $row['transferred_to_no'] : null,
@@ -1386,17 +1611,19 @@ function get_bundle_report_transactions(
         $types = '';
         $params = [];
         if ($rawProductId !== null) { $where[] = 'd.product_id = ?'; $types .= 'i'; $params[] = $rawProductId; }
-        if ($companyGodownId !== null) { $where[] = 'b.company_godown_id = ?'; $types .= 'i'; $params[] = $companyGodownId; }
+        if ($companyGodownId !== null) { $where[] = 'COALESCE(b.company_godown_id, k.company_godown_id) = ?'; $types .= 'i'; $params[] = $companyGodownId; }
         if ($dateFrom !== null) { $where[] = 'DATE(d.created_at) >= ?'; $types .= 's'; $params[] = $dateFrom; }
         if ($dateTo !== null) { $where[] = 'DATE(d.created_at) <= ?'; $types .= 's'; $params[] = $dateTo; }
 
+        ensure_raw_material_bucket_tables($db_conn);
         $stmt = $db_conn->prepare(
-            "SELECT d.bundle_id, b.bundle_no, d.pieces_used, d.packs_made, d.ref_id, d.created_by, d.created_at,
+            "SELECT d.bundle_id, d.bucket_id, b.bundle_no, d.pieces_used, d.packs_made, d.ref_id, d.created_by, d.created_at,
                     p.productName, cg.gname, w.code AS warehouse_code
              FROM raw_material_bundle_draws d
-             INNER JOIN raw_material_bundles b ON b.id = d.bundle_id
-             INNER JOIN company_godown cg ON cg.id = b.company_godown_id
-             LEFT JOIN warehouses w ON w.id = b.warehouse_id
+             LEFT JOIN raw_material_bundles b ON b.id = d.bundle_id
+             LEFT JOIN raw_material_bucket k ON k.id = d.bucket_id
+             INNER JOIN company_godown cg ON cg.id = COALESCE(b.company_godown_id, k.company_godown_id)
+             LEFT JOIN warehouses w ON w.id = COALESCE(b.warehouse_id, k.warehouse_id)
              INNER JOIN products p ON p.id = d.product_id
              WHERE " . implode(' AND ', $where)
         );
@@ -1405,6 +1632,7 @@ function get_bundle_report_transactions(
         foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
             $rows[] = [
                 'type'            => 'conversion',
+                'is_bucket'       => $r['bucket_id'] !== null,
                 'bundle_id'       => (int) $r['bundle_id'],
                 'bundle_no'       => (int) ($r['bundle_no'] ?? $r['bundle_id']),
                 'product_name'    => $r['productName'],
@@ -1487,7 +1715,7 @@ function get_bundle_report_transactions(
 
 function ensure_raw_material_bundle_transfers_table(mysqli $db_conn): void
 {
-    $db_conn->query(
+    rm_create_table_if_missing($db_conn, 'raw_material_bundle_transfers',
         "CREATE TABLE IF NOT EXISTS raw_material_bundle_transfers (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ref_id VARCHAR(64) NOT NULL,

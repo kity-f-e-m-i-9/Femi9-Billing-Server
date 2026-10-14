@@ -70,7 +70,8 @@ if ($rawSource) {
     $rawProductId = (int) $rawSource['neksomo_product_id'];
 
     $openBundles = get_open_raw_material_bundles($db_conn, $rawProductId, (int) $godownId, $warehouseId);
-    $totalBundlePieces = array_sum(array_column($openBundles, 'remaining_pieces'));
+    $bucketPieces = get_raw_material_bucket_balance($db_conn, $rawProductId, (int) $godownId, $warehouseId);
+    $totalBundlePieces = array_sum(array_column($openBundles, 'remaining_pieces')) + $bucketPieces;
     $coverBalance = get_cover_balance($db_conn, $productId, (int) $godownId, $warehouseId);
 
     echo json_encode([
@@ -78,6 +79,7 @@ if ($rawSource) {
         'raw_product_id'  => $rawProductId,
         'raw_pieces'      => $totalBundlePieces,
         'open_bundles'    => $openBundles,
+        'bucket_pieces'   => $bucketPieces,
         'cover_balance'   => $coverBalance,
         'closing_qty'     => 0,
         'extra_pieces'    => 0,

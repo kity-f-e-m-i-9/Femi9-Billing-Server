@@ -356,7 +356,7 @@ $filterQueryString = http_build_query(array_filter([
                                 <tr>
                                     <td><?php echo date('d-M-Y H:i', strtotime($t['created_at'])); ?></td>
                                     <td><span class="badge-type-<?php echo $t['type']; ?>"><?php echo ucfirst($t['type']); ?></span></td>
-                                    <td>Bundle #<?php echo (int) ($t['bundle_no'] ?? $t['bundle_id']); ?></td>
+                                    <td><?php echo !empty($t['is_bucket']) ? 'Loose pieces bucket' : 'Bundle #' . (int) ($t['bundle_no'] ?? $t['bundle_id']); ?></td>
                                     <td><?php echo htmlspecialchars($t['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars($t['gname'], ENT_QUOTES, 'UTF-8'); ?><?php echo $t['warehouse_code'] ? ' · ' . htmlspecialchars($t['warehouse_code'], ENT_QUOTES, 'UTF-8') : ''; ?></td>
                                     <td style="text-align:right;" class="<?php echo $t['qty'] > 0 ? 'qty-pos' : 'qty-neg'; ?>"><?php echo ($t['qty'] > 0 ? '+' : '') . number_format($t['qty']); ?></td>

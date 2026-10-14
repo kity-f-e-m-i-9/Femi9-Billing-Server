@@ -382,7 +382,7 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                                         </button>
                                     </div>
                                     <div class="bundle-empty-hint ata-bundle-empty-hint">
-                                        <i class="material-icons-outlined">error_outline</i>No open bundle yet — add one via Input Stock &rarr; Raw Bundles.
+                                        <i class="material-icons-outlined">error_outline</i>No open bundle or bucket pieces yet — add a bundle via Input Stock &rarr; Raw Bundles.
                                     </div>
                                 </div>
 
@@ -546,7 +546,7 @@ function renderBundleOption(state) {
     return $result;
 }
 
-function updateBundlePicker(rowEl, mapped, openBundles) {
+function updateBundlePicker(rowEl, mapped, openBundles, bucketPieces) {
     var wrap = rowEl.querySelector('.bundle-picker-wrap');
     var select = rowEl.querySelector('.bundle-select');
     var emptyHint = rowEl.querySelector('.bundle-empty-hint');
@@ -580,6 +580,10 @@ function updateBundlePicker(rowEl, mapped, openBundles) {
 
     var currentVal = select.value;
     var html = '<option value="">— Select bundle —</option>';
+    bucketPieces = parseInt(bucketPieces, 10) || 0;
+    if (bucketPieces > 0) {
+        html += '<option value="bucket" data-remaining="' + bucketPieces + '" data-bucket="1">Loose pieces bucket</option>';
+    }
     (openBundles || []).forEach(function (b) {
         html += '<option value="' + b.id + '" data-remaining="' + b.remaining_pieces + '">' + escBd(b.label) + '</option>';
     });
@@ -588,7 +592,7 @@ function updateBundlePicker(rowEl, mapped, openBundles) {
         select.value = currentVal;
     }
 
-    var hasBundles = (openBundles || []).length > 0;
+    var hasBundles = (openBundles || []).length > 0 || bucketPieces > 0;
     emptyHint.style.display = hasBundles ? 'none' : '';
     select.disabled = !hasBundles;
 
@@ -603,6 +607,28 @@ function updateBundlePicker(rowEl, mapped, openBundles) {
 
     updateCloseBundleButton(rowEl);
     $(select).off('change.closeBtn').on('change.closeBtn', function () { updateCloseBundleButton(rowEl); });
+    $(select).off('change.bucket').on('change.bucket', function () { toggleBucketMode(rowEl); });
+    toggleBucketMode(rowEl);
+}
+
+// The loose-pieces bucket has no per-bundle damage/extra bookkeeping, so
+// those two entry groups are hidden (and cleared) while it's selected.
+function toggleBucketMode(rowEl) {
+    var select = rowEl.querySelector('.bundle-select');
+    var isBucket = select.value === 'bucket';
+    ['damage', 'extra'].forEach(function (t) {
+        var g = rowEl.querySelector('.ata-adjust-group[data-adjust-type="' + t + '"]');
+        if (!g) return;
+        g.style.display = isBucket ? 'none' : '';
+        if (isBucket) {
+            g.querySelectorAll('.adjust-reason-select').forEach(function (s) {
+                if ($(s).data('select2')) { $(s).select2('destroy'); }
+            });
+            var rows = g.querySelector('.ata-adjust-rows');
+            if (rows) rows.innerHTML = '';
+        }
+    });
+    updateCloseBundleButton(rowEl);
 }
 
 // Enables/disables the row's "Close Bundle" button based on whether a
@@ -627,9 +653,15 @@ function updateCloseBundleButton(rowEl) {
         return;
     }
 
+    if (bundleId === 'bucket') {
+        closeBtn.disabled = true;
+        closeBtn.title = 'The loose-pieces bucket is not a bundle and cannot be closed';
+        return;
+    }
+
     var remaining = selectedOption.getAttribute('data-remaining');
     closeBtn.disabled = false;
-    closeBtn.title = 'Close this bundle (' + remaining + ' pc remaining will carry forward)';
+    closeBtn.title = 'Close this bundle (' + remaining + ' pc remaining will move to the loose-pieces bucket)';
 }
 
 // In-memory cache of each reason type's active list, seeded from PHP so
@@ -750,7 +782,7 @@ function closeSelectedBundle(rowEl) {
     var remaining = selectedOption.getAttribute('data-remaining');
     var label = selectedOption.textContent;
     var confirmMsg = 'Close ' + label + '?' + (parseInt(remaining, 10) > 0
-        ? ' Remaining ' + remaining + ' pc will automatically carry forward into another bundle.'
+        ? ' Remaining ' + remaining + ' pc will move to the loose-pieces bucket.'
         : '') + ' This cannot be undone.';
     if (!confirm(confirmMsg)) return;
 
@@ -811,7 +843,7 @@ function refreshRowStock(rowEl) {
         .then(function (data) {
             if (data.error) { panel.classList.add('is-empty'); panel.lastChild.textContent = '—'; return; }
             updateDirectionOptions(rowEl, data.mapped);
-            updateBundlePicker(rowEl, data.mapped, data.open_bundles);
+            updateBundlePicker(rowEl, data.mapped, data.open_bundles, data.bucket_pieces);
             updateCoverBalanceChip(rowEl, data.mapped, data.cover_balance);
             panel.classList.remove('is-empty');
             if (data.mapped) {

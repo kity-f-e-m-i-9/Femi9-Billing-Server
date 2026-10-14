@@ -22,6 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'history
     exit;
 }
 
+// DDL implicitly commits — ensure tables exist before any transaction.
+ensure_raw_material_bundles_table($db_conn);
+ensure_raw_material_bundle_draws_table($db_conn);
+ensure_raw_material_bundle_adjustments_table($db_conn);
+ensure_raw_material_bucket_tables($db_conn);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['close', 'damage', 'add_extra', 'reopen', 'delete_adjustment'], true)) {
     if (empty($_POST['csrf_token']) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
         $_SESSION['errorMessage'] = "Invalid form submission. Please try again.";
@@ -108,6 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['
 }
 
 $bundles = get_raw_material_bundles($db_conn);
+$buckets = get_raw_material_buckets($db_conn);
 $damageReasons = get_active_bundle_reasons($db_conn, 'damage');
 $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
 
@@ -299,6 +306,39 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                     </div>
                     <?php endif; ?>
 
+                    <?php
+                    $bucketTypeLabels = ['close_in' => 'Bundle closed → bucket', 'conversion_out' => 'Converted to packs', 'reopen_out' => 'Bundle reopened', 'undo_in' => 'Conversion undone'];
+                    $visibleBuckets = array_filter($buckets, fn($k) => $k['pieces'] > 0 || !empty($k['entries']));
+                    if ($visibleBuckets): ?>
+                    <div class="ata-card card" style="margin-bottom:18px;">
+                        <div class="ata-section-head" style="display:flex;align-items:center;gap:8px;padding:14px 20px;border-bottom:1px solid #eef0f3;">
+                            <i class="material-icons-outlined" style="font-size:19px;">inventory</i>
+                            <strong style="font-size:14.5px;">Loose pieces bucket</strong>
+                            <span class="text-muted small">leftover pieces from closed bundles — pick &ldquo;Loose pieces bucket&rdquo; in Convert Pieces &harr; Packs to use them</span>
+                        </div>
+                        <div style="padding:14px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+                            <?php foreach ($visibleBuckets as $k): ?>
+                            <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;">
+                                <div style="font-weight:600;font-size:13.5px;"><?php echo htmlspecialchars($k['productName'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                <div class="text-muted small"><?php echo htmlspecialchars($k['gname'], ENT_QUOTES, 'UTF-8'); ?><?php echo $k['warehouse_code'] ? ' &middot; ' . htmlspecialchars($k['warehouse_code'], ENT_QUOTES, 'UTF-8') : ''; ?></div>
+                                <div style="font-size:22px;font-weight:700;margin:6px 0;"><?php echo number_format($k['pieces']); ?> <span style="font-size:12px;font-weight:500;color:#6b7280;">pc</span></div>
+                                <?php if (!empty($k['entries'])): ?>
+                                <details style="font-size:12px;">
+                                    <summary style="cursor:pointer;color:#6b7280;">Recent movements</summary>
+                                    <?php foreach ($k['entries'] as $e): ?>
+                                    <div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed #eef0f3;">
+                                        <span><?php echo htmlspecialchars($bucketTypeLabels[$e['type']] ?? $e['type'], ENT_QUOTES, 'UTF-8'); ?><?php echo $e['bundle_no'] !== null ? ' #' . (int) $e['bundle_no'] : ''; ?> <span class="text-muted"><?php echo date('d-M H:i', strtotime($e['created_at'])); ?></span></span>
+                                        <strong style="color:<?php echo $e['qty'] >= 0 ? '#15803d' : '#b91c1c'; ?>;"><?php echo ($e['qty'] >= 0 ? '+' : '') . number_format($e['qty']); ?></strong>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </details>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
                     <?php if (empty($bundles)): ?>
                         <div class="alert alert-info">No bundles recorded yet.</div>
                     <?php else: ?>
@@ -432,7 +472,7 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                                     <button type="button" class="btn btn-sm btn-outline-secondary" title="Add extra pieces found in this bundle" onclick="openBundleActionModal(<?php echo (int) $b['id']; ?>, '<?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>', 'add_extra')">
                                         <i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">add_circle_outline</i>
                                     </button>
-                                    <form method="post" style="display:inline;" onsubmit="return confirm('Close <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>? Remaining: <?php echo $b['remaining_pieces']; ?> piece(s)<?php echo $b['remaining_pieces'] > 0 ? ' — this will automatically carry forward into another open bundle (or a new one)' : ''; ?>. This cannot be undone.');">
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('Close <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>? Remaining: <?php echo $b['remaining_pieces']; ?> piece(s)<?php echo $b['remaining_pieces'] > 0 ? ' — these will move to the loose-pieces bucket for this company profile + warehouse' : ''; ?>. This cannot be undone.');">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
                                         <input type="hidden" name="action" value="close">
                                         <input type="hidden" name="bundle_id" value="<?php echo (int) $b['id']; ?>">
@@ -443,7 +483,7 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                                     <div style="display:flex;align-items:center;gap:8px;" onclick="event.stopPropagation();">
                                         <span class="text-muted small"><?php echo htmlspecialchars($b['closed_by'] ?? '', ENT_QUOTES, 'UTF-8'); ?></span>
                                         <?php if ($b['transferred_to_bundle_id'] === null): ?>
-                                        <form method="post" style="display:inline;" onsubmit="return confirm('Reopen <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>?<?php echo $b['carried_to_bundle_id'] !== null ? ' This will also pull back the leftover pieces that were carried forward to Bundle #' . (int) ($b['carried_to_bundle_no'] ?? $b['carried_to_bundle_id']) . '.' : ''; ?>');">
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('Reopen <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>?<?php echo $b['carried_to_bundle_id'] !== null ? ' This will also pull back the leftover pieces that were carried forward to Bundle #' . (int) ($b['carried_to_bundle_no'] ?? $b['carried_to_bundle_id']) . '.' : (($b['to_bucket_pieces'] ?? 0) > 0 ? ' This will also take ' . (int) $b['to_bucket_pieces'] . ' pc back out of the loose-pieces bucket.' : ''); ?>');">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
                                             <input type="hidden" name="action" value="reopen">
                                             <input type="hidden" name="bundle_id" value="<?php echo (int) $b['id']; ?>">

@@ -39,6 +39,11 @@ if (!$bundleId) {
     exit;
 }
 
+// DDL implicitly commits, so make sure every table exists BEFORE the
+// transaction begins (the helpers skip DDL when tables already exist).
+ensure_raw_material_bundles_table($db_conn);
+ensure_raw_material_bundle_draws_table($db_conn);
+ensure_raw_material_bucket_tables($db_conn);
 $db_conn->begin_transaction();
 try {
     $closed = close_raw_material_bundle($db_conn, $bundleId, $closedBy);
