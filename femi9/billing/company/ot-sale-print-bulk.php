@@ -84,8 +84,11 @@ if (!empty($selectedTempids)) {
                     var divToPrint = document.getElementById('divToPrint');
                     var popupWin = window.open('', '_blank', 'width=990,height=540,left=200,top=80');
                     popupWin.document.open();
-                    popupWin.document.write('<html><body onload="window.print()">' + divToPrint.innerHTML + '</html>');
+                    popupWin.document.write('<html><head><meta charset="utf-8"><title>Invoices</title></head><body>' + divToPrint.innerHTML + '</body></html>');
                     popupWin.document.close();
+                    // Wait for layout to settle before printing; printing too early gave blank PDFs.
+                    popupWin.focus();
+                    setTimeout(function () { popupWin.print(); }, 800);
                 }
             </script>
 
@@ -140,10 +143,10 @@ if (!empty($selectedTempids)) {
 .wallet-deduction{color:#c0392b;}
 /* One invoice = one A4 page. No CSS zoom (unreliable in Safari): each invoice is laid out 250mm wide and
    scaled with transform to ~195mm, inside a fixed-height box so the page breaks are deterministic. */
-@page{size:A4 portrait;margin:8mm;}
+@page{size:A4 portrait;margin:16mm 8mm;}
 @media print{
 html,body{margin:0 !important;padding:0 !important;background:#fff !important;}
-.inv-page{width:194mm;height:272mm;overflow:hidden;position:relative;page-break-inside:avoid;break-inside:avoid;}
+.inv-page{width:194mm;height:255mm;overflow:hidden;position:relative;page-break-inside:avoid;break-inside:avoid;}
 .inv-page + .inv-page{page-break-before:always;break-before:page;}
 .maincontainar{margin:0 !important;width:246mm !important;max-width:none;box-sizing:border-box;transform:scale(0.776);transform-origin:top left;page-break-after:auto !important;break-after:auto !important;}
 .print-foot{display:none !important;}
