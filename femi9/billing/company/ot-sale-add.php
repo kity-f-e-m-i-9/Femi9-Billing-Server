@@ -90,8 +90,9 @@ $stmt_products->close();
 // ---------------------------------------------------------------
 $usertype   = $Result_Log_users_Dtails134['usertype'] ?? '';
 $login_user = $_SESSION['LOGIN_USER'] ?? '';
-// Admin/finance logins only see coupon/mobile/GST/order+ship date for website / id concept
-$hideExtraFields = in_array($usertype, ['admin', 'finance'], true);
+// Admin, finance and normal users (sub-users created under admin) only see
+// coupon/mobile/GST/order+ship date for website / id concept
+$hideExtraFields = in_array($usertype, ['admin', 'finance', 'users'], true);
 $categories = [];
 
 if ($usertype === 'admin') {
