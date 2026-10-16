@@ -12,28 +12,66 @@ function getMsAssignedDistrictNames($db_conn, int $msId): array {
     return array_column($districts, 'name');
 }
 
-// Matches territory_partners the same way getBdmAssignedTpIds() does — by
-// district NAME (case-insensitive, trimmed) against assigned_district,
-// falling back to branch_district for TPs not yet backfilled — since there's
-// no FK from territory_partners into the location tree.
+// Primary match: a TP's actual Firka coverage (territory_partner_locations),
+// walked up to its district ancestor — correctly surfaces a TP under EVERY
+// district they actually hold Firkas in, which matters because a TP can
+// cover Firkas across more than one district (e.g. one TP holding Firkas in
+// both Coimbatore and Tiruppur). The old assigned_district/branch_district
+// text field can only ever point to one district, so a cross-district TP
+// would silently vanish from one district's roster while their Firka target
+// still counted toward that district's total (getMsDistrictTargetAndFirkaStats
+// sums by actual Firka location, not by this field) — a real mismatch found
+// 2026-10-15 (Vinith Sangavi, TP id 96: Firkas in both Coimbatore and
+// Tiruppur, assigned_district only said Coimbatore).
+// Fallback: TPs with no territory_partner_locations rows at all yet (not
+// backfilled with Firka assignments) are still matched the old way, by their
+// assigned_district/branch_district text field, so they don't disappear from
+// every list.
 function getMsDistrictTpIds($db_conn, array $districtNames, bool $includeInactive = false): array {
     if (empty($districtNames)) return [];
 
     $placeholders = implode(',', array_fill(0, count($districtNames), '?'));
     $types = str_repeat('s', count($districtNames));
     $normalized = array_map(fn($n) => mb_strtolower(trim($n)), $districtNames);
-
     $activeClause = $includeInactive ? '' : 'is_active = 1 AND ';
+
+    $districtDepthRow = $db_conn->query(
+        "SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'district%' ORDER BY depth ASC LIMIT 1"
+    )->fetch_assoc();
+    $districtDepth = (int)($districtDepthRow['depth'] ?? 0);
+
+    $byFirkaIds = [];
+    if ($districtDepth) {
+        $stmtFirka = $db_conn->prepare("
+            WITH RECURSIVE district_tree AS (
+                SELECT id FROM partner_location_nodes WHERE depth = ? AND LOWER(TRIM(name)) IN ($placeholders)
+                UNION ALL
+                SELECT n.id FROM partner_location_nodes n JOIN district_tree dt ON n.parent_id = dt.id
+            )
+            SELECT DISTINCT tp.id
+            FROM territory_partners tp
+            JOIN territory_partner_locations tpl ON tpl.territory_partner_id = tp.id
+            WHERE {$activeClause}tpl.location_id IN (SELECT id FROM district_tree)
+        ");
+        $typesFirka = 'i' . $types;
+        $paramsFirka = array_merge([$districtDepth], $normalized);
+        $stmtFirka->bind_param($typesFirka, ...$paramsFirka);
+        $stmtFirka->execute();
+        $byFirkaIds = array_map(fn($r) => (int)$r['id'], $stmtFirka->get_result()->fetch_all(MYSQLI_ASSOC));
+        $stmtFirka->close();
+    }
+
     $stmt = $db_conn->prepare("
         SELECT id FROM territory_partners
         WHERE {$activeClause}LOWER(TRIM(COALESCE(NULLIF(assigned_district,''), branch_district))) IN ($placeholders)
+          AND id NOT IN (SELECT DISTINCT territory_partner_id FROM territory_partner_locations)
     ");
     $stmt->bind_param($types, ...$normalized);
     $stmt->execute();
-    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $byTextIds = array_map(fn($r) => (int)$r['id'], $stmt->get_result()->fetch_all(MYSQLI_ASSOC));
     $stmt->close();
 
-    return array_map(fn($r) => (int)$r['id'], $rows);
+    return array_values(array_unique(array_merge($byFirkaIds, $byTextIds)));
 }
 
 // District Total Target + Firka coverage counts for a set of district names —
@@ -231,5 +269,67 @@ function getTpTalukFirkaLabels($db_conn, array $tpIds): array {
         sort($fList);
         $out[$tpId] = ['taluks' => $tList, 'firkas' => $fList, 'target' => $targets[$tpId] ?? 0.0];
     }
+    return $out;
+}
+
+// Same Firka-level data as getTpTalukFirkaLabels(), but grouped by each
+// Firka's own district instead of flattened across all of them — lets a
+// caller show a cross-district TP's amount scoped to just the viewer's own
+// district(s) on their roster, with the rest attributed to whichever other
+// district(s) it actually belongs to. [tp_id => [district_name => ['target' => float, 'firkas' => [names]]]]
+function getTpFirkaDistrictSplit($db_conn, array $tpIds): array {
+    $out = [];
+    if (empty($tpIds)) return $out;
+    $idList = implode(',', array_map('intval', $tpIds));
+
+    $rows = $db_conn->query(
+        "WITH RECURSIVE anc AS (
+            SELECT id AS firka_id, id AS cur_id, parent_id FROM partner_location_nodes WHERE depth = 6
+            UNION ALL
+            SELECT a.firka_id, n.id, n.parent_id FROM partner_location_nodes n JOIN anc a ON n.id = a.parent_id
+         )
+         SELECT tpl.territory_partner_id AS tp_id, d.name AS district_name, f.name AS firka_name, f.target_amount
+         FROM territory_partner_locations tpl
+         JOIN partner_location_nodes f ON f.id = tpl.location_id AND f.depth = 6
+         JOIN anc a ON a.firka_id = f.id
+         JOIN partner_location_nodes d ON d.id = a.cur_id AND d.depth = 3
+         WHERE tpl.territory_partner_id IN ($idList)"
+    )->fetch_all(MYSQLI_ASSOC);
+
+    foreach ($rows as $r) {
+        $tpId = (int)$r['tp_id'];
+        $dn   = $r['district_name'];
+        if (!isset($out[$tpId][$dn])) { $out[$tpId][$dn] = ['target' => 0.0, 'firkas' => []]; }
+        $out[$tpId][$dn]['target'] += (float)$r['target_amount'];
+        $out[$tpId][$dn]['firkas'][] = $r['firka_name'];
+    }
+    return $out;
+}
+
+// Which District Manager(s) — a marketing_staff whose team level name
+// contains "District" — are directly assigned to a given district node, for
+// labeling a cross-district TP's "the rest of this amount belongs to
+// <district>, under <DM>" split note.
+function getDistrictManagerNames($db_conn, array $districtNames): array {
+    $out = [];
+    if (empty($districtNames)) return $out;
+    $placeholders = implode(',', array_fill(0, count($districtNames), '?'));
+    $types = str_repeat('s', count($districtNames));
+    $normalized = array_map(fn($n) => mb_strtolower(trim($n)), $districtNames);
+
+    $stmt = $db_conn->prepare(
+        "SELECT d.name AS district_name, ms.ms_name
+         FROM marketing_staff_locations msl
+         JOIN partner_location_nodes d ON d.id = msl.location_id AND d.depth = 3
+         JOIN marketing_staff ms ON ms.id = msl.ms_id AND ms.deleted_at IS NULL
+         JOIN marketing_team_levels tl ON tl.id = ms.team_level_id AND tl.level_name LIKE '%District%'
+         WHERE LOWER(TRIM(d.name)) IN ($placeholders)"
+    );
+    $stmt->bind_param($types, ...$normalized);
+    $stmt->execute();
+    foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+        $out[$r['district_name']][] = $r['ms_name'];
+    }
+    $stmt->close();
     return $out;
 }

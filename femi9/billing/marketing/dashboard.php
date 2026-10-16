@@ -201,11 +201,44 @@ if (!empty($teamTpIds)) {
     );
     $tpRoster = $resTp ? $resTp->fetch_all(MYSQLI_ASSOC) : [];
 
-    $tpLocLabels = getTpTalukFirkaLabels($db_conn, $teamTpIds);
+    // Target/Firka columns are scoped to just this team's own district(s) —
+    // a cross-district TP (e.g. one holding Firkas in both Coimbatore and
+    // Tiruppur) must only contribute the Tiruppur portion to a Tiruppur DM's
+    // roster, matching the district's own "Filled Firkas" total; the rest is
+    // surfaced as a split note naming the other district and its DM, instead
+    // of silently inflating this DM's numbers with another DM's target.
+    $tpSplit = getTpFirkaDistrictSplit($db_conn, $teamTpIds);
+    $teamDistrictNamesLower = array_map(fn($n) => mb_strtolower(trim($n)), $teamDistrictNames);
+
+    $otherDistrictsSeen = [];
+    foreach ($tpSplit as $_byDistrict) {
+        foreach ($_byDistrict as $_dn => $_info) {
+            if (!in_array(mb_strtolower(trim($_dn)), $teamDistrictNamesLower, true)) {
+                $otherDistrictsSeen[$_dn] = true;
+            }
+        }
+    }
+    $otherDistrictDms = getDistrictManagerNames($db_conn, array_keys($otherDistrictsSeen));
+
     foreach ($tpRoster as &$_tpRow) {
-        $_labels = $tpLocLabels[(int)$_tpRow['id']] ?? ['taluks' => [], 'firkas' => [], 'target' => 0.0];
-        $_tpRow['firka']  = implode(', ', $_labels['firkas']);
-        $_tpRow['target'] = $_labels['target'];
+        $_tpId       = (int)$_tpRow['id'];
+        $_byDistrict = $tpSplit[$_tpId] ?? [];
+        $_inTarget   = 0.0;
+        $_inFirkas   = [];
+        $_otherParts = [];
+        foreach ($_byDistrict as $_dn => $_info) {
+            if (in_array(mb_strtolower(trim($_dn)), $teamDistrictNamesLower, true)) {
+                $_inTarget = $_inTarget + $_info['target'];
+                $_inFirkas = array_merge($_inFirkas, $_info['firkas']);
+            } else {
+                $_dmNames = !empty($otherDistrictDms[$_dn]) ? implode('/', $otherDistrictDms[$_dn]) : 'unassigned DM';
+                $_otherParts[] = $_dn . ': ' . inr_format($_info['target'], 0) . ' (under ' . $_dmNames . ')';
+            }
+        }
+        sort($_inFirkas);
+        $_tpRow['firka']  = implode(', ', $_inFirkas);
+        $_tpRow['target'] = $_inTarget;
+        $_tpRow['other_district_split'] = implode('; ', $_otherParts);
     }
     unset($_tpRow);
 }
@@ -1004,6 +1037,7 @@ ksort($districtTpCounts);
                                     'district'  => $tp['district'],
                                     'firka'     => $tp['firka'],
                                     'target'    => (float)$tp['target'],
+                                    'other_split' => $tp['other_district_split'] ?? '',
                                     'is_active' => (int)$tp['is_active'],
                                 ];
                             }, $tpRoster)); ?>;
@@ -1064,7 +1098,9 @@ ksort($districtTpCounts);
                                         '<td><div class="mobile-cell"><i class="material-icons-outlined">phone_iphone</i><span class="mobile-text">' + esc(r.mobile) + '</span></div></td>' +
                                         '<td><span class="mobile-text">' + esc(r.district || '—') + '</span></td>' +
                                         '<td><span class="mobile-text">' + shortList(r.firka) + '</span></td>' +
-                                        '<td style="text-align:right;"><span class="sales-amount">' + money(r.target) + '</span></td>' +
+                                        '<td style="text-align:right;"><span class="sales-amount">' + money(r.target) + '</span>' +
+                                            (r.other_split ? '<div style="font-size:10px;color:#9ca3af;margin-top:2px;">+ ' + esc(r.other_split) + '</div>' : '') +
+                                        '</td>' +
                                         '<td style="text-align:center;">' + statusHtml + '</td>' +
                                         '</tr>';
                                 });
