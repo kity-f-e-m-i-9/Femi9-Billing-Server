@@ -164,6 +164,11 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
         .ata-bundle-close-btn:disabled { opacity:.4; cursor:not-allowed; }
         .ata-bundle-empty-hint { grid-column: 1 / -1; background:#fef2f2; border:1px solid #fecaca; border-radius:9px; padding:0 14px; height:46px; display:none; align-items:center; font-size:12.5px; color:#b91c1c; line-height:1.3; }
         .ata-bundle-empty-hint i { font-size:14px; vertical-align:middle; margin-right:3px; }
+        .ata-add-bundle-btn { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; margin-top:12px; border:1.5px dashed #a5b4fc; background:#f5f6ff; color:#4338ca; border-radius:10px; min-height:46px; padding:0 12px; font-size:13px; font-weight:600; cursor:pointer; transition:background .15s; }
+        .ata-add-bundle-btn:hover { background:#eaecff; }
+        .ata-add-bundle-btn.is-hidden { display:none !important; }
+        .bundle-remaining-after.is-ok { color:#4338ca; }
+        .bundle-remaining-after.is-short { color:#b91c1c; font-weight:600; }
 
         .ata-adjust-group { margin-top:16px; }
         .ata-adjust-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
@@ -226,6 +231,67 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
         .select2-results__option .bundle-option-remaining { float: right; margin-top: 2px; }
 
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Mobile-first refinements ─────────────────────────────── */
+        .ata-line-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+        .ata-line-head[hidden] { display:none; }
+        .ata-line-tag { font-size:11.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#4338ca; background:#eef2ff; border-radius:999px; padding:3px 10px; }
+        .ata-line-total { font-size:12.5px; font-weight:600; color:#15803d; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:999px; padding:3px 10px; }
+        .ata-line-total:empty { display:none; }
+
+        /* An "Another bundle" line: compact continuation of the product above */
+        .ata-row-card.is-extra-line { margin-top:-6px; margin-left:14px; border-left-width:3px; border-left-style:dashed; background:#fafbff; }
+        .ata-row-card.is-extra-line .ata-field-product,
+        .ata-row-card.is-extra-line .ata-field-direction,
+        .ata-row-card.is-extra-line .ata-field-machine,
+        .ata-row-card.is-extra-line .ata-field-stock { display:none !important; }
+        .ata-row-card.is-extra-line .ata-row-grid { grid-template-columns: 1fr auto; }
+
+        .ata-adjust-details { margin-top:14px; border:1px solid #eef0f3; border-radius:10px; background:#fbfbfd; }
+        .ata-adjust-details > summary { display:flex; align-items:center; gap:8px; padding:11px 14px; cursor:pointer; list-style:none; font-size:13px; font-weight:600; color:#374151; min-height:44px; }
+        .ata-adjust-details > summary::-webkit-details-marker { display:none; }
+        .ata-adjust-details > summary::after { content:'expand_more'; font-family:'Material Icons Outlined','Material Icons'; margin-left:auto; font-size:20px; color:#9ca3af; transition:transform .15s; }
+        .ata-adjust-details[open] > summary::after { transform:rotate(180deg); }
+        .ata-adjust-hint { font-weight:400; font-size:12px; color:#9ca3af; }
+        .ata-adjust-badge { background:#4338ca; color:#fff; border-radius:999px; font-size:11px; font-weight:700; padding:1px 8px; }
+        .ata-adjust-badge[hidden] { display:none; }
+        .ata-adjust-details > .ata-adjust-group { margin:0; padding:0 14px 14px; }
+        .ata-adjust-details > .ata-adjust-group:first-of-type { margin-top:2px; }
+
+        .bundle-remaining-after { padding:9px 12px; border-radius:9px; background:#eef2ff; line-height:1.4; }
+        .bundle-remaining-after.is-short { background:#fef2f2; }
+
+        .ata-submit-bar { display:flex; align-items:center; justify-content:flex-end; gap:14px; margin:14px 0 24px; }
+        .ata-submit-summary { font-size:13px; color:#6b7280; font-weight:500; }
+
+        @media (max-width: 767px) {
+            .ata-nav-tabs { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; margin-left:-4px; margin-right:-4px; padding:0 4px 4px; }
+            .ata-nav-tabs::-webkit-scrollbar { display:none; }
+            .ata-nav-tab { white-space:nowrap; flex:0 0 auto; padding:10px 14px; }
+            .ata-section-head { padding:12px 14px; }
+            .ata-section-head > div[style*="display:flex"] { width:100%; }
+            .ata-section-head > div[style*="display:flex"] .ata-btn { flex:1 1 0; justify-content:center; min-height:44px; }
+            .ata-scope-grid { grid-template-columns:1fr; padding:14px; }
+            .ata-rows { padding:14px 12px 18px; }
+            .ata-row-card { padding:12px; }
+            .ata-row-grid { grid-template-columns: 1fr 1fr; }
+            .ata-row-grid .ata-field-wide,
+            .ata-row-grid .ata-field-machine,
+            .ata-row-grid .ata-field-stock,
+            .ata-row-grid .ata-field-action { grid-column: 1 / -1; }
+            .ata-row-grid .ata-field-action { display:flex; justify-content:flex-end; gap:8px; align-items:center; }
+            .ata-row-grid .ata-field-action label { display:none; }
+            .ata-row-card.is-extra-line { margin-left:8px; }
+            .ata-row-card.is-extra-line .ata-row-grid { grid-template-columns: 1fr auto; }
+            .ata-row-card.is-extra-line .ata-row-grid .ata-field-action { grid-column:auto; }
+            .ata-adjust-entry-row { grid-template-columns: 1fr auto; }
+            .ata-adjust-entry-row > .ata-field:first-child { grid-column: 1 / -1; }
+            .ata-adjust-hint { display:none; }
+            .ata-submit-bar { position:sticky; bottom:0; z-index:20; margin:14px -12px 0; padding:10px 14px calc(10px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #e5e7eb; box-shadow:0 -4px 14px rgba(16,24,40,.08); justify-content:space-between; }
+            .ata-submit-bar .ata-btn-submit { min-height:46px; flex:0 0 auto; }
+            .ata-intro { font-size:13px; }
+        }
+
     </style>
 </head>
 <body>
@@ -242,11 +308,12 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                     <div class="ata-page-head">
                         <h1><span class="ata-icon-badge"><i class="material-icons-outlined">sync_alt</i></span>Convert Pieces &harr; Packs</h1>
                     </div>
-                    <p class="ata-intro">Assemble loose pieces into whole packs, or break a pack back open — for one product or several at once.</p>
+                    <p class="ata-intro">Assemble loose pieces into whole packs, or break a pack back open — for one product or several at once. Use &ldquo;Another bundle&rdquo; to convert one product from several bundles in one go.</p>
 
                     <div class="ata-nav-tabs">
                         <a href="input-stock-bundles.php" class="ata-nav-tab"><i class="material-icons-outlined">add_box</i> Input Stock</a>
                         <a href="raw-material-bundles-manage.php" class="ata-nav-tab"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
+                        <a href="raw-material-bundle-transfer.php" class="ata-nav-tab"><i class="material-icons-outlined">swap_horiz</i> Bundle Transfer</a>
                         <a href="neksomo-piece-pack-convert.php" class="ata-nav-tab active"><i class="material-icons-outlined">sync_alt</i> Convert Pieces &harr; Packs</a>
                         <a href="manage-piece-pack-conversions.php" class="ata-nav-tab"><i class="material-icons-outlined">history</i> Manage Conversions</a>
                         <a href="raw-material-bundles-report.php" class="ata-nav-tab"><i class="material-icons-outlined">assessment</i> Bundle Report</a>
@@ -311,7 +378,8 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                             <div class="ata-rows" id="productRows"></div>
                         </div>
 
-                        <div class="d-flex justify-content-end mt-3 mb-4">
+                        <div class="ata-submit-bar">
+                            <div class="ata-submit-summary" id="convertSummary">No products yet</div>
                             <button type="submit" class="ata-btn ata-btn-submit">
                                 <i class="material-icons" style="font-size:17px;">sync_alt</i> Convert All
                             </button>
@@ -323,8 +391,12 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                          part of the actual form until cloned in. -->
                     <template id="productRowTemplate">
                         <div class="product-row ata-row-card">
+                            <div class="ata-line-head" hidden>
+                                <span class="ata-line-tag"></span>
+                                <span class="ata-line-total"></span>
+                            </div>
                             <div class="ata-row-grid">
-                                <div class="ata-field ata-field-wide">
+                                <div class="ata-field ata-field-wide ata-field-product">
                                     <label>Product</label>
                                     <select required name="product_id[]" class="product-select">
                                         <option value="" hidden>Select</option>
@@ -335,7 +407,7 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="ata-field">
+                                <div class="ata-field ata-field-direction">
                                     <label>Direction</label>
                                     <select required name="direction[]" class="direction-select">
                                         <option value="pieces_to_pack">&#8599; Pieces &rarr; Pack</option>
@@ -343,10 +415,10 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                                     </select>
                                 </div>
                                 <div class="ata-field">
-                                    <label>Total Packs Produced</label>
+                                    <label class="pack-count-label">Total Packs Produced</label>
                                     <input type="number" min="1" required name="pack_count[]" class="pack-count-input" placeholder="e.g. 5">
                                 </div>
-                                <div class="ata-field">
+                                <div class="ata-field ata-field-machine">
                                     <label>Machine Code</label>
                                     <select name="machine_code_id[]" class="machine-code-select">
                                         <option value="">— None —</option>
@@ -355,7 +427,7 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="ata-field">
+                                <div class="ata-field ata-field-stock">
                                     <label>Current Stock</label>
                                     <span class="current-stock-panel ata-stock-chip is-empty"><i class="material-icons-outlined">inventory</i>&mdash;</span>
                                 </div>
@@ -380,11 +452,19 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                                             <i class="material-icons-outlined" style="font-size:15px;">close</i> Close Bundle
                                         </button>
                                     </div>
+                                    <div class="bundle-remaining-after" style="grid-column:1/-1;display:none;font-size:12.5px;"></div>
                                     <div class="bundle-empty-hint ata-bundle-empty-hint">
-                                        <i class="material-icons-outlined">error_outline</i>No open bundle yet — add one via Input Stock &rarr; Raw Bundles.
+                                        <i class="material-icons-outlined">error_outline</i>No open bundle or bucket pieces yet — add a bundle via Input Stock &rarr; Raw Bundles.
                                     </div>
                                 </div>
 
+                                <details class="ata-adjust-details">
+                                <summary>
+                                    <i class="material-icons-outlined" style="font-size:17px;">tune</i>
+                                    <span>Adjustments</span>
+                                    <span class="ata-adjust-hint">damaged · extra · covers</span>
+                                    <span class="ata-adjust-badge" hidden>0</span>
+                                </summary>
                                 <div class="ata-adjust-group" data-adjust-type="damage">
                                     <div class="ata-adjust-head">
                                         <span class="ata-adjust-title"><i class="material-icons-outlined" style="font-size:16px;vertical-align:middle;color:#b91c1c;">report</i> Damaged Pieces</span>
@@ -414,6 +494,10 @@ $extraReasons  = get_active_bundle_reasons($db_conn, 'extra');
                                     </div>
                                     <div class="ata-adjust-rows" data-adjust-type="cover_damage"></div>
                                 </div>
+                                </details>
+                                <button type="button" class="ata-add-bundle-btn add-bundle-btn" style="display:none;" title="Convert this product from another bundle too (adds a new line below)">
+                                    <i class="material-icons-outlined" style="font-size:18px;">add_circle_outline</i> Add another bundle for this product
+                                </button>
                             </div>
                         </div>
                     </template>
@@ -545,7 +629,7 @@ function renderBundleOption(state) {
     return $result;
 }
 
-function updateBundlePicker(rowEl, mapped, openBundles) {
+function updateBundlePicker(rowEl, mapped, openBundles, bucketPieces) {
     var wrap = rowEl.querySelector('.bundle-picker-wrap');
     var select = rowEl.querySelector('.bundle-select');
     var emptyHint = rowEl.querySelector('.bundle-empty-hint');
@@ -553,6 +637,9 @@ function updateBundlePicker(rowEl, mapped, openBundles) {
     if ($(select).data('select2')) {
         $(select).select2('destroy');
     }
+
+    var addBundleBtn = rowEl.querySelector('.add-bundle-btn');
+    if (addBundleBtn) addBundleBtn.style.display = mapped ? '' : 'none';
 
     if (!mapped) {
         wrap.style.display = 'none';
@@ -579,6 +666,10 @@ function updateBundlePicker(rowEl, mapped, openBundles) {
 
     var currentVal = select.value;
     var html = '<option value="">— Select bundle —</option>';
+    bucketPieces = parseInt(bucketPieces, 10) || 0;
+    if (bucketPieces > 0) {
+        html += '<option value="bucket" data-remaining="' + bucketPieces + '" data-bucket="1">Loose pieces bucket</option>';
+    }
     (openBundles || []).forEach(function (b) {
         html += '<option value="' + b.id + '" data-remaining="' + b.remaining_pieces + '">' + escBd(b.label) + '</option>';
     });
@@ -587,7 +678,7 @@ function updateBundlePicker(rowEl, mapped, openBundles) {
         select.value = currentVal;
     }
 
-    var hasBundles = (openBundles || []).length > 0;
+    var hasBundles = (openBundles || []).length > 0 || bucketPieces > 0;
     emptyHint.style.display = hasBundles ? 'none' : '';
     select.disabled = !hasBundles;
 
@@ -602,6 +693,88 @@ function updateBundlePicker(rowEl, mapped, openBundles) {
 
     updateCloseBundleButton(rowEl);
     $(select).off('change.closeBtn').on('change.closeBtn', function () { updateCloseBundleButton(rowEl); });
+    $(select).off('change.bucket').on('change.bucket', function () { toggleBucketMode(rowEl); });
+    toggleBucketMode(rowEl);
+}
+
+// The loose-pieces bucket has no per-bundle damage/extra bookkeeping, so
+// those two entry groups are hidden (and cleared) while it's selected.
+function toggleBucketMode(rowEl) {
+    var select = rowEl.querySelector('.bundle-select');
+    var isBucket = select.value === 'bucket';
+    ['damage', 'extra'].forEach(function (t) {
+        var g = rowEl.querySelector('.ata-adjust-group[data-adjust-type="' + t + '"]');
+        if (!g) return;
+        g.style.display = isBucket ? 'none' : '';
+        if (isBucket) {
+            g.querySelectorAll('.adjust-reason-select').forEach(function (s) {
+                if ($(s).data('select2')) { $(s).select2('destroy'); }
+            });
+            var rows = g.querySelector('.ata-adjust-rows');
+            if (rows) rows.innerHTML = '';
+        }
+    });
+    updateCloseBundleButton(rowEl);
+    updateRemainingAfter(rowEl);
+    syncSiblingBundleOptions();
+}
+
+// Read-only "Remaining after this conversion" line: the picked bundle's
+// (or bucket's) current pieces − packs × pieces/pack − damaged + extra,
+// recomputed live. Red when the entered packs need more than it holds
+// (the server then makes only the full packs that fit).
+function updateRemainingAfter(rowEl) {
+    var el = rowEl.querySelector('.bundle-remaining-after');
+    if (!el) return;
+    var select = rowEl.querySelector('.bundle-select');
+    var opt = select.options[select.selectedIndex];
+    if (!select.value || !opt || opt.getAttribute('data-remaining') === null) {
+        el.style.display = 'none';
+        return;
+    }
+    var remaining = parseInt(opt.getAttribute('data-remaining'), 10) || 0;
+    var ppp = parseInt($(rowEl.querySelector('.product-select')).find('option:selected').data('pieces-per-pack'), 10) || 0;
+    var packs = parseInt(rowEl.querySelector('.pack-count-input').value, 10) || 0;
+    function sumQty(type) {
+        var t = 0;
+        rowEl.querySelectorAll('.ata-adjust-rows[data-adjust-type="' + type + '"] .adjust-qty-input').forEach(function (i) {
+            t += parseInt(i.value, 10) || 0;
+        });
+        return t;
+    }
+    var damaged = sumQty('damage');
+    var extra = sumQty('extra');
+    var after = remaining - (packs * ppp) - damaged + extra;
+    el.style.display = '';
+    if (after < 0) {
+        var avail = remaining - damaged + extra;
+        el.className = 'bundle-remaining-after is-short';
+        el.textContent = 'Short by ' + Math.abs(after).toLocaleString('en-IN') + ' pc — only ' + Math.max(0, Math.floor(avail / (ppp || 1))) + ' pack(s) can be made from this bundle.';
+    } else {
+        el.className = 'bundle-remaining-after is-ok';
+        el.textContent = 'Remaining after this conversion: ' + after.toLocaleString('en-IN') + ' pc';
+    }
+}
+
+// A bundle can only be picked once per product within a batch — disable
+// it in the sibling lines of the same product once another line has it.
+function syncSiblingBundleOptions() {
+    var rows = Array.from(rowsContainer.querySelectorAll('.product-row'));
+    rows.forEach(function (rowEl) {
+        var productId = rowEl.querySelector('.product-select').value;
+        var select = rowEl.querySelector('.bundle-select');
+        var takenElsewhere = {};
+        rows.forEach(function (other) {
+            if (other === rowEl) return;
+            if (other.querySelector('.product-select').value !== productId) return;
+            var v = other.querySelector('.bundle-select').value;
+            if (v) takenElsewhere[v] = true;
+        });
+        Array.from(select.options).forEach(function (o) {
+            if (!o.value) return;
+            o.disabled = !!takenElsewhere[o.value];
+        });
+    });
 }
 
 // Enables/disables the row's "Close Bundle" button based on whether a
@@ -626,9 +799,15 @@ function updateCloseBundleButton(rowEl) {
         return;
     }
 
+    if (bundleId === 'bucket') {
+        closeBtn.disabled = true;
+        closeBtn.title = 'The loose-pieces bucket is not a bundle and cannot be closed';
+        return;
+    }
+
     var remaining = selectedOption.getAttribute('data-remaining');
     closeBtn.disabled = false;
-    closeBtn.title = 'Close this bundle (' + remaining + ' pc remaining will carry forward)';
+    closeBtn.title = 'Close this bundle (' + remaining + ' pc remaining will move to the loose-pieces bucket)';
 }
 
 // In-memory cache of each reason type's active list, seeded from PHP so
@@ -696,6 +875,7 @@ function addAdjustEntryRow(rowEl, type) {
             $(reasonSelect).select2('destroy');
         }
         entryEl.remove();
+        updateAdjustBadge(rowEl);
     });
     // Picking "+ Manage Reasons…" should open the modal, not actually
     // select it as a reason — jQuery's .val('').trigger('change') (not
@@ -712,6 +892,9 @@ function addAdjustEntryRow(rowEl, type) {
 
     rowsContainerEl.appendChild(fragment);
     refreshReasonDropdowns(type);
+    updateAdjustBadge(rowEl);
+    var det = rowEl.querySelector('.ata-adjust-details');
+    if (det) det.open = true;
 }
 
 // Stamps every rendered adjust-entry row's <select>/<input> name
@@ -749,7 +932,7 @@ function closeSelectedBundle(rowEl) {
     var remaining = selectedOption.getAttribute('data-remaining');
     var label = selectedOption.textContent;
     var confirmMsg = 'Close ' + label + '?' + (parseInt(remaining, 10) > 0
-        ? ' Remaining ' + remaining + ' pc will automatically carry forward into another bundle.'
+        ? ' Remaining ' + remaining + ' pc will move to the loose-pieces bucket.'
         : '') + ' This cannot be undone.';
     if (!confirm(confirmMsg)) return;
 
@@ -810,7 +993,7 @@ function refreshRowStock(rowEl) {
         .then(function (data) {
             if (data.error) { panel.classList.add('is-empty'); panel.lastChild.textContent = '—'; return; }
             updateDirectionOptions(rowEl, data.mapped);
-            updateBundlePicker(rowEl, data.mapped, data.open_bundles);
+            updateBundlePicker(rowEl, data.mapped, data.open_bundles, data.bucket_pieces);
             updateCoverBalanceChip(rowEl, data.mapped, data.cover_balance);
             panel.classList.remove('is-empty');
             if (data.mapped) {
@@ -836,7 +1019,8 @@ function updateRemoveButtonsState() {
     });
 }
 
-function addProductRow() {
+function addProductRow(opts) {
+    opts = (opts && opts.afterEl) ? opts : {};
     var fragment = rowTemplate.content.cloneNode(true);
     var rowEl = fragment.querySelector('.product-row');
     var productSelect = rowEl.querySelector('.product-select');
@@ -849,25 +1033,150 @@ function addProductRow() {
         });
         rowEl.remove();
         updateRemoveButtonsState();
+        syncSiblingBundleOptions();
+        refreshRowChrome();
     });
     rowEl.querySelector('.bundle-close-btn').addEventListener('click', function () {
         closeSelectedBundle(rowEl);
+    });
+    rowEl.querySelector('.add-bundle-btn').addEventListener('click', function () {
+        addProductRow({
+            afterEl: rowEl,
+            productId: productSelect.value,
+            machineCodeId: rowEl.querySelector('.machine-code-select').value
+        });
     });
     rowEl.querySelectorAll('.ata-adjust-add-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
             addAdjustEntryRow(rowEl, btn.getAttribute('data-adjust-type'));
         });
     });
-    rowsContainer.appendChild(fragment);
+    if (opts.afterEl) {
+        rowEl.classList.add('is-extra-line');
+        opts.afterEl.parentNode.insertBefore(fragment, opts.afterEl.nextSibling);
+    } else {
+        rowsContainer.appendChild(fragment);
+    }
 
     // Select2 must init after the element is actually in the DOM, not
     // while it's still inside the detached template fragment.
     $(productSelect).select2({ placeholder: 'Search a product…', width: '100%' });
-    $(productSelect).on('change', function () { refreshRowStock(rowEl); });
+    $(productSelect).on('change', function () {
+        refreshRowStock(rowEl);
+        // Changing a group's head product re-points its "another bundle" lines.
+        if (!rowEl.classList.contains('is-extra-line')) {
+            var g = buildGroups().filter(function (x) { return x.head === rowEl; })[0];
+            if (g) g.lines.slice(1).forEach(function (line) {
+                var sel = line.querySelector('.product-select');
+                if (sel.value !== productSelect.value) { $(sel).val(productSelect.value).trigger('change'); }
+            });
+        }
+        refreshRowChrome();
+    });
+    rowEl.querySelector('.machine-code-select').addEventListener('change', function () {
+        if (rowEl.classList.contains('is-extra-line')) return;
+        var g = buildGroups().filter(function (x) { return x.head === rowEl; })[0];
+        if (g) g.lines.slice(1).forEach(function (line) {
+            line.querySelector('.machine-code-select').value = rowEl.querySelector('.machine-code-select').value;
+        });
+    });
     rowEl.querySelector('.direction-select').addEventListener('change', function () { updateRowDirectionAccent(rowEl); });
     updateRowDirectionAccent(rowEl);
     updateRemoveButtonsState();
+    refreshRowChrome();
+
+    // "Another bundle" clone: same product (and machine code) preselected;
+    // the product change handler above then loads its bundles.
+    if (opts.productId) {
+        if (opts.machineCodeId) { rowEl.querySelector('.machine-code-select').value = opts.machineCodeId; }
+        $(productSelect).val(opts.productId).trigger('change');
+    }
 }
+
+// ── Grouped bundle lines, adjustment badges and the summary bar ──────
+function productRows() { return Array.from(rowsContainer.querySelectorAll('.product-row')); }
+
+function productLabelOf(rowEl) {
+    var opt = rowEl.querySelector('.product-select');
+    var o = opt.options[opt.selectedIndex];
+    return o && opt.value ? o.text.replace(/\s*\(\d+\/pack\)\s*$/, '').trim() : 'Select a product';
+}
+
+// A "group" is a head row plus the "Another bundle" lines that follow it.
+function buildGroups() {
+    var groups = [], head = null;
+    productRows().forEach(function (r) {
+        if (!r.classList.contains('is-extra-line') || !head) {
+            r.classList.remove('is-extra-line');
+            head = { head: r, lines: [r] };
+            groups.push(head);
+        } else {
+            head.lines.push(r);
+        }
+    });
+    return groups;
+}
+
+function refreshGroupLabels() {
+    buildGroups().forEach(function (g) {
+        g.lines.forEach(function (r, i) {
+            var b = r.querySelector('.add-bundle-btn');
+            if (b) b.classList.toggle('is-hidden', i !== g.lines.length - 1);
+        });
+        var n = g.lines.length, total = 0;
+        g.lines.forEach(function (r) { total += parseInt(r.querySelector('.pack-count-input').value, 10) || 0; });
+        g.lines.forEach(function (r, i) {
+            var head = r.querySelector('.ata-line-head');
+            var tag = r.querySelector('.ata-line-tag');
+            var tot = r.querySelector('.ata-line-total');
+            var packLabel = r.querySelector('.pack-count-label');
+            if (n === 1) {
+                head.hidden = true;
+                packLabel.textContent = 'Total Packs Produced';
+                return;
+            }
+            head.hidden = false;
+            tag.textContent = productLabelOf(g.head) + ' · bundle ' + (i + 1) + ' of ' + n;
+            tot.textContent = i === 0 ? ('Total ' + total.toLocaleString('en-IN') + ' pack(s)') : '';
+            packLabel.textContent = 'Packs from this bundle';
+        });
+    });
+}
+
+function updateConvertSummary() {
+    var el = document.getElementById('convertSummary');
+    if (!el) return;
+    var groups = buildGroups();
+    var packs = 0;
+    productRows().forEach(function (r) { packs += parseInt(r.querySelector('.pack-count-input').value, 10) || 0; });
+    el.textContent = groups.length
+        ? (groups.length + ' product' + (groups.length === 1 ? '' : 's') + ' · ' + packs.toLocaleString('en-IN') + ' pack(s)')
+        : 'No products yet';
+}
+
+function updateAdjustBadge(rowEl) {
+    var badge = rowEl.querySelector('.ata-adjust-badge');
+    if (!badge) return;
+    var n = rowEl.querySelectorAll('.ata-adjust-entry-row').length;
+    badge.textContent = n;
+    badge.hidden = n === 0;
+}
+
+function refreshRowChrome() {
+    refreshGroupLabels();
+    updateConvertSummary();
+}
+
+// Live "remaining after" + sibling bundle locking for any edit inside a
+// product row (pack count, damaged/extra qty, bundle choice).
+rowsContainer.addEventListener('input', function (e) {
+    var rowEl = e.target.closest('.product-row');
+    if (rowEl) { updateRemainingAfter(rowEl); refreshRowChrome(); }
+});
+rowsContainer.addEventListener('change', function (e) {
+    var rowEl = e.target.closest('.product-row');
+    if (rowEl) { updateRemainingAfter(rowEl); syncSiblingBundleOptions(); }
+});
 
 // Manage Machine Codes modal: list/add/edit/delete against
 // machine-code-manage.php, then refresh every row's dropdown so newly
@@ -1131,7 +1440,7 @@ reasonFormSubmit.addEventListener('click', function () {
     });
 });
 
-document.getElementById('addProductRowBtn').addEventListener('click', addProductRow);
+document.getElementById('addProductRowBtn').addEventListener('click', function () { addProductRow(); });
 ['godownSelect', 'warehouseSelect'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', refreshAllRowsStock);
 });
@@ -1146,6 +1455,14 @@ addProductRow();
 // submit time, isn't reliably enforced by browsers, so this is
 // re-checked explicitly. Entry names are stamped from live DOM order
 // right before this validation runs (see assignAdjustEntryNames()).
+document.querySelectorAll('#convertForm .ata-btn-submit').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('.ata-adjust-details').forEach(function (d) {
+            if (d.querySelector('.ata-adjust-entry-row')) d.open = true;
+        });
+    });
+});
+
 document.getElementById('convertForm').addEventListener('submit', function (e) {
     assignAdjustEntryNames();
 

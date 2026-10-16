@@ -120,7 +120,9 @@ foreach ($rawProductIds as $i => $rawProductId) {
     $productId = (int) $rawProductId;
     $direction = $rawDirections[$i] ?? '';
     $packCount = (int) ($rawPackCounts[$i] ?? 0);
-    $bundleId  = filter_var($rawBundleIds[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
+    // 'bucket' = convert from the loose-pieces bucket instead of a bundle.
+    $fromBucket = ($rawBundleIds[$i] ?? '') === 'bucket';
+    $bundleId  = $fromBucket ? null : (filter_var($rawBundleIds[$i] ?? '', FILTER_VALIDATE_INT) ?: null);
     $machineCodeId = filter_var($rawMachineCodeIds[$i] ?? '', FILTER_VALIDATE_INT) ?: null;
 
     if (!$productId || $packCount < 1 || !in_array($direction, ['pieces_to_pack', 'pack_to_pieces'], true)) {
@@ -139,20 +141,44 @@ foreach ($rawProductIds as $i => $rawProductId) {
         exit;
     }
 
-    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId, 'machine_code_id' => $machineCodeId, 'damaged_entries' => $damagedEntries, 'extra_entries' => $extraEntries, 'cover_damaged_entries' => $coverDamagedEntries];
+    if ($fromBucket && ($damagedEntries || $extraEntries)) {
+        $_SESSION['errorMessage'] = "Damaged/extra piece entries apply to a bundle — they can't be recorded when converting from the loose-pieces bucket.";
+        header("Location: neksomo-piece-pack-convert.php");
+        exit;
+    }
+
+    $rows[] = ['product_id' => $productId, 'direction' => $direction, 'pack_count' => $packCount, 'bundle_id' => $bundleId, 'from_bucket' => $fromBucket, 'machine_code_id' => $machineCodeId, 'damaged_entries' => $damagedEntries, 'extra_entries' => $extraEntries, 'cover_damaged_entries' => $coverDamagedEntries];
 }
 
-// A product appearing twice in one batch is never a legitimate
-// request — reject up front rather than silently applying two
-// conversions to the same row in sequence.
-$seenProductIds = array_column($rows, 'product_id');
-if (count($seenProductIds) !== count(array_unique($seenProductIds))) {
-    $_SESSION['errorMessage'] = "Each product can only appear once per conversion batch.";
-    header("Location: neksomo-piece-pack-convert.php");
-    exit;
+// A product may appear on several rows ONLY as separate bundle lines of
+// a mapped product's Pieces -> Pack conversion (each line its own bundle
+// or the bucket) — anything else repeating a product is rejected rather
+// than silently applying two conversions to the same row in sequence.
+$seenSources = [];
+foreach ($rows as $row) {
+    $pid = $row['product_id'];
+    $isBundleLine = $row['direction'] === 'pieces_to_pack'
+        && ($row['bundle_id'] || !empty($row['from_bucket']))
+        && get_neksomo_source_for_company_product($db_conn, $pid);
+    $key = $row['from_bucket'] ? 'bucket' : (string) $row['bundle_id'];
+    if (isset($seenSources[$pid])) {
+        if (!$isBundleLine || !$seenSources[$pid]['bundle_line']) {
+            $_SESSION['errorMessage'] = "Each product can only appear once per conversion batch (use \"Another bundle\" only for bundle-sourced Pieces → Pack).";
+            header("Location: neksomo-piece-pack-convert.php");
+            exit;
+        }
+        if (isset($seenSources[$pid]['keys'][$key])) {
+            $_SESSION['errorMessage'] = "The same bundle (or the bucket) is picked twice for one product — combine them into a single line.";
+            header("Location: neksomo-piece-pack-convert.php");
+            exit;
+        }
+    } else {
+        $seenSources[$pid] = ['bundle_line' => $isBundleLine, 'keys' => []];
+    }
+    $seenSources[$pid]['keys'][$key] = true;
 }
 
-$productIds = array_column($rows, 'product_id');
+$productIds = array_values(array_unique(array_column($rows, 'product_id')));
 $placeholders = implode(',', array_fill(0, count($productIds), '?'));
 $stmt = $db_conn->prepare("SELECT id, productName, pieces_per_pack FROM products WHERE id IN ($placeholders) AND pieces_per_pack > 1");
 $stmt->bind_param(str_repeat('i', count($productIds)), ...$productIds);
@@ -192,8 +218,8 @@ foreach ($rows as $row) {
 // hidden field is never trusted.
 foreach ($rows as $row) {
     $rawSource = get_neksomo_source_for_company_product($db_conn, $row['product_id']);
-    if ($rawSource && $row['direction'] === 'pieces_to_pack' && !$row['bundle_id']) {
-        $_SESSION['errorMessage'] = "Please select a raw material bundle for every mapped product — add one via Input Stock → Raw Bundles if none exist yet.";
+    if ($rawSource && $row['direction'] === 'pieces_to_pack' && !$row['bundle_id'] && empty($row['from_bucket'])) {
+        $_SESSION['errorMessage'] = "Please select a raw material bundle (or the loose-pieces bucket) for every mapped product — add a bundle via Input Stock → Raw Bundles if none exist yet.";
         header("Location: neksomo-piece-pack-convert.php");
         exit;
     }
@@ -205,6 +231,11 @@ $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 // All-or-nothing: one shared transaction across every row in the batch —
 // if any product's conversion fails (e.g. insufficient pieces/packs to
 // draw from), none of the batch's conversions are applied.
+// DDL implicitly commits, so make sure every table exists BEFORE the
+// transaction begins (the helpers skip DDL when tables already exist).
+ensure_raw_material_bundles_table($db_conn);
+ensure_raw_material_bundle_draws_table($db_conn);
+ensure_raw_material_bucket_tables($db_conn);
 $db_conn->begin_transaction();
 try {
     $summaries = [];
@@ -251,7 +282,14 @@ try {
             // converts only that many and reports the shortfall (see
             // docs/superpowers/specs/2026-09-22-raw-material-bundle-
             // tracking-design.md).
-            $bundleResult = convert_from_raw_material_bundle($db_conn, $row['bundle_id'], $row['product_id'], $piecesPerPack, $row['pack_count'], $refId, $createdBy);
+            if (!empty($row['from_bucket'])) {
+                $bundleResult = convert_from_raw_material_bucket(
+                    $db_conn, (int) $rawSource['neksomo_product_id'], (int) $godownId, $warehouseId,
+                    $row['product_id'], $piecesPerPack, $row['pack_count'], $refId, $createdBy
+                );
+            } else {
+                $bundleResult = convert_from_raw_material_bundle($db_conn, $row['bundle_id'], $row['product_id'], $piecesPerPack, $row['pack_count'], $refId, $createdBy);
+            }
 
             // Packaging cover is consumed 1-per-pack, against the bundle's
             // ACTUAL packs_made (never the requested count) — if the bundle
@@ -272,9 +310,9 @@ try {
             if ($totalCoverDamaged > 0) { $adjustNote .= ", $totalCoverDamaged cover(s) damaged"; }
 
             if ($bundleResult['packs_made'] < $bundleResult['requested_packs']) {
-                $summaries[] = "$productName: only {$bundleResult['packs_made']} of {$bundleResult['requested_packs']} pack(s) could be made — selected bundle ran short ({$bundleResult['remaining_after']} pc left$adjustNote). Now {$creditResult['qty_after']} pack(s) on hand";
+                $summaries[] = "$productName: only {$bundleResult['packs_made']} of {$bundleResult['requested_packs']} pack(s) could be made — " . (!empty($row['from_bucket']) ? 'bucket' : 'selected bundle') . " ran short ({$bundleResult['remaining_after']} pc left$adjustNote). Now {$creditResult['qty_after']} pack(s) on hand";
             } else {
-                $summaries[] = "$productName: assembled {$bundleResult['packs_made']} pack(s) from the selected bundle$adjustNote — now {$creditResult['qty_after']} pack(s) on hand";
+                $summaries[] = "$productName: assembled {$bundleResult['packs_made']} pack(s) from the " . (!empty($row['from_bucket']) ? 'loose-pieces bucket' : 'selected bundle') . "$adjustNote — now {$creditResult['qty_after']} pack(s) on hand";
             }
         } elseif ($row['direction'] === 'pieces_to_pack') {
             $result = $stockService->convertPiecesToPack(

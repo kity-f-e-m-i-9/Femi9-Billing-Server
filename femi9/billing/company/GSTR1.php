@@ -445,6 +445,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<tr>
 							<th>HSN</th>
 							<th>GST Rate</th>
+							<th>UQC</th>
 							<th>Total Quantity</th>
 							<th>Nil-Rated Value</th>
 							<th>Taxable Value</th>
@@ -455,7 +456,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							// taxable-rate product shows as two rows instead of merging their values —
 							// each channel query below is filtered by the product's actual gst rate,
 							// same split used in the filing summary table above (see gst_details.php).
-							$select_hsnwise_total="SELECT DISTINCT hsn, gst FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY hsn ASC, gst ASC";
+							$select_hsnwise_total="SELECT hsn, gst FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) GROUP BY hsn, gst ORDER BY hsn ASC, gst ASC";
 							$fetch_hsnwise_total=mysqli_query($db_conn,$select_hsnwise_total);
 							$HSN_grand_nil = 0; $HSN_grand_taxable = 0;
 							while($result_hsnwise_total=mysqli_fetch_array($fetch_hsnwise_total)){
@@ -540,6 +541,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<tr>
 							<td style="text-align:left;"><?=$hsn_code;?></td>
 							<td style="text-align:left;"><?=$hsn_rate > 0 ? $hsn_rate.'%' : 'Nil';?></td>
+							<td style="text-align:left;">PAC-PACKS</td>
 							<td style="text-align:left;"><?=$overall_HSN_sls_qty;?></td>
 							<td style="text-align:left;"><?=$hsn_rate == 0 ? inr_format($overall_HSN_sls_val, 2) : '';?></td>
 							<td style="text-align:left;"><?=$hsn_rate > 0 ? inr_format($overall_HSN_sls_val, 2) : '';?></td>
@@ -547,103 +549,53 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 							<?php }?>
 							<tr>
-							<td colspan="3" style="text-align:right;"><b>Total</b></td>
+							<td colspan="4" style="text-align:right;"><b>Total</b></td>
 							<td><b><?=inr_format($HSN_grand_nil, 2);?></b></td>
 							<td><b><?=inr_format($HSN_grand_taxable, 2);?></b></td>
 							</tr>
 							</table>
 
 
-							<!-------------HSN-wise B2B / B2C split (rated supplies only)---------->
+							<!-------------HSN-wise B2B / B2C split (rated + nil-rated, with tax split)---------->
 							<br/>
-							<h3>Table 4 &amp; 7 — Rated (Taxable) Supplies, B2B vs B2C, HSN-wise</h3>
+							<div align="right">
+							<a href="export_GSTR1_hsn?frdate=<?=urlencode($from_date);?>&todate=<?=urlencode($to_date);?>&godown_id=<?=urlencode($get_godown_id);?>" title="Export HSN-wise B2B / B2C (CSV)"><b>Export HSN B2B / B2C (CSV)</b></a>
+							 &nbsp;|&nbsp; <a href="export_GSTR1_json?frdate=<?=urlencode($from_date);?>&todate=<?=urlencode($to_date);?>&godown_id=<?=urlencode($get_godown_id);?>" title="Export GSTR-1 JSON"><b>Export GSTR-1 JSON</b></a>
+							</div>
+							<h3>Table 4 &amp; 7 — Supplies B2B vs B2C, HSN-wise (Nil-rated included)</h3>
 							<?php
-							// GST UQC (Unit Quantity Code) for a product's unit_type — the standard
-							// codes the GST portal expects; this catalog only uses two units.
-							function gst_uqc_label($unit_type) {
-								return $unit_type === 'pack' ? 'PAC-PACKS' : 'PCS-PIECES';
-							}
+							require_once __DIR__ . '/include/TpGstHelper.php';
+							require_once __DIR__ . '/include/HsnB2bB2cHelper.php';
+							$hsn_split_rows = compute_hsn_b2b_b2c($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_date, $to_date, $tp_sls_lines ?? []);
+							$hsn_split_tot = ['b2b' => ['qty'=>0,'taxable'=>0,'cgst'=>0,'sgst'=>0,'igst'=>0], 'b2c' => ['qty'=>0,'taxable'=>0,'cgst'=>0,'sgst'=>0,'igst'=>0]];
 							?>
 							<table id="gsttablevl" style="height:auto;">
 							<tr>
-							<th>HSN</th>
-							<th>GST Rate</th>
-							<th>UQC</th>
-							<th>B2B Qty</th>
-							<th>B2B Taxable Value</th>
-							<th>B2C Qty</th>
-							<th>B2C Taxable Value</th>
+							<th rowspan="2">HSN</th>
+							<th rowspan="2">GST Rate</th>
+							<th rowspan="2">UQC</th>
+							<th colspan="5">B2B (Registered)</th>
+							<th colspan="5">B2C (Unregistered)</th>
 							</tr>
-							<?php
-							// B2B = buyer_gsttype='register' (has GSTIN on file), B2C = 'unregister'.
-							// Restricted to gst_percentage > 0 rows only — nil-rated goods have no
-							// B2B/B2C filing relevance and are covered by the Nil Rated table above.
-							// unit_type is included in the grouping since a HSN+rate pair maps to a
-							// single unit_type in this catalog (verified: no HSN/rate combo mixes
-							// pieces and pack), so it's safe to show one UQC per row.
-							$select_hsnwise_rated="SELECT DISTINCT hsn, gst, unit_type FROM products WHERE gst > 0 AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY hsn ASC, gst ASC";
-							$fetch_hsnwise_rated=mysqli_query($db_conn,$select_hsnwise_rated);
-							$B2B_grand_val = 0; $B2C_grand_val = 0;
-							while($result_hsnwise_rated=mysqli_fetch_array($fetch_hsnwise_rated)){
-								$hsn_code=$result_hsnwise_rated['hsn'];
-								$hsn_rate=(float)$result_hsnwise_rated['gst'];
-								$hsn_uqc=gst_uqc_label($result_hsnwise_rated['unit_type']);
-
-								$b2b_qty = 0; $b2b_val = 0; $b2c_qty = 0; $b2c_val = 0;
-								foreach (['register' => true, 'unregister' => false] as $bg => $is_b2b) {
-									$q = "select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn='$hsn_code' and gst_percentage>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id'";
-									$r = mysqli_fetch_array(mysqli_query($db_conn,$q));
-									$qty = (float)($r[0] ?? 0); $val = (float)($r[1] ?? 0);
-
-									$q = "select sum(qty), sum(total-gstamount_total) from invoice_items where hsn='$hsn_code' and gst_percentage>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and user_type='$Login_user_TYPEvl' and user_id='$get_godown_id'";
-									$r = mysqli_fetch_array(mysqli_query($db_conn,$q));
-									$qty += (float)($r[0] ?? 0); $val += (float)($r[1] ?? 0);
-
-									$q = "select sum(qty), sum(total-gst_amount) from ot_sales where hsn='$hsn_code' and gst>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and godownid='$get_godown_id'";
-									$r = mysqli_fetch_array(mysqli_query($db_conn,$q));
-									$qty += (float)($r[0] ?? 0); $val += (float)($r[1] ?? 0);
-
-									$q = "select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn='$hsn_code' and gst_percentage>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id'";
-									$r = mysqli_fetch_array(mysqli_query($db_conn,$q));
-									$qty -= (float)($r[0] ?? 0); $val -= (float)($r[1] ?? 0);
-
-									$q = "select sum(osr.qty), sum(osr.total) from ot_sales_return osr join products p on p.id=osr.prid where osr.hsn='$hsn_code' and p.gst>0 and osr.buyer_gsttype='$bg' and osr.return_date between '$from_date' and '$to_date' and osr.godownid='$get_godown_id'";
-									$r = mysqli_fetch_array(mysqli_query($db_conn,$q));
-									$qty -= (float)($r[0] ?? 0); $val -= (float)($r[1] ?? 0);
-
-									require_once __DIR__ . '/include/TpGstHelper.php';
-									$q = "select tpii.quantity, tpii.amount, p.gst as gst_percentage, p.gst_type as product_gst_type, tp.gstin as tp_gstin from tp_invoices tpi join tp_invoice_items tpii on tpii.tp_invoice_id=tpi.id join products p on p.id=tpii.product_id join territory_partners tp on tp.id=tpi.territory_partner_id where p.hsn='$hsn_code' and p.gst>0 and tpi.invoice_date between '$from_date' and '$to_date' and tpi.source_godown_id='$get_godown_id'";
-									$res = mysqli_query($db_conn,$q);
-									while ($tr = mysqli_fetch_assoc($res)) {
-										$tp_is_reg = tp_gstin_is_valid($tr['tp_gstin']);
-										if (($bg === 'register') !== $tp_is_reg) continue;
-										[$tp_taxable, ] = tp_line_taxable_and_gst((float)$tr['amount'], $tr['gst_percentage'], $tr['product_gst_type']);
-										$qty += (float)$tr['quantity'];
-										$val += $tp_taxable;
-									}
-
-									if ($is_b2b) { $b2b_qty = $qty; $b2b_val = $val; }
-									else { $b2c_qty = $qty; $b2c_val = $val; }
-								}
-
-								if ($b2b_qty == 0 && $b2b_val == 0 && $b2c_qty == 0 && $b2c_val == 0) continue;
-								$B2B_grand_val += $b2b_val; $B2C_grand_val += $b2c_val;
+							<tr>
+							<th>Qty</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th>
+							<th>Qty</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th>
+							</tr>
+							<?php foreach ($hsn_split_rows as $hr) {
+								foreach (['b2b','b2c'] as $bk) { foreach ($hsn_split_tot[$bk] as $fk => $fv) { $hsn_split_tot[$bk][$fk] += $hr[$bk][$fk]; } }
 								?>
 							<tr>
-							<td style="text-align:left;"><?=$hsn_code;?></td>
-							<td style="text-align:left;"><?=$hsn_rate;?>%</td>
-							<td style="text-align:left;"><?=$hsn_uqc;?></td>
-							<td style="text-align:left;"><?=$b2b_qty;?></td>
-							<td style="text-align:left;"><?=inr_format($b2b_val, 2);?></td>
-							<td style="text-align:left;"><?=$b2c_qty;?></td>
-							<td style="text-align:left;"><?=inr_format($b2c_val, 2);?></td>
+							<td style="text-align:left;"><?=htmlspecialchars($hr['hsn']);?></td>
+							<td style="text-align:left;"><?=$hr['rate'] > 0 ? $hr['rate'].'%' : 'Nil';?></td>
+							<td style="text-align:left;"><?=$hr['uqc'];?></td>
+							<td><?=$hr['b2b']['qty'];?></td><td><?=inr_format($hr['b2b']['taxable'], 2);?></td><td><?=inr_format($hr['b2b']['cgst'], 2);?></td><td><?=inr_format($hr['b2b']['sgst'], 2);?></td><td><?=inr_format($hr['b2b']['igst'], 2);?></td>
+							<td><?=$hr['b2c']['qty'];?></td><td><?=inr_format($hr['b2c']['taxable'], 2);?></td><td><?=inr_format($hr['b2c']['cgst'], 2);?></td><td><?=inr_format($hr['b2c']['sgst'], 2);?></td><td><?=inr_format($hr['b2c']['igst'], 2);?></td>
 							</tr>
 							<?php }?>
 							<tr>
-							<td colspan="4" style="text-align:right;"><b>Total</b></td>
-							<td><b><?=inr_format($B2B_grand_val, 2);?></b></td>
-							<td></td>
-							<td><b><?=inr_format($B2C_grand_val, 2);?></b></td>
+							<td colspan="3" style="text-align:right;"><b>Total</b></td>
+							<td><b><?=$hsn_split_tot['b2b']['qty'];?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['igst'], 2);?></b></td>
+							<td><b><?=$hsn_split_tot['b2c']['qty'];?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['igst'], 2);?></b></td>
 							</tr>
 							</table>
 
@@ -707,59 +659,62 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 							<!-------------Documents Issued During the Tax Period---------->
 							<br/>
-							<h3>Table 13 — Documents Issued During the Tax Period</h3>
+							<h3>Table 13 — Documents Issued During the Tax Period (Registered / Unregistered)</h3>
 							<table id="gsttablevl" style="height:auto;">
 							<tr>
 							<th>Channel</th>
+							<th>Buyer Type</th>
 							<th>Document Series</th>
 							<th>Series From</th>
 							<th>Series To</th>
 							<th>Total Issued</th>
 							</tr>
 							<?php
-							// Split by the invoice number's own leading series code (its run of
-							// letters — "C" vs "CD", "IN" vs "WEB" vs "LWAA", "S" vs "SS" vs "SH",
-							// etc.), not by channel/buyer-type — a channel can carry more than one
-							// series (e.g. Customer Sale mixes "C..." and "CD..." numbers; OT Sale
-							// mixes "IN-...", "WEB/..." and bare "LWAA..." numbers with no
-							// separator at all), and a merged Series From/To across two different
-							// series would be meaningless.
+							// Split by buyer GST registration (Registered = buyer has a GSTIN on file /
+							// buyer_gsttype='register'; everything else = Unregistered), then by the
+							// invoice number's own leading series code ("C" vs "CD", "IN" vs "WEB" ...),
+							// so a merged Series From/To never spans two different series. An invoice
+							// counts once, as Registered if any of its lines is a registered-buyer line.
+							require_once __DIR__ . '/include/TpGstHelper.php';
 							function doc_series_code($inv_number) {
 								$inv_number = trim($inv_number);
 								if (preg_match('/^([A-Za-z]+)/', $inv_number, $m)) return strtoupper($m[1]);
 								return 'OTHER';
 							}
 							$doc_channels = [
-								['label' => 'Network Sale (SS/ST/DT/Shop)', 'table' => 'user_invoice', 'num_col' => 'inv_number', 'date_col' => 'date', 'where' => "from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id'"],
-								['label' => 'Customer Sale', 'table' => 'invoice', 'num_col' => 'inv_number', 'date_col' => 'date', 'where' => "user_type='$Login_user_TYPEvl' and user_id='$get_godown_id'"],
-								['label' => 'OT Sale', 'table' => 'ot_sales_invoice i join ot_sales s on s.tempid=i.tempid', 'num_col' => 'i.inv_number', 'date_col' => 's.date', 'where' => "s.godownid='$get_godown_id'", 'distinct' => 'i.tempid'],
-								['label' => 'Territory Partner', 'table' => 'tp_invoices', 'num_col' => 'invoice_number', 'date_col' => 'invoice_date', 'where' => "source_godown_id='$get_godown_id'"],
+								['label' => 'Network Sale (SS/ST/DT/Shop)', 'sql' => "select ui.inv_number as num, ui.date as d, (select max(x.buyer_gsttype='register') from user_invoice_items x where x.inv_id=ui.inv_id) as reg from user_invoice ui where ui.from_user_type='$Login_user_TYPEvl' and ui.from_user_id='$get_godown_id' and ui.date between '$from_date' and '$to_date' order by ui.date asc, ui.inv_number asc"],
+								['label' => 'Customer Sale', 'sql' => "select i.inv_number as num, i.date as d, (select max(x.buyer_gsttype='register') from invoice_items x where x.inv_id=i.inv_id) as reg from invoice i where i.user_type='$Login_user_TYPEvl' and i.user_id='$get_godown_id' and i.date between '$from_date' and '$to_date' order by i.date asc, i.inv_number asc"],
+								['label' => 'OT Sale', 'sql' => "select i.inv_number as num, min(s.date) as d, max(s.buyer_gsttype='register') as reg from ot_sales_invoice i join ot_sales s on s.tempid=i.tempid where s.godownid='$get_godown_id' and s.date between '$from_date' and '$to_date' group by i.inv_number order by d asc, i.inv_number asc"],
+								['label' => 'Territory Partner', 'sql' => "select tpi.invoice_number as num, tpi.invoice_date as d, tp.gstin as tp_gstin from tp_invoices tpi left join territory_partners tp on tp.id=tpi.territory_partner_id where tpi.source_godown_id='$get_godown_id' and tpi.invoice_date between '$from_date' and '$to_date' order by tpi.invoice_date asc, tpi.invoice_number asc", 'tp' => true],
 							];
 							$doc_grand_total = 0;
 							foreach ($doc_channels as $dc) {
-								$dq = "select {$dc['num_col']} as num from {$dc['table']} where {$dc['where']} and {$dc['date_col']} between '$from_date' and '$to_date' order by {$dc['date_col']} asc, {$dc['num_col']} asc";
-								$dres = mysqli_query($db_conn, $dq);
-								$series_groups = []; // series code => [invoice numbers in date/number order]
+								$dres = mysqli_query($db_conn, $dc['sql']);
+								$groups = ['Registered' => [], 'Unregistered' => []]; // type => series => [numbers]
 								while ($drow = mysqli_fetch_assoc($dres)) {
-									$series_groups[doc_series_code($drow['num'])][] = $drow['num'];
+									$is_reg = !empty($dc['tp']) ? tp_gstin_is_valid($drow['tp_gstin']) : ((int)$drow['reg'] === 1);
+									$groups[$is_reg ? 'Registered' : 'Unregistered'][doc_series_code($drow['num'])][] = $drow['num'];
 								}
-								ksort($series_groups);
-								foreach ($series_groups as $series_code => $nums) {
-									$count = count($nums);
-									if ($count == 0) continue;
-									$doc_grand_total += $count;
-									?>
+								foreach ($groups as $btype => $series_groups) {
+									ksort($series_groups);
+									foreach ($series_groups as $series_code => $nums) {
+										$count = count($nums);
+										if ($count == 0) continue;
+										$doc_grand_total += $count;
+										?>
 							<tr>
 							<td style="text-align:left;"><?=htmlspecialchars($dc['label']);?></td>
+							<td style="text-align:left;"><?=$btype;?></td>
 							<td style="text-align:left;"><?=htmlspecialchars($series_code);?></td>
 							<td style="text-align:left;"><?=htmlspecialchars($nums[0]);?></td>
 							<td style="text-align:left;"><?=htmlspecialchars($nums[$count-1]);?></td>
 							<td style="text-align:left;"><?=$count;?></td>
 							</tr>
 							<?php }
+								}
 							}?>
 							<tr>
-							<td colspan="4" style="text-align:right;"><b>Total</b></td>
+							<td colspan="5" style="text-align:right;"><b>Total</b></td>
 							<td><b><?=$doc_grand_total;?></b></td>
 							</tr>
 							</table>

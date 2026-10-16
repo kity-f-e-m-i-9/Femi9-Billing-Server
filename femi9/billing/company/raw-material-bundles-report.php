@@ -90,6 +90,7 @@ $filterQueryString = http_build_query(array_filter([
     <link href="../../assets/plugins/pace/pace.css" rel="stylesheet">
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link href="../../assets/css/bundle-mobile.css?v=20261014" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <style>
         :root {
@@ -173,6 +174,7 @@ $filterQueryString = http_build_query(array_filter([
                     <div class="ata-nav-tabs">
                         <a href="input-stock-bundles.php" class="ata-nav-tab"><i class="material-icons-outlined">add_box</i> Input Stock</a>
                         <a href="raw-material-bundles-manage.php" class="ata-nav-tab"><i class="material-icons-outlined">list_alt</i> Manage Bundles</a>
+                        <a href="raw-material-bundle-transfer.php" class="ata-nav-tab"><i class="material-icons-outlined">swap_horiz</i> Bundle Transfer</a>
                         <a href="neksomo-piece-pack-convert.php" class="ata-nav-tab"><i class="material-icons-outlined">sync_alt</i> Convert Pieces &harr; Packs</a>
                         <a href="manage-piece-pack-conversions.php" class="ata-nav-tab"><i class="material-icons-outlined">history</i> Manage Conversions</a>
                         <a href="raw-material-bundles-report.php" class="ata-nav-tab active"><i class="material-icons-outlined">assessment</i> Bundle Report</a>
@@ -219,7 +221,7 @@ $filterQueryString = http_build_query(array_filter([
                         </div>
                     </div>
 
-                    <form method="get" class="ata-filters" id="reportFilterForm">
+                    <form method="get" class="ata-filters" data-bm-collapsible id="reportFilterForm">
                         <input type="hidden" name="tab" value="<?php echo htmlspecialchars($activeTab, ENT_QUOTES, 'UTF-8'); ?>">
                         <div class="ata-filter-field">
                             <label>Product</label>
@@ -355,7 +357,7 @@ $filterQueryString = http_build_query(array_filter([
                                 <tr>
                                     <td><?php echo date('d-M-Y H:i', strtotime($t['created_at'])); ?></td>
                                     <td><span class="badge-type-<?php echo $t['type']; ?>"><?php echo ucfirst($t['type']); ?></span></td>
-                                    <td>Bundle #<?php echo (int) $t['bundle_id']; ?></td>
+                                    <td><?php echo !empty($t['is_bucket']) ? 'Loose pieces bucket' : 'Bundle #' . (int) ($t['bundle_no'] ?? $t['bundle_id']); ?></td>
                                     <td><?php echo htmlspecialchars($t['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars($t['gname'], ENT_QUOTES, 'UTF-8'); ?><?php echo $t['warehouse_code'] ? ' · ' . htmlspecialchars($t['warehouse_code'], ENT_QUOTES, 'UTF-8') : ''; ?></td>
                                     <td style="text-align:right;" class="<?php echo $t['qty'] > 0 ? 'qty-pos' : 'qty-neg'; ?>"><?php echo ($t['qty'] > 0 ? '+' : '') . number_format($t['qty']); ?></td>
@@ -383,5 +385,6 @@ $filterQueryString = http_build_query(array_filter([
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script src="../../assets/js/bundle-mobile.js?v=20261014"></script>
 </body>
 </html>

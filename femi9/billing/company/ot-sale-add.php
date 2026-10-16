@@ -90,6 +90,9 @@ $stmt_products->close();
 // ---------------------------------------------------------------
 $usertype   = $Result_Log_users_Dtails134['usertype'] ?? '';
 $login_user = $_SESSION['LOGIN_USER'] ?? '';
+// Admin, finance and normal users (sub-users created under admin) only see
+// coupon/mobile/GST/order+ship date for website / id concept
+$hideExtraFields = in_array($usertype, ['admin', 'finance', 'users'], true);
 $categories = [];
 
 if ($usertype === 'admin') {
@@ -300,6 +303,7 @@ $stmt_states->close();
                                                 </select>
                                                 <br>
 
+                                                <div class="ot-extra-field"<?= $hideExtraFields ? ' style="display:none"' : '' ?>>
                                                 <!-- Coupon Code -->
                                                 <label class="form-label">Coupon Code (User ID)</label>
                                                 <input type="text" name="coupon_code" id="coupon_code"
@@ -311,6 +315,7 @@ $stmt_states->close();
                                                        maxlength="50">
                                                 <div id="PrintCouponcode"></div>
                                                 <br>
+                                                </div>
 
                                                 <!-- Invoice Number -->
                                                 <label class="form-label">Invoice Number *</label>
@@ -328,6 +333,7 @@ $stmt_states->close();
                                                        class="form-control" maxlength="100">
                                                 <br>
 
+                                                <div class="ot-extra-field"<?= $hideExtraFields ? ' style="display:none"' : '' ?>>
                                                 <!-- Customer Mobile -->
                                                 <label class="form-label">Customer Mobile</label>
                                                 <input type="text" name="customer_mobile"
@@ -336,6 +342,7 @@ $stmt_states->close();
                                                        pattern="[1-9]{1}[0-9]{9}"
                                                        class="form-control" maxlength="10">
                                                 <br>
+                                                </div>
 
                                                 <!-- Billing Address -->
                                                 <label class="form-label">Billing Address *</label>
@@ -351,12 +358,14 @@ $stmt_states->close();
                                                           required maxlength="500"></textarea>
                                                 <br>
 
+                                                <div class="ot-extra-field"<?= $hideExtraFields ? ' style="display:none"' : '' ?>>
                                                 <!-- GST Number -->
                                                 <label class="form-label">GST Number</label>
                                                 <input type="text" maxlength="15"
                                                        onkeypress="restrictGSTIN(event)"
                                                        name="gst_number" class="form-control">
                                                 <br>
+                                                </div>
 
                                                 <!-- Order Number -->
                                                 <label class="form-label">Order Number</label>
@@ -365,15 +374,19 @@ $stmt_states->close();
                                                        class="form-control" maxlength="50">
                                                 <br>
 
+                                                <div class="ot-extra-field"<?= $hideExtraFields ? ' style="display:none"' : '' ?>>
                                                 <!-- Order Date -->
                                                 <label class="form-label">Order Date</label>
                                                 <input type="date" name="order_date" class="form-control">
                                                 <br>
+                                                </div>
 
+                                                <div class="ot-extra-field"<?= $hideExtraFields ? ' style="display:none"' : '' ?>>
                                                 <!-- Ship Date -->
                                                 <label class="form-label">Ship Date</label>
                                                 <input type="date" name="ship_date" class="form-control">
                                                 <br>
+                                                </div>
 
                                                 <!-- Courier Charges -->
                                                 <label class="form-label">Courier Charges (Rs.) *</label>
@@ -502,6 +515,7 @@ $stmt_states->close();
      * Show/hide wallet field based on selected category.
      * Recalculates grand total whenever category changes.
      */
+    const HIDE_EXTRA_FIELDS = <?= $hideExtraFields ? 'true' : 'false' ?>;
     function handleCategoryChange(selectedCat) {
         const group     = document.getElementById('walletAmountGroup');
         const walletInp = document.getElementById('wallet_amount');
@@ -512,6 +526,13 @@ $stmt_states->close();
         } else {
             group.style.display = 'none';
             walletInp.value = 0; // reset wallet when not applicable
+        }
+        if (HIDE_EXTRA_FIELDS) {
+            const show = WALLET_ELIGIBLE_CATS.includes(catLower);
+            document.querySelectorAll('.ot-extra-field').forEach(function (el) {
+                el.style.display = show ? '' : 'none';
+                if (!show) el.querySelectorAll('input').forEach(function (i) { i.value = ''; });
+            });
         }
         recalculateGrandTotal();
         suggestInvoiceNumber(selectedCat, true);

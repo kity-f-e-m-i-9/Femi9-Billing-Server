@@ -15,6 +15,7 @@ $selectedWarehouseId = isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !==
 $totalProducts = 0;
 $totalStock    = 0;
 $stockList     = [];
+$lowThreshold  = 10;
 
 try {
 
@@ -51,8 +52,32 @@ while ($row = mysqli_fetch_assoc($res)) {
 $totalProducts = count($stockList);
 mysqli_stmt_close($s);
 
+// Per-godown totals (always all godowns) for the breakdown chart + cards.
+$godownTotals = [];
+$g = mysqli_query($db_conn,
+    "SELECT w.id, w.code, w.name, COALESCE(SUM(st.closing_qty),0) AS qty, COUNT(DISTINCT CASE WHEN st.closing_qty <> 0 THEN st.product_id END) AS products
+     FROM warehouses w
+     LEFT JOIN stock st ON st.warehouse_id = w.id
+     WHERE w.is_active = 1
+     GROUP BY w.id, w.code, w.name
+     ORDER BY w.code ASC");
+while ($g && ($row = mysqli_fetch_assoc($g))) {
+    $godownTotals[] = $row;
+}
+
 } catch (\Throwable $_e) {
     error_log('[warehouse dashboard] Query error: ' . $_e->getMessage());
+}
+
+$lowStockCount = 0;
+foreach ($stockList as $_i) { if ((int)$_i['closing_qty'] < $lowThreshold) $lowStockCount++; }
+$maxQty = 0;
+foreach ($stockList as $_i) { $maxQty = max($maxQty, (int)$_i['closing_qty']); }
+$selectedLabel = 'All Godowns';
+foreach ($warehouses as $wh) {
+    if ($selectedWarehouseId === (int)$wh['id']) {
+        $selectedLabel = $wh['code'] . ($wh['name'] ? ' - ' . $wh['name'] : '');
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -61,7 +86,7 @@ mysqli_stmt_close($s);
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dashboard : <?php echo $business_name; ?></title>
+    <title>Stock Dashboard : <?php echo $business_name; ?></title>
 
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -73,6 +98,7 @@ mysqli_stmt_close($s);
     <link href="../../assets/css/main.min.css" rel="stylesheet">
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" href="../../assets/images/neptune.png">
+    <?php include("include/stock-style.php"); ?>
 </head>
 <body>
     <div class="app align-content-stretch d-flex flex-wrap">
@@ -85,107 +111,124 @@ mysqli_stmt_close($s);
 
             <div class="app-content">
                 <div class="content-wrapper">
-                    <div class="container">
+                    <div class="container-fluid">
 
+                        <div class="page-description">
+                            <h1>Stock Dashboard</h1>
+                            <span>Viewing: <b><?php echo htmlspecialchars($selectedLabel); ?></b></span>
+                        </div>
+
+                        <!-- KPI cards -->
                         <div class="row">
-                            <div class="col-xl-12">
-                                <div class="card widget widget-stats">
-                                    <div class="card-body">
-                                        <h1>Stock by Godown</h1>
-
-                                        <form method="GET" class="mb-3" style="max-width:320px;margin-top:16px;">
-                                            <label class="form-label" style="font-size:13px;font-weight:500;">Godown</label>
-                                            <select name="warehouse_id" class="form-control" onchange="this.form.submit()">
-                                                <option value="">All Godowns</option>
-                                                <?php foreach ($warehouses as $wh): ?>
-                                                    <option value="<?php echo (int)$wh['id']; ?>" <?php echo ($selectedWarehouseId === (int)$wh['id']) ? 'selected' : ''; ?>>
-                                                        <?php echo htmlspecialchars($wh['code']); ?><?php echo $wh['name'] ? ' - ' . htmlspecialchars($wh['name']) : ''; ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </form>
-
-                                        <div class="row" style="margin-top:20px;">
-
-                                            <div class="col-xl-6 col-md-6">
-                                                <div class="card widget widget-stats">
-                                                    <div class="card-body">
-                                                        <div class="widget-stats-container d-flex">
-                                                            <div class="widget-stats-icon widget-stats-icon-warning">
-                                                                <i class="material-icons-outlined">inventory_2</i>
-                                                            </div>
-                                                            <div class="widget-stats-content flex-fill">
-                                                                <span class="widget-stats-title">Products in Stock</span>
-                                                                <span class="widget-stats-amount"><?php echo $totalProducts; ?></span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="col-xl-6 col-md-6">
-                                                <div class="card widget widget-stats">
-                                                    <div class="card-body">
-                                                        <div class="widget-stats-container d-flex">
-                                                            <div class="widget-stats-icon widget-stats-icon-primary">
-                                                                <i class="material-icons-outlined">stacked_bar_chart</i>
-                                                            </div>
-                                                            <div class="widget-stats-content flex-fill">
-                                                                <span class="widget-stats-title">Total Stock Units</span>
-                                                                <span class="widget-stats-amount"><?php echo inr_format($totalStock, 0); ?></span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                        </div>
-
-                                    </div>
-                                </div>
+                            <div class="col-xl-3 col-md-6 mb-4">
+                                <div class="card wh-card wh-kpi"><div class="card-body">
+                                    <div class="wh-kpi-icon" style="background:#e8eaf6;color:#3f51b5;"><i class="material-icons-outlined">inventory_2</i></div>
+                                    <div><p class="wh-kpi-label">Products in Stock</p><p class="wh-kpi-value"><?php echo inr_format($totalProducts, 0); ?></p></div>
+                                </div></div>
+                            </div>
+                            <div class="col-xl-3 col-md-6 mb-4">
+                                <div class="card wh-card wh-kpi"><div class="card-body">
+                                    <div class="wh-kpi-icon" style="background:#e8eaf6;color:#3f51b5;"><i class="material-icons-outlined">stacked_bar_chart</i></div>
+                                    <div><p class="wh-kpi-label">Total Stock Units</p><p class="wh-kpi-value"><?php echo inr_format($totalStock, 0); ?></p></div>
+                                </div></div>
+                            </div>
+                            <div class="col-xl-3 col-md-6 mb-4">
+                                <div class="card wh-card wh-kpi"><div class="card-body">
+                                    <div class="wh-kpi-icon" style="background:#e8eaf6;color:#5c6bc0;"><i class="material-icons-outlined">warehouse</i></div>
+                                    <div><p class="wh-kpi-label">Active Godowns</p><p class="wh-kpi-value"><?php echo count($warehouses); ?></p></div>
+                                </div></div>
+                            </div>
+                            <div class="col-xl-3 col-md-6 mb-4">
+                                <div class="card wh-card wh-kpi"><div class="card-body">
+                                    <div class="wh-kpi-icon" style="background:#fee2e2;color:#dc2626;"><i class="material-icons-outlined">warning_amber</i></div>
+                                    <div><p class="wh-kpi-label">Low Stock (&lt;<?php echo $lowThreshold; ?>)</p><p class="wh-kpi-value" style="<?php echo $lowStockCount > 0 ? 'color:#dc2626;' : ''; ?>"><?php echo inr_format($lowStockCount, 0); ?></p></div>
+                                </div></div>
                             </div>
                         </div>
 
-                        <!-- Product Stock Table -->
+                        <!-- Godown breakdown -->
+                        <?php if (!empty($godownTotals)): ?>
                         <div class="row">
-                            <div class="col-xl-12">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5 class="card-title">
-                                            <i class="material-icons-outlined" style="vertical-align:middle;margin-right:6px;">inventory_2</i>
-                                            Product Stock<?php echo $selectedWarehouseId !== null ? '' : ' (All Godowns)'; ?>
-                                        </h5>
-                                    </div>
+                            <div class="col-12 mb-4">
+                                <div class="card wh-card"><div class="card-body">
+                                    <h5 class="mb-1">Stock by Godown</h5>
+                                    <div id="chartByGodown"></div>
+                                </div></div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <!-- Filter + table -->
+                        <div class="row">
+                            <div class="col-12 mb-4">
+                                <div class="card wh-card">
                                     <div class="card-body">
+                                        <div class="wh-toolbar">
+                                            <div style="flex:1;min-width:220px;max-width:360px;">
+                                                <label class="form-label" for="whSearch">Search product</label>
+                                                <input type="text" id="whSearch" class="form-control" placeholder="Type a product name…" autocomplete="off">
+                                            </div>
+                                            <form method="GET" style="min-width:220px;">
+                                                <label class="form-label" for="whSelect">Godown</label>
+                                                <select id="whSelect" name="warehouse_id" class="form-control" onchange="this.form.submit()">
+                                                    <option value="">All Godowns</option>
+                                                    <?php foreach ($warehouses as $wh): ?>
+                                                        <option value="<?php echo (int)$wh['id']; ?>" <?php echo ($selectedWarehouseId === (int)$wh['id']) ? 'selected' : ''; ?>>
+                                                            <?php echo htmlspecialchars($wh['code']); ?><?php echo $wh['name'] ? ' - ' . htmlspecialchars($wh['name']) : ''; ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </form>
+                                        </div>
+
+                                        <div class="wh-pills">
+                                            <a class="wh-pill <?php echo $selectedWarehouseId === null ? 'active' : ''; ?>" href="dashboard.php">All</a>
+                                            <?php foreach ($godownTotals as $gt): ?>
+                                                <a class="wh-pill <?php echo $selectedWarehouseId === (int)$gt['id'] ? 'active' : ''; ?>" href="dashboard.php?warehouse_id=<?php echo (int)$gt['id']; ?>">
+                                                    <?php echo htmlspecialchars($gt['code']); ?><small><?php echo inr_format((int)$gt['qty'], 0); ?></small>
+                                                </a>
+                                            <?php endforeach; ?>
+                                        </div>
+
                                         <?php if (empty($stockList)): ?>
-                                            <p class="text-muted">No stock found for this selection.</p>
+                                            <div class="wh-empty">
+                                                <i class="material-icons-outlined">inventory_2</i>
+                                                No stock found for this selection.
+                                            </div>
                                         <?php else: ?>
-                                        <div class="table-responsive">
-                                            <table class="table table-hover">
+                                        <div class="table-responsive" style="margin-top:18px;">
+                                            <table class="table table-hover wh-table" id="whTable">
                                                 <thead>
                                                     <tr>
-                                                        <th>#</th>
-                                                        <th>Product Name</th>
-                                                        <th class="text-center">Closing Stock</th>
+                                                        <th style="width:50px;">#</th>
+                                                        <th>Product</th>
+                                                        <th class="text-end" style="width:140px;">Closing Stock</th>
+                                                        <th style="width:180px;">Level</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                <?php $n = 1; foreach ($stockList as $item): ?>
-                                                    <tr>
-                                                        <td><?php echo $n++; ?></td>
-                                                        <td><b><?php echo htmlspecialchars($item['productName']); ?></b></td>
-                                                        <td class="text-center"><?php echo inr_format((int)$item['closing_qty'], 0); ?></td>
+                                                <?php $n = 1; foreach ($stockList as $item):
+                                                    $q = (int)$item['closing_qty'];
+                                                    $isLow = $q < $lowThreshold;
+                                                    $pct = $maxQty > 0 ? max(2, min(100, round($q / $maxQty * 100))) : 0;
+                                                ?>
+                                                    <tr data-name="<?php echo htmlspecialchars(strtolower($item['productName'])); ?>">
+                                                        <td class="text-muted"><?php echo $n++; ?></td>
+                                                        <td><b><?php echo htmlspecialchars($item['productName']); ?></b>
+                                                            <?php if ($isLow): ?> <span class="wh-badge-low">Low</span><?php endif; ?></td>
+                                                        <td class="text-end"><b><?php echo inr_format($q, 0); ?></b></td>
+                                                        <td><div class="wh-bar <?php echo $isLow ? 'low' : ''; ?>"><span style="width:<?php echo $pct; ?>%"></span></div></td>
                                                     </tr>
                                                 <?php endforeach; ?>
                                                 </tbody>
                                             </table>
+                                            <div class="wh-empty" id="whNoMatch" style="display:none;padding:28px;">No products match your search.</div>
                                         </div>
                                         <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <!-- End Product Table -->
 
                     </div>
                 </div>
@@ -194,10 +237,43 @@ mysqli_stmt_close($s);
     </div>
 
     <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
+    <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
     <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
     <script src="../../assets/plugins/pace/pace.min.js"></script>
+    <script src="../../assets/plugins/apexcharts/apexcharts.min.js"></script>
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
+    <script>
+    (function () {
+        var input = document.getElementById('whSearch');
+        var rows = document.querySelectorAll('#whTable tbody tr');
+        var none = document.getElementById('whNoMatch');
+        if (input) {
+            input.addEventListener('input', function () {
+                var q = input.value.trim().toLowerCase(), shown = 0;
+                rows.forEach(function (r) {
+                    var ok = r.getAttribute('data-name').indexOf(q) !== -1;
+                    r.style.display = ok ? '' : 'none';
+                    if (ok) shown++;
+                });
+                if (none) none.style.display = shown ? 'none' : 'block';
+            });
+        }
+        var gt = <?php echo json_encode(array_map(function ($r) { return ['label' => $r['code'], 'qty' => (int)$r['qty']]; }, $godownTotals)); ?>;
+        var el = document.querySelector('#chartByGodown');
+        if (el && gt.length) {
+            new ApexCharts(el, {
+                chart: { type: 'bar', height: 260, toolbar: { show: false } },
+                series: [{ name: 'Closing Qty', data: gt.map(function (g) { return g.qty; }) }],
+                xaxis: { categories: gt.map(function (g) { return g.label; }) },
+                colors: ['#3f51b5'],
+                plotOptions: { bar: { borderRadius: 6, columnWidth: '38%' } },
+                dataLabels: { enabled: false },
+                grid: { borderColor: '#eef2f6' }
+            }).render();
+        }
+    })();
+    </script>
 </body>
 </html>
