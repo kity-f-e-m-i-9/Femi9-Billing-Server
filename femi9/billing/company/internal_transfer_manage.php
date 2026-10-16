@@ -142,6 +142,7 @@ if (isset($_SESSION['autoTransferShortfalls'])) {
 									<tr>
 									<td>Manage Internal Stock Transfer</td>
 									<td><a href="internal_transfer" title="Add Internal Stock Transfer">&#10011;</a></td>
+									<td><a href="ot-channel-return-qty.php" class="btn btn-secondary" style="margin-left:10px;"><i class="material-icons" style="vertical-align:middle;font-size:18px;">undo</i> Return Qty</a></td>
 									</tr>
 									</table>
 									</h1>
