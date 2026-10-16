@@ -9,6 +9,28 @@ $select_product_list="select * from ot_sales where tempid='$tempid'";
 $fetch_product_list=mysqli_query($db_conn,$select_product_list);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 
+// Company Profile that this sale's return belongs to — shown read-only
+// under the Godown (physical) picker, so it's clear at a glance which
+// company profile (e.g. FEMI NAYAN LLP) the selected warehouse (G1) feeds.
+$stmt_ret_godown = $db_conn->prepare("SELECT gname FROM company_godown WHERE id = ? LIMIT 1");
+$stmt_ret_godown->bind_param('i', $result_product_list['godownid']);
+$stmt_ret_godown->execute();
+$ret_godown_row = $stmt_ret_godown->get_result()->fetch_assoc();
+$stmt_ret_godown->close();
+$ret_company_profile_name = $ret_godown_row['gname'] ?? '';
+
+// Active physical warehouses — same "Godown (physical)" picker as Add OT Sales,
+// so returned stock can be credited back to a specific warehouse instead of
+// always inheriting whatever the original sale line was tracked under.
+// Restricted to G1 only: OT channel sales are overwhelmingly booked against
+// G1 (company_godown FEMI NAYAN LLP) — 32k+ of ~35.6k ot_sales rows — so a
+// return picker offering R1/G2/G3/HO would just invite a wrong warehouse
+// being selected for stock that was never there.
+$stmt_ret_warehouse = $db_conn->prepare("SELECT id, code, name FROM warehouses WHERE is_active = 1 AND code = 'G1' ORDER BY code ASC");
+$stmt_ret_warehouse->execute();
+$all_return_warehouses = $stmt_ret_warehouse->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt_ret_warehouse->close();
+
 if(isset($_REQUEST['addReturn']))
 {
 	$tempid=$_REQUEST['tempid'];
@@ -17,7 +39,7 @@ if(isset($_REQUEST['addReturn']))
 	$date=date("Y-m-d",strtotime($_REQUEST['date']));
 	$product_id=$_REQUEST['product_id'];
 	$qty=$_REQUEST['qty'];
-	
+
 //GET SALES QTY
 $select_sls_details="select * from ot_sales where tempid='$tempid' and prid='$product_id'";
 $fetch_sls_details=mysqli_query($db_conn,$select_sls_details);
@@ -26,7 +48,16 @@ $Total_sls_qty=$result_sls_details['qty'];
 $buyer_gsttype=$result_sls_details['buyer_gsttype'];
 $hsn=$result_sls_details['hsn'];
 $gst_type=$result_sls_details['gst_type']; /*inner, outer*/
-$lineWarehouseId=$result_sls_details['warehouse_id']!==null ? (int)$result_sls_details['warehouse_id'] : null;
+// Which physical warehouse gets the returned stock back — TP/admin picks it
+// on this form now (like the Godown dropdown on Add OT Sales), instead of
+// always inheriting the original sale line's warehouse_id. Falls back to
+// the sale's own warehouse when the form leaves it unselected.
+$returnWarehouseId = isset($_REQUEST['warehouse_id']) && $_REQUEST['warehouse_id'] !== ''
+    ? (int)$_REQUEST['warehouse_id']
+    : null;
+$lineWarehouseId = $returnWarehouseId !== null
+    ? $returnWarehouseId
+    : ($result_sls_details['warehouse_id'] !== null ? (int)$result_sls_details['warehouse_id'] : null);
 
 //gstin
 /*
@@ -56,25 +87,33 @@ if($result_count_product['numCountRcds']==0)
 			// Insert return record
 			$stmt = $db_conn->prepare(
 				"INSERT INTO ot_sales_return
-					(tempid, prid, qty, return_date, godownid,
+					(tempid, prid, qty, return_date, godownid, warehouse_id,
 					 buyer_gsttype, price, total, hsn, gst_type)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 			);
 			$stmt->bind_param(
-				'siisssddss',
-				$tempid, $product_id_i, $qty_i, $date, $godownid_s,
+				'siissisddss',
+				$tempid, $product_id_i, $qty_i, $date, $godownid_s, $lineWarehouseId,
 				$buyer_gsttype, $price, $total_return_amount, $hsn, $gst_type
 			);
 			$stmt->execute();
 			$stmt->close();
 
 			// Reverse OT sale stock via StockService (FOR UPDATE lock + ledger entry)
-			$stockService->otReverse(
+			$reverseResult = $stockService->otReverse(
 				$product_id_i, $Login_user_TYPEvl, $godownid_s,
 				$qty_i, $tempid, $createdBy,
 				true, // externalTransaction
 				$lineWarehouseId
 			);
+
+			if (!$reverseResult['success']) {
+				// No stock row exists yet for this product in the chosen
+				// warehouse (e.g. it never had this product input there) —
+				// don't silently commit a return whose stock never actually
+				// landed anywhere.
+				throw new \RuntimeException('No stock row for this product in the selected warehouse.');
+			}
 
 			$db_conn->commit();
 			echo "<script>window.location='ot-sale-return.php?tempid=".base64_encode($tempid)."&&AddedSucc';</script>";
@@ -165,6 +204,8 @@ if($result_count_product['numCountRcds']==0)
 								<?php if(isset($_REQUEST['InvalidQTY'])){?><div class="alert alert-warning">Warning! Return qty are more than Sales qty.</div><?php }?>
 								
 								<?php if(isset($_REQUEST['Alreadyexists'])){?><div class="alert alert-warning">Warning! This product return details already exists.</div><?php }?>
+
+								<?php if(isset($_REQUEST['StockError'])){?><div class="alert alert-danger">Could not add return — check that the selected Godown (physical) already has stock for this product, then try again.</div><?php }?>
 								
 								
                             </div>
@@ -180,7 +221,7 @@ if($result_count_product['numCountRcds']==0)
 	 <?php include("validate-scripts.php");?>	 
 	 
 	 <?php if($result_product_list["amount_received"]==0){?>
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data" onsubmit="return confirm('Add this return? Stock will be credited back to the selected Godown (physical) immediately.');">
 <input type="hidden" name="tempid" value="<?=$tempid?>">
 <input type="hidden" name="godownid" value="<?=$result_product_list['godownid'];?>">
 
@@ -191,10 +232,14 @@ if($result_count_product['numCountRcds']==0)
 <input type="date" required="" name="date" value="<?php echo date("Y-m-d");?>" class="form-control">
           
 
-            <select required="" name="product_id" class="form-control" required="">
+            <select required="" name="product_id" id="productSelect" class="form-control" required="" onchange="updateReturnQtyMax()">
 <option value="" hidden="">Select Product</option>
-<?php 
-$select_product_listSD="select * from ot_sales where tempid='$tempid'";
+<?php
+// Products already returned for this invoice are left out here — the
+// duplicate check below still blocks a resubmit either way, but hiding
+// them stops a product from being offered for "return" a second time
+// once it's already gone back through the proper stock-reversing flow.
+$select_product_listSD="select * from ot_sales where tempid='$tempid' and prid not in (select prid from ot_sales_return where tempid='$tempid')";
 $fetch_product_listSD=mysqli_query($db_conn,$select_product_listSD);
 while($result_product_listSD=mysqli_fetch_array($fetch_product_listSD))
 {
@@ -203,10 +248,41 @@ $select_product_list12="select * from products where id='".$result_product_listS
 $fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
 $result_product_list12=mysqli_fetch_array($fetch_product_list12);
 ?>
-<option value="<?=$result_product_list12['id'];?>"><?=$result_product_list12['productName'];?></option>
+<option value="<?=$result_product_list12['id'];?>" data-maxqty="<?=(int)$result_product_listSD['qty'];?>"><?=$result_product_list12['productName'];?> (Invoiced Qty: <?=(int)$result_product_listSD['qty'];?>)</option>
 <?php }?>
 </select>
-<input type="number" placeholder="Return Qty" min="0" name="qty" class="form-control" required=""/>
+<input type="number" placeholder="Return Qty" min="0" id="returnQtyInput" name="qty" class="form-control" required=""/>
+<small id="returnQtyMaxHint" class="form-text text-muted"></small>
+<script>
+function updateReturnQtyMax() {
+    var sel  = document.getElementById('productSelect');
+    var opt  = sel.options[sel.selectedIndex];
+    var qty  = document.getElementById('returnQtyInput');
+    var hint = document.getElementById('returnQtyMaxHint');
+    var max  = opt ? opt.getAttribute('data-maxqty') : null;
+    if (max) {
+        qty.setAttribute('max', max);
+        qty.setAttribute('placeholder', 'Max: ' + max);
+        hint.textContent = 'Maximum return qty for this product in this invoice: ' + max;
+    } else {
+        qty.removeAttribute('max');
+        qty.setAttribute('placeholder', 'Return Qty');
+        hint.textContent = '';
+    }
+}
+</script>
+
+<label class="form-label">Godown (physical)</label>
+<select required name="warehouse_id" class="form-control">
+    <?php foreach ($all_return_warehouses as $wh): ?>
+        <option value="<?= (int)$wh['id'] ?>" selected>
+            <?= htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8') ?><?= $wh['name'] ? ' - ' . htmlspecialchars($wh['name'], ENT_QUOTES, 'UTF-8') : '' ?>
+        </option>
+    <?php endforeach; ?>
+</select>
+<small class="form-text text-muted">Company Profile: <strong><?= htmlspecialchars($ret_company_profile_name, ENT_QUOTES, 'UTF-8') ?></strong></small>
+<br/>
+
 <button type="submit" name="addReturn" class="btn btn-primary"><i class="material-icons">add</i>Add</button>
 												
                                             </div>

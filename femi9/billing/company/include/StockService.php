@@ -674,8 +674,67 @@ class StockService
     }
 
     /**
-     * Reverse an OT sale deduction (item delete or return).
-     * Restores closing_qty, decrements sales_qty, writes 'ot_reverse' ledger entry.
+     * Undo a previously-recorded OT return (ot-return-delete.php deleting an
+     * ot_sales_return row). Same stock math as otDeduct (decrements
+     * closing_qty, restores sales_qty) since it's taking back the stock the
+     * return had credited in — but written under its own 'ot_reverse_undo'
+     * action so reports can net it against the original 'ot_reverse' entry
+     * instead of mistaking it for a brand new sale (see
+     * DatewiseStockReport.php's computeStockMovement()).
+     */
+    public function otReverseUndo(
+        int    $productId,
+        string $userType,
+        string $userId,
+        int    $qty,
+        string $refId,
+        string $createdBy,
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
+    ): array {
+        if (!$externalTransaction) $this->db->begin_transaction();
+        try {
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
+            if ($row === null) {
+                if (!$externalTransaction) $this->db->rollback();
+                throw new StockException("No stock row for product=$productId type=$userType id=$userId");
+            }
+            $before = (int)$row['closing_qty'];
+            $after  = $before - $qty;
+            if ($after < 0) {
+                throw new StockException(
+                    "Insufficient stock to undo OT return for product=$productId. Available=$before, Requested=$qty"
+                );
+            }
+            $this->updateStockSnapshot($productId, $userType, $userId, [
+                'sales_qty'   => (int)$row['sales_qty'] + $qty,
+                'closing_qty' => $after,
+            ], $warehouseId);
+            $ledgerId = $this->writeLedger(
+                $productId, $userType, $userId,
+                'ot_reverse_undo', $qty, $before, $after,
+                'ot_sale', $refId, '', $createdBy, $warehouseId
+            );
+            if (!$externalTransaction) $this->db->commit();
+            return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
+        } catch (\Throwable $e) {
+            if (!$externalTransaction) $this->db->rollback();
+            throw $e;
+        }
+    }
+
+    /**
+     * Reverse an OT sale deduction for a GENUINE customer return (the goods
+     * physically came back, the sale still happened and stays in Sales Qty
+     * history — see ot-sale-return.php). Restores closing_qty, decrements
+     * sales_qty, writes 'ot_reverse' ledger entry — counted in Datewise's
+     * Return Qty column, not subtracted from Sales Qty (see
+     * DatewiseStockReport.php's computeStockMovement()).
+     *
+     * For deleting the ORIGINAL sale itself (the bill never should have
+     * existed, not a customer return), use otDeductUndo() instead — same
+     * stock math, but tagged so reports remove it from Sales Qty rather
+     * than inflating Return Qty next to an unchanged Sales figure.
      */
     public function otReverse(
         int    $productId,
@@ -703,6 +762,51 @@ class StockService
             $ledgerId = $this->writeLedger(
                 $productId, $userType, $userId,
                 'ot_reverse', $qty, $before, $after,
+                'ot_sale', $refId, '', $createdBy, $warehouseId
+            );
+            if (!$externalTransaction) $this->db->commit();
+            return ['success' => true, 'ledger_id' => $ledgerId, 'qty_after' => $after];
+        } catch (\Throwable $e) {
+            if (!$externalTransaction) $this->db->rollback();
+            throw $e;
+        }
+    }
+
+    /**
+     * Undo an OT sale's original deduction because the sale itself was
+     * DELETED (ot-sale-delete.php) — not because the customer returned
+     * anything. Identical stock math to otReverse() (restores closing_qty,
+     * decrements sales_qty), but written under its own 'ot_deduct_undo'
+     * action so Datewise reporting actually removes it from Sales Qty
+     * instead of counting it as a same-size Return next to an unmoved
+     * Sales figure (see DatewiseStockReport.php's computeStockMovement()).
+     */
+    public function otDeductUndo(
+        int    $productId,
+        string $userType,
+        string $userId,
+        int    $qty,
+        string $refId,
+        string $createdBy,
+        bool   $externalTransaction = false,
+        ?int   $warehouseId = null
+    ): array {
+        if (!$externalTransaction) $this->db->begin_transaction();
+        try {
+            $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
+            if ($row === null) {
+                if (!$externalTransaction) $this->db->rollback();
+                return ['success' => false, 'reason' => 'no_stock_row'];
+            }
+            $before = (int)$row['closing_qty'];
+            $after  = $before + $qty;
+            $this->updateStockSnapshot($productId, $userType, $userId, [
+                'sales_qty'   => max(0, (int)$row['sales_qty'] - $qty),
+                'closing_qty' => $after,
+            ], $warehouseId);
+            $ledgerId = $this->writeLedger(
+                $productId, $userType, $userId,
+                'ot_deduct_undo', $qty, $before, $after,
                 'ot_sale', $refId, '', $createdBy, $warehouseId
             );
             if (!$externalTransaction) $this->db->commit();

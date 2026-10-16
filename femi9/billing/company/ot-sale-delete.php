@@ -31,14 +31,19 @@ if ($item) {
     $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 
     try {
-        $stockService->otReverse(
+        // otDeductUndo, not otReverse — this bill is being deleted outright
+        // (never existed), not returned by the customer, so it should come
+        // back out of Sales Qty entirely rather than show up as a same-size
+        // Return next to an unchanged Sales figure. See StockService.php's
+        // otDeductUndo() docblock.
+        $stockService->otDeductUndo(
             $productId, $usertype, $godownid,
             $qty, (string)$rowid, $createdBy,
             false, // externalTransaction
             $warehouseId
         );
     } catch (\Throwable $e) {
-        error_log("ot-sale-delete otReverse error: " . $e->getMessage());
+        error_log("ot-sale-delete otDeductUndo error: " . $e->getMessage());
     }
 }
 
