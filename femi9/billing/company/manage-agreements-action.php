@@ -21,12 +21,48 @@ $updatedBy = $_SESSION['LOGIN_USER'] ?? 'system';
 $action = $_POST['action'] ?? '';
 
 if ($action === 'save_settings') {
+    // Signature image: optional on every save (the text fields are saved
+    // far more often than the signature changes) -- null here tells
+    // save_agreement_settings() to leave whatever's already on file alone.
+    $signatoryImagePath = null;
+    if (!empty($_FILES['authorized_signatory_signature']['name'])) {
+        $ext = strtolower(pathinfo($_FILES['authorized_signatory_signature']['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+            $_SESSION['errorMessage'] = "Signature must be a JPG or PNG file.";
+            header('Location: manage-agreements.php');
+            exit;
+        }
+        if ($_FILES['authorized_signatory_signature']['size'] > 2 * 1024 * 1024) {
+            $_SESSION['errorMessage'] = "Signature file must be under 2 MB.";
+            header('Location: manage-agreements.php');
+            exit;
+        }
+        // NOT under shared/ -- that whole directory is blocked from direct
+        // web access by its own .htaccess ("Require all denied", since
+        // everything else there is a PHP include, never meant to be
+        // fetched directly), which silently turned this signature image
+        // into a 403/broken-image everywhere it was displayed. This mirrors
+        // the public kyc_documents/ folders already used for PAN card
+        // uploads instead.
+        $uploadDir = __DIR__ . '/company_signature/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        $newName = 'company_signature_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        if (move_uploaded_file($_FILES['authorized_signatory_signature']['tmp_name'], $uploadDir . $newName)) {
+            $signatoryImagePath = $newName;
+            // A signature photo/scan is usually mostly blank margin around
+            // the actual ink; left uncropped it shrinks to an invisible
+            // sliver at the small size the signature strip displays at.
+            trim_signature_image_whitespace($uploadDir . $newName);
+        }
+    }
+
     save_agreement_settings(
         $db_conn,
         trim($_POST['company_address'] ?? ''),
         trim($_POST['authorized_signatory_name'] ?? ''),
         trim($_POST['authorized_signatory_designation'] ?? ''),
-        $updatedBy
+        $updatedBy,
+        $signatoryImagePath
     );
     $_SESSION['sucMessage'] = "Company settings saved.";
     header('Location: manage-agreements.php');
@@ -37,7 +73,38 @@ if ($action === 'save_cp_schedule') {
     $cpId = (int) ($_POST['cp_id'] ?? 0);
     $existing = get_or_create_cp_agreement($db_conn, $cpId);
     $wasSignedAndLocked = !empty($existing['signed_at']) && (int) ($existing['is_locked'] ?? 0) === 1;
-    $securityDeposit = ($_POST['security_deposit'] ?? '') !== '' ? (float) $_POST['security_deposit'] : null;
+    // Security Deposit and Approved Division(s) aren't taken from the form
+    // at all anymore (manage-agreements.php only shows them read-only) --
+    // recomputed here from whichever Division(s) "Partner Location" has
+    // assigned to this CP, same SUM(pln.deposit_amount) pattern as the TP
+    // Schedule-1 save above (see its own comment for the Firka/Taluk
+    // equivalent).
+    $stmtDep = $db_conn->prepare("
+        SELECT pln.name AS division_name, pln.deposit_amount
+        FROM channel_partner_locations cpl
+        JOIN partner_location_nodes pln ON pln.id = cpl.location_id
+        WHERE cpl.channel_partner_id = ?
+        ORDER BY pln.name ASC
+    ");
+    $stmtDep->bind_param('i', $cpId);
+    $stmtDep->execute();
+    $cpLocationRows = $stmtDep->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmtDep->close();
+
+    $securityDeposit = null;
+    $approvedDivisionsComputed = '';
+    if ($cpLocationRows) {
+        $sum = 0.0;
+        $hasAny = false;
+        $divisionNames = [];
+        foreach ($cpLocationRows as $row) {
+            if ($row['deposit_amount'] !== null) { $sum += (float) $row['deposit_amount']; $hasAny = true; }
+            $divisionNames[] = $row['division_name'];
+        }
+        $securityDeposit = $hasAny ? $sum : null;
+        $approvedDivisionsComputed = implode(', ', $divisionNames);
+    }
+
     $effectiveDate   = ($_POST['effective_date'] ?? '') !== '' ? $_POST['effective_date'] : null;
     // A per-partner wording override is optional -- the "use custom wording"
     // checkbox decides whether this partner's own custom_body_html is kept
@@ -59,7 +126,7 @@ if ($action === 'save_cp_schedule') {
             is_locked = 0
          WHERE channel_partner_id = ?"
     );
-    $approvedDivisions = trim($_POST['approved_divisions'] ?? '');
+    $approvedDivisions = $approvedDivisionsComputed;
     $divisionCodes = trim($_POST['division_codes'] ?? '');
     $warehouseAddress = trim($_POST['approved_warehouse_address'] ?? '');
     $stockCapacity = trim($_POST['stock_holding_capacity'] ?? '');
@@ -84,11 +151,53 @@ if ($action === 'save_tp_schedule') {
     $tpId = (int) ($_POST['tp_id'] ?? 0);
     $existingTp = get_or_create_tp_agreement($db_conn, $tpId);
     $wasSignedAndLockedTp = !empty($existingTp['signed_at']) && (int) ($existingTp['is_locked'] ?? 0) === 1;
-    $commitment = ($_POST['monthly_purchase_commitment'] ?? '') !== '' ? (float) $_POST['monthly_purchase_commitment'] : null;
+    // Approved Monthly Purchase Commitment, Taluk/Block, and Allotted
+    // Firka/Territory are no longer taken from the form at all --
+    // manage-agreements.php only shows them read-only now. All three are
+    // recomputed here straight from whichever Firka(s)/location(s)
+    // "Partner Location" actually has assigned to this TP (Firka = depth 6
+    // in partner_location_nodes, sitting directly under its Taluk at depth
+    // 5), so none of them can drift from what's really assigned. Same
+    // SUM(pln.target_amount) pattern as company/get-tp-advance-balance.php.
+    $stmtTgt = $db_conn->prepare("
+        SELECT pln.name AS firka_name, pln.target_amount, taluk.name AS taluk_name
+        FROM territory_partner_locations tpl
+        JOIN partner_location_nodes pln ON pln.id = tpl.location_id
+        LEFT JOIN partner_location_nodes taluk ON taluk.id = pln.parent_id
+        WHERE tpl.territory_partner_id = ?
+        ORDER BY pln.name ASC
+    ");
+    $stmtTgt->bind_param('i', $tpId);
+    $stmtTgt->execute();
+    $tpLocationRows = $stmtTgt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmtTgt->close();
+
+    $commitment = null;
+    $talukBlock = '';
+    $territoryFirka = '';
+    if ($tpLocationRows) {
+        $sum = 0.0;
+        $hasAny = false;
+        $firkaNames = [];
+        $talukNames = [];
+        foreach ($tpLocationRows as $row) {
+            if ($row['target_amount'] !== null) { $sum += (float) $row['target_amount']; $hasAny = true; }
+            $firkaNames[] = $row['firka_name'];
+            if (!empty($row['taluk_name'])) $talukNames[$row['taluk_name']] = true;
+        }
+        $commitment = $hasAny ? $sum : null;
+        $territoryFirka = implode(', ', $firkaNames);
+        $talukBlock = implode(', ', array_keys($talukNames));
+    }
+
+    // Territory Code is simply this TP's own tp_id (e.g. "TP-0082").
+    $stmtCode = $db_conn->prepare("SELECT tp_id FROM territory_partners WHERE id = ?");
+    $stmtCode->bind_param('i', $tpId);
+    $stmtCode->execute();
+    $territoryCode = $stmtCode->get_result()->fetch_assoc()['tp_id'] ?? '';
+    $stmtCode->close();
+
     $effectiveDate = ($_POST['effective_date'] ?? '') !== '' ? $_POST['effective_date'] : null;
-    $talukBlock = trim($_POST['taluk_block'] ?? '');
-    $territoryFirka = trim($_POST['territory_firka'] ?? '');
-    $territoryCode = trim($_POST['territory_code'] ?? '');
     $otherParticulars = trim($_POST['other_particulars'] ?? '');
     // Same optional per-partner wording override as save_cp_schedule above.
     $useCustomBodyTp = ($_POST['use_custom_body'] ?? '') === '1';
@@ -121,15 +230,38 @@ if ($action === 'save_cp_body_template' || $action === 'save_tp_body_template') 
     $type = $action === 'save_cp_body_template' ? 'channel_partner' : 'territory_partner';
     $bodyHtml = $_POST['body_html'] ?? '';
     save_agreement_body_template($db_conn, $type, $bodyHtml, $updatedBy);
-    // The shared wording just changed for every partner of this type --
-    // same auto-unlock-on-change reasoning as the per-partner schedule
-    // saves above, just applied in bulk: every already-signed copy on file
-    // no longer matches these new terms.
+
     $table = $type === 'channel_partner' ? 'channel_partner_agreements' : 'territory_partner_agreements';
-    $db_conn->query("UPDATE {$table} SET is_locked = 0 WHERE signed_at IS NOT NULL AND is_locked = 1");
+    $idColumn = $type === 'channel_partner' ? 'channel_partner_id' : 'territory_partner_id';
+
+    // Partners the admin ticked in the "N partner(s) have their own custom
+    // wording" checklist (manage-agreements.php) -- dropping their
+    // custom_body_html back to NULL switches them onto this shared
+    // template too, since get_effective_agreement_body() only falls back
+    // to the shared template when custom_body_html is empty.
+    $resetIds = array_values(array_filter(array_map('intval', explode(',', $_POST['reset_custom_ids'] ?? ''))));
+    if ($resetIds) {
+        $placeholders = implode(',', array_fill(0, count($resetIds), '?'));
+        $types = str_repeat('i', count($resetIds));
+        $stmtReset = $db_conn->prepare("UPDATE {$table} SET custom_body_html = NULL WHERE {$idColumn} IN ({$placeholders})");
+        $stmtReset->bind_param($types, ...$resetIds);
+        $stmtReset->execute();
+        $stmtReset->close();
+    }
+
+    // Only unlock partners whose EFFECTIVE wording actually changed just
+    // now: those still relying on the shared template (custom_body_html
+    // empty), plus whoever's custom override was just cleared above. A
+    // partner who KEEPS their own custom wording is untouched by this
+    // save -- their already-signed copy still matches what they actually
+    // signed, so leaving them locked is correct, not an oversight.
+    $db_conn->query("UPDATE {$table} SET is_locked = 0 WHERE signed_at IS NOT NULL AND is_locked = 1 AND (custom_body_html IS NULL OR custom_body_html = '')");
+
     $_SESSION['sucMessage'] = ($type === 'channel_partner' ? 'Channel Partner' : 'Territory Partner')
-        . " agreement wording saved. Every already-signed " . ($type === 'channel_partner' ? 'CP' : 'TP')
-        . " agreement has been unlocked for re-signing with the updated wording.";
+        . " agreement wording saved."
+        . ($resetIds ? ' ' . count($resetIds) . ' partner(s) switched back to the shared wording.' : '')
+        . " Every already-signed " . ($type === 'channel_partner' ? 'CP' : 'TP')
+        . " agreement using this shared wording has been unlocked for re-signing with the updated wording.";
     header('Location: manage-agreements.php' . ($type === 'channel_partner' ? '' : '?tab=tp'));
     exit;
 }

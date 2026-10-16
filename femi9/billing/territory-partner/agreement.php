@@ -34,6 +34,19 @@ if (isset($_SESSION['sucMessage'])) { $flashMsg = $_SESSION['sucMessage']; unset
 if (isset($_SESSION['errorMessage'])) { $flashErr = $_SESSION['errorMessage']; unset($_SESSION['errorMessage']); }
 
 function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, 'UTF-8'); }
+
+// Printing the dashboard-embedded page directly is unreliable: the fixed
+// letterhead header/footer (meant to repeat on every printed page) gets
+// mis-positioned by Chrome once nested inside the dashboard's own
+// positioned wrappers (sidebar/app-container), overlapping body text from
+// the second page onward. So "Print / Save as PDF" instead opens this same
+// URL with ?print=1, which renders a bare standalone document (just the
+// agreement content, no dashboard chrome at all) where the repeating fixed
+// header/footer behaves correctly, then auto-triggers window.print(). Only
+// available once locked (read-only) -- there's nothing meaningful to print
+// before the TP has signed.
+$printMode = $isLocked && isset($_GET['print']);
+ob_start();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -52,7 +65,10 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
     <style>
         .agr-doc { max-width:820px; margin:0 auto; background:#fff; padding:36px 44px; border:1px solid #e5e7eb; border-radius:10px; font-size:13.5px; line-height:1.6; color:#1f2937; }
         .agr-doc h1 { font-size:18px; text-align:center; margin-bottom:20px; }
-        .agr-doc h2 { font-size:14.5px; margin:22px 0 8px; }
+        .agr-doc h2 { font-size:14.5px; margin:22px 0 8px; break-after:avoid; page-break-after:avoid; } .agr-doc p { orphans:3; widows:3; }
+        .agr-letterhead-img { width:100%; height:auto; display:block; }
+        .agr-letterhead { margin-bottom:16px; }
+        .agr-letterhead-footer { margin-top:30px; }
         .agr-field-row { display:flex; align-items:center; gap:8px; margin:10px 0; flex-wrap:wrap; }
         .agr-field-row label { font-weight:600; min-width:150px; }
         .agr-field-row input, .agr-field-row .agr-value { flex:1; min-width:180px; border:none; border-bottom:1px solid #9ca3af; padding:2px 4px; background:transparent; }
@@ -62,7 +78,25 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
         .agr-witness-box { border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin-top:14px; }
         .agr-sig-block { margin-top:14px; padding-top:10px; border-top:1px dashed #e5e7eb; }
         .agr-sig-img { max-width:200px; max-height:44px; object-fit:contain; border-bottom:1px solid #9ca3af; }
-        @media print { .no-print { display:none !important; } .agr-doc { border:none; } }
+        .agr-pan-img { max-width:320px; max-height:220px; display:block; margin-top:6px; border:1px solid #e5e7eb; border-radius:4px; }
+        @media print {
+            .no-print { display:none !important; }
+            /* Reset the dashboard chrome's own positioned/offset wrappers
+               (app-container is position:relative + margin-left:280px for
+               the sidebar) -- left as-is, Chrome recalculates the fixed
+               letterhead's position against these per page, producing a
+               different (wrong) offset on every printed page beyond the
+               first. Flattening them back to static/zero keeps the fixed
+               header/footer anchored to the actual page box on every page. */
+            .app, .app-container, .app-content, .content-wrapper, .container-fluid, #agreementForm {
+                position:static !important; margin:0 !important; padding:0 !important;
+                width:auto !important; max-width:none !important; float:none !important;
+            }
+            .agr-doc { border:none; padding:0; max-width:none; margin:0; }
+            @page { size: A4; margin: 175px 42px 105px 42px; }
+            .agr-letterhead { position:fixed; top:0; left:0; right:0; }
+            .agr-letterhead-footer { position:fixed; bottom:0; left:0; right:0; margin-top:0; }
+        }
         .agr-locked-banner { background:#f0fdf4; border:1px solid #bbf7d0; color:#065f46; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:13px; }
         .agr-schedule-changed { background:#ffd400; border:1px solid #c9a600; border-radius:8px; padding:12px 16px; margin:10px 0; }
         .agr-schedule-changed .agr-field-row label, .agr-schedule-changed .agr-value { color:#1f2937; }
@@ -87,7 +121,7 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
         <?php include("femi_menu.php"); ?>
     </div>
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <div class="no-print"><?php include("app-header.php"); ?></div>
         <div class="app-content">
             <div class="content-wrapper">
                 <div class="container-fluid">
@@ -103,7 +137,7 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
                         <h1 style="font-size:20px;font-weight:600;color:#1f2937;margin:0;">Territory Partner Agreement</h1>
                         <?php if ($isLocked): ?>
-                        <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Print / Save as PDF</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="window.open('agreement.php?print=1', '_blank')">Print / Save as PDF</button>
                         <?php endif; ?>
                     </div>
 
@@ -115,7 +149,9 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
 
                     <form method="post" action="agreement-action.php" id="agreementForm" enctype="multipart/form-data" onsubmit="return prepareSignaturesAndValidate();">
                     <input type="hidden" name="csrf_token" value="<?php echo fv($_SESSION['csrf_token']); ?>">
+                    <?php ob_start(); ?>
                     <div class="agr-doc">
+                        <?php if (!$printMode): ?><?php render_agreement_letterhead_header(); ?><?php endif; ?>
                         <h1>FEMI9 LLP - TERRITORY PARTNER AGREEMENT</h1>
 
                         <p>This Territory Partner Agreement (hereinafter referred to as the "Agreement") is made and executed on the date and at the place specified below and shall become effective from the Effective Date recorded in Schedule&nbsp;&ndash;&nbsp;1.</p>
@@ -200,6 +236,9 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                         <p><strong>FOR FEMI9 LLP</strong></p>
                         <div class="agr-field-row"><label>Authorized Signatory Name:</label><span class="agr-value<?php echo empty($settings['authorized_signatory_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($settings['authorized_signatory_name'] ?: 'To be set by Company'); ?></span></div>
                         <div class="agr-field-row"><label>Designation:</label><span class="agr-value<?php echo empty($settings['authorized_signatory_designation']) ? ' agr-blank' : ''; ?>"><?php echo fv($settings['authorized_signatory_designation'] ?: 'To be set by Company'); ?></span></div>
+                        <?php if (!empty($settings['authorized_signatory_signature'])): ?>
+                        <div class="agr-field-row"><label>Signature:</label><span class="agr-value"><img src="<?php echo $printMode ? fv(__DIR__ . '/../company/company_signature/' . $settings['authorized_signatory_signature']) : '../company/company_signature/' . fv($settings['authorized_signatory_signature']); ?>" class="agr-sig-img"></span></div>
+                        <?php endif; ?>
 
                         <p style="margin-top:18px;"><strong>FOR THE TERRITORY PARTNER</strong></p>
                         <div class="agr-field-row<?php echo $profileChanged['name'] ? ' agr-row-changed' : ''; ?>"><label>Name:</label><span class="agr-value"><?php echo fv($tp['name']); ?></span></div>
@@ -242,12 +281,18 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                             <?php if ($isLocked): ?>
                                 <?php if (!empty($agreement['pan_card_path'])): ?>
                                     <a href="kyc_documents/<?php echo fv($agreement['pan_card_path']); ?>" target="_blank" class="agr-value">View Uploaded PAN Card</a>
+                                    <?php if (pan_card_is_displayable_image($agreement['pan_card_path'])): ?>
+                                        <img src="kyc_documents/<?php echo fv($agreement['pan_card_path']); ?>" class="agr-pan-img">
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <span class="agr-value agr-blank">Not uploaded</span>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <?php if (!empty($agreement['pan_card_path'])): ?>
                                     <a href="kyc_documents/<?php echo fv($agreement['pan_card_path']); ?>" target="_blank" class="agr-value no-print">Currently uploaded — view</a>
+                                    <?php if (pan_card_is_displayable_image($agreement['pan_card_path'])): ?>
+                                        <img src="kyc_documents/<?php echo fv($agreement['pan_card_path']); ?>" class="agr-pan-img no-print">
+                                    <?php endif; ?>
                                     <div class="form-text no-print">Choose a file below only if you want to replace it.</div>
                                 <?php endif; ?>
                                 <input type="file" name="pan_card" id="pan_card_input" accept=".jpg,.jpeg,.png,.pdf" class="no-print">
@@ -274,6 +319,19 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                 <?php else: ?>
                                     <span class="agr-value agr-blank">&mdash;</span>
                                 <?php endif; ?>
+                            </div>
+                            <?php elseif (!empty($agreement['witness1_signature'])): ?>
+                            <div class="agr-sig-block no-print">
+                                <label style="font-weight:600;display:block;margin-bottom:6px;">Signature:</label>
+                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                                    <input type="radio" name="witness1_sig_choice" id="witness1SigChoiceReuse" checked> Use previous signature
+                                </label>
+                                <img src="<?php echo fv($agreement['witness1_signature']); ?>" class="agr-sig-img" style="margin-bottom:10px;">
+                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;">
+                                    <input type="radio" name="witness1_sig_choice" id="witness1SigChoiceNew"> Draw a new signature instead
+                                </label>
+                                <div id="witness1SigContainer" style="display:none;margin-top:8px;"></div>
+                                <input type="hidden" name="witness1_signature" id="witness1_signature_input" value="<?php echo fv($agreement['witness1_signature']); ?>">
                             </div>
                             <?php else: ?>
                             <div class="agr-sig-block">
@@ -304,6 +362,19 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                     <span class="agr-value agr-blank">&mdash;</span>
                                 <?php endif; ?>
                             </div>
+                            <?php elseif (!empty($agreement['witness2_signature'])): ?>
+                            <div class="agr-sig-block no-print">
+                                <label style="font-weight:600;display:block;margin-bottom:6px;">Signature:</label>
+                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                                    <input type="radio" name="witness2_sig_choice" id="witness2SigChoiceReuse" checked> Use previous signature
+                                </label>
+                                <img src="<?php echo fv($agreement['witness2_signature']); ?>" class="agr-sig-img" style="margin-bottom:10px;">
+                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;">
+                                    <input type="radio" name="witness2_sig_choice" id="witness2SigChoiceNew"> Draw a new signature instead
+                                </label>
+                                <div id="witness2SigContainer" style="display:none;margin-top:8px;"></div>
+                                <input type="hidden" name="witness2_signature" id="witness2_signature_input" value="<?php echo fv($agreement['witness2_signature']); ?>">
+                            </div>
                             <?php else: ?>
                             <div class="agr-sig-block">
                                 <label style="font-weight:600;display:block;margin-bottom:6px;">Signature:</label>
@@ -321,7 +392,9 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                             <button type="submit" class="btn btn-success" style="padding:10px 28px;font-weight:600;">Accept &amp; Sign Agreement</button>
                         </div>
                         <?php endif; ?>
+                        <?php if (!$printMode): ?><?php render_agreement_letterhead_footer(); ?><?php endif; ?>
                     </div>
+                    <?php $__agrDocHtml = ob_get_clean(); echo $__agrDocHtml; ?>
                     </form>
 
                 </div>
@@ -347,11 +420,13 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
     // of forcing a fresh draw every time the Company edits the schedule or
     // wording — switching to "Draw a new signature" clears it so a stale
     // value can never be submitted alongside an unfinished new drawing.
-    (function () {
-        var reuse = document.getElementById('sigChoiceReuse');
-        var fresh = document.getElementById('sigChoiceNew');
-        var sigContainer = document.getElementById('tpSigContainer');
-        var sigInput = document.getElementById('tp_signature_input');
+    // Same pattern applies to both witnesses, who sign once and don't need
+    // to redo it on every re-sign round.
+    function wireSigReuseToggle(reuseId, freshId, containerId, inputId) {
+        var reuse = document.getElementById(reuseId);
+        var fresh = document.getElementById(freshId);
+        var sigContainer = document.getElementById(containerId);
+        var sigInput = document.getElementById(inputId);
         if (!reuse || !fresh) return;
         var previousSignature = sigInput.value;
         reuse.addEventListener('change', function () {
@@ -360,7 +435,10 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
         fresh.addEventListener('change', function () {
             if (this.checked) { sigContainer.style.display = ''; sigInput.value = ''; }
         });
-    })();
+    }
+    wireSigReuseToggle('sigChoiceReuse', 'sigChoiceNew', 'tpSigContainer', 'tp_signature_input');
+    wireSigReuseToggle('witness1SigChoiceReuse', 'witness1SigChoiceNew', 'witness1SigContainer', 'witness1_signature_input');
+    wireSigReuseToggle('witness2SigChoiceReuse', 'witness2SigChoiceNew', 'witness2SigContainer', 'witness2_signature_input');
 
     function prepareSignaturesAndValidate() {
         // Only the Territory Partner's own signature is mandatory —
@@ -382,3 +460,122 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
 <?php endif; ?>
 </body>
 </html>
+<?php
+$__fullPage = ob_get_clean();
+if ($printMode) {
+    // Render a REAL multi-page PDF server-side via dompdf instead of
+    // relying on the browser's own print pagination. Three earlier attempts
+    // at a pure-CSS "repeating fixed header/footer" print page (position:fixed
+    // + @page margins, even on a bare standalone document with no dashboard
+    // chrome) all intermittently mispositioned the letterhead -- missing on
+    // page 1, overlapping body text on later pages -- because Chrome's print
+    // engine doesn't reliably keep a fixed-position element pinned to the
+    // page box across page breaks. dompdf has no such ambiguity: its
+    // setCallbacks('end_document', ...) hook draws the two letterhead PNGs
+    // (the actual crop of the company's own Letterhead Femi9.pdf -- see
+    // shared/AgreementService.php) at the exact same canvas coordinates on
+    // every single page, independent of how the HTML content happens to
+    // flow or break. $__agrDocHtml is the exact same markup the on-screen
+    // page renders (captured via ob_start()/ob_get_clean() above, letterhead
+    // calls skipped via $printMode since dompdf draws those itself) -- only
+    // the stylesheet differs, because dompdf's CSS support doesn't extend to
+    // flexbox (used for the on-screen .agr-field-row label/value layout), so
+    // the label/value rows are laid out with CSS display:table instead here.
+    require_once __DIR__ . '/../../vendor/autoload.php';
+
+    $headerImg = __DIR__ . '/../../assets/images/agreement-letterhead-header.png';
+    $footerImg = __DIR__ . '/../../assets/images/agreement-letterhead-footer.png';
+    [$hImgW, $hImgH] = getimagesize($headerImg);
+    [$fImgW, $fImgH] = getimagesize($footerImg);
+
+    // All measurements in points (pt), matching dompdf's canvas units --
+    // never mix in CSS px here, it would need a 96->72dpi (0.75x) conversion.
+    // The letterhead images are drawn full-bleed (page-edge to page-edge,
+    // no side margin) since that's how the real letterhead looks; only the
+    // TEXT content gets the $marginSidePt left/right margin, via @page.
+    $pageWidthPt  = 595.28; // A4
+    $marginSidePt = 54; // left/right margin for the text content only
+    $textGapPt    = 12; // gap between the header/footer image and the text
+    $headerHPt    = $pageWidthPt * ($hImgH / $hImgW);
+    $footerHPt    = $pageWidthPt * ($fImgH / $fImgW);
+    $marginTopPt    = $headerHPt + $textGapPt;
+    $marginBottomPt = $footerHPt + $textGapPt;
+
+    // Calibri (the font the company actually wants) isn't one of dompdf's
+    // built-in fonts, and it's a licensed Microsoft font -- not something to
+    // bundle into the repo. It IS already installed on this Windows server
+    // (every Office/Windows install ships it under C:\Windows\Fonts), so
+    // it's registered here by reference to that system copy rather than a
+    // copy checked into the app.
+    $calibriDir = 'C:/Windows/Fonts/';
+    $calibriAvailable = is_file($calibriDir . 'calibri.ttf');
+
+    // See wrap_headings_with_next_block_for_pdf()'s own comment in
+    // AgreementService.php for why this, not just a CSS "h2 + p" rule, is
+    // needed to reliably keep a clause heading from being stranded alone
+    // at the bottom of a page.
+    $pdfBodyHtml = inline_pan_card_image_for_pdf($__agrDocHtml, __DIR__ . '/kyc_documents');
+    $pdfBodyHtml = wrap_headings_with_next_block_for_pdf($pdfBodyHtml);
+
+    $pdfHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        @page { size: A4; margin: ' . $marginTopPt . 'pt ' . $marginSidePt . 'pt ' . $marginBottomPt . 'pt ' . $marginSidePt . 'pt; }
+        body { margin:0; background:#ffffff; font-family: "Calibri", "DejaVu Sans", sans-serif; font-size:12px; line-height:1.6; color:#1f2937; }
+        .agr-doc { font-size:12px; }
+        .agr-doc h1 { font-size:18px; text-align:center; margin-bottom:20px; font-family: "Calibri", "DejaVu Sans", sans-serif; font-weight:bold; }
+        .agr-doc h2 { font-size:14px; margin:22px 0 8px; page-break-after:avoid; page-break-inside:avoid; font-family: "Calibri", "DejaVu Sans", sans-serif; font-weight:bold; }
+        .agr-doc h2 + p { page-break-before:avoid; }
+        .agr-pdf-keeptogether { page-break-inside: avoid; }
+        .agr-doc p { orphans:3; widows:3; }
+        .agr-field-row { display:table; width:100%; margin:10px 0; }
+        .agr-field-row label { display:table-cell; font-weight:bold; width:200px; padding-right:8px; font-family: "Calibri", "DejaVu Sans", sans-serif; }
+        .agr-field-row .agr-value { display:table-cell; border-bottom:1px solid #9ca3af; padding:2px 4px; }
+        .agr-value { color:#374151; }
+        .agr-value.agr-blank { color:#9ca3af; font-style:italic; }
+        .agr-ul { margin:8px 0 8px 20px; }
+        .agr-witness-box { border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin-top:14px; }
+        .agr-sig-img { max-width:200px; max-height:44px; }
+        .agr-pan-img { max-width:320px; max-height:220px; display:block; margin-top:4px; border:1px solid #e5e7eb; }
+        .agr-schedule-changed { background:#ffd400; border:1px solid #c9a600; border-radius:8px; padding:12px 16px; margin:10px 0; }
+        .agr-schedule-changed .agr-field-row label, .agr-schedule-changed .agr-value { color:#1f2937; }
+        .agr-field-row.agr-row-changed { background:#ffd400; border:1px solid #c9a600; border-radius:8px; padding:8px 12px; }
+        .agr-field-row.agr-row-changed label, .agr-field-row.agr-row-changed .agr-value { color:#1f2937; }
+        .agr-wording-changed { background:#ffd400; border:1px solid #c9a600; border-radius:8px; padding:4px 14px; margin:10px 0; }
+        .agr-word-changed { background:#ffd400; border-radius:3px; padding:0 2px; }
+        </style></head><body>' . $pdfBodyHtml . '</body></html>';
+
+    $pdfOptions = new \Dompdf\Options();
+    $pdfOptions->set('isRemoteEnabled', true);
+    // Without this, dompdf's default local-file security check (chroot)
+    // silently rejects every <img src="..."> pointing outside its own
+    // vendor directory -- including the PAN card image above -- falling
+    // back to a broken-image icon with no error surfaced anywhere. Scoping
+    // it to the whole femi9/ app root (not just kyc_documents/) keeps this
+    // working for any other local image this PDF path embeds later too.
+    $pdfOptions->setChroot([realpath(__DIR__ . '/../../')]);
+    $dompdf = new \Dompdf\Dompdf($pdfOptions);
+    if ($calibriAvailable) {
+        $fm = $dompdf->getFontMetrics();
+        $fm->registerFont(['family' => 'Calibri', 'style' => 'normal', 'weight' => 'normal'], $calibriDir . 'calibri.ttf');
+        $fm->registerFont(['family' => 'Calibri', 'style' => 'normal', 'weight' => 'bold'], $calibriDir . 'calibrib.ttf');
+        $fm->registerFont(['family' => 'Calibri', 'style' => 'italic', 'weight' => 'normal'], $calibriDir . 'calibrii.ttf');
+        $fm->registerFont(['family' => 'Calibri', 'style' => 'italic', 'weight' => 'bold'], $calibriDir . 'calibriz.ttf');
+    }
+    $dompdf->setPaper('A4');
+    $dompdf->loadHtml($pdfHtml);
+    $dompdf->setCallbacks([
+        ['event' => 'end_document', 'f' => function ($pageNumber, $pageCount, $canvas, $fontMetrics) use ($headerImg, $footerImg, $pageWidthPt, $headerHPt, $footerHPt) {
+            $pageHPt = $canvas->get_height();
+            $canvas->image($headerImg, 0, 0, $pageWidthPt, $headerHPt);
+            $canvas->image($footerImg, 0, $pageHPt - $footerHPt, $pageWidthPt, $footerHPt);
+        }],
+    ]);
+    $dompdf->render();
+
+    $fileName = 'Territory_Partner_Agreement_' . preg_replace('/[^a-zA-Z0-9]+/', '', $tp['tp_id'] ?? 'TP') . '.pdf';
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    $dompdf->stream($fileName, ['Attachment' => false]);
+    exit;
+} else {
+    echo $__fullPage;
+}

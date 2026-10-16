@@ -23,6 +23,15 @@ function ensure_agreement_tables(mysqli $db_conn): void
     ");
     $db_conn->query("INSERT IGNORE INTO agreement_settings (id) VALUES (1)");
 
+    // Company's own signature image for the "FOR FEMI9 LLP" execution block
+    // on every CP/TP agreement, set once via manage-agreements.php. Added
+    // via ALTER on existing installs since the table above predates this
+    // column (same convention as the other ALTERs further down this file).
+    $sigCol = $db_conn->query("SHOW COLUMNS FROM agreement_settings LIKE 'authorized_signatory_signature'");
+    if ($sigCol && $sigCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE agreement_settings ADD COLUMN authorized_signatory_signature VARCHAR(255) NULL AFTER authorized_signatory_designation");
+    }
+
     $db_conn->query("
         CREATE TABLE IF NOT EXISTS channel_partner_agreements (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -391,13 +400,25 @@ function get_agreement_settings(mysqli $db_conn): array
     return $res->fetch_assoc() ?: [];
 }
 
-function save_agreement_settings(mysqli $db_conn, string $companyAddress, string $signatoryName, string $signatoryDesignation, string $updatedBy): void
+/** $signatoryImagePath is the uploaded signature filename, or null to leave
+ * whatever's already saved untouched -- manage-agreements.php only sends a
+ * new one when the admin actually chose a replacement file, so re-saving
+ * the text fields alone (the common case) doesn't wipe out an existing
+ * signature. */
+function save_agreement_settings(mysqli $db_conn, string $companyAddress, string $signatoryName, string $signatoryDesignation, string $updatedBy, ?string $signatoryImagePath = null): void
 {
     ensure_agreement_tables($db_conn);
-    $stmt = $db_conn->prepare(
-        "UPDATE agreement_settings SET company_address = ?, authorized_signatory_name = ?, authorized_signatory_designation = ?, updated_by = ? WHERE id = 1"
-    );
-    $stmt->bind_param('ssss', $companyAddress, $signatoryName, $signatoryDesignation, $updatedBy);
+    if ($signatoryImagePath !== null) {
+        $stmt = $db_conn->prepare(
+            "UPDATE agreement_settings SET company_address = ?, authorized_signatory_name = ?, authorized_signatory_designation = ?, authorized_signatory_signature = ?, updated_by = ? WHERE id = 1"
+        );
+        $stmt->bind_param('sssss', $companyAddress, $signatoryName, $signatoryDesignation, $signatoryImagePath, $updatedBy);
+    } else {
+        $stmt = $db_conn->prepare(
+            "UPDATE agreement_settings SET company_address = ?, authorized_signatory_name = ?, authorized_signatory_designation = ?, updated_by = ? WHERE id = 1"
+        );
+        $stmt->bind_param('ssss', $companyAddress, $signatoryName, $signatoryDesignation, $updatedBy);
+    }
     $stmt->execute();
     $stmt->close();
 }
@@ -485,4 +506,243 @@ function get_profile_change_flags(array $live, array $agreement): array
         'mobile'       => $cmp($agreement['snap_mobile'], $live['mobile'] ?? ''),
         'email'        => $cmp($agreement['snap_email'], $live['email'] ?? ''),
     ];
+}
+
+/** Femi9 Nayan LLP company letterhead header -- rendered at the top of
+ * every CP/TP agreement document (the partner's own agreement.php and the
+ * company's read-only view-cp-agreement.php / view-tp-agreement.php) so the
+ * on-screen/printed agreement looks like it was issued on company
+ * letterhead. This is the ACTUAL letterhead graphic (cropped straight out
+ * of the company's own "Letterhead Femi9.pdf") as a PNG, not a CSS
+ * recreation -- an earlier version tried to rebuild the script wordmark/
+ * diagonal stripe in CSS and it never matched exactly, so it was replaced
+ * with these two image crops (agreement-letterhead-header.png /
+ * -footer.png) instead. $assetPrefix is the relative path to femi9/assets/
+ * from the including file; all four callers sit at the same billing/<x>/
+ * depth, so the default is correct for all of them. */
+function render_agreement_letterhead_header(string $assetPrefix = '../../assets/'): void
+{
+    $src = htmlspecialchars($assetPrefix, ENT_QUOTES, 'UTF-8') . 'images/agreement-letterhead-header.png';
+    ?>
+    <div class="agr-letterhead">
+        <img src="<?php echo $src; ?>" alt="FEMI NAYAN LLP" class="agr-letterhead-img">
+    </div>
+    <?php
+}
+
+/** Matching footer band for the letterhead above -- see
+ * render_agreement_letterhead_header(). */
+function render_agreement_letterhead_footer(string $assetPrefix = '../../assets/'): void
+{
+    $src = htmlspecialchars($assetPrefix, ENT_QUOTES, 'UTF-8') . 'images/agreement-letterhead-footer.png';
+    ?>
+    <div class="agr-letterhead-footer">
+        <img src="<?php echo $src; ?>" alt="support@femi9.in | www.femi9.in | +91 90429 16499" class="agr-letterhead-img">
+    </div>
+    <?php
+}
+
+/** Merges each top-level clause <h2> -- optionally wrapped in a single-
+ * child <div class="agr-wording-changed">, which is what
+ * diff_highlight_agreement_body() produces when the company has edited
+ * that one clause's heading but not its paragraph (or vice versa) -- with
+ * whatever top-level block immediately follows it, into one wrapping div.
+ * Used only for the dompdf PDF export: a plain CSS "h2 + p { page-break-
+ * before: avoid }" rule silently stops working the moment a
+ * wording-changed wrapper sits between the heading and its paragraph (they
+ * stop being adjacent siblings), which is exactly how a heading can end up
+ * stranded alone at the bottom of a printed page with its whole paragraph
+ * pushed to the next one. page-break-inside:avoid on this wrapper is
+ * unaffected by that, since it only cares about the wrapper's own single
+ * container, not sibling adjacency. */
+function wrap_headings_with_next_block_for_pdf(string $html): string
+{
+    if (trim($html) === '') return $html;
+    // Never let a DOM quirk take the whole PDF export down with it --
+    // worst case this just falls back to the unwrapped $html (the
+    // heading-orphan bug this function exists to prevent), same as
+    // diff_highlight_agreement_body()'s own fallback below.
+    try {
+        $dom = new DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="utf-8"?><div id="__root">' . $html . '</div>');
+        libxml_clear_errors();
+        // getElementById() needs a DTD declaring the attribute as an ID
+        // type to work reliably after loadHTML() -- plain HTML parsing
+        // doesn't guarantee that, and it's known to silently return null
+        // on some PHP/libxml builds while working fine on others.
+        // Matching split_agreement_body_blocks()'s own approach above
+        // (which hit this same pitfall first) avoids it by just taking
+        // the first <div>.
+        $root = $dom->getElementsByTagName('div')->item(0);
+        if (!$root) return $html;
+
+        $isHeadingNode = function (DOMNode $node) {
+            if ($node->nodeType !== XML_ELEMENT_NODE) return false;
+            if (strtolower($node->nodeName) === 'h2') return true;
+            if (strtolower($node->nodeName) === 'div'
+                && strpos($node->getAttribute('class'), 'agr-wording-changed') !== false) {
+                $elementChildren = [];
+                foreach ($node->childNodes as $c) {
+                    if ($c->nodeType === XML_ELEMENT_NODE) $elementChildren[] = $c;
+                }
+                return count($elementChildren) === 1 && strtolower($elementChildren[0]->nodeName) === 'h2';
+            }
+            return false;
+        };
+
+        // Snapshot top-level children first -- we move/remove nodes from
+        // $root while iterating, which a live NodeList doesn't tolerate.
+        $children = [];
+        foreach ($root->childNodes as $c) { $children[] = $c; }
+
+        $i = 0;
+        $n = count($children);
+        while ($i < $n) {
+            $node = $children[$i];
+            if ($node->nodeType === XML_ELEMENT_NODE && $isHeadingNode($node)) {
+                $j = $i + 1;
+                while ($j < $n && $children[$j]->nodeType !== XML_ELEMENT_NODE) { $j++; }
+                if ($j < $n) {
+                    $wrapper = $dom->createElement('div');
+                    $wrapper->setAttribute('class', 'agr-pdf-keeptogether');
+                    $root->insertBefore($wrapper, $node);
+                    for ($k = $i; $k <= $j; $k++) {
+                        $wrapper->appendChild($children[$k]);
+                    }
+                    $i = $j + 1;
+                    continue;
+                }
+            }
+            $i++;
+        }
+
+        $out = '';
+        foreach ($root->childNodes as $c) {
+            $out .= $dom->saveHTML($c);
+        }
+        return $out;
+    } catch (\Throwable $e) {
+        return $html;
+    }
+}
+
+/** Whether an uploaded filename is an image type the PAN card field can
+ * show inline (as opposed to a PDF upload, which stays a plain link).
+ * Shared between the screen view and inline_pan_card_image_for_pdf() below
+ * so both use the same extension list. */
+function pan_card_is_displayable_image(string $filename): bool
+{
+    $imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+    return in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), $imageExts, true);
+}
+
+/** A company signatory signature photo/scan is usually a full-page or
+ * full-screenshot image with the actual signature occupying a small part
+ * of it, surrounded by blank white/transparent margin. Displayed at the
+ * small, wide "signature strip" size used throughout the agreement pages
+ * (max-height ~44px), a tall image with mostly-blank content scales down
+ * to a sliver only a few pixels wide -- effectively invisible. This crops
+ * the image down to the actual ink (anything not near-white/transparent),
+ * with a small padding margin, so it displays at a legible size. Runs the
+ * bounding-box scan on a downsized copy for speed, then maps the box back
+ * to full resolution -- a multi-megapixel upload scanned pixel-by-pixel in
+ * PHP userland would be far too slow for a request-time upload handler.
+ * Best-effort: any failure leaves the original file untouched rather than
+ * blocking the settings save. */
+function trim_signature_image_whitespace(string $absPath): void
+{
+    $ext = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['png', 'jpg', 'jpeg'], true)) return;
+    try {
+        $img = $ext === 'png' ? @imagecreatefrompng($absPath) : @imagecreatefromjpeg($absPath);
+        if (!$img) return;
+
+        $w = imagesx($img);
+        $h = imagesy($img);
+        $hasAlpha = ($ext === 'png');
+
+        $scale = min(1.0, 400 / max($w, $h));
+        $sw = max(1, (int) round($w * $scale));
+        $sh = max(1, (int) round($h * $scale));
+        $small = imagecreatetruecolor($sw, $sh);
+        if ($hasAlpha) { imagealphablending($small, false); imagesavealpha($small, true); }
+        imagecopyresampled($small, $img, 0, 0, 0, 0, $sw, $sh, $w, $h);
+
+        $minX = $sw; $minY = $sh; $maxX = -1; $maxY = -1;
+        for ($y = 0; $y < $sh; $y++) {
+            for ($x = 0; $x < $sw; $x++) {
+                $rgb = imagecolorat($small, $x, $y);
+                if ($hasAlpha && ((($rgb >> 24) & 0x7F) >= 110)) continue; // mostly transparent
+                $r = ($rgb >> 16) & 0xFF; $g = ($rgb >> 8) & 0xFF; $b = $rgb & 0xFF;
+                if ($r > 235 && $g > 235 && $b > 235) continue; // near-white background
+                if ($x < $minX) $minX = $x;
+                if ($x > $maxX) $maxX = $x;
+                if ($y < $minY) $minY = $y;
+                if ($y > $maxY) $maxY = $y;
+            }
+        }
+        imagedestroy($small);
+        if ($maxX < $minX || $maxY < $minY) { imagedestroy($img); return; } // blank image, leave as-is
+
+        $pad = 0.03;
+        $x0 = max(0.0, ($minX / $sw) - $pad);
+        $y0 = max(0.0, ($minY / $sh) - $pad);
+        $x1 = min(1.0, (($maxX + 1) / $sw) + $pad);
+        $y1 = min(1.0, (($maxY + 1) / $sh) + $pad);
+
+        $cropX = (int) round($x0 * $w);
+        $cropY = (int) round($y0 * $h);
+        $cropW = min((int) round(($x1 - $x0) * $w), $w - $cropX);
+        $cropH = min((int) round(($y1 - $y0) * $h), $h - $cropY);
+        if ($cropW <= 0 || $cropH <= 0) { imagedestroy($img); return; }
+
+        $cropped = imagecreatetruecolor($cropW, $cropH);
+        if ($hasAlpha) { imagealphablending($cropped, false); imagesavealpha($cropped, true); }
+        imagecopy($cropped, $img, 0, 0, $cropX, $cropY, $cropW, $cropH);
+
+        if ($ext === 'png') {
+            imagepng($cropped, $absPath);
+        } else {
+            imagejpeg($cropped, $absPath, 92);
+        }
+        imagedestroy($cropped);
+        imagedestroy($img);
+    } catch (\Throwable $e) {
+        // Best-effort only.
+    }
+}
+
+/** The on-screen "View Uploaded PAN Card" link is just text in the PDF
+ * export -- dompdf doesn't follow links, it just renders the underlined
+ * label, which isn't useful on a document meant to be printed/filed.
+ * This swaps that link for the actual PAN card image, sized to fit the
+ * page, whenever the uploaded file is an image (jpg/png/etc) -- the
+ * overwhelming majority of uploads, since the KYC upload UI's own file
+ * picker defaults to a phone camera/gallery. A PDF upload (also allowed by
+ * that picker) can't be embedded this way without rasterising it first, so
+ * it's left as the plain link text, which is still accurate there (the
+ * uploaded file genuinely is a PDF, not an image dompdf silently failed to
+ * find). $kycDocsAbsDir is the absolute filesystem directory the four
+ * agreement pages' differing relative hrefs (`kyc_documents/...` or
+ * `../channel-partner/kyc_documents/...` etc.) all ultimately point at. */
+function inline_pan_card_image_for_pdf(string $html, string $kycDocsAbsDir): string
+{
+    $kycDocsAbsDir = rtrim($kycDocsAbsDir, '/\\') . '/';
+    $imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+
+    return preg_replace_callback(
+        '#<a href="[^"]*kyc_documents/([^"/]+)" target="_blank" class="agr-value">View Uploaded PAN Card</a>#',
+        function (array $m) use ($kycDocsAbsDir, $imageExts) {
+            $filename = $m[1];
+            $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+            $absPath = $kycDocsAbsDir . $filename;
+            if (!in_array($ext, $imageExts, true) || !is_file($absPath)) {
+                return $m[0];
+            }
+            $absPathHtml = htmlspecialchars($absPath, ENT_QUOTES, 'UTF-8');
+            return '<img src="' . $absPathHtml . '" class="agr-pan-img">';
+        },
+        $html
+    );
 }
