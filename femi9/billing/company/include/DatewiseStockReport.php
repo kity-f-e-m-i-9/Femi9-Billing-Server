@@ -39,20 +39,33 @@ function computeStockMovement($db_conn, $prid, $fromDate, $toDate, $companyIdsSq
 
     // Sales Qty — every deduction from this godown that represents an
     // actual sale: ordinary deduct (customer/TP/user invoices) and
-    // ot_deduct (OT sales), NET of reverse_deduct/ot_reverse — a return
-    // reduces Sales Qty back down, same as it reduces Closing Stock, so
-    // the two numbers stay consistent without the reader having to
-    // manually subtract Return Qty from Sales Qty themselves. Demo/Free/
-    // Damage is tracked and reported separately below (dfd_qty), not
-    // folded into Sales. Reverted back to net per explicit user
-    // correction — gross Sales (not reduced by returns) made Closing
-    // Stock look unreconcilable against Sales/Return shown side by side.
-    $deduct      = $sumAction('deduct');
-    $reverseDed  = $sumAction('reverse_deduct');
-    $otDeduct    = $sumAction('ot_deduct');
-    $otReverse   = $sumAction('ot_reverse');
-    $net_sales_for_closing = $deduct - $reverseDed + $otDeduct - $otReverse;
-    $total_sales = $net_sales_for_closing;
+    // ot_deduct (OT sales). Shown GROSS — not reduced by returns — since
+    // Return Qty is already its own column; netting the two together here
+    // made Sales Qty go negative when returns in a day outweighed that
+    // day's sales, which read as nonsense ("how can you sell -15?").
+    // Reader can combine Sales - Return themselves if they want the net
+    // figure. Closing Stock still correctly nets returns out via
+    // $net_sales_for_closing below, which is unaffected by this.
+    $deduct        = $sumAction('deduct');
+    $reverseDed    = $sumAction('reverse_deduct');
+    $otDeduct      = $sumAction('ot_deduct');
+    $otReverse     = $sumAction('ot_reverse');
+    // A deleted OT return (ot-return-delete.php) writes 'ot_reverse_undo' to
+    // take the credited stock back out — add it back into the closing-stock
+    // math (cancelling the earlier -$otReverse) without counting it as a
+    // real sale in $total_sales below.
+    $otReverseUndo = $sumAction('ot_reverse_undo');
+    // A deleted OT sale (ot-sale-delete.php — the bill itself removed, not a
+    // customer return) writes 'ot_deduct_undo' to take that stock back out.
+    // Subtracted from BOTH the closing-stock math (cancelling the earlier
+    // +$otDeduct) AND $total_sales below — unlike a genuine return
+    // ($otReverse, which stays out of Closing Stock's sale total but still
+    // counts as a real historical sale), a deleted bill never really
+    // happened, so it comes out of Sales Qty entirely instead of showing up
+    // as a same-size Return next to an unmoved Sales figure.
+    $otDeductUndo  = $sumAction('ot_deduct_undo');
+    $net_sales_for_closing = $deduct - $reverseDed + $otDeduct - $otReverse + $otReverseUndo - $otDeductUndo;
+    $total_sales = $deduct + $otDeduct - $otDeductUndo;
 
     // Demo/Free/Damage Qty — goods that left as demo, free giveaway, or
     // damage (demofree's transfer_out), net of transfer_out_reverse. Still
@@ -62,10 +75,11 @@ function computeStockMovement($db_conn, $prid, $fromDate, $toDate, $companyIdsSq
                  - (int)$sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='transfer_out_reverse' AND ref_type='demofree'");
 
     // Return Qty — reverse_deduct/ot_reverse entries shown as their own
-    // column. No longer netted into the displayed Sales Qty (see
-    // $total_sales above) — only still subtracted from Closing Stock via
-    // $net_sales_for_closing.
-    $total_sales_return = $reverseDed + $otReverse;
+    // column, net of ot_reverse_undo (a return that was later deleted
+    // shouldn't still count here). No longer netted into the displayed
+    // Sales Qty (see $total_sales above) — only still subtracted from
+    // Closing Stock via $net_sales_for_closing.
+    $total_sales_return = $reverseDed + $otReverse - $otReverseUndo;
 
     // Movement to CP — the godown -> Channel Partner leg of Partner-
     // Location transfers (pl-godown-transfer-action.php, transfer_type=
@@ -231,9 +245,13 @@ function datewiseReturnTotal($db_conn, int $prid, string $fromDate, string $toDa
     $sum = function($sql) use ($db_conn) {
         return (int)(mysqli_fetch_row(mysqli_query($db_conn, $sql))[0] ?? 0);
     };
-    $reverseDed = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='reverse_deduct'");
-    $otReverse  = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='ot_reverse'");
-    return $reverseDed + $otReverse;
+    $reverseDed    = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='reverse_deduct'");
+    $otReverse     = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='ot_reverse'");
+    // Net of ot_reverse_undo — a return that was later deleted (ot-return-
+    // delete.php) shouldn't still count here. See computeStockMovement()'s
+    // identical note.
+    $otReverseUndo = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='ot_reverse_undo'");
+    return $reverseDed + $otReverse - $otReverseUndo;
 }
 
 // Gross Sales Qty for one product, scoped to a single warehouse condition —
@@ -244,18 +262,15 @@ function datewiseReturnTotal($db_conn, int $prid, string $fromDate, string $toDa
 // trusting the stored stock.sales_qty column — StockService.php's
 // reverseDeduct()/otReverse() both floor-decrement that stored column on
 // every return (see reverseDeduct()'s own "Floors sales_qty at 0"
-// docblock), so it carries the same net-of-returns problem the Datewise fix
-// corrected. Fixing
-// it at the display layer here, same as that fix, rather than touching
-// StockService's core write path — stock.sales_qty likely backs other
-// reports beyond this one tab, and changing its stored meaning system-wide
-// is a materially bigger, riskier change than recomputing it for display on
-// this one page.
-// NET sales (deduct + ot_deduct, minus reverse_deduct/ot_reverse) — same
-// convention computeStockMovement()'s own $total_sales uses, so this
-// figure and Closing Stock stay reconcilable against each other without
-// the reader having to manually subtract Return Qty themselves. Reverted
-// from a gross (un-netted) version per explicit user correction.
+// docblock), so it carries the same net-of-returns problem this fixes.
+// Fixing it at the display layer here rather than touching StockService's
+// core write path — stock.sales_qty likely backs other reports beyond this
+// one tab, and changing its stored meaning system-wide is a materially
+// bigger, riskier change than recomputing it for display on this one page.
+// Name kept as "NetSalesTotal" to avoid touching its one call site in
+// overall-stock.php, but the value returned is gross (un-netted) — Return
+// Qty is shown in its own column instead, same convention as the Datewise
+// tab's $total_sales.
 function datewiseNetSalesTotal($db_conn, int $prid, string $fromDate, string $toDate, string $companyIdsSql, bool $filterByGodown, string $warehouseCond): int {
     $fromDate = mysqli_real_escape_string($db_conn, $fromDate);
     $toDate   = mysqli_real_escape_string($db_conn, $toDate);
@@ -265,11 +280,13 @@ function datewiseNetSalesTotal($db_conn, int $prid, string $fromDate, string $to
     $sum = function($sql) use ($db_conn) {
         return (int)(mysqli_fetch_row(mysqli_query($db_conn, $sql))[0] ?? 0);
     };
-    $deduct     = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='deduct'");
-    $reverseDed = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='reverse_deduct'");
-    $otDeduct   = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='ot_deduct'");
-    $otReverse  = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='ot_reverse'");
-    return $deduct - $reverseDed + $otDeduct - $otReverse;
+    $deduct       = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='deduct'");
+    $otDeduct     = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='ot_deduct'");
+    // Net of ot_deduct_undo — a sale that was later DELETED (ot-sale-
+    // delete.php, not a customer return) shouldn't still count here. See
+    // computeStockMovement()'s identical note.
+    $otDeductUndo = $sum("SELECT COALESCE(SUM(qty),0) FROM stock_ledger WHERE $base AND action='ot_deduct_undo'");
+    return $deduct + $otDeduct - $otDeductUndo;
 }
 
 // Internal Transfer Qty for one product, scoped to a single warehouse
