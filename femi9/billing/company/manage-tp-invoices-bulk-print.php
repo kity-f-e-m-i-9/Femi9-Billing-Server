@@ -100,7 +100,12 @@ if ($truncated) { $invoiceIds = array_slice($invoiceIds, 0, $MAX_BULK_PRINT); }
         .bp-toolbar .bp-meta { font-size:12.5px; color:#6b7280; }
         .bp-btn-print { margin-left:auto; background:linear-gradient(135deg,#0369a1 0%,#0284c7 100%); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
         .bp-empty { padding:60px 20px; text-align:center; color:#9ca3af; }
-        .bp-invoice-wrap { page-break-after:always; padding:16px; }
+        /* The invoice markup (ShopInvoiceHtml/TpInvoiceHtml's shared .maincontainar)
+           never sets its own background — on every other page it's printed on,
+           the body is plain white by default, so this never showed. Here the
+           page body is #f3f4f6 (for the sticky toolbar), and that gray bleeds
+           through the invoice's own unfilled padding/gaps without this. */
+        .bp-invoice-wrap { page-break-after:always; padding:16px; background:#fff; }
         .bp-invoice-wrap:last-child { page-break-after:auto; }
         @media print {
             .bp-toolbar { display:none; }

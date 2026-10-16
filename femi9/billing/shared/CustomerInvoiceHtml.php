@@ -158,7 +158,13 @@ hr{margin:3px 0;}
 /* Printing the page directly (window.print()) instead of a popup — hide
    everything except the invoice itself, on any screen size. */
 @media print {
-    @page { size: A4; margin: 6mm; }
+    /* No explicit "size:" here — declaring one (even just "A4" with no
+       orientation keyword) makes Chrome's print dialog hide its own Layout/
+       Paper size/More settings controls, assuming the page author already
+       fixed the paper shape. Margin-only keeps those controls available, as
+       seen on the company bulk-print page, which skips this whole @page
+       rule (forPdf=true) and shows a normal print dialog. */
+    @page { margin: 6mm; }
     body * { visibility: hidden; }
     #divToPrint, #divToPrint * { visibility: visible; }
     #divToPrint { position: absolute; left: 0; top: 0; width: 100%; }

@@ -68,7 +68,7 @@ hr{margin:3px 0;}
 <?php endif; ?>
 <?php if (!$forPdf): ?>
 @media print {
-    @page { size: A4; margin: 6mm; }
+    @page { margin: 6mm; } /* no size: here - keeps Chrome print dialog Layout/Paper size/More settings controls available */
     body * { visibility: hidden; }
     #divToPrint, #divToPrint * { visibility: visible; }
     #divToPrint { position: absolute; left: 0; top: 0; width: 100%; }
