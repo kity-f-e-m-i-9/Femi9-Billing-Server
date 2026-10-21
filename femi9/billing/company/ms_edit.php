@@ -31,7 +31,7 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_staff_locations (
     UNIQUE KEY uk_ms_location (ms_id, location_id)
 )");
 $stmt_cur = $db_conn->prepare("
-    SELECT n.id, n.name
+    SELECT n.id, n.name, n.depth
     FROM marketing_staff_locations msl
     JOIN partner_location_nodes n ON n.id = msl.location_id
     WHERE msl.ms_id = ?
@@ -45,6 +45,12 @@ $stmt_cur->close();
 $preselected_json = json_encode(array_map(function($loc) {
     return ['id' => (int)$loc['id'], 'name' => $loc['name']];
 }, $current_locations));
+// The person's existing assignment's own depth (e.g. Division instead of
+// District) — passed to JS so the picker can default to the deeper layer on
+// load instead of silently showing an empty "District" picker with their
+// real (Division-level) assignment invisible. Compared client-side against
+// the layer depths get-ms-location-options.php reports for this team level.
+$preselected_depth = !empty($current_locations) ? (int)$current_locations[0]['depth'] : null;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -281,6 +287,20 @@ if ($currentTeamLevelId) {
 			<style type="text/css"> .hidden {display: none;}</style>
 
 <label class="form-label">Assign Location</label>
+<div id="lpZoneFill" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+    <label class="form-label" style="font-size:12.5px;font-weight:700;color:#475569;margin-bottom:6px;">Fill from Zone</label>
+    <select class="form-control" id="lpZoneSelect" style="background-color:#fff !important;-webkit-box-shadow:0 0 0 1000px #fff inset;">
+        <option value="">-- select a zone --</option>
+    </select>
+    <small class="text-muted d-block mt-2" id="lpZoneFillStatus">Picking a zone replaces the selection below with every district in that zone — pick a different zone to start over from it instead.</small>
+</div>
+<div id="lpLayerToggle" style="display:none;margin-bottom:8px;">
+    <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-outline-primary active" id="lpOwnLayerBtn">District</button>
+        <button type="button" class="btn btn-outline-primary" id="lpNextLayerBtn">Division</button>
+    </div>
+    <small class="text-muted d-block mt-1">Pick a whole District, or switch to Division to narrow down to the divisions inside whichever districts are already selected below.</small>
+</div>
 <div class="lp-wrapper" id="locationPickerWrapper">
     <div class="lp-control" id="locationPickerControl">
         <div class="lp-value" id="lpValue">
@@ -337,6 +357,18 @@ if ($currentTeamLevelId) {
         var open     = false;
         var loaded   = false;
         var EXCLUDE_MS = <?php echo (int)$prid; ?>;
+        // District/Division toggle — whether the picker should fetch nodes
+        // one depth below the team level's own configured layer. Auto-set to
+        // true once (see loadNodes()'s success handler) if this person's
+        // existing assignment already sits at that deeper depth.
+        var useNextLayer = false;
+        var PRESELECTED_DEPTH = <?php echo $preselected_depth !== null ? (int)$preselected_depth : 'null'; ?>;
+        var autoDepthChecked = false;
+        // The district selection as it stood right before switching to
+        // Division mode — restored when switching back to District instead
+        // of losing it (Division mode's selection is a different, narrower
+        // thing and isn't carried back).
+        var savedDistrictSelection = null;
 
         renderChips();
         updateHiddenInputs();
@@ -375,15 +407,20 @@ if ($currentTeamLevelId) {
                     $body.append('<div style="padding:5px 14px 4px;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid #f0f0f0;">' + escHtml(curLayer) + '</div>');
                 }
                 var $row = $('<div class="lp-row"></div>');
-                if (node.is_taken) {
-                    $row.addClass('lp-row-taken');
-                    $row.append('<i class="material-icons lp-lock" style="font-size:16px;">lock</i>');
-                    $row.append($('<span>').text(node.name));
-                } else if (isSelected(node.id)) {
+                if (isSelected(node.id)) {
+                    // Already in this person's own selection takes priority
+                    // over is_taken — a Zone-fill can add a district that was
+                    // taken from someone else (see ms_action.php's
+                    // reassignment), and it must still show as removable
+                    // here, not as a locked row contradicting the chip above.
                     $row.addClass('lp-row-selectable lp-row-selected');
                     $row.append('<i class="material-icons lp-check" style="font-size:16px;">check</i>');
                     $row.append($('<span>').text(node.name));
                     $row.on('click', function () { toggleSelect(node); });
+                } else if (node.is_taken) {
+                    $row.addClass('lp-row-taken');
+                    $row.append('<i class="material-icons lp-lock" style="font-size:16px;">lock</i>');
+                    $row.append($('<span>').text(node.name));
                 } else {
                     $row.addClass('lp-row-selectable');
                     $row.append($('<span>').text(node.name));
@@ -423,18 +460,55 @@ if ($currentTeamLevelId) {
             updateHiddenInputs();
         }
 
+        function updateLayerToggleUi(resp) {
+            if (!resp || !resp.next_layer_name) {
+                $('#lpLayerToggle').hide();
+            } else {
+                $('#lpOwnLayerBtn').text(titleCase(resp.own_layer_name)).toggleClass('active', !useNextLayer);
+                $('#lpNextLayerBtn').text(titleCase(resp.next_layer_name)).toggleClass('active', useNextLayer);
+                $('#lpLayerToggle').show();
+            }
+            // "Fill from Zone" only makes sense at the own (District) depth —
+            // a Zone is always a group of whole districts, never divisions.
+            $('#lpZoneFill').toggle(!useNextLayer && !!(resp && resp.own_layer_name));
+        }
+
+        function titleCase(s) {
+            s = String(s || '').toLowerCase();
+            return s.charAt(0).toUpperCase() + s.slice(1);
+        }
+
         function loadNodes() {
             var levelId = $('#teamLevelSelect').val();
             if (!levelId) {
                 loaded = false;
                 allNodes = [];
+                $('#lpLayerToggle').hide();
                 $('#lpBody').html('<div class="lp-empty">Select a Team Level first.</div>');
                 return;
             }
             var managerId = $('#managerSelect').val() || 0;
             $('#lpBody').html('<div class="lp-loading">Loading&hellip;</div>');
-            $.getJSON('get-ms-location-options.php?team_level_id=' + levelId + '&manager_id=' + managerId + '&exclude_ms_id=' + EXCLUDE_MS, function (resp) {
+            var url = 'get-ms-location-options.php?team_level_id=' + levelId + '&manager_id=' + managerId
+                + '&exclude_ms_id=' + EXCLUDE_MS + (useNextLayer ? '&use_next_layer=1' : '');
+            $.getJSON(url, function (resp) {
                 loaded = true;
+                updateLayerToggleUi(resp);
+                // One-time auto-detect: if this person's existing assignment
+                // already sits at the deeper (Division) depth, flip the
+                // toggle and re-fetch once before the user ever sees the
+                // picker, instead of showing it stuck on "District" with
+                // their real assignment effectively hidden from new-pick
+                // candidates (the already-selected chips still show fine
+                // either way — this only affects what's offered to ADD).
+                if (!autoDepthChecked) {
+                    autoDepthChecked = true;
+                    if (!useNextLayer && resp.next_layer_depth && PRESELECTED_DEPTH === resp.next_layer_depth) {
+                        useNextLayer = true;
+                        loadNodes();
+                        return;
+                    }
+                }
                 if (resp.needs_manager) {
                     allNodes = [];
                     $('#lpBody').html('<div class="lp-empty">Select "Reports To" first.</div>');
@@ -456,6 +530,109 @@ if ($currentTeamLevelId) {
                 $('#lpBody').html('<div class="lp-empty">Failed to load. Please try again.</div>');
             });
         }
+
+        $('#lpOwnLayerBtn').on('click', function () {
+            if (!useNextLayer) return;
+            useNextLayer = false;
+            $('#lpOwnLayerBtn').addClass('active');
+            $('#lpNextLayerBtn').removeClass('active');
+            selected = savedDistrictSelection || [];
+            savedDistrictSelection = null;
+            renderChips();
+            updateHiddenInputs();
+            loadNodes();
+        });
+        $('#lpNextLayerBtn').on('click', function () {
+            if (useNextLayer) return;
+            // Remember whichever districts are already selected — Division
+            // mode narrows down to just these, not the manager's whole area
+            // (see loadDivisionsForSelectedDistricts()) — and restore them
+            // if the user switches back to District instead of losing them.
+            var priorDistrictIds = $.map(selected, function (s) { return s.id; });
+            savedDistrictSelection = selected.slice();
+            useNextLayer = true;
+            $('#lpNextLayerBtn').addClass('active');
+            $('#lpOwnLayerBtn').removeClass('active');
+            clearSelection();
+            if (priorDistrictIds.length) {
+                loadDivisionsForSelectedDistricts(priorDistrictIds);
+            } else {
+                loadNodes();
+            }
+        });
+
+        function loadDivisionsForSelectedDistricts(districtIds) {
+            loaded = false;
+            $('#lpBody').html('<div class="lp-loading">Loading&hellip;</div>');
+            $.getJSON('get-ms-divisions-for-districts.php?district_ids=' + districtIds.join(',') + '&exclude_ms_id=' + EXCLUDE_MS, function (resp) {
+                loaded = true;
+                if (resp.error || !resp.nodes || !resp.nodes.length) {
+                    allNodes = [];
+                    $('#lpBody').html('<div class="lp-empty">No divisions found under the previously-selected district(s).</div>');
+                    return;
+                }
+                allNodes = resp.nodes;
+                renderList($.trim($('#lpSearchInput').val()));
+            }).fail(function () {
+                $('#lpBody').html('<div class="lp-empty">Failed to load. Please try again.</div>');
+            });
+        }
+
+        // "Fill from Zone" — picking a zone replaces the current selection
+        // with every district in that zone, matched against whatever
+        // allNodes already holds (a district outside this manager's own
+        // scope is silently skipped exactly like picking it manually from
+        // the list would behave, rather than trusting the zone's district
+        // list blindly). Picking a different zone afterward starts over
+        // from that zone's districts rather than piling on top.
+        $.getJSON('get-ms-zones.php', function (zones) {
+            var $sel = $('#lpZoneSelect');
+            $.each(zones, function (_, z) {
+                $sel.append($('<option>').val(z.id).text(z.name));
+            });
+        });
+
+        $('#lpZoneSelect').on('change', function () {
+            var zoneId = $(this).val();
+            var zoneName = $(this).find('option:selected').text();
+            var $status = $('#lpZoneFillStatus');
+            if (!zoneId) return;
+            if (useNextLayer) { $status.text('Switch back to District first — a Zone fills in whole districts, not divisions.'); $(this).val(''); return; }
+            if (!loaded || !allNodes.length) { $status.text('Locations are still loading — please wait a moment and try again.'); return; }
+
+            $status.text('Adding…');
+            $.getJSON('get-ms-zone-districts.php?zone_id=' + zoneId, function (zoneDistricts) {
+                var byId = {};
+                $.each(allNodes, function (_, n) { byId[n.id] = n; });
+
+                // Picking a zone replaces the whole selection — it's meant
+                // as "this person's territory is now exactly this zone",
+                // not an additive pick. Whatever was selected before
+                // (manually, from the person's existing assignment, or from
+                // a previously-picked zone) is cleared first.
+                selected = [];
+
+                var added = 0, reassigned = 0, skippedOutOfScope = 0;
+                $.each(zoneDistricts, function (_, zd) {
+                    var node = byId[zd.id];
+                    if (!node) { skippedOutOfScope++; return; }
+                    selected.push({ id: node.id, name: node.name });
+                    if (node.is_taken) { reassigned++; } else { added++; }
+                });
+
+                renderChips();
+                renderList($.trim($('#lpSearchInput').val()));
+                updateHiddenInputs();
+
+                var parts = [];
+                if (added) parts.push(added + ' district(s) selected');
+                if (reassigned) parts.push(reassigned + ' moved from whoever else had them (on Update)');
+                if (skippedOutOfScope) parts.push(skippedOutOfScope + ' outside this manager\'s own district(s)');
+                $status.text((zoneName ? zoneName + ': ' : '') + (parts.length ? parts.join(', ') + '.' : 'Nothing to add.'));
+            }).fail(function () {
+                $status.text('Failed to load that Zone\'s districts. Please try again.');
+            });
+        });
 
         $('#locationPanel').on('click', function (e) { e.stopPropagation(); });
 

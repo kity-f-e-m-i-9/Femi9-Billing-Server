@@ -227,6 +227,20 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
 			<style type="text/css"> .hidden {display: none;}</style>
 
 <label class="form-label">Assign Location</label>
+<div id="lpZoneFill" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+    <label class="form-label" style="font-size:12.5px;font-weight:700;color:#475569;margin-bottom:6px;">Fill from Zone</label>
+    <select class="form-control" id="lpZoneSelect" style="background-color:#fff !important;-webkit-box-shadow:0 0 0 1000px #fff inset;">
+        <option value="">-- select a zone --</option>
+    </select>
+    <small class="text-muted d-block mt-2" id="lpZoneFillStatus">Picking a zone replaces the selection below with every district in that zone — pick a different zone to start over from it instead.</small>
+</div>
+<div id="lpLayerToggle" style="display:none;margin-bottom:8px;">
+    <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-outline-primary active" id="lpOwnLayerBtn">District</button>
+        <button type="button" class="btn btn-outline-primary" id="lpNextLayerBtn">Division</button>
+    </div>
+    <small class="text-muted d-block mt-1">Pick a whole District, or switch to Division to narrow down to the divisions inside whichever districts are already selected below.</small>
+</div>
 <div class="lp-wrapper" id="locationPickerWrapper">
     <div class="lp-control" id="locationPickerControl">
         <div class="lp-value" id="lpValue">
@@ -280,6 +294,11 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
         var selected = [];
         var open     = false;
         var loaded   = false;
+        // District/Division toggle — see ms_edit.php's matching comment.
+        var useNextLayer = false;
+        // The district selection as it stood right before switching to
+        // Division mode — see ms_edit.php's matching comment.
+        var savedDistrictSelection = null;
 
         function escHtml(str) { return $('<div>').text(str).html(); }
 
@@ -315,15 +334,17 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
                     $body.append('<div style="padding:5px 14px 4px;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid #f0f0f0;">' + escHtml(curLayer) + '</div>');
                 }
                 var $row = $('<div class="lp-row"></div>');
-                if (node.is_taken) {
-                    $row.addClass('lp-row-taken');
-                    $row.append('<i class="material-icons lp-lock" style="font-size:16px;">lock</i>');
-                    $row.append($('<span>').text(node.name));
-                } else if (isSelected(node.id)) {
+                if (isSelected(node.id)) {
+                    // Already in this person's own selection takes priority
+                    // over is_taken — see ms_edit.php's matching comment.
                     $row.addClass('lp-row-selectable lp-row-selected');
                     $row.append('<i class="material-icons lp-check" style="font-size:16px;">check</i>');
                     $row.append($('<span>').text(node.name));
                     $row.on('click', function () { toggleSelect(node); });
+                } else if (node.is_taken) {
+                    $row.addClass('lp-row-taken');
+                    $row.append('<i class="material-icons lp-lock" style="font-size:16px;">lock</i>');
+                    $row.append($('<span>').text(node.name));
                 } else {
                     $row.addClass('lp-row-selectable');
                     $row.append($('<span>').text(node.name));
@@ -363,18 +384,38 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
             updateHiddenInputs();
         }
 
+        function updateLayerToggleUi(resp) {
+            if (!resp || !resp.next_layer_name) {
+                $('#lpLayerToggle').hide();
+            } else {
+                $('#lpOwnLayerBtn').text(titleCase(resp.own_layer_name)).toggleClass('active', !useNextLayer);
+                $('#lpNextLayerBtn').text(titleCase(resp.next_layer_name)).toggleClass('active', useNextLayer);
+                $('#lpLayerToggle').show();
+            }
+            $('#lpZoneFill').toggle(!useNextLayer && !!(resp && resp.own_layer_name));
+        }
+
+        function titleCase(s) {
+            s = String(s || '').toLowerCase();
+            return s.charAt(0).toUpperCase() + s.slice(1);
+        }
+
         function loadNodes() {
             var levelId = $('#teamLevelSelect').val();
             if (!levelId) {
                 loaded = false;
                 allNodes = [];
+                $('#lpLayerToggle').hide();
                 $('#lpBody').html('<div class="lp-empty">Select a Team Level first.</div>');
                 return;
             }
             var managerId = $('#managerSelect').val() || 0;
             $('#lpBody').html('<div class="lp-loading">Loading&hellip;</div>');
-            $.getJSON('get-ms-location-options.php?team_level_id=' + levelId + '&manager_id=' + managerId + '&exclude_ms_id=0', function (resp) {
+            var url = 'get-ms-location-options.php?team_level_id=' + levelId + '&manager_id=' + managerId
+                + '&exclude_ms_id=0' + (useNextLayer ? '&use_next_layer=1' : '');
+            $.getJSON(url, function (resp) {
                 loaded = true;
+                updateLayerToggleUi(resp);
                 if (resp.needs_manager) {
                     allNodes = [];
                     $('#lpBody').html('<div class="lp-empty">Select "Reports To" first.</div>');
@@ -396,6 +437,100 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
                 $('#lpBody').html('<div class="lp-empty">Failed to load. Please try again.</div>');
             });
         }
+
+        $('#lpOwnLayerBtn').on('click', function () {
+            if (!useNextLayer) return;
+            useNextLayer = false;
+            $('#lpOwnLayerBtn').addClass('active');
+            $('#lpNextLayerBtn').removeClass('active');
+            selected = savedDistrictSelection || [];
+            savedDistrictSelection = null;
+            renderChips();
+            updateHiddenInputs();
+            loadNodes();
+        });
+        $('#lpNextLayerBtn').on('click', function () {
+            if (useNextLayer) return;
+            var priorDistrictIds = $.map(selected, function (s) { return s.id; });
+            savedDistrictSelection = selected.slice();
+            useNextLayer = true;
+            $('#lpNextLayerBtn').addClass('active');
+            $('#lpOwnLayerBtn').removeClass('active');
+            clearSelection();
+            if (priorDistrictIds.length) {
+                loadDivisionsForSelectedDistricts(priorDistrictIds);
+            } else {
+                loadNodes();
+            }
+        });
+
+        function loadDivisionsForSelectedDistricts(districtIds) {
+            loaded = false;
+            $('#lpBody').html('<div class="lp-loading">Loading&hellip;</div>');
+            $.getJSON('get-ms-divisions-for-districts.php?district_ids=' + districtIds.join(',') + '&exclude_ms_id=0', function (resp) {
+                loaded = true;
+                if (resp.error || !resp.nodes || !resp.nodes.length) {
+                    allNodes = [];
+                    $('#lpBody').html('<div class="lp-empty">No divisions found under the previously-selected district(s).</div>');
+                    return;
+                }
+                allNodes = resp.nodes;
+                renderList($.trim($('#lpSearchInput').val()));
+            }).fail(function () {
+                $('#lpBody').html('<div class="lp-empty">Failed to load. Please try again.</div>');
+            });
+        }
+
+        // "Fill from Zone" — see ms_edit.php's matching comment.
+        $.getJSON('get-ms-zones.php', function (zones) {
+            var $sel = $('#lpZoneSelect');
+            $.each(zones, function (_, z) {
+                $sel.append($('<option>').val(z.id).text(z.name));
+            });
+        });
+
+        $('#lpZoneSelect').on('change', function () {
+            var zoneId = $(this).val();
+            var zoneName = $(this).find('option:selected').text();
+            var $status = $('#lpZoneFillStatus');
+            if (!zoneId) return;
+            if (useNextLayer) { $status.text('Switch back to District first — a Zone fills in whole districts, not divisions.'); $(this).val(''); return; }
+            if (!loaded || !allNodes.length) { $status.text('Locations are still loading — please wait a moment and try again.'); return; }
+
+            $status.text('Adding…');
+            $.getJSON('get-ms-zone-districts.php?zone_id=' + zoneId, function (zoneDistricts) {
+                var byId = {};
+                $.each(allNodes, function (_, n) { byId[n.id] = n; });
+
+                // Picking a zone replaces the whole selection — see
+                // ms_edit.php's matching comment.
+                selected = [];
+
+                // A district already held by someone else is added here too
+                // (not skipped) — see ms_edit.php's matching comment; it's
+                // reassigned exclusively to this person when the form is
+                // saved (ms_action.php).
+                var added = 0, reassigned = 0, skippedOutOfScope = 0;
+                $.each(zoneDistricts, function (_, zd) {
+                    var node = byId[zd.id];
+                    if (!node) { skippedOutOfScope++; return; }
+                    selected.push({ id: node.id, name: node.name });
+                    if (node.is_taken) { reassigned++; } else { added++; }
+                });
+
+                renderChips();
+                renderList($.trim($('#lpSearchInput').val()));
+                updateHiddenInputs();
+
+                var parts = [];
+                if (added) parts.push(added + ' district(s) selected');
+                if (reassigned) parts.push(reassigned + ' moved from whoever else had them (on Add)');
+                if (skippedOutOfScope) parts.push(skippedOutOfScope + ' outside this manager\'s own district(s)');
+                $status.text((zoneName ? zoneName + ': ' : '') + (parts.length ? parts.join(', ') + '.' : 'Nothing to add.'));
+            }).fail(function () {
+                $status.text('Failed to load that Zone\'s districts. Please try again.');
+            });
+        });
 
         $('#locationPanel').on('click', function (e) { e.stopPropagation(); });
 
