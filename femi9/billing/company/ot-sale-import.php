@@ -101,16 +101,28 @@ $title = "Import OT Channel Sales";
                                     <div class="alert alert-info">
                                         <strong>How it works:</strong>
                                         <ol class="mb-2">
-                                            <li>Download the sample Excel template below — it includes every field from the Add Sale form (Company Profile, Category, Date, Invoice Number, Customer details, GST Number, Order/Ship Date, Courier Charges, State, Coupon Code, Wallet Amount) plus every active product as its own <strong>"&lt;Product&gt; Qty"</strong> / <strong>"&lt;Product&gt; Rate"</strong> / <strong>"&lt;Product&gt; Discount"</strong> column triple, generated fresh from your current product list.</li>
-                                            <li>Each row = <strong>one invoice</strong>. Fill <strong>Company Profile</strong>, <strong>Category</strong>, <strong>Date</strong> and <strong>Invoice Number</strong>, then enter a quantity in each product's Qty column you want on that invoice — leave Qty blank/0 for products not sold on that invoice. You can add as many products as you like on a single row; each product column can only be used once per row, so a product can never be added twice to the same invoice.</li>
-                                            <li>Products are matched to your catalog automatically by column, not by typing a name — Rate columns are pre-filled with each product's current price, which you can override per invoice. Fill each product's Discount column (Rs.) to reduce that line's amount, same as the manual Add Sale form.</li>
+                                            <li>Two sample templates, depending on the category you're importing — pick the one matching your rows:
+                                                <ul class="mb-1">
+                                                    <li><strong>Marketplace orders</strong> (Amazon, Flipkart, Blinkit, Jio, etc.) — leaves out Coupon Code, Customer Mobile, GST Number, Order Date and Ship Date, which don't apply to these. Invoice Number is always typed in manually (your own order number).</li>
+                                                    <li><strong>Website / ID Concept / WhatsApp Sales / Digital Orders</strong> — keeps every field, and its Invoice Number column additionally accepts the word <strong>NEXT</strong> (see below).</li>
+                                                </ul>
+                                            </li>
+                                            <li>Each row = <strong>one product line</strong>, not one invoice. Pick the product from the dropdown and fill Qty/Rate/Discount for just that product — only the columns for the product you picked are relevant on that row, nothing else needs filling. To put several products on the same invoice, add one row per product and repeat the same <strong>Invoice Number</strong> on each row — those invoice-level columns auto-fill down from the row above once you pick a product.</li>
+                                            <li>For the Website/ID Concept/WhatsApp Sales/Digital Orders template specifically: to add another product to the invoice directly above, leave Invoice Number <strong>blank</strong> on that row (don't retype or carry anything) — only pick the product. To start a brand-new invoice, type the word <strong>NEXT</strong> into Invoice Number and the next sequential number for that category + company is generated automatically, exactly like the Add Sale form suggests. You can still type an exact invoice number yourself instead of NEXT if you need to.</li>
+                                            <li><strong>Warehouse Code</strong> is optional — leave it blank unless your Company Profile tracks stock separately per physical warehouse (e.g. HO, G1). If it does, stock is checked and deducted against the specific warehouse you type here, not the company's total; an unrecognized code or one not linked to that Company Profile is rejected.</li>
+                                            <li>A product can only be used once per invoice — a repeated product on the same invoice is rejected.</li>
+                                            <li>Products are matched to your catalog by the dropdown selection, not by typing a name — pick straight from the list so the product links to the real catalog entry.</li>
                                             <li><strong>Wallet Amount</strong> is deducted from the invoice's grand total, same as Add Sale — but only applies when Category is <strong>Website</strong> or <strong>ID Concept</strong>; it's ignored for any other category. <strong>Coupon Code</strong> (SS/S/SD/D-prefixed) triggers the same channel-partner commission credit as a manually added sale.</li>
                                             <li>Rows are validated for stock availability before anything is saved — if any row fails, the whole file is rejected and nothing is imported.</li>
                                             <li>Invoice numbers that already exist for the same category are skipped and reported after upload.</li>
                                         </ol>
-                                        <a href="ot-sale-import-template.php" class="btn btn-sm btn-outline-primary">
+                                        <a href="ot-sale-import-template.php?group=marketplace" class="btn btn-sm btn-outline-primary">
                                             <i class="material-icons-outlined" style="vertical-align:middle;font-size:16px">download</i>
-                                            Download Sample Excel Template
+                                            Download Marketplace Template
+                                        </a>
+                                        <a href="ot-sale-import-template.php?group=tracked" class="btn btn-sm btn-outline-primary">
+                                            <i class="material-icons-outlined" style="vertical-align:middle;font-size:16px">download</i>
+                                            Download Website / ID Concept / WhatsApp / Digital Orders Template
                                         </a>
                                     </div>
 

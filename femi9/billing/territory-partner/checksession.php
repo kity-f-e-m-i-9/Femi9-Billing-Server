@@ -76,6 +76,33 @@ if (!empty($result_LoGuserDtails['must_change_password'])) {
     }
 }
 
+// Force the Territory Partner Agreement to be read & signed before any
+// other page is usable -- same gate pattern as must_change_password above.
+// is_locked only ever becomes 1 via agreement-action.php's own signature
+// submission (or stays 0 if Company later unlocks it for re-signing after
+// an edit), so this naturally re-blocks the rest of the portal again
+// whenever that happens, not just on a brand new account.
+//
+// Only active once Company has switched on "Work All TPs" on
+// manage-agreements.php (agreement_settings.tp_sign_enforced) -- before
+// that, a TP can use every page as usual, same as before this gate existed.
+$__currentPage = basename($_SERVER['PHP_SELF'] ?? '');
+if (!in_array($__currentPage, ['agreement.php', 'agreement-action.php', 'change-password.php', 'logout.php'], true)) {
+    $__enforceRes = $db_conn->query("SELECT tp_sign_enforced FROM agreement_settings WHERE id = 1");
+    $__enforceRow = $__enforceRes ? $__enforceRes->fetch_assoc() : null;
+    if ((int) ($__enforceRow['tp_sign_enforced'] ?? 0) === 1) {
+        $__stmtAgr = $db_conn->prepare("SELECT is_locked FROM territory_partner_agreements WHERE territory_partner_id = ?");
+        $__stmtAgr->bind_param('i', $result_LoGuserDtails['id']);
+        $__stmtAgr->execute();
+        $__agrRow = $__stmtAgr->get_result()->fetch_assoc();
+        $__stmtAgr->close();
+        if ((int) ($__agrRow['is_locked'] ?? 0) !== 1) {
+            header('Location: agreement.php');
+            exit;
+        }
+    }
+}
+
 if (!isset($_SESSION['LOGIN_USER_ID'])) {
     $_SESSION['LOGIN_USER_ID'] = $result_LoGuserDtails['id'];
 }

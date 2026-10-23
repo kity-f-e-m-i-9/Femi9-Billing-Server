@@ -62,7 +62,6 @@ ob_start();
         .agr-value { color:#374151; }
         .agr-value.agr-blank { color:#9ca3af; font-style:italic; }
         .agr-ul { margin:8px 0 8px 20px; }
-        .agr-witness-box { border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin-top:14px; }
         .agr-sig-block { margin-top:14px; padding-top:10px; border-top:1px dashed #e5e7eb; }
         .agr-sig-img { max-width:200px; max-height:44px; object-fit:contain; border-bottom:1px solid #9ca3af; }
         .agr-pan-img { max-width:320px; max-height:220px; display:block; margin-top:6px; border:1px solid #e5e7eb; border-radius:4px; }
@@ -117,7 +116,12 @@ ob_start();
                     <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
                         <h1 style="font-size:20px;font-weight:600;color:#1f2937;margin:0;">Channel Partner Agreement</h1>
                         <?php if ($isLocked): ?>
+                        <div style="display:flex;gap:8px;">
+                        <?php if (!empty($agreement['cp_signature'])): ?>
+                        <button type="button" class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="window.open('digi-card.php', '_blank')">View Your CP Card</button>
+                        <?php endif; ?>
                         <button type="button" class="btn btn-primary btn-sm" onclick="window.open('agreement.php?print=1', '_blank')">Print / Save as PDF</button>
+                        </div>
                         <?php endif; ?>
                     </div>
 
@@ -172,7 +176,7 @@ ob_start();
                         <p><strong>CHANNEL PARTNER</strong></p>
                         <div class="agr-field-row<?php echo $profileChanged['name'] ? ' agr-row-changed' : ''; ?>"><label>Name:</label><span class="agr-value"><?php echo fv($cp['name']); ?></span></div>
                         <div class="agr-field-row<?php echo $profileChanged['company_name'] ? ' agr-row-changed' : ''; ?>"><label>Business / Entity Name:</label><span class="agr-value<?php echo empty($cp['company_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['company_name'] ?: 'Not applicable'); ?></span></div>
-                        <div class="agr-field-row<?php echo $profileChanged['address'] ? ' agr-row-changed' : ''; ?>"><label>Address:</label><span class="agr-value"><?php echo fv($cp['address']); ?></span></div>
+                        <div class="agr-field-row<?php echo $profileChanged['address'] ? ' agr-row-changed' : ''; ?>"><label>Address:</label><span class="agr-value"><?php echo fv(partner_billing_address_line($cp)); ?></span></div>
                         <div class="agr-field-row<?php echo $profileChanged['mobile'] ? ' agr-row-changed' : ''; ?>"><label>Mobile Number:</label><span class="agr-value"><?php echo fv($cp['mobile']); ?></span></div>
                         <div class="agr-field-row<?php echo $profileChanged['email'] ? ' agr-row-changed' : ''; ?>"><label>Email Address:</label><span class="agr-value<?php echo empty($cp['email']) ? ' agr-blank' : ''; ?>"><?php echo fv($cp['email'] ?: '—'); ?></span></div>
                         <p>(hereinafter referred to as the "Channel Partner" or "CP", which expression shall, unless repugnant to the context or meaning thereof, include, where applicable, its successors, legal representatives, heirs, executors, administrators and permitted assigns).</p>
@@ -220,7 +224,7 @@ ob_start();
                             <li>Separate operational and commercial accountability shall be maintained for each allotted Division covered under this Agreement.</li>
                             <li>Company Stock shall remain the exclusive property of FEMI9 until released through authorized business transactions.</li>
                             <li>Warehouse operations, stock handling, inventory management and stock handover shall be carried out strictly in accordance with the Company's authorized procedures.</li>
-                            <li>All operational policies, SOPs, commercial policies and authorized business communications issued by FEMI9 from time to time shall be complied with.</li>
+                            <li>All operational policies, Standard Operating Procedures (SOPs), commercial policies and authorized business communications issued by FEMI9 from time to time shall be complied with.</li>
                             <li>All information and documents furnished to FEMI9 in connection with this appointment are true, complete and accurate to the best of the Channel Partner's knowledge.</li>
                             <li>The Channel Partner voluntarily accepts this appointment and undertakes to faithfully perform all obligations contained in this Agreement.</li>
                             <li>The Channel Partner acknowledges that no promise, assurance or representation other than those expressly contained in this Agreement shall be binding upon FEMI9.</li>
@@ -230,8 +234,16 @@ ob_start();
                         <p><strong>FOR FEMI9 LLP</strong></p>
                         <div class="agr-field-row"><label>Authorized Signatory Name:</label><span class="agr-value<?php echo empty($settings['authorized_signatory_name']) ? ' agr-blank' : ''; ?>"><?php echo fv($settings['authorized_signatory_name'] ?: 'To be set by Company'); ?></span></div>
                         <div class="agr-field-row"><label>Designation:</label><span class="agr-value<?php echo empty($settings['authorized_signatory_designation']) ? ' agr-blank' : ''; ?>"><?php echo fv($settings['authorized_signatory_designation'] ?: 'To be set by Company'); ?></span></div>
-                        <?php if (!empty($settings['authorized_signatory_signature'])): ?>
-                        <div class="agr-field-row"><label>Signature:</label><span class="agr-value"><img src="<?php echo $printMode ? fv(__DIR__ . '/../company/company_signature/' . $settings['authorized_signatory_signature']) : '../company/company_signature/' . fv($settings['authorized_signatory_signature']); ?>" class="agr-sig-img"></span></div>
+                        <?php
+                        $__companySigSrc = null;
+                        if (!empty($settings['authorized_signatory_signature'])) {
+                            $__companySigSrc = $printMode
+                                ? image_file_as_data_uri(__DIR__ . '/../company/company_signature/' . $settings['authorized_signatory_signature'])
+                                : '../company/company_signature/' . fv($settings['authorized_signatory_signature']);
+                        }
+                        ?>
+                        <?php if ($__companySigSrc): ?>
+                        <div class="agr-field-row"><label>Signature:</label><span class="agr-value"><img src="<?php echo $__companySigSrc; ?>" class="agr-sig-img"></span></div>
                         <?php endif; ?>
 
                         <p style="margin-top:18px;"><strong>FOR THE CHANNEL PARTNER</strong></p>
@@ -275,9 +287,13 @@ ob_start();
                             <?php if ($isLocked): ?>
                                 <?php if (!empty($agreement['pan_card_path'])): ?>
                                     <a href="kyc_documents/<?php echo fv($agreement['pan_card_path']); ?>" target="_blank" class="agr-value">View Uploaded PAN Card</a>
-                                    <?php if (pan_card_is_displayable_image($agreement['pan_card_path'])): ?>
+                                    <?php if (!$printMode && pan_card_is_displayable_image($agreement['pan_card_path'])): ?>
                                         <img src="kyc_documents/<?php echo fv($agreement['pan_card_path']); ?>" class="agr-pan-img">
                                     <?php endif; ?>
+                                    <?php // In print mode, inline_pan_card_image_for_pdf() replaces the <a> above
+                                          // with a data-URI <img> itself (a relative kyc_documents/ path, like this
+                                          // one, has no base href to resolve against inside dompdf and renders as a
+                                          // broken-image icon — see image_file_as_data_uri()'s doc comment). ?>
                                 <?php else: ?>
                                     <span class="agr-value agr-blank">Not uploaded</span>
                                 <?php endif; ?>
@@ -294,89 +310,16 @@ ob_start();
                             <?php endif; ?>
                         </div>
 
-                        <div class="agr-witness-box">
-                            <p style="font-weight:700;">WITNESS &ndash; 1</p>
-                            <div class="agr-field-row"><label>Name:</label>
-                                <?php if ($isLocked): ?><span class="agr-value"><?php echo fv($agreement['witness1_name']); ?></span>
-                                <?php else: ?><input type="text" name="witness1_name" value="<?php echo fv($agreement['witness1_name']); ?>">
-                                <?php endif; ?>
-                            </div>
-                            <div class="agr-field-row"><label>Address:</label>
-                                <?php if ($isLocked): ?><span class="agr-value"><?php echo fv($agreement['witness1_address']); ?></span>
-                                <?php else: ?><input type="text" name="witness1_address" value="<?php echo fv($agreement['witness1_address']); ?>">
-                                <?php endif; ?>
-                            </div>
-                            <?php if ($isLocked): ?>
-                            <div class="agr-field-row"><label>Signature:</label>
-                                <?php if (!empty($agreement['witness1_signature'])): ?>
-                                    <img src="<?php echo fv($agreement['witness1_signature']); ?>" class="agr-sig-img">
-                                <?php else: ?>
-                                    <span class="agr-value agr-blank">&mdash;</span>
-                                <?php endif; ?>
-                            </div>
-                            <?php elseif (!empty($agreement['witness1_signature'])): ?>
-                            <div class="agr-sig-block no-print">
-                                <label style="font-weight:600;display:block;margin-bottom:6px;">Signature:</label>
-                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-                                    <input type="radio" name="witness1_sig_choice" id="witness1SigChoiceReuse" checked> Use previous signature
-                                </label>
-                                <img src="<?php echo fv($agreement['witness1_signature']); ?>" class="agr-sig-img" style="margin-bottom:10px;">
-                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;">
-                                    <input type="radio" name="witness1_sig_choice" id="witness1SigChoiceNew"> Draw a new signature instead
-                                </label>
-                                <div id="witness1SigContainer" style="display:none;margin-top:8px;"></div>
-                                <input type="hidden" name="witness1_signature" id="witness1_signature_input" value="<?php echo fv($agreement['witness1_signature']); ?>">
-                            </div>
-                            <?php else: ?>
-                            <div class="agr-sig-block">
-                                <label style="font-weight:600;display:block;margin-bottom:6px;">Signature:</label>
-                                <div id="witness1SigContainer" class="no-print"></div>
-                                <input type="hidden" name="witness1_signature" id="witness1_signature_input">
-                            </div>
-                            <?php endif; ?>
+                        <?php if ($isLocked && !empty($agreement['cp_signature']) && !$printMode): ?>
+                        <!-- Digi Card is deliberately on-screen only (via the "View Your
+                             CP Card" button and this preview) -- not embedded in the
+                             printed/PDF Agreement itself; Company asked for the printed
+                             document to stay just the agreement text and signatures. -->
+                        <div class="agr-field-row no-print" style="display:block;">
+                            <label style="display:block;margin-bottom:8px;">Your Digi Card:</label>
+                            <img src="digi-card.php?t=<?php echo (int) strtotime($agreement['signed_at'] ?? 'now'); ?>" style="max-width:100%;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);">
                         </div>
-
-                        <div class="agr-witness-box">
-                            <p style="font-weight:700;">WITNESS &ndash; 2</p>
-                            <div class="agr-field-row"><label>Name:</label>
-                                <?php if ($isLocked): ?><span class="agr-value"><?php echo fv($agreement['witness2_name']); ?></span>
-                                <?php else: ?><input type="text" name="witness2_name" value="<?php echo fv($agreement['witness2_name']); ?>">
-                                <?php endif; ?>
-                            </div>
-                            <div class="agr-field-row"><label>Address:</label>
-                                <?php if ($isLocked): ?><span class="agr-value"><?php echo fv($agreement['witness2_address']); ?></span>
-                                <?php else: ?><input type="text" name="witness2_address" value="<?php echo fv($agreement['witness2_address']); ?>">
-                                <?php endif; ?>
-                            </div>
-                            <?php if ($isLocked): ?>
-                            <div class="agr-field-row"><label>Signature:</label>
-                                <?php if (!empty($agreement['witness2_signature'])): ?>
-                                    <img src="<?php echo fv($agreement['witness2_signature']); ?>" class="agr-sig-img">
-                                <?php else: ?>
-                                    <span class="agr-value agr-blank">&mdash;</span>
-                                <?php endif; ?>
-                            </div>
-                            <?php elseif (!empty($agreement['witness2_signature'])): ?>
-                            <div class="agr-sig-block no-print">
-                                <label style="font-weight:600;display:block;margin-bottom:6px;">Signature:</label>
-                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-                                    <input type="radio" name="witness2_sig_choice" id="witness2SigChoiceReuse" checked> Use previous signature
-                                </label>
-                                <img src="<?php echo fv($agreement['witness2_signature']); ?>" class="agr-sig-img" style="margin-bottom:10px;">
-                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;">
-                                    <input type="radio" name="witness2_sig_choice" id="witness2SigChoiceNew"> Draw a new signature instead
-                                </label>
-                                <div id="witness2SigContainer" style="display:none;margin-top:8px;"></div>
-                                <input type="hidden" name="witness2_signature" id="witness2_signature_input" value="<?php echo fv($agreement['witness2_signature']); ?>">
-                            </div>
-                            <?php else: ?>
-                            <div class="agr-sig-block">
-                                <label style="font-weight:600;display:block;margin-bottom:6px;">Signature:</label>
-                                <div id="witness2SigContainer" class="no-print"></div>
-                                <input type="hidden" name="witness2_signature" id="witness2_signature_input">
-                            </div>
-                            <?php endif; ?>
-                        </div>
+                        <?php endif; ?>
 
                         <h2>ACKNOWLEDGEMENT</h2>
                         <p>By signing this Agreement, the Parties acknowledge that they have read, understood and voluntarily accepted all the terms and conditions contained herein and agree to be legally bound by the provisions of this Division Channel Partner Agreement. This Agreement shall become effective from the Effective Date specified in Schedule&nbsp;&ndash;&nbsp;1 and shall remain in force until terminated in accordance with the provisions of this Agreement.</p>
@@ -407,15 +350,11 @@ ob_start();
 <script src="../../assets/js/signature-pad.js"></script>
 <script>
     initSignaturePad('cpSigContainer', 'cp_signature_input');
-    initSignaturePad('witness1SigContainer', 'witness1_signature_input');
-    initSignaturePad('witness2SigContainer', 'witness2_signature_input');
 
     // Re-sign flow: default to reusing the signature already on file instead
     // of forcing a fresh draw every time the Company edits the schedule or
     // wording — switching to "Draw a new signature" clears it so a stale
     // value can never be submitted alongside an unfinished new drawing.
-    // Same pattern applies to both witnesses, who sign once and don't need
-    // to redo it on every re-sign round.
     function wireSigReuseToggle(reuseId, freshId, containerId, inputId) {
         var reuse = document.getElementById(reuseId);
         var fresh = document.getElementById(freshId);
@@ -431,13 +370,8 @@ ob_start();
         });
     }
     wireSigReuseToggle('sigChoiceReuse', 'sigChoiceNew', 'cpSigContainer', 'cp_signature_input');
-    wireSigReuseToggle('witness1SigChoiceReuse', 'witness1SigChoiceNew', 'witness1SigContainer', 'witness1_signature_input');
-    wireSigReuseToggle('witness2SigChoiceReuse', 'witness2SigChoiceNew', 'witness2SigContainer', 'witness2_signature_input');
 
     function prepareSignaturesAndValidate() {
-        // Only the Channel Partner's own signature is mandatory — witnesses
-        // are optional, and filling in just one of the two is fine (not
-        // both required). Confirmed 2026-09-28.
         var cpSig = document.getElementById('cp_signature_input').value;
         if (!cpSig) { alert('Please provide your signature (draw or type) before submitting.'); return false; }
 
@@ -493,20 +427,19 @@ if ($printMode) {
 
     $pdfHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>
         @page { size: A4; margin: ' . $marginTopPt . 'pt ' . $marginSidePt . 'pt ' . $marginBottomPt . 'pt ' . $marginSidePt . 'pt; }
-        body { margin:0; background:#ffffff; font-family: "Calibri", "DejaVu Sans", sans-serif; font-size:12px; line-height:1.6; color:#1f2937; }
-        .agr-doc { font-size:12px; }
+        body { margin:0; background:#ffffff; font-family: "Calibri", "DejaVu Sans", sans-serif; font-size:13.5px; line-height:1.6; color:#1f2937; }
+        .agr-doc { font-size:13.5px; }
         .agr-doc h1 { font-size:18px; text-align:center; margin-bottom:20px; font-family: "Calibri", "DejaVu Sans", sans-serif; font-weight:bold; }
-        .agr-doc h2 { font-size:14px; margin:22px 0 8px; page-break-after:avoid; page-break-inside:avoid; font-family: "Calibri", "DejaVu Sans", sans-serif; font-weight:bold; }
+        .agr-doc h2 { font-size:15.5px; margin:22px 0 8px; page-break-after:avoid; page-break-inside:avoid; font-family: "Calibri", "DejaVu Sans", sans-serif; font-weight:bold; }
         .agr-doc h2 + p { page-break-before:avoid; }
-        .agr-pdf-keeptogether { page-break-inside: avoid; }
-        .agr-doc p { orphans:3; widows:3; }
+        .agr-pdf-keeptogether { page-break-inside: avoid; break-inside: avoid-page; }
+        .agr-doc p { orphans:4; widows:3; }
         .agr-field-row { display:table; width:100%; margin:10px 0; }
         .agr-field-row label { display:table-cell; font-weight:bold; width:200px; padding-right:8px; font-family: "Calibri", "DejaVu Sans", sans-serif; }
         .agr-field-row .agr-value { display:table-cell; border-bottom:1px solid #9ca3af; padding:2px 4px; }
         .agr-value { color:#374151; }
         .agr-value.agr-blank { color:#9ca3af; font-style:italic; }
         .agr-ul { margin:8px 0 8px 20px; }
-        .agr-witness-box { border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin-top:14px; }
         .agr-sig-img { max-width:200px; max-height:44px; }
         .agr-pan-img { max-width:320px; max-height:220px; display:block; margin-top:4px; border:1px solid #e5e7eb; }
         .agr-schedule-changed { background:#ffd400; border:1px solid #c9a600; border-radius:8px; padding:12px 16px; margin:10px 0; }

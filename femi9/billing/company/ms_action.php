@@ -62,14 +62,32 @@ if(isset($_REQUEST['add-customer']))
 				UNIQUE KEY uk_ms_location (ms_id, location_id)
 			)");
 			$stmt_loc = $db_conn->prepare("INSERT IGNORE INTO marketing_staff_locations (ms_id, location_id) VALUES (?, ?)");
+			$assigned_loc_ids = [];
 			foreach ($_POST['location_ids'] as $loc_id) {
 				$loc_id = (int)$loc_id;
 				if ($loc_id > 0) {
 					$stmt_loc->bind_param('ii', $new_ms_id, $loc_id);
 					$stmt_loc->execute();
+					$assigned_loc_ids[] = $loc_id;
 				}
 			}
 			$stmt_loc->close();
+
+			// Exclusive assignment: a district/division just given to this
+			// person (e.g. via "Fill from Zone" on Add Marketing Staff) is
+			// taken away from whoever else held it, instead of two staff
+			// quietly holding the same location at once — per request
+			// 2026-10-20, so a Zone-filled location always lands with
+			// exactly one owner.
+			if (!empty($assigned_loc_ids)) {
+				$loc_ph = implode(',', array_fill(0, count($assigned_loc_ids), '?'));
+				$stmt_reassign = $db_conn->prepare(
+					"DELETE FROM marketing_staff_locations WHERE location_id IN ($loc_ph) AND ms_id != ?"
+				);
+				$stmt_reassign->bind_param(str_repeat('i', count($assigned_loc_ids)) . 'i', ...array_merge($assigned_loc_ids, [$new_ms_id]));
+				$stmt_reassign->execute();
+				$stmt_reassign->close();
+			}
 		}
 
 		echo "<script>window.location='ms_manage?addesuccess';</script>";
@@ -133,14 +151,31 @@ if(isset($_REQUEST['update-customer']))
 		$stmt_del_loc->close();
 		if (!empty($_POST['location_ids']) && is_array($_POST['location_ids'])) {
 			$stmt_loc = $db_conn->prepare("INSERT IGNORE INTO marketing_staff_locations (ms_id, location_id) VALUES (?, ?)");
+			$assigned_loc_ids = [];
 			foreach ($_POST['location_ids'] as $loc_id) {
 				$loc_id = (int)$loc_id;
 				if ($loc_id > 0) {
 					$stmt_loc->bind_param('ii', $update_id_int, $loc_id);
 					$stmt_loc->execute();
+					$assigned_loc_ids[] = $loc_id;
 				}
 			}
 			$stmt_loc->close();
+
+			// Exclusive assignment — see the matching comment in the
+			// add-customer branch above. Re-saving this person's locations
+			// (e.g. after "Fill from Zone" pulled in a district someone else
+			// already held) takes it away from that other person instead of
+			// leaving both holding it.
+			if (!empty($assigned_loc_ids)) {
+				$loc_ph = implode(',', array_fill(0, count($assigned_loc_ids), '?'));
+				$stmt_reassign = $db_conn->prepare(
+					"DELETE FROM marketing_staff_locations WHERE location_id IN ($loc_ph) AND ms_id != ?"
+				);
+				$stmt_reassign->bind_param(str_repeat('i', count($assigned_loc_ids)) . 'i', ...array_merge($assigned_loc_ids, [$update_id_int]));
+				$stmt_reassign->execute();
+				$stmt_reassign->close();
+			}
 		}
 
 		echo "<script>window.location='ms_manage?updatedSuccess';</script>";

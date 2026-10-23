@@ -52,6 +52,7 @@ if ($typeFilter !== '') {
 
 $stmt = $db_conn->prepare(
     "SELECT o.id, o.order_date, o.status, o.transfer_id, o.cp_invoice_id, o.cancel_reason, o.product_type, o.channel_partner_id,
+            o.created_by_user_type,
             cp.name AS cp_name, cp.cp_id AS cp_code,
             i.product_id, i.qty, i.price, i.amount, p.productName
      FROM channel_partner_purchase_orders o
@@ -78,6 +79,7 @@ foreach ($rows as $r) {
             'cp_invoice_id'      => $r['cp_invoice_id'],
             'cancel_reason'      => $r['cancel_reason'],
             'product_type'       => $r['product_type'] ?? 'napkin',
+            'created_by_user_type' => $r['created_by_user_type'] ?? 'cp',
             'cp_id'              => (int)$r['channel_partner_id'],
             'cp_name'            => $r['cp_name'],
             'cp_code'            => $r['cp_code'],
@@ -184,6 +186,17 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
     </style>
 </head>
 <body>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<?php if (isset($_SESSION['successMessage'])) {
+    $sm = $_SESSION['successMessage']; ?>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>Swal.fire({ icon:'success', title:'Success', text:'<?php echo htmlspecialchars($sm, ENT_QUOTES); ?>', confirmButtonText:'OK' });</script>
+<?php unset($_SESSION['successMessage']); } ?>
+<?php if (isset($_SESSION['errorMessage'])) {
+    $em = $_SESSION['errorMessage']; ?>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>Swal.fire({ icon:'error', title:'Warning', text:'<?php echo htmlspecialchars($em, ENT_QUOTES); ?>', confirmButtonText:'OK' });</script>
+<?php unset($_SESSION['errorMessage']); } ?>
 <div class="app align-content-stretch d-flex flex-wrap">
     <div class="app-sidebar">
         <?php include("logo.php"); ?>
@@ -197,7 +210,7 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
 
                     <!-- Page Header -->
                     <div class="row">
-                        <div class="col">
+                        <div class="col d-flex align-items-center justify-content-between flex-wrap" style="gap:10px;">
                             <div class="page-description">
                                 <h1>
                                     <table class="headertble"><tr>
@@ -205,6 +218,9 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
                                     </tr></table>
                                 </h1>
                             </div>
+                            <a href="cp-add-purchase-order.php" class="btn btn-primary">
+                                <i class="material-icons" style="vertical-align:middle;font-size:18px;">add</i> New Purchase Order
+                            </a>
                         </div>
                     </div>
 
@@ -321,6 +337,9 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
                                             <td>
                                                 <code style="font-size:12px;background:#f3f4f6;padding:2px 7px;border-radius:4px;"><?=htmlspecialchars($o['cp_code'])?></code><br>
                                                 <span style="font-weight:600;font-size:13.5px;color:#1f2937;"><?=htmlspecialchars($o['cp_name'])?></span>
+                                                <?php if ($o['created_by_user_type'] === 'company'): ?>
+                                                <br><span style="font-size:10px;font-weight:600;color:#7c3aed;">Created by Company</span>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?=$tBg?>;color:<?=$tFg?>;"><?=htmlspecialchars(tpProductTypeLabel($poType))?></span>

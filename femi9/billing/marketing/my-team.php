@@ -3,7 +3,7 @@ include("checksession.php");
 include("config.php");
 require_once("include/TeamLevelColors.php");
 require_once("include/TeamSubtree.php");
-require_once("include/TeamTargetRollup.php");
+require_once __DIR__ . '/../company/include/TeamTargetRollup.php';
 error_reporting(0);
 
 $rootId = (int)$markeingSTFID;

@@ -4,15 +4,23 @@
  *
  * Parses an uploaded Excel file (see ot-sale-import-template.php) and creates
  * ot_sales_invoice / ot_sales rows, mirroring ot-sale-action.php's add-record
- * insert logic. One spreadsheet row = one invoice; every active product has
- * its own "<Name> Qty" / "<Name> Rate" column pair, so a single row can carry
- * several products at once and each product can only appear once per row —
- * there's no way to add the same product twice under one invoice.
+ * insert logic. One spreadsheet row = one PRODUCT LINE, not one invoice —
+ * rows that share the same Invoice Number + Category are grouped back into a
+ * single invoice, so a multi-product invoice is entered as one row per
+ * product with the Invoice Number repeated. The same product can't appear
+ * twice under one invoice (checked across all of that invoice's rows).
  *
- * Columns are matched to products by the product_id embedded in row 2 of the
- * template (falls back to matching the "<Name> Qty"/"<Name> Rate" header text
- * against the live product list if row 2 is missing/edited), not by re-typing
- * product names, so the product is always linked to the real DB record.
+ * Invoice Number has two extra conventions, used only by the
+ * tracked-category template (Website/ID Concept/WhatsApp Sales/Digital
+ * Orders — see OT_TRACKED_INVOICE_CATS in OtInvoiceNumberGenerator.php):
+ * left BLANK, it means "another product line on the invoice directly
+ * above"; the literal word "NEXT" means "auto-generate this category's
+ * next sequential invoice number", the same convention the manual Add Sale
+ * form suggests. Every other category always needs a real typed number.
+ *
+ * The Product column is matched against the live product list by its short
+ * name (see OtImportProducts.php — same label the template's dropdown
+ * shows), not a free-typed name, so it's always linked to a real DB record.
  *
  * The whole file is validated (stock availability, required fields, known
  * lookups) before any DB write — if any row fails, nothing is imported.
@@ -26,6 +34,8 @@ include("config.php");
 require_once("include/StockService.php");
 require_once("include/GodownAccess.php");
 include("RemoveSpecialChar.php");
+require_once("include/OtImportProducts.php");
+require_once("include/OtInvoiceNumberGenerator.php");
 require '../../../vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -104,6 +114,7 @@ try {
 // ---------------------------------------------------------------------
 $fixedFieldMap = [
     'company profile'  => 'godown',
+    'warehouse code'   => 'warehouse_code',
     'category'         => 'cat',
     'date'             => 'date',
     'invoice number'   => 'inv_number',
@@ -119,6 +130,10 @@ $fixedFieldMap = [
     'state'            => 'state',
     'coupon code'      => 'coupon_code',
     'wallet amount'    => 'wallet_amount',
+    'product'          => 'product_name',
+    'qty'              => 'qty',
+    'rate'             => 'rate',
+    'discount'         => 'discount',
 ];
 
 function ot_import_normalize_header($raw) {
@@ -144,28 +159,7 @@ if ($header_row_num === null) {
     ot_import_back([]);
 }
 
-// The template puts "product_id:<id>" markers in the row right after the
-// header, one per Qty/Rate column pair — that's the authoritative link back
-// to the product. If that marker row is missing/blank (user deleted it),
-// fall back to matching header text against the live product list by name.
-$row_nums_all = array_keys($rows);
-$header_pos = array_search($header_row_num, $row_nums_all, true);
-$marker_row_num = $row_nums_all[$header_pos + 1] ?? null;
-$markerRow = ($marker_row_num !== null) ? $rows[$marker_row_num] : [];
-
 $colToFixedField = [];
-$colToProductId = []; // col => product_id, for Qty columns
-$rateColForQtyCol = []; // qty col => rate col
-$discColForQtyCol = []; // qty col => discount col (optional — template may omit it)
-
-$activeProductByName = [];
-$res = $db_conn->query(
-    "SELECT id, productName, gst, hsn FROM products
-     WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL)"
-);
-while ($row = $res->fetch_assoc()) {
-    $activeProductByName[strtolower(trim($row['productName']))] = $row;
-}
 
 $headerRowData = $rows[$header_row_num];
 $colKeys = array_keys($headerRowData);
@@ -176,36 +170,6 @@ foreach ($colKeys as $idx => $col) {
 
     if (isset($fixedFieldMap[$norm])) {
         $colToFixedField[$col] = $fixedFieldMap[$norm];
-        continue;
-    }
-
-    if (preg_match('/^(.*)\s+qty$/i', trim($rawHeader), $m)) {
-        $productLabel = trim($m[1]);
-        $nextCol = $colKeys[$idx + 1] ?? null;
-        $afterNextCol = $colKeys[$idx + 2] ?? null;
-
-        $pid = 0;
-        $markerVal = (string)($markerRow[$col] ?? '');
-        if (preg_match('/^product_id:(\d+)$/', trim($markerVal), $pm)) {
-            $pid = (int)$pm[1];
-        } elseif (isset($activeProductByName[strtolower($productLabel)])) {
-            $pid = (int)$activeProductByName[strtolower($productLabel)]['id'];
-        }
-
-        if ($pid > 0) {
-            $colToProductId[$col] = $pid;
-            if ($nextCol !== null) {
-                $rateColForQtyCol[$col] = $nextCol;
-            }
-            // Discount column is optional — only wire it up if the next
-            // header actually says "<Product> Discount" for this same product.
-            if ($afterNextCol !== null) {
-                $afterNextHeader = trim((string)($headerRowData[$afterNextCol] ?? ''));
-                if (strcasecmp($afterNextHeader, $productLabel . ' Discount') === 0) {
-                    $discColForQtyCol[$col] = $afterNextCol;
-                }
-            }
-        }
     }
 }
 
@@ -215,10 +179,19 @@ if (!in_array('inv_number', $colToFixedField, true)) {
     ot_import_back([]);
 }
 
-if (empty($colToProductId)) {
+if (!in_array('product_name', $colToFixedField, true) || !in_array('qty', $colToFixedField, true) || !in_array('rate', $colToFixedField, true)) {
     @unlink($stored_path);
-    $_SESSION['errorMessage'] = "No product Qty/Rate columns were recognized — please use the provided sample template without altering the product columns.";
+    $_SESSION['errorMessage'] = "The template is missing the required 'Product' / 'Qty' / 'Rate' column — please use the provided sample template.";
     ot_import_back([]);
+}
+
+// Live product list, keyed by the same short name the template's Product
+// dropdown shows (see OtImportProducts.php) — case-insensitive match.
+$productByShortName = [];
+$productById = [];
+foreach (ot_import_active_products($db_conn) as $p) {
+    $productByShortName[strtolower(trim($p['short_name']))] = $p;
+    $productById[(int)$p['id']] = $p;
 }
 
 // ---------------------------------------------------------------------
@@ -229,6 +202,25 @@ $godownByName = [];
 $res = $db_conn->query("SELECT id, gname FROM company_godown");
 while ($row = $res->fetch_assoc()) {
     $godownByName[strtolower(trim($row['gname']))] = (int)$row['id'];
+}
+
+// Optional per-invoice physical warehouse (Warehouse Code column) — same
+// "Godown (physical)" concept the manual Add Sale form offers. Left blank,
+// stock is checked/deducted against the untracked (no-warehouse) stock row,
+// same as before this column existed.
+$warehouseByCode = [];
+$res = $db_conn->query("SELECT id, code FROM warehouses WHERE is_active = 1");
+while ($row = $res->fetch_assoc()) {
+    $warehouseByCode[strtolower(trim($row['code']))] = (int)$row['id'];
+}
+
+// Which warehouses each company profile is actually linked to — a typo'd or
+// unrelated code is rejected rather than silently checking/deducting the
+// wrong location's stock.
+$warehousesByGodown = [];
+$res = $db_conn->query("SELECT company_godown_id, warehouse_id FROM company_godown_warehouses");
+while ($row = $res->fetch_assoc()) {
+    $warehousesByGodown[(int)$row['company_godown_id']][] = (int)$row['warehouse_id'];
 }
 
 $allowedCats = [];
@@ -244,12 +236,6 @@ if ($usertype === 'admin') {
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) { $allowedCats[strtolower(trim($row['cat']))] = $row['cat']; }
     $stmt->close();
-}
-
-$productById = [];
-$res = $db_conn->query("SELECT id, productName, gst, gst_type, hsn FROM products WHERE id IN (" . implode(',', array_map('intval', array_unique(array_values($colToProductId)))) . ")");
-while ($row = $res->fetch_assoc()) {
-    $productById[(int)$row['id']] = $row;
 }
 
 $stateByName = [];
@@ -279,18 +265,21 @@ function ot_import_val($rowData, $colToField, $field, $default = '') {
 
 $row_nums = array_keys($rows);
 $data_start_index = array_search($header_row_num, $row_nums, true) + 1;
-// Skip the product_id marker row if present right after the header.
-if ($marker_row_num !== null && !empty($colToProductId)) {
-    $firstQtyCol = array_key_first($colToProductId);
-    $markerCell = trim((string)($markerRow[$firstQtyCol] ?? ''));
-    if (preg_match('/^product_id:\d+$/', $markerCell)) {
-        $data_start_index++;
-    }
-}
 
 $errors = [];
 $groups = []; // groupKey => invoice group
 $rowLabel = 0;
+// Tracks the last invoice number used per "cat|godownid|napkin-or-diaper" key
+// so a run of "NEXT" rows for the same tracked category + company continues
+// sequentially within this file, instead of re-querying the database (which
+// hasn't been written to yet mid-parse) for every row.
+$categoryPointer = [];
+// groupKey of the most recently appended-to invoice — a row with a BLANK
+// Invoice Number continues this one (another product line on the same
+// invoice) instead of starting a new one. This is how the tracked-category
+// template signals "same invoice, no number to repeat" once its Invoice
+// Number column stops auto-carrying down (see ot-sale-import-template.php).
+$lastGroupKey = null;
 
 for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
     $rnum = $row_nums[$idx];
@@ -298,12 +287,14 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
 
     $inv_number = ot_import_val($rowData, $colToFixedField, 'inv_number');
 
-    // Skip fully blank rows.
-    $hasAnyProductQty = false;
-    foreach ($colToProductId as $col => $pid) {
-        if (trim((string)($rowData[$col] ?? '')) !== '') { $hasAnyProductQty = true; break; }
-    }
-    if ($inv_number === '' && !$hasAnyProductQty) {
+    // Skip rows with no product on them — the template's invoice-level
+    // columns (Invoice Number included) auto-carry a formula copying the row
+    // above, so an unused trailing row can show a stale Invoice Number with
+    // no Product/Qty of its own; only Product+Qty blank reliably means
+    // "nothing was entered on this row".
+    $productNameRaw = ot_import_val($rowData, $colToFixedField, 'product_name');
+    $qtyRaw = ot_import_val($rowData, $colToFixedField, 'qty');
+    if ($productNameRaw === '' && $qtyRaw === '') {
         continue;
     }
 
@@ -315,13 +306,13 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
     if ($godownName !== '') {
         $godownid = $godownByName[strtolower($godownName)] ?? 0;
         if (!$godownid) {
-            $errors[] = "$excelRowLabel: unknown Company Profile '$godownName'";
+            $errors[] = "$excelRowLabel: unknown Company Profile '$godownName' [Column: Company Profile]";
             continue;
         }
     } elseif ($default_godownid > 0) {
         $godownid = $default_godownid;
     } else {
-        $errors[] = "$excelRowLabel: Company Profile is required (or set a Default Company Profile)";
+        $errors[] = "$excelRowLabel: Company Profile is required (or set a Default Company Profile) [Column: Company Profile]";
         continue;
     }
 
@@ -330,28 +321,71 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
         continue;
     }
 
+    // Optional physical warehouse — blank means "untracked" (same stock row
+    // as before this column existed); a typed code must be a real, active
+    // warehouse linked to this row's company profile.
+    $warehouseCodeRaw = ot_import_val($rowData, $colToFixedField, 'warehouse_code');
+    $warehouseId = null;
+    if ($warehouseCodeRaw !== '') {
+        $warehouseId = $warehouseByCode[strtolower($warehouseCodeRaw)] ?? null;
+        if ($warehouseId === null) {
+            $errors[] = "$excelRowLabel: unknown Warehouse Code '$warehouseCodeRaw' [Column: Warehouse Code]";
+            continue;
+        }
+        if (!in_array($warehouseId, $warehousesByGodown[$godownid] ?? [], true)) {
+            $errors[] = "$excelRowLabel: Warehouse Code '$warehouseCodeRaw' is not linked to this Company Profile [Column: Warehouse Code]";
+            continue;
+        }
+    }
+
     $catRaw = ot_import_val($rowData, $colToFixedField, 'cat');
     $catRaw = ($catRaw !== '') ? $catRaw : $default_cat;
     if ($catRaw === '') {
-        $errors[] = "$excelRowLabel: Category is required (or set a Default Category)";
+        $errors[] = "$excelRowLabel: Category is required (or set a Default Category) [Column: Category]";
         continue;
     }
     $catKey = strtolower(trim($catRaw));
     if (!isset($allowedCats[$catKey])) {
-        $errors[] = "$excelRowLabel: unknown or unauthorized category '$catRaw'";
+        $errors[] = "$excelRowLabel: unknown or unauthorized category '$catRaw' [Column: Category]";
         continue;
     }
     $catname = $allowedCats[$catKey];
 
-    if ($inv_number === '') {
-        $errors[] = "$excelRowLabel: Invoice Number is required";
-        continue;
+    // A blank Invoice Number means "another product line on the invoice
+    // directly above" (the tracked-category template leaves this column
+    // blank for a continuation row instead of auto-carrying a value down —
+    // see ot-sale-import-template.php). Only valid when there IS a
+    // previous row to continue, for the same category and company — and,
+    // as a safety net against forgetting to type NEXT for a genuinely new
+    // customer, only if this row's own Customer Mobile (when it has one)
+    // actually matches that invoice's. A true continuation row normally
+    // carries the same mobile down via formula anyway, so this only ever
+    // fires when something doesn't add up.
+    $isContinuation = false;
+    $isNextInvoice = false;
+    if (trim($inv_number) === '') {
+        $continueCustomerMobile = ot_import_val($rowData, $colToFixedField, 'customer_mobile');
+        if ($lastGroupKey !== null && isset($groups[$lastGroupKey])
+            && $groups[$lastGroupKey]['cat'] === $catname
+            && $groups[$lastGroupKey]['godownid'] === $godownid
+            && $groups[$lastGroupKey]['warehouse_id'] === $warehouseId) {
+            if ($continueCustomerMobile !== '' && $continueCustomerMobile !== $groups[$lastGroupKey]['customer_mobile']) {
+                $errors[] = "$excelRowLabel: Customer Mobile '$continueCustomerMobile' doesn't match the invoice directly above ('{$groups[$lastGroupKey]['customer_mobile']}') — did you forget to type NEXT to start a new invoice? [Column: Invoice Number]";
+                continue;
+            }
+            $isContinuation = true;
+        } else {
+            $errors[] = "$excelRowLabel: Invoice Number is required (leave it blank only to add another product to the invoice directly above) [Column: Invoice Number]";
+            continue;
+        }
+    } else {
+        $isNextInvoice = (strcasecmp(trim($inv_number), 'NEXT') === 0);
     }
 
     $dateRaw = ot_import_val($rowData, $colToFixedField, 'date');
     $dateTs = $dateRaw !== '' ? strtotime($dateRaw) : false;
     if ($dateTs === false) {
-        $errors[] = "$excelRowLabel: Date is missing or invalid";
+        $errors[] = "$excelRowLabel: Date is missing or invalid [Column: Date]";
         continue;
     }
     $date = date('Y-m-d', $dateTs);
@@ -359,125 +393,167 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
     $stateName = ot_import_val($rowData, $colToFixedField, 'state');
     $state_id = $stateName !== '' ? ($stateByName[strtolower($stateName)] ?? 0) : 0;
     if ($stateName !== '' && !$state_id) {
-        $errors[] = "$excelRowLabel: unknown state '$stateName'";
+        $errors[] = "$excelRowLabel: unknown state '$stateName' [Column: State]";
         continue;
     }
 
-    // Collect product lines for this row. Each product column pair can only
-    // contribute one line per row by construction — there's exactly one Qty
-    // cell per product per row, so duplicate line items are structurally
-    // impossible.
-    $lines = [];
-    $rowHasProductError = false;
-    foreach ($colToProductId as $qtyCol => $pid) {
-        $qtyRaw = trim((string)($rowData[$qtyCol] ?? ''));
-        if ($qtyRaw === '') continue;
-
-        $qty = (int)$qtyRaw;
-        if ($qty <= 0) continue; // treat 0/blank as "not ordered"
-
-        $rateCol = $rateColForQtyCol[$qtyCol] ?? null;
-        $rate = $rateCol !== null ? (float)trim((string)($rowData[$rateCol] ?? '0')) : 0;
-        if ($rate <= 0) {
-            $product = $productById[$pid] ?? null;
-            $pname = $product['productName'] ?? "#$pid";
-            $errors[] = "$excelRowLabel: Rate must be greater than 0 for product '$pname'";
-            $rowHasProductError = true;
-            continue;
-        }
-
-        if (!isset($productById[$pid])) {
-            $errors[] = "$excelRowLabel: product #$pid is no longer active";
-            $rowHasProductError = true;
-            continue;
-        }
-        $product = $productById[$pid];
-
-        $discCol = $discColForQtyCol[$qtyCol] ?? null;
-        $discount = $discCol !== null ? max(0, (float)trim((string)($rowData[$discCol] ?? '0'))) : 0.0;
-
-        $lines[] = [
-            'product_id' => $pid,
-            'gst'        => (float)$product['gst'],
-            'gst_type'   => ($product['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive',
-            'hsn'        => $product['hsn'] ?? '',
-            'qty'        => $qty,
-            'rate'       => $rate,
-            'discount'   => $discount,
-        ];
-    }
-
-    if ($rowHasProductError) continue;
-
-    if (empty($lines)) {
-        $errors[] = "$excelRowLabel: no product quantities were entered";
+    // Resolve this row's single product line — one product per row;
+    // rows sharing the same Invoice Number + Category stack into one
+    // invoice below instead of one row carrying every product as a column.
+    if ($productNameRaw === '' || $qtyRaw === '') {
+        $missingCol = $productNameRaw === '' ? 'Product' : 'Qty';
+        $errors[] = "$excelRowLabel: Product and Qty are required on every row [Column: $missingCol]";
         continue;
     }
 
-    // Reject invoice numbers that already exist for this category IN THE SAME
-    // FINANCIAL YEAR as this row's own Date — invoice numbers like "IN-708"
-    // are legitimately reused year to year (e.g. Amazon/Flipkart order-derived
-    // numbers with no year tag baked in), so a same-numbered invoice from a
-    // prior financial year is not a real clash. ot_sales_invoice has no date
-    // of its own; the date lives on ot_sales (one value per tempid).
-    $rowFy = ot_import_financial_year($date);
-    $stmt = $db_conn->prepare("
-        SELECT DISTINCT os.date
-        FROM ot_sales_invoice osi
-        JOIN ot_sales os ON os.tempid = osi.tempid
-        WHERE osi.cat = ? AND osi.inv_number = ?
-    ");
-    $stmt->bind_param('ss', $catname, $inv_number);
-    $stmt->execute();
-    $existingDates = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-
-    $fyClash = false;
-    foreach ($existingDates as $ed) {
-        if (ot_import_financial_year((string)$ed['date']) === $rowFy) { $fyClash = true; break; }
+    $productKey = strtolower(trim($productNameRaw));
+    if (!isset($productByShortName[$productKey])) {
+        $errors[] = "$excelRowLabel: unknown product '$productNameRaw' — please pick a product from the dropdown list [Column: Product]";
+        continue;
     }
-    if ($fyClash) {
-        $errors[] = "$excelRowLabel: Invoice Number '$inv_number' already exists for category '$catname' in FY $rowFy — skipped";
+    $product = $productByShortName[$productKey];
+    $pid = (int)$product['id'];
+
+    $qty = (int)$qtyRaw;
+    if ($qty <= 0) {
+        $errors[] = "$excelRowLabel: Qty must be greater than 0 for product '{$product['productName']}' [Column: Qty]";
         continue;
     }
 
-    $groupKey = $catKey . '|' . strtolower($inv_number) . '|' . $rowFy;
-    if (isset($groups[$groupKey])) {
-        $errors[] = "$excelRowLabel: duplicate Invoice Number '$inv_number' within this file for category '$catname' in FY $rowFy";
+    $rate = (float) ot_import_val($rowData, $colToFixedField, 'rate', '0');
+    if ($rate <= 0) {
+        $errors[] = "$excelRowLabel: Rate must be greater than 0 for product '{$product['productName']}' [Column: Rate]";
         continue;
     }
 
-    $gst_number = RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'gst_number'));
-    $buyer_gsttype = (strlen($gst_number) === 15) ? 'register' : 'unregister';
+    $discount = max(0, (float) ot_import_val($rowData, $colToFixedField, 'discount', '0'));
 
-    // Wallet Amount only applies to Website/ID Concept categories — same
-    // restriction as the manual Add Sale form; other categories force it to 0.
-    $wallet_amount = in_array($catKey, $wallet_eligible_cats, true)
-        ? max(0, (float) ot_import_val($rowData, $colToFixedField, 'wallet_amount', '0'))
-        : 0.00;
-
-    $coupon_code = RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'coupon_code'));
-
-    $groups[$groupKey] = [
-        'godownid'         => $godownid,
-        'cat'              => $catname,
-        'inv_number'       => $inv_number,
-        'date'             => $date,
-        'customer_name'    => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'customer_name')),
-        'customer_mobile'  => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'customer_mobile')),
-        'customer_address' => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'customer_address')),
-        'shipping_address' => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'shipping_address')),
-        'gst_number'       => $gst_number,
-        'buyer_gsttype'    => $buyer_gsttype,
-        'order_number'     => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'order_number')),
-        'order_date'       => (($v = ot_import_val($rowData, $colToFixedField, 'order_date')) !== '' && strtotime($v) !== false) ? date('Y-m-d', strtotime($v)) : '1991-01-01',
-        'ship_date'        => (($v = ot_import_val($rowData, $colToFixedField, 'ship_date')) !== '' && strtotime($v) !== false) ? date('Y-m-d', strtotime($v)) : '1991-01-01',
-        'courier_charges'  => (float) ot_import_val($rowData, $colToFixedField, 'courier_charges', '0'),
-        'state_id'         => $state_id,
-        'wallet_amount'    => $wallet_amount,
-        'coupon_code'      => $coupon_code,
-        'lines'            => $lines,
+    $line = [
+        'product_id' => $pid,
+        'gst'        => (float)$product['gst'],
+        'gst_type'   => ($product['gst_type'] ?? 'exclusive') === 'inclusive' ? 'inclusive' : 'exclusive',
+        'hsn'        => $product['hsn'] ?? '',
+        'qty'        => $qty,
+        'rate'       => $rate,
+        'discount'   => $discount,
     ];
+
+    $rowFy = ot_import_financial_year($date);
+
+    if ($isContinuation) {
+        $groupKey = $lastGroupKey;
+        $inv_number = $groups[$groupKey]['inv_number'];
+    } else {
+        // "NEXT" in the Invoice Number column asks for this tracked category's
+        // next sequential invoice number instead of a typed-in one — same
+        // convention the manual Add Sale form auto-suggests. Only valid for
+        // the four tracked categories (see OT_TRACKED_INVOICE_CATS); every
+        // other category's invoice number always comes from the marketplace/
+        // manual entry itself and can't be auto-generated.
+        $isDiaper = ($product['category'] ?? '') === 'diaper';
+        $pointerKey = $catKey . '|' . $godownid . '|' . ($isDiaper ? 'diaper' : 'napkin');
+
+        if ($isNextInvoice) {
+            if (!in_array($catname, OT_TRACKED_INVOICE_CATS, true)) {
+                $errors[] = "$excelRowLabel: 'NEXT' is only supported for Website / ID Concept / WhatsApp Sales / Digital Orders — type the invoice number for '$catname' yourself [Column: Invoice Number]";
+                continue;
+            }
+
+            if (isset($categoryPointer[$pointerKey])) {
+                $generated = ot_import_increment_trailing_number($categoryPointer[$pointerKey]);
+                if ($generated === null) {
+                    $errors[] = "$excelRowLabel: could not auto-generate the next invoice number — '{$categoryPointer[$pointerKey]}' has no trailing number to increment [Column: Invoice Number]";
+                    continue;
+                }
+            } else {
+                $generated = ot_invoice_next_number($db_conn, $catname, $godownid, $isDiaper ? 'diaper' : 'napkin');
+                if ($generated === null) {
+                    $errors[] = "$excelRowLabel: could not auto-generate an invoice number for '$catname' [Column: Invoice Number]";
+                    continue;
+                }
+            }
+            $inv_number = $generated;
+        }
+        $categoryPointer[$pointerKey] = $inv_number;
+
+        $groupKey = $catKey . '|' . strtolower($inv_number) . '|' . $rowFy;
+
+        if (!isset($groups[$groupKey])) {
+            // First row seen for this invoice — reject it if the same Invoice
+            // Number already exists for this category IN THE SAME FINANCIAL
+            // YEAR as this row's Date. Invoice numbers like "IN-708" are
+            // legitimately reused year to year (e.g. Amazon/Flipkart
+            // order-derived numbers with no year tag baked in), so a
+            // same-numbered invoice from a prior financial year is not a real
+            // clash. ot_sales_invoice has no date of its own; the date lives
+            // on ot_sales (one value per tempid).
+            $stmt = $db_conn->prepare("
+                SELECT DISTINCT os.date
+                FROM ot_sales_invoice osi
+                JOIN ot_sales os ON os.tempid = osi.tempid
+                WHERE osi.cat = ? AND osi.inv_number = ?
+            ");
+            $stmt->bind_param('ss', $catname, $inv_number);
+            $stmt->execute();
+            $existingDates = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+
+            $fyClash = false;
+            foreach ($existingDates as $ed) {
+                if (ot_import_financial_year((string)$ed['date']) === $rowFy) { $fyClash = true; break; }
+            }
+            if ($fyClash) {
+                $errors[] = "$excelRowLabel: Invoice Number '$inv_number' already exists for category '$catname' in FY $rowFy — skipped [Column: Invoice Number]";
+                continue;
+            }
+
+            $gst_number = RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'gst_number'));
+            $buyer_gsttype = (strlen($gst_number) === 15) ? 'register' : 'unregister';
+
+            // Wallet Amount only applies to Website/ID Concept categories —
+            // same restriction as the manual Add Sale form; other categories
+            // force it to 0.
+            $wallet_amount = in_array($catKey, $wallet_eligible_cats, true)
+                ? max(0, (float) ot_import_val($rowData, $colToFixedField, 'wallet_amount', '0'))
+                : 0.00;
+
+            $coupon_code = RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'coupon_code'));
+
+            $groups[$groupKey] = [
+                'godownid'         => $godownid,
+                'warehouse_id'     => $warehouseId,
+                'cat'              => $catname,
+                'inv_number'       => $inv_number,
+                'date'             => $date,
+                'customer_name'    => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'customer_name')),
+                'customer_mobile'  => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'customer_mobile')),
+                'customer_address' => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'customer_address')),
+                'shipping_address' => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'shipping_address')),
+                'gst_number'       => $gst_number,
+                'buyer_gsttype'    => $buyer_gsttype,
+                'order_number'     => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'order_number')),
+                'order_date'       => (($v = ot_import_val($rowData, $colToFixedField, 'order_date')) !== '' && strtotime($v) !== false) ? date('Y-m-d', strtotime($v)) : '1991-01-01',
+                'ship_date'        => (($v = ot_import_val($rowData, $colToFixedField, 'ship_date')) !== '' && strtotime($v) !== false) ? date('Y-m-d', strtotime($v)) : '1991-01-01',
+                'courier_charges'  => (float) ot_import_val($rowData, $colToFixedField, 'courier_charges', '0'),
+                'state_id'         => $state_id,
+                'wallet_amount'    => $wallet_amount,
+                'coupon_code'      => $coupon_code,
+                'lines'            => [],
+                'product_ids'      => [],
+            ];
+        }
+    }
+
+    // Each product can only appear once per invoice — across all of that
+    // invoice's rows, not just this one.
+    if (in_array($pid, $groups[$groupKey]['product_ids'], true)) {
+        $errors[] = "$excelRowLabel: product '{$product['productName']}' is already on invoice '$inv_number' — each product can only appear once per invoice [Column: Product]";
+        continue;
+    }
+
+    $groups[$groupKey]['product_ids'][] = $pid;
+    $groups[$groupKey]['lines'][] = $line;
+    $lastGroupKey = $groupKey;
 }
 
 if (!empty($errors)) {
@@ -500,17 +576,18 @@ if (empty($groups)) {
 $stockService = new StockService($db_conn);
 $createdBy = $_SESSION['LOGIN_USER'] ?? 'system';
 
-$neededByKey = []; // "godownid|product_id" => total qty
+$neededByKey = []; // "godownid|warehouseIdOrNone|product_id" => total qty
 foreach ($groups as $g) {
     foreach ($g['lines'] as $line) {
-        $key = $g['godownid'] . '|' . $line['product_id'];
+        $key = $g['godownid'] . '|' . ($g['warehouse_id'] ?? 'none') . '|' . $line['product_id'];
         $neededByKey[$key] = ($neededByKey[$key] ?? 0) + $line['qty'];
     }
 }
 
 foreach ($neededByKey as $key => $needed) {
-    [$godownid, $product_id] = explode('|', $key);
-    $available = $stockService->getClosingQty((int)$product_id, $Login_user_TYPEvl, $godownid);
+    [$godownid, $warehouseIdPart, $product_id] = explode('|', $key);
+    $warehouseId = $warehouseIdPart === 'none' ? null : (int)$warehouseIdPart;
+    $available = $stockService->getClosingQty((int)$product_id, $Login_user_TYPEvl, $godownid, $warehouseId);
     if ($available === null || $available < $needed) {
         @unlink($stored_path);
         $pname = $productById[(int)$product_id]['productName'] ?? "#$product_id";
@@ -566,17 +643,17 @@ try {
 
             $stmt = $db_conn->prepare(
                 "INSERT INTO ot_sales
-                    (godownid, cat, qty, date, tempid, prid, price, discount,
+                    (godownid, warehouse_id, cat, qty, date, tempid, prid, price, discount,
                      sub_total, total, gst, gst_amount, customer_name, customer_mobile,
                      customer_address, order_number, amount_received, amount_date,
                      shipping_address, gst_number, order_date, ship_date, hsn,
                      buyer_gsttype, state_id, gst_type, username, usertype)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0', '1991-01-01',
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0', '1991-01-01',
                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $stmt->bind_param(
-                'issssidddddsssssssssssssss',
-                $g['godownid'], $g['cat'], $line['qty'], $g['date'], $tempid, $line['product_id'],
+                'iissssidddddsssssssssssssss',
+                $g['godownid'], $g['warehouse_id'], $g['cat'], $line['qty'], $g['date'], $tempid, $line['product_id'],
                 $line['rate'], $line['discount'], $sub_total, $total, $line['gst'], $gst_amount,
                 $g['customer_name'], $g['customer_mobile'], $g['customer_address'], $g['order_number'],
                 $g['shipping_address'], $g['gst_number'], $g['order_date'], $g['ship_date'], $line['hsn'],
@@ -589,7 +666,7 @@ try {
             $stockService->otDeduct(
                 $line['product_id'], $Login_user_TYPEvl, (string)$g['godownid'],
                 $line['qty'], $tempid, $createdBy,
-                true
+                true, $g['warehouse_id']
             );
         }
 

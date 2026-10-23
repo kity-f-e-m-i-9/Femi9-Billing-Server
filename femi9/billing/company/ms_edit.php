@@ -364,6 +364,11 @@ if ($currentTeamLevelId) {
         var useNextLayer = false;
         var PRESELECTED_DEPTH = <?php echo $preselected_depth !== null ? (int)$preselected_depth : 'null'; ?>;
         var autoDepthChecked = false;
+        // Set right before loadNodes() when the user actively picks a
+        // manager (not on initial page load, which must leave an existing
+        // assignment alone) — tells loadZones() to auto-apply that
+        // manager's own zone once it comes back, if they have exactly one.
+        var autoFillZoneOnLoad = false;
         // The district selection as it stood right before switching to
         // Division mode — restored when switching back to District instead
         // of losing it (Division mode's selection is a different, narrower
@@ -512,8 +517,10 @@ if ($currentTeamLevelId) {
                 if (resp.needs_manager) {
                     allNodes = [];
                     $('#lpBody').html('<div class="lp-empty">Select "Reports To" first.</div>');
+                    loadZones(0, resp.own_layer_depth);
                     return;
                 }
+                loadZones(managerId, resp.own_layer_depth);
                 if (resp.error === 'no_layer_linked') {
                     allNodes = [];
                     $('#lpBody').html('<div class="lp-empty">This team level has no Location Layer linked. Configure it in Manage Team Levels.</div>');
@@ -585,19 +592,56 @@ if ($currentTeamLevelId) {
         // the list would behave, rather than trusting the zone's district
         // list blindly). Picking a different zone afterward starts over
         // from that zone's districts rather than piling on top.
-        $.getJSON('get-ms-zones.php', function (zones) {
-            var $sel = $('#lpZoneSelect');
-            $.each(zones, function (_, z) {
-                $sel.append($('<option>').val(z.id).text(z.name));
+        //
+        // The zone list itself is scoped to whichever manager is picked
+        // above (re-fetched by loadNodes() every time team level/manager
+        // changes) — a DM under a given ASM should only see that ASM's own
+        // zone(s), not every zone in the company, same as the district list.
+        function loadZones(managerId, ownLayerDepth) {
+            var url = 'get-ms-zones.php' + (managerId && ownLayerDepth ? '?manager_id=' + managerId + '&depth=' + ownLayerDepth : '');
+            $.getJSON(url, function (zones) {
+                var $sel = $('#lpZoneSelect');
+                var keepVal = $sel.val();
+                $sel.empty().append($('<option>').val('').text('-- select a zone --'));
+                $.each(zones, function (_, z) {
+                    $sel.append($('<option>').val(z.id).text(z.name));
+                });
+                // A manager was just picked and they have exactly one zone
+                // of their own — apply it automatically instead of making
+                // the admin pick it again from a dropdown that only has one
+                // option anyway. Skips districts already taken by someone
+                // else (an automatic action shouldn't silently steal
+                // another staff member's territory the way a deliberate
+                // manual zone-pick does).
+                if (autoFillZoneOnLoad && zones.length === 1) {
+                    autoFillZoneOnLoad = false;
+                    $sel.val(zones[0].id);
+                    applyZoneFill(zones[0].id, zones[0].name, true);
+                    return;
+                }
+                autoFillZoneOnLoad = false;
+                if (keepVal && $sel.find('option[value="' + keepVal + '"]').length) {
+                    $sel.val(keepVal);
+                }
             });
-        });
+        }
 
-        $('#lpZoneSelect').on('change', function () {
-            var zoneId = $(this).val();
-            var zoneName = $(this).find('option:selected').text();
+        // Picking a zone replaces the current selection with every district
+        // in it, matched against whatever allNodes already holds (a
+        // district outside this manager's own scope is silently skipped
+        // exactly like picking it manually from the list would behave,
+        // rather than trusting the zone's district list blindly). Picking a
+        // different zone afterward starts over from that zone's districts
+        // rather than piling on top.
+        //
+        // skipTaken=true (used for the automatic apply-on-manager-pick path
+        // above) leaves out districts already assigned to someone else
+        // instead of reassigning them — a manual pick from the dropdown
+        // still reassigns, since that's a deliberate "this is now their
+        // territory" action, not an automatic one.
+        function applyZoneFill(zoneId, zoneName, skipTaken) {
             var $status = $('#lpZoneFillStatus');
-            if (!zoneId) return;
-            if (useNextLayer) { $status.text('Switch back to District first — a Zone fills in whole districts, not divisions.'); $(this).val(''); return; }
+            if (useNextLayer) { $status.text('Switch back to District first — a Zone fills in whole districts, not divisions.'); $('#lpZoneSelect').val(''); return; }
             if (!loaded || !allNodes.length) { $status.text('Locations are still loading — please wait a moment and try again.'); return; }
 
             $status.text('Adding…');
@@ -612,10 +656,11 @@ if ($currentTeamLevelId) {
                 // a previously-picked zone) is cleared first.
                 selected = [];
 
-                var added = 0, reassigned = 0, skippedOutOfScope = 0;
+                var added = 0, reassigned = 0, skippedOutOfScope = 0, skippedTaken = 0;
                 $.each(zoneDistricts, function (_, zd) {
                     var node = byId[zd.id];
                     if (!node) { skippedOutOfScope++; return; }
+                    if (skipTaken && node.is_taken) { skippedTaken++; return; }
                     selected.push({ id: node.id, name: node.name });
                     if (node.is_taken) { reassigned++; } else { added++; }
                 });
@@ -627,11 +672,19 @@ if ($currentTeamLevelId) {
                 var parts = [];
                 if (added) parts.push(added + ' district(s) selected');
                 if (reassigned) parts.push(reassigned + ' moved from whoever else had them (on Update)');
+                if (skippedTaken) parts.push(skippedTaken + ' already assigned to someone else (skipped)');
                 if (skippedOutOfScope) parts.push(skippedOutOfScope + ' outside this manager\'s own district(s)');
                 $status.text((zoneName ? zoneName + ': ' : '') + (parts.length ? parts.join(', ') + '.' : 'Nothing to add.'));
             }).fail(function () {
                 $status.text('Failed to load that Zone\'s districts. Please try again.');
             });
+        }
+
+        $('#lpZoneSelect').on('change', function () {
+            var zoneId = $(this).val();
+            var zoneName = $(this).find('option:selected').text();
+            if (!zoneId) return;
+            applyZoneFill(zoneId, zoneName, false);
         });
 
         $('#locationPanel').on('click', function (e) { e.stopPropagation(); });
@@ -844,6 +897,7 @@ if ($currentTeamLevelId) {
             $.getJSON('get-ms-chain.php?ms_id=' + managerId, function (chain) {
                 renderChain(chain);
             });
+            autoFillZoneOnLoad = true;
             loadNodes();
         });
 

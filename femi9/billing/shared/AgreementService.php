@@ -32,6 +32,18 @@ function ensure_agreement_tables(mysqli $db_conn): void
         $db_conn->query("ALTER TABLE agreement_settings ADD COLUMN authorized_signatory_signature VARCHAR(255) NULL AFTER authorized_signatory_designation");
     }
 
+    // "Work All TPs" / "Work All CPs" -- off by default. Until Company flips
+    // this on, a TP/CP can log in and use every page as usual (no agreement
+    // involved at all), same as before this gate existed. Once Company
+    // enables it, territory-partner/checksession.php and
+    // channel-partner/checksession.php start forcing any not-yet-signed
+    // partner straight to agreement.php on every page load until they sign.
+    $enforceCol = $db_conn->query("SHOW COLUMNS FROM agreement_settings LIKE 'tp_sign_enforced'");
+    if ($enforceCol && $enforceCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE agreement_settings ADD COLUMN tp_sign_enforced TINYINT(1) NOT NULL DEFAULT 0 AFTER authorized_signatory_signature");
+        $db_conn->query("ALTER TABLE agreement_settings ADD COLUMN cp_sign_enforced TINYINT(1) NOT NULL DEFAULT 0 AFTER tp_sign_enforced");
+    }
+
     $db_conn->query("
         CREATE TABLE IF NOT EXISTS channel_partner_agreements (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -400,6 +412,16 @@ function get_agreement_settings(mysqli $db_conn): array
     return $res->fetch_assoc() ?: [];
 }
 
+/** Toggles the "Work All TPs" / "Work All CPs" sign-enforcement switch.
+ * $type is 'tp' or 'cp'. See the column comment in ensure_agreement_tables()
+ * for what this actually gates. */
+function set_agreement_sign_enforced(mysqli $db_conn, string $type, bool $enforced): void
+{
+    ensure_agreement_tables($db_conn);
+    $column = $type === 'cp' ? 'cp_sign_enforced' : 'tp_sign_enforced';
+    $db_conn->query("UPDATE agreement_settings SET {$column} = " . ($enforced ? 1 : 0) . " WHERE id = 1");
+}
+
 /** $signatoryImagePath is the uploaded signature filename, or null to leave
  * whatever's already saved untouched -- manage-agreements.php only sends a
  * new one when the admin actually chose a replacement file, so re-saving
@@ -492,6 +514,31 @@ function get_or_create_tp_agreement(mysqli $db_conn, int $tpId): array
  * channel_partner_agreements/territory_partner_agreements row (holding the
  * snap_* columns).
  */
+/** The "Address:" line shown on a CP/TP agreement, and what the
+ * name/mobile/email/etc change-detector above compares against — built
+ * from the Billing Address fields (branch_line1/line2/city/district/state/
+ * country/pincode) that company/add-(territory|channel)-partner.php and
+ * their edit- counterparts actually have a form for, NOT the plain
+ * `address` TEXT column also present on both tables. That column has no
+ * form anywhere that writes to it (confirmed empty for all 285 TPs in this
+ * installation 2026-10-23) -- it's dead, Billing Address is what's
+ * actually filled in. Works for both channel_partners and
+ * territory_partners rows since the branch_* column names are identical
+ * on both tables. */
+function partner_billing_address_line(array $p): string
+{
+    $parts = array_filter([
+        trim((string)($p['branch_line1'] ?? '')),
+        trim((string)($p['branch_line2'] ?? '')),
+        trim((string)($p['branch_city'] ?? '')),
+        trim((string)($p['branch_district'] ?? '')),
+        trim((string)($p['branch_state'] ?? '')),
+        trim((string)($p['branch_country'] ?? '')),
+        !empty($p['branch_pincode']) ? 'Pincode: ' . trim((string)$p['branch_pincode']) : '',
+    ], fn($v) => $v !== '');
+    return implode(', ', $parts);
+}
+
 function get_profile_change_flags(array $live, array $agreement): array
 {
     $hasSnapshot = !empty($agreement['signed_at']) && $agreement['snap_name'] !== null;
@@ -502,7 +549,7 @@ function get_profile_change_flags(array $live, array $agreement): array
     return [
         'name'         => $cmp($agreement['snap_name'], $live['name'] ?? ''),
         'company_name' => $cmp($agreement['snap_company_name'], $live['company_name'] ?? ''),
-        'address'      => $cmp($agreement['snap_address'], $live['address'] ?? ''),
+        'address'      => $cmp($agreement['snap_address'], partner_billing_address_line($live)),
         'mobile'       => $cmp($agreement['snap_mobile'], $live['mobile'] ?? ''),
         'email'        => $cmp($agreement['snap_email'], $live['email'] ?? ''),
     ];
@@ -542,26 +589,37 @@ function render_agreement_letterhead_footer(string $assetPrefix = '../../assets/
     <?php
 }
 
-/** Merges each top-level clause <h2> -- optionally wrapped in a single-
- * child <div class="agr-wording-changed">, which is what
- * diff_highlight_agreement_body() produces when the company has edited
- * that one clause's heading but not its paragraph (or vice versa) -- with
- * whatever top-level block immediately follows it, into one wrapping div.
- * Used only for the dompdf PDF export: a plain CSS "h2 + p { page-break-
- * before: avoid }" rule silently stops working the moment a
- * wording-changed wrapper sits between the heading and its paragraph (they
- * stop being adjacent siblings), which is exactly how a heading can end up
- * stranded alone at the bottom of a printed page with its whole paragraph
- * pushed to the next one. page-break-inside:avoid on this wrapper is
- * unaffected by that, since it only cares about the wrapper's own single
- * container, not sibling adjacency. */
+/** Strips the blank spacer <p> that the rich-text editor behind
+ * agreement_body_templates.body_html (territory_partner's customized
+ * clauses) consistently inserts right after every <h2> and before the
+ * clause's real paragraph. That spacer is invisible either way (it's pure
+ * whitespace -- removing it changes nothing on screen), but its presence
+ * breaks direct-sibling CSS adjacency: ".agr-doc h2 + p" was meant to glue
+ * a heading to its paragraph (page-break-before:avoid) and ".agr-doc p"
+ * carries orphans/widows so a heading is never left with zero lines of its
+ * paragraph below it -- neither rule can fire when the element actually
+ * adjacent to the heading is this blank spacer instead of the real
+ * paragraph. Also handles the same situation when the heading is wrapped in
+ * a single-child <div class="agr-wording-changed"> (diff_highlight_agreement_body()'s
+ * output when the company edited just that clause's heading).
+ *
+ * An earlier version of this function instead wrapped the heading and its
+ * whole paragraph in a page-break-inside:avoid container, forcing the
+ * entire pair to the next page together the moment either didn't fit --
+ * which did stop the heading from ever being orphaned, but at the cost of
+ * leaving large blank gaps at the bottom of the previous page every time a
+ * clause landed near a page boundary. The native CSS orphans/widows
+ * approach here is what the stylesheet already had in place (just silently
+ * defeated by the spacer); fixing adjacency lets dompdf do the one thing
+ * it's actually designed for: let a paragraph start on the current page
+ * and keep going onto the next, as long as at least `orphans` lines of it
+ * stay up top with the heading. */
 function wrap_headings_with_next_block_for_pdf(string $html): string
 {
     if (trim($html) === '') return $html;
     // Never let a DOM quirk take the whole PDF export down with it --
-    // worst case this just falls back to the unwrapped $html (the
-    // heading-orphan bug this function exists to prevent), same as
-    // diff_highlight_agreement_body()'s own fallback below.
+    // worst case this just falls back to the untouched $html (the spacer
+    // stays in place, same orphan risk as before this function existed).
     try {
         $dom = new DOMDocument();
         libxml_use_internal_errors(true);
@@ -577,6 +635,31 @@ function wrap_headings_with_next_block_for_pdf(string $html): string
         $root = $dom->getElementsByTagName('div')->item(0);
         if (!$root) return $html;
 
+        // Descend through any wrapper div(s) that hold nothing but a single
+        // element child -- e.g. the caller's $__agrDocHtml here is actually
+        // "<div class=\"agr-doc\">...every clause...</div>" (the on-screen
+        // page's own ob_start()/ob_get_clean() capture includes that outer
+        // div), so the real top-level clause siblings this function needs
+        // to see start one level deeper than $root. Without this, every
+        // <h2> search below silently finds nothing and the whole function
+        // is a no-op. $descended tracks whether $root is now that real
+        // .agr-doc div (must be serialized back WITH its own tag below, so
+        // every ".agr-doc ..." rule in the caller's stylesheet still has
+        // something to match against) rather than the throwaway synthetic
+        // "#__root" wrapper this function made up on line one.
+        $descended = false;
+        while (true) {
+            $elementChildren = [];
+            foreach ($root->childNodes as $c) {
+                if ($c->nodeType === XML_ELEMENT_NODE) $elementChildren[] = $c;
+                elseif ($c->nodeType === XML_TEXT_NODE && trim($c->nodeValue) !== '') { $elementChildren = null; break; }
+            }
+            if ($elementChildren === null || count($elementChildren) !== 1) break;
+            if (strtolower($elementChildren[0]->nodeName) !== 'div') break;
+            $root = $elementChildren[0];
+            $descended = true;
+        }
+
         $isHeadingNode = function (DOMNode $node) {
             if ($node->nodeType !== XML_ELEMENT_NODE) return false;
             if (strtolower($node->nodeName) === 'h2') return true;
@@ -591,8 +674,18 @@ function wrap_headings_with_next_block_for_pdf(string $html): string
             return false;
         };
 
-        // Snapshot top-level children first -- we move/remove nodes from
-        // $root while iterating, which a live NodeList doesn't tolerate.
+        // A node contributes nothing visible -- a bare text/whitespace node,
+        // or a <p> whose only content is whitespace.
+        $isEmptyish = function (DOMNode $node) {
+            if ($node->nodeType === XML_TEXT_NODE) return trim($node->nodeValue) === '';
+            if ($node->nodeType === XML_ELEMENT_NODE && strtolower($node->nodeName) === 'p') {
+                return trim($node->textContent) === '' && $node->getElementsByTagName('*')->length === 0;
+            }
+            return false;
+        };
+
+        // Snapshot top-level children first -- we remove nodes from $root
+        // while iterating, which a live NodeList doesn't tolerate.
         $children = [];
         foreach ($root->childNodes as $c) { $children[] = $c; }
 
@@ -602,21 +695,17 @@ function wrap_headings_with_next_block_for_pdf(string $html): string
             $node = $children[$i];
             if ($node->nodeType === XML_ELEMENT_NODE && $isHeadingNode($node)) {
                 $j = $i + 1;
-                while ($j < $n && $children[$j]->nodeType !== XML_ELEMENT_NODE) { $j++; }
-                if ($j < $n) {
-                    $wrapper = $dom->createElement('div');
-                    $wrapper->setAttribute('class', 'agr-pdf-keeptogether');
-                    $root->insertBefore($wrapper, $node);
-                    for ($k = $i; $k <= $j; $k++) {
-                        $wrapper->appendChild($children[$k]);
-                    }
-                    $i = $j + 1;
-                    continue;
+                while ($j < $n && $isEmptyish($children[$j])) {
+                    $root->removeChild($children[$j]);
+                    $j++;
                 }
             }
             $i++;
         }
 
+        if ($descended) {
+            return $dom->saveHTML($root);
+        }
         $out = '';
         foreach ($root->childNodes as $c) {
             $out .= $dom->saveHTML($c);
@@ -635,6 +724,35 @@ function pan_card_is_displayable_image(string $filename): bool
 {
     $imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
     return in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), $imageExts, true);
+}
+
+/** Reads a local image file and returns it as a "data:...;base64,..." URI,
+ * or null if it's missing/unreadable. Used instead of a plain filesystem
+ * <img src="..."> path in the dompdf-rendered PDF export: dompdf's chroot +
+ * isRemoteEnabled local-file loading has proven unreliable here across
+ * Windows path-separator differences and deploy environments where the
+ * referenced file didn't actually ship (confirmed 2026-10-21 — company
+ * signature and PAN card images both rendering as broken-image icons in the
+ * exported PDF while the exact same files displayed fine on-screen). A data
+ * URI sidesteps file-path resolution entirely — same technique the TP's own
+ * canvas-drawn signature already relies on (it's always a data URI, and it
+ * has never had this problem). */
+function image_file_as_data_uri(string $absPath): ?string
+{
+    if (!is_file($absPath)) { return null; }
+    $ext = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
+    $mime = match ($ext) {
+        'jpg', 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'bmp' => 'image/bmp',
+        default => null,
+    };
+    if ($mime === null) { return null; }
+    $data = @file_get_contents($absPath);
+    if ($data === false) { return null; }
+    return 'data:' . $mime . ';base64,' . base64_encode($data);
 }
 
 /** A company signatory signature photo/scan is usually a full-page or
@@ -736,12 +854,14 @@ function inline_pan_card_image_for_pdf(string $html, string $kycDocsAbsDir): str
         function (array $m) use ($kycDocsAbsDir, $imageExts) {
             $filename = $m[1];
             $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-            $absPath = $kycDocsAbsDir . $filename;
-            if (!in_array($ext, $imageExts, true) || !is_file($absPath)) {
+            if (!in_array($ext, $imageExts, true)) {
                 return $m[0];
             }
-            $absPathHtml = htmlspecialchars($absPath, ENT_QUOTES, 'UTF-8');
-            return '<img src="' . $absPathHtml . '" class="agr-pan-img">';
+            $dataUri = image_file_as_data_uri($kycDocsAbsDir . $filename);
+            if ($dataUri === null) {
+                return $m[0];
+            }
+            return '<img src="' . $dataUri . '" class="agr-pan-img">';
         },
         $html
     );

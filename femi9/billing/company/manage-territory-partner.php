@@ -527,7 +527,7 @@ $i = 0;
                                                         <i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i>
                                                     </a>
                                                     <?php if ($tp['is_active']): ?>
-                                                    <a href="login-as-tp?tpid=<?php echo $enc_id; ?>" class="action-link" title="Login as this Territory Partner" target="_blank">
+                                                    <a href="login-as-tp?tpid=<?php echo $enc_id; ?>" class="action-link" title="Login as this Territory Partner" target="_blank" rel="noopener">
                                                         <i class="material-icons-outlined" style="font-size:17px;color:#059669;">login</i>
                                                     </a>
                                                     <?php endif; ?>

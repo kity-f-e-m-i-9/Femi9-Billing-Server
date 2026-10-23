@@ -234,7 +234,8 @@ $walletBalance = $_wCredits - $_wWithdrawn;
                         }
                     </style>
                     <li class="nav-item" style="margin-top:8px;margin-right:4px;">
-                        <a class="tp-back-to-company" href="../company/dashboard.php" title="Back to Company Login">
+                        <a class="tp-back-to-company" href="../company/manage-territory-partner.php" title="Back to Company Login"
+                           onclick="window.close(); setTimeout(function(){ window.location.href='../company/manage-territory-partner.php'; }, 300); return false;">
                             <i class="material-icons-outlined" style="transform:scaleX(-1);">logout</i><span class="tp-back-label">Back to Company</span>
                         </a>
                     </li>

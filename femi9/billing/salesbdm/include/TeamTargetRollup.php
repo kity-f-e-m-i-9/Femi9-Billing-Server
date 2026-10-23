@@ -1,16 +1,23 @@
 <?php
-// Per-Sales-BDM target vs achieved, reusing the exact same formula as
-// dashboard.php's own "Overall Target %" card (target = SUM of
-// partner_location_nodes.target_amount across that BDM's assigned/active
-// TPs; achieved = their TPs' Napkin-only downstream sales in the range) —
-// just parameterized by an arbitrary bdm_id instead of always "me", so
-// my-team.php can show the same figure for every BDM in the reporting chain.
+// Per-Sales-BDM target vs achieved — target = this BDM's full DISTRICT total
+// (every Firka's target_amount across their zone's districts, assigned or
+// not — see getBdmDistrictTotalTarget()), the exact same figure their own
+// dashboard.php "District Total Target" card shows; achieved = their TPs'
+// Napkin-only downstream sales in the range. Just parameterized by an
+// arbitrary bdm_id instead of always "me", so my-team.php/
+// salesbdm-team-report.php show the same figure for every BDM in the
+// reporting chain — previously this summed only Firkas that already had a
+// TP assigned (a materially smaller number than the dashboard's own card),
+// which under-reported target for anyone with vacant Firkas in their zone.
 
 function getBdmRawTargetAchieved($db_conn, int $bdmId, string $fromDate, string $toDate): array {
     require_once __DIR__ . '/BdmTpScope.php';
+    $districtNames = getBdmAssignedDistrictNames($db_conn, $bdmId);
+    $target = getBdmDistrictTotalTarget($db_conn, $districtNames);
+
     $tpIds = getBdmAssignedTpIds($db_conn, $bdmId);
     if (empty($tpIds)) {
-        return ['target' => 0.0, 'achieved' => 0.0, 'tp_count' => 0, 'selling_tp_count' => 0, 'advance_paid' => 0.0, 'napkin_purchase' => 0.0];
+        return ['target' => $target, 'achieved' => 0.0, 'tp_count' => 0, 'selling_tp_count' => 0, 'advance_paid' => 0.0, 'napkin_purchase' => 0.0];
     }
     $tpIdList = implode(',', array_map('intval', $tpIds));
 
@@ -26,12 +33,6 @@ function getBdmRawTargetAchieved($db_conn, int $bdmId, string $fromDate, string 
     require_once __DIR__ . '/../../shared/TpStatusHistory.php';
     $tpIdsAll = getBdmAssignedTpIds($db_conn, $bdmId, true);
     $activeTpCount = getTpActiveCountAsOf($db_conn, $tpIdsAll, $toDate);
-
-    $target = (float)($db_conn->query("
-        SELECT COALESCE(SUM(pln.target_amount),0) FROM territory_partner_locations tpl
-        JOIN partner_location_nodes pln ON pln.id = tpl.location_id
-        WHERE tpl.territory_partner_id IN ($tpIdList)
-    ")->fetch_row()[0] ?? 0);
 
     // Napkin advance payments received in the range — same figure as
     // dashboard.php's own "Overall Target %" card ($overall_achieved there);

@@ -63,8 +63,36 @@ function call_rows($db, $sql, $types = '', $params = []) {
     return $r ? $r->fetch_all(MYSQLI_ASSOC) : [];
 }
 
+// Optional "view one district only" filter — Company's Sales BDM report tab
+// (mis-report.php) narrows this exact same dashboard down to one of this
+// BDM's own districts instead of their whole zone. Validated against this
+// BDM's actual district list (getBdmAssignedDistrictNames) so it can never
+// be used to peek into a district outside their zone. Feeds both the TP
+// match (getBdmAssignedTpIds' override param) and the district-tree target/
+// Firka-coverage queries further down, which both normally re-derive the
+// BDM's full district list themselves — passing this through instead
+// narrows everything on the page to just the picked district, consistently.
+$_allBdmDistrictNames = getBdmAssignedDistrictNames($db_conn, $effectiveBdmId);
+$filter_district = trim($_GET['district'] ?? '');
+if ($filter_district !== '') {
+    $_matchedDistrict = null;
+    foreach ($_allBdmDistrictNames as $_dn0) {
+        if (mb_strtolower(trim($_dn0)) === mb_strtolower($filter_district)) { $_matchedDistrict = $_dn0; break; }
+    }
+    $filter_district = $_matchedDistrict; // null if not actually one of this BDM's own districts
+} else {
+    $filter_district = null;
+}
+$_effectiveDistrictNames = $filter_district !== null ? [$filter_district] : $_allBdmDistrictNames;
+
+// "embed" — Company's Sales BDM report tab (mis-report.php) loads this page
+// inside an iframe, which already sits inside the company's own sidebar/
+// header; this skips rendering a second, redundant sidebar/header so only
+// the dashboard content itself shows, full-width.
+$embed = !empty($_GET['embed']);
+
 // ── This BDM's assigned TPs (district-name matched, see BdmTpScope.php) ────
-$tpIds = getBdmAssignedTpIds($db_conn, $effectiveBdmId);
+$tpIds = getBdmAssignedTpIds($db_conn, $effectiveBdmId, false, $_effectiveDistrictNames);
 $hasTps = !empty($tpIds);
 $tpIdList = $hasTps ? implode(',', array_map('intval', $tpIds)) : '0';
 
@@ -110,7 +138,7 @@ $to   = isset($_GET['to'])   && $_GET['to']   ? date('Y-m-d', strtotime($_GET['t
 // cards would then disagree by exactly that Firka's target_amount.
 $_districtDepthRowEarly = crow($db_conn, "SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'district%' ORDER BY depth ASC LIMIT 1");
 $_districtDepth = (int)($_districtDepthRowEarly['depth'] ?? 0);
-$_districtNames = getBdmAssignedDistrictNames($db_conn, $effectiveBdmId);
+$_districtNames = $_effectiveDistrictNames;
 $_districtTreeSql = '';
 $_dtTypes = ''; $_dtParams = [];
 if ($_districtDepth && !empty($_districtNames)) {
@@ -133,7 +161,7 @@ if ($_districtDepth && !empty($_districtNames)) {
 // other query on this page intentionally stays active-only and is untouched.
 $tp_total_count = 0; $tp_active_count = 0; $tp_inactive_count = 0; $tp_new_count = 0;
 $tp_target_active = 0.0; $tp_target_inactive = 0.0;
-$tpIdsAll = getBdmAssignedTpIds($db_conn, $effectiveBdmId, true);
+$tpIdsAll = getBdmAssignedTpIds($db_conn, $effectiveBdmId, true, $_effectiveDistrictNames);
 if (!empty($tpIdsAll)) {
     $tpIdListAll = implode(',', array_map('intval', $tpIdsAll));
     if ($_districtTreeSql) {
@@ -427,7 +455,7 @@ if ($hasTps) {
     $district_total_target = 0.0;
     $_districtDepthRow = crow($db_conn, "SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'district%' ORDER BY depth ASC LIMIT 1");
     $_districtDepth = (int)($_districtDepthRow['depth'] ?? 0);
-    $_districtNames = getBdmAssignedDistrictNames($db_conn, $effectiveBdmId);
+    $_districtNames = $_effectiveDistrictNames;
     if ($_districtDepth && !empty($_districtNames)) {
         $_dn = array_map(fn($n) => mb_strtolower(trim($n)), $_districtNames);
         $_ph = implode(',', array_fill(0, count($_dn), '?'));
@@ -909,15 +937,28 @@ if ($hasTps) {
             .kpi-multi b { font-size: 15px; }
         }
     </style>
+    <?php if ($embed): ?>
+    <style>
+        .app-sidebar { display: none !important; }
+        .app-container { margin-left: 0 !important; width: 100% !important; }
+        /* .app-content's margin-top is normally there to clear the fixed
+           header we just removed — without this it leaves a tall blank gap
+           above the page title instead. */
+        .app-content { margin-top: 0 !important; }
+        .app-content .page-description { padding: 15px 0 !important; margin-bottom: 15px !important; }
+    </style>
+    <?php endif; ?>
 </head>
-<body>
+<body<?php echo $embed ? ' class="sbdm-embed"' : ''; ?>>
 <div class="app align-content-stretch d-flex flex-wrap">
+    <?php if (!$embed): ?>
     <div class="app-sidebar">
         <?php include("logo.php"); ?>
         <?php include("femi_menu.php"); ?>
     </div>
+    <?php endif; ?>
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <?php if (!$embed) include("app-header.php"); ?>
         <div class="app-content">
             <div class="content-wrapper">
                 <div class="container-fluid">
@@ -932,9 +973,9 @@ if ($hasTps) {
                         </div>
                     </div>
 
-                    <?php if ($viewingOther): ?>
+                    <?php if ($viewingOther && !$embed): ?>
                         <div class="alert alert-info" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
-                            <span><i class="material-icons-outlined" style="vertical-align:middle;font-size:17px;">visibility</i> Viewing <b><?php echo htmlspecialchars($viewBdmName); ?>'s</b> dashboard (read-only).</span>
+                            <span><i class="material-icons-outlined" style="vertical-align:middle;font-size:17px;">visibility</i> Viewing <b><?php echo htmlspecialchars($viewBdmName); ?>'s</b> dashboard (read-only)<?php echo $filter_district ? ' — <b>' . htmlspecialchars($filter_district) . '</b> district only' : ''; ?>.</span>
                             <a href="<?php echo htmlspecialchars($viewBackUrl); ?>" class="btn btn-sm" style="background:#fff;color:#0b5ed7;font-weight:700;border:none;box-shadow:0 1px 4px rgba(0,0,0,.15);">&larr; Back to Our Team Report</a>
                         </div>
                     <?php endif; ?>
@@ -943,6 +984,23 @@ if ($hasTps) {
                         <div class="alert alert-info">No Territory Partners are assigned to your districts yet. Contact your admin if this looks wrong.</div>
                     <?php else: ?>
 
+                    <?php if ($embed): ?>
+                    <!-- Embedded in company's Sales BDM report tab, whose own
+                         filter bar (Sales BDM / District / TP / From / To /
+                         Search) already drives tp_id/from/to via the iframe's
+                         URL — this page's own matching controls would just
+                         be a confusing duplicate, so only the read-only
+                         summary line shows here. -->
+                    <div class="mis-filter">
+                        <div style="font-size:12px;color:#888;">
+                            <?php if ($filter_tp_id>0): ?>
+                            Filtered by TP: <b><?php echo htmlspecialchars($tpNameMap[$filter_tp_id] ?? ''); ?></b> &nbsp;|&nbsp;
+                            <?php endif; ?>
+                            Period: <b><?php echo date('d M Y', strtotime($from)); ?></b> to <b><?php echo date('d M Y', strtotime($to)); ?></b> &nbsp;|&nbsp;
+                            <?php echo count($tpIds); ?> TP(s) in your districts
+                        </div>
+                    </div>
+                    <?php else: ?>
                     <div class="mis-filter">
                         <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
                             <div>
@@ -982,6 +1040,7 @@ if ($hasTps) {
                             <?php echo count($tpIds); ?> TP(s) in your districts
                         </div>
                     </div>
+                    <?php endif; ?>
 
                     <!-- ── SECTION NAVIGATION (quick jump) ─────────────────── -->
                     <nav class="section-nav" id="sectionNav">

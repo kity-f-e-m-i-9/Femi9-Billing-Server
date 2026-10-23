@@ -41,16 +41,45 @@ $selectedTpId = (int) ($_GET['tp_id'] ?? 0);
 $cpAgreement = $selectedCpId ? get_or_create_cp_agreement($db_conn, $selectedCpId) : null;
 $tpAgreement = $selectedTpId ? get_or_create_tp_agreement($db_conn, $selectedTpId) : null;
 
-// Security Deposit and Approved Division(s) are likewise read off whichever
-// Division(s) "Partner Location" has assigned to this CP, instead of being
-// typed in -- Division is depth 4 in partner_location_nodes, each with its
-// own deposit_amount (the Division-level equivalent of a Firka's
-// target_amount for TPs, see below). Division Code(s), Stock Holding
-// Capacity and Commercial/Purchase Category stay manual: there's no
-// matching column anywhere (partner_location_nodes.code is defined but
-// never actually populated for any Division in this install, and stock
-// capacity/commercial category aren't location attributes at all -- they
-// vary per CP's own negotiated terms).
+// Effective Date defaults to the TP's own onboarding date (when the
+// software first created their record) rather than sitting blank until
+// someone picks one -- only used as a fallback for display; once
+// effective_date is actually saved, that value wins.
+$selectedTpCreatedDate = null;
+if ($selectedTpId) {
+    $stmtTpCreated = $db_conn->prepare("SELECT created_at FROM territory_partners WHERE id = ?");
+    $stmtTpCreated->bind_param('i', $selectedTpId);
+    $stmtTpCreated->execute();
+    $tpCreatedAt = $stmtTpCreated->get_result()->fetch_assoc()['created_at'] ?? null;
+    $stmtTpCreated->close();
+    $selectedTpCreatedDate = $tpCreatedAt ? date('Y-m-d', strtotime($tpCreatedAt)) : null;
+}
+
+// Same Effective-Date-defaults-to-onboarding-date fallback for CP.
+$selectedCpCreatedDate = null;
+if ($selectedCpId) {
+    $stmtCpCreated = $db_conn->prepare("SELECT created_at FROM channel_partners WHERE id = ?");
+    $stmtCpCreated->bind_param('i', $selectedCpId);
+    $stmtCpCreated->execute();
+    $cpCreatedAt = $stmtCpCreated->get_result()->fetch_assoc()['created_at'] ?? null;
+    $stmtCpCreated->close();
+    $selectedCpCreatedDate = $cpCreatedAt ? date('Y-m-d', strtotime($cpCreatedAt)) : null;
+}
+
+// Security Deposit and Approved Division(s) are likewise computed from
+// whichever Division(s) "Partner Location" has assigned to this CP --
+// Division is depth 4 in partner_location_nodes, each with its own
+// deposit_amount (the Division-level equivalent of a Firka's target_amount
+// for TPs, see below). This is only the DEFAULT shown in the (now editable)
+// Security Deposit / Approved Division(s) inputs below -- Company can
+// hand-adjust either field directly, and a "Recompute" button re-fills them
+// from these computed values on demand; see manage-agreements-action.php's
+// save_cp_schedule, which persists whatever was actually typed. Division
+// Code(s), Stock Holding Capacity and Commercial/Purchase Category stay
+// manual: there's no matching column anywhere (partner_location_nodes.code
+// is defined but never actually populated for any Division in this
+// install, and stock capacity/commercial category aren't location
+// attributes at all -- they vary per CP's own negotiated terms).
 $cpComputedDeposit = null;
 $cpComputedDivisions = '';
 if ($selectedCpId) {
@@ -188,20 +217,20 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     <div class="card mb-4">
                         <div class="card-header"><h5 class="card-title">Company Settings (shown on every CP/TP Agreement)</h5></div>
                         <div class="card-body">
-                            <form method="post" action="manage-agreements-action.php" enctype="multipart/form-data">
+                            <form method="post" action="manage-agreements-action.php" enctype="multipart/form-data" id="companySettingsForm">
                                 <input type="hidden" name="action" value="save_settings">
                                 <div class="mb-3">
                                     <label class="form-label">FEMI9 LLP Registered Office / Principal Place of Business</label>
-                                    <textarea name="company_address" class="form-control" rows="2"><?php echo fv($settings['company_address']); ?></textarea>
+                                    <textarea name="company_address" id="companyAddressInput" class="form-control" rows="2"><?php echo fv($settings['company_address']); ?></textarea>
                                 </div>
                                 <div class="row g-2">
                                     <div class="col-md-3">
                                         <label class="form-label">Authorized Signatory Name</label>
-                                        <input type="text" name="authorized_signatory_name" class="form-control" value="<?php echo fv($settings['authorized_signatory_name']); ?>">
+                                        <input type="text" name="authorized_signatory_name" id="signatoryNameInput" class="form-control" value="<?php echo fv($settings['authorized_signatory_name']); ?>">
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label">Designation</label>
-                                        <input type="text" name="authorized_signatory_designation" class="form-control" value="<?php echo fv($settings['authorized_signatory_designation']); ?>">
+                                        <input type="text" name="authorized_signatory_designation" id="signatoryDesignationInput" class="form-control" value="<?php echo fv($settings['authorized_signatory_designation']); ?>">
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label">Signature (shown on every Agreement)</label>
@@ -218,6 +247,45 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                     </div>
                                 </div>
                             </form>
+                            <hr>
+                            <p class="text-muted mb-2" style="font-size:12.5px;">See how the fields above (even before you click Save) will actually look on a partner's agreement — uses a fake "Demo" partner, nothing is saved or sent to anyone real.</p>
+                            <button type="button" class="btn btn-info btn-sm text-white" onclick="openDemoPreview('tp')">&#128065; Preview Demo TP Agreement</button>
+                            <button type="button" class="btn btn-info btn-sm text-white" onclick="openDemoPreview('cp')">&#128065; Preview Demo CP Agreement</button>
+                            <hr>
+                            <p class="text-muted mb-2" style="font-size:12.5px;">
+                                Off by default: a TP/CP can log in and use the portal normally, agreement untouched.
+                                Once switched ON below, any TP/CP who hasn't signed yet is forced straight to the
+                                Agreement page on every login until they sign — same as before this existed.
+                            </p>
+                            <form method="post" action="manage-agreements-action.php" class="d-inline" onsubmit="return confirm(<?php echo $settings['tp_sign_enforced'] ? "'Turn OFF Work All TPs? Territory Partners will be able to use the portal normally again without signing.'" : "'Turn ON Work All TPs? Every Territory Partner who has not signed yet will be forced straight to the Agreement page on their next login.'"; ?>);">
+                                <input type="hidden" name="action" value="toggle_tp_sign_enforced">
+                                <input type="hidden" name="enforced" value="<?php echo $settings['tp_sign_enforced'] ? '0' : '1'; ?>">
+                                <button type="submit" class="btn btn-sm <?php echo $settings['tp_sign_enforced'] ? 'btn-success' : 'btn-outline-secondary'; ?>">
+                                    Work All TPs: <?php echo $settings['tp_sign_enforced'] ? 'ON' : 'OFF'; ?>
+                                </button>
+                            </form>
+                            <form method="post" action="manage-agreements-action.php" class="d-inline" onsubmit="return confirm(<?php echo $settings['cp_sign_enforced'] ? "'Turn OFF Work All CPs? Channel Partners will be able to use the portal normally again without signing.'" : "'Turn ON Work All CPs? Every Channel Partner who has not signed yet will be forced straight to the Agreement page on their next login.'"; ?>);">
+                                <input type="hidden" name="action" value="toggle_cp_sign_enforced">
+                                <input type="hidden" name="enforced" value="<?php echo $settings['cp_sign_enforced'] ? '0' : '1'; ?>">
+                                <button type="submit" class="btn btn-sm <?php echo $settings['cp_sign_enforced'] ? 'btn-success' : 'btn-outline-secondary'; ?>">
+                                    Work All CPs: <?php echo $settings['cp_sign_enforced'] ? 'ON' : 'OFF'; ?>
+                                </button>
+                            </form>
+                            <form method="post" action="demo-agreement-preview.php" target="_blank" id="demoPreviewForm" style="display:none;">
+                                <input type="hidden" name="type" id="demoPreviewType">
+                                <input type="hidden" name="company_address" id="demoPreviewAddress">
+                                <input type="hidden" name="authorized_signatory_name" id="demoPreviewSigName">
+                                <input type="hidden" name="authorized_signatory_designation" id="demoPreviewSigDesignation">
+                            </form>
+                            <script>
+                            function openDemoPreview(type) {
+                                document.getElementById('demoPreviewType').value = type;
+                                document.getElementById('demoPreviewAddress').value = document.getElementById('companyAddressInput').value;
+                                document.getElementById('demoPreviewSigName').value = document.getElementById('signatoryNameInput').value;
+                                document.getElementById('demoPreviewSigDesignation').value = document.getElementById('signatoryDesignationInput').value;
+                                document.getElementById('demoPreviewForm').submit();
+                            }
+                            </script>
                         </div>
                     </div>
 
@@ -254,7 +322,12 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                             <span class="badge bg-secondary">Not signed yet</span>
                                         <?php endif; ?>
                                     </h5>
-                                    <a href="view-cp-agreement.php?cp_id=<?php echo (int) $selectedCpId; ?>" class="btn btn-outline-primary btn-sm">View Full Agreement</a>
+                                    <div class="d-flex gap-2">
+                                        <?php if ((int) $cpAgreement['is_locked'] === 1 && !empty($cpAgreement['cp_signature'])): ?>
+                                        <a href="view-cp-digi-card.php?cp_id=<?php echo (int) $selectedCpId; ?>&download=1" class="btn btn-sm" style="background:#7c3aed;color:#fff;">Download CP Card</a>
+                                        <?php endif; ?>
+                                        <a href="view-cp-agreement.php?cp_id=<?php echo (int) $selectedCpId; ?>" class="btn btn-outline-primary btn-sm">View Full Agreement</a>
+                                    </div>
                                 </div>
                                 <div class="card-body">
                                     <form method="post" action="manage-agreements-action.php">
@@ -273,8 +346,10 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                         <div class="row g-3">
                                             <div class="col-md-4">
                                                 <label class="form-label">Security Deposit (Rs.)</label>
-                                                <input type="text" class="form-control" value="<?php echo $cpComputedDeposit !== null ? 'Rs. ' . fv(number_format($cpComputedDeposit, 2)) : 'No Division assigned yet'; ?>" readonly disabled>
-                                                <div class="form-text">Auto-calculated as the sum of the Deposit Amount set on each Division assigned to this CP under "Partner Location" — not editable here.</div>
+                                                <input type="number" step="0.01" name="security_deposit" class="form-control" id="cpDepositInput"
+                                                    value="<?php echo $cpAgreement['security_deposit'] !== null ? fv($cpAgreement['security_deposit']) : ($cpComputedDeposit !== null ? fv($cpComputedDeposit) : ''); ?>"
+                                                    data-computed="<?php echo $cpComputedDeposit !== null ? fv($cpComputedDeposit) : ''; ?>">
+                                                <div class="form-text">Editable — defaults to the sum of the Deposit Amount on each Division assigned under "Partner Location". Use "Recompute" below to re-sync if that assignment changes.</div>
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label">Approved Stock Holding Capacity</label>
@@ -288,8 +363,10 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Approved Division(s)</label>
-                                                <textarea class="form-control" rows="2" readonly disabled><?php echo $cpComputedDivisions !== '' ? fv($cpComputedDivisions) : 'No Division assigned yet'; ?></textarea>
-                                                <div class="form-text">Auto-filled from the Division(s) assigned to this CP under "Partner Location" — not editable here.</div>
+                                                <textarea name="approved_divisions" class="form-control" rows="2" id="cpDivisionsInput"
+                                                    data-computed="<?php echo fv($cpComputedDivisions); ?>"><?php echo fv($cpAgreement['approved_divisions'] ?? $cpComputedDivisions); ?></textarea>
+                                                <div class="form-text">Editable — defaults to the Division(s) assigned to this CP under "Partner Location".</div>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm mt-2" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;font-weight:600;" onclick="cpRecomputeFromPartnerLocation()">&#8635; Recompute Deposit / Division from Partner Location</button>
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Division Code(s)</label>
@@ -302,7 +379,10 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label">Effective Date</label>
-                                                <input type="date" name="effective_date" class="form-control" value="<?php echo fv($cpAgreement['effective_date']); ?>">
+                                                <input type="date" name="effective_date" class="form-control" value="<?php echo fv($cpAgreement['effective_date'] ?: $selectedCpCreatedDate); ?>">
+                                                <?php if (empty($cpAgreement['effective_date']) && $selectedCpCreatedDate): ?>
+                                                <div class="form-text">Defaulted to this CP's onboarding date — change if the agreement actually took effect on a different date.</div>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="col-md-8">
                                                 <label class="form-label">Other Approved Commercial Particulars</label>
@@ -352,7 +432,12 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                             <span class="badge bg-secondary">Not signed yet</span>
                                         <?php endif; ?>
                                     </h5>
-                                    <a href="view-tp-agreement.php?tp_id=<?php echo (int) $selectedTpId; ?>" class="btn btn-outline-primary btn-sm">View Full Agreement</a>
+                                    <div class="d-flex gap-2">
+                                        <?php if ((int) $tpAgreement['is_locked'] === 1 && !empty($tpAgreement['tp_signature'])): ?>
+                                        <a href="view-tp-digi-card.php?tp_id=<?php echo (int) $selectedTpId; ?>&download=1" class="btn btn-sm" style="background:#7c3aed;color:#fff;">Download TP Card</a>
+                                        <?php endif; ?>
+                                        <a href="view-tp-agreement.php?tp_id=<?php echo (int) $selectedTpId; ?>" class="btn btn-outline-primary btn-sm">View Full Agreement</a>
+                                    </div>
                                 </div>
                                 <div class="card-body">
                                     <form method="post" action="manage-agreements-action.php">
@@ -371,22 +456,33 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                                         <div class="row g-3">
                                             <div class="col-md-4">
                                                 <label class="form-label">Approved Monthly Purchase Commitment (Rs.)</label>
-                                                <input type="text" class="form-control" value="<?php echo $tpComputedTarget !== null ? 'Rs. ' . fv(number_format($tpComputedTarget, 2)) : 'No Firka/location assigned yet'; ?>" readonly disabled>
-                                                <div class="form-text">Auto-calculated as the sum of the Target Amount set on each Firka/location assigned to this TP under "Partner Location" — not editable here.</div>
+                                                <input type="number" step="0.01" name="monthly_purchase_commitment" class="form-control" id="tpCommitmentInput"
+                                                    value="<?php echo $tpAgreement['monthly_purchase_commitment'] !== null ? fv($tpAgreement['monthly_purchase_commitment']) : ($tpComputedTarget !== null ? fv($tpComputedTarget) : ''); ?>"
+                                                    data-computed="<?php echo $tpComputedTarget !== null ? fv($tpComputedTarget) : ''; ?>">
+                                                <div class="form-text">Editable — defaults to the sum of the Target Amount on each Firka/location assigned under "Partner Location". Use "Recompute" below to re-sync if that assignment changes.</div>
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label">Taluk / Block</label>
-                                                <input type="text" class="form-control" value="<?php echo $tpComputedTaluks !== '' ? fv($tpComputedTaluks) : 'No Firka/location assigned yet'; ?>" readonly disabled>
-                                                <div class="form-text">Auto-filled from the Taluk each assigned Firka belongs to — not editable here.</div>
+                                                <input type="text" name="taluk_block" class="form-control" id="tpTalukInput"
+                                                    value="<?php echo fv($tpAgreement['taluk_block'] ?? $tpComputedTaluks); ?>"
+                                                    data-computed="<?php echo fv($tpComputedTaluks); ?>">
+                                                <div class="form-text">Editable — defaults to the Taluk each assigned Firka belongs to.</div>
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label">Effective Date</label>
-                                                <input type="date" name="effective_date" class="form-control" value="<?php echo fv($tpAgreement['effective_date']); ?>">
+                                                <input type="date" name="effective_date" class="form-control" value="<?php echo fv($tpAgreement['effective_date'] ?: $selectedTpCreatedDate); ?>">
+                                                <?php if (empty($tpAgreement['effective_date']) && $selectedTpCreatedDate): ?>
+                                                <div class="form-text">Defaulted to this TP's onboarding date — change if the agreement actually took effect on a different date.</div>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Allotted Firka / Territory</label>
-                                                <textarea class="form-control" rows="2" readonly disabled><?php echo $tpComputedFirkas !== '' ? fv($tpComputedFirkas) : 'No Firka/location assigned yet'; ?></textarea>
-                                                <div class="form-text">Auto-filled from the Firka(s) assigned to this TP under "Partner Location" — not editable here.</div>
+                                                <textarea name="territory_firka" class="form-control" rows="2" id="tpFirkaInput"
+                                                    data-computed="<?php echo fv($tpComputedFirkas); ?>"><?php echo fv($tpAgreement['territory_firka'] ?? $tpComputedFirkas); ?></textarea>
+                                                <div class="form-text">Editable — defaults to the Firka(s) assigned to this TP under "Partner Location".</div>
+                                                <button type="button" class="btn btn-sm mt-2" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;font-weight:600;" onclick="tpRecomputeFromPartnerLocation()">
+                                                    &#8635; Recompute Target / Taluk / Firka from Partner Location
+                                                </button>
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Territory Code</label>
@@ -568,6 +664,31 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
 <script>
     $('#cpSelect').select2({ placeholder: 'Search by name or CP ID…', allowClear: false });
     $('#tpSelect').select2({ placeholder: 'Search by name or TP ID…', allowClear: false });
+</script>
+<script>
+    // Re-fills the three Schedule-1 fields from "Partner Location" without
+    // reloading the page -- still just a form fill, so Save must be clicked
+    // afterwards to persist it. Pulled from each field's own data-computed
+    // attribute (rendered server-side from the same query that used to force
+    // these fields read-only), not re-fetched, so this can't silently pick
+    // up a different TP's data if the dropdown changes without a reload.
+    function tpRecomputeFromPartnerLocation() {
+        var commitmentInput = document.getElementById('tpCommitmentInput');
+        var talukInput = document.getElementById('tpTalukInput');
+        var firkaInput = document.getElementById('tpFirkaInput');
+        if (commitmentInput) commitmentInput.value = commitmentInput.dataset.computed || '';
+        if (talukInput) talukInput.value = talukInput.dataset.computed || '';
+        if (firkaInput) firkaInput.value = firkaInput.dataset.computed || '';
+    }
+
+    // Same re-fill as tpRecomputeFromPartnerLocation() above, for CP's
+    // Security Deposit / Approved Division(s).
+    function cpRecomputeFromPartnerLocation() {
+        var depositInput = document.getElementById('cpDepositInput');
+        var divisionsInput = document.getElementById('cpDivisionsInput');
+        if (depositInput) depositInput.value = depositInput.dataset.computed || '';
+        if (divisionsInput) divisionsInput.value = divisionsInput.dataset.computed || '';
+    }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
 <script>

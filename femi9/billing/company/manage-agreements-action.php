@@ -73,37 +73,16 @@ if ($action === 'save_cp_schedule') {
     $cpId = (int) ($_POST['cp_id'] ?? 0);
     $existing = get_or_create_cp_agreement($db_conn, $cpId);
     $wasSignedAndLocked = !empty($existing['signed_at']) && (int) ($existing['is_locked'] ?? 0) === 1;
-    // Security Deposit and Approved Division(s) aren't taken from the form
-    // at all anymore (manage-agreements.php only shows them read-only) --
-    // recomputed here from whichever Division(s) "Partner Location" has
-    // assigned to this CP, same SUM(pln.deposit_amount) pattern as the TP
-    // Schedule-1 save above (see its own comment for the Firka/Taluk
-    // equivalent).
-    $stmtDep = $db_conn->prepare("
-        SELECT pln.name AS division_name, pln.deposit_amount
-        FROM channel_partner_locations cpl
-        JOIN partner_location_nodes pln ON pln.id = cpl.location_id
-        WHERE cpl.channel_partner_id = ?
-        ORDER BY pln.name ASC
-    ");
-    $stmtDep->bind_param('i', $cpId);
-    $stmtDep->execute();
-    $cpLocationRows = $stmtDep->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmtDep->close();
-
-    $securityDeposit = null;
-    $approvedDivisionsComputed = '';
-    if ($cpLocationRows) {
-        $sum = 0.0;
-        $hasAny = false;
-        $divisionNames = [];
-        foreach ($cpLocationRows as $row) {
-            if ($row['deposit_amount'] !== null) { $sum += (float) $row['deposit_amount']; $hasAny = true; }
-            $divisionNames[] = $row['division_name'];
-        }
-        $securityDeposit = $hasAny ? $sum : null;
-        $approvedDivisionsComputed = implode(', ', $divisionNames);
-    }
+    // Security Deposit and Approved Division(s) are company-editable on
+    // manage-agreements.php (requested 2026-10-21, same as the TP side's
+    // Target/Taluk/Firka) -- manage-agreements.php's own "Recompute" button
+    // re-fills them client-side from "Partner Location"'s own assignment, so
+    // they can still be re-synced on demand without this save ever
+    // overwriting a deliberate manual edit.
+    $securityDeposit = ($_POST['security_deposit'] ?? '') !== ''
+        ? (float) str_replace(',', '', $_POST['security_deposit'])
+        : null;
+    $approvedDivisions = trim($_POST['approved_divisions'] ?? '');
 
     $effectiveDate   = ($_POST['effective_date'] ?? '') !== '' ? $_POST['effective_date'] : null;
     // A per-partner wording override is optional -- the "use custom wording"
@@ -126,7 +105,6 @@ if ($action === 'save_cp_schedule') {
             is_locked = 0
          WHERE channel_partner_id = ?"
     );
-    $approvedDivisions = $approvedDivisionsComputed;
     $divisionCodes = trim($_POST['division_codes'] ?? '');
     $warehouseAddress = trim($_POST['approved_warehouse_address'] ?? '');
     $stockCapacity = trim($_POST['stock_holding_capacity'] ?? '');
@@ -152,43 +130,18 @@ if ($action === 'save_tp_schedule') {
     $existingTp = get_or_create_tp_agreement($db_conn, $tpId);
     $wasSignedAndLockedTp = !empty($existingTp['signed_at']) && (int) ($existingTp['is_locked'] ?? 0) === 1;
     // Approved Monthly Purchase Commitment, Taluk/Block, and Allotted
-    // Firka/Territory are no longer taken from the form at all --
-    // manage-agreements.php only shows them read-only now. All three are
-    // recomputed here straight from whichever Firka(s)/location(s)
-    // "Partner Location" actually has assigned to this TP (Firka = depth 6
-    // in partner_location_nodes, sitting directly under its Taluk at depth
-    // 5), so none of them can drift from what's really assigned. Same
-    // SUM(pln.target_amount) pattern as company/get-tp-advance-balance.php.
-    $stmtTgt = $db_conn->prepare("
-        SELECT pln.name AS firka_name, pln.target_amount, taluk.name AS taluk_name
-        FROM territory_partner_locations tpl
-        JOIN partner_location_nodes pln ON pln.id = tpl.location_id
-        LEFT JOIN partner_location_nodes taluk ON taluk.id = pln.parent_id
-        WHERE tpl.territory_partner_id = ?
-        ORDER BY pln.name ASC
-    ");
-    $stmtTgt->bind_param('i', $tpId);
-    $stmtTgt->execute();
-    $tpLocationRows = $stmtTgt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmtTgt->close();
-
-    $commitment = null;
-    $talukBlock = '';
-    $territoryFirka = '';
-    if ($tpLocationRows) {
-        $sum = 0.0;
-        $hasAny = false;
-        $firkaNames = [];
-        $talukNames = [];
-        foreach ($tpLocationRows as $row) {
-            if ($row['target_amount'] !== null) { $sum += (float) $row['target_amount']; $hasAny = true; }
-            $firkaNames[] = $row['firka_name'];
-            if (!empty($row['taluk_name'])) $talukNames[$row['taluk_name']] = true;
-        }
-        $commitment = $hasAny ? $sum : null;
-        $territoryFirka = implode(', ', $firkaNames);
-        $talukBlock = implode(', ', array_keys($talukNames));
-    }
+    // Firka/Territory are company-editable on this form (requested
+    // 2026-10-21 -- company wants to hand-adjust these per TP, e.g. a
+    // negotiated commitment different from the raw Firka-target sum).
+    // manage-agreements.php's own "Recompute from Partner Location" button
+    // re-fills them client-side from the same Firka/location sum this
+    // handler used to force unconditionally, so they can still be re-synced
+    // on demand without this save ever overwriting a deliberate manual edit.
+    $commitment = ($_POST['monthly_purchase_commitment'] ?? '') !== ''
+        ? (float) str_replace(',', '', $_POST['monthly_purchase_commitment'])
+        : null;
+    $talukBlock = trim($_POST['taluk_block'] ?? '');
+    $territoryFirka = trim($_POST['territory_firka'] ?? '');
 
     // Territory Code is simply this TP's own tp_id (e.g. "TP-0082").
     $stmtCode = $db_conn->prepare("SELECT tp_id FROM territory_partners WHERE id = ?");
@@ -263,6 +216,18 @@ if ($action === 'save_cp_body_template' || $action === 'save_tp_body_template') 
         . " Every already-signed " . ($type === 'channel_partner' ? 'CP' : 'TP')
         . " agreement using this shared wording has been unlocked for re-signing with the updated wording.";
     header('Location: manage-agreements.php' . ($type === 'channel_partner' ? '' : '?tab=tp'));
+    exit;
+}
+
+if ($action === 'toggle_tp_sign_enforced' || $action === 'toggle_cp_sign_enforced') {
+    $type = $action === 'toggle_cp_sign_enforced' ? 'cp' : 'tp';
+    $enforced = ($_POST['enforced'] ?? '') === '1';
+    set_agreement_sign_enforced($db_conn, $type, $enforced);
+    $_SESSION['sucMessage'] = ($type === 'cp' ? 'Channel Partners' : 'Territory Partners')
+        . ($enforced
+            ? ' will now be forced straight to the Agreement page on login until they sign.'
+            : ' can now use the portal normally again without being forced to the Agreement page.');
+    header('Location: manage-agreements.php' . ($type === 'tp' ? '?tab=tp' : ''));
     exit;
 }
 

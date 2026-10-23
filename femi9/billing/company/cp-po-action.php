@@ -30,7 +30,7 @@ cpEnsureInvoiceTables($db_conn);
 $poStmt = $db_conn->prepare("SELECT id, channel_partner_id, status, product_type,
     use_default_delivery_address, custom_delivery_line1, custom_delivery_line2,
     custom_delivery_city, custom_delivery_district, custom_delivery_state,
-    custom_delivery_country, custom_delivery_pincode
+    custom_delivery_country, custom_delivery_pincode, created_by_user_type
     FROM channel_partner_purchase_orders WHERE id = ? LIMIT 1");
 $poStmt->bind_param("i", $po_id);
 $poStmt->execute();
@@ -77,11 +77,16 @@ if (empty($poItems)) {
 // the race between the queue page's displayed headroom (computed at page
 // load) and this click (stock/deposit may have moved since). Excludes this
 // PO's own already-counted pending value from the check, since approving it
-// is what "spends" that reservation for real.
+// is what "spends" that reservation for real. Skipped for an order Company
+// itself placed (company/cp-add-purchase-order.php already let that one
+// through above headroom on purpose) — the cap still applies to every order
+// a CP placed through their own portal.
 $grandTotal = array_sum(array_column($poItems, 'amount'));
-$headroom = cpAvailableHeadroom($db_conn, $cp_id, $po_id);
-if ($grandTotal > $headroom + 0.001) {
-    header("Location: cp-today-orders.php?error=overheadroom"); exit;
+if (($po['created_by_user_type'] ?? 'cp') !== 'company') {
+    $headroom = cpAvailableHeadroom($db_conn, $cp_id, $po_id);
+    if ($grandTotal > $headroom + 0.001) {
+        header("Location: cp-today-orders.php?error=overheadroom"); exit;
+    }
 }
 
 $created_by = $_SESSION['LOGIN_USER'] ?? '';

@@ -57,18 +57,37 @@ require_once __DIR__ . '/include/AssignedLocations.php';
 require_once __DIR__ . '/include/MsDistrictScope.php';
 
 $msId          = (int)$Login_user_IDvl;
-$districts     = getMsAssignedDistricts($db_conn, $msId);
-$districtNames = array_column($districts, 'name');
+// Target-scope nodes: District OR Division depth, used as-is (not collapsed
+// up to the enclosing district) — see getMsAssignedTargetScopeNodes()'s own
+// doc comment. $districtNames stays the generic "assigned location name(s)"
+// list the rest of this page (team roster / cross-district TP split below)
+// already keys off of; those stay district-oriented (out of scope for the
+// division feature — see the plan), so a division assignment simply won't
+// contribute to that particular downstream widget, same as before.
+$scopeNodes    = getMsAssignedTargetScopeNodes($db_conn, $msId);
+$districts     = $scopeNodes;
+$districtNames = array_column($scopeNodes, 'name');
 $districtLabel = !empty($districtNames) ? implode(', ', $districtNames) : 'No District Assigned';
+// true only when EVERY assigned scope node is Division depth (4) — drives
+// the "District"/"Division" wording on the dashboard's own cards below.
+$isDivisionScope = !empty($scopeNodes) && count(array_filter($scopeNodes, fn($n) => (int)$n['depth'] === 4)) === count($scopeNodes);
+$scopeWord = $isDivisionScope ? 'Division' : 'District';
 
 $from = $_GET['from'] ?? date('Y-m-01');
 $to   = $_GET['to']   ?? date('Y-m-d');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) { $from = date('Y-m-01'); }
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to))   { $to   = date('Y-m-d'); }
 
-$districtStats  = getMsDistrictTargetAndFirkaStats($db_conn, $districtNames);
-$vacantFirkas   = getMsVacantFirkas($db_conn, $districtNames);
-$allTpIds       = getMsDistrictTpIds($db_conn, $districtNames, true);
+// Embedded in company's MIS Report "Marketing Staff" tab iframe (see
+// company/view-ms-dashboard.php + mis-report.php) — same ?embed=1 pattern
+// salesbdm/dashboard.php already uses: hides this page's own sidebar/header
+// chrome so only the actual dashboard content shows inside the iframe.
+$embed = !empty($_GET['embed']);
+
+$scopeIds       = array_column($scopeNodes, 'id');
+$districtStats  = getMsNodeTargetAndFirkaStats($db_conn, $scopeIds);
+$vacantFirkas   = getMsNodeVacantFirkas($db_conn, $scopeIds, $districtLabel);
+$allTpIds       = getMsNodeTpIds($db_conn, $scopeIds, true);
 
 $invoicedAmount = 0.0;
 $invoiceRows    = [];
@@ -154,10 +173,11 @@ if (!empty($_dmCandidates)) {
     $_dmTargetStats = getRawTargetAchievedStats($db_conn, $_dmIds, $from, $to);
     foreach ($_dmCandidates as $_dm) {
         $_dmId = (int)$_dm['id'];
-        $_dmDistricts = getMsAssignedDistricts($db_conn, $_dmId);
-        $_dmDistrictNames = array_column($_dmDistricts, 'name');
+        $_dmScopeNodes = getMsAssignedTargetScopeNodes($db_conn, $_dmId);
+        $_dmDistrictNames = array_column($_dmScopeNodes, 'name');
         $_dmDistrictLabel = !empty($_dmDistrictNames) ? implode(', ', $_dmDistrictNames) : 'No District Assigned';
-        $_t = !empty($_dmDistrictNames) ? getMsDistrictTargetAndFirkaStats($db_conn, $_dmDistrictNames)['district_total_target'] : 0.0;
+        $_dmScopeIds = array_column($_dmScopeNodes, 'id');
+        $_t = !empty($_dmScopeIds) ? getMsNodeTargetAndFirkaStats($db_conn, $_dmScopeIds)['district_total_target'] : 0.0;
         $_a = $_dmTargetStats[$_dmId]['achieved'] ?? 0.0;
         $myDms[] = [
             'id'       => $_dmId,
@@ -445,26 +465,41 @@ ksort($districtTpCounts);
             .modal-dialog { margin: 10px; }
         }
     </style>
+    <?php if ($embed): ?>
+    <style>
+        .app-sidebar { display: none !important; }
+        .app-container { margin-left: 0 !important; width: 100% !important; }
+        .app-content { margin-top: 0 !important; }
+    </style>
+    <?php endif; ?>
 </head>
-<body>
+<body<?php echo $embed ? ' class="ms-embed"' : ''; ?>>
     <div class="app align-content-stretch d-flex flex-wrap">
+        <?php if (!$embed): ?>
         <div class="app-sidebar">
             <?php include("logo.php");?>
             <?php include("femi_menu.php");?>
         </div>
+        <?php endif; ?>
         <div class="app-container">
-            
-           <?php include("app-header.php");?>
-			
+
+           <?php if (!$embed) include("app-header.php");?>
+
             <div class="app-content">
                 <div class="content-wrapper">
                     <div class="container-fluid">
+
+                        <?php if (!empty($_companyBridgeView) && !$embed): ?>
+                        <div class="alert alert-info" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
+                            <span><i class="material-icons-outlined" style="vertical-align:middle;font-size:17px;">visibility</i> Viewing <b><?php echo htmlspecialchars($result_LoGuserDtails['ms_name'] ?? ''); ?>'s</b> dashboard (read-only).</span>
+                        </div>
+                        <?php endif; ?>
 
                         <div class="row mb-2">
                             <div class="col">
                                 <h4 style="font-weight:700;color:#1f2937;margin-bottom:4px;">
                                     <i class="material-icons-two-tone" style="vertical-align:middle;font-size:22px;">dashboard</i>
-                                    District Dashboard
+                                    <?php echo htmlspecialchars($scopeWord); ?> Dashboard
                                 </h4>
                                 <p id="districtDashboardLabel" style="color:#6b7280;font-size:13px;margin:0;">
                                     <?php echo htmlspecialchars($districtLabel); ?>
@@ -478,7 +513,7 @@ ksort($districtTpCounts);
                                 <div class="stat-card purple">
                                     <div>
                                         <h3 id="statDistrictTarget">&#8377;<?php echo inr_format($districtStats['district_total_target'], 0); ?></h3>
-                                        <p>District Total Target</p>
+                                        <p><?php echo htmlspecialchars($scopeWord); ?> Total Target</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">flag</i></div>
                                 </div>

@@ -32,10 +32,22 @@ $total_received = (float)(mysqli_fetch_array(mysqli_query($db_conn,
     "SELECT COALESCE(SUM(received),0) AS s FROM receipt WHERE inv_id='$invid'"))['s']);
 $balance_due = max(0, $invoice_total - $total_received);
 
-// DELETE receipt
+// DELETE receipt — but never the invoice's LAST remaining receipt row: a
+// receipt row (even a received=0 one) is also what marks this invoice as
+// "submitted" elsewhere (manage-orders.php's Continue/Completed split,
+// shop-manage-invoice.php's Return/Remove approval gate). Deleting the only
+// one would silently flip those back to "still a draft", bypassing the
+// Sales BDM approval Return/Remove otherwise require. So when this is the
+// last row, correct it to received=0 in place instead of removing it.
 if (isset($_REQUEST['delreceiptact'])) {
     $rcptid = (int)base64_decode($_REQUEST['rcptid'] ?? '');
-    mysqli_query($db_conn, "DELETE FROM receipt WHERE id='$rcptid'");
+    $receiptCount = (int)(mysqli_fetch_array(mysqli_query($db_conn,
+        "SELECT COUNT(*) AS n FROM receipt WHERE inv_id='$invid'"))['n']);
+    if ($receiptCount <= 1) {
+        mysqli_query($db_conn, "UPDATE receipt SET received=0, receivable=invoice_amount WHERE id='$rcptid'");
+    } else {
+        mysqli_query($db_conn, "DELETE FROM receipt WHERE id='$rcptid'");
+    }
     echo "<script>window.location='add-receipt.php?invid=" . urlencode($invid) . "&invuser=$getinvuser&DeletedSuccess';</script>";
     exit;
 }

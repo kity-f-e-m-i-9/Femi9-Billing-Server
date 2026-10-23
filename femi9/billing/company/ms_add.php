@@ -299,6 +299,8 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
         // The district selection as it stood right before switching to
         // Division mode — see ms_edit.php's matching comment.
         var savedDistrictSelection = null;
+        // See ms_edit.php's matching comment.
+        var autoFillZoneOnLoad = false;
 
         function escHtml(str) { return $('<div>').text(str).html(); }
 
@@ -419,8 +421,10 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
                 if (resp.needs_manager) {
                     allNodes = [];
                     $('#lpBody').html('<div class="lp-empty">Select "Reports To" first.</div>');
+                    loadZones(0, resp.own_layer_depth);
                     return;
                 }
+                loadZones(managerId, resp.own_layer_depth);
                 if (resp.error === 'no_layer_linked') {
                     allNodes = [];
                     $('#lpBody').html('<div class="lp-empty">This team level has no Location Layer linked. Configure it in Manage Team Levels.</div>');
@@ -482,19 +486,33 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
         }
 
         // "Fill from Zone" — see ms_edit.php's matching comment.
-        $.getJSON('get-ms-zones.php', function (zones) {
-            var $sel = $('#lpZoneSelect');
-            $.each(zones, function (_, z) {
-                $sel.append($('<option>').val(z.id).text(z.name));
+        function loadZones(managerId, ownLayerDepth) {
+            var url = 'get-ms-zones.php' + (managerId && ownLayerDepth ? '?manager_id=' + managerId + '&depth=' + ownLayerDepth : '');
+            $.getJSON(url, function (zones) {
+                var $sel = $('#lpZoneSelect');
+                var keepVal = $sel.val();
+                $sel.empty().append($('<option>').val('').text('-- select a zone --'));
+                $.each(zones, function (_, z) {
+                    $sel.append($('<option>').val(z.id).text(z.name));
+                });
+                // See ms_edit.php's matching comment.
+                if (autoFillZoneOnLoad && zones.length === 1) {
+                    autoFillZoneOnLoad = false;
+                    $sel.val(zones[0].id);
+                    applyZoneFill(zones[0].id, zones[0].name, true);
+                    return;
+                }
+                autoFillZoneOnLoad = false;
+                if (keepVal && $sel.find('option[value="' + keepVal + '"]').length) {
+                    $sel.val(keepVal);
+                }
             });
-        });
+        }
 
-        $('#lpZoneSelect').on('change', function () {
-            var zoneId = $(this).val();
-            var zoneName = $(this).find('option:selected').text();
+        // See ms_edit.php's matching comment.
+        function applyZoneFill(zoneId, zoneName, skipTaken) {
             var $status = $('#lpZoneFillStatus');
-            if (!zoneId) return;
-            if (useNextLayer) { $status.text('Switch back to District first — a Zone fills in whole districts, not divisions.'); $(this).val(''); return; }
+            if (useNextLayer) { $status.text('Switch back to District first — a Zone fills in whole districts, not divisions.'); $('#lpZoneSelect').val(''); return; }
             if (!loaded || !allNodes.length) { $status.text('Locations are still loading — please wait a moment and try again.'); return; }
 
             $status.text('Adding…');
@@ -506,14 +524,11 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
                 // ms_edit.php's matching comment.
                 selected = [];
 
-                // A district already held by someone else is added here too
-                // (not skipped) — see ms_edit.php's matching comment; it's
-                // reassigned exclusively to this person when the form is
-                // saved (ms_action.php).
-                var added = 0, reassigned = 0, skippedOutOfScope = 0;
+                var added = 0, reassigned = 0, skippedOutOfScope = 0, skippedTaken = 0;
                 $.each(zoneDistricts, function (_, zd) {
                     var node = byId[zd.id];
                     if (!node) { skippedOutOfScope++; return; }
+                    if (skipTaken && node.is_taken) { skippedTaken++; return; }
                     selected.push({ id: node.id, name: node.name });
                     if (node.is_taken) { reassigned++; } else { added++; }
                 });
@@ -525,11 +540,19 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
                 var parts = [];
                 if (added) parts.push(added + ' district(s) selected');
                 if (reassigned) parts.push(reassigned + ' moved from whoever else had them (on Add)');
+                if (skippedTaken) parts.push(skippedTaken + ' already assigned to someone else (skipped)');
                 if (skippedOutOfScope) parts.push(skippedOutOfScope + ' outside this manager\'s own district(s)');
                 $status.text((zoneName ? zoneName + ': ' : '') + (parts.length ? parts.join(', ') + '.' : 'Nothing to add.'));
             }).fail(function () {
                 $status.text('Failed to load that Zone\'s districts. Please try again.');
             });
+        }
+
+        $('#lpZoneSelect').on('change', function () {
+            var zoneId = $(this).val();
+            var zoneName = $(this).find('option:selected').text();
+            if (!zoneId) return;
+            applyZoneFill(zoneId, zoneName, false);
         });
 
         $('#locationPanel').on('click', function (e) { e.stopPropagation(); });
@@ -732,6 +755,7 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS marketing_team_levels (
             $.getJSON('get-ms-chain.php?ms_id=' + managerId, function (chain) {
                 renderChain(chain);
             });
+            autoFillZoneOnLoad = true;
             loadNodes();
         });
 

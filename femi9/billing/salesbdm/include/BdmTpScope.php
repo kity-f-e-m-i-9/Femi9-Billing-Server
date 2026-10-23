@@ -38,8 +38,56 @@ function getBdmAssignedDistrictNames($db_conn, int $bdmId): array {
     return getZoneDistrictNames($db_conn, (int)$zone['id']);
 }
 
-function getBdmAssignedTpIds($db_conn, int $bdmId, bool $includeInactive = false): array {
-    $districtNames = getBdmAssignedDistrictNames($db_conn, $bdmId);
+// Full district-level target potential across the given district names —
+// every Firka's target_amount, regardless of whether that Firka currently
+// has a TP or whether that TP is active/inactive. Same formula (and same
+// pll.is_tp_filter_enabled=1 + pln.is_active=1 restriction, so a stray
+// target_amount at a non-assignable depth like Division never gets double-
+// counted) as salesbdm/dashboard.php's own "District Total Target" card —
+// factored out here so salesbdm/include/TeamTargetRollup.php's team-rollup
+// figure can show the exact same number a BDM sees on their own dashboard,
+// instead of the smaller "only Firkas that already have a TP" figure it used
+// to compute.
+function getBdmDistrictTotalTarget($db_conn, array $districtNames): float {
+    if (empty($districtNames)) return 0.0;
+
+    $districtDepthRow = $db_conn->query(
+        "SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'district%' ORDER BY depth ASC LIMIT 1"
+    )->fetch_assoc();
+    $districtDepth = (int)($districtDepthRow['depth'] ?? 0);
+    if (!$districtDepth) return 0.0;
+
+    $dn = array_map(fn($n) => mb_strtolower(trim($n)), $districtNames);
+    $ph = implode(',', array_fill(0, count($dn), '?'));
+    $types = 'i' . str_repeat('s', count($dn));
+    $params = array_merge([$districtDepth], $dn);
+
+    $stmt = $db_conn->prepare(
+        "WITH RECURSIVE district_tree AS (
+            SELECT id FROM partner_location_nodes WHERE depth = ? AND LOWER(TRIM(name)) IN ($ph)
+            UNION ALL
+            SELECT n.id FROM partner_location_nodes n JOIN district_tree dt ON n.parent_id = dt.id
+         )
+         SELECT COALESCE(SUM(pln.target_amount),0) AS total_target
+         FROM partner_location_nodes pln
+         JOIN partner_location_layers pll ON pll.depth = pln.depth
+         WHERE pln.id IN (SELECT id FROM district_tree) AND pll.is_tp_filter_enabled = 1 AND pln.is_active = 1"
+    );
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $total = (float)($stmt->get_result()->fetch_assoc()['total_target'] ?? 0);
+    $stmt->close();
+
+    return $total;
+}
+
+// $districtNamesOverride lets a caller narrow the match down to a subset of
+// this BDM's own districts (e.g. salesbdm/dashboard.php's "view one
+// district only" filter, picked from company's Sales BDM report tab)
+// instead of their whole zone — null (the default, used everywhere else)
+// keeps the normal "every district this BDM's zone covers" behavior.
+function getBdmAssignedTpIds($db_conn, int $bdmId, bool $includeInactive = false, ?array $districtNamesOverride = null): array {
+    $districtNames = $districtNamesOverride !== null ? $districtNamesOverride : getBdmAssignedDistrictNames($db_conn, $bdmId);
     if (empty($districtNames)) return [];
 
     $placeholders = implode(',', array_fill(0, count($districtNames), '?'));

@@ -85,6 +85,81 @@ while ($row = $nodes_result->fetch_assoc()) {
 }
 $stmt_nodes->close();
 
+// ── Deposit amount per node: the sum of deposit_amount across every LEAF
+// (childless) node in its subtree — a node's own value only counts toward
+// its own row if that node itself has no children (e.g. a Firka, the
+// deepest level, where the real assignment deposit lives). A node that DOES
+// have children (e.g. a Division with Taluks under it) never counts its own
+// value on its own row even if one happens to be stored there — only what's
+// genuinely at the bottom of its branches, wherever that bottom is (Division
+// for a Channel Partner, Firka for a Territory Partner — depth isn't
+// uniform). That bottom-level value still flows up into every ancestor's
+// total as usual. One recursive CTE builds the (ancestor, descendant-or-self)
+// closure for this level's node ids, then sums only the leaf descendants'
+// deposit_amount per ancestor.
+$amountByNode = [];
+$node_ids = array_map(fn($n) => (int) $n['id'], $nodes);
+if (!empty($node_ids)) {
+    $placeholders = implode(',', array_fill(0, count($node_ids), '?'));
+    $types = str_repeat('i', count($node_ids));
+    $stmt_amt = $db_conn->prepare("
+        WITH RECURSIVE closure AS (
+            SELECT id AS ancestor_id, id AS descendant_id FROM partner_location_nodes
+            UNION ALL
+            SELECT c.ancestor_id, n.id FROM closure c JOIN partner_location_nodes n ON n.parent_id = c.descendant_id
+        )
+        SELECT c.ancestor_id, COALESCE(SUM(p.deposit_amount), 0) AS total
+        FROM closure c
+        JOIN partner_location_nodes p ON p.id = c.descendant_id
+        LEFT JOIN partner_location_nodes ch ON ch.parent_id = p.id
+        WHERE c.ancestor_id IN ($placeholders) AND ch.id IS NULL
+        GROUP BY c.ancestor_id
+    ");
+    $stmt_amt->bind_param($types, ...$node_ids);
+    $stmt_amt->execute();
+    $res_amt = $stmt_amt->get_result();
+    while ($r = $res_amt->fetch_assoc()) {
+        $amountByNode[(int) $r['ancestor_id']] = (float) $r['total'];
+    }
+    $stmt_amt->close();
+}
+
+// ── CP Amount per node: the flip side of the Amount column above — the sum
+// of deposit_amount stored directly on every NON-leaf node in its subtree
+// (a node that has children, e.g. a Division with Taluks under it, where a
+// Channel Partner's own deposit is recorded directly rather than at the
+// bottom of the branch). Every deposit_amount value in the table falls into
+// exactly one of these two columns — leaf (Amount) or non-leaf (CP Amount),
+// never both — so nothing is double-counted or dropped. Same closure as
+// above, but keeping only descendants that themselves have at least one
+// child (EXISTS, not a JOIN, so a node with several children isn't summed
+// once per child).
+$cpAmountByNode = [];
+if (!empty($node_ids)) {
+    $placeholders = implode(',', array_fill(0, count($node_ids), '?'));
+    $types = str_repeat('i', count($node_ids));
+    $stmt_cpamt = $db_conn->prepare("
+        WITH RECURSIVE closure AS (
+            SELECT id AS ancestor_id, id AS descendant_id FROM partner_location_nodes
+            UNION ALL
+            SELECT c.ancestor_id, n.id FROM closure c JOIN partner_location_nodes n ON n.parent_id = c.descendant_id
+        )
+        SELECT c.ancestor_id, COALESCE(SUM(p.deposit_amount), 0) AS total
+        FROM closure c
+        JOIN partner_location_nodes p ON p.id = c.descendant_id
+        WHERE c.ancestor_id IN ($placeholders)
+          AND EXISTS (SELECT 1 FROM partner_location_nodes ch WHERE ch.parent_id = p.id)
+        GROUP BY c.ancestor_id
+    ");
+    $stmt_cpamt->bind_param($types, ...$node_ids);
+    $stmt_cpamt->execute();
+    $res_cpamt = $stmt_cpamt->get_result();
+    while ($r = $res_cpamt->fetch_assoc()) {
+        $cpAmountByNode[(int) $r['ancestor_id']] = (float) $r['total'];
+    }
+    $stmt_cpamt->close();
+}
+
 // ── Page meta ─────────────────────────────────────────────────────────────────
 $page_title = $current_layer_name
     ? htmlspecialchars($current_layer_name) . 's'
@@ -228,8 +303,10 @@ $i = 0;
                                                     <th><?php echo $current_layer_name ? htmlspecialchars($current_layer_name) : 'Name'; ?></th>
                                                     <th>Code</th>
                                                     <th><?php echo $next_layer_name ? htmlspecialchars($next_layer_name) . 's' : 'Sub-locations'; ?></th>
+                                                    <th>Amount</th>
+                                                    <th>CP Amount</th>
                                                     <th>Status</th>
-                                                    
+
                                                     <th>Actions</th>
                                                 </tr>
                                             </thead>
@@ -266,6 +343,8 @@ $i = 0;
                                                             <span class="text-muted">0</span>
                                                         <?php endif; ?>
                                                     </td>
+                                                    <td>&#8377;<?php echo inr_format($amountByNode[(int)$node['id']] ?? 0, 0); ?></td>
+                                                    <td>&#8377;<?php echo inr_format($cpAmountByNode[(int)$node['id']] ?? 0, 0); ?></td>
                                                     <td>
                                                         <?php if ($node['is_active']): ?>
                                                             <span class="badge badge-success">Active</span>

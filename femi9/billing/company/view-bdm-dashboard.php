@@ -32,5 +32,14 @@ setcookie('femi9_company_bdm_view', $token, [
     'httponly' => true,
     'samesite' => 'Lax',
 ]);
-header('Location: ../salesbdm/dashboard.php');
+
+// Forward the district + date-range filter straight through to the real
+// dashboard — lets MIS Report's "Sales BDM" tab (district + from/to +
+// Search) land on the exact filtered view it asked for instead of the
+// BDM's default (whole-zone, this-month) dashboard.
+$_fwd = [];
+foreach (['district', 'from', 'to', 'preset', 'embed', 'tp_id'] as $_k) {
+    if (isset($_GET[$_k]) && $_GET[$_k] !== '') { $_fwd[$_k] = $_GET[$_k]; }
+}
+header('Location: ../salesbdm/dashboard.php' . ($_fwd ? ('?' . http_build_query($_fwd)) : ''));
 exit;

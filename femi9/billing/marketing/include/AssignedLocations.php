@@ -96,3 +96,77 @@ function getMsAssignedDistricts($db_conn, int $msId): array {
 
     return $result;
 }
+
+// Like getMsAssignedDistricts() above, but for TARGET-SCOPING purposes
+// instead of the Add Shop form's District/Taluk pickers — a District OR a
+// DIVISION assignment is kept as-is here (not collapsed up to its enclosing
+// district), so a DM assigned a specific Division sees/rolls up just that
+// division's Firka target, not the whole district's. Used by
+// company/include/TeamTargetRollup.php and marketing/dashboard.php.
+//
+//   - STATE    -> every district under that state (same as getMsAssignedDistricts()).
+//   - DISTRICT -> that district itself.
+//   - DIVISION -> that division itself (the one depth this function adds).
+//   - anything else (a rare direct Taluk/Firka assignment) -> walk up to the
+//     nearest DISTRICT ancestor, same safety net as getMsAssignedDistricts().
+//
+// Returns [{id, name, depth}].
+function getMsAssignedTargetScopeNodes($db_conn, int $msId): array {
+    $stmtAss = $db_conn->prepare(
+        "SELECT location_id FROM marketing_staff_locations WHERE ms_id=?"
+    );
+    $stmtAss->bind_param('i', $msId);
+    $stmtAss->execute();
+    $assignedIds = array_column($stmtAss->get_result()->fetch_all(MYSQLI_ASSOC), 'location_id');
+    $stmtAss->close();
+
+    if (empty($assignedIds)) {
+        return [];
+    }
+
+    $allNodes = [];
+    $res = $db_conn->query("SELECT id, parent_id, depth, name FROM partner_location_nodes WHERE is_active=1");
+    while ($row = $res->fetch_assoc()) {
+        $allNodes[(int)$row['id']] = [
+            'id'        => (int)$row['id'],
+            'parent_id' => $row['parent_id'] !== null ? (int)$row['parent_id'] : null,
+            'depth'     => (int)$row['depth'],
+            'name'      => $row['name'],
+        ];
+    }
+
+    $scopeIds = [];
+    foreach ($assignedIds as $locId) {
+        $locId = (int)$locId;
+        if (!isset($allNodes[$locId])) { continue; }
+        $node = $allNodes[$locId];
+
+        if ($node['depth'] === 3 || $node['depth'] === 4) {
+            // DISTRICT or DIVISION — this DM's own assignment, used directly.
+            $scopeIds[$locId] = true;
+        } elseif ($node['depth'] === 2) {
+            // STATE — expand to every district under it.
+            foreach ($allNodes as $nId => $n) {
+                if ($n['depth'] === 3 && $n['parent_id'] === $locId) { $scopeIds[$nId] = true; }
+            }
+        } else {
+            // TALUK/FIRKA (or anything deeper/shallower) — walk up to the
+            // nearest DISTRICT ancestor, same fallback as getMsAssignedDistricts().
+            $cur = $node;
+            while ($cur !== null && $cur['depth'] !== 3) {
+                $cur = $cur['parent_id'] !== null ? ($allNodes[$cur['parent_id']] ?? null) : null;
+            }
+            if ($cur !== null) { $scopeIds[$cur['id']] = true; }
+        }
+    }
+
+    $result = [];
+    foreach (array_keys($scopeIds) as $id) {
+        $n = $allNodes[$id] ?? null;
+        if (!$n) { continue; }
+        $result[] = ['id' => $n['id'], 'name' => $n['name'], 'depth' => $n['depth']];
+    }
+    usort($result, fn($a, $b) => strcmp($a['name'], $b['name']));
+
+    return $result;
+}

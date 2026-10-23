@@ -77,14 +77,16 @@ if (empty($panCardPath)) {
 // Snapshot the CP's own profile fields as they stand right now, so a later
 // edit by the Company (e.g. via Manage Channel Partner) can be detected
 // and highlighted on this page next time it's opened.
-$stmtCp = $db_conn->prepare("SELECT name, company_name, address, mobile, email FROM channel_partners WHERE id = ?");
+$stmtCp = $db_conn->prepare("SELECT name, company_name, address, mobile, email,
+    branch_line1, branch_line2, branch_city, branch_district, branch_state, branch_country, branch_pincode
+    FROM channel_partners WHERE id = ?");
 $stmtCp->bind_param('i', $cp_id);
 $stmtCp->execute();
 $cpProfile = $stmtCp->get_result()->fetch_assoc() ?: [];
 $stmtCp->close();
 $snapName        = $cpProfile['name'] ?? '';
 $snapCompanyName = $cpProfile['company_name'] ?? '';
-$snapAddress     = $cpProfile['address'] ?? '';
+$snapAddress     = partner_billing_address_line($cpProfile);
 $snapMobile      = $cpProfile['mobile'] ?? '';
 $snapEmail       = $cpProfile['email'] ?? '';
 

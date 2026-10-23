@@ -44,11 +44,22 @@ function cpEnsurePurchaseOrderTables(mysqli $db): void
                 custom_delivery_state VARCHAR(100) NULL,
                 custom_delivery_country VARCHAR(100) NULL,
                 custom_delivery_pincode VARCHAR(20) NULL,
+                created_by VARCHAR(100) NULL,
+                created_by_user_type ENUM('cp','company') NOT NULL DEFAULT 'cp',
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY idx_cppo_cp_status (channel_partner_id, status),
                 KEY idx_cppo_transfer (transfer_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+    } else {
+        // Self-migrate: these two columns were added after the table
+        // already existed on some installs (company-side PO creation,
+        // §cp-add-purchase-order.php) — same pattern as source_po_id below.
+        $col = $db->query("SHOW COLUMNS FROM channel_partner_purchase_orders LIKE 'created_by'");
+        if ($col && $col->num_rows === 0) {
+            $db->query("ALTER TABLE channel_partner_purchase_orders ADD COLUMN created_by VARCHAR(100) NULL AFTER custom_delivery_pincode");
+            $db->query("ALTER TABLE channel_partner_purchase_orders ADD COLUMN created_by_user_type ENUM('cp','company') NOT NULL DEFAULT 'cp' AFTER created_by");
+        }
     }
 
     $itemsTable = $db->query("SHOW TABLES LIKE 'channel_partner_purchase_order_items'");

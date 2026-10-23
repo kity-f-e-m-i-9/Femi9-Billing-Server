@@ -11,6 +11,39 @@ if (session_status() === PHP_SESSION_NONE) {
 // Include database connection
 require_once __DIR__ . '/include/db-connect.php';
 
+// Company "view a Marketing Staff's dashboard" bridge — read-only,
+// allowlisted pages only. Mirrors salesbdm/checksession.php's own
+// company_bdm_view_bridge mechanism exactly (see its comment for the full
+// reasoning). Never touches $_SESSION — it just resolves $result_LoGuserDtails
+// for THIS request, and config.php (included right after) picks it up
+// instead of re-querying by $_SESSION['LOGIN_USER'].
+$_msCompanyBridgeAllowedScripts = ['dashboard.php'];
+if (in_array(basename($_SERVER['SCRIPT_NAME']), $_msCompanyBridgeAllowedScripts, true) && !empty($_COOKIE['femi9_company_ms_view'])) {
+    $db_conn->query("CREATE TABLE IF NOT EXISTS company_ms_view_bridge (
+        token VARCHAR(64) PRIMARY KEY,
+        ms_id INT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
+    $stmt_cmv = $db_conn->prepare("
+        SELECT s.* FROM company_ms_view_bridge b
+        JOIN marketing_staff s ON s.id = b.ms_id
+        WHERE b.token = ? AND b.expires_at > NOW() LIMIT 1
+    ");
+    $stmt_cmv->bind_param('s', $_COOKIE['femi9_company_ms_view']);
+    $stmt_cmv->execute();
+    $bridgeMsRow = $stmt_cmv->get_result()->fetch_assoc();
+    $stmt_cmv->close();
+    if ($bridgeMsRow && ($bridgeMsRow['account_status'] ?? '') === 'active') {
+        $result_LoGuserDtails = $bridgeMsRow;
+        $log_username = $bridgeMsRow['ms_mobile'];
+        $Login_user_IDvl = (int)$bridgeMsRow['id'];
+        $Login_user_TYPEvl = 'marketing';
+        $_companyBridgeView = true;
+        return;
+    }
+}
+
 // Check if user is logged in - Use isset() instead of empty()
 if (!isset($_SESSION['LOGIN_USER']) || $_SESSION['LOGIN_USER'] === '') {
     $_SESSION['errorMessage'] = 'Session Expired. Please login again.';

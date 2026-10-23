@@ -71,4 +71,30 @@ if (!isset($_SESSION['LOGIN_USER_ID'])) {
 if (!isset($_SESSION['LOGIN_USER_NAME'])) {
     $_SESSION['LOGIN_USER_NAME'] = $result_LoGuserDtails['name'];
 }
+
+// Force the Channel Partner Agreement to be read & signed before any other
+// page is usable -- same gate as territory-partner/checksession.php's
+// identical one (see its own comment for why checking is_locked, not just
+// "has signed_at", also re-blocks the portal if Company unlocks it again
+// for re-signing after an edit).
+//
+// Only active once Company has switched on "Work All CPs" on
+// manage-agreements.php (agreement_settings.cp_sign_enforced) -- before
+// that, a CP can use every page as usual, same as before this gate existed.
+$__currentPage = basename($_SERVER['PHP_SELF'] ?? '');
+if (!in_array($__currentPage, ['agreement.php', 'agreement-action.php', 'change-password.php', 'logout.php'], true)) {
+    $__enforceRes = $db_conn->query("SELECT cp_sign_enforced FROM agreement_settings WHERE id = 1");
+    $__enforceRow = $__enforceRes ? $__enforceRes->fetch_assoc() : null;
+    if ((int) ($__enforceRow['cp_sign_enforced'] ?? 0) === 1) {
+        $__stmtAgr = $db_conn->prepare("SELECT is_locked FROM channel_partner_agreements WHERE channel_partner_id = ?");
+        $__stmtAgr->bind_param('i', $result_LoGuserDtails['id']);
+        $__stmtAgr->execute();
+        $__agrRow = $__stmtAgr->get_result()->fetch_assoc();
+        $__stmtAgr->close();
+        if ((int) ($__agrRow['is_locked'] ?? 0) !== 1) {
+            header('Location: agreement.php');
+            exit;
+        }
+    }
+}
 ?>

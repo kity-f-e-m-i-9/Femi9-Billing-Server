@@ -171,6 +171,165 @@ function getMsDistrictTargetAndFirkaStats($db_conn, array $districtNames): array
     return $stats;
 }
 
+// ID-rooted twin of getMsDistrictTpIds() — for a staff member's own TARGET
+// SCOPE nodes (district OR division, see getMsAssignedTargetScopeNodes()),
+// not a district-name lookup. Only the Firka-location match applies here
+// (no legacy assigned_district/branch_district text-field fallback — that
+// field only ever stores a district name, so it naturally doesn't apply to
+// a division-rooted scope).
+function getMsNodeTpIds($db_conn, array $locationIds, bool $includeInactive = false): array {
+    if (empty($locationIds)) return [];
+    $ids = array_map('intval', $locationIds);
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $types = str_repeat('i', count($ids));
+    $activeClause = $includeInactive ? '' : 'is_active = 1 AND ';
+
+    $stmt = $db_conn->prepare("
+        WITH RECURSIVE node_tree AS (
+            SELECT id FROM partner_location_nodes WHERE id IN ($ph)
+            UNION ALL
+            SELECT n.id FROM partner_location_nodes n JOIN node_tree nt ON n.parent_id = nt.id
+        )
+        SELECT DISTINCT tp.id
+        FROM territory_partners tp
+        JOIN territory_partner_locations tpl ON tpl.territory_partner_id = tp.id
+        WHERE {$activeClause}tpl.location_id IN (SELECT id FROM node_tree)
+    ");
+    $stmt->bind_param($types, ...$ids);
+    $stmt->execute();
+    $out = array_map(fn($r) => (int)$r['id'], $stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+    $stmt->close();
+    return $out;
+}
+
+// ID-rooted twin of getMsDistrictTargetAndFirkaStats() — same stats shape,
+// same pll.is_tp_filter_enabled=1 gating (which is what actually scopes the
+// SUM to Firka rows), just rooted directly at the given location ids instead
+// of looking up district-depth nodes by name. Works identically whether the
+// ids are District or Division depth — see getMsAssignedTargetScopeNodes().
+function getMsNodeTargetAndFirkaStats($db_conn, array $locationIds): array {
+    $stats = [
+        'district_total_target'    => 0.0,
+        'firka_total_count'        => 0,
+        'firka_filled_count'       => 0,
+        'firka_vacant_count'       => 0,
+        'target_active_amount'     => 0.0,
+        'target_inactive_amount'   => 0.0,
+        'target_unassigned_amount' => 0.0,
+    ];
+    if (empty($locationIds)) return $stats;
+
+    $ids = array_map('intval', $locationIds);
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $types = str_repeat('i', count($ids));
+
+    $stmtTarget = $db_conn->prepare(
+        "WITH RECURSIVE node_tree AS (
+            SELECT id FROM partner_location_nodes WHERE id IN ($ph)
+            UNION ALL
+            SELECT n.id FROM partner_location_nodes n JOIN node_tree nt ON n.parent_id = nt.id
+         )
+         SELECT COALESCE(SUM(pln.target_amount),0) AS total_target
+         FROM partner_location_nodes pln
+         JOIN partner_location_layers pll ON pll.depth = pln.depth
+         WHERE pln.id IN (SELECT id FROM node_tree) AND pll.is_tp_filter_enabled = 1 AND pln.is_active = 1"
+    );
+    $stmtTarget->bind_param($types, ...$ids);
+    $stmtTarget->execute();
+    $stats['district_total_target'] = (float)($stmtTarget->get_result()->fetch_assoc()['total_target'] ?? 0);
+    $stmtTarget->close();
+
+    $stmtFirka = $db_conn->prepare(
+        "WITH RECURSIVE node_tree AS (
+            SELECT id FROM partner_location_nodes WHERE id IN ($ph)
+            UNION ALL
+            SELECT n.id FROM partner_location_nodes n JOIN node_tree nt ON n.parent_id = nt.id
+         )
+         SELECT
+             COUNT(*) AS total_firkas,
+             COUNT(DISTINCT tpl.location_id) AS filled_firkas
+         FROM partner_location_nodes pln
+         JOIN partner_location_layers pll ON pll.depth = pln.depth
+         LEFT JOIN territory_partner_locations tpl ON tpl.location_id = pln.id
+         WHERE pln.id IN (SELECT id FROM node_tree) AND pll.is_tp_filter_enabled = 1 AND pln.is_active = 1"
+    );
+    $stmtFirka->bind_param($types, ...$ids);
+    $stmtFirka->execute();
+    $firkaRow = $stmtFirka->get_result()->fetch_assoc();
+    $stmtFirka->close();
+    $stats['firka_total_count']  = (int)($firkaRow['total_firkas'] ?? 0);
+    $stats['firka_filled_count'] = (int)($firkaRow['filled_firkas'] ?? 0);
+    $stats['firka_vacant_count'] = $stats['firka_total_count'] - $stats['firka_filled_count'];
+
+    $stmtSplit = $db_conn->prepare(
+        "WITH RECURSIVE node_tree AS (
+            SELECT id FROM partner_location_nodes WHERE id IN ($ph)
+            UNION ALL
+            SELECT n.id FROM partner_location_nodes n JOIN node_tree nt ON n.parent_id = nt.id
+         )
+         SELECT pln.id, pln.target_amount, MAX(tp.is_active) AS has_active_tp, COUNT(tpl.location_id) AS tp_count
+         FROM partner_location_nodes pln
+         JOIN partner_location_layers pll ON pll.depth = pln.depth
+         LEFT JOIN territory_partner_locations tpl ON tpl.location_id = pln.id
+         LEFT JOIN territory_partners tp ON tp.id = tpl.territory_partner_id
+         WHERE pln.id IN (SELECT id FROM node_tree) AND pll.is_tp_filter_enabled = 1 AND pln.is_active = 1
+         GROUP BY pln.id, pln.target_amount"
+    );
+    $stmtSplit->bind_param($types, ...$ids);
+    $stmtSplit->execute();
+    foreach ($stmtSplit->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+        $val = (float)($r['target_amount'] ?? 0);
+        if ((int)($r['tp_count'] ?? 0) === 0) {
+            $stats['target_unassigned_amount'] += $val;
+        } elseif ((int)($r['has_active_tp'] ?? 0) === 1) {
+            $stats['target_active_amount'] += $val;
+        } else {
+            $stats['target_inactive_amount'] += $val;
+        }
+    }
+    $stmtSplit->close();
+
+    return $stats;
+}
+
+// ID-rooted twin of getMsVacantFirkas() — rooted directly at the given
+// location ids (District OR Division depth) instead of district-name
+// lookup. $scopeLabel (e.g. "Erode" or "Erode / Division 2") is used as the
+// row label in place of a re-derived district name, since the root here
+// might not be a district at all.
+function getMsNodeVacantFirkas($db_conn, array $locationIds, string $scopeLabel = ''): array {
+    if (empty($locationIds)) return [];
+    $ids = array_map('intval', $locationIds);
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $types = str_repeat('i', count($ids));
+
+    $stmt = $db_conn->prepare(
+        "WITH RECURSIVE node_tree AS (
+            SELECT id FROM partner_location_nodes WHERE id IN ($ph)
+            UNION ALL
+            SELECT n.id FROM partner_location_nodes n JOIN node_tree nt ON n.parent_id = nt.id
+         )
+         SELECT pln.name AS firka_name, pln.target_amount
+         FROM partner_location_nodes pln
+         JOIN node_tree nt ON nt.id = pln.id
+         JOIN partner_location_layers pll ON pll.depth = pln.depth
+         LEFT JOIN territory_partner_locations tpl ON tpl.location_id = pln.id
+         WHERE pll.is_tp_filter_enabled = 1 AND pln.is_active = 1
+         GROUP BY pln.id, pln.name, pln.target_amount
+         HAVING COUNT(tpl.location_id) = 0
+         ORDER BY pln.target_amount DESC"
+    );
+    $stmt->bind_param($types, ...$ids);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    foreach ($rows as &$r) { $r['district_name'] = $scopeLabel; }
+    unset($r);
+
+    return $rows;
+}
+
 // Row-level detail of every vacant Firka (no TP assigned at all) across the
 // given districts — [{district, firka, target_amount}], for the "Vacant
 // Firkas" tile's drill-down panel. Same district_tree pattern as above, just

@@ -76,14 +76,16 @@ if (empty($panCardPath)) {
 // Snapshot the TP's own profile fields as they stand right now, so a later
 // edit by the Company (e.g. via Manage Territory Partner) can be detected
 // and highlighted on this page next time it's opened.
-$stmtTp = $db_conn->prepare("SELECT name, company_name, address, mobile, email FROM territory_partners WHERE id = ?");
+$stmtTp = $db_conn->prepare("SELECT name, company_name, address, mobile, email,
+    branch_line1, branch_line2, branch_city, branch_district, branch_state, branch_country, branch_pincode
+    FROM territory_partners WHERE id = ?");
 $stmtTp->bind_param('i', $tp_id);
 $stmtTp->execute();
 $tpProfile = $stmtTp->get_result()->fetch_assoc() ?: [];
 $stmtTp->close();
 $snapName        = $tpProfile['name'] ?? '';
 $snapCompanyName = $tpProfile['company_name'] ?? '';
-$snapAddress     = $tpProfile['address'] ?? '';
+$snapAddress     = partner_billing_address_line($tpProfile);
 $snapMobile      = $tpProfile['mobile'] ?? '';
 $snapEmail       = $tpProfile['email'] ?? '';
 

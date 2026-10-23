@@ -2782,7 +2782,7 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                             <div class="page-description" style="margin-left:-10px;">
                                 <h1>
                                     <i class="material-icons-outlined" style="vertical-align:middle;margin-right:6px;">assessment</i>
-                                    Dashboard — Sales Overview
+                                    Dashboard — <span id="misMainTitleText">Main Overview</span>
                                 </h1>
                             </div>
                         </div>
@@ -2802,6 +2802,8 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                         .tf-team-list { list-style:none; margin:0 0 16px; padding:0; }
                         .tf-team-list li { padding:8px 0; border-bottom:1px solid var(--gridline); font-size:12.5px; }
                         .tf-team-list li b { display:block; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px; color:var(--blue); }
+                        .tf-bdm-link { color:var(--text-primary); text-decoration:none; }
+                        .tf-bdm-link:hover { color:var(--blue); text-decoration:underline; }
                         .tf-team-overview h4 { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-secondary); margin:0 0 8px; }
                         .tf-team-overview .tf-ov-row { display:flex; justify-content:space-between; font-size:12.5px; padding:4px 0; }
                         .tf-callout { text-align:center; font-weight:700; font-size:13px; margin-top:10px; padding:8px; border-radius:8px; background:var(--critical-tint); color:var(--critical); }
@@ -2822,6 +2824,8 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                         <div class="tf-toggle" id="dashViewToggle" style="margin-bottom:0;">
                             <button type="button" class="tf-toggle-btn active" id="btnDashMain" data-view="main">Main</button>
                             <button type="button" class="tf-toggle-btn" id="btnDashTotalFlow" data-view="totalflow">Total Flow</button>
+                            <button type="button" class="tf-toggle-btn" id="btnDashSalesBdm" data-view="salesbdm">Sales BDM</button>
+                            <button type="button" class="tf-toggle-btn" id="btnDashMarketingStaff" data-view="marketingstaff">Marketing Staff</button>
                         </div>
                         <?php if ($scope === 'company' && !$is_neksomo_view): ?>
                         <a href="mis-report-export-xlsx.php?scope=<?php echo urlencode($scope); ?>&from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?><?php echo $filter_tp > 0 ? '&tp_id='.(int)$filter_tp : ''; ?>"
@@ -3725,6 +3729,104 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                         </div>
                     </div><!-- /#totalFlowPanel -->
 
+                    <!-- ══ SALES BDM PANEL ═══════════════════════════════════
+                         Hidden until the "Sales BDM" toggle is clicked. Pick a
+                         BDM (+ optionally one of their own districts) and a
+                         date range, then Search — embeds that BDM's own real,
+                         live dashboard (salesbdm/dashboard.php) in an iframe
+                         via the existing read-only company->salesbdm bridge
+                         (view-bdm-dashboard.php), narrowed to the picked
+                         district/date-range. Not a recreated summary — the
+                         exact same dashboard that BDM sees themselves. -->
+                    <div id="salesBdmPanel" style="display:none;">
+                        <div class="mis-filter">
+                            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Sales BDM</label>
+                                    <select id="sbdmBdmSelect" class="form-control form-control-sm" style="width:220px;">
+                                        <option value="">Loading&hellip;</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">District</label>
+                                    <select id="sbdmDistrictSelect" class="form-control form-control-sm" style="width:200px;" disabled>
+                                        <option value="">All Districts</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Territory Partner</label>
+                                    <select id="sbdmTpSelect" class="form-control form-control-sm" style="width:200px;" disabled>
+                                        <option value="">All Territory Partners</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">From</label>
+                                    <input type="date" id="sbdmFrom" class="form-control form-control-sm" style="width:145px;" value="<?php echo htmlspecialchars($from); ?>">
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">To</label>
+                                    <input type="date" id="sbdmTo" class="form-control form-control-sm" style="width:145px;" value="<?php echo htmlspecialchars($to); ?>">
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">&nbsp;</label>
+                                    <button type="button" id="sbdmSearchBtn" class="btn btn-primary btn-sm" disabled>Search</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="sbdmEmpty" style="padding:50px 0;text-align:center;color:var(--text-secondary);">
+                            <i class="material-icons-outlined" style="font-size:28px;vertical-align:middle;">person_search</i>
+                            &nbsp;Pick a Sales BDM above (and, optionally, one of their districts), then click Search.
+                        </div>
+                        <div id="sbdmError" style="display:none;color:var(--critical);padding:20px;"></div>
+                        <div id="sbdmFrameWrap" style="display:none;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+                            <iframe id="sbdmFrame" src="about:blank" style="width:100%;border:none;display:block;min-height:600px;" title="Sales BDM Dashboard"></iframe>
+                        </div>
+                    </div><!-- /#salesBdmPanel -->
+
+                    <!-- ══ MARKETING STAFF PANEL ═════════════════════════════
+                         Same pattern as #salesBdmPanel above: pick a Marketing
+                         Staff and a date range, then Search — embeds that MS's
+                         own real, live dashboard (marketing/dashboard.php) in
+                         an iframe via the read-only company->marketing bridge
+                         (view-ms-dashboard.php). No District/Territory Partner
+                         filter here (unlike Sales BDM) — one Marketing Staff
+                         maps to their own fixed assigned districts/firkas,
+                         there's nothing further to narrow by. -->
+                    <div id="marketingStaffPanel" style="display:none;">
+                        <div class="mis-filter">
+                            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Marketing Staff</label>
+                                    <select id="msStaffSelect" class="form-control form-control-sm" style="width:220px;">
+                                        <option value="">Loading&hellip;</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">From</label>
+                                    <input type="date" id="msFrom" class="form-control form-control-sm" style="width:145px;" value="<?php echo htmlspecialchars($from); ?>">
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">To</label>
+                                    <input type="date" id="msTo" class="form-control form-control-sm" style="width:145px;" value="<?php echo htmlspecialchars($to); ?>">
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">&nbsp;</label>
+                                    <button type="button" id="msSearchBtn" class="btn btn-primary btn-sm" disabled>Search</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="msEmpty" style="padding:50px 0;text-align:center;color:var(--text-secondary);">
+                            <i class="material-icons-outlined" style="font-size:28px;vertical-align:middle;">person_search</i>
+                            &nbsp;Pick a Marketing Staff above, then click Search.
+                        </div>
+                        <div id="msError" style="display:none;color:var(--critical);padding:20px;"></div>
+                        <div id="msFrameWrap" style="display:none;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+                            <iframe id="msFrame" src="about:blank" style="width:100%;border:none;display:block;min-height:600px;" title="Marketing Staff Dashboard"></iframe>
+                        </div>
+                    </div><!-- /#marketingStaffPanel -->
+
                 </div><!-- container-fluid -->
             </div>
         </div>
@@ -3886,12 +3988,22 @@ document.querySelectorAll('.tab-item').forEach(function(t) {
 (function() {
     var btnMain = document.getElementById('btnDashMain');
     var btnFlow = document.getElementById('btnDashTotalFlow');
+    var btnSbdm = document.getElementById('btnDashSalesBdm');
+    var btnMsStaff = document.getElementById('btnDashMarketingStaff');
     var mainPanel = document.getElementById('mainPanel');
     var flowPanel = document.getElementById('totalFlowPanel');
+    var sbdmPanel = document.getElementById('salesBdmPanel');
+    var msStaffPanel = document.getElementById('marketingStaffPanel');
     if (!btnMain || !btnFlow || !mainPanel || !flowPanel) return;
 
     var tfCache = null;
     var tfCharts = {};
+
+    function escHtmlTf(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
 
     function fmtInr(n) {
         n = Math.round(n || 0);
@@ -3926,10 +4038,17 @@ document.querySelectorAll('.tab-item').forEach(function(t) {
         kpiHtml += tfKpiCard('var(--orange)','var(--orange-tint)','groups','Active Channel Partners', k.active_cps.toLocaleString('en-IN'), '');
         document.getElementById('tfKpiRow').innerHTML = kpiHtml;
 
-        // Sidebar: team list
+        // Sidebar: team list — each BDM's name links to their own real
+        // dashboard (view-bdm-dashboard.php's existing read-only company->
+        // salesbdm bridge, same one Salesbdm Team Report already uses), in
+        // a new tab so this Total Flow view stays where it was. That page
+        // keeps its own date-range filter (preset dropdown) same as any
+        // other Sales BDM dashboard visit — nothing to carry over here.
         var teamHtml = '';
         d.team.forEach(function(t) {
-            teamHtml += '<li><b>' + t.zone.toUpperCase() + '</b>' + t.bdm_name + '</li>';
+            teamHtml += '<li><b>' + t.zone.toUpperCase() + '</b>' +
+                '<a href="view-bdm-dashboard.php?bdm_id=' + t.bdm_id + '" target="_blank" rel="noopener" class="tf-bdm-link">' + escHtmlTf(t.bdm_name) + '</a>' +
+                '</li>';
         });
         document.getElementById('tfTeamList').innerHTML = teamHtml;
 
@@ -4064,23 +4183,209 @@ document.querySelectorAll('.tab-item').forEach(function(t) {
             });
     }
 
+    // The top "Dashboard — ..." heading reflects whichever tab is actually
+    // showing -- Sales Overview / Total Flow / Sales BDM, and once a BDM is
+    // picked on that last tab, that BDM's own name specifically (set from
+    // the Sales BDM select's change handler below). Switching to Main or
+    // Total Flow must reset it back here, or a previously-picked BDM's name
+    // would otherwise keep showing on a tab that has nothing to do with it.
+    var misMainTitleText = document.getElementById('misMainTitleText');
+    function setMainTitle(text) {
+        if (misMainTitleText) misMainTitleText.textContent = text;
+    }
+
     function showView(view) {
-        if (view === 'totalflow') {
-            btnFlow.classList.add('active');
-            btnMain.classList.remove('active');
-            mainPanel.style.display = 'none';
-            flowPanel.style.display = '';
-            if (!tfCache) loadTotalFlow();
-        } else {
-            btnMain.classList.add('active');
-            btnFlow.classList.remove('active');
-            flowPanel.style.display = 'none';
-            mainPanel.style.display = '';
-        }
+        btnMain.classList.toggle('active', view === 'main');
+        btnFlow.classList.toggle('active', view === 'totalflow');
+        if (btnSbdm) btnSbdm.classList.toggle('active', view === 'salesbdm');
+        if (btnMsStaff) btnMsStaff.classList.toggle('active', view === 'marketingstaff');
+        mainPanel.style.display = view === 'main' ? '' : 'none';
+        flowPanel.style.display = view === 'totalflow' ? '' : 'none';
+        if (sbdmPanel) sbdmPanel.style.display = view === 'salesbdm' ? '' : 'none';
+        if (msStaffPanel) msStaffPanel.style.display = view === 'marketingstaff' ? '' : 'none';
+        if (view === 'totalflow' && !tfCache) loadTotalFlow();
+        if (view === 'salesbdm') sbdmOnShow();
+        if (view === 'marketingstaff') msStaffOnShow();
+        if (view === 'main') setMainTitle('Main Overview');
+        else if (view === 'totalflow') setMainTitle('Total Flow');
+        else if (view === 'salesbdm') setMainTitle(sbdmBdmSelect && sbdmBdmSelect.value ? sbdmBdmSelect.options[sbdmBdmSelect.selectedIndex].text : 'Sales BDM');
+        else if (view === 'marketingstaff') setMainTitle(msStaffSelect && msStaffSelect.value ? msStaffSelect.options[msStaffSelect.selectedIndex].text : 'Marketing Staff');
     }
 
     btnMain.addEventListener('click', function() { showView('main'); });
     btnFlow.addEventListener('click', function() { showView('totalflow'); });
+    if (btnSbdm) btnSbdm.addEventListener('click', function() { showView('salesbdm'); });
+    if (btnMsStaff) btnMsStaff.addEventListener('click', function() { showView('marketingstaff'); });
+
+    // ── Sales BDM tab — pick a BDM (+ optional district) and a date range,
+    // Search embeds that BDM's own real dashboard in an iframe via the
+    // existing company->salesbdm read-only bridge (view-bdm-dashboard.php).
+    // The BDM list is fetched once, lazily, the first time this tab is shown.
+    var sbdmBdmSelect = document.getElementById('sbdmBdmSelect');
+    var sbdmDistrictSelect = document.getElementById('sbdmDistrictSelect');
+    var sbdmTpSelect = document.getElementById('sbdmTpSelect');
+    var sbdmFrom = document.getElementById('sbdmFrom');
+    var sbdmTo = document.getElementById('sbdmTo');
+    var sbdmSearchBtn = document.getElementById('sbdmSearchBtn');
+    var sbdmEmpty = document.getElementById('sbdmEmpty');
+    var sbdmErrorEl = document.getElementById('sbdmError');
+    var sbdmFrameWrap = document.getElementById('sbdmFrameWrap');
+    var sbdmFrame = document.getElementById('sbdmFrame');
+    var sbdmListLoaded = false;
+
+    function sbdmOnShow() {
+        if (sbdmListLoaded || !sbdmBdmSelect) return;
+        sbdmListLoaded = true;
+        fetch('get-salesbdm-list.php')
+            .then(function(r) { return r.json(); })
+            .then(function(list) {
+                sbdmBdmSelect.innerHTML = '';
+                sbdmBdmSelect.appendChild(new Option('-- select --', ''));
+                (list || []).forEach(function(b) {
+                    sbdmBdmSelect.appendChild(new Option(b.name + (b.zone ? ' (' + b.zone + ')' : ''), b.id));
+                });
+            })
+            .catch(function() {
+                sbdmBdmSelect.innerHTML = '';
+                sbdmBdmSelect.appendChild(new Option('Failed to load — retry', ''));
+            });
+    }
+
+    function sbdmReloadTps() {
+        var bdmId = sbdmBdmSelect.value;
+        sbdmTpSelect.innerHTML = '';
+        sbdmTpSelect.appendChild(new Option('All Territory Partners', ''));
+        if (!bdmId) { sbdmTpSelect.disabled = true; return; }
+        sbdmTpSelect.disabled = true;
+        var url = 'get-salesbdm-tps.php?bdm_id=' + encodeURIComponent(bdmId);
+        if (sbdmDistrictSelect.value) url += '&district=' + encodeURIComponent(sbdmDistrictSelect.value);
+        fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(tps) {
+                (tps || []).forEach(function(t) { sbdmTpSelect.appendChild(new Option(t.name, t.id)); });
+                sbdmTpSelect.disabled = false;
+            })
+            .catch(function() { sbdmTpSelect.disabled = false; });
+    }
+
+    sbdmBdmSelect && sbdmBdmSelect.addEventListener('change', function() {
+        var bdmId = this.value;
+        setMainTitle(bdmId ? this.options[this.selectedIndex].text : 'Sales BDM');
+        sbdmDistrictSelect.innerHTML = '';
+        sbdmDistrictSelect.appendChild(new Option('All Districts', ''));
+        if (!bdmId) {
+            sbdmDistrictSelect.disabled = true;
+            sbdmSearchBtn.disabled = true;
+            sbdmReloadTps();
+            return;
+        }
+        sbdmSearchBtn.disabled = false;
+        sbdmDistrictSelect.disabled = true;
+        fetch('get-salesbdm-districts.php?bdm_id=' + encodeURIComponent(bdmId))
+            .then(function(r) { return r.json(); })
+            .then(function(names) {
+                (names || []).forEach(function(n) { sbdmDistrictSelect.appendChild(new Option(n, n)); });
+                sbdmDistrictSelect.disabled = false;
+            })
+            .catch(function() { sbdmDistrictSelect.disabled = false; });
+        sbdmReloadTps();
+        // Load straight away on picking a BDM, same as every date-range or
+        // district/TP filter still underneath -- Search stays for re-running
+        // after narrowing those, but a BDM pick alone shouldn't need a
+        // second click just to see something.
+        sbdmDoSearch();
+    });
+
+    sbdmDistrictSelect && sbdmDistrictSelect.addEventListener('change', sbdmReloadTps);
+
+    function sbdmDoSearch() {
+        var bdmId = sbdmBdmSelect.value;
+        if (!bdmId) return;
+        var qs = 'bdm_id=' + encodeURIComponent(bdmId) + '&embed=1';
+        if (sbdmDistrictSelect.value) qs += '&district=' + encodeURIComponent(sbdmDistrictSelect.value);
+        if (sbdmTpSelect.value) qs += '&tp_id=' + encodeURIComponent(sbdmTpSelect.value);
+        if (sbdmFrom.value) qs += '&from=' + encodeURIComponent(sbdmFrom.value);
+        if (sbdmTo.value) qs += '&to=' + encodeURIComponent(sbdmTo.value);
+        sbdmErrorEl.style.display = 'none';
+        sbdmEmpty.style.display = 'none';
+        sbdmFrameWrap.style.display = '';
+        sbdmFrame.src = 'view-bdm-dashboard.php?' + qs;
+    }
+
+    sbdmSearchBtn && sbdmSearchBtn.addEventListener('click', sbdmDoSearch);
+
+    // Auto-grow the iframe to its content's actual height (same-origin, so
+    // this is allowed) instead of a fixed height with an inner scrollbar —
+    // matches how the BDM would see their own dashboard full-page.
+    sbdmFrame && sbdmFrame.addEventListener('load', function() {
+        try {
+            var doc = sbdmFrame.contentWindow.document;
+            var h = Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+            if (h > 0) sbdmFrame.style.height = (h + 20) + 'px';
+        } catch (e) { /* cross-origin or not-yet-loaded — keep min-height fallback */ }
+    });
+
+    // ── Marketing Staff tab — same pattern as the Sales BDM tab just above,
+    // but simpler: no District/Territory Partner cascade, since one
+    // Marketing Staff maps to their own fixed assigned districts/firkas with
+    // nothing further to narrow by. Picking a Marketing Staff loads
+    // immediately, same as Sales BDM.
+    var msStaffSelect = document.getElementById('msStaffSelect');
+    var msFrom = document.getElementById('msFrom');
+    var msTo = document.getElementById('msTo');
+    var msSearchBtn = document.getElementById('msSearchBtn');
+    var msEmpty = document.getElementById('msEmpty');
+    var msErrorEl = document.getElementById('msError');
+    var msFrameWrap = document.getElementById('msFrameWrap');
+    var msFrame = document.getElementById('msFrame');
+    var msListLoaded = false;
+
+    function msStaffOnShow() {
+        if (msListLoaded || !msStaffSelect) return;
+        msListLoaded = true;
+        fetch('get-marketing-staff-list.php')
+            .then(function(r) { return r.json(); })
+            .then(function(list) {
+                msStaffSelect.innerHTML = '';
+                msStaffSelect.appendChild(new Option('-- select --', ''));
+                (list || []).forEach(function(m) {
+                    msStaffSelect.appendChild(new Option(m.name, m.id));
+                });
+            })
+            .catch(function() {
+                msStaffSelect.innerHTML = '';
+                msStaffSelect.appendChild(new Option('Failed to load — retry', ''));
+            });
+    }
+
+    function msDoSearch() {
+        var msId = msStaffSelect.value;
+        if (!msId) return;
+        var qs = 'ms_id=' + encodeURIComponent(msId) + '&embed=1';
+        if (msFrom.value) qs += '&from=' + encodeURIComponent(msFrom.value);
+        if (msTo.value) qs += '&to=' + encodeURIComponent(msTo.value);
+        msErrorEl.style.display = 'none';
+        msEmpty.style.display = 'none';
+        msFrameWrap.style.display = '';
+        msFrame.src = 'view-ms-dashboard.php?' + qs;
+    }
+
+    msStaffSelect && msStaffSelect.addEventListener('change', function() {
+        var msId = this.value;
+        setMainTitle(msId ? this.options[this.selectedIndex].text : 'Marketing Staff');
+        msSearchBtn.disabled = !msId;
+        if (msId) msDoSearch();
+    });
+
+    msSearchBtn && msSearchBtn.addEventListener('click', msDoSearch);
+
+    msFrame && msFrame.addEventListener('load', function() {
+        try {
+            var doc = msFrame.contentWindow.document;
+            var h = Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+            if (h > 0) msFrame.style.height = (h + 20) + 'px';
+        } catch (e) { /* cross-origin or not-yet-loaded — keep min-height fallback */ }
+    });
 })();
 </script>
 </body>
