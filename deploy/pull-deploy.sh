@@ -32,11 +32,13 @@ REMOTE=$(git rev-parse "origin/$BRANCH")
 echo "[$(date '+%F %T')] deploying${DRY:+ (DRY RUN)} ${LOCAL:0:7} -> ${REMOTE:0:7}" >> "$LOG"
 git reset -q --hard "origin/$BRANCH"
 
+# NOTE: .user.ini files in the repo are local-MAMP-only PHP overrides - never deploy them.
 RSYNC_FLAGS="-rlptD"; [ -n "${DRY:-}" ] && RSYNC_FLAGS="-rlptDn --itemize-changes"   # DRY=1 shows what would change
 rsync $RSYNC_FLAGS \
   --exclude='.git' --exclude='.github' --exclude='deploy' --exclude='.cpanel.yml' \
   --exclude='.claude' --exclude='docs' --exclude='sql' \
   --exclude='.env' --exclude='.env.*' \
+  --exclude='.user.ini' \
   --exclude='**/logs/**' --exclude='error_log' \
   ./ "$WEB_ROOT/" >> "$LOG" 2>&1
 
