@@ -1,8 +1,9 @@
 name: Publish Website to CPanel
+# The server now PULLS from GitHub on its own (cron -> deploy/pull-deploy.sh), so this FTP
+# deploy no longer runs on push. It stays here as a manual fallback only: GitHub -> Actions
+# -> this workflow -> Run workflow (needs FTP open on the server's firewall).
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 concurrency:
   group: production-deploy
   cancel-in-progress: false
