@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 ob_start();
 include("checksession.php");
 require_once("include/GodownAccess.php");
@@ -116,7 +116,7 @@ try {
     // Auto-generate ref_number if not provided
     $ref_id = $ref_input ?: ('PLT-' . str_pad($transfer_id, 5, '0', STR_PAD_LEFT));
     if (!$ref_input) {
-        $db_conn->query("UPDATE pl_godown_transfers SET ref_number='$ref_id' WHERE id=$transfer_id");
+        $db_conn->query("UPDATE pl_godown_transfers SET ref_number='".db_esc($ref_id)."' WHERE id=$transfer_id");
     }
 
     // Process each product

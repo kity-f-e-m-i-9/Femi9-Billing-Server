@@ -41,7 +41,7 @@ $file = "".$Report_LABLE."-".$DISPLAY_LABLE."-".$from_date."(to)".$to_date.".csv
 
 											
 // Fetch product data from database
-$select_records = "select * from ".$tablename." where valid_from between '$from_date' and '$to_date' order by id asc";
+$select_records = "select * from ".$tablename." where valid_from between '".db_esc($from_date)."' and '".db_esc($to_date)."' order by id asc";
 $fetch_records = mysqli_query($db_conn, $select_records);
 
 // Initialize CSV content

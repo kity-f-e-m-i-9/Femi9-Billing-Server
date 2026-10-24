@@ -75,7 +75,7 @@ $se_usertype=base64_decode($_REQUEST['usertype']);
 $se_userID=base64_decode($_REQUEST['user_tempID']);
 $tablename_USER=base64_decode($_REQUEST['tablename']);
 
-$select_USER_Records123="select * from ".$tablename_USER." where temp_id='$se_userID'";
+$select_USER_Records123="select * from ".$tablename_USER." where temp_id='".db_esc($se_userID)."'";
 $fetch_USER_Records123=mysqli_query($db_conn,$select_USER_Records123);
 $result_USER_Records133=mysqli_fetch_array($fetch_USER_Records123);
 

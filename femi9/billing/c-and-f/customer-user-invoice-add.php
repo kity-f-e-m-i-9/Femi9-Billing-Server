@@ -176,7 +176,7 @@ select:focus, input[type=number]:focus{background:#fffa8f;}
 		
 		//RECEIPT AMOUNT		
 $totalamount=$result_InvoieDetails["total"];
-$selectcountreceipt="select sum(received) from receipt where inv_id='".$Invoice_ID."'";
+$selectcountreceipt="select sum(received) from receipt where inv_id='".db_esc($Invoice_ID)."'";
 $fetchcountreceipt=mysqli_query($db_conn,$selectcountreceipt);
 $resulcountreceipt=mysqli_fetch_array($fetchcountreceipt);
 $Total_Receipt_amount=$resulcountreceipt[0];

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
@@ -18,7 +18,7 @@ $sql_input = "SELECT i.*, p.productName, g.gname
               LEFT JOIN products p ON p.id = i.product_id
               LEFT JOIN company_godown g ON g.id = i.godownid
               WHERE i.warehouse_id = $r1_warehouse_id
-                AND i.input_date BETWEEN '$from_date' AND '$to_date'
+                AND i.input_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
                 AND (g.id IS NULL OR " . godown_finance_filter_sql($db_conn, 'g') . ")
               ORDER BY i.input_date, i.id";
 $res_input = mysqli_query($db_conn, $sql_input);
@@ -32,7 +32,7 @@ $sql_moves = "SELECT m.*, p.productName,
               LEFT JOIN warehouses wt ON wt.id = m.to_warehouse_id
               LEFT JOIN company_godown g ON g.id = m.from_company_godown_id
               WHERE (m.from_warehouse_id = $r1_warehouse_id OR m.to_warehouse_id = $r1_warehouse_id)
-                AND DATE(m.created_at) BETWEEN '$from_date' AND '$to_date'
+                AND DATE(m.created_at) BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
                 AND (g.id IS NULL OR " . godown_finance_filter_sql($db_conn, 'g') . ")
               ORDER BY m.created_at, m.id";
 $res_moves = mysqli_query($db_conn, $sql_moves);

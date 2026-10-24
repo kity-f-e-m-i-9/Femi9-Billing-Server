@@ -86,12 +86,12 @@ $receiptdate = !empty($result_invoicedetails['date'])
                    from_user_type, from_user_id, to_user_type, to_user_id,
                    receipt_method, receipt_remarks) 
                   VALUES 
-                  ('$invoice_id', '$invoice_id', '$total_amount', '$receivedamount',
+                  ('".db_esc($invoice_id)."', '".db_esc($invoice_id)."', '$total_amount', '$receivedamount',
                    '$receivableamount', '$receiptdate',
                    '".$result_invoicedetails['from_user_type']."',
                    '".$result_invoicedetails['from_user_id']."',
                    '$usertype', '$userid',
-                   '$receipt_method', '$receipt_remarks')";
+                   '".db_esc($receipt_method)."', '$receipt_remarks')";
         mysqli_query($db_conn, $insertreceipt);
     }
 	

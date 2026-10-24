@@ -97,7 +97,7 @@ if($get_from_user_type=='stockiest')
 	$LableName="Stockist";
 }
 
-$select890="select * from ".$Tablename." where temp_id='$get_from_user_id'";
+$select890="select * from ".$Tablename." where temp_id='".db_esc($get_from_user_id)."'";
 $fetch890=mysqli_query($db_conn,$select890);
 $result890=mysqli_fetch_array($fetch890);
 $print_userID=$result890['useridtext'];

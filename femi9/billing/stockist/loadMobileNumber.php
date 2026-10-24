@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $mobilenumber=$_REQUEST['q'];
 $invuser=$_REQUEST['invuser'];
@@ -17,7 +17,7 @@ else
 }
 	
 
-$Select_Count_MobilenUmber="select count(*) as numMob from ".$tablename." where mobile_number='$mobilenumber'";
+$Select_Count_MobilenUmber="select count(*) as numMob from ".$tablename." where mobile_number='".db_esc($mobilenumber)."'";
 $Fetch_Count_MobilenUmber=mysqli_query($db_conn,$Select_Count_MobilenUmber);
 $Result_Count_MobilenUmber=mysqli_fetch_array($Fetch_Count_MobilenUmber);
 if($Result_Count_MobilenUmber['numMob']==0){?>

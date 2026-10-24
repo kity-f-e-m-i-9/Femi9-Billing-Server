@@ -160,7 +160,7 @@ $_SESSION['invuser']=$getinvuser;
 		
 		if($getinvuser=="customer")
 	{
-		$select_product_list="select * from invoice_items where inv_id='$invid_decode' order by id asc";
+		$select_product_list="select * from invoice_items where inv_id='".db_esc($invid_decode)."' order by id asc";
 	}else{
 		$select_product_list="select * from user_invoice_items where inv_id=? order by id asc";
 	}
@@ -226,7 +226,7 @@ $return_id="".$randum_number."RTN".$temp_date."".$temp_time."";
 <?php 
 if($getinvuser=="customer")
 	{
-		$select_product_list12="select * from invoice_items where inv_id='$invid_decode' order by id asc";
+		$select_product_list12="select * from invoice_items where inv_id='".db_esc($invid_decode)."' order by id asc";
 	}else{
 $select_product_list12="select * from user_invoice_items where inv_id=? order by id asc";
 	}

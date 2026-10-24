@@ -49,7 +49,7 @@ if(isset($_REQUEST['add-customer']))
 	{
 		$insert_products="insert into marketing_staff (ms_name,ms_mobile,password,ms_email,ms_address,country_code,account_status,team_level_id,manager_id,monthly_target_amount)
 		values ('$ms_name','$ms_mobile','$password','$ms_email','$ms_address',
-		'$country_code','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").")";
+		'".db_esc($country_code)."','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").")";
 		mysqli_query($db_conn,$insert_products);
 		$new_ms_id = mysqli_insert_id($db_conn);
 
@@ -134,7 +134,7 @@ if(isset($_REQUEST['update-customer']))
 	}
 
 	$update_products="update marketing_staff set ms_name='$ms_name',ms_email='$ms_email',
-	ms_address='$ms_address',country_code='$country_code',team_level_id=".($team_level_id > 0 ? $team_level_id : "NULL").",manager_id=".($manager_id > 0 ? $manager_id : "NULL").",monthly_target_amount=".($monthly_target_amount !== null ? $monthly_target_amount : "NULL")." where id='$update_id'";
+	ms_address='$ms_address',country_code='".db_esc($country_code)."',team_level_id=".($team_level_id > 0 ? $team_level_id : "NULL").",manager_id=".($manager_id > 0 ? $manager_id : "NULL").",monthly_target_amount=".($monthly_target_amount !== null ? $monthly_target_amount : "NULL")." where id='".db_esc($update_id)."'";
 	mysqli_query($db_conn,$update_products);
 
 		$db_conn->query("CREATE TABLE IF NOT EXISTS marketing_staff_locations (

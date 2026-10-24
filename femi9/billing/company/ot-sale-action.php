@@ -343,7 +343,7 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
                          target_sls_amount,target_reached,refer_by_usertype,refer_by_userid,
                          commission_percentage,commission_amount,commission_type,remarks) 
                         VALUES 
-                        ('$tempid','Nill','".date('Y-m-d')."','".date('Y-m-d')."',
+                        ('".db_esc($tempid)."','Nill','".date('Y-m-d')."','".date('Y-m-d')."',
                          '0','0','0','0','yes','$usertype_print','$userid_print',
                          '0','$total_coupon_commission','Website Order Commission','$Remarks_CB')";
                     mysqli_query($db_conn, $Insert_wallet_records);

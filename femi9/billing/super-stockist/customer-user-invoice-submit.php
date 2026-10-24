@@ -76,7 +76,7 @@ db_q($db_conn,$update_invoice_ITEMS12,[$update_invoice_date,$invoice_id,$Login_u
 		$insertreceipt="insert into receipt (receiptid,inv_id,invoice_amount,received,receivable,date,from_user_type,
 		from_user_id,to_user_type,to_user_id,receipt_method,receipt_remarks) 
 		values 
-		('$invoice_id','$invoice_id','$total_amount','$receivedamount','$receivableamount','$receiptdate','".$resultdetails['user_type']."','".$resultdetails['user_id']."','$usertype','$userid','$receipt_method','$receipt_remarks')";
+		('".db_esc($invoice_id)."','".db_esc($invoice_id)."','$total_amount','".db_esc($receivedamount)."','$receivableamount','$receiptdate','".$resultdetails['user_type']."','".$resultdetails['user_id']."','$usertype','$userid','".db_esc($receipt_method)."','$receipt_remarks')";
 		mysqli_query($db_conn,$insertreceipt);
 	}
 	//-------------------------------------

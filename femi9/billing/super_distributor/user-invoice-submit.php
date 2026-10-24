@@ -126,7 +126,7 @@ if (isset($_REQUEST['invoice-submit'])) {
                    '".$invoice_data['from_user_type']."',
                    '".$invoice_data['from_user_id']."',
                    '$usertype', '$userid',
-                   '$receipt_method', '$receipt_remarks')";
+                   '".db_esc($receipt_method)."', '$receipt_remarks')";
         mysqli_query($db_conn, $insertreceipt);
     }
     

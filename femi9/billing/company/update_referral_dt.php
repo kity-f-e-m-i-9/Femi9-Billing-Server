@@ -100,7 +100,7 @@ function closerefresh()
 		    
 		}else{
 		
-		$select_count_REFERID="select * from ".$tblename." where useridtext='$st_ref_userid_conc'";
+		$select_count_REFERID="select * from ".$tblename." where useridtext='".db_esc($st_ref_userid_conc)."'";
 		$fetch_count_REFERID=mysqli_query($db_conn,$select_count_REFERID);
 		$result_count_REFERID=mysqli_num_rows($fetch_count_REFERID);
 		if($result_count_REFERID==1)

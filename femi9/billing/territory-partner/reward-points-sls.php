@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 /**
  * Reward Points (Sales) - Territory Partner
  */
@@ -118,14 +118,14 @@ function safeQuery_tpsls(mysqli $conn, string $sql): float {
 $total_points_users = safeQuery_tpsls($db_conn,
     "SELECT COALESCE(SUM(sub_total) / 100, 0) FROM user_invoice
      WHERE from_user_type = '$user_type' AND from_user_id = '$user_id'
-     AND date BETWEEN '$current_from_date' AND '$current_to_date'"
+     AND date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."'"
 );
 
 // 2. Customer Sales Points — invoice sub_total / 100
 $total_points_customers = safeQuery_tpsls($db_conn,
     "SELECT COALESCE(SUM(sub_total) / 100, 0) FROM invoice
      WHERE user_type = '$user_type' AND user_id = '$user_id'
-     AND date BETWEEN '$current_from_date' AND '$current_to_date'"
+     AND date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."'"
 );
 
 $total_combined_points = $total_points_users + $total_points_customers;
@@ -136,7 +136,7 @@ $user_return_points = safeQuery_tpsls($db_conn,
      WHERE r.invnumber IN (
          SELECT inv_id FROM user_invoice
          WHERE from_user_type = '$user_type' AND from_user_id = '$user_id'
-         AND date BETWEEN '$current_from_date' AND '$current_to_date'
+         AND date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."'
      ) AND r.to_usertype = '$user_type' AND r.to_userid = '$user_id'"
 );
 
@@ -148,7 +148,7 @@ if (mysqli_num_rows($table_exists) > 0) {
          WHERE r.invnumber IN (
              SELECT inv_id FROM invoice
              WHERE user_type = '$user_type' AND user_id = '$user_id'
-             AND date BETWEEN '$current_from_date' AND '$current_to_date'
+             AND date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."'
          ) AND r.user_type = '$user_type' AND r.user_id = '$user_id'"
     );
 } else {

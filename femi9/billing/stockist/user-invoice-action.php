@@ -77,7 +77,7 @@ $admin_statecode=$result_LoGuserDtails['state_id'];
 		//$tablename="shop";
 	}
 	
-$selecutomser_dtails="select * from ".$tablename." where temp_id='$customer_id'";
+$selecutomser_dtails="select * from ".$tablename." where temp_id='".db_esc($customer_id)."'";
 $fetchcutomser_dtails=mysqli_query($db_conn,$selecutomser_dtails);
 $resultcutomser_dtails=mysqli_fetch_array($fetchcutomser_dtails);
 $customer_state=$resultcutomser_dtails['state_id'];

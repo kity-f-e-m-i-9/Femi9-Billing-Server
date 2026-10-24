@@ -181,7 +181,7 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from ".$tablename." where valid_from between '$from_date' and '$to_date' and onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl' order by id asc";
+										<?php $select_product_list="select * from ".$tablename." where valid_from between '".db_esc($from_date)."' and '".db_esc($to_date)."' and onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl' order by id asc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{

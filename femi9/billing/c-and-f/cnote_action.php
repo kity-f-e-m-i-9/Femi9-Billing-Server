@@ -21,10 +21,10 @@ if(isset($_REQUEST['add-return']))
 	}
 	
 	if($tablename!="customers"){
-$selecutomser_dtails="select * from ".$tablename." where temp_id='$from_userid'";
+$selecutomser_dtails="select * from ".$tablename." where temp_id='".db_esc($from_userid)."'";
 	}
 	else{
-		$selecutomser_dtails="select * from ".$tablename." where id='$from_userid'";
+		$selecutomser_dtails="select * from ".$tablename." where id='".db_esc($from_userid)."'";
 	}
 	
 $fetchcutomser_dtails=mysqli_query($db_conn,$selecutomser_dtails);

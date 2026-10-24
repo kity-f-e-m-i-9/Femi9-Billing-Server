@@ -95,7 +95,7 @@ if ($product_gst_type === 'inclusive' && $gst_percentage > 0) {
 	
 	
 	//count available stock
-	$select_count_AVSTOCK="select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'
+	$select_count_AVSTOCK="select * from stock where product_id='".db_esc($pr_id)."' and user_type='$Login_user_TYPEvl' and user_id='".db_esc($Login_user_IDvl)."'
 		and warehouse_id " . ($warehouseId === null ? 'IS NULL' : '= ' . (int)$warehouseId);
 	$FETCH_count_AVSTOCK=mysqli_query($db_conn,$select_count_AVSTOCK);
 	$RESULT_count_AVSTOCK=mysqli_fetch_array($FETCH_count_AVSTOCK);

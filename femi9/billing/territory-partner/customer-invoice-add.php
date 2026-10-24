@@ -365,7 +365,7 @@ $rd = 0;
             <?php if ($amount_received_fully == 0): ?>
             <td>
             <?php
-            $cnt_ret2 = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='$Invoice_ID' AND prid='" . $ri['pr_id'] . "'"));
+            $cnt_ret2 = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='".db_esc($Invoice_ID)."' AND prid='" . $ri['pr_id'] . "'"));
             if ($cnt_ret2 == 0) {
                 echo "<a href='customer-del-inv-product.php?inv_id=$Invoice_ID_encode&&rowid=$ItemRowid&&userid=$CustomerID&&actionremove' onclick=\"return confirm('Delete?');\"><span class='badge bg-danger'>Remove</span></a>";
             } else {

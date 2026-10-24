@@ -81,7 +81,7 @@ if(isset($_REQUEST['add-salesbdm']))
 	{
 		$insert_products="insert into sales_bdm_staff (bdm_name,bdm_mobile,password,bdm_email,bdm_address,country_code,account_status,team_level_id,manager_id,monthly_target_amount,zone,espo_user_id)
 		values ('$bdm_name','$bdm_mobile','$password','$bdm_email','$bdm_address',
-		'$country_code','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").",'$zone',".($espo_user_id !== null ? "'$espo_user_id'" : "NULL").")";
+		'".db_esc($country_code)."','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").",'$zone',".($espo_user_id !== null ? "'".db_esc($espo_user_id)."'" : "NULL").")";
 		mysqli_query($db_conn,$insert_products);
 		$new_bdm_id = mysqli_insert_id($db_conn);
 
@@ -165,7 +165,7 @@ if(isset($_REQUEST['update-salesbdm']))
 	}
 
 	$update_products="update sales_bdm_staff set bdm_name='$bdm_name',bdm_email='$bdm_email',
-	bdm_address='$bdm_address',country_code='$country_code',team_level_id=".($team_level_id > 0 ? $team_level_id : "NULL").",manager_id=".($manager_id > 0 ? $manager_id : "NULL").",monthly_target_amount=".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").",zone='$zone',espo_user_id=".($espo_user_id !== null ? "'$espo_user_id'" : "NULL")." where id='$update_id'";
+	bdm_address='$bdm_address',country_code='".db_esc($country_code)."',team_level_id=".($team_level_id > 0 ? $team_level_id : "NULL").",manager_id=".($manager_id > 0 ? $manager_id : "NULL").",monthly_target_amount=".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").",zone='$zone',espo_user_id=".($espo_user_id !== null ? "'".db_esc($espo_user_id)."'" : "NULL")." where id='".db_esc($update_id)."'";
 	mysqli_query($db_conn,$update_products);
 
 	// District assignment is now entirely Zone-derived (see $zone above and

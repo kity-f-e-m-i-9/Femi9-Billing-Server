@@ -21,7 +21,7 @@ $_SESSION['ACTIONEDIT']=$get_action;
 //4.shop-invoice-submit.php
 
 //get Godown Details
-$select_Godowndetails="select * from company_godown where id='".$_REQUEST['gid']."' AND " . godown_finance_filter_sql($db_conn);
+$select_Godowndetails="select * from company_godown where id='".db_esc($_REQUEST['gid'])."' AND " . godown_finance_filter_sql($db_conn);
 $fetch_Godowndetails=mysqli_query($db_conn,$select_Godowndetails);
 $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 
@@ -170,7 +170,7 @@ select:focus, input[type=number]:focus{background:#fffa8f;}
 		
 		//RECEIPT AMOUNT		
 $totalamount=$result_InvoieDetails["total"];
-$selectcountreceipt="select sum(received) from receipt where inv_id='".$Invoice_ID."'";
+$selectcountreceipt="select sum(received) from receipt where inv_id='".db_esc($Invoice_ID)."'";
 $fetchcountreceipt=mysqli_query($db_conn,$selectcountreceipt);
 $resulcountreceipt=mysqli_fetch_array($fetchcountreceipt);
 $Total_Receipt_amount=$resulcountreceipt[0];

@@ -180,7 +180,7 @@ $select_Count_records="select count(*) as numRecords from input_stock where inpu
 										if($result_Count_records['numRecords']>0)
 										{
 
-											$select_product_list="select distinct tempid from input_stock where input_date between '$from_date' and '$to_date' and godownid IN (" . godown_ids_subquery($db_conn) . ") order by id asc";
+											$select_product_list="select distinct tempid from input_stock where input_date between '".db_esc($from_date)."' and '".db_esc($to_date)."' and godownid IN (" . godown_ids_subquery($db_conn) . ") order by id asc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{

@@ -1,11 +1,11 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); 
 require_once("include/PermissionCheck.php"); requirePermission('debit_note');
 include("config.php"); 
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 
 //get Godown Details
-$select_Godowndetails="select * from company_godown where id='".$_REQUEST['gid']."' AND " . godown_finance_filter_sql($db_conn);
+$select_Godowndetails="select * from company_godown where id='".db_esc($_REQUEST['gid'])."' AND " . godown_finance_filter_sql($db_conn);
 $fetch_Godowndetails=mysqli_query($db_conn,$select_Godowndetails);
 $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 

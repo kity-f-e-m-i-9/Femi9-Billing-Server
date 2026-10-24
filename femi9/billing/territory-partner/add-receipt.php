@@ -29,7 +29,7 @@ if ($getinvuser === 'customer') {
 
 // Existing receipts
 $total_received = (float)(mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COALESCE(SUM(received),0) AS s FROM receipt WHERE inv_id='$invid'"))['s']);
+    "SELECT COALESCE(SUM(received),0) AS s FROM receipt WHERE inv_id='".db_esc($invid)."'"))['s']);
 $balance_due = max(0, $invoice_total - $total_received);
 
 // DELETE receipt — but never the invoice's LAST remaining receipt row: a
@@ -98,7 +98,7 @@ if (isset($_POST['addreceipt'])) {
 
 // Refresh after POST
 $total_received = (float)(mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COALESCE(SUM(received),0) AS s FROM receipt WHERE inv_id='$invid'"))['s']);
+    "SELECT COALESCE(SUM(received),0) AS s FROM receipt WHERE inv_id='".db_esc($invid)."'"))['s']);
 $balance_due = max(0, $invoice_total - $total_received);
 $receipts    = mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='".db_esc($invid)."' ORDER BY id ASC");
 ?>

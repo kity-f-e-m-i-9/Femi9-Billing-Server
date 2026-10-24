@@ -162,7 +162,7 @@ $invtable_name="invoice";
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from ".$invtable_name." where inv_id='$invid'";
+					<?php $select_product_list="select * from ".$invtable_name." where inv_id='".db_esc($invid)."'";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										$result_product_list=mysqli_fetch_array($fetch_product_list);
 											

@@ -13,7 +13,7 @@ $selected_category = $_REQUEST['catname'];
 // Build category filter
 $category_filter = "";
 if(!empty($selected_category) && $selected_category != 'customer') {
-    $category_filter = " AND to_user_type='$selected_category'";
+    $category_filter = " AND to_user_type='".db_esc($selected_category)."'";
 }
 
 ob_end_clean();
@@ -232,7 +232,7 @@ if($selected_category == '' || $selected_category == 'territory_partner') {
     $select_tp_list = "select id as inv_id, invoice_number as inv_number, invoice_date as date, total_amount as total,
                               territory_partner_id, source_godown_id, source_cp_id
                        from tp_invoices
-                       where invoice_date between '$from_date' and '$to_date'
+                       where invoice_date between '".db_esc($from_date)."' and '".db_esc($to_date)."'
                        and created_by_user_type != 'super_stockiest'
                        and total_amount > 0
                        and (source_cp_id > 0 or source_godown_id in (" . godown_ids_subquery($db_conn) . "))

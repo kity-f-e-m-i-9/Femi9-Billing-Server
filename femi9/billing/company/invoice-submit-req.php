@@ -48,7 +48,7 @@ if(isset($_REQUEST['invoice-submit']))
 		$insertreceipt="insert into receipt (receiptid,inv_id,invoice_amount,received,receivable,date,from_user_type,
 		from_user_id,to_user_type,to_user_id,receipt_method,receipt_remarks) 
 		values 
-		('$invoice_id','$invoice_id','$total_amount','$receivedamount','$receivableamount','$receiptdate','".$resultdetails['from_user_type']."','".$resultdetails['from_user_id']."','$usertype','$userid','$receipt_method','$receipt_remarks')";
+		('".db_esc($invoice_id)."','".db_esc($invoice_id)."','$total_amount','".db_esc($receivedamount)."','$receivableamount','$receiptdate','".$resultdetails['from_user_type']."','".$resultdetails['from_user_id']."','$usertype','$userid','".db_esc($receipt_method)."','$receipt_remarks')";
 		mysqli_query($db_conn,$insertreceipt);
 	}
 	

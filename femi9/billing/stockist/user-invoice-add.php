@@ -191,7 +191,7 @@ select:focus, input[type=number]:focus{background:#fffa8f;}
 		
 		//RECEIPT AMOUNT		
 $totalamount=$result_InvoieDetails["total"];
-$selectcountreceipt="select sum(received) from receipt where inv_id='".$Invoice_ID."'";
+$selectcountreceipt="select sum(received) from receipt where inv_id='".db_esc($Invoice_ID)."'";
 $fetchcountreceipt=mysqli_query($db_conn,$selectcountreceipt);
 $resulcountreceipt=mysqli_fetch_array($fetchcountreceipt);
 $Total_Receipt_amount=$resulcountreceipt[0];
@@ -536,12 +536,12 @@ db_q($db_conn,$update_zero_invoice,[$Invoice_ID]);
 		 
 <?php
 // Fetch all existing receipts for this invoice
-$select_ReceiptDetails = "SELECT * FROM receipt WHERE inv_id = '" . $Invoice_ID . "' ORDER BY id ASC";
+$select_ReceiptDetails = "SELECT * FROM receipt WHERE inv_id = '".db_esc($Invoice_ID)."' ORDER BY id ASC";
 $fetch_ReceiptDetails   = mysqli_query($db_conn, $select_ReceiptDetails);
 $result_ReceiptDetails  = mysqli_fetch_array($fetch_ReceiptDetails);
 
 // Calculate already received amount
-$select_sum_receipt = "SELECT COALESCE(SUM(received), 0) AS total_received FROM receipt WHERE inv_id = '" . $Invoice_ID . "'";
+$select_sum_receipt = "SELECT COALESCE(SUM(received), 0) AS total_received FROM receipt WHERE inv_id = '".db_esc($Invoice_ID)."'";
 $fetch_sum_receipt  = mysqli_query($db_conn, $select_sum_receipt);
 $result_sum_receipt = mysqli_fetch_array($fetch_sum_receipt);
 $already_received   = (float)$result_sum_receipt['total_received'];

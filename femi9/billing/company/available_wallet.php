@@ -101,7 +101,7 @@ elseif($usertype=="stockiest") {$tablenameWE="stockiest";}
 elseif($usertype=="distributor"){$tablenameWE="distributor";}
 else{$tablenameWE="super_distributor";}
 
-$select_onbaord_user_records="select temp_id from ".$tablenameWE." where mobile_number='$mobile'";
+$select_onbaord_user_records="select temp_id from ".$tablenameWE." where mobile_number='".db_esc($mobile)."'";
 $fetch_onbaord_user_records=mysqli_query($db_conn,$select_onbaord_user_records);
 $result_onbaord_user_records=mysqli_fetch_array($fetch_onbaord_user_records);
 
@@ -162,7 +162,7 @@ $tablename_USER=base64_decode($_REQUEST['tablename']);
 		
 		
 		<?php 
-$select_USER_Records123="select * from ".$tablename_USER." where temp_id='$se_userID'";
+$select_USER_Records123="select * from ".$tablename_USER." where temp_id='".db_esc($se_userID)."'";
 $fetch_USER_Records123=mysqli_query($db_conn,$select_USER_Records123);
 $result_USER_Records133=mysqli_fetch_array($fetch_USER_Records123);
 

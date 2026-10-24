@@ -12,7 +12,7 @@ if($GET_mapusertype!="company")
 	if($GET_mapusertype=="stockiest"){$tblename="stockiest"; $lablename="Stockist";}
 	if($GET_mapusertype=="distributor"){$tblename="distributor"; $lablename="Distributor";}
 	
-$select_sslist="select * from ".$tblename." where temp_id='$GET_mapuserid'";
+$select_sslist="select * from ".$tblename." where temp_id='".db_esc($GET_mapuserid)."'";
 $fetch_sslist=mysqli_query($db_conn,$select_sslist);
 $result_sslist=mysqli_fetch_array($fetch_sslist);
 

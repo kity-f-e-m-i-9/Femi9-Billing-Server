@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 
 $title = "Manage Invoices";
@@ -638,7 +638,7 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
                                         $serial = 0;
                                         
                                         // Build WHERE clause with date filter
-                                        $where_conditions = ["ui.to_user_type = '$getinvuser'"];
+                                        $where_conditions = ["ui.to_user_type = '".db_esc($getinvuser)."'"];
                                         
                                         // Add date filters if provided, otherwise default to last 7 days
                                         if (!empty($_GET['from_date'])) {

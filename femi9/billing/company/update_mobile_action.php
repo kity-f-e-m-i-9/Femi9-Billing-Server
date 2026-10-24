@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 error_reporting(0);
 
 if(isset($_REQUEST['UpdateAction']))
@@ -34,7 +34,7 @@ else
 	$redir_url="overallusers?invuser=distributor&&";	
 }
 
-$select_candidate_list="select * from ".$updae_table_name." where username='$new_mobile_number'";
+$select_candidate_list="select * from ".$updae_table_name." where username='".db_esc($new_mobile_number)."'";
 $fetch_candidate_list=mysqli_query($db_conn,$select_candidate_list);
 $result_candidate_list=mysqli_num_rows($fetch_candidate_list);
 	

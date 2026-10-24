@@ -18,7 +18,7 @@ if(isset($_REQUEST['subforgotbutton']))
 $frmobilenumber=$_REQUEST['frmobilenumber'];
 $randumpassword=$_REQUEST['randumpassword'];
 	
-$select_LoGuserDtails="select * from ".$forgottable." where mobile_number='$frmobilenumber'";
+$select_LoGuserDtails="select * from ".$forgottable." where mobile_number='".db_esc($frmobilenumber)."'";
 $fetch_LoGuserDtails=mysqli_query($db_conn,$select_LoGuserDtails);
 $result_LoGuserDtails=mysqli_fetch_array($fetch_LoGuserDtails);
 $mailid=$result_LoGuserDtails['email'];

@@ -4,7 +4,7 @@ require_once("include/GodownAccess.php");
 
 $godownid=$_REQUEST['q'];
 
-$select_Godowndetails="select * from company_godown where id='".$godownid."' AND " . godown_finance_filter_sql($db_conn);
+$select_Godowndetails="select * from company_godown where id='".db_esc($godownid)."' AND " . godown_finance_filter_sql($db_conn);
 $fetch_Godowndetails=mysqli_query($db_conn,$select_Godowndetails);
 $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 
