@@ -166,6 +166,13 @@ $formatted_customer_sales  = inr_format($total_points_customers, 2);
 
 $display_from = date('d M', strtotime($current_from_date));
 $display_to   = date('d M Y', strtotime($current_to_date));
+
+// Legacy role points — if this TP's mobile number matches an old-role
+// account (Stockist / Super Stockist / Distributor / Super Distributor),
+// show the lifetime sales points earned there, labelled with that role.
+require_once __DIR__ . '/include/LegacyRolePoints.php';
+$legacyPoints = getLegacyRolePoints($db_conn, $Login_user_mobile ?? '');
+$formattedLegacySales = $legacyPoints ? inr_format($legacyPoints['sales'], 2) : null;
 ?>
                     <div class="row">
                         <div class="col-md-6">
@@ -201,6 +208,20 @@ $display_to   = date('d M Y', strtotime($current_to_date));
                             </div>
                         </div>
                     </div>
+                    <?php if ($legacyPoints): ?>
+                    <div class="row" style="margin-top:20px;">
+                        <div class="col-md-4">
+                            <div class="breakdown-card" style="border:2px solid #fde68a;">
+                                <h6 style="color:#111827;font-weight:600;margin-bottom:10px;">
+                                    <i class="material-icons" style="vertical-align:middle;color:#b45309;">history</i>
+                                    Your <?php echo htmlspecialchars($legacyPoints['role_label'], ENT_QUOTES, 'UTF-8'); ?> Points
+                                </h6>
+                                <div style="font-size:28px;font-weight:700;color:#b45309;"><?php echo $formattedLegacySales; ?></div>
+                                <div style="font-size:12px;color:#9ca3af;margin-top:6px;">Sales points earned as <?php echo htmlspecialchars($legacyPoints['role_label'], ENT_QUOTES, 'UTF-8'); ?> in Jun 2026 (before TP)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <div class="row" style="margin-top:20px;">
                         <div class="col">
                             <div class="card">

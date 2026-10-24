@@ -205,6 +205,18 @@ $formattedTeam     = $fmt($teamPoints);
 $formattedReturn   = $fmt($returnPoints);
 $formattedSales    = $fmt($salesPoints);
 
+// 6. Legacy role points — if this TP's mobile number matches an old-role
+// account (Stockist / Super Stockist / Distributor / Super Distributor),
+// show the lifetime purchase points earned there, labelled with that role.
+require_once __DIR__ . '/include/LegacyRolePoints.php';
+$legacyPoints = getLegacyRolePoints($db_conn, $Login_user_mobile ?? '');
+if ($legacyPoints) {
+    $legacyPoints['total']            = round($legacyPoints['purchase'] + $legacyPoints['daily_login'], 2);
+    $formattedLegacyPurchase          = $fmt($legacyPoints['purchase']);
+    $formattedLegacyDaily             = $fmt($legacyPoints['daily_login']);
+    $formattedLegacyTotal             = $fmt($legacyPoints['total']);
+}
+
 $displayFrom      = date('d M', strtotime($currentFromDate));
 $displayTo        = date('d M Y', strtotime($currentToDate));
 $safeBusinessName = htmlspecialchars($business_name, ENT_QUOTES, 'UTF-8');
@@ -314,6 +326,20 @@ $safeBusinessName = htmlspecialchars($business_name, ENT_QUOTES, 'UTF-8');
                                 <div class="stats-meta"><?php echo $salesInvoiceCount; ?> sale<?php echo $salesInvoiceCount !== 1 ? 's' : ''; ?> — separate from Total Reward Points</div>
                             </div>
                         </div>
+                        <?php if ($legacyPoints): ?>
+                        <div class="col-md-4">
+                            <div class="stats-card" style="border-color:#fde68a;">
+                                <i class="material-icons stats-icon" style="color:#fde68a;">history</i>
+                                <div class="stats-label">Your <?php echo htmlspecialchars($legacyPoints['role_label'], ENT_QUOTES, 'UTF-8'); ?> Points</div>
+                                <div class="stats-value" style="color:#b45309;"><?php echo $formattedLegacyTotal; ?></div>
+                                <div class="stats-meta">Jun 2026, as <?php echo htmlspecialchars($legacyPoints['role_label'], ENT_QUOTES, 'UTF-8'); ?> (before TP)</div>
+                                <div style="margin-top:10px;padding-top:10px;border-top:1px solid #fde68a;font-size:12.5px;color:#92400e;">
+                                    <div style="display:flex;justify-content:space-between;"><span>Purchase Points</span><strong><?php echo $formattedLegacyPurchase; ?></strong></div>
+                                    <div style="display:flex;justify-content:space-between;margin-top:4px;"><span>Daily Login Points</span><strong><?php echo $formattedLegacyDaily; ?></strong></div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     <div class="row">
                         <div class="col-12">
