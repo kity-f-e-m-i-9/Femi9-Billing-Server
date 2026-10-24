@@ -25,6 +25,7 @@ require_once("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('reward_points');
 require_once("config.php");
 require_once("include/TpRewardPointsData.php");
+require_once(__DIR__ . "/../territory-partner/include/LegacyRolePoints.php");
 
 $autoloadPath = '../../vendor/autoload.php';
 if (!file_exists($autoloadPath)) {
@@ -61,6 +62,18 @@ try {
     die("Failed to load reward points data.");
 }
 
+// June 2026 legacy role points (Stockist/Super Stockist/Distributor/Super
+// Distributor), matched by phone number — same as the on-screen table.
+foreach ($combined_users as &$u) {
+    $mobile = $u['details']['mobile'] ?? '';
+    $u['legacy_all'] = $mobile ? getLegacyRolePointsAll($db_conn, $mobile) : [];
+    $u['legacy_total'] = array_sum(array_map(fn($l) => $l['purchase'] + $l['daily_login'], $u['legacy_all']));
+    $u['grand_total'] = $u['total_points'] + $u['legacy_total'];
+    $u['legacy_sales_total'] = array_sum(array_map(fn($l) => $l['sales'], $u['legacy_all']));
+    $u['sales_grand_total'] = $u['sales_points'] + $u['legacy_sales_total'];
+}
+unset($u);
+
 // ============================================================================
 // SPREADSHEET
 // ============================================================================
@@ -82,8 +95,15 @@ $headers = [
     'K' => 'Returns (-)',
     'L' => 'Total Points',
     'M' => 'Sales Points (not in total)',
+    'N' => 'Old Role(s) (before TP)',
+    'O' => 'Old Role ID(s)',
+    'P' => 'Old Role Purchase (Jun)',
+    'Q' => 'Old Role Login (Jun)',
+    'R' => 'Old Role Sales (Jun)',
+    'S' => 'Grand Total (Total Points + Old Role)',
+    'T' => 'Sales Grand Total (Sales + Old Role)',
 ];
-$lastCol = 'M';
+$lastCol = 'T';
 
 // ── Title ──
 $sheet->mergeCells("A1:{$lastCol}1");
@@ -113,7 +133,7 @@ $sheet->getStyle("A2:{$lastCol}2")->applyFromArray([
 
 // ── Data ──
 $rowNum = 3;
-$numericCols = ['F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];
+$numericCols = ['F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'P', 'Q', 'R', 'S', 'T'];
 
 foreach ($combined_users as $i => $u) {
     $d = $u['details'];
@@ -133,6 +153,17 @@ foreach ($combined_users as $i => $u) {
     $sheet->setCellValue("L{$rowNum}", (float)$u['total_points']);
     $sheet->setCellValue("M{$rowNum}", (float)$u['sales_points']);
 
+    $sheet->setCellValue("N{$rowNum}", implode("\n", array_column($u['legacy_all'], 'role_label')));
+    $sheet->setCellValue("O{$rowNum}", implode("\n", array_column($u['legacy_all'], 'temp_id')));
+    $sheet->setCellValue("P{$rowNum}", (float)array_sum(array_column($u['legacy_all'], 'purchase')));
+    $sheet->setCellValue("Q{$rowNum}", (float)array_sum(array_column($u['legacy_all'], 'daily_login')));
+    $sheet->setCellValue("R{$rowNum}", (float)$u['legacy_sales_total']);
+    $sheet->setCellValue("S{$rowNum}", (float)$u['grand_total']);
+    $sheet->setCellValue("T{$rowNum}", (float)$u['sales_grand_total']);
+    if (!empty($u['legacy_all'])) {
+        $sheet->getStyle("N{$rowNum}:O{$rowNum}")->getAlignment()->setWrapText(true);
+    }
+
     $bgColor = ($sn % 2 === 0) ? 'FFF0F4FF' : 'FFFFFFFF';
     $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->applyFromArray([
         'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => $bgColor]],
@@ -146,6 +177,8 @@ foreach ($combined_users as $i => $u) {
 
     $sheet->getStyle("L{$rowNum}")->getFont()->setBold(true)->setColor(new Color('FF4F46E5'));
     $sheet->getStyle("M{$rowNum}")->getFont()->setColor(new Color('FF0EA5E9'));
+    $sheet->getStyle("S{$rowNum}")->getFont()->setBold(true)->setColor(new Color('FF111827'));
+    $sheet->getStyle("T{$rowNum}")->getFont()->setBold(true)->setColor(new Color('FF111827'));
 
     $rowNum++;
 }
@@ -159,7 +192,7 @@ $sheet->setCellValue("A{$totalsRow}", 'TOTAL');
 $sheet->mergeCells("A{$totalsRow}:E{$totalsRow}");
 
 if ($dataEnd >= $dataStart) {
-    foreach (['F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'] as $nc) {
+    foreach (['F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'P', 'Q', 'R', 'S', 'T'] as $nc) {
         $sheet->setCellValue("{$nc}{$totalsRow}", "=SUM({$nc}{$dataStart}:{$nc}{$dataEnd})");
     }
 }
@@ -180,6 +213,9 @@ $sheet->getColumnDimension('C')->setWidth(24);
 $sheet->getColumnDimension('D')->setWidth(14);
 $sheet->getColumnDimension('E')->setWidth(20);
 foreach (['F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'] as $nc) $sheet->getColumnDimension($nc)->setWidth(16);
+$sheet->getColumnDimension('N')->setWidth(20);
+$sheet->getColumnDimension('O')->setWidth(24);
+foreach (['P', 'Q', 'R', 'S', 'T'] as $nc) $sheet->getColumnDimension($nc)->setWidth(18);
 
 // ── Freeze + filter ──
 $sheet->freezePane('A3');
