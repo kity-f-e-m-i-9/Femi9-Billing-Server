@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php';
+<?php require_once __DIR__ . '/../shared/csv-safe.php'; require_once __DIR__ . '/../shared/db-helpers.php';
 ob_start();
 include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('report');
 include("config.php");
@@ -31,9 +31,9 @@ $output = fopen('php://output', 'w');
 fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
 
 // Write title rows
-fputcsv($output, array('Sales From Company'));
-fputcsv($output, array('Date: '.date("d/m/Y",strtotime($from_date)).' to '.date("d/m/Y",strtotime($to_date))));
-fputcsv($output, array('')); // Empty row
+femi_fputcsv($output, array('Sales From Company'));
+femi_fputcsv($output, array('Date: '.date("d/m/Y",strtotime($from_date)).' to '.date("d/m/Y",strtotime($to_date))));
+femi_fputcsv($output, array('')); // Empty row
 
 // Build header array
 $header = array('S.No', 'Company Profile', 'Inv Number', 'User Type', 'Name', 'Mobile', 'Category', 'District', 'Taluk', 'Date', 'Total Amount');
@@ -49,7 +49,7 @@ while($result_prdetails_header = mysqli_fetch_array($fetch_prdetails_header)) {
     $products[] = $result_prdetails_header['id'];
 }
 
-fputcsv($output, $header);
+femi_fputcsv($output, $header);
 
 // Initialize
 $i = 0;
@@ -158,7 +158,7 @@ if($selected_category != 'customer') {
             $row[] = ($result_sumprqty['qty']!=NULL) ? inr_format((float)$result_sumprqty['amount'], 2) : "";
         }
         
-        fputcsv($output, $row);
+        femi_fputcsv($output, $row);
     }
 }
 
@@ -219,7 +219,7 @@ if(empty($selected_category) || $selected_category == 'customer') {
             $row[] = ($result_sumprqty12['qty']!=NULL) ? inr_format((float)$result_sumprqty12['amount'], 2) : "";
         }
         
-        fputcsv($output, $row);
+        femi_fputcsv($output, $row);
     }
 }
 
@@ -296,12 +296,12 @@ if($selected_category == '' || $selected_category == 'territory_partner') {
             $row[] = ($result_sumprqtyTP['quantity']!=NULL) ? inr_format((float)$result_sumprqtyTP['rate'], 2) : "";
         }
 
-        fputcsv($output, $row);
+        femi_fputcsv($output, $row);
     }
 }
 
 // Write empty row
-fputcsv($output, array(''));
+femi_fputcsv($output, array(''));
 
 // Write GRAND TOTAL row
 $total_row = array_fill(0, 10, '');
@@ -314,7 +314,7 @@ foreach($products as $p) {
     $total_row[] = '';
 }
 
-fputcsv($output, $total_row);
+femi_fputcsv($output, $total_row);
 
 fclose($output);
 exit;

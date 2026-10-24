@@ -51,6 +51,7 @@ if(isset($_REQUEST['add-customer']))
 		values ('$ms_name','$ms_mobile','".db_esc(femi_password_hash((string)($password)))."','$ms_email','$ms_address',
 		'".db_esc($country_code)."','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").")";
 		mysqli_query($db_conn,$insert_products);
+		femi_flag_must_change($db_conn, 'marketing', (string)$ms_mobile); // starts on the shared default password: force a change at first login
 		$new_ms_id = mysqli_insert_id($db_conn);
 
 		if ($new_ms_id && !empty($_POST['location_ids']) && is_array($_POST['location_ids'])) {

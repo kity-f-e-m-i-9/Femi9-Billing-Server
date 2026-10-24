@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/csv-safe.php'; require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $file = "distributor-list.csv";
@@ -7,7 +7,7 @@ header("Content-Type: text/csv; charset=UTF-8");
 header("Content-Disposition: attachment; filename=$file");
 
 $output = fopen("php://output", "w");
-fputcsv($output, ['Name', 'State', 'District', 'Taluk', 'Pincode', 'Email', 'Mobile', 'GSTIN', 'Address']);
+femi_fputcsv($output, ['Name', 'State', 'District', 'Taluk', 'Pincode', 'Email', 'Mobile', 'GSTIN', 'Address']);
 
 $select_product_list = "select * from distributor where stockiest_id='".db_esc($onboard_userID)."' order by id desc";
 $fetch_product_list = mysqli_query($db_conn, $select_product_list);
@@ -41,7 +41,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
 	$result_pincodelist = mysqli_fetch_array($fetch_pincodelist);
 	$pincodeshow = $result_pincodelist['pincode'];
 
-	fputcsv($output, [
+	femi_fputcsv($output, [
 		$result_product_list['name'],
 		$state_name,
 		$district_name,

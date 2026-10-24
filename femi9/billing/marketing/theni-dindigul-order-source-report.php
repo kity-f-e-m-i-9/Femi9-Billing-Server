@@ -105,6 +105,7 @@ $dateRanges = [
 // ============================================================================
 // SPREADSHEET
 // ============================================================================
+require_once __DIR__ . '/../shared/SafeSpreadsheetBinder.php'; \PhpOffice\PhpSpreadsheet\Cell\Cell::setValueBinder(new FemiSafeValueBinder()); // formula-injection guard
 $spreadsheet = new Spreadsheet();
 $spreadsheet->removeSheetByIndex(0);
 

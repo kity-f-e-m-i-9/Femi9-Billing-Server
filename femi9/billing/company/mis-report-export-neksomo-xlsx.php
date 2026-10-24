@@ -141,6 +141,7 @@ function qtyFmt(Worksheet $sheet, string $cell): void {
 }
 
 // ── Build the workbook ───────────────────────────────────────────────────────
+require_once __DIR__ . '/../shared/SafeSpreadsheetBinder.php'; \PhpOffice\PhpSpreadsheet\Cell\Cell::setValueBinder(new FemiSafeValueBinder()); // formula-injection guard
 $spreadsheet = new Spreadsheet();
 $spreadsheet->getProperties()
     ->setCreator($business_name ?? 'Femi9')

@@ -40,6 +40,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         mysqli_stmt_bind_param($stmt, "si", $newHash, $salesBdmID);
         mysqli_stmt_execute($stmt);
         mysqli_stmt_close($stmt);
+        femi_clear_must_change($db_conn, 'salesbdm', (string)($result_LoGuserDtails['bdm_mobile'] ?? ''));
 
         echo "<script>
             alert('Password changed successfully! Please login with your new password.');

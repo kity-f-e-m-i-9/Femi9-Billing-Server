@@ -84,6 +84,7 @@ if(isset($_REQUEST['add-salesbdm']))
 		'".db_esc($country_code)."','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").",'$zone',".($espo_user_id !== null ? "'".db_esc($espo_user_id)."'" : "NULL").")";
 		mysqli_query($db_conn,$insert_products);
 		$new_bdm_id = mysqli_insert_id($db_conn);
+		femi_flag_must_change($db_conn, 'salesbdm', (string)$bdm_mobile); // starts on the shared default password: force a change at first login
 
 		// District assignment is now entirely Zone-derived (see $zone above
 		// and salesbdm/include/BdmTpScope.php) — both the old manual "Assign

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/csv-safe.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -13,7 +13,7 @@ header("Content-Type: text/csv; charset=UTF-8");
 header("Content-Disposition: attachment; filename=$file");
 
 $output = fopen("php://output", "w");
-fputcsv($output, ['Category', 'ID', 'Name', 'State', 'District', 'Division', 'Firka', 'Pincode', 'Country Code', 'Mobile Number', 'Landline', 'Email ID', 'Address', 'GSTIN']);
+femi_fputcsv($output, ['Category', 'ID', 'Name', 'State', 'District', 'Division', 'Firka', 'Pincode', 'Country Code', 'Mobile Number', 'Landline', 'Email ID', 'Address', 'GSTIN']);
 
 $select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID=? AND s.onboard_userTYPE=? AND s.deleted_at IS NULL";
 $filter_types = "is";
@@ -54,7 +54,7 @@ function geo_name($geo_node_names, $id) {
 }
 
 while ($result_shop = mysqli_fetch_array($fetch_shops)) {
-    fputcsv($output, [
+    femi_fputcsv($output, [
         $result_shop['catlable'],
         $result_shop['useridtext'],
         $result_shop['name'],

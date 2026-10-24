@@ -39,6 +39,11 @@ if (!function_exists('femi_csrf_guard')) {
         $self_script = strtolower(basename((string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH)));
         if (strpos($self_script, 'success_') === 0) { return; }
 
+        if (!headers_sent()) {
+            header('X-Content-Type-Options: nosniff');
+            header('Referrer-Policy: strict-origin-when-cross-origin');
+        }
+
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         if (!in_array($method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], true)) { return; }
 

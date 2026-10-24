@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/csv-safe.php';
 ob_start();
 include("checksession.php");
 include("config.php");
@@ -29,9 +29,9 @@ header("Expires: 0");
 $output = fopen('php://output', 'w');
 fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
 
-fputcsv($output, array('B2B Sales Report - ' . $selected_branch_state . ' (Territory Partner)'));
-fputcsv($output, array('Date: '.date("d/m/Y",strtotime($from_date)).' to '.date("d/m/Y",strtotime($to_date))));
-fputcsv($output, array(''));
+femi_fputcsv($output, array('B2B Sales Report - ' . $selected_branch_state . ' (Territory Partner)'));
+femi_fputcsv($output, array('Date: '.date("d/m/Y",strtotime($from_date)).' to '.date("d/m/Y",strtotime($to_date))));
+femi_fputcsv($output, array(''));
 
 // District here comes from the TP's actual assigned territory (firkas), not
 // their free-typed billing/delivery address fields — those can be stale or
@@ -49,7 +49,7 @@ while ($p = mysqli_fetch_assoc($prodRes)) {
     $header[] = $p['productName'];
     $products[$p['id']] = $p['productName'];
 }
-fputcsv($output, $header);
+femi_fputcsv($output, $header);
 
 // ── Territory partners matching this branch_state (+ optional pincode) ──
 $tp_ids = [];
@@ -194,10 +194,10 @@ foreach ($rows as $r) {
         $row[] = $qty ?: "0";
     }
 
-    fputcsv($output, $row);
+    femi_fputcsv($output, $row);
 }
 
-fputcsv($output, array(''));
+femi_fputcsv($output, array(''));
 
 $total_row = array_fill(0, 10, '');
 $total_row[9]  = 'GRAND TOTAL:';
@@ -207,7 +207,7 @@ $total_row[12] = inr_format($grand_total, 2);
 foreach ($products as $pid => $pname) {
     $total_row[] = $product_grand_totals[$pid];
 }
-fputcsv($output, $total_row);
+femi_fputcsv($output, $total_row);
 
 fclose($output);
 exit;

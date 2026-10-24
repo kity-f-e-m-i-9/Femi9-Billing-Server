@@ -193,3 +193,29 @@ if (!function_exists('femi_password_hidden_cell')) {
            . '<button type="submit" class="btn btn-sm btn-outline-secondary" style="padding:1px 8px;font-size:12px">Reset</button></form>';
     }
 }
+
+if (!function_exists('femi_flag_must_change')) {
+    /** Makes the user's next dashboard visit force a password change (same flag forgot-password uses). */
+    function femi_flag_must_change(mysqli $db, string $utype, string $mobile): void
+    {
+        try {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? 'system';
+            $f = mysqli_prepare($db, "INSERT INTO forgotpassword (usertype, mobilenumber, reset_at, ip_address, must_change_password)
+                 VALUES (?, ?, NOW(), ?, 1)
+                 ON DUPLICATE KEY UPDATE must_change_password = 1, password_changed_at = NULL");
+            mysqli_stmt_bind_param($f, 'sss', $utype, $mobile, $ip);
+            mysqli_stmt_execute($f);
+            mysqli_stmt_close($f);
+        } catch (Throwable $e) { /* flag table optional */ }
+    }
+
+    function femi_clear_must_change(mysqli $db, string $utype, string $mobile): void
+    {
+        try {
+            $f = mysqli_prepare($db, "UPDATE forgotpassword SET must_change_password = 0, password_changed_at = NOW() WHERE usertype = ? AND mobilenumber = ?");
+            mysqli_stmt_bind_param($f, 'ss', $utype, $mobile);
+            mysqli_stmt_execute($f);
+            mysqli_stmt_close($f);
+        } catch (Throwable $e) { }
+    }
+}
