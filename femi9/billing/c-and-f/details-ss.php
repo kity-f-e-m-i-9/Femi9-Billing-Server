@@ -30,7 +30,7 @@ $district_name=	$result_district['dist_name'];
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : Stockist</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : Stockist</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -69,7 +69,7 @@ $district_name=	$result_district['dist_name'];
  
  <?php if($result_product_list["user_icon"]!="Nil"){ ?>
  <tr>
-                    <th colspan="2"><img src="../super-stockist/<?php echo $result_product_list["user_icon"];?>" style="width:150px;border-radius:10px;"></th>
+                    <th colspan="2"><img src="../super-stockist/<?php echo htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;border-radius:10px;"></th>
                     </tr>
  <?php } ?>
  
@@ -94,7 +94,7 @@ $district_name=	$result_district['dist_name'];
 					
                     <tr>
                     <th scope="col">Name</th>
-                    <td><?php echo $result_product_list['name'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">State</th>
@@ -119,7 +119,7 @@ $select_distict="select * from taluk where assigned_SID=? order by id asc";
 $talukID=$result_district['id'];
 
 ?>
-<li><span style="color:#000;"><?=$result_district['taluk'];?></span><hr>
+<li><span style="color:#000;"><?=htmlspecialchars((string)($result_district['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></span><hr>
 <ol>
 					<?php 
 					$select_STockPincode="select * from pincode where assigned_SID=? and taluk_id=? order by pincode asc";
@@ -127,7 +127,7 @@ $talukID=$result_district['id'];
 					while($result_STockPincode=mysqli_fetch_array($fetch_STockPincode))
 					{
 					?>
-					<li><?php echo $result_STockPincode['pincode'];?></li>
+					<li><?php echo htmlspecialchars((string)($result_STockPincode['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></li>
 					<?php } ?>
 </ol>
 
@@ -148,31 +148,31 @@ $talukID=$result_district['id'];
 					
 					<tr>
                     <th scope="col">Email ID</th>
-                    <td><?php echo $result_product_list['email'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Address</th>
-                    <td><?php echo $result_product_list['address'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Mobile Number</th>
-                    <td><?php echo $result_product_list['country_code'];?>&nbsp;<?php echo $result_product_list['mobile_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Username</th>
-                    <td><span id="usernamebox"><?php echo $result_product_list['username'];?></span></td>
+                    <td><span id="usernamebox"><?php echo htmlspecialchars((string)($result_product_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                     </tr>
 					
 					<!-----<tr>
                     <th scope="col">Password</th>
-                    <td><?php echo $result_product_list['password'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['password']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>----->
 					
 					<tr>
                     <th scope="col">GST Number</th>
-                    <td><?php echo $result_product_list['gstin'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					
@@ -225,7 +225,7 @@ $stockistID=$result_product_list['temp_id'];
                     </tr>
 					<tr>
                     <th scope="col">Referred User ID</th>
-                    <td><b><?php echo $Result_ReferralDetails['st_ref_userid'];?></b></td>
+                    <td><b><?php echo htmlspecialchars((string)($Result_ReferralDetails['st_ref_userid']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
                     </tr>
 					<tr>
                     <th scope="col">Referred User Name</th>
@@ -240,19 +240,19 @@ $stockistID=$result_product_list['temp_id'];
                     </tr>
 					<tr>
                     <th scope="col">Category</th>
-                    <td><b><?php echo $Relect_STcatdetails['catname'];?></b></td>
+                    <td><b><?php echo htmlspecialchars((string)($Relect_STcatdetails['catname']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
                     </tr>
 					<tr>
                     <th scope="col">Target Sales Value(Rs.)</th>
-                    <td><?php echo $Relect_STcatdetails['target_amount'];?></td>
+                    <td><?php echo htmlspecialchars((string)($Relect_STcatdetails['target_amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Referral (%)</th>
-                    <td><?php echo $Relect_STcatdetails['ref_commission_percentage'];?>%</td>
+                    <td><?php echo htmlspecialchars((string)($Relect_STcatdetails['ref_commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
                     </tr>
 					<tr>
                     <th scope="col">Cashback (%)</th>
-                    <td><?php echo $Relect_STcatdetails['cash_back_percentage'];?>%</td>
+                    <td><?php echo htmlspecialchars((string)($Relect_STcatdetails['cash_back_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
                     </tr>
 					
 				<?php } else{
@@ -279,11 +279,11 @@ $stockistID=$result_product_list['temp_id'];
                     </tr>
 					<tr>
                     <th scope="col">Plan Amount</th>
-                    <td>&#8377; <?php echo $result_product_list['plan_amount'];?></td>
+                    <td>&#8377; <?php echo htmlspecialchars((string)($result_product_list['plan_amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Valid Months</th>
-                    <td><?php echo $result_product_list['valid_months'];?> Months</td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['valid_months']), ENT_QUOTES, 'ISO-8859-1', false);?> Months</td>
                     </tr>
 					
 					<tr>
@@ -293,7 +293,7 @@ $stockistID=$result_product_list['temp_id'];
 					
 					<tr>
                     <th scope="col">payment Method</th>
-                    <td><?php echo $result_product_list['amount_method'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['amount_method']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
@@ -314,7 +314,7 @@ $stockistID=$result_product_list['temp_id'];
 					
 					<tr>
                     <th scope="col">Reference Number</th>
-                    <td><?php echo $result_product_list['ref_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['ref_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<?php */?>
 					

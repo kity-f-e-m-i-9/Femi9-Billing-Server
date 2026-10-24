@@ -702,7 +702,7 @@ $is_advance_mandatory = isAdvancePaymentMandatory($getinvuser);
 								<?php if(isset($_REQUEST['stocknotupdated'])){?>
 								<div class="alert alert-danger">
 								    <i class="material-icons" style="vertical-align: middle; margin-right: 8px;">warning</i>
-								    Please update opening stock (<?=$result_Godown['gname'];?>)!
+								    Please update opening stock (<?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?>)!
 								</div>
 								<?php }?>
 								
@@ -799,7 +799,7 @@ else{ $amount_received_fully="0";}
 
 <input type="hidden" name="inv_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>">
 <input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>">
-<input type="hidden" name="godownid" value="<?=$result_InvoieDetails['from_user_id'];?>">
+<input type="hidden" name="godownid" value="<?=htmlspecialchars((string)($result_InvoieDetails['from_user_id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
 <!-- Invoice Details Section -->
 <div class="form-section">
@@ -812,7 +812,7 @@ else{ $amount_received_fully="0";}
         <div class="col-md-6 mb-3">
             <label class="form-label">Company Profile</label>
             <select name="godownid" class="form-control" disabled>
-                <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+                <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
             </select>
         </div>
 
@@ -844,7 +844,7 @@ else{ $amount_received_fully="0";}
             ?>
             
             <select name="customer_id" class="form-control" <?php if($totalcountitems>0){echo 'disabled';}?> id="customer-select-edit">
-                <option value="<?php echo $CustomerID;?>"><?php echo $result_CUSTDetails['name'];?>, <?php echo $result_CUSTDetails['mobile_number'];?></option>
+                <option value="<?php echo $CustomerID;?>"><?php echo htmlspecialchars((string)($result_CUSTDetails['name']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php echo htmlspecialchars((string)($result_CUSTDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
                 <?php 
                 if($totalcountitems==0) {
                     if($getinvuser=="candf"){
@@ -866,7 +866,7 @@ else{ $amount_received_fully="0";}
                             $UserName_SHOW="".strtoupper($result_Customers_list['name']).", ".$result_Customers_list['mobile_number']."";	
                         }
                 ?>
-                <option value="<?php echo $result_Customers_list['temp_id'];?>"><?php echo $UserName_SHOW;?></option>
+                <option value="<?php echo htmlspecialchars((string)($result_Customers_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo $UserName_SHOW;?></option>
                 <?php
                     }
                 }
@@ -887,7 +887,7 @@ else{ $amount_received_fully="0";}
         
         <div class="col-md-6 mb-3">
             <label class="form-label">Invoice Date <span class="required">*</span></label>
-            <input type="date" readonly name="date" value="<?=$result_InvoieDetails['date'];?>" required="" class="form-control">
+            <input type="date" readonly name="date" value="<?=htmlspecialchars((string)($result_InvoieDetails['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" class="form-control">
         </div>
     </div>
 </div>
@@ -911,7 +911,7 @@ else{ $amount_received_fully="0";}
                     $fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
                     while($result_Products_list=mysqli_fetch_array($fetch_Products_list)) {
                     ?>
-                    <option value="<?php echo $result_Products_list['id'];?>"><?php echo $result_Products_list['productName'];?></option>
+                    <option value="<?php echo htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
                     <?php }?>
                 </select>
             </div>
@@ -1016,13 +1016,13 @@ else{ $amount_received_fully="0";}
         ?>
             <tr>
                 <td><?php echo $rd=$rd+1;?></td>
-                <td><strong><?=$result_ProductDetails123['productName'];?></strong></td>
-                <td><?=$result_ProductDetails123['hsn'];?></td>
-                <td><?=$result_INVProductDetails['qty'];?></td>
-                <td>₹<?=$result_INVProductDetails['amount'];?></td>
-                <td>₹<?=$result_INVProductDetails['discount_amount'];?> <small>(<?=$result_INVProductDetails['discount_percentage'];?>%)</small></td>
+                <td><strong><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></strong></td>
+                <td><?=htmlspecialchars((string)($result_ProductDetails123['hsn']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                <td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                <td>₹<?=htmlspecialchars((string)($result_INVProductDetails['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                <td>₹<?=htmlspecialchars((string)($result_INVProductDetails['discount_amount']), ENT_QUOTES, 'ISO-8859-1', false);?> <small>(<?=htmlspecialchars((string)($result_INVProductDetails['discount_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</small></td>
                 <td><strong>₹<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></strong></td>
-                <td>₹<?=$result_INVProductDetails['gstamount_total'];?> <small>(<?=$result_INVProductDetails['gst_percentage'];?>%)</small></td>
+                <td>₹<?=htmlspecialchars((string)($result_INVProductDetails['gstamount_total']), ENT_QUOTES, 'ISO-8859-1', false);?> <small>(<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</small></td>
                 <td><strong>₹<?php echo inr_format($TotalAMount, 2);?></strong></td>
                 <?php if($amount_received_fully==0){?>
                 <td>
@@ -1057,10 +1057,10 @@ else{ $amount_received_fully="0";}
                 <p><strong>Invoice Number:</strong> 
                     <?php if($get_action=="edit") {?>
                     <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive">
-                        <?php echo $result_InvoieDetails['inv_number'];?> <i class="material-icons" style="font-size: 16px;">edit</i>
+                        <?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?> <i class="material-icons" style="font-size: 16px;">edit</i>
                     </a>
                     <?php }else{?>
-                    <span><?php echo $result_InvoieDetails['inv_number'];?></span>
+                    <span><?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                     <?php }?>
                 </p>
                 
@@ -1071,7 +1071,7 @@ else{ $amount_received_fully="0";}
                             <div class="modal-header">
                                 <h5 class="modal-title" id="exampleModalLiveLabel">
                                     Update Invoice Number<br/>
-                                    <small class="text-muted"><?php echo $result_InvoieDetails['inv_number'];?></small>
+                                    <small class="text-muted"><?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></small>
                                 </h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
@@ -1199,7 +1199,7 @@ else{ $amount_received_fully="0";}
                     
                     <div class="bold">
                         Courier Charges
-                        <span><input type="number" value="<?=$result_InvoieDetails['courier_charges'];?>" name="courier_charges" min="0" required onKeyup="totalamount()" id="cucharge" class="form-control"></span>
+                        <span><input type="number" value="<?=htmlspecialchars((string)($result_InvoieDetails['courier_charges']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="courier_charges" min="0" required onKeyup="totalamount()" id="cucharge" class="form-control"></span>
                     </div>
                     
                     <div class="bold">
@@ -1333,7 +1333,7 @@ else{ $amount_received_fully="0";}
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
                         <div class="bold">
                             Invoice Date
-                            <span><input type="date" name="update_invoice_date" class="form-control" id="bookingDateu" value="<?=$result_InvoieDetails['date'];?>"></span>
+                            <span><input type="date" name="update_invoice_date" class="form-control" id="bookingDateu" value="<?=htmlspecialchars((string)($result_InvoieDetails['date']), ENT_QUOTES, 'ISO-8859-1', false);?>"></span>
                         </div>
                         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
                         <script>
@@ -1401,8 +1401,8 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
 <input type="hidden" name="randum_number" value="<?=$randum_number?>">
 <input type="hidden" name="inv_id" value="<?=$inv_id?>">
 <input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>">
-<input type="hidden" name="username" value="<?=$_SESSION['LOGIN_USER'];?>">
-<input type="hidden" name="usertype" value="<?=$Result_Log_users_Dtails134['usertype'];?>">
+<input type="hidden" name="username" value="<?=htmlspecialchars((string)($_SESSION['LOGIN_USER']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="usertype" value="<?=htmlspecialchars((string)($Result_Log_users_Dtails134['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
 <!-- New Invoice Form Section -->
 <div class="form-section">
@@ -1475,7 +1475,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
                 $fetch_Godown=mysqli_query($db_conn,$select_Godown);
                 while($result_Godown=mysqli_fetch_array($fetch_Godown)) {
                 ?>
-                <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+                <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
                 <?php }?>
             </select>
             <div id="opstock"></div>
@@ -1534,7 +1534,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
                         $UserName_SHOW="".strtoupper($result_Customers_list['name']).", ".$result_Customers_list['mobile_number']."";	
                     }
                 ?>
-                <option value="<?=$result_Customers_list['temp_id'];?>"><?=$UserName_SHOW;?></option>
+                <option value="<?=htmlspecialchars((string)($result_Customers_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=$UserName_SHOW;?></option>
                 <?php }?>
             </select>
             
@@ -1592,7 +1592,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
                     $fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
                     while($result_Products_list=mysqli_fetch_array($fetch_Products_list)) {
                     ?>
-                    <option value="<?=$result_Products_list['id'];?>"><?=$result_Products_list['productName'];?></option>
+                    <option value="<?=htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
                     <?php }?>
                 </select>
             </div>

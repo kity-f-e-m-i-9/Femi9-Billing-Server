@@ -131,7 +131,7 @@ $i= $start_from;
                     <?php $select_prdetails_header="select * from `products` order by `id` asc";
                     $fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
                     while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
-                    <th><?=$result_prdetails_header['productName'];?></th>
+                    <th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
                     <?php }?>
                     <th>Total</th>
                     <th>Entered by</th>
@@ -166,7 +166,7 @@ $i= $start_from;
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
                     <td><?php echo date("d/M/Y",strtotime($ResultRecords["date"]));?></td>
-                    <td><?php echo $result_INVOICE["inv_number"];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_INVOICE["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
                     <?php $select_prdetails_header="select * from `products` order by `id` asc";
                     $fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
@@ -186,7 +186,7 @@ $i= $start_from;
                     <?php }?>
 
                     <td><?=inr_format($result_SUM_TOTAL['grand_total'], 2);?></td>
-                    <td><?=$ResultRecords["username"];?><br/><?=ucwords($ResultRecords["usertype"]);?></td>
+                    <td><?=htmlspecialchars((string)($ResultRecords["username"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/><?=htmlspecialchars((string)(ucwords($ResultRecords["usertype"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
                                                     <td>
 <a href="internal_transfer_details?tempid=<?=$tempid;?>"><img src="../../assets/images/details-32.png"/></a>

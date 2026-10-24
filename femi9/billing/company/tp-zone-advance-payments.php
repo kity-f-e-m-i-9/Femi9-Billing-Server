@@ -321,10 +321,10 @@ function zoneQS(array $overrides = []): string {
                             <div class="row">
                                 <div class="col-lg-3 col-md-6">
                                     <div class="stats-card<?php echo !empty($tpEntryCounts) ? ' tp-balance-clickable' : ''; ?>" <?php echo !empty($tpEntryCounts) ? 'onclick="openPaymentsBreakdownModal()"' : ''; ?>>
-                                        <h3><?php echo $stats['count']; ?></h3>
+                                        <h3><?php echo htmlspecialchars((string)($stats['count']), ENT_QUOTES, 'ISO-8859-1', false); ?></h3>
                                         <p>Total Payments <span class="tp-count-badge"><?=count($tpEntryCounts)?> TP(s)</span></p>
                                         <p style="font-size:11.5px;color:#9ca3af;margin-top:4px;">
-                                            <?php echo $stats_by_type['napkin']['count']; ?> Napkin &middot; <?php echo $stats_by_type['diaper']['count']; ?> Diaper
+                                            <?php echo htmlspecialchars((string)($stats_by_type['napkin']['count']), ENT_QUOTES, 'ISO-8859-1', false); ?> Napkin &middot; <?php echo htmlspecialchars((string)($stats_by_type['diaper']['count']), ENT_QUOTES, 'ISO-8859-1', false); ?> Diaper
                                         </p>
                                     </div>
                                 </div>
@@ -372,12 +372,12 @@ function zoneQS(array $overrides = []): string {
                                         <div class="modal-body">
                                             <div class="btn-group mb-3" role="group">
                                                 <?php foreach ($company_profiles as $i => $cp): ?>
-                                                <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=$i === 0 ? ' active' : ''?>" data-scope="company-<?=$cp['id']?>"><?=htmlspecialchars($cp['gname'])?></button>
+                                                <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=$i === 0 ? ' active' : ''?>" data-scope="company-<?=htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars($cp['gname'])?></button>
                                                 <?php endforeach; ?>
                                                 <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=empty($company_profiles) ? ' active' : ''?>" data-scope="all">All Receivers</button>
                                             </div>
                                             <?php foreach ($company_profiles as $i => $cp): $rowsForCp = $tpBalanceByCompany[$cp['id']] ?? []; $cpTotal = array_sum(array_column($rowsForCp, 'balance')); ?>
-                                            <div class="balance-scope-pane" data-scope="company-<?=$cp['id']?>" <?=$i === 0 ? '' : 'style="display:none;"'?>>
+                                            <div class="balance-scope-pane" data-scope="company-<?=htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false)?>" <?=$i === 0 ? '' : 'style="display:none;"'?>>
                                                 <div class="tp-count-popover-row" style="font-weight:700;border-bottom:2px solid #e5e7eb;">
                                                     <span>Total</span>
                                                     <b>&#8377;<?=inr_format($cpTotal, 2)?></b>
@@ -424,12 +424,12 @@ function zoneQS(array $overrides = []): string {
                                         <div class="modal-body">
                                             <div class="btn-group mb-3" role="group">
                                                 <?php foreach ($company_profiles as $i => $cp): ?>
-                                                <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=$i === 0 ? ' active' : ''?>" data-scope="company-<?=$cp['id']?>"><?=htmlspecialchars($cp['gname'])?></button>
+                                                <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=$i === 0 ? ' active' : ''?>" data-scope="company-<?=htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars($cp['gname'])?></button>
                                                 <?php endforeach; ?>
                                                 <button type="button" class="btn btn-sm btn-outline-primary balance-scope-btn<?=empty($company_profiles) ? ' active' : ''?>" data-scope="all">All Receivers</button>
                                             </div>
                                             <?php foreach ($company_profiles as $i => $cp): $rowsForCp = $tpEntryCountsByCompany[$cp['id']] ?? []; $cpTotal = array_sum(array_column($rowsForCp, 'count')); ?>
-                                            <div class="balance-scope-pane" data-scope="company-<?=$cp['id']?>" <?=$i === 0 ? '' : 'style="display:none;"'?>>
+                                            <div class="balance-scope-pane" data-scope="company-<?=htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false)?>" <?=$i === 0 ? '' : 'style="display:none;"'?>>
                                                 <div class="tp-count-popover-row" style="font-weight:700;border-bottom:2px solid #e5e7eb;">
                                                     <span>Total</span>
                                                     <b><?=(int)$cpTotal?></b>
@@ -498,7 +498,7 @@ function zoneQS(array $overrides = []): string {
                                                     <select name="tp_id" id="zoneTpPayerSelect" class="form-control">
                                                         <option value="">All Payers</option>
                                                         <?php foreach ($zoneTps as $tp): ?>
-                                                        <option value="<?=$tp['id']?>" <?=$filter_tp == $tp['id'] ? 'selected' : ''?>>
+                                                        <option value="<?=htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false)?>" <?=$filter_tp == $tp['id'] ? 'selected' : ''?>>
                                                             <?=htmlspecialchars($tp['name'])?> (<?=htmlspecialchars($tp['tp_id'])?>)
                                                         </option>
                                                         <?php endforeach; ?>
@@ -509,7 +509,7 @@ function zoneQS(array $overrides = []): string {
                                                     <select name="company_id" class="form-control">
                                                         <option value="">All Receivers</option>
                                                         <?php foreach ($company_profiles as $cp): ?>
-                                                        <option value="<?=$cp['id']?>" <?=$filter_company == $cp['id'] ? 'selected' : ''?>><?=htmlspecialchars($cp['gname'])?></option>
+                                                        <option value="<?=htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false)?>" <?=$filter_company == $cp['id'] ? 'selected' : ''?>><?=htmlspecialchars($cp['gname'])?></option>
                                                         <?php endforeach; ?>
                                                     </select>
                                                 </div>

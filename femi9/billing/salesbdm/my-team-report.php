@@ -173,7 +173,7 @@ usort($reportRows, fn($a, $b) => $b['pct'] <=> $a['pct']);
                                 ?>
                                     <tr>
                                         <td><a class="team-name-link" href="<?php echo $viewUrl; ?>"><?php echo htmlspecialchars($r['name']); ?></a></td>
-                                        <td><span class="lvl-badge" style="background:<?php echo $r['color']; ?>;"><?php echo htmlspecialchars($r['level_name']); ?></span></td>
+                                        <td><span class="lvl-badge" style="background:<?php echo htmlspecialchars((string)($r['color']), ENT_QUOTES, 'ISO-8859-1', false); ?>;"><?php echo htmlspecialchars($r['level_name']); ?></span></td>
                                         <td><?php echo $r['zone'] ? htmlspecialchars($r['zone']) : '—'; ?></td>
                                         <td><?php echo (int)$r['tp_count']; ?></td>
                                         <td><?php echo (int)$r['selling_tp_count']; ?></td>
@@ -184,7 +184,7 @@ usort($reportRows, fn($a, $b) => $b['pct'] <=> $a['pct']);
                                             <a href="<?php echo $viewUrl; ?>" style="text-decoration:none;">
                                                 <div style="display:flex;align-items:center;gap:5px;">
                                                     <div class="pbar" style="width:70px;"><div class="pf" style="width:<?php echo min($r['pct'],100); ?>%;background:<?php echo $bc; ?>;"></div></div>
-                                                    <span style="font-size:12.5px;font-weight:700;color:<?php echo $bc; ?>;"><?php echo $r['pct']; ?>%</span>
+                                                    <span style="font-size:12.5px;font-weight:700;color:<?php echo $bc; ?>;"><?php echo htmlspecialchars((string)($r['pct']), ENT_QUOTES, 'ISO-8859-1', false); ?>%</span>
                                                 </div>
                                             </a>
                                         </td>

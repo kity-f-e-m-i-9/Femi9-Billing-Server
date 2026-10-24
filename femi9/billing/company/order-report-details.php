@@ -70,7 +70,7 @@ $productname=strtoupper($result_products['productName']);
 								
 								<tr>
 		<td><?=$productname;?></td>
-		<td><?=$result_pincode_list['qty'];?></td>
+		<td><?=htmlspecialchars((string)($result_pincode_list['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 		</tr>	
 
 							<?php }?>								

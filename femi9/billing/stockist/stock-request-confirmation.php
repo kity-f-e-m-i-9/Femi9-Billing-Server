@@ -124,14 +124,14 @@ $imgshow="<img src='screenshot/".$result_reqdetaiis['screenshot2']."' style='wid
 <?php if($result_reqdetaiis['utr']!="Nil"){?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>UTR/TRANSACTION Number</b></label><br/>
-<?=$result_reqdetaiis['utr'];?>
+<?=htmlspecialchars((string)($result_reqdetaiis['utr']), ENT_QUOTES, 'ISO-8859-1', false);?>
 </br>
 </div>
 <?php }?>
 
 <div style="margin-top:10px;">
 <label class="form-label"><b>Delivery Address:-</b></label><br/>
-<?=strtoupper($result_reqdetaiis['delivery_address']);?>
+<?=htmlspecialchars((string)(strtoupper($result_reqdetaiis['delivery_address'])), ENT_QUOTES, 'ISO-8859-1', false);?>
 </br>
 </div>
 										
@@ -158,13 +158,13 @@ $imgshow="<img src='screenshot/".$result_reqdetaiis['screenshot2']."' style='wid
 											
 											if($result_productCurrentst['qty']>0){
 										?>
-        <input type="hidden" name="prid[]" value="<?php echo $result_productCurrentst['id']; ?>"/>
+        <input type="hidden" name="prid[]" value="<?php echo htmlspecialchars((string)($result_productCurrentst['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"/>
         <tr>
-                                 <td><a href="#" class="popup-trigger"><?php echo $result_pramount["productName"];?></a></td>
-		<td><?=$result_productCurrentst['qty'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['amount'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['subtotal'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['gsttotal'];?> (<?=$result_productCurrentst['gst'];?>%)</td>
+                                 <td><a href="#" class="popup-trigger"><?php echo htmlspecialchars((string)($result_pramount["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
+		<td><?=htmlspecialchars((string)($result_productCurrentst['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['subtotal']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['gsttotal']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?=htmlspecialchars((string)($result_productCurrentst['gst']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 		<td align="right" style="display:none;"><?=inr_format($result_productCurrentst['total'], 2);?></td>
                                                 </tr>
                                            

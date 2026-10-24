@@ -191,7 +191,7 @@ function deleteRow(tableID) {
 										while($result_product_list12=mysqli_fetch_array($fetch_product_list12))
 										{
 											?>
-<option value="<?=$result_product_list12['id'];?>"><?=$result_product_list12['productName'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list12['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_product_list12['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 </select>
 					     </td>

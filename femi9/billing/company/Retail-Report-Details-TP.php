@@ -286,7 +286,7 @@ $qparam = urlencode($search ?? '');
                                                         if($dist_result) {
                                                             while($dist = mysqli_fetch_assoc($dist_result)) {
                                                                 $selected_attr = in_array((int)$dist['id'], $selected_district_ids, true) ? 'selected' : '';
-                                                                echo '<option value="'.$dist['id'].'" '.$selected_attr.'>'.htmlspecialchars($dist['name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($dist['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($dist['name']).'</option>';
                                                             }
                                                         }
                                                         ?>
@@ -311,7 +311,7 @@ $qparam = urlencode($search ?? '');
                                                             $firka_result = $stmt_firka->get_result();
                                                             while($firka = $firka_result->fetch_assoc()) {
                                                                 $selected_attr = in_array((int)$firka['id'], $selected_firka_ids, true) ? 'selected' : '';
-                                                                echo '<option value="'.$firka['id'].'" '.$selected_attr.'>'.htmlspecialchars($firka['name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($firka['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($firka['name']).'</option>';
                                                             }
                                                             $stmt_firka->close();
                                                         }
@@ -351,7 +351,7 @@ $qparam = urlencode($search ?? '');
                                                             if($tpNameResult) {
                                                                 while($tpRow = mysqli_fetch_assoc($tpNameResult)) {
                                                                     $selected_attr = in_array((int)$tpRow['id'], $selected_tp_ids, true) ? 'selected' : '';
-                                                                    echo '<option value="'.$tpRow['id'].'" '.$selected_attr.'>'.htmlspecialchars($tpRow['name']).'</option>';
+                                                                    echo '<option value="'.htmlspecialchars((string)($tpRow['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($tpRow['name']).'</option>';
                                                                 }
                                                             }
                                                         }

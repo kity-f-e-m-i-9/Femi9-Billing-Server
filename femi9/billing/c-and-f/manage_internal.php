@@ -141,16 +141,16 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?php echo strtoupper($result_godowndetails2["name"]);?><br/>
+													<td><?php echo htmlspecialchars((string)(strtoupper($result_godowndetails2["name"])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 													<b>
-													<?php echo $result_godowndetails2["mobile_number"];?>
+													<?php echo htmlspecialchars((string)($result_godowndetails2["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
 													</b>
 													<br/>
-													<?=$ResultRecords12['to_usertype'];?>
+													<?=htmlspecialchars((string)($ResultRecords12['to_usertype']), ENT_QUOTES, 'ISO-8859-1', false);?>
 													</td>
 					<td><?php echo date("d/M/Y",strtotime($ResultRecords12["date"]));?></td>
-                    <td><?php echo $Result_productDetils["productName"];?></td>
-				<th><?=$ResultRecords12['qty'];?></th>
+                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+				<th><?=htmlspecialchars((string)($ResultRecords12['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 													
 													<td>
 <a href="delete_internal.php?rowid=<?=base64_encode($ResultRecords12['id']);?>" onclick="return confirm('You want to delete confirm?');">

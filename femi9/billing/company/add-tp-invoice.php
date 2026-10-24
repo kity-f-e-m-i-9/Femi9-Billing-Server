@@ -323,7 +323,7 @@ if ($prefill_po_id > 0) {
                     </div>
 
                     <form action="tp-invoice-action" method="post" id="invoiceForm">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="action" value="insert-tp-invoice">
                         <input type="hidden" name="po_id" value="<?php echo (int)$prefill_po_id; ?>">
                         <input type="hidden" name="source_location_id" id="sourceLocationId">
@@ -346,7 +346,7 @@ if ($prefill_po_id > 0) {
                                     <select name="tp_id" id="tpSelect" class="form-control" required>
                                         <option value=""></option>
                                         <?php foreach ($tps as $tp): ?>
-                                            <option value="<?php echo $tp['id']; ?>"
+                                            <option value="<?php echo htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"
                                                 data-tpid="<?php echo htmlspecialchars($tp['tp_id']); ?>"
                                                 data-mobile="<?php echo htmlspecialchars($tp['mobile'] ?? ''); ?>">
                                                 <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars($tp['tp_id']); ?>)

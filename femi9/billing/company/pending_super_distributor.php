@@ -183,11 +183,11 @@ $select_ssdetails="select * from ".$tblanem." where temp_id='$supersid'";
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					D:&nbsp;<?=ucwords($district_name);?><br/>T:&nbsp;<?=ucwords($taluk_name);?>
 					<br/>P:&nbsp;<?=$pincodeshow;?>
 					</td>
-					<td><?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td>
 			<?php 
@@ -206,8 +206,8 @@ $select_ssdetails="select * from ".$tblanem." where temp_id='$supersid'";
 
 
 <td>
-<?=ucwords($result_ssdetails['name']);?><br/>
-<?=ucwords($result_ssdetails['mobile_number']);?><br/>
+<?=htmlspecialchars((string)(ucwords($result_ssdetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<?=htmlspecialchars((string)(ucwords($result_ssdetails['mobile_number'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 <?=$lableshow_user;?>
 </td>
 
@@ -225,7 +225,7 @@ function newPopup(url) {
 			
 						<td>
 			    <div class="actions-group">
-			        <a href="super_Distributor_del_approval.php?distributorid=<?php echo base64_encode($result_product_list['temp_id']);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm this Distributor (<?php echo ucwords($result_product_list["name"]);?>)')"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+			        <a href="super_Distributor_del_approval.php?distributorid=<?php echo base64_encode($result_product_list['temp_id']);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm this Distributor (<?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>)')"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 			    </div>
 			</td>
 			

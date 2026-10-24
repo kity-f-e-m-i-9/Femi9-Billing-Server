@@ -123,7 +123,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo $district_name;?></td>
-													<td><?php echo $result_product_list['taluk'];?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
 													<a href="edit-taluk.php?prid=<?php echo $row_id;?>"><img src="../../assets/images/edit-32.png"/></a>
 													</td>

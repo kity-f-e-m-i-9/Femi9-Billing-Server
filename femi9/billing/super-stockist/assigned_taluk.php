@@ -115,7 +115,7 @@ $select_stcatlist="select temp_id,name from stockiest where onboard_userTYPE='".
    $fetch_stcatlist=mysqli_query($db_conn,$select_stcatlist);
 							   while($result_stcatlist=mysqli_fetch_array($fetch_stcatlist))
 							   {?>
-	<option value="<?php echo $result_stcatlist['temp_id'];?>"><?php echo strtoupper($result_stcatlist['name']);?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_stcatlist['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)(strtoupper($result_stcatlist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 
@@ -205,7 +205,7 @@ var DistrictID="<?php echo $loguser_DistrictID;?>";
 										while($result_Taluk_list=mysqli_fetch_array($fetch_Taluk_list))
 										{
 											?>
-											<option value="<?php echo $result_Taluk_list['id'];?>"><?php echo $result_Taluk_list['taluk'];?></option>
+											<option value="<?php echo htmlspecialchars((string)($result_Taluk_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Taluk_list['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>
 												

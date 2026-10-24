@@ -174,8 +174,8 @@ if($Total_available_stock_VLSS2>0){
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultRcd_VLSS2["useridtext"];?></td>
-							<td><?=$resultRcd_VLSS2["name"];?></td>
+                            <td><?=htmlspecialchars((string)($resultRcd_VLSS2["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS2["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS2;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 							<td align="right"><?=$Total_available_stock_VLSS2;?></td>
@@ -237,8 +237,8 @@ if($Total_available_stock_VLSS3>0){
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultRcd_VLSS3["useridtext"];?></td>
-							<td><?=$resultRcd_VLSS3["name"];?></td>
+                            <td><?=htmlspecialchars((string)($resultRcd_VLSS3["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS3["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS3;?></td>
 							<td align="right"><?=$Total_available_stock_VLSS3;?></td>
 				

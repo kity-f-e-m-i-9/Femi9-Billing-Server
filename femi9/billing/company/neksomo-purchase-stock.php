@@ -214,8 +214,8 @@ $Result_closing_packs  = $total_closing_packs;
 											<tbody>
 			<?php foreach ($product_rows as $r): ?>
                                                 <tr>
-                                                    <td><?php echo $r['productName'];?></td>
-													<td><?php echo $r['hsn'];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($r['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($r['hsn']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
 						<!-------PURCHASE QTY------------->
 						<td align="right"><?php echo inr_format($r['PurchasedQty'], 0) . ' ' . $r['unitLabel'];?></td>

@@ -264,7 +264,7 @@ if($Total_Visit_Count>0)
                             <td><?php echo ++$i; ?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$fetch_records["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($fetch_records["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td style="background:#EEE;font-weight:bold;"><?=$Total_Visit_Count;?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>

@@ -96,7 +96,7 @@ $locationLayers = $db_conn->query("SELECT id, depth, layer_name FROM partner_loc
                                     <?php include("validate-scripts.php"); ?>
 
                                     <form action="marketing-team-level-action" method="post" enctype="multipart/form-data">
-                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 
                                         <div class="example-container">
                                             <div class="example-content">

@@ -452,7 +452,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <select name="godownid" class="form-control" required>
                                         <option value="" hidden>Select</option>
                                         <?php foreach ($godownOptions as $g): ?>
-                                        <option value="<?=$g['id']?>"><?=htmlspecialchars($g['gname'])?></option>
+                                        <option value="<?=htmlspecialchars((string)($g['id']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars($g['gname'])?></option>
                                         <?php endforeach; ?>
                                     </select>
                                     <br/>

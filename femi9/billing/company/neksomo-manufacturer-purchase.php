@@ -117,7 +117,7 @@ $warehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_ac
                         <?php endif; ?>
 
                         <form action="neksomo-manufacturer-purchase-action.php" method="post" id="purchaseForm">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="add-record" value="1">
                         <div id="hiddenProductInputs"></div>
 

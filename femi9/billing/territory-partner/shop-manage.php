@@ -75,7 +75,7 @@ $i = $start_from;
                                             <select id="filter_district" class="form-control" onchange="filterGeoPopulate(3, this.value); applyShopFilters();">
                                                 <option value="">All Districts</option>
                                                 <?php foreach ($geoNodes as $_n): if ($_n['depth'] === 3): ?>
-                                                <option value="<?php echo $_n['id']; ?>" <?php echo ($filter_district === $_n['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($_n['name']); ?></option>
+                                                <option value="<?php echo htmlspecialchars((string)($_n['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo ($filter_district === $_n['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($_n['name']); ?></option>
                                                 <?php endif; endforeach; ?>
                                             </select>
                                         </div>
@@ -84,7 +84,7 @@ $i = $start_from;
                                             <select id="filter_division" class="form-control" onchange="filterGeoPopulate(4, this.value); applyShopFilters();">
                                                 <option value="">All Divisions</option>
                                                 <?php if ($filter_district): foreach ($geoNodes as $_n): if ($_n['depth'] === 4 && $_n['parent_id'] === $filter_district): ?>
-                                                <option value="<?php echo $_n['id']; ?>" <?php echo ($filter_division === $_n['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($_n['name']); ?></option>
+                                                <option value="<?php echo htmlspecialchars((string)($_n['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo ($filter_division === $_n['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($_n['name']); ?></option>
                                                 <?php endif; endforeach; endif; ?>
                                             </select>
                                         </div>
@@ -93,7 +93,7 @@ $i = $start_from;
                                             <select id="filter_firka" class="form-control" onchange="applyShopFilters();">
                                                 <option value="">All Firkas</option>
                                                 <?php if ($filter_division): foreach ($geoNodes as $_n): if ($_n['depth'] === 5 && $_n['parent_id'] === $filter_division): ?>
-                                                <option value="<?php echo $_n['id']; ?>" <?php echo ($filter_firka === $_n['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($_n['name']); ?></option>
+                                                <option value="<?php echo htmlspecialchars((string)($_n['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo ($filter_firka === $_n['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($_n['name']); ?></option>
                                                 <?php endif; endforeach; endif; ?>
                                             </select>
                                         </div>

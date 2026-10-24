@@ -406,7 +406,7 @@ if ($hasTps) {
                                     <select name="tp_id" id="tpFilterSelect" class="form-control">
                                         <option value="">All TPs</option>
                                         <?php foreach ($tps as $tp): ?>
-                                        <option value="<?php echo $tp['id']; ?>" <?php echo $filter_tp_id == $tp['id'] ? 'selected' : ''; ?>>
+                                        <option value="<?php echo htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo $filter_tp_id == $tp['id'] ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars($tp['tp_code']); ?>)
                                         </option>
                                         <?php endforeach; ?>
@@ -525,7 +525,7 @@ if ($hasTps) {
                                                     </td>
                                                     <td class="text-right"><b>&#8377;<?php echo inr_format($amount, 2); ?></b></td>
                                                     <td>
-                                                        <span class="po-status-pill <?php echo htmlspecialchars($o['status']); ?>" <?php echo $o['status']==='cancelled' && $o['cancel_reason'] ? 'title="'.htmlspecialchars($o['cancel_reason'], ENT_QUOTES).'"' : ''; ?>><?php echo ucfirst($o['status']); ?></span>
+                                                        <span class="po-status-pill <?php echo htmlspecialchars($o['status']); ?>" <?php echo $o['status']==='cancelled' && $o['cancel_reason'] ? 'title="'.htmlspecialchars($o['cancel_reason'], ENT_QUOTES).'"' : ''; ?>><?php echo htmlspecialchars((string)(ucfirst($o['status'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span>
                                                     </td>
                                                     <td>
                                                         <?php if (!empty($o['is_direct'])): ?>

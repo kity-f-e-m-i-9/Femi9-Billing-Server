@@ -85,10 +85,10 @@ while ($row = $result->fetch_assoc()) {
 ?>
                                                 <tr>
                                                     <td><a href="#" class="popup-trigger"><?php echo htmlspecialchars($row['productName']); ?></a></td>
-                                                    <td style="display:none;"><?php echo $row['opening_qty']; ?></td>
-                                                    <td style="display:none;"><?php echo $row['input_qty']; ?></td>
-                                                    <td style="display:none;"><?php echo $row['deduct_qty']; ?></td>
-                                                    <td align="right"><b><?php echo $row['closing_qty']; ?></b></td>
+                                                    <td style="display:none;"><?php echo htmlspecialchars((string)($row['opening_qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+                                                    <td style="display:none;"><?php echo htmlspecialchars((string)($row['input_qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+                                                    <td style="display:none;"><?php echo htmlspecialchars((string)($row['deduct_qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+                                                    <td align="right"><b><?php echo htmlspecialchars((string)($row['closing_qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></b></td>
                                                 </tr>
 <?php }
 }

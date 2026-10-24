@@ -322,7 +322,7 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                     ? " (Available: " . $availability['available_qty'] . ")" 
                                                                     : " (Fully Returned)";
                                                         ?>
-                                                            <option value="<?=$result_product_list['id'];?>" 
+                                                            <option value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" 
                                                                     data-available="<?=htmlspecialchars((string)($availability['available_qty']), ENT_QUOTES, 'UTF-8', false);?>"
                                                                     data-original="<?=htmlspecialchars((string)($availability['original_qty']), ENT_QUOTES, 'UTF-8', false);?>"
                                                                     data-returned="<?=htmlspecialchars((string)($availability['returned_qty']), ENT_QUOTES, 'UTF-8', false);?>"
@@ -467,10 +467,10 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                 <tr>
                                                                     <th scope="row"><?php echo ++$rd;?></th>
                                                                     <td><?=htmlspecialchars($result_ProductDetails123['productName']);?></td>
-                                                                    <td><?=$result_INVProductDetails['qty'];?></td>
+                                                                    <td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                                     <td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
                                                                     <td align="right"><?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
-                                                                    <td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+                                                                    <td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
                                                                     <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
                                                                     <td>
                                                                         <a href="cnote_delete.php?returnid=<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?=$ItemRowid;?>&&InvoiceID=<?=htmlspecialchars((string)($InvoiceID), ENT_QUOTES, 'UTF-8', false);?>&&redirurl=cnote_new&&ActionDel" 
@@ -518,7 +518,7 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                             <?php if ($resultReturnDtails['discount'] == 0) { ?>
                                                                                 <input type="number" onkeyup="totalamount()" id="discount" value="0" min="0" name="discount" required="">
                                                                             <?php } else { ?>
-                                                                                <input type="number" value="<?=$resultReturnDtails['discount'];?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
+                                                                                <input type="number" value="<?=htmlspecialchars((string)($resultReturnDtails['discount']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
                                                                             <?php } ?>
                                                                         </span>
                                                                     </p>

@@ -234,13 +234,13 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
                                             
                                                 <tr>
                             <td><?php echo ++$i; ?></td>
-							<td><?=$result_market_SSCASH_VLSS_THISMONTH['invnumber'];?></td>
+							<td><?=htmlspecialchars((string)($result_market_SSCASH_VLSS_THISMONTH['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=date("d/m/Y",strtotime($result_market_SSCASH_VLSS_THISMONTH['date']));?></td>
 							<td><?=$TotalReturnQTY;?></td>
 							<td><?=inr_format($TotalReturnAmount, 2);?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 				
                                         </tr>
@@ -322,13 +322,13 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
                                             
                                                 <tr>
                             <td><?php echo ++$i; ?></td>
-							<td><?=$result_market_SSCASH_VLSS_THISMONTH['invnumber'];?></td>
+							<td><?=htmlspecialchars((string)($result_market_SSCASH_VLSS_THISMONTH['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=date("d/m/Y",strtotime($result_market_SSCASH_VLSS_THISMONTH['date']));?></td>
 							<td><?=$TotalReturnQTY;?></td>
 							<td><?=inr_format($TotalReturnAmount, 2);?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				
@@ -410,13 +410,13 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
                                             
                                                 <tr>
                             <td><?php echo ++$i; ?></td>
-							<td><?=$result_market_SSCASH_VLSS_THISMONTH['invnumber'];?></td>
+							<td><?=htmlspecialchars((string)($result_market_SSCASH_VLSS_THISMONTH['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=date("d/m/Y",strtotime($result_market_SSCASH_VLSS_THISMONTH['date']));?></td>
 							<td><?=$TotalReturnQTY;?></td>
 							<td><?=inr_format($TotalReturnAmount, 2);?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				

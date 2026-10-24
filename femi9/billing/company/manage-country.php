@@ -123,12 +123,12 @@ $i= $start_from;
 											?>
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?php echo $result_product_list['c_name'];?></td>
-                                                    <td><?php echo $result_product_list['c_code'];?></td>
-													<td><?php echo $result_product_list['currency_name'];?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list['currency_name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
 													<?php if($result_product_list['currency_ascii_code']!=NULL){?>
-													&#<?php echo $result_product_list['currency_ascii_code'];?>;
+													&#<?php echo htmlspecialchars((string)($result_product_list['currency_ascii_code']), ENT_QUOTES, 'ISO-8859-1', false);?>;
 													<?php }?>
 													</td>
 																										<td>

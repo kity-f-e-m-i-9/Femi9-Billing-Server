@@ -92,6 +92,6 @@ if (isset($_REQUEST['inv_id'])) {
         $stmtDel->close();
     }
 
-    echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&action={$_SESSION['ACTIONEDIT']}&&ActionRemove';</script>";
+    echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&action=".htmlspecialchars((string)($_SESSION['ACTIONEDIT']), ENT_QUOTES, 'ISO-8859-1', false)."&&ActionRemove';</script>";
 }
 ?>

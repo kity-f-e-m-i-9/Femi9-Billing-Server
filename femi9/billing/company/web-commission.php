@@ -112,9 +112,9 @@ $fetch_wp_settings=mysqli_query($db_conn,$select_wp_settings);
 while($result_wp_settings=mysqli_fetch_array($fetch_wp_settings))
 {
 ?>
-<input type="hidden" name="updateid[]" value="<?=$result_wp_settings['id'];?>">
-<label class="form-label"><?=$result_wp_settings['usertype'];?></label>
-<input type="text" required value="<?=$result_wp_settings['amount'];?>" name="amount[]" class="form-control"><br/>
+<input type="hidden" name="updateid[]" value="<?=htmlspecialchars((string)($result_wp_settings['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<label class="form-label"><?=htmlspecialchars((string)($result_wp_settings['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?></label>
+<input type="text" required value="<?=htmlspecialchars((string)($result_wp_settings['amount']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="amount[]" class="form-control"><br/>
 <?php }?>
 												
 												

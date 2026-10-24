@@ -166,13 +166,13 @@ $preselected_depth = !empty($current_locations) ? (int)$current_locations[0]['de
 									<?php include("validate-scripts.php");?>        
                                        
 <form action="ms_action" method="post" enctype="multipart/form-data">
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                
 											   <label class="form-label">Name*</label>
-<input type="text" value="<?=$result_product_list['ms_name'];?>" required="" name="ms_name" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="text" value="<?=htmlspecialchars((string)($result_product_list['ms_name']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" name="ms_name" class="form-control" onkeypress="restrictSpecialChars(event)">
 <br/>
 												
 <style>
@@ -192,28 +192,28 @@ $preselected_depth = !empty($current_locations) ? (int)$current_locations[0]['de
             <div class="country-code">
                 <label class="form-label">Country Code *</label>
 <select id='country_code' name='country_code' required="" class="form-control">
-<option value="<?php echo $result_product_list['country_code'];?>" hidden><?php echo $result_product_list['country_code'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php $selectCountry="select * from country order by c_name asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>
             <div class="mobile-number">
                 <label class="form-label">Mobile Number (Username)*</label>
-                <input type="text" required disabled onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo $result_product_list['ms_mobile'];?>" class="form-control" maxlength="10">
+                <input type="text" required disabled onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo htmlspecialchars((string)($result_product_list['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" maxlength="10">
             </div>
         </div>
         <!-- New add end -->
 </br>
 
 <label class="form-label">Email ID</label>
-<input type="email" name="ms_email" onkeypress="restrictemail(event)" value="<?=$result_product_list['ms_email'];?>" class="form-control" placeholder="optional">
+<input type="email" name="ms_email" onkeypress="restrictemail(event)" value="<?=htmlspecialchars((string)($result_product_list['ms_email']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" placeholder="optional">
 </br>
 
 <label class="form-label">Address</label>
-<textarea name="ms_address" onkeypress="restrictSpecialChars(event)" class="form-control" placeholder="optional"><?=$result_product_list['ms_address'];?></textarea>
+<textarea name="ms_address" onkeypress="restrictSpecialChars(event)" class="form-control" placeholder="optional"><?=htmlspecialchars((string)($result_product_list['ms_address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 </br>
 
 <label class="form-label">Monthly Target Amount (&#8377;)</label>

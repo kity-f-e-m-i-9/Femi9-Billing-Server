@@ -347,7 +347,7 @@ foreach ($notes as $n) { if ($n['priority'] === 'high') $highOpenCount++; }
                                             <span class="dn-badge <?php echo $isTp ? 'dn-source-tp' : 'dn-source-bdm'; ?>"><?php echo $isTp ? 'TP' : 'Sales BDM'; ?></span>
                                         </td>
                                         <td><?php echo !$isTp ? htmlspecialchars($n['submitter_name'] ?? '—') : '<span class="text-muted">&mdash;</span>'; ?></td>
-                                        <td><?php echo $isTp ? htmlspecialchars($n['submitter_name'] . ' (' . $n['submitter_code'] . ')') : '<span class="text-muted">&mdash;</span>'; ?></td>
+                                        <td><?php echo $isTp ? htmlspecialchars($n['submitter_name'] . ' (' . htmlspecialchars((string)($n['submitter_code']), ENT_QUOTES, 'ISO-8859-1', false) . ')') : '<span class="text-muted">&mdash;</span>'; ?></td>
                                         <td><?php echo htmlspecialchars($n['district']); ?></td>
                                         <td>
                                             <?php $noteType = $n['note_type'] ?? 'tp'; ?>
@@ -369,7 +369,7 @@ foreach ($notes as $n) { if ($n['priority'] === 'high') $highOpenCount++; }
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <div class="dn-status-cell" data-id="<?php echo (int)$n['id']; ?>" data-source="<?php echo $n['source']; ?>" data-status="<?php echo htmlspecialchars($status, ENT_QUOTES); ?>">
+                                            <div class="dn-status-cell" data-id="<?php echo (int)$n['id']; ?>" data-source="<?php echo htmlspecialchars((string)($n['source']), ENT_QUOTES, 'ISO-8859-1', false); ?>" data-status="<?php echo htmlspecialchars($status, ENT_QUOTES); ?>">
                                             <?php if ($status === 'completed'): ?>
                                                 <span class="dn-badge" style="background:#d1fae5;color:#065f46;"><i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">check_circle</i> Completed</span>
                                             <?php elseif ($status === 'in_progress'): ?>

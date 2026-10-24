@@ -122,15 +122,15 @@ if(isset($_REQUEST['add-offers']))
 											
                                                 
 												<label class="form-label">Super Stockist (Message)</label>
-                               <input type="text" name="ss_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=$result_product_list['ss_msg'];?>">
+                               <input type="text" name="ss_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['ss_msg']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												
 												<label class="form-label">Stockist (Message)</label>
-                               <input type="text" name="st_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=$result_product_list['st_msg'];?>">
+                               <input type="text" name="st_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['st_msg']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												
 												<label class="form-label">Distributor (Message)</label>
-                               <input type="text" name="dt_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=$result_product_list['dt_msg'];?>">
+                               <input type="text" name="dt_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['dt_msg']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												
 												

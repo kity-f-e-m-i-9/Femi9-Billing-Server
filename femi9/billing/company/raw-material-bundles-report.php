@@ -319,7 +319,7 @@ $filterQueryString = http_build_query(array_filter([
                                     <td style="text-align:right;"><?php echo $b['added_extra_pieces'] > 0 ? '<span class="qty-pos">' . number_format($b['added_extra_pieces']) . '</span>' : '—'; ?></td>
                                     <td style="text-align:right;"><?php echo number_format($b['conversions_count']); ?></td>
                                     <td style="text-align:right;"><?php echo number_format($b['packs_made_total']); ?></td>
-                                    <td><span class="<?php echo $b['status'] === 'open' ? 'badge-open' : 'badge-closed'; ?>"><?php echo ucfirst($b['status']); ?></span></td>
+                                    <td><span class="<?php echo $b['status'] === 'open' ? 'badge-open' : 'badge-closed'; ?>"><?php echo htmlspecialchars((string)(ucfirst($b['status'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span></td>
                                     <td>
                                         <?php if ($b['variance_label'] !== null): ?>
                                         <span class="<?php echo $isCarried ? 'badge-short' : ($isExcess ? 'badge-excess' : 'badge-exact'); ?>"><?php echo htmlspecialchars($b['variance_label'], ENT_QUOTES, 'UTF-8'); ?></span>
@@ -356,7 +356,7 @@ $filterQueryString = http_build_query(array_filter([
                                 <?php foreach ($txnRows as $t): ?>
                                 <tr>
                                     <td><?php echo date('d-M-Y H:i', strtotime($t['created_at'])); ?></td>
-                                    <td><span class="badge-type-<?php echo $t['type']; ?>"><?php echo ucfirst($t['type']); ?></span></td>
+                                    <td><span class="badge-type-<?php echo htmlspecialchars((string)($t['type']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucfirst($t['type'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span></td>
                                     <td><?php echo !empty($t['is_bucket']) ? 'Loose pieces bucket' : 'Bundle #' . (int) ($t['bundle_no'] ?? $t['bundle_id']); ?></td>
                                     <td><?php echo htmlspecialchars($t['product_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo htmlspecialchars($t['gname'], ENT_QUOTES, 'UTF-8'); ?><?php echo $t['warehouse_code'] ? ' · ' . htmlspecialchars($t['warehouse_code'], ENT_QUOTES, 'UTF-8') : ''; ?></td>

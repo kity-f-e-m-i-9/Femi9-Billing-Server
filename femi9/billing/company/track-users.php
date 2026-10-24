@@ -114,7 +114,7 @@ $users = $db_conn->query("SELECT id, name, mobile, email, account_status, last_l
                                     <td><?=date('d-M-Y', strtotime($u['created_at']))?></td>
                                     <td>
                                         <form method="post" style="display:inline;">
-                                            <input type="hidden" name="id" value="<?=$u['id']?>">
+                                            <input type="hidden" name="id" value="<?=htmlspecialchars((string)($u['id']), ENT_QUOTES, 'ISO-8859-1', false)?>">
                                             <input type="hidden" name="toggle_status" value="<?=$u['account_status']==='active'?'inactive':'active'?>">
                                             <button type="submit" class="btn btn-sm btn-outline-secondary"><?=$u['account_status']==='active'?'Deactivate':'Activate'?></button>
                                         </form>

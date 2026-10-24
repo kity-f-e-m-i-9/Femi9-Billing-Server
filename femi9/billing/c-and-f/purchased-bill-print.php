@@ -207,13 +207,13 @@ $result_Godown=mysqli_fetch_array($fetch_Godown);
 <tr valign="top">
 <td><img src="<?=$invoice_logo?>"/></td>
 <td valign="top">
-<span id="cmpname"><?=$result_Godown['gname'];?></span><br/>
-<?=$result_Godown['address_line1'];?><br/>
-<?=$result_Godown['address_line2'];?><br/>
-<b>GSTIN/UIN :</b> <?=$result_Godown['gstin'];?><br/>
-<b>State Name</b> : <?=$result_Godown['state'];?> <b>Code</b> : <?=$result_Godown['state_code'];?><br/>
-<b>Contact</b> : <?=$result_Godown['contact'];?><br/>
-<b>Email</b> : <?=$result_Godown['email'];?>
+<span id="cmpname"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></span><br/>
+<?=htmlspecialchars((string)($result_Godown['address_line1']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<?=htmlspecialchars((string)($result_Godown['address_line2']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<b>GSTIN/UIN :</b> <?=htmlspecialchars((string)($result_Godown['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<b>State Name</b> : <?=htmlspecialchars((string)($result_Godown['state']), ENT_QUOTES, 'ISO-8859-1', false);?> <b>Code</b> : <?=htmlspecialchars((string)($result_Godown['state_code']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<b>Contact</b> : <?=htmlspecialchars((string)($result_Godown['contact']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<b>Email</b> : <?=htmlspecialchars((string)($result_Godown['email']), ENT_QUOTES, 'ISO-8859-1', false);?>
 </td>
 </tr>
 </table>
@@ -234,8 +234,8 @@ else{$deliveryaddress=$result_userprofile['deliveryaddress'];}
 ?>
 <p class="cusdetaiis">
 Consignee (Ship to):<br/>
-<b><?=$result_userprofile['companyname'];?></b><br/>
-GSTIN: <?=$result_Customer_Details['gstin'];?><br/>
+<b><?=htmlspecialchars((string)($result_userprofile['companyname']), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+GSTIN: <?=htmlspecialchars((string)($result_Customer_Details['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 <?=$deliveryaddress;?>
 </p>
 
@@ -243,15 +243,15 @@ GSTIN: <?=$result_Customer_Details['gstin'];?><br/>
 <hr/>
 <p class="cusdetaiis">
 Buyer (Bill to):<br/>
-<b><?php echo ucwords($result_Customer_Details['name']);?></b><br/>
-GSTIN: <?=$result_Customer_Details['gstin'];?><br/>
+<b><?php echo htmlspecialchars((string)(ucwords($result_Customer_Details['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+GSTIN: <?=htmlspecialchars((string)($result_Customer_Details['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 State : <?=$state_name;?>, District: <?=$district_name?>
 </p>
 </td>
 <td valign="top">
 <table id="second_topvl">
 <tr id="border_nbottom">
-<td>Invoice #<br/><b><?php echo $result_Invoice_Details['inv_number'];?></b></td>
+<td>Invoice #<br/><b><?php echo htmlspecialchars((string)($result_Invoice_Details['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 <td>Invoice Date:<br/><b><?php if($result_Invoice_Details['date']!=NULL){ echo date("d M Y",strtotime($result_Invoice_Details['date'])); }?></b></td>
 </tr>
 
@@ -262,33 +262,33 @@ $Result_DLDetails=mysqli_fetch_array($Fetch_DLDetails);
 ?>
 
 <tr id="border_nbottom" valign="top">
-<td height="50">Delivery Note<br/><?=$Result_DLDetails['dl_note'];?></td>
-<td>Mode/Terms of Payment<br/><?=$Result_DLDetails['mode_pmnt'];?></td>
+<td height="50">Delivery Note<br/><?=htmlspecialchars((string)($Result_DLDetails['dl_note']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td>Mode/Terms of Payment<br/><?=htmlspecialchars((string)($Result_DLDetails['mode_pmnt']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 </tr>
 <tr id="border_nbottom" valign="top">
-<td height="50">Reference No. & Date<br/><?php if($Result_DLDetails['ref_no']!=NULL){ echo $Result_DLDetails['ref_no'];?>, <?php } if($Result_DLDetails['ref_date']!=NULL){ echo date("d/m/Y",strtotime($Result_DLDetails['ref_date'])); }?></td>
-<td>Other References<br/><?=$Result_DLDetails['ot_ref'];?></td>
+<td height="50">Reference No. & Date<br/><?php if($Result_DLDetails['ref_no']!=NULL){ echo htmlspecialchars((string)($Result_DLDetails['ref_no']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php } if($Result_DLDetails['ref_date']!=NULL){ echo date("d/m/Y",strtotime($Result_DLDetails['ref_date'])); }?></td>
+<td>Other References<br/><?=htmlspecialchars((string)($Result_DLDetails['ot_ref']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 </tr>
 <tr id="border_nbottom" valign="top">
-<td height="50">Buyer's Order No.<br/><?=$Result_DLDetails['order_no'];?></td>
+<td height="50">Buyer's Order No.<br/><?=htmlspecialchars((string)($Result_DLDetails['order_no']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>Dated<br/>
 <?php if($Result_DLDetails['dated']!=NULL){ echo date("d/m/Y",strtotime($Result_DLDetails['dated'])); }?>
 </td>
 </tr>
 <tr id="border_nbottom" valign="top">
-<td height="50">Dispatch Doc No.<br/><?=$Result_DLDetails['dispatch_doc_no'];?></td>
+<td height="50">Dispatch Doc No.<br/><?=htmlspecialchars((string)($Result_DLDetails['dispatch_doc_no']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>Delivery Note Date<br/>
 <?php if($Result_DLDetails['dlnote_date']!=NULL){ echo date("d/m/Y",strtotime($Result_DLDetails['dlnote_date'])); }?>
 </td>
 </tr>
 <tr id="border_nbottom" valign="top">
-<td height="50">Dispatched through<br/><?=$Result_DLDetails['dispatch_through'];?></td>
-<td>Destination<br/><?=$Result_DLDetails['destination'];?></td>
+<td height="50">Dispatched through<br/><?=htmlspecialchars((string)($Result_DLDetails['dispatch_through']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td>Destination<br/><?=htmlspecialchars((string)($Result_DLDetails['destination']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 </tr>
 </table>
 <p id="shiippingaddress">
 Terms of Delivery<br/>
-<?=$Result_DLDetails['terms'];?>
+<?=htmlspecialchars((string)($Result_DLDetails['terms']), ENT_QUOTES, 'ISO-8859-1', false);?>
 </p>
 </td>
 </tr>
@@ -332,12 +332,12 @@ Terms of Delivery<br/>
 	?>
 <tr>
 <td>1</td>
-<td><b><?=$result_ProductDetails123['productName'];?></b></td>
-<td id="rightlaign"><?=$result_ProductDetails123['hsn'];?></td>
+<td><b><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
+<td id="rightlaign"><?=htmlspecialchars((string)($result_ProductDetails123['hsn']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td id="rightlaign">Packs</td>
-<td id="rightlaign"><?=$result_INVProductDetails['gst_percentage'];?>%</td>
+<td id="rightlaign"><?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=$discountpercentage_show;?>%)</td>
 <td id="rightlaign"><?php echo inr_format($TotalAMount23, 2);?></td>
 </tr>

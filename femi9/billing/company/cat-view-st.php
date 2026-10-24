@@ -123,10 +123,10 @@ $i= $start_from;
 											?>
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?php echo $result_product_list['catname'];?></td>
-                                                    <td><?php echo $result_product_list['target_amount'];?></td>
-													<td><?php echo $result_product_list['ref_commission_percentage'];?>%</td>
-													<td><?php echo $result_product_list['cash_back_percentage'];?>%</td>
+													<td><?php echo htmlspecialchars((string)($result_product_list['catname']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list['target_amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list['ref_commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
+													<td><?php echo htmlspecialchars((string)($result_product_list['cash_back_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
 																										<td>
 													    <div class="actions-group">
 													        <a href="cat-edit-st?prid=<?php echo $row_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>

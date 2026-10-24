@@ -120,8 +120,8 @@ $i= $start_from;
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
 					<td><?=date("d/m/Y",strtotime($result_product_list["date"]));?></td>
-					<td><?=$result_product_list["title"];?></td>
-					<td><a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>" title="<?=$result_product_list["title"];?>"><img src="<?php echo $imgsrcname;?>" style="width:50px;border-radius:10px;" alt="<?=$result_product_list["title"];?>"></a></td>
+					<td><?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>" title="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>"><img src="<?php echo $imgsrcname;?>" style="width:50px;border-radius:10px;" alt="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>"></a></td>
 													
 			<td>
 			<a href="edit_demo.php?prid=<?php echo $rowid;?>&&actionupdate" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Details">

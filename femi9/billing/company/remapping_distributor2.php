@@ -141,7 +141,7 @@ if($result_supersotkistCNT['numMAPP']!=0)
                                             <div class="mb-3">
                                                 <label class="form-label">
                                                     <strong>Select Distributors to Remap:</strong> 
-                                                    (<?php echo $result_supersotkistCNT['numMAPP']; ?> distributors found)
+                                                    (<?php echo htmlspecialchars((string)($result_supersotkistCNT['numMAPP']), ENT_QUOTES, 'ISO-8859-1', false); ?> distributors found)
                                                 </label>
                                                 <div class="mb-2">
                                                     <button type="button" class="btn btn-sm btn-secondary" onclick="selectAllDistributors()">
@@ -163,8 +163,8 @@ if($result_supersotkistCNT['numMAPP']!=0)
 											?>
 											
 											<li class="list-group-item">
-        <input class="form-check-input me-1 distributor-checkbox" name="distributorid[]" type="checkbox" value="<?=$result_supersotkist['id'];?>" aria-label="Select distributor">
-        <?=strtoupper($result_supersotkist['name']);?>, <?=$result_supersotkist['mobile_number'];?>
+        <input class="form-check-input me-1 distributor-checkbox" name="distributorid[]" type="checkbox" value="<?=htmlspecialchars((string)($result_supersotkist['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" aria-label="Select distributor">
+        <?=htmlspecialchars((string)(strtoupper($result_supersotkist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_supersotkist['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>
     </li>
 	
 	

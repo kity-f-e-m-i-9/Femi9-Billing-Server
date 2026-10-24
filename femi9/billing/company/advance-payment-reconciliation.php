@@ -1614,7 +1614,7 @@ $stmt->close();
                                 <option value="<?= htmlspecialchars($exec['execution_id']) ?>">
                                     <?= htmlspecialchars($exec['execution_id']) ?> - 
                                     <?= date('d/M/Y H:i', strtotime($exec['execution_date'])) ?> - 
-                                    <?= $exec['successful_invoices'] ?> invoices - 
+                                    <?= htmlspecialchars((string)($exec['successful_invoices']), ENT_QUOTES, 'ISO-8859-1', false) ?> invoices - 
                                     ₹<?= inr_format($exec['total_amount'], 2) ?>
                                 </option>
                             <?php endforeach; ?>
@@ -1794,13 +1794,13 @@ $stmt->close();
                             <td>₹<?= inr_format($customer['balance_after'], 2) ?></td>
                             <td>
                                 <?php if ($customer['fully_paid'] > 0): ?>
-                                    <span class="badge badge-success">✓ <?= $customer['fully_paid'] ?> Fully Paid</span>
+                                    <span class="badge badge-success">✓ <?= htmlspecialchars((string)($customer['fully_paid']), ENT_QUOTES, 'ISO-8859-1', false) ?> Fully Paid</span>
                                 <?php endif; ?>
                                 <?php if ($customer['partially_paid'] > 0): ?>
-                                    <span class="badge badge-warning">⚡ <?= $customer['partially_paid'] ?> Partial</span>
+                                    <span class="badge badge-warning">⚡ <?= htmlspecialchars((string)($customer['partially_paid']), ENT_QUOTES, 'ISO-8859-1', false) ?> Partial</span>
                                 <?php endif; ?>
                                 <?php if ($customer['unpaid'] > 0): ?>
-                                    <span class="badge badge-danger">✗ <?= $customer['unpaid'] ?> Unpaid</span>
+                                    <span class="badge badge-danger">✗ <?= htmlspecialchars((string)($customer['unpaid']), ENT_QUOTES, 'ISO-8859-1', false) ?> Unpaid</span>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -1950,7 +1950,7 @@ $stmt->close();
                                         <td>₹<?= inr_format($inv['invoice_amount'], 2) ?></td>
                                         <td>₹<?= inr_format($balance_before, 2) ?></td>
                                         <td>₹<?= inr_format($balance_after, 2) ?></td>
-                                        <td><?= $inv['receipt_count'] ?> receipts</td>
+                                        <td><?= htmlspecialchars((string)($inv['receipt_count']), ENT_QUOTES, 'ISO-8859-1', false) ?> receipts</td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>

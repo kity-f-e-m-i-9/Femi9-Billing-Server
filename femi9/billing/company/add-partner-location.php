@@ -126,7 +126,7 @@ if (!empty($all_layer_names) && $depth > $max_layer_depth) {
                                     <?php include("validate-scripts.php"); ?>
 
                                     <form action="partner-location-action" method="post" enctype="multipart/form-data">
-                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <input type="hidden" name="parent_id" value="<?php echo $parent_id !== null ? $parent_id : ''; ?>">
                                         <input type="hidden" name="depth" value="<?php echo $depth; ?>">
 

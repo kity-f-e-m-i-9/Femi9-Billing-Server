@@ -413,7 +413,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($dist = $dist_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_district == $dist['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$dist['id'].'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($dist['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
                                                             }
                                                             $stmt_dist->close();
                                                         }
@@ -434,7 +434,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($taluk = $taluk_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_taluk == $taluk['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$taluk['id'].'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($taluk['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
                                                             }
                                                             $stmt_taluk->close();
                                                         }
@@ -520,7 +520,7 @@ $qparam = urlencode($search ?? '');
                                                                 if($user_result) {
                                                                     while($user = mysqli_fetch_assoc($user_result)) {
                                                                         $selected_attr = ($selected_user_id == $user['id']) ? 'selected' : '';
-                                                                        echo '<option value="'.$user['id'].'" '.$selected_attr.'>'.htmlspecialchars($user['name']).'</option>';
+                                                                        echo '<option value="'.htmlspecialchars((string)($user['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($user['name']).'</option>';
                                                                     }
                                                                 }
                                                             }

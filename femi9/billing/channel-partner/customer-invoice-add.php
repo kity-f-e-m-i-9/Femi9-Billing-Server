@@ -141,12 +141,12 @@ $cnt_items = (int)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS
     $res_custs = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE user_id='$Login_user_IDvl' ORDER BY name ASC");
     while ($rc = mysqli_fetch_array($res_custs)) {
 ?>
-<option value="<?php echo $rc['id']; ?>"><?php echo ucwords($rc['name']); ?>, <?php echo $rc['mobile']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rc['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucwords($rc['name'])), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($rc['mobile']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } } ?>
 </select>
 
 <label class="form-label">Invoice Date*</label>
-<input type="date" readonly name="date" value="<?php echo $res_inv['date']; ?>" required class="form-control">
+<input type="date" readonly name="date" value="<?php echo htmlspecialchars((string)($res_inv['date']), ENT_QUOTES, 'ISO-8859-1', false); ?>" required class="form-control">
 <br/>
 
 <?php if ($amount_received_fully == 0): ?>
@@ -157,7 +157,7 @@ $cnt_items = (int)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS
 $res_prods = mysqli_query($db_conn, "SELECT * FROM products ORDER BY id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) {
 ?>
-<option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rp['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 </select>
 <br/><br/>
@@ -195,11 +195,11 @@ $rd = 0;
             <td><?php echo ++$rd; ?></td>
             <td><?php echo htmlspecialchars($ri['productName']); ?></td>
             <td><?php echo htmlspecialchars($ri['hsn']); ?></td>
-            <td><?php echo $ri['qty']; ?></td>
-            <td><?php echo $ri['amount']; ?></td>
-            <td><?php echo $ri['discount_amount']; ?> (<?php echo $ri['discount_percentage']; ?>%)</td>
+            <td><?php echo htmlspecialchars((string)($ri['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+            <td><?php echo htmlspecialchars((string)($ri['amount']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+            <td><?php echo htmlspecialchars((string)($ri['discount_amount']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($ri['discount_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
             <td>&#8377;<?php echo inr_format((float)$ri['subtotal'], 2); ?></td>
-            <td><?php echo $ri['gstamount_total']; ?> (<?php echo $ri['gst_percentage']; ?>%)</td>
+            <td><?php echo htmlspecialchars((string)($ri['gstamount_total']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($ri['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
             <td><?php echo inr_format((float)$ri['total'], 2); ?></td>
             <?php if ($amount_received_fully == 0): ?>
             <td>
@@ -312,7 +312,7 @@ function receiptamount() {
 <?php if (empty($res_receipt['receipt_method'])): ?>
 <option value="" hidden>Select</option>
 <?php else: ?>
-<option value="<?php echo $res_receipt['receipt_method']; ?>" hidden><?php echo $res_receipt['receipt_method']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($res_receipt['receipt_method']), ENT_QUOTES, 'ISO-8859-1', false); ?>" hidden><?php echo htmlspecialchars((string)($res_receipt['receipt_method']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php endif; ?>
 <option>--None--</option>
 <option>Cash</option>
@@ -374,7 +374,7 @@ function receiptamount() {
                     <label class="form-label">Country Code*</label>
                     <select name="country_code" required class="form-control">
                     <?php $fc = mysqli_query($db_conn, "SELECT * FROM country ORDER BY id ASC"); while ($rc2 = mysqli_fetch_array($fc)) { ?>
-                    <option value="<?php echo $rc2['c_code']; ?>"><?php echo $rc2['c_name']; ?> (<?php echo $rc2['c_code']; ?>)</option>
+                    <option value="<?php echo htmlspecialchars((string)($rc2['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rc2['c_name']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($rc2['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
                     <?php } ?>
                     </select>
                 </div>
@@ -442,7 +442,7 @@ function showInvoiceDuplicate(str) {
 $res_custs = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE user_id='$Login_user_IDvl' ORDER BY name ASC");
 while ($rc = mysqli_fetch_array($res_custs)) {
 ?>
-<option value="<?php echo $rc['id']; ?>"><?php echo ucwords($rc['name']); ?>, <?php echo $rc['mobile']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rc['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucwords($rc['name'])), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($rc['mobile']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 </select>
 
@@ -459,7 +459,7 @@ while ($rc = mysqli_fetch_array($res_custs)) {
 $res_prods = mysqli_query($db_conn, "SELECT * FROM products ORDER BY id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) {
 ?>
-<option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rp['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 </select>
 <br/><br/>

@@ -272,7 +272,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						<a href="pending-stockist" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">Stockist</span>
-                                                <span class="widget-stats-amount"><?=$result_countSTOCK1223['numSTOCKpend'];?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_countSTOCK1223['numSTOCKpend']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                             </div>
 											</a>
                                         </div>
@@ -295,7 +295,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						<a href="pending-distributor" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">Distributors</span>
-                                                <span class="widget-stats-amount"><?=$result_countDIST1223['numDIST23'];?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_countDIST1223['numDIST23']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                             </div>
 											</a>
                                         </div>
@@ -352,7 +352,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						<a href="overview_super_stockist" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">S-Stockist</span>
-                                                <span class="widget-stats-amount"><?=$result_countSS['numSS'];?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_countSS['numSS']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                                 <!----<span class="widget-stats-info">471 Orders Total</span>--->
                                             </div>
 											</a>
@@ -380,7 +380,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						<a href="overview_stockist" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">Stockist</span>
-                                                <span class="widget-stats-amount"><?=$result_countSTOCK['numSTOCK'];?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_countSTOCK['numSTOCK']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                             </div>
 											</a>
                                             <!----<div class="widget-stats-indicator widget-stats-indicator-positive align-self-start">
@@ -407,7 +407,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						<a href="overview_distributor" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Distributors</span>
-                       <span class="widget-stats-amount"><?=$result_countDIST['numDIST'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_countDIST['numDIST']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                             </div>
 											</a>
                                         </div>
@@ -432,7 +432,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						<a href="overview_super_distributor" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">S_Distributors</span>
-                       <span class="widget-stats-amount"><?=$result_countDIST_super['numDIST'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_countDIST_super['numDIST']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                             </div>
 											</a>
                                         </div>
@@ -457,7 +457,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
                                             <a href="overview_shop" style="text-decoration:none;">
 											<div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">Shops</span>
-                                                <span class="widget-stats-amount"><?=$result_countSHOP['numSHOP'];?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_countSHOP['numSHOP']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                             </div>
 											</a>
                                         </div>

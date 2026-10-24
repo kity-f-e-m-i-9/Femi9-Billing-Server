@@ -18,7 +18,7 @@
                 array("id" => 3, "name" => "Product 3", "price" => 30)
             );
             foreach ($products as $product) {
-                echo "<option value='".$product['id']."' data-price='".$product['price']."'>".$product['name']."</option>";
+                echo "<option value='".htmlspecialchars((string)($product['id']), ENT_QUOTES, 'ISO-8859-1', false)."' data-price='".htmlspecialchars((string)($product['price']), ENT_QUOTES, 'ISO-8859-1', false)."'>".htmlspecialchars((string)($product['name']), ENT_QUOTES, 'ISO-8859-1', false)."</option>";
             }
             ?>
         </select>

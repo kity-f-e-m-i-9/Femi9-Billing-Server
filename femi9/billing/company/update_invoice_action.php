@@ -32,12 +32,12 @@ if($Result_Count_Invoice==0){
 	$update_DLNote="update ".$tablename." set inv_number='$invnumber' where inv_id='$InvoiceID'";
 	mysqli_query($db_conn,$update_DLNote);
 	
-	echo "<script>window.location='".$_REQUEST['redirurl']."?invuser=$invuser&&InvoiceID=".urlencode((string)$_POST["InvoiceID"])."&&action=$action&&gid=$gid&&InvoiceUpdatedSuccess';</script>";
+	echo "<script>window.location='".htmlspecialchars((string)($_REQUEST['redirurl']), ENT_QUOTES, 'ISO-8859-1', false)."?invuser=$invuser&&InvoiceID=".urlencode((string)$_POST["InvoiceID"])."&&action=$action&&gid=$gid&&InvoiceUpdatedSuccess';</script>";
 	
 }
 else{
 	
-	echo "<script>window.location='".$_REQUEST['redirurl']."?invuser=$invuser&&InvoiceID=".urlencode((string)$_POST["InvoiceID"])."&&action=$action&&gid=$gid&&invoicealready';</script>";
+	echo "<script>window.location='".htmlspecialchars((string)($_REQUEST['redirurl']), ENT_QUOTES, 'ISO-8859-1', false)."?invuser=$invuser&&InvoiceID=".urlencode((string)$_POST["InvoiceID"])."&&action=$action&&gid=$gid&&invoicealready';</script>";
 }
 	
 }

@@ -188,7 +188,7 @@ if ($selected_tp_db_id > 0) {
                                 </div>
                                 <div class="card-body p-0">
                                     <form method="post" action="add-tp-input-stock-action.php" id="stockForm">
-                                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <input type="hidden" name="tp_db_id" value="<?= $selected_tp_db_id; ?>">
                                         <input type="hidden" name="tp_id_text" value="<?= htmlspecialchars($selected_tp['tp_id']); ?>">
 

@@ -231,13 +231,13 @@ if($result_onbaord_user_records['useridtext']!=NULL)
                     <tr>
                     <td><?php echo ++$i; ?></td>
 					<td><?=$WD_user_type;?></td>
-					<td><?=$result_onbaord_user_records['useridtext'];?></td>
+					<td><?=htmlspecialchars((string)($result_onbaord_user_records['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_onbaord_user_records['name']);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_onbaord_user_records['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					<?php echo $district_name;?>
 					</td>
 					
-					<td><?=$result_onbaord_user_records["country_code"];?>&nbsp;<?=$result_onbaord_user_records["mobile_number"];?></td>
+					<td><?=htmlspecialchars((string)($result_onbaord_user_records["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_onbaord_user_records["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td><?=inr_format($result_product_list['total_sls_amount'], 2);?></td>
 					<td>
@@ -252,7 +252,7 @@ if($result_onbaord_user_records['useridtext']!=NULL)
 					</td>
 					
 					<td><?=inr_format($result_product_list['commission_amount'], 2);?></td>
-					<td><div style="width:300px;"><?=$result_product_list['remarks'];?></div></td>
+					<td><div style="width:300px;"><?=htmlspecialchars((string)($result_product_list['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></div></td>
 					
 					
 					

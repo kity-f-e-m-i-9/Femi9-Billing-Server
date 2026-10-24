@@ -97,15 +97,15 @@ $select_product_list="select * from distributor where id=?";
                                   
 <form action="Distributor-edit-action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?=$result_product_list['id'];?>">
-<input type="hidden" name="old_icon" value="<?=$result_product_list['user_icon'];?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="old_icon" value="<?=htmlspecialchars((string)($result_product_list['user_icon']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 <input type="hidden" name="distributor_id" value="<?=$distributor_temp_id;?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
 											
             <label class="form-label">Name</label>
-            <input type="text" required="" name="name" onkeypress="restrictSpecialChars(event)" value="<?php echo $result_product_list['name'];?>" class="form-control">
+            <input type="text" required="" name="name" onkeypress="restrictSpecialChars(event)" value="<?php echo htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			<?php
 			if($result_product_list["user_icon"]!="Nil"){$imgsrcname="../stockist/".$result_product_list["user_icon"]."";}else{$imgsrcname="../../assets/images/no image.jpg";}
 			?>
@@ -113,12 +113,12 @@ $select_product_list="select * from distributor where id=?";
 			
 			<label class="form-label">Category*</label>
            <select required="" name="target_amount" class="form-control">
-							   <option value="<?=$result_referral_records['target_amount'];?>" hidden=""><?=$result_referral_records['target_amount'];?></option>
+							   <option value="<?=htmlspecialchars((string)($result_referral_records['target_amount']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?=htmlspecialchars((string)($result_referral_records['target_amount']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php $select_stcatlist="select * from distributor_category order by id asc";
 							   $fetch_stcatlist=mysqli_query($db_conn,$select_stcatlist);
 							   while($result_stcatlist=mysqli_fetch_array($fetch_stcatlist))
 							   {?>
-	<option value="<?php echo $result_stcatlist['amount'];?>"><?php echo $result_stcatlist['amount'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_stcatlist['amount']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stcatlist['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 			<br/>
@@ -152,53 +152,53 @@ $select_product_list="select * from distributor where id=?";
             <div class="country-code">
                 <label class="form-label">Country Code *</label>
 <select id='country_code' name='country_code' required="" class="form-control">
-<option value="<?php echo $result_product_list['country_code'];?>" hidden><?php echo $result_product_list['country_code'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php $selectCountry="select * from country order by c_name asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>
             <div class="mobile-number">
                 <label class="form-label">Mobile Number (Username)*</label>
-                <input type="text" required name="mobile_number" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo $result_product_list['mobile_number'];?>" class="form-control" maxlength="10" readonly>
+                <input type="text" required name="mobile_number" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" maxlength="10" readonly>
             </div>
         </div>
         <!-- New add end -->
 		
 		
 			<!------<label class="form-label">Mobile Number</label>
-            <input type="text" value="<?php echo $result_product_list['mobile_number'];?>" required="" name="mobile_number" class="form-control" maxlength="10" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}">---->
+            <input type="text" value="<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" name="mobile_number" class="form-control" maxlength="10" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}">---->
 			
 			<br/>									
 			<label class="form-label">Email ID</label>
-            <input type="email" onkeypress="restrictemail(event)" value="<?php echo $result_product_list['email'];?>" required="" name="email" class="form-control">
+            <input type="email" onkeypress="restrictemail(event)" value="<?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" name="email" class="form-control">
 			<br/>	
 			
 			
 			<label class="form-label">State Name*</label>
-            <input type="text" required="" name="state_id" value="<?php echo $result_product_list['state_id'];?>" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" required="" name="state_id" value="<?php echo htmlspecialchars((string)($result_product_list['state_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>
 			
 			<label class="form-label">District Name*</label>
-            <input type="text" required="" name="district_id" value="<?php echo $result_product_list['district_id'];?>" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" required="" name="district_id" value="<?php echo htmlspecialchars((string)($result_product_list['district_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>
 			
 			<label class="form-label">Taluk Name*</label>
-            <input type="text" required="" name="taluk_id" value="<?php echo $result_product_list['taluk_id'];?>" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" required="" name="taluk_id" value="<?php echo htmlspecialchars((string)($result_product_list['taluk_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>
 			
 			<label class="form-label">Pincode*</label>
-            <input type="text" required="" name="pincode_id" value="<?php echo $result_product_list['pincode_id'];?>" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" required="" name="pincode_id" value="<?php echo htmlspecialchars((string)($result_product_list['pincode_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>
 			
 			<label class="form-label">Address*</label>
-            <textarea name="address" onkeypress="restrictSpecialChars(event)" class="form-control" required="required"><?php echo $result_product_list['address'];?></textarea>
+            <textarea name="address" onkeypress="restrictSpecialChars(event)" class="form-control" required="required"><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			<label class="form-label">GST Number*</label>
-            <input type="text" required="" name="gstin" maxlength="15" onkeypress="restrictGSTIN(event)" class="form-control" value="<?php echo $result_product_list['gstin'];?>">
+            <input type="text" required="" name="gstin" maxlength="15" onkeypress="restrictGSTIN(event)" class="form-control" value="<?php echo htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			<br/>
 			
 			<label class="form-label">Shop Onboard
@@ -211,7 +211,7 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 			<br/>
 			
 			<!-----<label class="form-label">Password</label>
-            <input type="text" value="<?php echo $result_product_list['password'];?>" required="" name="password" class="form-control">
+            <input type="text" value="<?php echo htmlspecialchars((string)($result_product_list['password']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" name="password" class="form-control">
 	<br/>---->
 	
 	<button type="submit" name="update-superstockiest" class="btn btn-primary">

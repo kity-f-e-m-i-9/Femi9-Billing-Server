@@ -146,7 +146,7 @@ $i= $start_from;
 				<?php $select_prdetails_header="select * from `products` order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 				
 												</tr>
@@ -170,8 +170,8 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultRcd_VLSS1["useridtext"];?></td>
-							<td><?=$resultRcd_VLSS1["name"];?></td>
+                            <td><?=htmlspecialchars((string)($resultRcd_VLSS1["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							
 							<!------------------------PRODUCT WISE SALES QTY------------------------------->
@@ -210,7 +210,7 @@ $i= $start_from;
 				<?php $select_prdetails_header="select * from `products` order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 												</tr>
                                             </thead>
@@ -250,8 +250,8 @@ $taluk_name_VLSS2=$taluk_id_VLSS2;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultRcd_VLSS2["useridtext"];?></td>
-							<td><?=$resultRcd_VLSS2["name"];?></td>
+                            <td><?=htmlspecialchars((string)($resultRcd_VLSS2["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS2["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS2;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 							

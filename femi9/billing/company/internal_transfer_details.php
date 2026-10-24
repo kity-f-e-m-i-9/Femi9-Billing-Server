@@ -52,7 +52,7 @@ if($result_Count_Invoice==0)
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <!-- Title -->
-    <title><?=$result_Invoice['inv_number']?> : Internal Stock Transfer Details : <?php echo $business_name;?></title>
+    <title><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?> : Internal Stock Transfer Details : <?php echo $business_name;?></title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -185,21 +185,21 @@ $i= $start_from;
 									</thead>
 									<tbody>
 									<tr>
-									<td><?php echo $result_godowndetails["gname"];?></td>
-													<td><?php echo $result_godowndetails2["gname"];?></td>
+									<td><?php echo htmlspecialchars((string)($result_godowndetails["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_godowndetails2["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 									<td>
 				   <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive">
-				   <span><?=$result_Invoice['inv_number']?></span>
+				   <span><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?></span>
 				   </a>
 				   
 				   <!--------INVOICE NUMBER EDIT FORM OPEN-------->
-				   <div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+				   <div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
 													
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
                                                                 <h5 class="modal-title" id="exampleModalLiveLabel">Update Invoice Number<br/>
-																<?php echo $result_Invoice['inv_number'];?></h5>
+																<?php echo htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></h5>
                                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
 				<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_invoice_action_itr">	
@@ -266,7 +266,7 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                   <td><?php echo $Result_productDetils["productName"];?></td>
+                   <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo inr_format($PR_qty, 1); if($PR_returned > 0){ echo '<br/><small class="text-muted">Returned: '.inr_format($PR_returned, 1).'</small>'; } ?></td>
 					<td><?php echo inr_format($PR_rate, 2);?></td>
 					<td><?php echo inr_format($SubTotal, 2);?></td>
@@ -276,17 +276,17 @@ $i= $start_from;
 																										<td>
 													    <div class="actions-group">
 													        <?php if($PR_returnable > 0){ ?>
-													        <a href="#" class="action-link" title="Return Stock" data-bs-toggle="modal" data-bs-target="#returnModal<?=$ResultRecords['id'];?>"><i class="material-icons-outlined" style="font-size:17px;color:#f59e0b;">undo</i></a>
+													        <a href="#" class="action-link" title="Return Stock" data-bs-toggle="modal" data-bs-target="#returnModal<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><i class="material-icons-outlined" style="font-size:17px;color:#f59e0b;">undo</i></a>
 													        <?php } ?>
 													        <a href="internal_transfer_delete?Roowid=<?=$RowID;?>&&tempid=<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 
 													    <?php if($PR_returnable > 0){ ?>
-													    <div class="modal fade" id="returnModal<?=$ResultRecords['id'];?>" tabindex="-1" aria-labelledby="returnModalLabel<?=$ResultRecords['id'];?>" aria-hidden="true">
+													    <div class="modal fade" id="returnModal<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="returnModalLabel<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" aria-hidden="true">
 													        <div class="modal-dialog">
 													            <div class="modal-content">
 													                <div class="modal-header">
-													                    <h5 class="modal-title" id="returnModalLabel<?=$ResultRecords['id'];?>">Return Stock<br/><?php echo $Result_productDetils["productName"];?></h5>
+													                    <h5 class="modal-title" id="returnModalLabel<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">Return Stock<br/><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></h5>
 													                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 													                </div>
 													                <form method="post" onsubmit="return confirm('Return this quantity to the source godown?');" action="internal_transfer_return_action">
@@ -294,8 +294,8 @@ $i= $start_from;
 													                    <input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>">
 													                    <div class="example-content" style="padding:20px;">
 													                        <div class="form-floating mb-3">
-													                            <input type="number" name="return_qty" placeholder="Quantity to Return" class="form-control" id="returnQty<?=$ResultRecords['id'];?>" min="1" max="<?=$PR_returnable;?>" required>
-													                            <label for="returnQty<?=$ResultRecords['id'];?>">Quantity to Return (max <?=$PR_returnable;?>)</label>
+													                            <input type="number" name="return_qty" placeholder="Quantity to Return" class="form-control" id="returnQty<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" min="1" max="<?=$PR_returnable;?>" required>
+													                            <label for="returnQty<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">Quantity to Return (max <?=$PR_returnable;?>)</label>
 													                        </div>
 													                        <button type="submit" class="btn btn-primary"><i class="material-icons">undo</i>Return</button>
 													                    </div>

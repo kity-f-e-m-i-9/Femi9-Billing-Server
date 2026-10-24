@@ -90,11 +90,11 @@ while ($item = mysqli_fetch_array($items)) {
 ?>
     <tr>
         <th><?php echo ++$rd; ?></th>
-        <td><?php echo $product['productName']; ?></td>
-        <td><?php echo $item['qty']; ?></td>
+        <td><?php echo htmlspecialchars((string)($product['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+        <td><?php echo htmlspecialchars((string)($item['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
         <td>&#8377;<?php echo inr_format($item['amount'], 2); ?></td>
         <td align="right"><?php echo inr_format($item['subtotal'], 2); ?></td>
-        <td><?php echo inr_format($item['gstamount_total'], 2); ?> (<?php echo $item['gst_percentage']; ?>%)</td>
+        <td><?php echo inr_format($item['gstamount_total'], 2); ?> (<?php echo htmlspecialchars((string)($item['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
         <td align="right"><?php echo inr_format($item['total'], 2); ?></td>
         <td>
             <a href="cnote_delete.php?returnid=<?php echo htmlspecialchars((string)($enc_returnid), ENT_QUOTES, 'UTF-8', false); ?>&rowid=<?php echo $ItemRowid; ?>&redirurl=cnote_details"

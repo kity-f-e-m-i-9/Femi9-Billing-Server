@@ -160,9 +160,9 @@ $available_stock133+=$available_stock;
 
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultrecords_VLSS1["useridtext"];?></td>
-							<td><?=$resultrecords_VLSS1["name"];?></td>
-							<td><?=$resultrecords_VLSS1["mobile_number"];?></td>
+                            <td><?=htmlspecialchars((string)($resultrecords_VLSS1["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultrecords_VLSS1["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultrecords_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS2;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 							<td align="right"><?=$available_stock?></td>

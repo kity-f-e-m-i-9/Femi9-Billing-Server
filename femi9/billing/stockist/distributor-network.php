@@ -124,8 +124,8 @@ $taluk_name12=$result_Taluks1212['taluk'];
 ?>
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list1212["name"]);?></td>
-<td><?php echo strtoupper($result_district1212['dist_name']);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list1212["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_district1212['dist_name'])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($taluk_name12);?></td>
 </tr>
 </tbody>
@@ -170,12 +170,12 @@ $pincodeshow=$result_pincodelist['pincode'];
 
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list["name"]);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($district_name);?></td>
 <td><?php echo strtoupper($taluk_name);?></td>
 <td><?php echo strtoupper($pincodeshow);?></td>
 </tr>
-<tr><td colspan="4"><a href="shop-network.php?stockistid=<?=$stockistid;?>&&distributorid=<?=$result_product_list['temp_id'];?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="4"><a href="shop-network.php?stockistid=<?=$stockistid;?>&&distributorid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" title="<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

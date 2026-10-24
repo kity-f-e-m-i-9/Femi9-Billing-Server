@@ -74,7 +74,7 @@ $title="Report - Retail";
 							   $fetch_stateList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_stateList))
 							   {?>
-						   <option value="<?php echo $result_stateList['id'];?>"><?php echo htmlspecialchars($result_stateList['st_name']);?></option>
+						   <option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars($result_stateList['st_name']);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>

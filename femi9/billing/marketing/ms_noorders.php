@@ -133,13 +133,13 @@ else
                                         <?php if(empty($se_msid)): ?>
                                         <option value="" hidden>Select</option>
                                         <?php else: ?>
-                                        <option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false)?>" hidden><?=strtoupper($result_msDetails12['ms_name'])?>, <?=$result_msDetails12['ms_mobile']?></option>
+                                        <option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false)?>" hidden><?=htmlspecialchars((string)(strtoupper($result_msDetails12['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false)?>, <?=htmlspecialchars((string)($result_msDetails12['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false)?></option>
                                         <?php endif; ?>
                                         <?php
                                         $fetch_ms = mysqli_query($db_conn, "SELECT * FROM marketing_staff ORDER BY ms_name ASC");
                                         while($r = mysqli_fetch_array($fetch_ms)):
                                         ?>
-                                        <option value="<?=$r['id']?>"><?=strtoupper($r['ms_name'])?>, <?=$r['ms_mobile']?></option>
+                                        <option value="<?=htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars((string)(strtoupper($r['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false)?>, <?=htmlspecialchars((string)($r['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false)?></option>
                                         <?php endwhile; ?>
                                     </select>
                                 </div>
@@ -189,8 +189,8 @@ else
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
                                                     <td>
-                                                        <?=$row['ms_name']?><br/>
-                                                        <?=$row['ms_mobile']?>
+                                                        <?=htmlspecialchars((string)($row['ms_name']), ENT_QUOTES, 'ISO-8859-1', false)?><br/>
+                                                        <?=htmlspecialchars((string)($row['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false)?>
                                                     </td>
                                                     <td>
                                                         <?=htmlspecialchars($row['shop_name'])?>

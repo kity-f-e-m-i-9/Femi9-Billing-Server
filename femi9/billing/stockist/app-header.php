@@ -73,9 +73,9 @@
 							<table id="logoTablevl">
 				<tr valign="top">
 				<td><img src="<?php require_once __DIR__ . '/../shared/db-helpers.php'; echo $usericon_concat;?>" class="usericon"></td>
-				<td><h1><?=strtoupper($result_superstock['name']);?></h1>
-				<h3><?=$result_superstock['useridtext'];?></h3>
-				<h2><?=$result_distname12['dist_name'];?><br/><?=ucwords($taluk_name_log);?></h2>
+				<td><h1><?=htmlspecialchars((string)(strtoupper($result_superstock['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></h1>
+				<h3><?=htmlspecialchars((string)($result_superstock['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></h3>
+				<h2><?=htmlspecialchars((string)($result_distname12['dist_name']), ENT_QUOTES, 'ISO-8859-1', false);?><br/><?=ucwords($taluk_name_log);?></h2>
 				<h3>Stockist (<?=$Login_person_CAT;?>)</h3></td>
 				</tr>
 				</table>

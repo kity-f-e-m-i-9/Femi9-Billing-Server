@@ -183,7 +183,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 										while($Result_Taluk_list12=mysqli_fetch_array($fetch_Taluk_list12))
 										{
 											?>
-											<option value="<?php echo $Result_Taluk_list12['id'];?>"><?php echo $Result_Taluk_list12['taluk'];?></option>
+											<option value="<?php echo htmlspecialchars((string)($Result_Taluk_list12['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($Result_Taluk_list12['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>
 												

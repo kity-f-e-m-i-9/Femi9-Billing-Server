@@ -7,6 +7,6 @@ $state_id=$_REQUEST['subcourseID'];
 $fetch_product_list=db_q($db_conn,$select_product_list,[$state_id]);
 while($result_PRDTlist=mysqli_fetch_array($fetch_product_list))
 { ?>
-<option value="<?php echo $result_PRDTlist['id'];?>"><?php echo $result_PRDTlist['dist_name'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_PRDTlist['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_PRDTlist['dist_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>

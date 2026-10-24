@@ -342,15 +342,15 @@ $weeks = [
     <h5 style="color: #667eea; font-weight: 700; margin: 24px 0 16px 0;">📅 Weekly Breakdown</h5>
     
     <?php foreach ($weeks as $week_num => $week): ?>
-        <div class="week-card <?php echo $week['status']; ?>">
+        <div class="week-card <?php echo htmlspecialchars((string)($week['status']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
             <div class="week-header">
                 <div class="week-title">
-                    <?php echo $week['label']; ?>
+                    <?php echo htmlspecialchars((string)($week['label']), ENT_QUOTES, 'ISO-8859-1', false); ?>
                     <small style="color: #6b7280; font-weight: 500; font-size: 14px;">
-                        (Target: <?php echo $week['target_pct']; ?>% of monthly)
+                        (Target: <?php echo htmlspecialchars((string)($week['target_pct']), ENT_QUOTES, 'ISO-8859-1', false); ?>% of monthly)
                     </small>
                 </div>
-                <span class="week-status-badge <?php echo $week['status']; ?>">
+                <span class="week-status-badge <?php echo htmlspecialchars((string)($week['status']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                     <?php echo $week['status'] === 'pass' ? '✅ PASS' : '❌ FAIL'; ?>
                 </span>
             </div>
@@ -383,7 +383,7 @@ $weeks = [
     <!-- Eligibility Status -->
     <div style="text-align: center; margin: 32px 0 24px 0;">
         <h5 style="color: #4b5563; font-weight: 600; margin-bottom: 16px;">Eligibility Status</h5>
-        <span class="eligibility-badge <?php echo $record['eligibility_status']; ?>">
+        <span class="eligibility-badge <?php echo htmlspecialchars((string)($record['eligibility_status']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
             <?php echo $eligibility; ?>
         </span>
         <?php if ($record['eligibility_status'] === 'not_eligible'): ?>

@@ -145,19 +145,19 @@ $select_cfdetails="select * from c_and_f where temp_id=?";
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					D:&nbsp;<?php echo $district_name;?></td>
-					<td><?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					
-					<?php /*?><td><b><?php echo $result_product_list["username"];?></b></td>
-					<td>&#8377; <?php echo $result_product_list["plan_amount"];?><br/>
-					<?php echo $result_product_list["valid_months"];?> Days<br/>
+					<?php /*?><td><b><?php echo htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
+					<td>&#8377; <?php echo htmlspecialchars((string)($result_product_list["plan_amount"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?php echo htmlspecialchars((string)($result_product_list["valid_months"]), ENT_QUOTES, 'ISO-8859-1', false);?> Days<br/>
 					<?php echo date("d/m/Y",strtotime($result_product_list["valid_from"]));?>
 					(to) <?php echo date("d/m/Y",strtotime($result_product_list["valid_to"]));?>
 					</td>
 					
-					<td><?php echo $result_product_list["ref_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["ref_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<?php */?>
 					
 					<td>
@@ -176,8 +176,8 @@ $select_cfdetails="select * from c_and_f where temp_id=?";
 </td>
 
 <td>
-<?=ucwords($result_cfdetails['name']);?><br/>
-<?=ucwords($result_cfdetails['mobile_number']);?>
+<?=htmlspecialchars((string)(ucwords($result_cfdetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<?=htmlspecialchars((string)(ucwords($result_cfdetails['mobile_number'])), ENT_QUOTES, 'ISO-8859-1', false);?>
 </td>
 
 

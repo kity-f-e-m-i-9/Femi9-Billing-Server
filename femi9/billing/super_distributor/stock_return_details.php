@@ -75,7 +75,7 @@ include("config.php");
 									Stock Return Details
 									<br/>
 									<div style="font-size:14px;margin-top:10px;">Invoice Number:-</div>
-									<div style="font-size:17px;"><?=$result_details123['invnumber'];?></div>
+									<div style="font-size:17px;"><?=htmlspecialchars((string)($result_details123['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
 									<br/>
 									
 									<?php 
@@ -141,8 +141,8 @@ $i= $start_from;
 	?>
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
-<td><?=$result_ProductDetails123['productName'];?></td>
-<td><?=$result_INVProductDetails['qty'];?></td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 

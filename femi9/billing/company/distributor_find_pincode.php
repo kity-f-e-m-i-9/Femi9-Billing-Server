@@ -21,6 +21,6 @@ $select_Picode_list="select * from pincode where state_id=? and dist_id=? and ta
 $fetch_Picode_list=db_q($db_conn,$select_Picode_list,[$stateid,$districtid,$talukID]);
 while($Result_Picode_list=mysqli_fetch_array($fetch_Picode_list))
 { ?>
-<option value="<?=$Result_Picode_list['id'];?>"><?=$Result_Picode_list['pincode'];?></option>
+<option value="<?=htmlspecialchars((string)($Result_Picode_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($Result_Picode_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>

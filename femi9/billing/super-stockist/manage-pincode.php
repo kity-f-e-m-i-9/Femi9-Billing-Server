@@ -141,7 +141,7 @@ $i= $start_from;
 													 <td><?php echo $state_name;?></td>
                                                     <td><?php echo $district_name;?></td>
 													<td><?php echo $talulk_name;?></td>
-													<td><?php echo $result_pincode_list['pincode'];?></td>
+													<td><?php echo htmlspecialchars((string)($result_pincode_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
 													<a href="edit-pincode.php?prid=<?php echo $row_id;?>"><img src="../../assets/images/edit-32.png"/></a>
 													</td>

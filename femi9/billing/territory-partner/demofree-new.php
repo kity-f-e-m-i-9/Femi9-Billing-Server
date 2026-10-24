@@ -261,7 +261,7 @@ $tempid = "" . $randum_number . "DFD/" . $temp_date . "/" . $temp_time . "";
                     $product_result = $fetch_product_list->get_result();
                     while ($result_product_list = $product_result->fetch_assoc()) {
                     ?>
-                    <option value="<?php echo $result_product_list['id']; ?>"><?php echo htmlspecialchars($result_product_list['productName']); ?> (Stock: <?php echo $result_product_list['closing_qty']; ?>)</option>
+                    <option value="<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars($result_product_list['productName']); ?> (Stock: <?php echo htmlspecialchars((string)($result_product_list['closing_qty']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
                     <?php }
                     $fetch_product_list->close(); ?>
                 </select>

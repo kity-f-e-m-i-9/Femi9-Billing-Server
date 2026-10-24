@@ -10,7 +10,7 @@ $stateid=$_GET['subcourseID'];
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											?>
-											<option value="<?php echo $result_product_list['id'];?>"><?php echo $result_product_list['dist_name'];?></option>
+											<option value="<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_product_list['dist_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 											</select>
 

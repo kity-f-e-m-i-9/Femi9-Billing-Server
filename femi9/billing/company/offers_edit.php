@@ -135,15 +135,15 @@ else
 <?php include("validate-scripts.php");?>
 <form method="post" enctype="multipart/form-data" id="uploadForm">
 
-<input type="hidden" name="tempid" value="<?=$result_product_list['tempid'];?>">
-<input type="hidden" name="old_img" value="<?=$result_product_list['offer_img'];?>">
+<input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($result_product_list['tempid']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="old_img" value="<?=htmlspecialchars((string)($result_product_list['offer_img']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
 											
 											<label class="form-label">User*</label>
                                <select required name="usertype" class="form-control">
-							   <option value="<?=$result_product_list['usertype'];?>" hidden><?=$result_product_list['usertype'];?></option>
+							   <option value="<?=htmlspecialchars((string)($result_product_list['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden><?=htmlspecialchars((string)($result_product_list['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <option value="super_stockiest">Super Stockist</option>
 							   <option value="stockiest">Stockist</option>
 							   <option value="distributor">Distributor</option>
@@ -151,18 +151,18 @@ else
 												<br/>
                                                 
 												<label class="form-label">Offer Title*</label>
-                               <input type="text" required name="offer_title" value="<?=$result_product_list['offer_title'];?>" onkeypress="restrictSpecialChars(event)" class="form-control">
+                               <input type="text" required name="offer_title" value="<?=htmlspecialchars((string)($result_product_list['offer_title']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)" class="form-control">
 												<br/>
 												
 												<label class="form-label">Offer Image (optional)</label>
             <input type="file" name="offer_img" class="form-control" id="fileLogo" accept=".jpg, .jpeg, .png">
 			<br/>
-			<img src="<?php echo $imgsrcname;?>" style="width:300px;border-radius:10px;" alt="<?=$result_product_list["title"];?>">
+			<img src="<?php echo $imgsrcname;?>" style="width:300px;border-radius:10px;" alt="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			<br/>
 			<br/>
 			
 			<label class="form-label">Expired Date*</label>
-                               <input type="date" id="bookingDateu" value="<?=$result_product_list['expired_date'];?>" required name="expired_date" class="form-control">
+                               <input type="date" id="bookingDateu" value="<?=htmlspecialchars((string)($result_product_list['expired_date']), ENT_QUOTES, 'ISO-8859-1', false);?>" required name="expired_date" class="form-control">
 												<br/>
 												
 												<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>

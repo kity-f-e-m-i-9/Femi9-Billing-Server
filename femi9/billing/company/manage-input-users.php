@@ -229,9 +229,9 @@ else
 													<td><?php echo $talk_name;?></td>
 													
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["input_date"]));?></td>
-                                                    <td><?php echo $Result_productDetils["productName"];?></td>
-													<td><?php echo $result_product_list["input_qty"];?></td>
-													<td><?php echo $result_product_list["remarks"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["input_qty"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["remarks"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 													<!-----													<td>
 													    <div class="actions-group">

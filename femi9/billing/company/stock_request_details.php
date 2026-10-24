@@ -144,7 +144,7 @@ $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 								
 								<?php if(isset($_REQUEST['DeleteSuccess'])){?><div class="alert alert-danger">Deleted ! one product deleted success.</div><?php }?>
 								
-								<?php if(isset($_REQUEST['stocknotupdated'])){?><div class="alert alert-danger">Please update opening stock (<?=$result_Godown['gname'];?>) !</div>
+								<?php if(isset($_REQUEST['stocknotupdated'])){?><div class="alert alert-danger">Please update opening stock (<?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?>) !</div>
 									<?php }?>
 									
 									<?php if(isset($_REQUEST['invoicealready'])){?><div class="alert alert-danger">Invoice Number already exists!</div>
@@ -280,7 +280,7 @@ $result_countadditems=mysqli_fetch_array($fetch_countadditems);
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						   <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+						   <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>
@@ -296,7 +296,7 @@ $result_countadditems=mysqli_fetch_array($fetch_countadditems);
 							   </select>
 				<?php }else{?>
 				<select required="" name="godownid" class="form-control">
-							   <option value="<?=htmlspecialchars((string)($_REQUEST['gid']), ENT_QUOTES, 'UTF-8', false);?>"><?=$result_Godown['gname'];?></option>
+							   <option value="<?=htmlspecialchars((string)($_REQUEST['gid']), ENT_QUOTES, 'UTF-8', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   </select>
 							   <?php
 							   $reqWarehouseId = null;
@@ -336,7 +336,7 @@ xmlhttp.send();}
 
 <label class="form-label"><?=$lablenamedisplay;?>*</label>
 <select name="customer_id" class="form-control">
-<option value="<?php echo $CustomerID;?>"><?php echo $result_CUSTDetails['name'];?>, <?php echo $result_CUSTDetails['mobile_number'];?></option>
+<option value="<?php echo $CustomerID;?>"><?php echo htmlspecialchars((string)($result_CUSTDetails['name']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php echo htmlspecialchars((string)($result_CUSTDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 </select><br/>
 
 
@@ -348,7 +348,7 @@ xmlhttp.send();}
 <?php if($result_invoice_details['date']==NULL){?>
 <input type="date" name="date" id="bookingDate" value="<?php echo date("Y-m-d");?>" required="" class="form-control">
 <?php }else{?>
-<input type="date" name="date" value="<?php echo $result_invoice_details['date'];?>" readonly required="" class="form-control">
+<input type="date" name="date" value="<?php echo htmlspecialchars((string)($result_invoice_details['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" readonly required="" class="form-control">
 <?php }?>
 </br>
 
@@ -385,7 +385,7 @@ $select_requestdetails12="select * from stock_request_items where reqid=? and qt
 		$result_Products_list=mysqli_fetch_array($fetch_Products_list);
 										
 											?>
-<option value="<?php echo $result_Products_list['id'];?>"><?php echo $result_Products_list['productName'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 </select>
 
@@ -463,13 +463,13 @@ $select_requestdetails12="select * from stock_request_items where reqid=? and qt
 	?>
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
-<td><?=$result_ProductDetails123['productName'];?></td>
-<td><?=$result_ProductDetails123['hsn'];?></td>
-<td><?=$result_INVProductDetails['qty'];?></td>
-<td><?=$result_INVProductDetails['amount'];?></td>
-<td><?=$result_INVProductDetails['discount_amount'];?>(<?=$result_INVProductDetails['discount_percentage'];?>%)</td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['hsn']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['discount_amount']), ENT_QUOTES, 'ISO-8859-1', false);?>(<?=htmlspecialchars((string)($result_INVProductDetails['discount_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
-<td><?=$result_INVProductDetails['gstamount_total'];?>(<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['gstamount_total']), ENT_QUOTES, 'ISO-8859-1', false);?>(<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
 <a href="user-del-inv-product-req?inv_id=<?php echo htmlspecialchars((string)($get_req_id), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?php echo $ItemRowid;?>&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
@@ -489,9 +489,9 @@ $select_requestdetails12="select * from stock_request_items where reqid=? and qt
                                                 <div class="invoice-info">
 												
 				   <div>
-				   <b>Delivery Address:-</b> <br/><?=$result_requestdetails['delivery_address'];?>
+				   <b>Delivery Address:-</b> <br/><?=htmlspecialchars((string)($result_requestdetails['delivery_address']), ENT_QUOTES, 'ISO-8859-1', false);?>
 				   </div>
-                   <div style="margin-top:10px;"><b>Invoice Number:-</b> <br/><?=$result_invoice_details['inv_number'];?></div>
+                   <div style="margin-top:10px;"><b>Invoice Number:-</b> <br/><?=htmlspecialchars((string)($result_invoice_details['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
                    <div style="margin-top:10px;">
 				   <b>Invoice Date:-</b> <br/><?php if($result_invoice_details['date']!=NULL){ echo date("d/M/Y",strtotime($result_invoice_details['date'])); }?>
 				   </div>
@@ -594,7 +594,7 @@ $usertype=$result_invoice_details['to_user_type'];
 		 </p><br/>
 		 
 		 <p class="bold">Courier Charges <span>
-		 <input type="number" value="<?=$result_InvoieDetails['courier_charges'];?>" name="courier_charges" min="0" required="" onKeyup="totalamount()" id="cucharge" class="form-control">
+		 <input type="number" value="<?=htmlspecialchars((string)($result_InvoieDetails['courier_charges']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="courier_charges" min="0" required="" onKeyup="totalamount()" id="cucharge" class="form-control">
 		 </span>
 		 </p><br/>
 		 

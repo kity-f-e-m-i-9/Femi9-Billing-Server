@@ -118,7 +118,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['id'];?>" <?=($get_godown_id==$result_Godown['id'])?'selected':'';?>><?=$result_Godown['gname'];?></option>
+						  <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" <?=($get_godown_id==$result_Godown['id'])?'selected':'';?>><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   </div>
@@ -587,15 +587,15 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<tr>
 							<td style="text-align:left;"><?=htmlspecialchars($hr['hsn']);?></td>
 							<td style="text-align:left;"><?=$hr['rate'] > 0 ? $hr['rate'].'%' : 'Nil';?></td>
-							<td style="text-align:left;"><?=$hr['uqc'];?></td>
-							<td><?=$hr['b2b']['qty'];?></td><td><?=inr_format($hr['b2b']['taxable'], 2);?></td><td><?=inr_format($hr['b2b']['cgst'], 2);?></td><td><?=inr_format($hr['b2b']['sgst'], 2);?></td><td><?=inr_format($hr['b2b']['igst'], 2);?></td>
-							<td><?=$hr['b2c']['qty'];?></td><td><?=inr_format($hr['b2c']['taxable'], 2);?></td><td><?=inr_format($hr['b2c']['cgst'], 2);?></td><td><?=inr_format($hr['b2c']['sgst'], 2);?></td><td><?=inr_format($hr['b2c']['igst'], 2);?></td>
+							<td style="text-align:left;"><?=htmlspecialchars((string)($hr['uqc']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($hr['b2b']['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td><td><?=inr_format($hr['b2b']['taxable'], 2);?></td><td><?=inr_format($hr['b2b']['cgst'], 2);?></td><td><?=inr_format($hr['b2b']['sgst'], 2);?></td><td><?=inr_format($hr['b2b']['igst'], 2);?></td>
+							<td><?=htmlspecialchars((string)($hr['b2c']['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td><td><?=inr_format($hr['b2c']['taxable'], 2);?></td><td><?=inr_format($hr['b2c']['cgst'], 2);?></td><td><?=inr_format($hr['b2c']['sgst'], 2);?></td><td><?=inr_format($hr['b2c']['igst'], 2);?></td>
 							</tr>
 							<?php }?>
 							<tr>
 							<td colspan="3" style="text-align:right;"><b>Total</b></td>
-							<td><b><?=$hsn_split_tot['b2b']['qty'];?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['igst'], 2);?></b></td>
-							<td><b><?=$hsn_split_tot['b2c']['qty'];?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['igst'], 2);?></b></td>
+							<td><b><?=htmlspecialchars((string)($hsn_split_tot['b2b']['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['igst'], 2);?></b></td>
+							<td><b><?=htmlspecialchars((string)($hsn_split_tot['b2c']['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['igst'], 2);?></b></td>
 							</tr>
 							</table>
 

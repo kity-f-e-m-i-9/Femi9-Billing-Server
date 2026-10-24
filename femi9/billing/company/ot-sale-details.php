@@ -40,7 +40,7 @@ if($result_Count_Invoice==0)
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <!-- Title -->
-    <title><?=$result_Invoice['inv_number']?> : OT Sales Details : <?php echo $business_name;?></title>
+    <title><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?> : OT Sales Details : <?php echo $business_name;?></title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -163,8 +163,8 @@ $i= $start_from;
 									</thead>
 									<tbody>
 									<tr>
-									<td><?php echo $result_godowndetails["gname"];?></td>
-									<td><?=$result_Invoice['inv_number']?></td>
+									<td><?php echo htmlspecialchars((string)($result_godowndetails["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+									<td><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?></td>
 									<td><?=date("d/m/Y",strtotime($result_Invoice_Details['date']));?></td>
 									</tr>
 									</tbody>
@@ -210,7 +210,7 @@ $i= $start_from;
                                             
                                                 <tr id="viewRow_<?=$RowID;?>">
                                                     <td><?php echo ++$i; ?></td>
-                    <td><?php echo $Result_productDetils["productName"];?></td>
+                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo inr_format($PR_qty, 1);?></td>
 					<td><?php echo inr_format($PR_rate, 2);?></td>
 					<td><?php echo inr_format($SubTotal, 2);?></td>
@@ -226,7 +226,7 @@ $i= $start_from;
                                                 </tr>
                                                 <tr id="editRow_<?=$RowID;?>" style="display:none;background:#f8fafc;">
                                                     <td></td>
-                                                    <td><?php echo $Result_productDetils["productName"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <td><input type="number" min="1" step="1" class="form-control form-control-sm" id="editQty_<?=$RowID;?>" value="<?=$PR_qty;?>" style="width:90px;"></td>
                                                     <td><input type="number" min="0" step="any" class="form-control form-control-sm" id="editRate_<?=$RowID;?>" value="<?=$PR_rate;?>" style="width:100px;"></td>
                                                     <td colspan="2"><input type="number" min="0" step="any" class="form-control form-control-sm" id="editDisc_<?=$RowID;?>" value="<?=$PR_discount;?>" placeholder="Discount(Rs.)" style="width:110px;"></td>

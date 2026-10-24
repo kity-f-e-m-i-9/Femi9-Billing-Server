@@ -148,20 +148,20 @@ $fetch_ssDetails=mysqli_fetch_array($exe_ssDetails);
 					
                     <td>
 					<?php if($result_product_list["user_icon"]!="Nil"){ ?>
-					<a href="../stockist/<?=$result_product_list["user_icon"];?>" target="_blank">
-					<img src="../stockist/<?=$result_product_list["user_icon"];?>" style="width:90px;border-radius:10px;">
+					<a href="../stockist/<?=htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" target="_blank">
+					<img src="../stockist/<?=htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:90px;border-radius:10px;">
 					</a>
 					<?php }else{ ?>
 					<img src="../../assets/images/149071.png" style="width:90px;border-radius:10px;">
 					<?php }?>
 					</td>
  
-					<td><?=$result_product_list["useridtext"];?></td>
-					<td><?php echo ucwords($result_product_list["name"]);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo $district_name;?></td>
 					<td><?php echo $taluk_name;?></td>
 					<td><?=$pincodeshow;?></td>
-					<td><?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td>
 			<?php 

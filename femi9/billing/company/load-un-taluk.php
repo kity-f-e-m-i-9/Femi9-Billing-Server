@@ -10,6 +10,6 @@ $district_id=$_REQUEST['techID'];
 			while($result_product_list244=mysqli_fetch_array($fetch_product_list244))
 										{
 											?>
-<option value="<?=$result_product_list244['id'];?>"><?=$result_product_list244['taluk'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list244['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_product_list244['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 								<?php }?>
 											</select>

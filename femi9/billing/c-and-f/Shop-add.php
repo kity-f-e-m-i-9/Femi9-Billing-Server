@@ -106,7 +106,7 @@ $tempID="".$randum_number."FSHP".$temp_date."".$temp_time."";?>
 	<?php $selectShopCat="select * from shop_category order by id asc";
 	$fetchShopCat=mysqli_query($db_conn,$selectShopCat);
 	while($resultShopCat=mysqli_fetch_array($fetchShopCat)){?>
-	<option value="<?php echo $resultShopCat['id'];?>"><?php echo $resultShopCat['catlable'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($resultShopCat['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($resultShopCat['catlable']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	<?php  } ?>
 	</select>
 	<br/>
@@ -215,7 +215,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 							   $fetch_staeList=db_q($db_conn,$select_stateList,[$valuess]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   ?>
-	<option value="<?php echo $valuess;?>"><?php echo $result_stateList['st_name'];?></option>
+	<option value="<?php echo $valuess;?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 			<br/>
@@ -269,7 +269,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 <?php $selectCountry="select * from country order by id asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>

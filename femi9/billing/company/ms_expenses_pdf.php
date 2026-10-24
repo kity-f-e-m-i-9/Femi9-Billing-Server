@@ -31,7 +31,7 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
     <h1>Datewise Expenses Report</h1>
 	<h3><?=date("d/m/Y",strtotime($from_date));?> (to) <?=date("d/m/Y",strtotime($to_date));?></h3>
 	<?php if($se_msid!=NULL){?>
-	<h3>Staff : <?=$result_msDetails12['ms_name'];?>, <?=$result_msDetails12['ms_mobile'];?></h3>
+	<h3>Staff : <?=htmlspecialchars((string)($result_msDetails12['ms_name']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetails12['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></h3>
 	<?php }?>
 	
                                          <table class="table">
@@ -83,13 +83,13 @@ $result_msDetails=mysqli_fetch_array($fetch_msDetails);
 ?>                                            
                     <tr>
                     <td><?php echo ++$i; ?></td>
-                    <td><?=$result_msDetails['ms_name'];?><br/>
-					<?=$result_msDetails['ms_mobile'];?>
+                    <td><?=htmlspecialchars((string)($result_msDetails['ms_name']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?=htmlspecialchars((string)($result_msDetails['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</td>
 					<td>
 					<b><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
 					<td><?=inr_format($exp_amount, 2);?></td>
-					<td><?=ucwords($result_product_list["remarks"]);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list["remarks"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 													
 	

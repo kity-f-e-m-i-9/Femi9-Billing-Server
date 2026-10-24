@@ -75,7 +75,7 @@ include("config.php");
 									Stock Return Details
 									<br/>
 									<div style="font-size:14px;margin-top:10px;">Invoice Number:-</div>
-									<div style="font-size:17px;"><?=$result_details123['invnumber'];?></div>
+									<div style="font-size:17px;"><?=htmlspecialchars((string)($result_details123['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
 									<br/>
 									
 									<?php 
@@ -150,21 +150,21 @@ $i= $start_from;
 	
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
-<td><input type="text" readonly class="form-control" style="width:50px;" name="rtnid[]" value="<?=$result_INVProductDetails['id'];?>"></td>
-<td><?=$result_ProductDetails123['productName'];?></td>
-<td><?=$result_INVProductDetails['qty'];?></td>
+<td><input type="text" readonly class="form-control" style="width:50px;" name="rtnid[]" value="<?=htmlspecialchars((string)($result_INVProductDetails['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"></td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
 <td>
 <?php if($result_details123['status']=="pending"){?>
-<input type="number" name="damaged_qty[]" class="form-control" style="width:100px;" min="0" max="<?=$result_INVProductDetails['qty'];?>" required="">
+<input type="number" name="damaged_qty[]" class="form-control" style="width:100px;" min="0" max="<?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="">
 <?php }else{?>
-<span style="color:red;"><?=$result_INVProductDetails['damaged_qty'];?></span>
+<span style="color:red;"><?=htmlspecialchars((string)($result_INVProductDetails['damaged_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 <?php }?>
 </td>
 
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
-<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 
                                                         </tr>

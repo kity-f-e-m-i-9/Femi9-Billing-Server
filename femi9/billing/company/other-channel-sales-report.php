@@ -105,7 +105,7 @@ error_reporting(0);
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-						   <option value="<?=$result_stateList['cat'];?>"><?=$result_stateList['cat'];?></option>
+						   <option value="<?=htmlspecialchars((string)($result_stateList['cat']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_stateList['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   
@@ -164,7 +164,7 @@ error_reporting(0);
 											?>
                                                 <tr>
                                            <td><?=$i=$i+1; ?></td>
-										<td><?=$result_pincode_list['cat'];?></td>
+										<td><?=htmlspecialchars((string)($result_pincode_list['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						<td><?=date("d/m/Y",strtotime($result_pincode_list['date']));?></td>
                                                     <td><?=$productname;?></td>
 													<td style="text-align:right;"><?=$slsqty;?></td>

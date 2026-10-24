@@ -203,8 +203,8 @@ $select_Customers="select * from company_godown where id=?";
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?=$result_Customers["gname"];?></td>
-													<td><?=$resultrecords['cat'];?></td>
+                                                    <td><?=htmlspecialchars((string)($result_Customers["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?=htmlspecialchars((string)($resultrecords['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?=date("d/M/Y",strtotime($resultrecords["date"]));?></td>
 													
 				<?php

@@ -82,17 +82,17 @@ $select_product_list="select * from customers where id=?";
                                     <div class="card-body">
                     <?php include("validate-scripts.php");?>                   
 <form action="customer-action.php" method="post" enctype="multipart/form-data">
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                
 											   <label class="form-label">Customer Name*</label>
-<input type="text" value="<?=$result_product_list['name'];?>" onkeypress="restrictSpecialChars(event)" required="" name="name" class="form-control" >
+<input type="text" value="<?=htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)" required="" name="name" class="form-control" >
 <br/>
 												
 <!----<label class="form-label">Mobile Number*</label>
-<input type="text" required="" name="mobile" value="<?=$result_product_list['mobile'];?>" class="form-control">--->
+<input type="text" required="" name="mobile" value="<?=htmlspecialchars((string)($result_product_list['mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">--->
 
 
 <!-- New add -->
@@ -113,17 +113,17 @@ $select_product_list="select * from customers where id=?";
             <div class="country-code">
                 <label class="form-label">Country Code *</label>
 <select id='country_code' name='country_code' required="" class="form-control">
-<option value="<?php echo $result_product_list['country_code'];?>" hidden><?php echo $result_product_list['country_code'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php $selectCountry="select * from country order by c_name asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>
             <div class="mobile-number">
                 <label class="form-label">Mobile Number (Username)*</label>
-                <input type="text" required name="mobile" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo $result_product_list['mobile'];?>" class="form-control" maxlength="10">
+                <input type="text" required name="mobile" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo htmlspecialchars((string)($result_product_list['mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" maxlength="10">
             </div>
         </div>
         <!-- New add end -->
@@ -131,21 +131,21 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 </br>
 
 <label class="form-label">Email ID</label>
-<input type="email" onkeypress="restrictemail(event)" name="email" value="<?=$result_product_list['email'];?>" class="form-control" placeholder="optional">
+<input type="email" onkeypress="restrictemail(event)" name="email" value="<?=htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" placeholder="optional">
 </br>
 
 <label class="form-label">GSTIN</label>
-<input type="text" name="gstin" onkeypress="restrictGSTIN(event)" class="form-control" value="<?=$result_product_list['gstin'];?>" placeholder="optional">
+<input type="text" name="gstin" onkeypress="restrictGSTIN(event)" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?>" placeholder="optional">
 </br>
 
 <label class="form-label">Address</label>
-<textarea name="address" class="form-control" onkeypress="restrictSpecialChars(event)" placeholder="optional"><?=$result_product_list['address'];?></textarea>
+<textarea name="address" class="form-control" onkeypress="restrictSpecialChars(event)" placeholder="optional"><?=htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 </br>
 
-<input type="hidden" name="marketing_date" value="<?=$result_product_list['marketing_date'];?>">
+<input type="hidden" name="marketing_date" value="<?=htmlspecialchars((string)($result_product_list['marketing_date']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 <!----
 <label class="form-label">Marketting Date*</label>
-<input type="date" name="marketing_date" value="<?=$result_product_list['marketing_date'];?>" required="" class="form-control">
+<input type="date" name="marketing_date" value="<?=htmlspecialchars((string)($result_product_list['marketing_date']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" class="form-control">
 </br>----->
 												
 												<button type="submit" name="update-customer" class="btn btn-primary">Update</button>

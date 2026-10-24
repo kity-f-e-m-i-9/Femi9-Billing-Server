@@ -66,7 +66,7 @@ else{
 }
 			
 			?>
-		 <option value="<?=$result_userdetails['temp_id'];?>"><?=ucwords($result_userdetails['name']);?>, <?=$result_userdetails['mobile_number'];?>, DT:<?=ucwords($district_name);?>, TLK:<?=ucwords($talk_name)?></option>
+		 <option value="<?=htmlspecialchars((string)($result_userdetails['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(ucwords($result_userdetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_userdetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>, DT:<?=ucwords($district_name);?>, TLK:<?=ucwords($talk_name)?></option>
 		<?php }?>
 							   </select>
 

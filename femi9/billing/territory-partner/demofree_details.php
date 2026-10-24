@@ -54,7 +54,7 @@ $stmt_rec->close();
 
 <?php if (isset($_SESSION['sucMessage'])): ?>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>Swal.fire({ icon:'success', title:'Success', text:'<?php echo $_SESSION['sucMessage']; ?>', confirmButtonText:'OK' });</script>
+    <script>Swal.fire({ icon:'success', title:'Success', text:'<?php echo htmlspecialchars((string)($_SESSION['sucMessage']), ENT_QUOTES, 'ISO-8859-1', false); ?>', confirmButtonText:'OK' });</script>
 <?php unset($_SESSION['sucMessage']); endif; ?>
 
                     <div class="row">

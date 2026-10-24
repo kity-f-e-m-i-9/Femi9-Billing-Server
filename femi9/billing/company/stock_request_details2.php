@@ -105,11 +105,11 @@ include("config.php");
 										?>
         <input type="hidden" name="prid[]" value="<?=$prid; ?>"/>
         <tr>
-        <td><a href="#" class="popup-trigger"><?php echo $result_pramount["productName"];?></a></td>
-		<td><?=$result_productCurrentst['qty'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['amount'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['subtotal'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['gsttotal'];?> (<?=$result_productCurrentst['gst'];?>%)</td>
+        <td><a href="#" class="popup-trigger"><?php echo htmlspecialchars((string)($result_pramount["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
+		<td><?=htmlspecialchars((string)($result_productCurrentst['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['subtotal']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['gsttotal']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?=htmlspecialchars((string)($result_productCurrentst['gst']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 		<td align="right" style="display:none;"><?=inr_format($result_productCurrentst['total'], 2);?></td></td>
 		
 		

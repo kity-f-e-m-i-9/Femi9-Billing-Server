@@ -279,7 +279,7 @@ $i = 0;
                                             <label class="form-label">Company Profile</label>
                                             <select name="company_id" class="form-control">
                                                 <?php foreach ($company_profiles as $cp): ?>
-                                                <option value="<?php echo $cp['id']; ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
+                                                <option value="<?php echo htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($cp['gname']); ?>
                                                 </option>
                                                 <?php endforeach; ?>
@@ -313,7 +313,7 @@ $i = 0;
                                             <label class="form-label">Company Profile</label>
                                             <select name="company_id" class="form-control" required>
                                                 <?php foreach ($company_profiles as $cp): ?>
-                                                <option value="<?php echo $cp['id']; ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
+                                                <option value="<?php echo htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($cp['gname']); ?>
                                                 </option>
                                                 <?php endforeach; ?>
@@ -348,7 +348,7 @@ $i = 0;
                                             <label class="form-label">Company Profile</label>
                                             <select name="company_id" class="form-control" required>
                                                 <?php foreach ($company_profiles as $cp): ?>
-                                                <option value="<?php echo $cp['id']; ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
+                                                <option value="<?php echo htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($cp['gname']); ?>
                                                 </option>
                                                 <?php endforeach; ?>
@@ -384,7 +384,7 @@ $i = 0;
                                             <label class="form-label">Company Profile</label>
                                             <select name="company_id" class="form-control" required>
                                                 <?php foreach ($company_profiles as $cp): ?>
-                                                <option value="<?php echo $cp['id']; ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
+                                                <option value="<?php echo htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($cp['gname']); ?>
                                                 </option>
                                                 <?php endforeach; ?>
@@ -455,7 +455,7 @@ $i = 0;
                                                     <td><?php echo htmlspecialchars($b['uploaded_by']); ?></td>
                                                     <td><?php echo date('d/m/Y h:i A', strtotime($b['created_at'])); ?></td>
                                                     <td>
-                                                        <button type="button" class="btn btn-sm btn-danger btn-action delete-batch-btn" data-id="<?php echo $b['id']; ?>" title="Delete Upload">
+                                                        <button type="button" class="btn btn-sm btn-danger btn-action delete-batch-btn" data-id="<?php echo htmlspecialchars((string)($b['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" title="Delete Upload">
                                                             <i class="material-icons" style="font-size:16px;vertical-align:middle;">delete</i>
                                                         </button>
                                                     </td>
@@ -497,7 +497,7 @@ $i = 0;
                                                     <td class="text-right"><?php echo inr_format($row['credit'], 2); ?></td>
                                                     <td class="text-right font-weight-bold"><?php echo inr_format($row['net_amount'], 2); ?></td>
                                                     <td>
-                                                        <button type="button" class="btn btn-sm btn-danger btn-action delete-item-btn" data-id="<?php echo $row['id']; ?>" title="Delete Entry">
+                                                        <button type="button" class="btn btn-sm btn-danger btn-action delete-item-btn" data-id="<?php echo htmlspecialchars((string)($row['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" title="Delete Entry">
                                                             <i class="material-icons" style="font-size:16px;vertical-align:middle;">delete</i>
                                                         </button>
                                                     </td>
@@ -595,7 +595,7 @@ $(document).ready(function () {
         btn.prop('disabled', true);
         $.post('expense-tracker-delete-action.php', {
             id: id,
-            csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+            csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
         })
         .done(function (response) {
             if (response.success) {
@@ -620,7 +620,7 @@ $(document).ready(function () {
         btn.prop('disabled', true);
         $.post('expense-tracker-delete-item-action.php', {
             item_id: id,
-            csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+            csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
         })
         .done(function (response) {
             if (response.success) {

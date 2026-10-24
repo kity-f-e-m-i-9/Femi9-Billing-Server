@@ -54,7 +54,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 					<td>
 					<b><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
 					<td><?=inr_format($exp_amount, 2);?></td>
-					<td><?=ucwords($result_product_list["remarks"]);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list["remarks"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 	
                                                 </tr>
                                            

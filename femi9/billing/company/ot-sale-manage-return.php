@@ -115,7 +115,7 @@ error_reporting(0);
 													<th>Product Name</th>
 													
                                     				<?php foreach($products as $product) { ?>
-                                    				<th><?= $product['productName']; ?></th>
+                                    				<th><?= htmlspecialchars((string)($product['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></th>
                                     				<?php } ?>
 				
                                                 </tr>
@@ -156,11 +156,11 @@ error_reporting(0);
                                             <tr>
                                                 <td><?php echo ++$i; ?></td>
 												<td><?php echo date("d/m/Y", strtotime($return_date)); ?></td>
-												<td><?php echo $result_productDetails["order_number"]; ?></td>
-												<td><?php echo $result_productDetails["customer_name"]; ?></td>
-												<td><?php echo $result_productDetails["customer_mobile"]; ?></td>
-												<td><?php echo $result_productDetails["customer_address"]; ?></td>
-												<td><?php echo $resultProducts["productName"]; ?></td>
+												<td><?php echo htmlspecialchars((string)($result_productDetails["order_number"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+												<td><?php echo htmlspecialchars((string)($result_productDetails["customer_name"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+												<td><?php echo htmlspecialchars((string)($result_productDetails["customer_mobile"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+												<td><?php echo htmlspecialchars((string)($result_productDetails["customer_address"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+												<td><?php echo htmlspecialchars((string)($resultProducts["productName"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
 												
 												<?php 
                                                 // Product wise quantities

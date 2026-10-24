@@ -111,7 +111,7 @@ $invnumber=$result_district12['inv_number'];
 					<td><?php echo date("d/m/Y",strtotime($result_tslsDetails["date"]));?></td>
 					<td><?=$invnumber;?></td>
 					<td><?=$productName;?></td>
-					<td><?=$result_tslsDetails['qty'];?></td>
+					<td><?=htmlspecialchars((string)($result_tslsDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
                                                 </tr>
                                            

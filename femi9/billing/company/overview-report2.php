@@ -193,7 +193,7 @@ $i= $start_from;
 				<?php $select_prdetails_header="select * from `products` order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 				
 												</tr>
@@ -264,7 +264,7 @@ $entered_by_mobile=$result_UserDetails['contact'];
 													(<?=ucwords($entered_usertype);?>)<br/>
 													<?=$entered_by_mobile;?>
 													</td>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo ucwords($Cust_Name);?><br/><b>M:</b>&nbsp;<?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													

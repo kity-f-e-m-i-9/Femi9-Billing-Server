@@ -193,7 +193,7 @@ $i = 0;
                                             <select name="tp_id" class="form-control">
                                                 <option value="">All Payers</option>
                                                 <?php foreach ($tps as $tp): ?>
-                                                <option value="<?php echo $tp['id']; ?>" <?php echo $filter_tp == $tp['id'] ? 'selected' : ''; ?>>
+                                                <option value="<?php echo htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo $filter_tp == $tp['id'] ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars($tp['tp_id']); ?>)
                                                 </option>
                                                 <?php endforeach; ?>

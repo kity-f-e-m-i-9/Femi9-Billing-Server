@@ -10,6 +10,6 @@ $fetch_product_list=db_q($db_conn,$select_product_list,[$state_id]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {
 ?>
-<option value="<?=$result_product_list['id'];?>"><?=$result_product_list['dist_name'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_product_list['dist_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>

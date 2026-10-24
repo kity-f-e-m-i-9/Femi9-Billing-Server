@@ -781,7 +781,7 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
                                                             <i class="material-icons">print</i>
                                                             Print
                                                         </a>
-                                                        <a href="add-receipt.php?invid=<?= $invoice['inv_id']; ?>&invuser=<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>"
+                                                        <a href="add-receipt.php?invid=<?= htmlspecialchars((string)($invoice['inv_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>&invuser=<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>"
                                                            class="btn-action btn-receipt">
                                                             <i class="material-icons">receipt_long</i>
                                                             Receipt

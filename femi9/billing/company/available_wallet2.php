@@ -140,8 +140,8 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 													<?php if($result_wallet_History1234['commission_type']=="Refferral"){?>
                                                         <div class="todo-item-content">
                                                             <span class="todo-item-title">&#8377;<?=inr_format($result_wallet_History1234['commission_amount'], 2);?><span class="badge badge-style-light rounded-pill badge-success">Credit</span></span>
-															<span>Refferral (<?=$result_wallet_History1234['commission_percentage'];?>%)</span><br/>
-															<span class="todo-item-subtitle"><?=$result_wallet_History1234['month'];?>, <?=$result_wallet_History1234['year'];?></span>
+															<span>Refferral (<?=htmlspecialchars((string)($result_wallet_History1234['commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</span><br/>
+															<span class="todo-item-subtitle"><?=htmlspecialchars((string)($result_wallet_History1234['month']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_wallet_History1234['year']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                                         </div>
 													<?php 
 													} 
@@ -151,9 +151,9 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 														?>
 													<div class="todo-item-content">
                                                             <span class="todo-item-title">&#8377;<?=inr_format($result_wallet_History1234['commission_amount'], 2);?><span class="badge badge-style-light rounded-pill badge-success">Credit</span></span>
-                                                            <span>Cashback (<?=$result_wallet_History1234['commission_percentage'];?>%)</span><br/>
-															<span><?=$result_wallet_History1234['remarks'];?></span>
-															<span class="todo-item-subtitle"><?=$result_wallet_History1234['month'];?>, <?=$result_wallet_History1234['year'];?></span>
+                                                            <span>Cashback (<?=htmlspecialchars((string)($result_wallet_History1234['commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</span><br/>
+															<span><?=htmlspecialchars((string)($result_wallet_History1234['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
+															<span class="todo-item-subtitle"><?=htmlspecialchars((string)($result_wallet_History1234['month']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_wallet_History1234['year']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                                         </div>
 													<?php }?>
                                                         <!-----<div class="todo-item-actions">

@@ -107,14 +107,14 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 <?php if($se_msid==NULL){?>
 <option value="" hidden="">Select</option>
 <?php }else{?>
-<option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=strtoupper($result_msDetails12['ms_name']);?>, <?=$result_msDetails12['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=htmlspecialchars((string)(strtoupper($result_msDetails12['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetails12['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 <?php $select_msDetailsOPT="select * from marketing_staff order by ms_name asc";
 $fetch_msDetailsOPT=mysqli_query($db_conn,$select_msDetailsOPT);
 while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 {
 ?>
-<option value="<?=$result_msDetailsOPT['id'];?>"><?=strtoupper($result_msDetailsOPT['ms_name']);?>, <?=$result_msDetailsOPT['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($result_msDetailsOPT['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_msDetailsOPT['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetailsOPT['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 </div>
@@ -196,13 +196,13 @@ $result_msDetails=mysqli_fetch_array($fetch_msDetails);
 ?>                                            
                     <tr>
                     <td><?php echo ++$i; ?></td>
-                    <td><?=$result_msDetails['ms_name'];?><br/>
-					<?=$result_msDetails['ms_mobile'];?>
+                    <td><?=htmlspecialchars((string)($result_msDetails['ms_name']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?=htmlspecialchars((string)($result_msDetails['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</td>
 					<td>
 					<b><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
 					<td><?=inr_format($exp_amount, 2);?></td>
-					<td><?=ucwords($result_product_list["remarks"]);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list["remarks"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td>
 					<a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>">View&nbsp;Photo</a>

@@ -15,7 +15,7 @@ $select_Picode_list="select * from pincode where state_id=? and dist_id=? and ta
 		while($Result_Pincodevl_list=mysqli_fetch_array($Fetch_Pincodevl_list))
 									{
 								?>
-<option value="<?=$Result_Pincodevl_list['id'];?>"><?=$Result_Pincodevl_list['pincode'];?></option>
+<option value="<?=htmlspecialchars((string)($Result_Pincodevl_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($Result_Pincodevl_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 						<?php }?>
 						</select>
 						
@@ -31,7 +31,7 @@ $select_Picode_list="select * from pincode where state_id=? and dist_id=? and ta
 		while($Result_Pincodevl_list=mysqli_fetch_array($Fetch_Pincodevl_list))
 									{
 								?>
-<option value="<?=$Result_Pincodevl_list['id'];?>"><?=$Result_Pincodevl_list['pincode'];?></option>
+<option value="<?=htmlspecialchars((string)($Result_Pincodevl_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($Result_Pincodevl_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 						<?php }?>
 						</select>
 						

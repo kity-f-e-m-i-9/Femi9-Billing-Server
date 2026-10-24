@@ -26,7 +26,7 @@ $select_product_list="select * from shop where id=?";
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : Shop</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : Shop</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -100,16 +100,16 @@ $select_product_list="select * from shop where id=?";
 							 
 							 <table style="width:100%;">
 							 <tr><td>Shop Name</td></tr>
-							 <tr><td style="font-size:18px;"><b><?=$result_product_list['name'];?></td></tr>
+							 <tr><td style="font-size:18px;"><b><?=htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td></tr>
 							 
 							 <tr><td>Shop Address</td></tr>
-							 <tr><td style="font-size:18px;"><b><?=strtoupper($result_product_list['address']);?></td></tr>
+							 <tr><td style="font-size:18px;"><b><?=htmlspecialchars((string)(strtoupper($result_product_list['address'])), ENT_QUOTES, 'ISO-8859-1', false);?></td></tr>
 							 
 							 <tr><td>Email ID</td></tr>
-							 <tr><td style="font-size:18px;"><b><?=$result_product_list['email'];?></td></tr>
+							 <tr><td style="font-size:18px;"><b><?=htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?></td></tr>
 							 
 							 <tr><td>GSTIN</td></tr>
-							 <tr><td style="font-size:18px;"><b><?=$result_product_list['gstin'];?>
+							 <tr><td style="font-size:18px;"><b><?=htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?>
 							 <hr/>
 							 </td></tr>
 							 
@@ -159,7 +159,7 @@ $select_product_list="select * from shop where id=?";
 											$crntstock123+=$crntstock;
 										?>
 							  <tr>
-							 <td><?=$resultprdetails['productName'];?></td>
+							 <td><?=htmlspecialchars((string)($resultprdetails['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							 <td align="right"><?=$crntstock;?></td>
 							 </tr>
 										<?php }?>
@@ -196,9 +196,9 @@ $select_product_list="select * from shop where id=?";
 											$crntstock123cst+=$crntstock12;
 										?>
 							  <tr>
-							 <td><?=$resultprdetails12['brand'];?></td>
+							 <td><?=htmlspecialchars((string)($resultprdetails12['brand']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							 <td align="right"><?=$crntstock12;?></td>
-							 <td><?=$result_productCurrentst12['cst_panty'];?></td>
+							 <td><?=htmlspecialchars((string)($result_productCurrentst12['cst_panty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							 </tr>
 										<?php }?>
 										<tr>

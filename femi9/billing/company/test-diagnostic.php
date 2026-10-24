@@ -55,7 +55,7 @@ while ($row = mysqli_fetch_assoc($result_companies)) {
     echo "<tr>";
     echo "<td><strong>" . htmlspecialchars($row['to_user_id']) . "</strong></td>";
     echo "<td>" . htmlspecialchars($row['to_user_type']) . "</td>";
-    echo "<td>" . $row['payment_count'] . "</td>";
+    echo "<td>" . htmlspecialchars((string)($row['payment_count']), ENT_QUOTES, 'ISO-8859-1', false) . "</td>";
     echo "<td>₹" . inr_format($row['total_balance'], 2) . "</td>";
     echo "</tr>";
 }

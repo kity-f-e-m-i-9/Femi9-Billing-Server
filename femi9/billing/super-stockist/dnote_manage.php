@@ -152,9 +152,9 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?=$result_CompanyProfile['gname'];?></td>
-													<td><?=$result_CompanyProfile['gstin'];?></td>
-                                                    <td><?php echo $result_userinvoice["inv_number"];?></td>
+													<td><?=htmlspecialchars((string)($result_CompanyProfile['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?=htmlspecialchars((string)($result_CompanyProfile['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_userinvoice["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 
 				<td><?php echo inr_format($result_product_list["total"], 2);?></td>

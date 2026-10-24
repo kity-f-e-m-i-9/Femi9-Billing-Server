@@ -153,7 +153,7 @@ $get_to_date   = $_REQUEST['todate'] ?? date('Y-m-d');
                                                     if ($total_sales == 0 && $total_return == 0) continue;
                                                 ?>
                                                 <tr>
-                                                    <td><?php echo $Result_productDetils["productName"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <td align="right"><?php echo $total_sales;?></td>
                                                     <td align="right"><?php echo $total_return;?></td>
                                                 </tr>

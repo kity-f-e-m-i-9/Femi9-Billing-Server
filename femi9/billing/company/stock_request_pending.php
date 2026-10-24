@@ -162,7 +162,7 @@ $i= $start_from;
                                                     <td><?php echo ++$i; ?></td>
                                  <td><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
 								 
-								<td><b><?=strtoupper($result_distlist['name']);?></b>
+								<td><b><?=htmlspecialchars((string)(strtoupper($result_distlist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b>
 								<br/>
 								<span style="font-size:13px;color:#999;"><?=strtoupper($fromusertype);?></span>
 								</td>	
@@ -170,7 +170,7 @@ $i= $start_from;
 <td><?=$totalqty;?></td>	
 <td><?=$totalAmount;?></td>		
 <td><?=inr_format($trns_AMount, 2);?></td>			
-<!----<td><?=$result_product_list['reqtype'];?></td>---->							
+<!----<td><?=htmlspecialchars((string)($result_product_list['reqtype']), ENT_QUOTES, 'ISO-8859-1', false);?></td>---->							
 													
 													<td>
 			<a href="stock_request_details?reqid=<?=base64_encode($reqid);?>&&gid=<?=$godownid;?>" data-bs-toggle="tooltip" data-bs-placement="top" title="View Details">

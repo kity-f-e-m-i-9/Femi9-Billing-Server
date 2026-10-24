@@ -90,7 +90,7 @@ $message_title="Country";
 <?php include("validate-scripts.php");?>
 	
 <form action="product-action" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!')">
-			<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+			<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <div class="example-container">
                                             <div class="example-content">
                                    

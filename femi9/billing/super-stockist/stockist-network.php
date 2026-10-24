@@ -116,8 +116,8 @@ $result_district12=mysqli_fetch_array($fetch_district12);
 ?>
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list12["name"]);?></td>
-<td><?php echo strtoupper($result_district12['dist_name']);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list12["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_district12['dist_name'])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 </tr>
 </tbody>
 <?php }?>		
@@ -156,11 +156,11 @@ $taluk_name=$result_Taluks12['taluk'];
 
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list["name"]);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($district_name);?></td>
 <td><?php echo strtoupper($taluk_name);?></td>
 </tr>
-<tr><td colspan="3"><a href="distributor-network.php?superid=<?=$superstockistid;?>&&stockistid=<?=$result_product_list['temp_id'];?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="3"><a href="distributor-network.php?superid=<?=$superstockistid;?>&&stockistid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" title="<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

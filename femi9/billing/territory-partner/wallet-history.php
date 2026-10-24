@@ -59,12 +59,12 @@ $tempID = GeraHash_tp(20) . date("dmyHis");
 
         <?php if (isset($_SESSION['successMessage'])): ?>
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script>Swal.fire({icon:'success',title:'Success',text:'<?php echo $_SESSION['successMessage']; ?>',confirmButtonText:'OK'});</script>
+        <script>Swal.fire({icon:'success',title:'Success',text:'<?php echo htmlspecialchars((string)($_SESSION['successMessage']), ENT_QUOTES, 'ISO-8859-1', false); ?>',confirmButtonText:'OK'});</script>
         <?php unset($_SESSION['successMessage']); endif; ?>
 
         <?php if (isset($_SESSION['errorMessage'])): ?>
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script>Swal.fire({icon:'error',title:'Error',text:'<?php echo $_SESSION['errorMessage']; ?>',confirmButtonText:'OK'});</script>
+        <script>Swal.fire({icon:'error',title:'Error',text:'<?php echo htmlspecialchars((string)($_SESSION['errorMessage']), ENT_QUOTES, 'ISO-8859-1', false); ?>',confirmButtonText:'OK'});</script>
         <?php unset($_SESSION['errorMessage']); endif; ?>
 
         <div class="app-content">

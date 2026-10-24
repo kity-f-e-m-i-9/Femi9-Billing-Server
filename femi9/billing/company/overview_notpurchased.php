@@ -170,9 +170,9 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultusers["useridtext"];?></td>
-							<td><?=$resultusers["name"];?></td>
-							<td><?=$resultusers["mobile_number"];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 				
                                         </tr>
@@ -230,9 +230,9 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultusers["useridtext"];?></td>
-							<td><?=$resultusers["name"];?></td>
-							<td><?=$resultusers["mobile_number"];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				
@@ -367,9 +367,9 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultusers["useridtext"];?></td>
-							<td><?=$resultusers["name"];?></td>
-							<td><?=$resultusers["mobile_number"];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				

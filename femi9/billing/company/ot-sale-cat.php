@@ -108,7 +108,7 @@ if(isset($_REQUEST['actiondelete']))
 								<?php if(isset($_REQUEST['deletedDone'])){?><div class="alert alert-warning">Deleted ! one <?php echo $message_title;?> deleted success.</div><?php }?>
    <?php include("validate-scripts.php");?>                                     
 <form action="product-action" method="post" enctype="multipart/form-data">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <div class="example-container">
                                             <div class="example-content">
                                                 <label for="exampleInputEmail1" class="form-label">Category Name</label>
@@ -156,10 +156,10 @@ if(isset($_REQUEST['actiondelete']))
                                            
                                                 <tr>
                                                     <td><?=$i; ?></td>
-                                                    <td><?php echo $result_product_list["cat"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["cat"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 																										<td>
 													    <div class="actions-group">
-													        <a href="ot-sale-cat?prid=<?=$result_product_list['id'];?>&&actiondelete" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <a href="ot-sale-cat?prid=<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>&&actiondelete" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 													</td>
                                                 </tr>

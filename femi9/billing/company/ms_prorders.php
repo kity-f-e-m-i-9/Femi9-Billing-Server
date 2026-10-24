@@ -337,14 +337,14 @@ if (!empty($se_msids)) {
 <?php if($se_msid==NULL){?>
 <option value="" hidden="">Select</option>
 <?php }else{?>
-<option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=strtoupper($result_msDetails12['ms_name']);?>, <?=$result_msDetails12['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=htmlspecialchars((string)(strtoupper($result_msDetails12['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetails12['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 <?php $select_msDetailsOPT="select * from marketing_staff order by ms_name asc";
 $fetch_msDetailsOPT=mysqli_query($db_conn,$select_msDetailsOPT);
 while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 {
 ?>
-<option value="<?=$result_msDetailsOPT['id'];?>"><?=strtoupper($result_msDetailsOPT['ms_name']);?>, <?=$result_msDetailsOPT['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($result_msDetailsOPT['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_msDetailsOPT['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetailsOPT['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 </div>

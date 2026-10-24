@@ -323,7 +323,7 @@ if(isset($_REQUEST['add-users']))
 				$fetch_sls_category=mysqli_query($db_conn,$ot_sls_category);
 				while($result_sls_category=mysqli_fetch_array($fetch_sls_category)){?>
 				<label>
-				<input type="checkbox" name="ot_catID[]" value="<?=$result_sls_category['id'];?>">&nbsp;<?=$result_sls_category['cat'];?></label> <?php echo "<br/>";?>
+				<input type="checkbox" name="ot_catID[]" value="<?=htmlspecialchars((string)($result_sls_category['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">&nbsp;<?=htmlspecialchars((string)($result_sls_category['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></label> <?php echo "<br/>";?>
 				<?php }?>
 
 <br/>

@@ -96,7 +96,7 @@ $result_Records=mysqli_fetch_array($fetch_Records);
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 								
 <label class="form-label">Date*</label>
-<input type="date" required="" id="bookingDate" name="date" value="<?=$result_Records['date'];?>" class="form-control">
+<input type="date" required="" id="bookingDate" name="date" value="<?=htmlspecialchars((string)($result_Records['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 <br/>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -109,13 +109,13 @@ flatpickr("#bookingDate", {
           
 <label class="form-label">Category*</label>
 <select required="" name="catname" class="form-control">
-<option value="<?=$result_Records['cat'];?>" hidden=""><?=$result_Records['cat'];?></option>
+<option value="<?=htmlspecialchars((string)($result_Records['cat']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?=htmlspecialchars((string)($result_Records['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php $select_product_list="select * from ot_cat";
 	$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 	while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											?>
-<option value="<?=$result_product_list['cat'];?>"><?=$result_product_list['cat'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list['cat']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_product_list['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 </select>
 <br/>			
@@ -141,7 +141,7 @@ $STName=$result_stateList12['st_name'];
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-						   <option value="<?php echo $result_stateList['id'];?>"><?php echo $result_stateList['st_name'];?></option>
+						   <option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>	
@@ -149,32 +149,32 @@ $STName=$result_stateList12['st_name'];
 							   <input type="hidden" name="admin_state_id" value="<?=$Config_Admin_State;?>">
 
 <label class="form-label">Invoice Number*</label>
-            <input type="text" required="" name="inv_number" value="<?=$result_Invoice['inv_number'];?>" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" required="" name="inv_number" value="<?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>	
 
 
  <label class="form-label">Customer Name*</label>
-            <input type="text" required="" name="customer_name" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=$result_Records['customer_name'];?>">
+            <input type="text" required="" name="customer_name" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=htmlspecialchars((string)($result_Records['customer_name']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			<br/>
 			
 			<label class="form-label">Customer Mobile</label>
-           <input type="text" name="customer_mobile" onChange="showMobileNumber(this.value)" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" class="form-control" maxlength="10" value="<?=$result_Records['customer_mobile'];?>">
+           <input type="text" name="customer_mobile" onChange="showMobileNumber(this.value)" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" class="form-control" maxlength="10" value="<?=htmlspecialchars((string)($result_Records['customer_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			<br/>
 			
 			<label class="form-label">Billing Address*</label>
-            <textarea name="customer_address" class="form-control" onkeypress="restrictSpecialChars(event)" required="required"><?=$result_Records['customer_address'];?></textarea>
+            <textarea name="customer_address" class="form-control" onkeypress="restrictSpecialChars(event)" required="required"><?=htmlspecialchars((string)($result_Records['customer_address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			<label class="form-label">Shipping Address*</label>
-            <textarea name="shipping_address" class="form-control" onkeypress="restrictSpecialChars(event)" required="required"><?=$result_Records['shipping_address'];?></textarea>
+            <textarea name="shipping_address" class="form-control" onkeypress="restrictSpecialChars(event)" required="required"><?=htmlspecialchars((string)($result_Records['shipping_address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			<label class="form-label">GST Number</label>
-            <input type="text" name="gst_number" value="<?=$result_Records['gst_number'];?>" maxlength="15" onkeypress="restrictGSTIN(event)" class="form-control">	
+            <input type="text" name="gst_number" value="<?=htmlspecialchars((string)($result_Records['gst_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" maxlength="15" onkeypress="restrictGSTIN(event)" class="form-control">	
 			<br/>
 			
 			<label class="form-label">Order Number</label>
-            <input type="text" name="order_number" value="<?=$result_Records['order_number'];?>" onkeypress="restrictSpecialChars(event)" class="form-control">
+            <input type="text" name="order_number" value="<?=htmlspecialchars((string)($result_Records['order_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)" class="form-control">
 			<br/>
 			
 			<?php 
@@ -192,7 +192,7 @@ $STName=$result_stateList12['st_name'];
 			<br/>
 			
 			<label class="form-label">Courier Charges(Rs.) *</label>
-            <input type="number" min="0" name="courier_charges" value="<?=$result_Invoice['courier_charges'];?>" required="" class="form-control">
+            <input type="number" min="0" name="courier_charges" value="<?=htmlspecialchars((string)($result_Invoice['courier_charges']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" class="form-control">
 			<br/>
 
 			<h5>Product Details</h5>
@@ -215,11 +215,11 @@ $STName=$result_stateList12['st_name'];
 			        <tr>
 			            <td>
 			                <?=htmlspecialchars($itemRow['productName']);?>
-			                <input type="hidden" name="item_id[]" value="<?=$itemRow['id'];?>">
+			                <input type="hidden" name="item_id[]" value="<?=htmlspecialchars((string)($itemRow['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			            </td>
-			            <td><input type="number" min="1" step="1" name="item_qty[]" value="<?=$itemRow['qty'];?>" class="form-control" required></td>
-			            <td><input type="number" min="0" step="any" name="item_price[]" value="<?=$itemRow['price'];?>" class="form-control" required></td>
-			            <td><input type="number" min="0" step="any" name="item_discount[]" value="<?=$itemRow['discount'];?>" class="form-control"></td>
+			            <td><input type="number" min="1" step="1" name="item_qty[]" value="<?=htmlspecialchars((string)($itemRow['qty']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" required></td>
+			            <td><input type="number" min="0" step="any" name="item_price[]" value="<?=htmlspecialchars((string)($itemRow['price']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" required></td>
+			            <td><input type="number" min="0" step="any" name="item_discount[]" value="<?=htmlspecialchars((string)($itemRow['discount']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control"></td>
 			        </tr>
 			    <?php } ?>
 			    </tbody>

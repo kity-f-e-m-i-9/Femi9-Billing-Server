@@ -195,9 +195,9 @@ if($Total_SS_outstanding>0){
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultRcd_VLSS1["useridtext"];?></td>
-							<td><?=$resultRcd_VLSS1["name"];?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+                            <td><?=htmlspecialchars((string)($resultRcd_VLSS1["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							
 			<?php if($usertype_stock=="stockiest" || $usertype_stock=="distributor" || $usertype_stock=="shop"){?>

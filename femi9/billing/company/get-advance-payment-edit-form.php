@@ -77,8 +77,8 @@ $stmt->close();
     }
 </style>
 
-<input type="hidden" name="payment_id" value="<?php echo $payment['id']; ?>">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="payment_id" value="<?php echo htmlspecialchars((string)($payment['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 
 <!-- Info Note -->
 <div class="info-note">
@@ -110,7 +110,7 @@ $stmt->close();
         <div class="col-md-6 mb-3">
             <label class="form-label">Amount (₹) <span class="text-danger">*</span></label>
             <input type="number" name="amount" class="form-control" 
-                   value="<?php echo $payment['amount']; ?>" 
+                   value="<?php echo htmlspecialchars((string)($payment['amount']), ENT_QUOTES, 'ISO-8859-1', false); ?>" 
                    min="1" step="0.01" required>
             <small class="text-muted">Current: ₹<?php echo inr_format($payment['amount'], 2); ?></small>
         </div>
@@ -119,7 +119,7 @@ $stmt->close();
         <div class="col-md-6 mb-3">
             <label class="form-label">Payment Date <span class="text-danger">*</span></label>
             <input type="date" name="payment_date" class="form-control" 
-                   value="<?php echo $payment['payment_date']; ?>" 
+                   value="<?php echo htmlspecialchars((string)($payment['payment_date']), ENT_QUOTES, 'ISO-8859-1', false); ?>" 
                    max="<?php echo date('Y-m-d'); ?>" required>
         </div>
 
@@ -160,7 +160,7 @@ $stmt->close();
         <div class="col-md-6 mb-3">
             <label class="form-label">Adjusted Amount (₹)</label>
             <input type="number" name="adjusted_amount" class="form-control" 
-                   value="<?php echo $payment['adjusted_amount']; ?>" 
+                   value="<?php echo htmlspecialchars((string)($payment['adjusted_amount']), ENT_QUOTES, 'ISO-8859-1', false); ?>" 
                    min="0" step="0.01">
             <small class="text-muted">Amount already used/adjusted</small>
         </div>
@@ -169,7 +169,7 @@ $stmt->close();
         <div class="col-md-6 mb-3">
             <label class="form-label">Balance Amount (₹)</label>
             <input type="number" name="balance_amount" class="form-control" 
-                   value="<?php echo $payment['balance_amount']; ?>" 
+                   value="<?php echo htmlspecialchars((string)($payment['balance_amount']), ENT_QUOTES, 'ISO-8859-1', false); ?>" 
                    min="0" step="0.01" readonly>
             <small class="text-muted">Will be auto-calculated: Amount - Adjusted</small>
         </div>

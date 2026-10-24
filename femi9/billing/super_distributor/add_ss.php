@@ -116,7 +116,7 @@ $tempID="".$randum_number."FSHP".$temp_date."".$temp_time."";?>
 	<?php $selectShopCat="select * from shop_category order by id asc";
 	$fetchShopCat=mysqli_query($db_conn,$selectShopCat);
 	while($resultShopCat=mysqli_fetch_array($fetchShopCat)){?>
-	<option value="<?php echo $resultShopCat['id'];?>"><?php echo $resultShopCat['catlable'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($resultShopCat['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($resultShopCat['catlable']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	<?php  } ?>
 	</select>
 	<br/>
@@ -240,19 +240,19 @@ function getXMLHTTP() { //fuction to return the xml http object
 	
 	<label for="exampleInputEmail1" class="form-label">State Name*</label>
     <select name="state_id" class="form-control" required="">
-	<option value="<?php echo $result_LoGuserDtails['state_id'];?>" hidden=""><?php echo $result_LoGuserDtails['state_id'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_LoGuserDtails['state_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?php echo htmlspecialchars((string)($result_LoGuserDtails['state_id']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	</select>
 	<br/>
 	
 	<label for="exampleInputEmail1" class="form-label">District Name</label>
     <select name="dist_id" class="form-control">
-	<option value="<?php echo $result_LoGuserDtails['district_id'];?>" hidden=""><?php echo $result_LoGuserDtails['district_id'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_LoGuserDtails['district_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?php echo htmlspecialchars((string)($result_LoGuserDtails['district_id']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	</select>
 	<br/>
 	
 	<label for="exampleInputEmail1" class="form-label">Taluk Name</label>
     <select name="taluk_id" class="form-control">
-	<option value="<?php echo $result_LoGuserDtails['taluk_id'];?>" hidden=""><?php echo $result_LoGuserDtails['taluk_id'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_LoGuserDtails['taluk_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?php echo htmlspecialchars((string)($result_LoGuserDtails['taluk_id']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	</select>
 	<br/>
 	
@@ -282,7 +282,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 <?php $selectCountry="select * from country order by id asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>

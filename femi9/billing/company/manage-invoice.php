@@ -135,7 +135,7 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $Cust_Name;?>, <?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
@@ -147,7 +147,7 @@ $i= $start_from;
 													
 													<td style="white-space:nowrap;">
 <div style="display:flex;align-items:center;gap:8px;">
-<a href="invoice-print?invoiceid=<?php echo $result_product_list["inv_id"];?>" title="Print">
+<a href="invoice-print?invoiceid=<?php echo htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" title="Print">
 <img src="../../assets/images/print32.png"/></a>
 </div>
 													</td>

@@ -2860,8 +2860,8 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                 <select name="tp_id" class="form-control form-control-sm" style="width:200px;" onchange="this.form.submit()">
                                     <option value="0" <?php echo $filter_tp==0?'selected':''; ?>>All Territory Partners</option>
                                     <?php foreach ($all_tps as $tp): ?>
-                                    <option value="<?php echo $tp['id']; ?>" <?php echo $filter_tp==$tp['id']?'selected':''; ?>>
-                                        <?php echo htmlspecialchars($tp['name']); ?> (<?php echo $tp['tp_id']; ?>)
+                                    <option value="<?php echo htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo $filter_tp==$tp['id']?'selected':''; ?>>
+                                        <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars((string)($tp['tp_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>)
                                     </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -3243,10 +3243,10 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                             $pct = round($rev/$gr*100,1);
                                             echo "<tr>
                                                 <td><b>".htmlspecialchars($r['lbl']??$g)."</b></td>
-                                                <td>₹".inr_format($r['c']??0, 2)." <small>({$r['cc']})</small></td>
-                                                <td>₹".inr_format($r['s']??0, 2)." <small>({$r['sc']})</small></td>
-                                                <td>₹".inr_format($r['t']??0, 2)." <small>({$r['tc']})</small></td>
-                                                <td>₹".inr_format($r['o']??0, 2)." <small>({$r['oc']})</small></td>
+                                                <td>₹".inr_format($r['c']??0, 2)." <small>(".htmlspecialchars((string)($r['cc']), ENT_QUOTES, 'ISO-8859-1', false).")</small></td>
+                                                <td>₹".inr_format($r['s']??0, 2)." <small>(".htmlspecialchars((string)($r['sc']), ENT_QUOTES, 'ISO-8859-1', false).")</small></td>
+                                                <td>₹".inr_format($r['t']??0, 2)." <small>(".htmlspecialchars((string)($r['tc']), ENT_QUOTES, 'ISO-8859-1', false).")</small></td>
+                                                <td>₹".inr_format($r['o']??0, 2)." <small>(".htmlspecialchars((string)($r['oc']), ENT_QUOTES, 'ISO-8859-1', false).")</small></td>
                                                 <td><b>₹".inr_format($rev, 2)."</b></td>
                                                 <td>{$cnt}</td>
                                                 <td><div style='display:flex;align-items:center;gap:6px'>
@@ -3326,7 +3326,7 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                                     <?php echo $gap>0?'−':'+'?>₹<?php echo inr_format(abs($gap), 0); ?>
                                                 </td>
                                                 <td><b>₹<?php echo inr_format($tp['diaper_revenue'], 2); ?></b></td>
-                                                <td><span style="font-size:13px;font-weight:700;color:#7c3aed;"><?php echo $tp['diaper_pct']; ?>%</span></td>
+                                                <td><span style="font-size:13px;font-weight:700;color:#7c3aed;"><?php echo htmlspecialchars((string)($tp['diaper_pct']), ENT_QUOTES, 'ISO-8859-1', false); ?>%</span></td>
                                             </tr>
                                         <?php endforeach; ?>
                                         </tbody>
@@ -3411,7 +3411,7 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                             <?php $pct = round($s['revenue']/$ts_rev*100,1); ?>
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($s['state_name']); ?></b></td>
-                                                <td><?php echo $s['cnt']; ?></td>
+                                                <td><?php echo htmlspecialchars((string)($s['cnt']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                 <td><span class="br">₹<?php echo inr_format($s['revenue'], 2); ?></span></td>
                                                 <td><div style="display:flex;align-items:center;gap:5px">
                                                     <div class="pbar" style="width:70px"><div class="pf" style="width:<?php echo $pct; ?>%;background:#1baf7a"></div></div>
@@ -3441,7 +3441,7 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                             <?php $pct = round($d['revenue']/$td_rev*100,1); ?>
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($d['district_name']); ?></b></td>
-                                                <td><?php echo $d['cnt']; ?></td>
+                                                <td><?php echo htmlspecialchars((string)($d['cnt']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                 <td><span class="br">₹<?php echo inr_format($d['revenue'], 2); ?></span></td>
                                                 <td><div style="display:flex;align-items:center;gap:5px">
                                                     <div class="pbar" style="width:70px"><div class="pf" style="width:<?php echo $pct; ?>%;background:#4a3aa7"></div></div>
@@ -3475,7 +3475,7 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                             <tr>
                                                 <td><?php echo $i+1; ?></td>
                                                 <td><b><?php echo htmlspecialchars($s['shop_name']); ?></b></td>
-                                                <td><?php echo $s['inv_cnt']; ?></td>
+                                                <td><?php echo htmlspecialchars((string)($s['inv_cnt']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                 <td>
                                                     <span class="br">₹<?php echo inr_format($s['revenue'], 2); ?></span>
                                                     <div class="pbar mt-1"><div class="pf" style="width:<?php echo round($s['revenue']/$msr*100,1); ?>%;background:#eb6834"></div></div>
@@ -3505,7 +3505,7 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                                 <td><?php echo $i+1; ?></td>
                                                 <td><b><?php echo htmlspecialchars($c['dist_name']); ?></b></td>
                                                 <td><?php echo htmlspecialchars($c['dist_type']); ?></td>
-                                                <td><?php echo $c['inv_cnt']; ?></td>
+                                                <td><?php echo htmlspecialchars((string)($c['inv_cnt']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                 <td>
                                                     <span class="br">₹<?php echo inr_format($c['revenue'], 2); ?></span>
                                                     <div class="pbar mt-1"><div class="pf" style="width:<?php echo round($c['revenue']/$mcr*100,1); ?>%;background:#2a78d6"></div></div>
@@ -3547,7 +3547,7 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                                     <?php if ($m['growth']===null): ?>
                                                         <span style="color:#888">—</span>
                                                     <?php elseif ($m['growth']>=0): ?>
-                                                        <span class="gp">▲ <?php echo $m['growth']; ?>%</span>
+                                                        <span class="gp">▲ <?php echo htmlspecialchars((string)($m['growth']), ENT_QUOTES, 'ISO-8859-1', false); ?>%</span>
                                                     <?php else: ?>
                                                         <span class="gn">▼ <?php echo abs($m['growth']); ?>%</span>
                                                     <?php endif; ?>
@@ -3596,7 +3596,7 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                                     <?php elseif ($r['status']==='pending'): ?>
                                                     <span class="sbadge bpa">Pending</span>
                                                     <?php else: ?>
-                                                    <span class="sbadge bp"><?php echo ucfirst($r['status']); ?></span>
+                                                    <span class="sbadge bp"><?php echo htmlspecialchars((string)(ucfirst($r['status'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td><?php if ($r['detail_url']): ?><a href="<?php echo htmlspecialchars($r['detail_url']); ?>">View</a><?php else: ?>—<?php endif; ?></td>

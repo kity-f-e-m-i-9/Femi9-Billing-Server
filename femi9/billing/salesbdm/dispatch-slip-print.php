@@ -198,7 +198,7 @@ $branch_parts = array_filter([
 <tr valign="top">
 <td>
 <?php if (!empty($result_Godown['logo'])): ?>
-<img src="<?= $result_Godown['logo']; ?>" style="width:150px;margin-right:5px;"/>
+<img src="<?= htmlspecialchars((string)($result_Godown['logo']), ENT_QUOTES, 'ISO-8859-1', false); ?>" style="width:150px;margin-right:5px;"/>
 <?php endif; ?>
 </td>
 <td valign="top">
@@ -274,8 +274,8 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign"><?= inr_format($qty, 0); ?> Packs</td>
 <td id="rightlaign"><?= inr_format($rate, 2); ?></td>
 <td id="rightlaign"><?= ($item['packs_per_carton'] !== null && $item['packs_per_carton'] !== '') ? inr_format((int)$item['packs_per_carton'], 0) : '—'; ?></td>
-<td id="rightlaign"><?= $item['carton_display']; ?></td>
-<td id="rightlaign"><?= $item['box_display']; ?></td>
+<td id="rightlaign"><?= htmlspecialchars((string)($item['carton_display']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+<td id="rightlaign"><?= htmlspecialchars((string)($item['box_display']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
 </tr>
 <?php endforeach; ?>
 

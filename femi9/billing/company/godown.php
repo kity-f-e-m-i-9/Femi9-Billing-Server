@@ -341,10 +341,10 @@ function validateFileLogo(file) {
                                            
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["gname"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 	<td>
 	<?php if($result_product_list["logo"]!=NULL){?>
-	<img src="<?php echo $result_product_list["logo"];?>" style="width:50px;border:1px solid #999;"/>
+	<img src="<?php echo htmlspecialchars((string)($result_product_list["logo"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:50px;border:1px solid #999;"/>
 	<?php }else{ echo "---";}?>
 	</td>
 																										<td>

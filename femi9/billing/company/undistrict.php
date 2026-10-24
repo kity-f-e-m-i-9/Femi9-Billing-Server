@@ -118,7 +118,7 @@ $i= $start_from;
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
 									<td><?php echo $state_name;?></td>
-                                      <td><?php echo $result_product_list["dist_name"];?></td>
+                                      <td><?php echo htmlspecialchars((string)($result_product_list["dist_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 <td>
 <?php if($result_product_list["assigned_SSID"]=="Nil"){?>

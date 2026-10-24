@@ -136,24 +136,24 @@ $shopcat_name=$result_shopcatt['catlable'];
 					</td>
 					<td><?=$shopcat_name;?></td>
 					<td>
-					<b><?php echo strtoupper($result_product_list["name"]);?></td>
-					<td><?=ucwords($result_product_list["state_name"]);?></td>
-					<td><?=ucwords($result_product_list["district_name"]);?></td>
-					<td><?=$result_product_list["taluk_name"];?></td>
-					<td><?=$result_product_list["pincode"];?></td>
+					<b><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list["state_name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list["district_name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["taluk_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["pincode"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
-					<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
-					<td><?php if($result_product_list["landline"]!=NULL){ echo $result_product_list["landline"]; }else{ echo "---";}?></td>
-					<td><?php if($result_product_list["email"]!=NULL){ echo $result_product_list["email"]; }else{ echo "---";}?></td>
-					<td><?php echo $result_product_list["address"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php if($result_product_list["landline"]!=NULL){ echo htmlspecialchars((string)($result_product_list["landline"]), ENT_QUOTES, 'ISO-8859-1', false); }else{ echo "---";}?></td>
+					<td><?php if($result_product_list["email"]!=NULL){ echo htmlspecialchars((string)($result_product_list["email"]), ENT_QUOTES, 'ISO-8859-1', false); }else{ echo "---";}?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["address"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
 					<?php if($result_product_list["latitude"]!=NULL && $result_product_list["longitude"]!=NULL){?>
-					<a href="https://www.google.com/maps?q=<?php echo $result_product_list["latitude"];?>,<?php echo $result_product_list["longitude"];?>" target="_blank" title="<?php echo htmlspecialchars($result_product_list["google_location"]);?>">View</a>
+					<a href="https://www.google.com/maps?q=<?php echo htmlspecialchars((string)($result_product_list["latitude"]), ENT_QUOTES, 'ISO-8859-1', false);?>,<?php echo htmlspecialchars((string)($result_product_list["longitude"]), ENT_QUOTES, 'ISO-8859-1', false);?>" target="_blank" title="<?php echo htmlspecialchars($result_product_list["google_location"]);?>">View</a>
 					<?php }elseif($result_product_list["google_location"]!=NULL){?>
 					<a href="https://www.google.com/maps/search/?api=1&query=<?php echo urlencode($result_product_list["google_location"]);?>" target="_blank" title="<?php echo htmlspecialchars($result_product_list["google_location"]);?>">View</a>
 					<?php }else { echo "---";}?>
 					</td>
-					<td><?php if($result_product_list["gstin"]!=NULL){ echo $result_product_list["gstin"]; }else{ echo "---";}?></td>
+					<td><?php if($result_product_list["gstin"]!=NULL){ echo htmlspecialchars((string)($result_product_list["gstin"]), ENT_QUOTES, 'ISO-8859-1', false); }else{ echo "---";}?></td>
 					
 			
 													

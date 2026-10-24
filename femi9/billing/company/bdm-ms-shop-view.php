@@ -237,10 +237,10 @@ $kpiNo = array_sum(array_column($rawStats, 'no'));
                                             <td><b><?=htmlspecialchars($row['ms_name'])?></b></td>
                                             <td><span class="tp-tag" style="color:<?=$color?>;background:<?=$color?>1a;"><?=htmlspecialchars($row['level_name'] ?: '-')?></span></td>
                                             <td><?=htmlspecialchars($row['districts'])?></td>
-                                            <td><span class="stat-pill"><?=$sum['shops']?></span></td>
-                                            <td><span class="stat-pill"><?=$sum['oldshops']?></span></td>
-                                            <td><span class="stat-pill"><?=$sum['got']?></span></td>
-                                            <td><span class="stat-pill"><?=$sum['no']?></span></td>
+                                            <td><span class="stat-pill"><?=htmlspecialchars((string)($sum['shops']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                            <td><span class="stat-pill"><?=htmlspecialchars((string)($sum['oldshops']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                            <td><span class="stat-pill"><?=htmlspecialchars((string)($sum['got']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                            <td><span class="stat-pill"><?=htmlspecialchars((string)($sum['no']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
                                             <td><span class="stat-pill"><?=($sum['got'] + $sum['no'])?></span></td>
                                             <td>
                                                 <div class="actions-cell">

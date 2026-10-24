@@ -148,8 +148,8 @@ $displaytousersdetai=" ".$lblevl2."<br/>".strtoupper($tousername)."
 						<td><?=date("d/m/Y",strtotime($result_pincode_list['date']));?></td>
                                       
 									  <td>
-									  <?=$lblevl;?><br/><?=strtoupper($result_fromusers['name'])?>
-									  <br/><b>Mob:</b> <?=$result_fromusers['mobile_number'];?>
+									  <?=$lblevl;?><br/><?=htmlspecialchars((string)(strtoupper($result_fromusers['name'])), ENT_QUOTES, 'ISO-8859-1', false)?>
+									  <br/><b>Mob:</b> <?=htmlspecialchars((string)($result_fromusers['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>
 									  </td>
 													
 									  <td>

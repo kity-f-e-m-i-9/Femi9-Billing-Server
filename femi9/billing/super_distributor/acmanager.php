@@ -91,20 +91,20 @@ $select_stae="select * from state where id='".db_esc($state_id)."'";
 	$result_stae=mysqli_fetch_array($fetch_stae);
 ?>
 		   
-<h1><?=ucwords($result_StockDetails['name']);?></h1>
-<h2><?=ucwords($result_stae['st_name'])?></h2>
+<h1><?=htmlspecialchars((string)(ucwords($result_StockDetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></h1>
+<h2><?=htmlspecialchars((string)(ucwords($result_stae['st_name'])), ENT_QUOTES, 'ISO-8859-1', false)?></h2>
 <h4>C&F</h4>
 <table style="font-size:15px;font-weight:bold;">
 <tr>
 <td><i class="material-icons-two-tone">call</i></td>
-<td><a href="tel://<?=$result_StockDetails['mobile_number'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['mobile_number'];?></a></td>
+<td><a href="tel://<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php if($result_StockDetails['email']!=NULL){?>
 <tr>
 <td><i class="material-icons-two-tone">email</i></td>
-<td><a href="mailto:<?=$result_StockDetails['email'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['email'];?></a></td>
+<td><a href="mailto:<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php }?>
 </table>							
@@ -136,20 +136,20 @@ $taluk_name=$result_taluklist['taluk'];
 										 
 										 ?>
 										 
-										 <h1><?=ucwords($result_StockDetails['name']);?></h1>
-<h2><?=ucwords($result_stae['st_name'])?></h2>
+										 <h1><?=htmlspecialchars((string)(ucwords($result_StockDetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></h1>
+<h2><?=htmlspecialchars((string)(ucwords($result_stae['st_name'])), ENT_QUOTES, 'ISO-8859-1', false)?></h2>
 <h4>Super Stockist</h4>
 <table style="font-size:15px;font-weight:bold;">
 <tr>
 <td><i class="material-icons-two-tone">call</i></td>
-<td><a href="tel://<?=$result_StockDetails['mobile_number'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['mobile_number'];?></a></td>
+<td><a href="tel://<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php if($result_StockDetails['email']!=NULL){?>
 <tr>
 <td><i class="material-icons-two-tone">email</i></td>
-<td><a href="mailto:<?=$result_StockDetails['email'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['email'];?></a></td>
+<td><a href="mailto:<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php }?>
 </table>
@@ -180,20 +180,20 @@ $select_taluklist="select * from taluk where id='$taluk_id'";
 	$result_taluklist=mysqli_fetch_array($fetch_taluklist);
 $taluk_name=$result_taluklist['taluk'];
 ?>
-<h1><?=ucwords($result_StockDetails['name']);?></h1>
+<h1><?=htmlspecialchars((string)(ucwords($result_StockDetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></h1>
 <h2><?=ucwords($district_name)?>, <?=ucwords($taluk_name);?></h2>
 <h4>Stockist</h4>
 <table style="font-size:15px;font-weight:bold;">
 <tr>
 <td><i class="material-icons-two-tone">call</i></td>
-<td><a href="tel://<?=$result_StockDetails['mobile_number'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['mobile_number'];?></a></td>
+<td><a href="tel://<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php if($result_StockDetails['email']!=NULL){?>
 <tr>
 <td><i class="material-icons-two-tone">email</i></td>
-<td><a href="mailto:<?=$result_StockDetails['email'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['email'];?></a></td>
+<td><a href="mailto:<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php }?>
 </table>							
@@ -252,7 +252,7 @@ $taluk_name=$result_taluklist['taluk'];
 		<h1>Company</h1>
 		<?php }  else{?>
 		
-		<h1><?=ucwords($result_count_REFERID['name']);?>
+		<h1><?=htmlspecialchars((string)(ucwords($result_count_REFERID['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>
 							<span style="font-size:12px;">(<?=$labelname;?>)</span>
 							</h1>
 <h2>
@@ -261,15 +261,15 @@ $taluk_name=$result_taluklist['taluk'];
 <table style="font-size:15px;font-weight:bold;">
 <tr>
 <td><i class="material-icons-two-tone">call</i></td>
-<td><a href="tel://<?=$result_count_REFERID['mobile_number'];?>" style="text-decoration:none;color:blue;">
-<?=$result_count_REFERID['mobile_number'];?></a></td>
+<td><a href="tel://<?=htmlspecialchars((string)($result_count_REFERID['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_count_REFERID['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 
 <?php if($result_count_REFERID['email']!=NULL){?>
 <tr>
 <td><i class="material-icons-two-tone">email</i></td>
-<td><a href="mailto:<?=$result_count_REFERID['email'];?>" style="text-decoration:none;color:blue;">
-<?=$result_count_REFERID['email'];?></a></td>
+<td><a href="mailto:<?=htmlspecialchars((string)($result_count_REFERID['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_count_REFERID['email']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php }?>
 

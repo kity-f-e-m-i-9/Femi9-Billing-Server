@@ -12,7 +12,7 @@ $distid=$_REQUEST['talukid'];
 		while($result_taluk_list=mysqli_fetch_array($fetch_pincode_list))
 					{
 						?>
-<option value="<?=$result_taluk_list['id'];?>"><?=$result_taluk_list['pincode'];?></option>
+<option value="<?=htmlspecialchars((string)($result_taluk_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_taluk_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>
 												

@@ -132,15 +132,15 @@ else
 <?php include("validate-scripts.php");?>
 <form method="post" enctype="multipart/form-data" id="uploadForm">
 
-<input type="hidden" name="tempid" value="<?=$result_product_list['tempid'];?>">
-<input type="hidden" name="old_img" value="<?=$result_product_list['per_photo'];?>">
+<input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($result_product_list['tempid']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="old_img" value="<?=htmlspecialchars((string)($result_product_list['per_photo']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
 											
 											<label class="form-label">User*</label>
                                <select required name="usertype" class="form-control">
-							   <option value="<?=$result_product_list['usertype'];?>" hidden><?=$result_product_list['usertype'];?></option>
+							   <option value="<?=htmlspecialchars((string)($result_product_list['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden><?=htmlspecialchars((string)($result_product_list['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <option value="super_stockiest">Super Stockist</option>
 							   <option value="stockiest">Stockist</option>
 							   <option value="distributor">Distributor</option>
@@ -148,13 +148,13 @@ else
 												<br/>
                                                 
 												<label class="form-label">Particulars (optional)</label>
-                               <input type="text" name="particulars" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=$result_product_list['particulars'];?>">
+                               <input type="text" name="particulars" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['particulars']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												
 												<label class="form-label">Photo</label>
             <input type="file" name="per_photo" class="form-control" id="fileLogo" accept=".jpg, .jpeg, .png">
 			<br/>
-			<img src="<?php echo $imgsrcname;?>" style="width:300px;border-radius:10px;" alt="<?=$result_product_list["title"];?>">
+			<img src="<?php echo $imgsrcname;?>" style="width:300px;border-radius:10px;" alt="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			<br/>
 			<br/>
 												

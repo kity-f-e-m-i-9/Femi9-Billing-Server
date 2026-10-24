@@ -186,7 +186,7 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                     <div class="invoice-card">
                                         <form action="user-invoice-action.php" method="POST" id="invoiceForm">
                                             <!-- CSRF Token -->
-                                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                             <input type="hidden" name="invuser" value="<?php echo htmlspecialchars($getinvuser); ?>">
                                             <input type="hidden" name="username" value="<?php echo htmlspecialchars($_SESSION['LOGIN_USER'] ?? ''); ?>">
                                             <input type="hidden" name="usertype" value="<?php echo htmlspecialchars($_SESSION['LOGIN_USER_TYPE'] ?? ''); ?>">
@@ -217,7 +217,7 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                                         $fetch_Godown = mysqli_query($db_conn, $select_Godown);
                                                         while ($row_Godown = mysqli_fetch_array($fetch_Godown)) {
                                                             $selected = ($godown_id == $row_Godown['id']) ? 'selected' : '';
-                                                            echo '<option value="' . $row_Godown['id'] . '" ' . $selected . '>' . htmlspecialchars($row_Godown['gname']) . '</option>';
+                                                            echo '<option value="' . htmlspecialchars((string)($row_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false) . '" ' . $selected . '>' . htmlspecialchars($row_Godown['gname']) . '</option>';
                                                         }
                                                         ?>
                                                     </select>
@@ -342,7 +342,7 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                                                     $select_Products = "SELECT * FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC";
                                                                     $fetch_Products = mysqli_query($db_conn, $select_Products);
                                                                     while ($row_Product = mysqli_fetch_array($fetch_Products)) {
-                                                                        echo '<option value="' . $row_Product['id'] . '">' . htmlspecialchars($row_Product['productName']) . '</option>';
+                                                                        echo '<option value="' . htmlspecialchars((string)($row_Product['id']), ENT_QUOTES, 'ISO-8859-1', false) . '">' . htmlspecialchars($row_Product['productName']) . '</option>';
                                                                     }
                                                                     ?>
                                                                 </select>

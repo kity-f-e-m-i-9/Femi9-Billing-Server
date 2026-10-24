@@ -96,7 +96,7 @@ $select_product_list="select * from taluk where id=?";
         <?php include("validate-scripts.php");?>                               
 <form action="product-action.php" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
 
 												
 												<label for="exampleInputEmail1" class="form-label">State Name</label>
@@ -111,7 +111,7 @@ $select_product_list="select * from taluk where id=?";
 												</select>
 												</div>
 												<label for="exampleInputEmail1" class="form-label">Taluk Name</label>
-                                                <input type="text" name="taluk" class="form-control" value="<?php echo $result_product_list['taluk'];?>" onkeypress="restrictSpecialChars(event)">
+                                                <input type="text" name="taluk" class="form-control" value="<?php echo htmlspecialchars((string)($result_product_list['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)">
 												
 												<br/>
 												

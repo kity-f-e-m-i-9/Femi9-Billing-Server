@@ -119,7 +119,7 @@ $profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profil
 <tr valign="top">
 <td width="50%">
 <table id="noneborder"><tr valign="top">
-<td><?php if (!empty($profile['logo'])): ?><img src="<?php echo $profile['logo']; ?>" style="width:95px;border-radius:10px;"/><?php endif; ?></td>
+<td><?php if (!empty($profile['logo'])): ?><img src="<?php echo htmlspecialchars((string)($profile['logo']), ENT_QUOTES, 'ISO-8859-1', false); ?>" style="width:95px;border-radius:10px;"/><?php endif; ?></td>
 <td valign="top">
 <span id="cmpname"><?php echo htmlspecialchars($tpRow['company_name'] ?: $tpRow['name']); ?></span><br/>
 <?php echo htmlspecialchars($tpRow['branch_line1'] . ' ' . $tpRow['branch_city']); ?><br/>
@@ -133,15 +133,15 @@ $profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profil
 Consignee (Ship to):<br/>
 <b><?php echo ucwords(htmlspecialchars($shop['name'])); ?></b><br/>
 <?php echo htmlspecialchars($shop['address']); ?><br/>
-<?php if (!empty($shop['gstin'])): ?>GSTIN: <?php echo $shop['gstin']; ?><br/><?php endif; ?>
-Mobile: <?php echo $shop['mobile_number']; ?><br/>
+<?php if (!empty($shop['gstin'])): ?>GSTIN: <?php echo htmlspecialchars((string)($shop['gstin']), ENT_QUOTES, 'ISO-8859-1', false); ?><br/><?php endif; ?>
+Mobile: <?php echo htmlspecialchars((string)($shop['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?><br/>
 State: <?php echo $state_name; ?>
 </p>
 </td>
 <td valign="top">
 <table id="second_topvl">
 <tr id="border_nbottom">
-<td>Invoice #<br/><b><?php echo $inv['inv_number']; ?></b></td>
+<td>Invoice #<br/><b><?php echo htmlspecialchars((string)($inv['inv_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></b></td>
 <td>Invoice Date:<br/><b><?php echo date("d M Y", strtotime($inv['date'])); ?></b></td>
 </tr>
 <tr id="border_nbottom" valign="top">
@@ -171,13 +171,13 @@ while ($ri = mysqli_fetch_array($items)) {
 ?>
 <tr>
 <td><?php echo ++$invno; ?></td>
-<td><b><?php echo $pr['productName']; ?></b></td>
-<td id="rightlaign"><?php echo $pr['hsn']; ?></td>
-<td id="rightlaign"><?php echo $ri['qty']; ?> Packs</td>
+<td><b><?php echo htmlspecialchars((string)($pr['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></b></td>
+<td id="rightlaign"><?php echo htmlspecialchars((string)($pr['hsn']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+<td id="rightlaign"><?php echo htmlspecialchars((string)($ri['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($pr['mrp'], 2); ?></td>
 <td id="rightlaign"><?php echo inr_format($ri['amount'], 2); ?></td>
 <td id="rightlaign">Packs</td>
-<td id="rightlaign"><?php echo $ri['gst_percentage']; ?>%</td>
+<td id="rightlaign"><?php echo htmlspecialchars((string)($ri['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%</td>
 <td id="rightlaign"><?php echo inr_format($ri['discount_amount'], 2); ?> (<?php echo inr_format($ri['discount_percentage'], 0); ?>%)</td>
 <td id="rightlaign"><?php echo inr_format($lineTotal, 2); ?></td>
 </tr>

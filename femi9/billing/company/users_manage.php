@@ -147,7 +147,7 @@ $i= $start_from;
 											?>
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?php echo $result_product_list['username'];?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <td>
 													<?php 
 													if ($passwordError) {
@@ -155,19 +155,19 @@ $i= $start_from;
 													} else {
 													?>
 														<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-															<span id="pwd-hidden-<?php echo $result_product_list["id"];?>" 
+															<span id="pwd-hidden-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" 
 																  style="cursor:pointer;font-size:16px;display:flex;align-items:center;gap:5px;" 
-																  onclick="document.getElementById('pwd-hidden-<?php echo $result_product_list["id"];?>').style.display='none'; 
-																		   document.getElementById('pwd-shown-<?php echo $result_product_list["id"];?>').style.display='flex';"
+																  onclick="document.getElementById('pwd-hidden-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>').style.display='none'; 
+																		   document.getElementById('pwd-shown-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>').style.display='flex';"
 																  title="Click to show password">
 																<i class="material-icons" style="vertical-align:middle;font-size:18px;">visibility_off</i> 
 																<strong>••••••••••</strong>
 															</span>
 															
-															<span id="pwd-shown-<?php echo $result_product_list["id"];?>" 
+															<span id="pwd-shown-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" 
 																  style="display:none;cursor:pointer;font-size:16px;align-items:center;gap:5px;" 
-																  onclick="document.getElementById('pwd-shown-<?php echo $result_product_list["id"];?>').style.display='none'; 
-																		   document.getElementById('pwd-hidden-<?php echo $result_product_list["id"];?>').style.display='flex';"
+																  onclick="document.getElementById('pwd-shown-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>').style.display='none'; 
+																		   document.getElementById('pwd-hidden-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>').style.display='flex';"
 																  title="Click to hide password">
 																<i class="material-icons" style="vertical-align:middle;font-size:18px;">visibility</i> 
 																<strong style="background:#ffeb3b;padding:5px 10px;border-radius:5px;letter-spacing:1px;">

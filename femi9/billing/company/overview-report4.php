@@ -203,10 +203,10 @@ $district_name=	$result_district['dist_name'];
 											?>
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?=$result_product_list["useridtext"];?></td>
-                                                    <td><?=$result_product_list["name"];?></td>
+													<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                                                    <td><?=htmlspecialchars((string)($result_product_list["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?=$district_name;?></td>
-													<td><?=$result_product_list['mobile_number'];?></td>
+													<td><?=htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?=date("d/M/Y",strtotime($result_product_list["valid_from"]));?></td>
 													</tr>
 										<?php }?>

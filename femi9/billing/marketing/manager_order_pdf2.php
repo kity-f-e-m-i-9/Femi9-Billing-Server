@@ -60,13 +60,13 @@ $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
                                             
                                                <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_shopcatt['name'];?></td>
-					<td><?=$result_shopcatt['mobile_number'];?></td>
-					<td><?=ucwords($result_shopcatt["address"]);?></td>
+					<td><?=htmlspecialchars((string)($result_shopcatt['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_shopcatt['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_shopcatt["address"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td><?=date("d/m/Y",strtotime($result_product_list["order_date"]));?></td>
-					<td><?=$result_product_list["noorder_reason"];?></td>
-					<td><?=$result_product_list["marketing_tool"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["noorder_reason"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["marketing_tool"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 	
                                                 </tr>
                                            

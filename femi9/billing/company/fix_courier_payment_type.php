@@ -664,7 +664,7 @@ function e(mixed $v): string
                     <?php endforeach; ?>
                 <?php else: ?>
                     <div class="alert alert-success">
-                        ✅ <strong><?= $data['updated'] ?> receipt(s) updated</strong> successfully.
+                        ✅ <strong><?= htmlspecialchars((string)($data['updated']), ENT_QUOTES, 'ISO-8859-1', false) ?> receipt(s) updated</strong> successfully.
                         All changes logged to <code><?= e(AUDIT_TABLE) ?></code>.
                     </div>
                 <?php endif; ?>
@@ -677,7 +677,7 @@ function e(mixed $v): string
                     <?php endforeach; ?>
                 <?php else: ?>
                     <div class="alert alert-info">
-                        ↩️ <strong><?= $data['restored'] ?> receipt(s) restored</strong>
+                        ↩️ <strong><?= htmlspecialchars((string)($data['restored']), ENT_QUOTES, 'ISO-8859-1', false) ?> receipt(s) restored</strong>
                         to <code>regular</code>. Audit log marked as rolled back.
                     </div>
                 <?php endif; ?>

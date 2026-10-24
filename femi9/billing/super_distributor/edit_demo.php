@@ -93,14 +93,14 @@ $select_product_list="select * from demo_awareness where id=?";
                       <?php include("validate-scripts.php");?>                 
 <form action="demo_action.php" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?=$result_product_list['id'];?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 <input type="hidden" name="old_photo" value="<?=$imgsrcname;?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
 											
            <label class="form-label">Demo Title*</label>
-            <input type="text" required="" value="<?=$result_product_list['title'];?>" onkeypress="restrictSpecialChars(event)" name="title" class="form-control">
+            <input type="text" required="" value="<?=htmlspecialchars((string)($result_product_list['title']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)" name="title" class="form-control">
 			<br/>
 			
 			<label class="form-label">Demo Photo *</label>

@@ -195,7 +195,7 @@ $_ss_res = mysqli_query($db_conn,
      WHERE s.closing_qty > 0
      ORDER BY p.productName");
 while ($result_product_list12 = mysqli_fetch_assoc($_ss_res)) { ?>
-<option value="<?= $result_product_list12['id']; ?>"><?= htmlspecialchars($result_product_list12['productName']); ?> (Stock: <?= $result_product_list12['closing_qty']; ?>)</option>
+<option value="<?= htmlspecialchars((string)($result_product_list12['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?= htmlspecialchars($result_product_list12['productName']); ?> (Stock: <?= htmlspecialchars((string)($result_product_list12['closing_qty']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
 <?php } ?>
 </select>
 					     </td>

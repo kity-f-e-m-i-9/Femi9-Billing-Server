@@ -166,7 +166,7 @@ foreach ($staffRows as $r) {
                                     <?php $viewUrl = 'view-bdm-dashboard.php?bdm_id=' . $r['id']; ?>
                                     <tr>
                                         <td><a class="team-name-cell" href="<?php echo $viewUrl; ?>"><?php echo htmlspecialchars($r['name']); ?></a></td>
-                                        <td><span class="lvl-badge" style="background:<?php echo $r['color']; ?>;"><?php echo htmlspecialchars($r['level_name']); ?></span></td>
+                                        <td><span class="lvl-badge" style="background:<?php echo htmlspecialchars((string)($r['color']), ENT_QUOTES, 'ISO-8859-1', false); ?>;"><?php echo htmlspecialchars($r['level_name']); ?></span></td>
                                         <td><?php echo $r['manager_name'] ? htmlspecialchars($r['manager_name']) : '<span class="text-muted">—</span>'; ?></td>
                                         <td><?php echo $r['zone'] ? htmlspecialchars($r['zone']) : '<span class="text-muted">—</span>'; ?></td>
                                         <td><?php echo $r['status'] === 'active' ? '<span style="color:#0ca30c;font-weight:600;">Active</span>' : '<span style="color:#d03b3b;font-weight:600;">Inactive</span>'; ?></td>
@@ -180,7 +180,7 @@ foreach ($staffRows as $r) {
                                             <a href="<?php echo $viewUrl; ?>" style="text-decoration:none;">
                                                 <div style="display:flex;align-items:center;gap:5px;">
                                                     <div class="pbar" style="width:70px;"><div class="pf" style="width:<?php echo min($r['pct'],100); ?>%;background:<?php echo $bc; ?>;"></div></div>
-                                                    <span style="font-size:12.5px;font-weight:700;color:<?php echo $bc; ?>;"><?php echo $r['pct']; ?>%</span>
+                                                    <span style="font-size:12.5px;font-weight:700;color:<?php echo $bc; ?>;"><?php echo htmlspecialchars((string)($r['pct']), ENT_QUOTES, 'ISO-8859-1', false); ?>%</span>
                                                 </div>
                                             </a>
                                         </td>

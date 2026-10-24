@@ -26,7 +26,7 @@ $select_product_list="select * from shop where id=?";
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : Shop</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : Shop</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -102,7 +102,7 @@ $select_product_list="select * from shop where id=?";
 							 <tr>
 							 <td colspan="2">Shop Name</td>
 							 </tr>
-							 <tr><td colspan="2" style="font-size:18px;"><b><?=$result_product_list['name'];?></b><hr/></td></tr>
+							 <tr><td colspan="2" style="font-size:18px;"><b><?=htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></b><hr/></td></tr>
 							 
 							 <?php if($invid!=NULL){?>
 							 <tr>
@@ -147,7 +147,7 @@ $select_product_list="select * from shop where id=?";
 											$crntstock123+=$crntstock;
 										?>
 							  <tr>
-							 <td><?=$resultprdetails['productName'];?></td>
+							 <td><?=htmlspecialchars((string)($resultprdetails['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							 <td align="right"><?=$crntstock;?></td>
 							 </tr>
 										<?php }?>
@@ -184,9 +184,9 @@ $select_product_list="select * from shop where id=?";
 											$crntstock123cst+=$crntstock12;
 										?>
 							  <tr>
-							 <td><?=$resultprdetails12['brand'];?></td>
+							 <td><?=htmlspecialchars((string)($resultprdetails12['brand']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							 <td align="right"><?=$crntstock12;?></td>
-							 <td><?=$result_productCurrentst12['cst_panty'];?></td>
+							 <td><?=htmlspecialchars((string)($result_productCurrentst12['cst_panty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							 </tr>
 										<?php }?>
 										<tr>

@@ -39,7 +39,7 @@ $from_date=$_REQUEST['frd'];
 			   <?php $select_prdetails_header="select * from products order by id asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 				
                                                 </tr>
@@ -67,12 +67,12 @@ $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
                                             
                                                <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_shopcatt['name'];?></td>
-					<td><?=$result_shopcatt['mobile_number'];?></td>
-					<td><?=ucwords($result_shopcatt["address"]);?></td>
+					<td><?=htmlspecialchars((string)($result_shopcatt['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_shopcatt['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_shopcatt["address"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td><?=date("d/m/Y",strtotime($result_product_list["order_date"]));?></td>
-					<td><?=$result_product_list["marketing_tool"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["marketing_tool"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					
 					<!------------------------PRODUCT WISE SALES QTY------------------------------->

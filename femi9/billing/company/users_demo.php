@@ -223,15 +223,15 @@ $taluk_name=$result_Taluk12['taluk'];}else{$taluk_name="";}
                     <tr>
                     <td><?php echo ++$i; ?></td>
 					<td><?=$disusertype;?></td>
-					<td><b><?php echo ucwords($result_Userdetails["name"]);?></b></td>
+					<td><b><?php echo htmlspecialchars((string)(ucwords($result_Userdetails["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 					<td>D:&nbsp;<?php echo $district_name;?>
 					<br/>T:&nbsp;<?php echo $taluk_name;?>
 					</td>
-					<td><b><?php echo ucwords($result_Userdetails["mobile_number"]);?></b></td>
+					<td><b><?php echo htmlspecialchars((string)(ucwords($result_Userdetails["mobile_number"])), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 					<td><?php echo date("d/m/Y",strtotime($result_product_list['date']));?></td>
-					<td><b><?php echo ucwords($result_product_list["title"]);?></b></td>
+					<td><b><?php echo htmlspecialchars((string)(ucwords($result_product_list["title"])), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 					
-					<td><a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>" title="<?=$result_product_list["title"];?>"><img src="<?php echo $imgsrcname;?>" style="width:50px;border-radius:10px;" alt="<?=$result_product_list["title"];?>"></a></td>
+					<td><a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>" title="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>"><img src="<?php echo $imgsrcname;?>" style="width:50px;border-radius:10px;" alt="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>"></a></td>
 					
                                                 </tr>
                                            

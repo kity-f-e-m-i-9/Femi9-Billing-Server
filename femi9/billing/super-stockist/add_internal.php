@@ -216,7 +216,7 @@ flatpickr("#bookingDate", {
 							   $fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 							   while($result_product_list=mysqli_fetch_array($fetch_product_list)) {
 							   ?>
-<option value="<?=$result_product_list['id'];?>"><?=strtoupper($result_product_list['productName']);?> (Qty: <?=$result_product_list['closing_qty'];?>)</option>
+<option value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_product_list['productName'])), ENT_QUOTES, 'ISO-8859-1', false);?> (Qty: <?=htmlspecialchars((string)($result_product_list['closing_qty']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 							   <?php } ?>
 							   </select>
 							   <br/>

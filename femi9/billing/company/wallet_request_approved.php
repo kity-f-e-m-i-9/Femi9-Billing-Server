@@ -276,10 +276,10 @@ if ($WD_user_type === 'territory_partner') {
 					<td><?=date("d/m/Y",strtotime($result_product_list['updated_date']));?><br/>
 					<?=date("g:i A",strtotime($result_product_list['updated_time']));?>
 					</td>
-					<td><?=$result_product_list['TDS_percentage'];?>%</td>
+					<td><?=htmlspecialchars((string)($result_product_list['TDS_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
 					<td><?=inr_format($result_product_list['TDS_deduction'], 2);?></td>
 					<td><?=inr_format($result_product_list['sent_amount'], 2);?></td>
-					<td><?=$result_product_list['remarks'];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
                                                 </tr>
                                            

@@ -14,7 +14,7 @@ $result_count_opstock13=mysqli_fetch_array($fetch_count_opstock13);
 if($result_count_opstock13['numopstock12']==0)
 {
 ?>
-<div style="background:red;color:white;padding:5px;border-radius:5px;margin-bottom:15px;">Please update opening stock (<?=$result_Godown['gname'];?>)</div>
+<div style="background:red;color:white;padding:5px;border-radius:5px;margin-bottom:15px;">Please update opening stock (<?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?>)</div>
 <button type="submit" name="add-draft-record" class="btn" style="background:#f59e0b;border:none;color:#fff;" title="Save without affecting stock — come back and finish it later"><i class="material-icons">save</i> Save as Draft</button>
 <?php }else{?>
 <button type="submit" name="add-draft-record" class="btn" style="background:#f59e0b;border:none;color:#fff;" title="Save without affecting stock — come back and finish it later"><i class="material-icons">save</i> Save as Draft</button>

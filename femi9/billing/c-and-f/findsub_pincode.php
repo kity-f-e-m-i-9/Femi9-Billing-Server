@@ -10,7 +10,7 @@ $TalukID=$_GET['subcourseID'];
 		while($Result_Pincodevl_list=mysqli_fetch_array($Fetch_Pincodevl_list))
 									{
 								?>
-<option value="<?php echo $Result_Pincodevl_list['id'];?>"><?php echo $Result_Pincodevl_list['pincode'];?></option>
+<option value="<?php echo htmlspecialchars((string)($Result_Pincodevl_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($Result_Pincodevl_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 						<?php }?>
 						</select>
 

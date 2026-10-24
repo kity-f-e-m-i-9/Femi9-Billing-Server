@@ -1109,7 +1109,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
             
             $.post('get-advance-payment-details.php', {
                 id: id, 
-                csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+                csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
             })
             .done(function(response) {
                 $('#modalContent').html(response);
@@ -1129,7 +1129,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
             
             $.post('get-advance-payment-edit-form.php', {
                 id: id, 
-                csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+                csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
             })
             .done(function(response) {
                 $('#editModalContent').html(response);
@@ -1186,7 +1186,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
             
             $.post('delete-advance-payment-action.php', {
                 id: id,
-                csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+                csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
             })
             .done(function(response) {
                 if (response.success) {

@@ -19,7 +19,7 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <!-- Title -->
-    <title><?=$result_Invoice['inv_number']?> : Demo/Free/Damage Details : <?php echo $business_name;?></title>
+    <title><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?> : Demo/Free/Damage Details : <?php echo $business_name;?></title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -151,7 +151,7 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                   <td><?php echo $Result_productDetils["productName"];?></td>
+                   <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo inr_format($PR_qty, 1);?></td>
 													
 																										<td>

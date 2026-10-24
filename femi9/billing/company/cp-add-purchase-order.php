@@ -358,7 +358,7 @@ if ($productType !== null) {
                                     <select class="form-control mb-2" id="pr_select" onchange="showPoPrice(this.value)">
                                         <option value=""></option>
                                         <?php foreach ($productList as $p): ?>
-                                        <option value="<?php echo $p['id']; ?>" data-price="<?php echo htmlspecialchars($p['mrp']); ?>"><?php echo htmlspecialchars($p['productName']); ?></option>
+                                        <option value="<?php echo htmlspecialchars((string)($p['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" data-price="<?php echo htmlspecialchars($p['mrp']); ?>"><?php echo htmlspecialchars($p['productName']); ?></option>
                                         <?php endforeach; ?>
                                     </select>
 

@@ -225,7 +225,7 @@ $fetch_Customers_list=mysqli_query($db_conn,$selectCusList);
 while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 		{
 ?>
-<option value="<?php echo $result_Customers_list['id'];?>"><?php echo ucwords($result_Customers_list['name']);?>, <?php echo $result_Customers_list['mobile'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_Customers_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)(ucwords($result_Customers_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php echo htmlspecialchars((string)($result_Customers_list['mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php
  }
 }
@@ -235,9 +235,9 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 
 <label class="form-label">Invoice Date*</label>
 <?php if($get_action=="edit") {?>
-<input type="date" readonly name="date" value="<?=$result_InvoieDetails['date'];?>" required="" class="form-control">
+<input type="date" readonly name="date" value="<?=htmlspecialchars((string)($result_InvoieDetails['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" class="form-control">
 <?php }else{?>
-<input type="date" readonly name="date" value="<?=$result_InvoieDetails['date'];?>" required="" class="form-control">
+<input type="date" readonly name="date" value="<?=htmlspecialchars((string)($result_InvoieDetails['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" class="form-control">
 <?php }?>
 </br>
 
@@ -251,7 +251,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 										while($result_Products_list=mysqli_fetch_array($fetch_Products_list))
 										{
 											?>
-<option value="<?php echo $result_Products_list['id'];?>"><?php echo $result_Products_list['productName'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 </select>
 <br/><br/>
@@ -329,13 +329,13 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
 
-<td><?=$result_ProductDetails123['productName'];?></td>
-<td><?=$result_ProductDetails123['hsn'];?></td>
-<td><?=$result_INVProductDetails['qty'];?></td>
-<td><?=$result_INVProductDetails['amount'];?></td>
-<td><?=$result_INVProductDetails['discount_amount'];?>(<?=$result_INVProductDetails['discount_percentage'];?>%)</td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['hsn']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['discount_amount']), ENT_QUOTES, 'ISO-8859-1', false);?>(<?=htmlspecialchars((string)($result_INVProductDetails['discount_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
-<td><?=$result_INVProductDetails['gstamount_total'];?>(<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['gstamount_total']), ENT_QUOTES, 'ISO-8859-1', false);?>(<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 
 <?php if($amount_received_fully==0){?>
@@ -372,20 +372,20 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 				   
 				   <?php if($get_action=="edit") {?>
 				   <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive">
-				   <span><?php echo $result_InvoieDetails['inv_number'];?></span>
+				   <span><?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 				   </a>
 				   <?php }else{?>
-				   <span><?php echo $result_InvoieDetails['inv_number'];?></span>
+				   <span><?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 				   <?php }?>
 				   
 				   <!--------INVOICE NUMBER EDIT FORM OPEN-------->
-				   <div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+				   <div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
 													
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
                                                                 <h5 class="modal-title" id="exampleModalLiveLabel">Update Invoice Number<br/>
-																<?php echo $result_InvoieDetails['inv_number'];?></h5>
+																<?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></h5>
                                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
 				<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_invoice_action">	
@@ -468,7 +468,7 @@ db_q($db_conn,$update_zero_invoice,[$Invoice_ID]);
 		 </p>
 		 
 		 <p><b>Courier Charges</b>
-		 <input type="number" value="<?=$result_InvoieDetails['courier_charges'];?>" name="courier_charges" min="0" required="" onKeyup="totalamount()" id="cucharge" class="form-control">
+		 <input type="number" value="<?=htmlspecialchars((string)($result_InvoieDetails['courier_charges']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="courier_charges" min="0" required="" onKeyup="totalamount()" id="cucharge" class="form-control">
 		 </p>
 		 
 		 <p><b>Total</b>
@@ -553,7 +553,7 @@ function receiptamount(){
 		 <?php if($result_ReceiptDetails['receipt_method']==NULL){?>
 		 <option value="" hidden="">Select</option>
 		 <?php }else{?>
-		 <option value="<?=$result_ReceiptDetails['receipt_method'];?>" hidden=""><?=$result_ReceiptDetails['receipt_method'];?></option>
+		 <option value="<?=htmlspecialchars((string)($result_ReceiptDetails['receipt_method']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?=htmlspecialchars((string)($result_ReceiptDetails['receipt_method']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 		 <?php }?>
 		 <option>--None--</option>
 		 <option>Cash</option>
@@ -643,7 +643,7 @@ function receiptamount(){
 <?php $selectCountry="select * from country order by id asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>
@@ -741,7 +741,7 @@ $fetch_Customers_list=mysqli_query($db_conn,$selectCusList);
 while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 		{
 ?>
-<option value="<?php echo $result_Customers_list['id'];?>"><?php echo ucwords($result_Customers_list['name']);?>, <?php echo $result_Customers_list['mobile'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_Customers_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)(ucwords($result_Customers_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php echo htmlspecialchars((string)($result_Customers_list['mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 
@@ -766,7 +766,7 @@ $fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
 while($result_Products_list=mysqli_fetch_array($fetch_Products_list))
 {
 ?>
-<option value="<?=$result_Products_list['id'];?>"><?=$result_Products_list['productName'];?></option>
+<option value="<?=htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 <br/><br/>

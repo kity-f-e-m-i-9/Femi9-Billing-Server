@@ -261,8 +261,8 @@ function showDistrictEdit(str) {
     }
     
     var invuser = "super_stockiest";
-    var current_ss_id = "<?php echo $result_product_list['id']; ?>";
-    var current_dist_id = "<?php echo $result_product_list['district_id']; ?>";
+    var current_ss_id = "<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>";
+    var current_dist_id = "<?php echo htmlspecialchars((string)($result_product_list['district_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>";
     
     xmlhttp.open("GET", "loadDistrictEdit.php?q=" + str + "&invuser=" + invuser + "&current_ss_id=" + current_ss_id + "&current_dist_id=" + current_dist_id, true);
     xmlhttp.send();

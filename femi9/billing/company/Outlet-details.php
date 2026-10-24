@@ -36,7 +36,7 @@ $pincodeshow=$result_pincodelist['pincode'];
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : Outlet</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : Outlet</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -104,7 +104,7 @@ $pincodeshow=$result_pincodelist['pincode'];
   
                     <tr>
                     <th scope="col">Name</th>
-                    <td><?php echo $result_product_list['name'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
@@ -122,30 +122,30 @@ $pincodeshow=$result_pincodelist['pincode'];
 					
 					<tr>
                     <th scope="col">Email ID</th>
-                    <td><?php echo $result_product_list['email'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Address</th>
-                    <td><?php echo $result_product_list['address'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Mobile Number</th>
-                    <td><?php echo $result_product_list['mobile_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Username</th>
-                    <td><span id="usernamebox"><?php echo $result_product_list['username'];?></span></td>
+                    <td><span id="usernamebox"><?php echo htmlspecialchars((string)($result_product_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Password</th>
-                    <td><?php echo $result_product_list['password'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['password']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">GST Number</th>
-                    <td><?php echo $result_product_list['gstin'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<?php /*?>
@@ -155,11 +155,11 @@ $pincodeshow=$result_pincodelist['pincode'];
 					
 					<tr>
                     <th scope="col">Plan Amount</th>
-                    <td>&#8377; <?php echo $result_product_list['plan_amount'];?></td>
+                    <td>&#8377; <?php echo htmlspecialchars((string)($result_product_list['plan_amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Valid Months</th>
-                    <td><?php echo $result_product_list['valid_months'];?> Months</td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['valid_months']), ENT_QUOTES, 'ISO-8859-1', false);?> Months</td>
                     </tr>
 					
 					<tr>
@@ -169,7 +169,7 @@ $pincodeshow=$result_pincodelist['pincode'];
 					
 					<tr>
                     <th scope="col">payment Method</th>
-                    <td><?php echo $result_product_list['amount_method'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['amount_method']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
@@ -190,7 +190,7 @@ $pincodeshow=$result_pincodelist['pincode'];
 					
 					<tr>
                     <th scope="col">Reference Number</th>
-                    <td><?php echo $result_product_list['ref_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['ref_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<?php */?>
 					

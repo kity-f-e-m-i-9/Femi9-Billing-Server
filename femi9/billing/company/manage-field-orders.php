@@ -236,7 +236,7 @@ $visits = array_slice($visits, ($page - 1) * $perPage, $perPage, true);
                                 <select name="tp_filter" id="tp_filter_select" class="form-control">
                                     <option value="0">— All —</option>
                                     <?php foreach ($tpList as $tp): ?>
-                                    <option value="<?=$tp['id']?>" <?=$tp_filter===(int)$tp['id']?'selected':''?>><?=htmlspecialchars($tp['name'])?> (<?=htmlspecialchars($tp['tp_id'])?>)</option>
+                                    <option value="<?=htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false)?>" <?=$tp_filter===(int)$tp['id']?'selected':''?>><?=htmlspecialchars($tp['name'])?> (<?=htmlspecialchars($tp['tp_id'])?>)</option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>

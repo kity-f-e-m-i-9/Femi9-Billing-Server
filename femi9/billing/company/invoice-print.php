@@ -198,7 +198,7 @@ $gsttype=$result_Invoice_Details['gst_type'] ?: 'inner';
 								</td>
 
 								<td>
-									<b>Invoice # :</b> <?php echo $result_Invoice_Details['inv_number'];?><br />
+									<b>Invoice # :</b> <?php echo htmlspecialchars((string)($result_Invoice_Details['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?><br />
 									<b>Date:</b> <?php echo date("d/M/Y",strtotime($result_Invoice_Details['date']));?>
 								</td>
 							</tr>
@@ -217,9 +217,9 @@ $gsttype=$result_Invoice_Details['gst_type'] ?: 'inner';
 								</td>
 
 								<td>
-								<?php echo ucwords($result_Customer_Details['name']);?><br />
-									<?=$result_Customer_Details['mobile'];?><br />
-									<?php echo ucwords($result_Customer_Details['address']);?>
+								<?php echo htmlspecialchars((string)(ucwords($result_Customer_Details['name'])), ENT_QUOTES, 'ISO-8859-1', false);?><br />
+									<?=htmlspecialchars((string)($result_Customer_Details['mobile']), ENT_QUOTES, 'ISO-8859-1', false);?><br />
+									<?php echo htmlspecialchars((string)(ucwords($result_Customer_Details['address'])), ENT_QUOTES, 'ISO-8859-1', false);?>
 								</td>
 							</tr>
 						</table>
@@ -238,9 +238,9 @@ $gsttype=$result_Invoice_Details['gst_type'] ?: 'inner';
 		$ItemRowid=base64_encode($result_INVProductDetails['id']);
 	?>
 				<tr class="item">
-					<td><?=$result_INVProductDetails['productName'];?><?= $result_INVProductDetails['gst_type_item']==='inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
+					<td><?=htmlspecialchars((string)($result_INVProductDetails['productName']), ENT_QUOTES, 'ISO-8859-1', false);?><?= $result_INVProductDetails['gst_type_item']==='inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
 					<td align="right">&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
-<td align="right"><?=$result_INVProductDetails['qty'];?></td>
+<td align="right"><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td align="right">&#8377;<?php echo inr_format($result_INVProductDetails['total'], 2);?></td>
 				</tr>
 

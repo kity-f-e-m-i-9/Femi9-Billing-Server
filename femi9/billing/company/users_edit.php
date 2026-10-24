@@ -256,14 +256,14 @@ $ex_catid = array_filter(explode("#", $catid));
 <form method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!')">
 
 <input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($id), ENT_QUOTES, 'UTF-8', false);?>">
-<input type="hidden" name="username" value="<?=$result_count_users['username'];?>">
+<input type="hidden" name="username" value="<?=htmlspecialchars((string)($result_count_users['username']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			
                                         <div class="example-container">
                                             <div class="example-content">
                                    
 												
 <label class="form-label">Username*</label>
-<input type="text" required="" disabled value="<?=$result_count_users['username'];?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="text" required="" disabled value="<?=htmlspecialchars((string)($result_count_users['username']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 <br/>
 
 <label class="form-label">Password*</label>

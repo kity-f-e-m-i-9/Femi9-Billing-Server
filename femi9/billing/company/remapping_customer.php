@@ -125,7 +125,7 @@ $business_name = escape_html($business_name ?? 'Billing App');
                                     <div class="card-body">
                                         <form action="remapping_customer2.php" method="post" id="remappingForm">
                                             <!-- CSRF Token -->
-                                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                             
                                             <div class="example-container">
                                                 <div class="example-content">

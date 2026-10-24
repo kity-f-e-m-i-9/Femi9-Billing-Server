@@ -321,7 +321,7 @@ $renderMovementTable = function($thisDate, $idsSqlForLeaf, $warehouseCondForBuck
         ob_start();
                             ?>
                         <tr>
-                        <td><?php echo $Result_productDetils["productName"];?></td>
+                        <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						<?php // Opening stock, like Closing Stock, is only meaningful once scoped
 						// to specific company godown(s) — see the Closing Stock column's note
 						// below for the full rationale. ?>
@@ -466,13 +466,13 @@ foreach ($godownCardKeys as $cardGodownLabel) {
 	<summary class="datewise-day-summary">
 		<span class="datewise-day-date"><?=date("d M Y (D)",strtotime($thisDate));?></span>
 		<span class="datewise-day-quicktotals">
-			<?php if ($filterByGodown): ?>Opening <b><?=$dayTotals['opening_qty'];?></b> &middot; <?php endif; ?>
-			In <b><?=$dayTotals['input_qty'];?></b> &middot;
-			Sales <b><?=$dayTotals['total_sales'];?></b> &middot;
-			DFD <b><?=$dayTotals['dfd_qty'];?></b> &middot;
-			Transfer <b><?=$dayTotals['internal_transfer'];?></b> &middot;
-			CP <b><?=$dayTotals['movement_to_cp'];?></b>
-			<?php if ($filterByGodown): ?> &middot; Closing <b><?=$dayTotals['closing'];?></b><?php endif; ?>
+			<?php if ($filterByGodown): ?>Opening <b><?=htmlspecialchars((string)($dayTotals['opening_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></b> &middot; <?php endif; ?>
+			In <b><?=htmlspecialchars((string)($dayTotals['input_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></b> &middot;
+			Sales <b><?=htmlspecialchars((string)($dayTotals['total_sales']), ENT_QUOTES, 'ISO-8859-1', false);?></b> &middot;
+			DFD <b><?=htmlspecialchars((string)($dayTotals['dfd_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></b> &middot;
+			Transfer <b><?=htmlspecialchars((string)($dayTotals['internal_transfer']), ENT_QUOTES, 'ISO-8859-1', false);?></b> &middot;
+			CP <b><?=htmlspecialchars((string)($dayTotals['movement_to_cp']), ENT_QUOTES, 'ISO-8859-1', false);?></b>
+			<?php if ($filterByGodown): ?> &middot; Closing <b><?=htmlspecialchars((string)($dayTotals['closing']), ENT_QUOTES, 'ISO-8859-1', false);?></b><?php endif; ?>
 		</span>
 	</summary>
 	<div style="overflow-x:auto;">

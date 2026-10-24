@@ -163,12 +163,12 @@ $rowid=base64_encode($result_product_list["id"]);
                                             
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_product_list["useridtext"];?></td>
-					<td><b><?php echo ucwords($result_product_list["name"]);?></b></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 					
 					
 					<td>
-					<?=$result_product_list["country_code"];?>&nbsp;<?=$result_product_list["mobile_number"];?>
+					<?=htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</td>
 					
 					
@@ -176,7 +176,7 @@ $rowid=base64_encode($result_product_list["id"]);
 					
 					<td><?=$taluk_name;?></td>
 					
-<td><?=$result_product_list["username"];?></td>
+<td><?=htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
 <td>
 			<?php 
@@ -187,11 +187,11 @@ $rowid=base64_encode($result_product_list["id"]);
 			else if($result_product_list['account_status']=="active")
 			{
 			?>
-			<a href="inactive_user?usr=stockiest&&backurl=overallusers&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=Stockist" onclick="return confirm('You want to confirm Deactivate this (<?php echo strtoupper($result_product_list["name"]);?>)  user?');"><span class='badge badge-style-bordered badge-success'>Active</span></a>
+			<a href="inactive_user?usr=stockiest&&backurl=overallusers&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=Stockist" onclick="return confirm('You want to confirm Deactivate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>)  user?');"><span class='badge badge-style-bordered badge-success'>Active</span></a>
 			<?php
 			}else{
 				?>
-				<a href="active_user?usr=stockiest&&backurl=overallusers&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=Stockist" onclick="return confirm('You want to confirm Activate this (<?php echo strtoupper($result_product_list["name"]);?>)  user?');"><span class='badge badge-style-bordered badge-danger'>Deactive</span></a>
+				<a href="active_user?usr=stockiest&&backurl=overallusers&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=Stockist" onclick="return confirm('You want to confirm Activate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>)  user?');"><span class='badge badge-style-bordered badge-danger'>Deactive</span></a>
 				
 				<?php
 			}
@@ -232,9 +232,9 @@ if(is_numeric($GET_onboard_user_city_id))
 ?>
 
 <td><?=$GET_onboard_usertype;?></td>
-<td><?=$result_onbaord_user_records['useridtext'];?></td>
-<td><?=$result_onbaord_user_records['name'];?></td>
-<td><?=$result_onbaord_user_records['mobile_number'];?></td>
+<td><?=htmlspecialchars((string)($result_onbaord_user_records['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_onbaord_user_records['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_onbaord_user_records['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?=$DitrictName_print;?></td>
 
                                                 </tr>

@@ -177,7 +177,7 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                                         <td>&#8377;<?php echo inr_format($item['rate'], 2); ?></td>
                                         <td>
                                             <input type="hidden" name="prid[]" value="<?php echo $pid; ?>">
-                                            <input type="hidden" name="rate[]" value="<?php echo $item['rate']; ?>">
+                                            <input type="hidden" name="rate[]" value="<?php echo htmlspecialchars((string)($item['rate']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                             <input type="number" name="qty[]" min="0" max="<?php echo $available; ?>"
                                                    value="<?php echo $draft_qty; ?>"
                                                    class="form-control form-control-sm" style="width:90px;">
@@ -217,7 +217,7 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                                 <tr>
                                     <td><?php echo ++$n; ?></td>
                                     <td><?php echo htmlspecialchars($pname); ?></td>
-                                    <td><?php echo $di['qty']; ?></td>
+                                    <td><?php echo htmlspecialchars((string)($di['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                     <td>&#8377;<?php echo inr_format($di['amount'], 2); ?></td>
                                     <td>&#8377;<?php echo inr_format($di['total'], 2); ?></td>
                                     <td><a href="tp-cnote-item-del?itemid=<?php echo base64_encode($di['id']); ?>&returnid=<?php echo base64_encode($returnid); ?>&inv_id=<?php echo $inv_id; ?>" style="color:red;" onclick="return confirm('Remove item?')">&#10005;</a></td>
@@ -266,7 +266,7 @@ $isAccepted = $returnid && ($returnMaster['status'] ?? '') === 'accept';
                                 <tr>
                                     <td><?php echo ++$n; ?></td>
                                     <td><?php echo htmlspecialchars($pname); ?></td>
-                                    <td><?php echo $di['qty']; ?></td>
+                                    <td><?php echo htmlspecialchars((string)($di['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                     <td>&#8377;<?php echo inr_format($di['amount'], 2); ?></td>
                                     <td>&#8377;<?php echo inr_format($di['total'], 2); ?></td>
                                     <td>

@@ -133,7 +133,7 @@ $district_name=	$result_district['dist_name'];
 
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list["name"]);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($district_name);?></td>
 </tr>
 
@@ -216,7 +216,7 @@ function newPopup(url) {
 <!--------------------COUNT AREA END--****---------------------->
 
 
-<tr><td colspan="2"><a href="stockist-network-sls?ssid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>&&frd=<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>&&tod=<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false)?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="2"><a href="stockist-network-sls?ssid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>&&stataeid=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>&&frd=<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>&&tod=<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false)?>" title="<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

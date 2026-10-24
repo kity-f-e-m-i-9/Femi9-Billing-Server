@@ -165,17 +165,17 @@ $shopcat_name=$result_shopcatt['catlable'];
 					</td>
 					<td><?=$shopcat_name;?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></td>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
-					<td><?=ucwords($result_product_list['district_id']);?></td>
-					<td><?=ucwords($result_product_list['taluk_id']);?></td>
-					<td><?=$result_product_list['pincode_id']?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list['district_id'])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list['taluk_id'])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list['pincode_id']), ENT_QUOTES, 'ISO-8859-1', false)?></td>
 					
-					<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
-					<td><?php if($result_product_list["landline"]!=NULL){ echo $result_product_list["landline"]; }else{ echo "---";}?></td>
-					<td><?php if($result_product_list["email"]!=NULL){ echo $result_product_list["email"]; }else{ echo "---";}?></td>
-					<td><?php echo $result_product_list["address"];?></td>
-					<td><?php if($result_product_list["gstin"]!=NULL){ echo $result_product_list["gstin"]; }else{ echo "---";}?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php if($result_product_list["landline"]!=NULL){ echo htmlspecialchars((string)($result_product_list["landline"]), ENT_QUOTES, 'ISO-8859-1', false); }else{ echo "---";}?></td>
+					<td><?php if($result_product_list["email"]!=NULL){ echo htmlspecialchars((string)($result_product_list["email"]), ENT_QUOTES, 'ISO-8859-1', false); }else{ echo "---";}?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["address"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php if($result_product_list["gstin"]!=NULL){ echo htmlspecialchars((string)($result_product_list["gstin"]), ENT_QUOTES, 'ISO-8859-1', false); }else{ echo "---";}?></td>
 
 			<!-------<td>
 			<a href="details-ss.php?prid=<?php echo $rowid;?>&&actiondetails" data-bs-toggle="tooltip" data-bs-placement="top" title="View Details">

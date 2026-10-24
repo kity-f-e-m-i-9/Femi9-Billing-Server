@@ -6,7 +6,7 @@
 				<table id="logoTablevl">
 				<tr valign="top">
 				<td><img src="../../assets/images/femi-logo.png" class="usericon"></td>
-				<td><h1><?=strtoupper($result_LoGuserDtails['ms_name']);?></h1>
+				<td><h1><?=htmlspecialchars((string)(strtoupper($result_LoGuserDtails['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?></h1>
 				<h2><?=htmlspecialchars($_SESSION['LOGIN_USER'] ?? ($result_LoGuserDtails['ms_mobile'] ?? ''));?></h2>
 				<h3>Marketing</h3></td>
 				</tr>

@@ -226,7 +226,7 @@ else if($getinvuser=="shop")
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_userinvoice["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_userinvoice["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $lablenamedisplay;?></td>
 													<td><?php echo $Cust_Name;?><br/>M: <?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>

@@ -120,9 +120,9 @@ $i= $start_from;
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
 							<td><?php echo date("d/M/Y",strtotime($result_product_list["input_date"]));?></td>
-                                                    <td><?php echo $Result_productDetils["productName"];?></td>
-													<td><?php echo $result_product_list["input_qty"];?></td>
-													<td><?php echo $result_product_list["remarks"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["input_qty"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["remarks"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
 													<a href="delete-input?Roowid=<?php echo $RowID;?>"onclick="return confirm('You want to delete confirm?');"><img src="../../assets/images/delete-32.png"/></a>
 													</td>

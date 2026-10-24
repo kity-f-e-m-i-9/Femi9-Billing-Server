@@ -73,7 +73,7 @@ while($result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLD
 						$closing_stock=$result_marketstock_VLDIST_VLSS1['closing_qty'];
 ?>
   <tr>
-  <td><?php echo $Result_productDetils["productName"];?></td>
+  <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
   <td style="text-align:right;font-weight:bold;"><?=$closing_stock;?></td>
   </tr>                  
 <?php } ?>  

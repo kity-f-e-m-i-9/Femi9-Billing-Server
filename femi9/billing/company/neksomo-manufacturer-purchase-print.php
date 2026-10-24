@@ -261,7 +261,7 @@ $invoice_heading = $has_gst_product ? 'Manufacturer Purchase Tax Invoice' : 'Man
 <tr valign="top">
 <td>
 <?php if (!empty($result_Godown['logo'])): ?>
-<img src="<?= $result_Godown['logo']; ?>" style="width:150px;margin-right:5px;"/>
+<img src="<?= htmlspecialchars((string)($result_Godown['logo']), ENT_QUOTES, 'ISO-8859-1', false); ?>" style="width:150px;margin-right:5px;"/>
 <?php endif; ?>
 </td>
 <td valign="top">
@@ -325,9 +325,9 @@ $invoice_heading = $has_gst_product ? 'Manufacturer Purchase Tax Invoice' : 'Man
 <td><?= $sl; ?></td>
 <td><b><?= htmlspecialchars($item['productName']); ?></b></td>
 <td id="rightlaign"><?= htmlspecialchars($item['hsn'] ?? ''); ?></td>
-<td id="rightlaign"><?= inr_format($item['display_qty'], 0); ?> <?= $item['per_label']; ?><?= $item['display_qty'] == 1 ? '' : 's'; ?><?php if ($item['is_pack']): ?> (<?= inr_format((int)$item['quantity_pieces'], 0); ?> pcs)<?php endif; ?></td>
+<td id="rightlaign"><?= inr_format($item['display_qty'], 0); ?> <?= htmlspecialchars((string)($item['per_label']), ENT_QUOTES, 'ISO-8859-1', false); ?><?= $item['display_qty'] == 1 ? '' : 's'; ?><?php if ($item['is_pack']): ?> (<?= inr_format((int)$item['quantity_pieces'], 0); ?> pcs)<?php endif; ?></td>
 <td id="rightlaign"><?= inr_format($item['rate'], 2); ?></td>
-<td id="rightlaign"><?= $item['per_label']; ?></td>
+<td id="rightlaign"><?= htmlspecialchars((string)($item['per_label']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
 <td id="rightlaign"><?= fmt_gst_pct($gst_pct); ?>%</td>
 <td id="rightlaign"><?= inr_format((float)$item['taxable_value'], 2); ?></td>
 </tr>

@@ -10,11 +10,11 @@ $select_ProductsPrice="select * from stock_request_items where prid=? and reqid=
 		 
 ?>
 
- <input type="number" min="0" name="qty" value="<?=$Result_ProductsPrice['qty'];?>" readonly id="qty" onKeyup="totalkm()" required="" placeholder="Qty" class="numberinput">
+ <input type="number" min="0" name="qty" value="<?=htmlspecialchars((string)($Result_ProductsPrice['qty']), ENT_QUOTES, 'ISO-8859-1', false);?>" readonly id="qty" onKeyup="totalkm()" required="" placeholder="Qty" class="numberinput">
 
-<input type="number" min="0" name="amount" value="<?=$Result_ProductsPrice['amount'];?>" readonly id="amount" onKeyup="totalkm()" required="" placeholder="Price">
+<input type="number" min="0" name="amount" value="<?=htmlspecialchars((string)($Result_ProductsPrice['amount']), ENT_QUOTES, 'ISO-8859-1', false);?>" readonly id="amount" onKeyup="totalkm()" required="" placeholder="Price">
 
-<input type="number" min="0" name="total" value="<?=$Result_ProductsPrice['subtotal'];?>" readonly id="output" class="numberinput" required="" placeholder="Total">
+<input type="number" min="0" name="total" value="<?=htmlspecialchars((string)($Result_ProductsPrice['subtotal']), ENT_QUOTES, 'ISO-8859-1', false);?>" readonly id="output" class="numberinput" required="" placeholder="Total">
 		
 		<script>
   function discamount(){

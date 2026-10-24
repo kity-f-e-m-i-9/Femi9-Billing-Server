@@ -143,15 +143,15 @@ function closerefresh()
  <table class="table123">
                     <tr>
                     <th scope="col">Name</th>
-                    <td>:&nbsp;&nbsp; <b><?php echo $result_candidate_list['name'];?></b></td>
+                    <td>:&nbsp;&nbsp; <b><?php echo htmlspecialchars((string)($result_candidate_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
                     </tr>
 					<tr>
                     <th scope="col">Mobile Number</th>
-                    <td>:&nbsp;&nbsp; <b><?php echo $result_candidate_list['mobile_number'];?></b></td>
+                    <td>:&nbsp;&nbsp; <b><?php echo htmlspecialchars((string)($result_candidate_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
                     </tr>
 					<tr>
                     <th scope="col">Username</th>
-                    <td><span id="usernamebox"><?php echo $result_candidate_list['username'];?></span></td>
+                    <td><span id="usernamebox"><?php echo htmlspecialchars((string)($result_candidate_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                     </tr>
 					<tr>
                     <th scope="col">Update Username</th>

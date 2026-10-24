@@ -247,7 +247,7 @@ foreach ($existing_items as $it) {
                     </div>
 
                     <form action="edit-tp-invoice-action" method="post" id="invoiceForm">
-                        <input type="hidden" name="csrf_token"   value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token"   value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="action"       value="update-tp-invoice">
                         <input type="hidden" name="invoice_enc"  value="<?php echo htmlspecialchars($enc); ?>">
                         <div id="hiddenProductInputs"></div>

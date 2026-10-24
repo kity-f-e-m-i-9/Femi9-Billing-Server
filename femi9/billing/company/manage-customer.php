@@ -129,12 +129,12 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<!-----<td><?=$result_product_list["useridtext"];?></td>---->
-                                                    <td><?php echo $result_product_list["name"];?></td>
-													<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile"];?></td>
-													<td><?php echo $result_product_list["email"];?></td>
-													<td><?php echo $result_product_list["gstin"];?></td>
-													<td><?php echo $result_product_list["address"];?></td>
+													<!-----<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>---->
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["email"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["gstin"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["address"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["marketing_date"]));?></td>
 																										<td>
 													    <div class="actions-group">

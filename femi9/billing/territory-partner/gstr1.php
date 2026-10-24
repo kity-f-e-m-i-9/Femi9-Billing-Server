@@ -431,7 +431,7 @@ if ($from_month != '') {
                         <tr>
                         <td style="text-align:left;"><?=htmlspecialchars($hr['hsn']);?></td>
                         <td style="text-align:left;"><?=$hr['rate'] > 0 ? $hr['rate'].'%' : 'Nil';?></td>
-                        <td style="text-align:left;"><?=$hr['qty'];?></td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($hr['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                         <td style="text-align:left;"><?=$hr['rate'] == 0 ? inr_format($hr['val'], 2) : '';?></td>
                         <td style="text-align:left;"><?=$hr['rate'] > 0 ? inr_format($hr['val'], 2) : '';?></td>
                         </tr>
@@ -458,10 +458,10 @@ if ($from_month != '') {
                         <?php foreach ($hsn_b2b_rows as $hr): ?>
                         <tr>
                         <td style="text-align:left;"><?=htmlspecialchars($hr['hsn']);?></td>
-                        <td style="text-align:left;"><?=$hr['rate'];?>%</td>
-                        <td style="text-align:left;"><?=$hr['b2b_qty'];?></td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($hr['rate']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($hr['b2b_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                         <td style="text-align:left;"><?=inr_format($hr['b2b_val'], 2);?></td>
-                        <td style="text-align:left;"><?=$hr['b2c_qty'];?></td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($hr['b2c_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                         <td style="text-align:left;"><?=inr_format($hr['b2c_val'], 2);?></td>
                         </tr>
                         <?php endforeach; ?>
@@ -532,7 +532,7 @@ if ($from_month != '') {
                         <td style="text-align:left;"><?=htmlspecialchars($dr['series']);?></td>
                         <td style="text-align:left;"><?=htmlspecialchars($dr['from']);?></td>
                         <td style="text-align:left;"><?=htmlspecialchars($dr['to']);?></td>
-                        <td style="text-align:left;"><?=$dr['count'];?></td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($dr['count']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                         </tr>
                         <?php endforeach; ?>
                         <tr>

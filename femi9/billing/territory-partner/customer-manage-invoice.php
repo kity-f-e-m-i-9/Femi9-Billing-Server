@@ -120,17 +120,17 @@ while ($result_inv = mysqli_fetch_array($fetch_invoices)) {
 
                                     <!-- Invoice number → delivery note modal -->
                                     <td>
-                                    <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#dlModal<?php echo $result_inv["id"]; ?>">
+                                    <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#dlModal<?php echo htmlspecialchars((string)($result_inv["id"]), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                     <?php echo htmlspecialchars($result_inv["inv_number"]); ?></a>
 
-                                    <div class="modal fade" id="dlModal<?php echo $result_inv["id"]; ?>" tabindex="-1" aria-hidden="true">
+                                    <div class="modal fade" id="dlModal<?php echo htmlspecialchars((string)($result_inv["id"]), ENT_QUOTES, 'ISO-8859-1', false); ?>" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog"><div class="modal-content">
                                         <div class="modal-header">
                                             <h5 class="modal-title">Update Delivery Note<br/><?php echo htmlspecialchars($result_inv["inv_number"]); ?></h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                         </div>
                                         <form method="post" onsubmit="return confirm('Confirm?');" action="dlnote_action.php">
-                                        <input type="hidden" name="inv_id"     value="<?php echo $result_inv["inv_id"]; ?>">
+                                        <input type="hidden" name="inv_id"     value="<?php echo htmlspecialchars((string)($result_inv["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <input type="hidden" name="inv_number" value="<?php echo htmlspecialchars($result_inv["inv_number"]); ?>">
                                         <input type="hidden" name="inv_table"  value="customer">
                                         <div class="example-content" style="padding:20px;">
@@ -159,7 +159,7 @@ while ($result_inv = mysqli_fetch_array($fetch_invoices)) {
                                     $cnt_ret = mysqli_num_rows(mysqli_query($db_conn,
                                         "SELECT * FROM user_return_stock_items WHERE invnumber='" . $result_inv["inv_id"] . "'"));
                                     if ($cnt_ret == 0) {
-                                        echo "<a href='update_customer3.php?invuser=$getinvuser&&InvoiceID=" . $result_inv["inv_id"] . "' style='text-decoration:none;'><span class='badge badge-style-bordered badge-primary'>Update</span></a>";
+                                        echo "<a href='update_customer3.php?invuser=$getinvuser&&InvoiceID=" . htmlspecialchars((string)($result_inv["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false) . "' style='text-decoration:none;'><span class='badge badge-style-bordered badge-primary'>Update</span></a>";
                                     } else {
                                         echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";
                                     }

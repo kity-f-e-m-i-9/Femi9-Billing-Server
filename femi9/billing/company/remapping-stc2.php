@@ -127,8 +127,8 @@ if($result_supersotkistCNT['numMAPP']!=0)
 											?>
 											
 											<li class="list-group-item">
-        <input class="form-check-input me-1" name="distributorid[]" type="checkbox" value="<?=$result_supersotkist['id'];?>" aria-label="...">
-        <?=strtoupper($result_supersotkist['name']);?>, <?=$result_supersotkist['mobile_number'];?>
+        <input class="form-check-input me-1" name="distributorid[]" type="checkbox" value="<?=htmlspecialchars((string)($result_supersotkist['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" aria-label="...">
+        <?=htmlspecialchars((string)(strtoupper($result_supersotkist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_supersotkist['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>
     </li>
 	
 	
@@ -144,7 +144,7 @@ if($result_supersotkistCNT['numMAPP']!=0)
 							   $fetch_staeList12=db_q($db_conn,$select_stateList12,[$GET_mapuserid]);
 							   while($result_stateList12=mysqli_fetch_array($fetch_staeList12))
 							   {?>
-						   <option value="<?=$result_stateList12['temp_id'];?>"><?=strtoupper($result_stateList12['name']);?>, <?=$result_stateList12['mobile_number'];?></option>
+						   <option value="<?=htmlspecialchars((string)($result_stateList12['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_stateList12['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_stateList12['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?><br/>
 							   </select>
 											

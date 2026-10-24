@@ -248,65 +248,65 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
                                             <div class="example-content">
 											
 											<label class="form-label">Candidate Name</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" value="<?=$result_userdetails234['name'];?>" name="name" class="form-control">
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" value="<?=htmlspecialchars((string)($result_userdetails234['name']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="name" class="form-control">
 			<br/>
 			
 			<label class="form-label">Candidate Photo</label>
-			<input type="hidden" name="old_user_icon" value="<?=$result_userdetails234['user_icon'];?>">
+			<input type="hidden" name="old_user_icon" value="<?=htmlspecialchars((string)($result_userdetails234['user_icon']), ENT_QUOTES, 'ISO-8859-1', false);?>">
             <input type="file" name="user_icon" class="form-control" id="fileUpload" accept=".jpg, .jpeg, .png">
 			
 			<?php if($result_userdetails234['user_icon']!="Nil"){?>
-			<img src="../super_distributor/<?=$result_userdetails234['user_icon'];?>" style="width:150px;margin-bottom:10px;margin-top:10px;"/>
+			<img src="../super_distributor/<?=htmlspecialchars((string)($result_userdetails234['user_icon']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;margin-bottom:10px;margin-top:10px;"/>
 			<div style="clear:both;"></div>
 			<?php }?>
 			<br/>
 			
 			<label class="form-label">State</label>
-            <input type="text" required="" name="state_id" value="<?=$result_userdetails234['state_id'];?>" class="form-control">
+            <input type="text" required="" name="state_id" value="<?=htmlspecialchars((string)($result_userdetails234['state_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			<br/>
 			
 			<label class="form-label">District</label>
-            <input type="text" required="" name="district_id" value="<?=$result_userdetails234['district_id'];?>" class="form-control">
+            <input type="text" required="" name="district_id" value="<?=htmlspecialchars((string)($result_userdetails234['district_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			<br/>
 			
 			<label class="form-label">Taluk</label>
-            <input type="text" required="" name="taluk_id" value="<?=$result_userdetails234['taluk_id'];?>" class="form-control">
+            <input type="text" required="" name="taluk_id" value="<?=htmlspecialchars((string)($result_userdetails234['taluk_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			<br/>
 			
 			<label class="form-label">Pincode</label>
-            <input type="text" required="" name="pincode_id" value="<?=$result_userdetails234['pincode_id'];?>" class="form-control">
+            <input type="text" required="" name="pincode_id" value="<?=htmlspecialchars((string)($result_userdetails234['pincode_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			<br/>
 			
 			<label class="form-label">Mobile Number</label>
-            <input type="text" required="" value="<?=$result_userdetails234['mobile_number'];?>" disabled class="form-control">
+            <input type="text" required="" value="<?=htmlspecialchars((string)($result_userdetails234['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" disabled class="form-control">
 			<br/>
 			
 			<label class="form-label">Email ID</label>
-            <input type="email" required="" onkeypress="restrictemail(event)" value="<?=$result_userdetails234['email'];?>" name="email" class="form-control">
+            <input type="email" required="" onkeypress="restrictemail(event)" value="<?=htmlspecialchars((string)($result_userdetails234['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="email" class="form-control">
 			<br/>
 			
 			<label class="form-label">GSTIN</label>
-            <input type="text" required="" onkeypress="restrictGSTIN(event)" value="<?=$result_userdetails234['gstin'];?>" name="gstin" class="form-control">
+            <input type="text" required="" onkeypress="restrictGSTIN(event)" value="<?=htmlspecialchars((string)($result_userdetails234['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="gstin" class="form-control">
 			<br/>
 			
             <label class="form-label">Business Name</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" value="<?=$resultcountprofileDetails['companyname'];?>" name="companyname" class="form-control">
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" value="<?=htmlspecialchars((string)($resultcountprofileDetails['companyname']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="companyname" class="form-control">
 			<br/>
 			
 			<label class="form-label">Business Address</label>
-            <textarea required="" name="address" onkeypress="restrictSpecialChars(event)" class="form-control"><?=$result_userdetails234['address'];?></textarea>
+            <textarea required="" name="address" onkeypress="restrictSpecialChars(event)" class="form-control"><?=htmlspecialchars((string)($result_userdetails234['address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			<label class="form-label">Delivery Address</label>
-            <textarea required="" name="deliveryaddress" onkeypress="restrictSpecialChars(event)" class="form-control"><?=$resultcountprofileDetails['deliveryaddress'];?></textarea>
+            <textarea required="" name="deliveryaddress" onkeypress="restrictSpecialChars(event)" class="form-control"><?=htmlspecialchars((string)($resultcountprofileDetails['deliveryaddress']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			<label class="form-label">Business Logo</label>
-			<input type="hidden" name="old_logo" value="<?=$resultcountprofileDetails['logo'];?>">
+			<input type="hidden" name="old_logo" value="<?=htmlspecialchars((string)($resultcountprofileDetails['logo']), ENT_QUOTES, 'ISO-8859-1', false);?>">
             <input type="file" name="logo" class="form-control" id="fileLogo" accept=".jpg, .jpeg, .png">
 			
 			<?php if($resultcountprofileDetails['logo']!="Nil"){?>
-			<img src="<?=$resultcountprofileDetails['logo'];?>" style="width:150px;margin-bottom:10px;margin-top:10px;"/>
+			<img src="<?=htmlspecialchars((string)($resultcountprofileDetails['logo']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;margin-bottom:10px;margin-top:10px;"/>
 			<div style="clear:both;"></div>
 			<?php }?>
 			<br/>
@@ -314,24 +314,24 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
 			<h1>Bank Details</h1>
 			
 			<label class="form-label">A/c Name</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="acname" value="<?=$resultcountprofileDetails['acname'];?>" class="form-control">
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="acname" value="<?=htmlspecialchars((string)($resultcountprofileDetails['acname']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			<br/>
 			
 			<label class="form-label">A/c Number</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="acnumber" value="<?=$resultcountprofileDetails['acnumber'];?>" class="form-control"><br/>
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="acnumber" value="<?=htmlspecialchars((string)($resultcountprofileDetails['acnumber']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control"><br/>
 			
 			<label class="form-label">Bank Name</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="bankname" value="<?=$resultcountprofileDetails['bankname'];?>" class="form-control"><br/>
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="bankname" value="<?=htmlspecialchars((string)($resultcountprofileDetails['bankname']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control"><br/>
 			
 			<label class="form-label">Branch Name</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="branchname" value="<?=$resultcountprofileDetails['branchname'];?>" class="form-control"><br/>
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="branchname" value="<?=htmlspecialchars((string)($resultcountprofileDetails['branchname']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control"><br/>
 			
 			<label class="form-label">IFS Code</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="ifsc" value="<?=$resultcountprofileDetails['ifsc'];?>" class="form-control">
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="ifsc" value="<?=htmlspecialchars((string)($resultcountprofileDetails['ifsc']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			<br/>
 			
 			<label class="form-label">UPI Number</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="upinumber" value="<?=$resultcountprofileDetails['upinumber'];?>" class="form-control">
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="upinumber" value="<?=htmlspecialchars((string)($resultcountprofileDetails['upinumber']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			<br/>
 			
 	<button type="submit" name="updateprofile" class="btn btn-primary">

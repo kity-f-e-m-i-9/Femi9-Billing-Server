@@ -139,7 +139,7 @@ xmlhttp.send();}
 							   $fetch_Godown=db_q($db_conn,$select_Godown,[$loginuser_DistrictID]);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['temp_id'];?>"><?=strtoupper($result_Godown['name']);?>, <?=$result_Godown['mobile_number'];?></option>
+						  <option value="<?=htmlspecialchars((string)($result_Godown['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_Godown['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_Godown['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>
@@ -167,7 +167,7 @@ flatpickr("#bookingDate", {
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{?>
-<option value="<?=$result_product_list['id'];?>"><?=strtoupper($result_product_list['productName']);?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_product_list['productName'])), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>

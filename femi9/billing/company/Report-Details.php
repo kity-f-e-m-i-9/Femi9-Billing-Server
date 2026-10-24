@@ -514,7 +514,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($dist = $dist_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_district == $dist['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$dist['id'].'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($dist['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
                                                             }
                                                             $stmt_dist->close();
                                                         }
@@ -535,7 +535,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($taluk = $taluk_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_taluk == $taluk['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$taluk['id'].'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($taluk['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
                                                             }
                                                             $stmt_taluk->close();
                                                         }
@@ -579,7 +579,7 @@ $qparam = urlencode($search ?? '');
                                                                     if($seller_result) {
                                                                         while($seller = mysqli_fetch_assoc($seller_result)) {
                                                                             $selected_attr = ($selected_seller_id == $seller['id']) ? 'selected' : '';
-                                                                            echo '<option value="'.$seller['id'].'" '.$selected_attr.'>'.htmlspecialchars($seller['name']).'</option>';
+                                                                            echo '<option value="'.htmlspecialchars((string)($seller['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($seller['name']).'</option>';
                                                                         }
                                                                     }
                                                                 } else {
@@ -637,7 +637,7 @@ $qparam = urlencode($search ?? '');
                                                                         if($seller_result) {
                                                                             while($seller = mysqli_fetch_assoc($seller_result)) {
                                                                                 $selected_attr = ($selected_seller_id == $seller['id']) ? 'selected' : '';
-                                                                                echo '<option value="'.$seller['id'].'" '.$selected_attr.'>'.htmlspecialchars($seller['name']).'</option>';
+                                                                                echo '<option value="'.htmlspecialchars((string)($seller['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($seller['name']).'</option>';
                                                                             }
                                                                         }
                                                                     }
@@ -684,14 +684,14 @@ $qparam = urlencode($search ?? '');
                                                                 $buyer_list_result = mysqli_query($db_conn, $buyer_list_query);
                                                                 if($buyer_list_result) while($b = mysqli_fetch_assoc($buyer_list_result)) {
                                                                     $sel = ($selected_buyer_id == $b['id']) ? 'selected' : '';
-                                                                    echo '<option value="'.$b['id'].'" '.$sel.'>'.htmlspecialchars($b['name']).'</option>';
+                                                                    echo '<option value="'.htmlspecialchars((string)($b['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$sel.'>'.htmlspecialchars($b['name']).'</option>';
                                                                 }
                                                             }
                                                         } elseif($selected_buyer_type == 'customer') {
                                                             $cq = mysqli_query($db_conn, "SELECT id, name FROM customers ORDER BY name ASC LIMIT 1000");
                                                             if($cq) while($c = mysqli_fetch_assoc($cq)) {
                                                                 $sel = ($selected_buyer_id == $c['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$c['id'].'" '.$sel.'>'.htmlspecialchars($c['name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($c['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$sel.'>'.htmlspecialchars($c['name']).'</option>';
                                                             }
                                                         }
                                                         ?>
@@ -711,7 +711,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($bdist = $buyer_dist_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_buyer_district == $bdist['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$bdist['id'].'" '.$selected_attr.'>'.htmlspecialchars($bdist['dist_name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($bdist['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($bdist['dist_name']).'</option>';
                                                             }
                                                             $stmt_buyer_dist->close();
                                                         }

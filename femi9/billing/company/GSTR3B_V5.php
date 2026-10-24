@@ -133,13 +133,13 @@ $fetch_sum_total_intra_register=db_q($db_conn,$select_sum_total_intra_register,[
 							   <?php if($get_godown_id==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$result_Godown_details['gname'];?></option>
+							   <option value="<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=htmlspecialchars((string)($result_Godown_details['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+						  <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   </div>

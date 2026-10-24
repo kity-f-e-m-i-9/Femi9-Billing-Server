@@ -12,7 +12,7 @@ $districtid=$_REQUEST['techID'];
 										while($result_taluk_list=mysqli_fetch_array($fetch_taluk_list))
 										{
 											?>
-<option value="<?php echo $result_taluk_list['id'];?>"><?php echo $result_taluk_list['taluk'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_taluk_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_taluk_list['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>
 												

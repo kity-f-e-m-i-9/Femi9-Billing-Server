@@ -163,8 +163,8 @@ $select_product_list="select * from marketing_staff where deleted_at is null ord
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["ms_name"];?></td>
-													<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["ms_mobile"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["ms_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["ms_mobile"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
                                                         <?php
                                                         $storedPassword = $result_product_list['password'];
@@ -196,8 +196,8 @@ $select_product_list="select * from marketing_staff where deleted_at is null ord
                                                         </div>
                                                         <?php } ?>
                                                         </td>
-													<td><?php echo $result_product_list["ms_email"];?></td>
-													<td><?php echo $result_product_list["ms_address"];?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["ms_email"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["ms_address"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 													<td>
 													<?php

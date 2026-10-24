@@ -103,7 +103,7 @@ $title="Invoice Payment Details";
 ?>
                                             
                                                 <tr>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
 				<td><?php echo inr_format($result_product_list["sub_total"], 2);?></td>

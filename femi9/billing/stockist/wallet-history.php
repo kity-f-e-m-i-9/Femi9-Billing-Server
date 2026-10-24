@@ -110,7 +110,7 @@ $tds_percentage=$result_admin_settings2233['tds_percentage'];
 												
 												<!----------------------------------------------------------------->
 												<!--------------------------Popup Open----------------------------->
-												<div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+												<div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
 													
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
@@ -290,20 +290,20 @@ $commissionType=$result_wallet_History1234['commission_type'];
 
 <!----Whom did he refferred---->
 <?php if($commissionType=='Refferral'){?>
-<span><b><?php echo ucwords($result_onbaord_user_records_whom['name']);?> </b><span style="font-size:12px !important;">(<?=ucwords($whom_user_type);?>)</span><br/>
-<?php echo $result_onbaord_user_records_whom['mobile_number'];?></span>
+<span><b><?php echo htmlspecialchars((string)(ucwords($result_onbaord_user_records_whom['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> </b><span style="font-size:12px !important;">(<?=ucwords($whom_user_type);?>)</span><br/>
+<?php echo htmlspecialchars((string)($result_onbaord_user_records_whom['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 <?php }?>
 
 <!-------Cashback Remarks------->
 <?php if($commissionType=='Cashback'){?>
-Cashback : <?php echo $result_wallet_History1234['commission_percentage'];?>%<br/>
-<?php echo $result_wallet_History1234['remarks'];?>
+Cashback : <?php echo htmlspecialchars((string)($result_wallet_History1234['commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%<br/>
+<?php echo htmlspecialchars((string)($result_wallet_History1234['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?>
 <?php }?>
 															
 	<?php if($commissionType!='Website Order Commission'){?>
-	<span class="todo-item-subtitle"><?=$result_wallet_History1234['month'];?>, <?=$result_wallet_History1234['year'];?></span>
+	<span class="todo-item-subtitle"><?=htmlspecialchars((string)($result_wallet_History1234['month']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_wallet_History1234['year']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 	<?php }else{?>
-	<span class="todo-item-subtitle">Website Order Commission (OT Sales)<br/><?=$result_wallet_History1234['remarks'];?></span>
+	<span class="todo-item-subtitle">Website Order Commission (OT Sales)<br/><?=htmlspecialchars((string)($result_wallet_History1234['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 	<?php }?>
 															
                                                         </div>

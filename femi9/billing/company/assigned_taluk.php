@@ -115,7 +115,7 @@ $select_stcatlist="select temp_id,name from stockiest where onboard_userTYPE='".
    $fetch_stcatlist=mysqli_query($db_conn,$select_stcatlist);
 							   while($result_stcatlist=mysqli_fetch_array($fetch_stcatlist))
 							   {?>
-	<option value="<?php echo $result_stcatlist['temp_id'];?>"><?php echo strtoupper($result_stcatlist['name']);?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_stcatlist['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)(strtoupper($result_stcatlist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>
@@ -210,7 +210,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-	<option value="<?php echo $result_stateList['id'];?>"><?php echo $result_stateList['st_name'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 			<br/>

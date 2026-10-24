@@ -163,7 +163,7 @@ $i= $start_from;
 				<?php $select_prdetails_header="select * from `products` order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 													<th>Details</th>
 													<th>Actions</th>
@@ -198,10 +198,10 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?php echo $result_godowndetails["gname"];?></td>
-													<td><?php echo $ResultRecords["category"];?></td>
+													<td><?php echo htmlspecialchars((string)($result_godowndetails["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($ResultRecords["category"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo date("d/M/Y",strtotime($ResultRecords["date"]));?></td>
-                    <td><?php echo $ResultRecords["remarks"];?></td>
+                    <td><?php echo htmlspecialchars((string)($ResultRecords["remarks"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<!------------------------PRODUCT WISE SALES QTY------------------------------->
 				<?php $select_prdetails_header="select * from `products` order by `id` asc";

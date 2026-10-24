@@ -287,7 +287,7 @@ $Total_available_stock123_VLSS1+=$Total_available_stock_VLSS1;
 							<td><?=$to_user_type;?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td align="right"><?=$Total_available_stock_VLSS1;?></td>
 				
@@ -419,7 +419,7 @@ $Total_available_stock123_VLSS1+=$Total_available_stock_VLSS1;
 							<td><?=$to_user_type;?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td align="right"><?=$Total_available_stock_VLSS1;?></td>
 				
@@ -551,7 +551,7 @@ $Total_available_stock123_VLSS1+=$Total_available_stock_VLSS1;
 							<td><?=$to_user_type;?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td align="right"><?=$Total_available_stock_VLSS1;?></td>
 				

@@ -304,7 +304,7 @@ $exportQuery = http_build_query([
                                             <tr>
                                                 <td><?php echo date('d-m-Y', strtotime($inv['date'])); ?></td>
                                                 <td><b><?php echo htmlspecialchars($inv['inv_no']); ?></b></td>
-                                                <td><span class="badge-kind <?php echo $inv['kind']; ?>"><?php echo $inv['kind'] === 'shop' ? 'Shop' : 'Customer'; ?></span></td>
+                                                <td><span class="badge-kind <?php echo htmlspecialchars((string)($inv['kind']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo $inv['kind'] === 'shop' ? 'Shop' : 'Customer'; ?></span></td>
                                                 <td><?php echo htmlspecialchars(ucwords($inv['party'])); ?></td>
                                                 <td><?php echo htmlspecialchars($inv['mobile']); ?></td>
                                                 <td>&#x20B9;<?php echo inr_format($inv['total'], 2); ?></td>

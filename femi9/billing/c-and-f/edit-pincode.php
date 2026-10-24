@@ -111,7 +111,7 @@ $result_picnode_list=mysqli_fetch_array($fetch_product_list);
         <?php include("validate-scripts.php");?>                               
 <form action="product-action.php" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_picnode_list["id"]?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_picnode_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
@@ -138,12 +138,12 @@ $result_picnode_list=mysqli_fetch_array($fetch_product_list);
 										while($Result_Taluk_list12=mysqli_fetch_array($fetch_Taluk_list12))
 										{
 											?>
-											<option value="<?php echo $Result_Taluk_list12['id'];?>"><?php echo $Result_Taluk_list12['taluk'];?></option>
+											<option value="<?php echo htmlspecialchars((string)($Result_Taluk_list12['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($Result_Taluk_list12['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>
 												
 												<label for="exampleInputEmail1" class="form-label">Pincode</label>
-                                 <input type="text" maxlength="15" class="form-control" name="pincode" required="required" value="<?php echo $result_picnode_list['pincode'];?>" placeholder="Pincode" onkeypress="restrictpincode(event)"/>
+                                 <input type="text" maxlength="15" class="form-control" name="pincode" required="required" value="<?php echo htmlspecialchars((string)($result_picnode_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?>" placeholder="Pincode" onkeypress="restrictpincode(event)"/>
 												<br/>
 												
 												<button type="submit" name="update-pincode" class="btn btn-primary"><i class="material-icons">update</i>Update</button>

@@ -139,14 +139,14 @@ if ($hasTps) {
                                 <?php if (empty($requests)): ?>
                                     <tr><td colspan="9" class="text-center text-muted" style="padding:24px;">No requests found for this filter.</td></tr>
                                 <?php else: foreach ($requests as $r): ?>
-                                    <tr id="carRow<?php echo $r['id']; ?>">
+                                    <tr id="carRow<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <td><?php echo date('d M Y', strtotime($r['created_at'])); ?><br><span class="text-muted" style="font-size:11px;"><?php echo date('h:i A', strtotime($r['created_at'])); ?></span></td>
                                         <td><?php echo htmlspecialchars($r['tp_name']); ?><br><span class="text-muted" style="font-size:11px;"><?php echo htmlspecialchars($r['tp_code']); ?></span></td>
                                         <td><?php echo htmlspecialchars(tpProductTypeLabel($r['product_type'])); ?></td>
                                         <td><?php echo (int)$r['total_boxes']; ?> box<?php echo $r['total_boxes']!=1?'es':''; ?><?php if ($r['total_covers'] > 0): ?>, <?php echo (int)$r['total_covers']; ?> cover<?php echo $r['total_covers']!=1?'s':''; ?><?php endif; ?></td>
                                         <td>&#8377;<?php echo number_format($r['calculated_amount'],2); ?></td>
                                         <td style="max-width:220px;white-space:normal;"><?php echo $r['note'] ? htmlspecialchars($r['note']) : '<span class="text-muted">&mdash;</span>'; ?></td>
-                                        <td><span class="car-badge <?php echo $r['status']; ?>"><?php echo ucfirst($r['status']); ?></span></td>
+                                        <td><span class="car-badge <?php echo htmlspecialchars((string)($r['status']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucfirst($r['status'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span></td>
                                         <td style="font-size:11.5px;">
                                             <?php if ($r['reviewed_by_name']): ?>
                                                 <?php echo htmlspecialchars($r['reviewed_by_name']); ?><br>
@@ -158,9 +158,9 @@ if ($hasTps) {
                                         </td>
                                         <td>
                                             <?php if ($r['status'] === 'pending'): ?>
-                                            <button type="button" class="btn btn-primary btn-sm" onclick="openCarReview(<?php echo $r['id']; ?>, <?php echo (float)$r['calculated_amount']; ?>)">Review</button>
+                                            <button type="button" class="btn btn-primary btn-sm" onclick="openCarReview(<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo (float)$r['calculated_amount']; ?>)">Review</button>
                                             <?php elseif ($r['status'] === 'approved'): ?>
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openCarEdit(<?php echo $r['id']; ?>, <?php echo (float)$r['approved_amount']; ?>)">Edit</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openCarEdit(<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo (float)$r['approved_amount']; ?>)">Edit</button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>

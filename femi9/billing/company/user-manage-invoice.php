@@ -273,7 +273,7 @@ $select_Customers="select * from ".$tablename." where temp_id='$CuSTID'";
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 													<td><?php echo $Cust_Name;?><br/>M:&nbsp;<?php echo $Cust_Mbile;?>
 			
@@ -286,7 +286,7 @@ $select_Customers="select * from ".$tablename." where temp_id='$CuSTID'";
 			if($result_count_return==0){
 			?>
 													
-													<a href="update_customer.php?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=$result_product_list["inv_id"];?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
+													<a href="update_customer.php?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
 													</a>
 			<?php } else{ echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";}?>
 			<!----------END CUSTOMER UPDATE***--------->
@@ -322,16 +322,16 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 }
 ?>
 				<td><?php echo inr_format($result_product_list["total"], 2);?>
-				<br/><a href="add-receipt?invid=<?=$result_product_list["inv_id"];?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>"><?=$msgpayment;?></a>
+				<br/><a href="add-receipt?invid=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>"><?=$msgpayment;?></a>
 				</td>
 				
-				<td><?=$result_product_list["username"];?><br/><?=ucwords($result_product_list["usertype"]);?></td>
+				<td><?=htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/><?=htmlspecialchars((string)(ucwords($result_product_list["usertype"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 				
 				<td>
 				<?php if($result_product_list['rwpoints_enable']==1){?>
-				<a href="update_rwpermission?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>&&rwst=<?=$result_product_list['rwpoints_enable'];?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>&&invnumber=<?=base64_encode($result_product_list["inv_number"]);?>" onclick="return confirm('You want to confirm update to Disabled Reward Points?');"><span class='badge badge-style-bordered badge-success'>Enable</span></a>
+				<a href="update_rwpermission?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>&&rwst=<?=htmlspecialchars((string)($result_product_list['rwpoints_enable']), ENT_QUOTES, 'ISO-8859-1', false);?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>&&invnumber=<?=base64_encode($result_product_list["inv_number"]);?>" onclick="return confirm('You want to confirm update to Disabled Reward Points?');"><span class='badge badge-style-bordered badge-success'>Enable</span></a>
 				<?php }else{?>
-				<a href="update_rwpermission?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>&&rwst=<?=$result_product_list['rwpoints_enable'];?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>&&invnumber=<?=base64_encode($result_product_list["inv_number"]);?>" onclick="return confirm('You want to confirm update to Enable Reward Points?');"><span class='badge badge-style-bordered badge-danger'>Disabled</span></a>
+				<a href="update_rwpermission?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>&&rwst=<?=htmlspecialchars((string)($result_product_list['rwpoints_enable']), ENT_QUOTES, 'ISO-8859-1', false);?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>&&invnumber=<?=base64_encode($result_product_list["inv_number"]);?>" onclick="return confirm('You want to confirm update to Enable Reward Points?');"><span class='badge badge-style-bordered badge-danger'>Disabled</span></a>
 				<?php }?>
 				</td>
 													
@@ -354,7 +354,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 
 																										<td>
 													    <div class="actions-group">
-													        <a href="user-invoice-add?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=$INVID_encode;?>&&action=edit&&gid=<?=$result_product_list['from_user_id'];?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+													        <a href="user-invoice-add?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=$INVID_encode;?>&&action=edit&&gid=<?=htmlspecialchars((string)($result_product_list['from_user_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
 													    </div>
 													</td>
 	

@@ -29,7 +29,7 @@ $taluk_name=$result_taluklist['taluk'];
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : Distributor</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : Distributor</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -73,7 +73,7 @@ $taluk_name=$result_taluklist['taluk'];
  
  <?php if($result_product_list["user_icon"]!="Nil"){ ?>
  <tr>
-                    <th colspan="2"><img src="../stockist/<?php echo $result_product_list["user_icon"];?>" style="width:150px;border-radius:10px;"></th>
+                    <th colspan="2"><img src="../stockist/<?php echo htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;border-radius:10px;"></th>
                     </tr>
  <?php } ?>
  
@@ -98,7 +98,7 @@ $taluk_name=$result_taluklist['taluk'];
   
                     <tr>
                     <th scope="col">Name</th>
-                    <td><?php echo $result_product_list['name'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<?php 
@@ -114,19 +114,19 @@ $taluk_name=$result_taluklist['taluk'];
 					
 					<tr>
                     <th scope="col">State</th>
-                    <td><?php echo $result_product_list['state_id'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['state_id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">District</th>
-                    <td><?php echo $result_product_list['district_id'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['district_id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Taluk</th>
-                    <td><?php echo $result_product_list['taluk_id'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['taluk_id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Pincode</th>
-                    <td><?php echo $result_product_list['pincode_id'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['pincode_id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
@@ -145,31 +145,31 @@ $taluk_name=$result_taluklist['taluk'];
 					
 					<tr>
                     <th scope="col">Email ID</th>
-                    <td><?php echo $result_product_list['email'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Address</th>
-                    <td><?php echo $result_product_list['address'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Mobile Number</th>
-                    <td><?php echo $result_product_list['country_code'];?>&nbsp;<?php echo $result_product_list['mobile_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Username</th>
-                    <td><span id="usernamebox"><?php echo $result_product_list['username'];?></span></td>
+                    <td><span id="usernamebox"><?php echo htmlspecialchars((string)($result_product_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                     </tr>
 					
 					<!----<tr>
                     <th scope="col">Password</th>
-                    <td><?php echo $result_product_list['password'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['password']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>--->
 					
 					<tr>
                     <th scope="col">GST Number</th>
-                    <td><?php echo $result_product_list['gstin'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<?php /*?>
@@ -179,11 +179,11 @@ $taluk_name=$result_taluklist['taluk'];
 					
 					<tr>
                     <th scope="col">Plan Amount</th>
-                    <td>&#8377; <?php echo $result_product_list['plan_amount'];?></td>
+                    <td>&#8377; <?php echo htmlspecialchars((string)($result_product_list['plan_amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Valid Months</th>
-                    <td><?php echo $result_product_list['valid_months'];?> Months</td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['valid_months']), ENT_QUOTES, 'ISO-8859-1', false);?> Months</td>
                     </tr>
 					
 					<tr>
@@ -193,7 +193,7 @@ $taluk_name=$result_taluklist['taluk'];
 					
 					<tr>
                     <th scope="col">payment Method</th>
-                    <td><?php echo $result_product_list['amount_method'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['amount_method']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
@@ -214,7 +214,7 @@ $taluk_name=$result_taluklist['taluk'];
 					
 					<tr>
                     <th scope="col">Reference Number</th>
-                    <td><?php echo $result_product_list['ref_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['ref_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<?php */?>
                                                    

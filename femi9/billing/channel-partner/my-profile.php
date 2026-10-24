@@ -258,7 +258,7 @@ if (isset($_REQUEST['updateprofile'])) {
                                     </p>
 
                                     <form method="post" enctype="multipart/form-data" onsubmit="return confirm('Please confirm update.');">
-                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <div class="example-container">
                                             <div class="example-content">
 

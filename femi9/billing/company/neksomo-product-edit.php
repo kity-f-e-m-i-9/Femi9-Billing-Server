@@ -83,7 +83,7 @@ if (!$product) {
                                     <?php if (isset($_REQUEST['error'])) { ?><div class="alert alert-danger">Please check that the product name, category, GST, and unit fields are filled in correctly.</div><?php } ?>
 
 <form action="neksomo-product-action.php" method="post">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 <input type="hidden" name="action" value="update-product">
 <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
 

@@ -293,26 +293,26 @@ $fetch_product_list  = mysqli_query($db_conn, $select_product_list);
                                                 ?>
                                                 <tr>
                                                     <td class="text-center serial-number"><?php echo ++$i; ?></td>
-                                                    <td class="text-center"><?=$result_product_list["useridtext"];?></td>
-                                                    <td><span class="user-name"><?php echo ucwords($result_product_list["name"]);?></span></td>
+                                                    <td class="text-center"><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                                                    <td><span class="user-name"><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
 
                                                     <td class="text-center">
                                                         <a href="#" id="linkcaption"
                                                            data-bs-toggle="modal"
-                                                           data-bs-target="#modal<?php echo $result_product_list["id"];?>"
+                                                           data-bs-target="#modal<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>"
                                                            title="Click to Update Mobile Number">
-                                                            <?=$result_product_list["country_code"];?>&nbsp;<?=$result_product_list["mobile_number"];?>
+                                                            <?=htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
                                                         </a>
 
-                                                        <div class="modal fade" id="modal<?php echo $result_product_list["id"];?>" tabindex="-1" aria-hidden="true">
+                                                        <div class="modal fade" id="modal<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-hidden="true">
                                                             <div class="modal-dialog">
                                                                 <div class="modal-content">
                                                                     <div class="modal-header">
-                                                                        <h5 class="modal-title">Update Mobile Number<br/><?=$result_product_list["mobile_number"];?></h5>
+                                                                        <h5 class="modal-title">Update Mobile Number<br/><?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></h5>
                                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                     </div>
                                                                     <form method="post" onsubmit="return confirm('Please confirm!');" enctype="multipart/form-data" action="update_mobile_action">
-                                                                        <input type="hidden" name="old_mobile_number" value="<?=$result_product_list["mobile_number"];?>">
+                                                                        <input type="hidden" name="old_mobile_number" value="<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                                         <input type="hidden" name="update_usertype"   value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>">
                                                                         <div class="example-content" style="padding:20px;">
                                                                             <div class="form-floating mb-3">
@@ -337,24 +337,24 @@ $fetch_product_list  = mysqli_query($db_conn, $select_product_list);
                                                         <td>
                                                             <div style="display:flex;align-items:center;gap:8px;">
                                                                 <span>Company</span>
-                                                                <a href="JavaScript:newPopup('update_referral.php?stockistid=<?=$result_product_list['temp_id'];?>');">
+                                                                <a href="JavaScript:newPopup('update_referral.php?stockistid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>');">
                                                                     <button class="btn-update">Update</button>
                                                                 </a>
                                                             </div>
                                                         </td>
                                                         <td class="text-center">---</td>
                                                     <?php else: ?>
-                                                        <td class="text-center"><?=$result_count_REFERID["useridtext"];?></td>
+                                                        <td class="text-center"><?=htmlspecialchars((string)($result_count_REFERID["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                         <td>
                                                             <div style="display:flex;flex-direction:column;gap:4px;">
-                                                                <span class="user-name"><?=$result_count_REFERID['name'];?></span>
+                                                                <span class="user-name"><?=htmlspecialchars((string)($result_count_REFERID['name']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                                                 <span style="font-size:11px;color:#888;"><?=$labelname;?></span>
-                                                                <a href="JavaScript:newPopup('update_referral.php?stockistid=<?=$result_product_list['temp_id'];?>');">
+                                                                <a href="JavaScript:newPopup('update_referral.php?stockistid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>');">
                                                                     <button class="btn-update">Update</button>
                                                                 </a>
                                                             </div>
                                                         </td>
-                                                        <td class="text-center"><?=$result_count_REFERID['mobile_number'];?></td>
+                                                        <td class="text-center"><?=htmlspecialchars((string)($result_count_REFERID['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <?php endif; ?>
                                                 </tr>
                                                 <?php endwhile; ?>

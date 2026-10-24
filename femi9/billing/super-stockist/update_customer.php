@@ -131,7 +131,7 @@ else
 											?>
                                             
                                                 <tr>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $Cust_Name;?><br/>M: <?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
@@ -193,7 +193,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 			
 			
 ?>
-<option value="<?=$result_Customers_list['temp_id'];?>"><?=$UserName_SHOW;?></option>
+<option value="<?=htmlspecialchars((string)($result_Customers_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=$UserName_SHOW;?></option>
 <?php }?>
 </select>
 							   

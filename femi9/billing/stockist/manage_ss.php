@@ -143,25 +143,25 @@ $pincodeshow=$result_pincodelist['pincode'];
                                             
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_product_list["useridtext"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
-					D:&nbsp;<?=ucwords($result_product_list["district_id"]);?><br/>
-					T:&nbsp;<?=ucwords($result_product_list["taluk_id"]);?>
-					<br/>P:&nbsp;<?=$result_product_list["pincode_id"];?>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+					D:&nbsp;<?=htmlspecialchars((string)(ucwords($result_product_list["district_id"])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					T:&nbsp;<?=htmlspecialchars((string)(ucwords($result_product_list["taluk_id"])), ENT_QUOTES, 'ISO-8859-1', false);?>
+					<br/>P:&nbsp;<?=htmlspecialchars((string)($result_product_list["pincode_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</td>
-					<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					
 					<?php /*?>
-					<td><b><?php echo $result_product_list["username"];?></b></td>
-					<td>&#8377; <?php echo $result_product_list["plan_amount"];?><br/>
-					<?php echo $result_product_list["valid_months"];?> Days<br/>
+					<td><b><?php echo htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
+					<td>&#8377; <?php echo htmlspecialchars((string)($result_product_list["plan_amount"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?php echo htmlspecialchars((string)($result_product_list["valid_months"]), ENT_QUOTES, 'ISO-8859-1', false);?> Days<br/>
 					<?php echo date("d/m/Y",strtotime($result_product_list["valid_from"]));?>
 					(to) <?php echo date("d/m/Y",strtotime($result_product_list["valid_to"]));?>
 					</td>
 					
-					<td><?php echo $result_product_list["ref_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["ref_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<?php */?>
 					
 					<td>

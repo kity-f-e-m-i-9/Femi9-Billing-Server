@@ -83,12 +83,12 @@ $select_product_list="select * from competitor_brand where id=?";
 <?php include("validate-scripts.php");?>                                       
 <form action="brand-action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                 <label for="brand" class="form-label">Brand Name</label>
-         <input type="text" required="" name="brand" value="<?=$result_product_list["brand"]?>" class="form-control" id="brand" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
+         <input type="text" required="" name="brand" value="<?=htmlspecialchars((string)($result_product_list["brand"]), ENT_QUOTES, 'ISO-8859-1', false)?>" class="form-control" id="brand" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
 												<br/>
 												
 												

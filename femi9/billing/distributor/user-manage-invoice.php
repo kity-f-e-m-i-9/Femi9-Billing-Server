@@ -172,16 +172,16 @@ $i= $start_from;
                                                     <td><?php echo ++$i; ?></td>
                                                     
 													<!--delivery note form open--->		
-													<td><a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo $result_product_list["id"];?>">
-													<?php echo $result_product_list["inv_number"];?></a></td>
+													<td><a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
+													<?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 													
-													<div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+													<div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
 													
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
                                                                 <h5 class="modal-title" id="exampleModalLiveLabel">Update Delivery Note<br/>
-																<?php echo $result_product_list["inv_number"];?></h5>
+																<?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></h5>
                                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
 									<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="dlnote_action">	
@@ -192,57 +192,57 @@ $Fetch_DLDetails=mysqli_query($db_conn,$Select_DLDetails);
 $Result_DLDetails=mysqli_fetch_array($Fetch_DLDetails);
 ?>
 									
-									<input type="hidden" name="inv_id" value="<?php echo $result_product_list["inv_id"];?>">
-									<input type="hidden" name="inv_number" value="<?php echo $result_product_list["inv_number"];?>">
+									<input type="hidden" name="inv_id" value="<?php echo htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
+									<input type="hidden" name="inv_number" value="<?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
 									<input type="hidden" name="inv_table" value="shop">
 															
                                                             <div class="example-content" style="padding:20px;">
                                                 <div class="form-floating mb-3">
-                                                    <input type="text" name="dl_note" placeholder="Delivery Note" class="form-control" id="floatingInput" value="<?=$Result_DLDetails['dl_note'];?>">
+                                                    <input type="text" name="dl_note" placeholder="Delivery Note" class="form-control" id="floatingInput" value="<?=htmlspecialchars((string)($Result_DLDetails['dl_note']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingInput">Delivery Note</label>
                                                 </div>
                                                 <div class="form-floating mb-3">
-                                                    <input type="text" name="mode_pmnt" placeholder="Mode/Terms of Payment" class="form-control" id="floatingPassword" value="<?=$Result_DLDetails['mode_pmnt'];?>">
+                                                    <input type="text" name="mode_pmnt" placeholder="Mode/Terms of Payment" class="form-control" id="floatingPassword" value="<?=htmlspecialchars((string)($Result_DLDetails['mode_pmnt']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Mode/Terms of Payment</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="text" name="ref_no" placeholder="Reference No." class="form-control" id="floatingPassword" value="<?=$Result_DLDetails['ref_no'];?>">
+                                                    <input type="text" name="ref_no" placeholder="Reference No." class="form-control" id="floatingPassword" value="<?=htmlspecialchars((string)($Result_DLDetails['ref_no']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Reference No.</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="date" placeholder="Reference Date." class="form-control" id="floatingPassword" name="ref_date" value="<?=$Result_DLDetails['ref_date'];?>">
+                                                    <input type="date" placeholder="Reference Date." class="form-control" id="floatingPassword" name="ref_date" value="<?=htmlspecialchars((string)($Result_DLDetails['ref_date']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Reference Date.</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="text" placeholder="Other References" class="form-control" id="floatingPassword" name="ot_ref" value="<?=$Result_DLDetails['ot_ref'];?>">
+                                                    <input type="text" placeholder="Other References" class="form-control" id="floatingPassword" name="ot_ref" value="<?=htmlspecialchars((string)($Result_DLDetails['ot_ref']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Other References</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="text" placeholder="Buyer's Order No." class="form-control" id="floatingPassword" name="order_no" value="<?=$Result_DLDetails['order_no'];?>">
+                                                    <input type="text" placeholder="Buyer's Order No." class="form-control" id="floatingPassword" name="order_no" value="<?=htmlspecialchars((string)($Result_DLDetails['order_no']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Buyer's Order No.</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="date" placeholder="Dated" class="form-control" id="floatingPassword" name="dated" value="<?=$Result_DLDetails['dated'];?>">
+                                                    <input type="date" placeholder="Dated" class="form-control" id="floatingPassword" name="dated" value="<?=htmlspecialchars((string)($Result_DLDetails['dated']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Dated</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="text" placeholder="Dispatch Doc No." class="form-control" id="floatingPassword" name="dispatch_doc_no" value="<?=$Result_DLDetails['dispatch_doc_no'];?>">
+                                                    <input type="text" placeholder="Dispatch Doc No." class="form-control" id="floatingPassword" name="dispatch_doc_no" value="<?=htmlspecialchars((string)($Result_DLDetails['dispatch_doc_no']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Dispatch Doc No.</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="date" placeholder="Delivery Note Date" class="form-control" id="floatingPassword" name="dlnote_date" value="<?=$Result_DLDetails['dlnote_date'];?>">
+                                                    <input type="date" placeholder="Delivery Note Date" class="form-control" id="floatingPassword" name="dlnote_date" value="<?=htmlspecialchars((string)($Result_DLDetails['dlnote_date']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Delivery Note Date</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="text" placeholder="Dispatched through" class="form-control" id="floatingPassword" name="dispatch_through" value="<?=$Result_DLDetails['dispatch_through'];?>">
+                                                    <input type="text" placeholder="Dispatched through" class="form-control" id="floatingPassword" name="dispatch_through" value="<?=htmlspecialchars((string)($Result_DLDetails['dispatch_through']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Dispatched through</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="text" placeholder="Destination" class="form-control" id="floatingPassword" name="destination" value="<?=$Result_DLDetails['destination'];?>">
+                                                    <input type="text" placeholder="Destination" class="form-control" id="floatingPassword" name="destination" value="<?=htmlspecialchars((string)($Result_DLDetails['destination']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Destination</label>
                                                 </div>
 												<div class="form-floating mb-3">
-                                                    <input type="text" placeholder="Terms of Delivery" class="form-control" id="floatingPassword" name="terms" value="<?=$Result_DLDetails['terms'];?>">
+                                                    <input type="text" placeholder="Terms of Delivery" class="form-control" id="floatingPassword" name="terms" value="<?=htmlspecialchars((string)($Result_DLDetails['terms']), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                     <label for="floatingPassword">Terms of Delivery</label>
                                                 </div>
 												
@@ -268,7 +268,7 @@ $Result_DLDetails=mysqli_fetch_array($Fetch_DLDetails);
 			if($result_count_return==0){
 			?>
 													
-													<a href="update_customer2.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$result_product_list["inv_id"];?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
+													<a href="update_customer2.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
 													</a>
 			<?php } else{ echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";}?>
 			<!----------END CUSTOMER UPDATE***--------->
@@ -300,7 +300,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 }
 ?>
 				<td><?php echo inr_format($result_product_list["total"], 2);?>
-				<br/><a href="add-receipt?invid=<?=$result_product_list["inv_id"];?>&&invuser=<?=$getinvuser;?>"><?=$msgpayment;?></a>
+				<br/><a href="add-receipt?invid=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>&&invuser=<?=$getinvuser;?>"><?=$msgpayment;?></a>
 				</td>					
 												
 <td>

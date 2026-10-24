@@ -505,7 +505,7 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Stockist</span>
-                       <span class="widget-stats-amount"><?=$result_stockistcount['numcountstockist'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_stockistcount['numcountstockist']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
                                         </div>
                                     </div>
@@ -526,7 +526,7 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
 	$Fetchcount_DIST=mysqli_query($db_conn,$Selectcount_DIST);
 	$Resultcount_DIST=mysqli_fetch_array($Fetchcount_DIST);
 	?>
-                       <span class="widget-stats-amount"><?=$Resultcount_DIST['numcountDIST'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($Resultcount_DIST['numcountDIST']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
                                         </div>
                                     </div>
@@ -559,7 +559,7 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
                                             </div>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Total<br/>Taluk</span>
-                       <span class="widget-stats-amount"><?=$result_counTalluk['TolTalukCount'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_counTalluk['TolTalukCount']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
 										</div>
                                     </div>
@@ -589,7 +589,7 @@ function newPopup(url) {
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Total<br/>Pincode</span>
-                       <span class="widget-stats-amount"><?=$result_counPincode['TolPINCCount'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_counPincode['TolPINCCount']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
 										</div>
                                     </div>
@@ -611,7 +611,7 @@ function newPopup(url) {
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Available<br/>Taluk</span>
-                       <span class="widget-stats-amount"><?=$result_counTallukAvailable['TolTalukCountAvailable'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_counTallukAvailable['TolTalukCountAvailable']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
 										</div>
                                     </div>
@@ -632,7 +632,7 @@ function newPopup(url) {
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Available<br/>Pincode</span>
-                       <span class="widget-stats-amount"><?=$ResultPINCAvailable['TolPINCCountAvailable'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($ResultPINCAvailable['TolPINCCountAvailable']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
 										</div>
                                     </div>

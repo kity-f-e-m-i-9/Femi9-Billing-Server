@@ -288,7 +288,7 @@ $warehouses_list = $wh_result ? $wh_result->fetch_all(MYSQLI_ASSOC) : [];
                     <?php endif; ?>
 
                     <form action="pl-godown-transfer-action" method="post" id="transferForm">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="transfer_type" value="location_to_godown">
                         <input type="hidden" name="note" value="">
 
@@ -312,7 +312,7 @@ $warehouses_list = $wh_result ? $wh_result->fetch_all(MYSQLI_ASSOC) : [];
                                         <select name="cp_id" id="locationSelect" class="form-control" required>
                                             <option value=""></option>
                                             <?php foreach ($cp_list as $cp): ?>
-                                            <option value="<?php echo $cp['id']; ?>"
+                                            <option value="<?php echo htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"
                                                 data-code="<?php echo htmlspecialchars($cp['cp_id']); ?>">
                                                 <?php echo htmlspecialchars($cp['name']); ?> (<?php echo htmlspecialchars($cp['cp_id']); ?>)
                                             </option>
@@ -326,7 +326,7 @@ $warehouses_list = $wh_result ? $wh_result->fetch_all(MYSQLI_ASSOC) : [];
                                         <select name="godown_id" id="godownSelect" class="form-control" required>
                                             <option value=""></option>
                                             <?php foreach ($godowns as $g): ?>
-                                            <option value="<?php echo $g['id']; ?>"
+                                            <option value="<?php echo htmlspecialchars((string)($g['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"
                                                 data-contact="<?php echo htmlspecialchars($g['contact'] ?? ''); ?>">
                                                 <?php echo htmlspecialchars($g['gname']); ?>
                                             </option>

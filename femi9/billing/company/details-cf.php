@@ -15,7 +15,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : C&F</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : C&F</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -57,7 +57,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
  <table class="table">
   <?php if($result_product_list["user_icon"]!="Nil"){ ?>
  <tr>
-                    <th colspan="2"><img src="<?php echo $result_product_list["user_icon"];?>" style="width:150px;border-radius:10px;"></th>
+                    <th colspan="2"><img src="<?php echo htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;border-radius:10px;"></th>
                     </tr>
  <?php } ?>
  <tr>
@@ -79,7 +79,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
                     </tr>
                     <tr>
                     <th scope="col">Name</th>
-                    <td><?php echo ucwords($result_product_list['name']);?></td>
+                    <td><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
@@ -98,7 +98,7 @@ $select_distict="select st_name from state where id=?";
 	$fetch_district=db_q($db_conn,$select_distict,[$value]);
 $result_district=mysqli_fetch_array($fetch_district);
 		
-		echo "<li>".ucwords($result_district['st_name'])."</li>";
+		echo "<li>".htmlspecialchars((string)(ucwords($result_district['st_name'])), ENT_QUOTES, 'ISO-8859-1', false)."</li>";
 	
    }
 
@@ -109,31 +109,31 @@ $result_district=mysqli_fetch_array($fetch_district);
 					
 					<tr>
                     <th scope="col">Email ID</th>
-                    <td><?php echo $result_product_list['email'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Address</th>
-                    <td><?php echo $result_product_list['address'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Mobile Number</th>
-                    <td><?php echo $result_product_list['country_code'];?>&nbsp;<?php echo $result_product_list['mobile_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Username</th>
-                    <td><span id="usernamebox"><?php echo $result_product_list['username'];?></span></td>
+                    <td><span id="usernamebox"><?php echo htmlspecialchars((string)($result_product_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Password</th>
-                    <td><?php echo $result_product_list['password'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['password']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					 <tr>
                     <th scope="col">GST Number</th>
-                    <td><?php echo $result_product_list['gstin'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
                                                    

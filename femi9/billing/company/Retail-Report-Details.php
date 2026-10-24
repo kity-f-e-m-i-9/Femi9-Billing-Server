@@ -448,7 +448,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($dist = $dist_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_district == $dist['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$dist['id'].'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($dist['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
                                                             }
                                                             $stmt_dist->close();
                                                         }
@@ -469,7 +469,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($taluk = $taluk_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_taluk == $taluk['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$taluk['id'].'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($taluk['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
                                                             }
                                                             $stmt_taluk->close();
                                                         }
@@ -498,7 +498,7 @@ $qparam = urlencode($search ?? '');
                                                         if($cat_result) {
                                                             while($cat = mysqli_fetch_assoc($cat_result)) {
                                                                 $selected_attr = ($selected_stockist_category == $cat['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$cat['id'].'" '.$selected_attr.'>'.htmlspecialchars($cat['catname']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($cat['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($cat['catname']).'</option>';
                                                             }
                                                         }
                                                         ?>

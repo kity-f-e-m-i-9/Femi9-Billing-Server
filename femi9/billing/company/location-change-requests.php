@@ -137,13 +137,13 @@ $pendingCount = (int)($db_conn->query("SELECT COUNT(*) c FROM ms_shop_location_r
                                     <?php if (empty($requests)): ?>
                                         <tr><td colspan="8" class="text-center text-muted" style="padding:24px;">No requests found for this filter.</td></tr>
                                     <?php else: foreach ($requests as $r): ?>
-                                        <tr id="lcrRow<?php echo $r['id']; ?>">
+                                        <tr id="lcrRow<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                             <td><?php echo date('d M Y', strtotime($r['requested_at'])); ?><br><span class="text-muted" style="font-size:11px;"><?php echo date('h:i A', strtotime($r['requested_at'])); ?></span></td>
                                             <td><?php echo htmlspecialchars($r['shop_name']); ?><br><span class="text-muted" style="font-size:11px;"><?php echo htmlspecialchars($r['shop_address']); ?></span></td>
                                             <td><?php echo htmlspecialchars($r['shop_district'] ?? '—'); ?></td>
                                             <td><?php echo htmlspecialchars($r['ms_name'] ?? '—'); ?></td>
                                             <td><?php echo (int)$r['location_recapture_count']; ?> / 2</td>
-                                            <td><span class="lcr-badge <?php echo $r['status']; ?>"><?php echo ucfirst($r['status']); ?></span></td>
+                                            <td><span class="lcr-badge <?php echo htmlspecialchars((string)($r['status']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucfirst($r['status'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span></td>
                                             <td style="font-size:11.5px;">
                                                 <?php if ($r['responded_at']): ?>
                                                     <?php echo htmlspecialchars($r['responded_by_name'] ?? ''); ?><br>
@@ -155,7 +155,7 @@ $pendingCount = (int)($db_conn->query("SELECT COUNT(*) c FROM ms_shop_location_r
                                             </td>
                                             <td>
                                                 <?php if ($r['status'] === 'pending'): ?>
-                                                <button type="button" class="btn btn-primary btn-sm" onclick="openLcrReview(<?php echo $r['id']; ?>, '<?php echo htmlspecialchars($r['shop_name'], ENT_QUOTES); ?>')">Review</button>
+                                                <button type="button" class="btn btn-primary btn-sm" onclick="openLcrReview(<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>, '<?php echo htmlspecialchars($r['shop_name'], ENT_QUOTES); ?>')">Review</button>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>

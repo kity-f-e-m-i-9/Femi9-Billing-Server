@@ -87,7 +87,7 @@ $warehouses_list = $wh_result ? $wh_result->fetch_all(MYSQLI_ASSOC) : [];
 									
 									
 									<div class="card-body">
-									<?php if(isset($_REQUEST['stocknotupdated'])){?><div class="alert alert-danger">Please update opening stock (<?=$result_Godown['gname'];?>) !</div>
+									<?php if(isset($_REQUEST['stocknotupdated'])){?><div class="alert alert-danger">Please update opening stock (<?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?>) !</div>
 									<?php }?>
 									
 									<?php if(isset($_REQUEST['alreadyexists'])){?><div class="alert alert-danger">Invalid Return Stock details, already exists !</div>
@@ -120,7 +120,7 @@ $tempID="".$randum_number."RTST/".$temp_date."/".$temp_time."";?>
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						   <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+						   <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>
@@ -149,7 +149,7 @@ $tempID="".$randum_number."RTST/".$temp_date."/".$temp_time."";?>
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											?>
-<option value="<?php echo $result_product_list['id'];?>"><?php echo $result_product_list['productName'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_product_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 </select>
 <br/>

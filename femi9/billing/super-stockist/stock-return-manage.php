@@ -120,7 +120,7 @@ $i= $start_from;
                                             
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_product_list['invnumber'];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?=date("d/m/Y",strtotime($result_product_list['date']));?></td>
 					<td><?=$TotalReturnqty;?></td>
 					<td><?=inr_format($result_product_list['subtotal'], 2);?></td>

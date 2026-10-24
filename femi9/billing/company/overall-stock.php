@@ -206,7 +206,7 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
 									while($result_Godown=mysqli_fetch_array($fetch_Godown))
 									{?>
 								<label style="font-weight:normal;display:flex;align-items:center;gap:6px;padding:5px 0;white-space:nowrap;margin:0;">
-								<input type="checkbox" name="godownid[]" value="<?=$result_Godown['id'];?>" class="godown-check" data-gname="<?=htmlspecialchars($result_Godown['gname'], ENT_QUOTES, 'UTF-8');?>" onchange="onGodownFilterChange()"> <?=$result_Godown['gname'];?>
+								<input type="checkbox" name="godownid[]" value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="godown-check" data-gname="<?=htmlspecialchars($result_Godown['gname'], ENT_QUOTES, 'UTF-8');?>" onchange="onGodownFilterChange()"> <?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?>
 								</label>
 									<?php }?>
 									</div>
@@ -318,7 +318,7 @@ foreach ($warehouseBuckets as $bucketKey => $bucket) {
 							<div class="col">
 								<div class="card">
 									<div class="card-body">
-										<h1><span><?=$result_Godown['gname'];?> &mdash; <?=htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8');?></span> <span class="card-summary-line" id="cardSummary-<?=$user_id_Loginvl;?>-<?=htmlspecialchars($cardFilterClass, ENT_QUOTES, 'UTF-8');?>"></span></h1>
+										<h1><span><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?> &mdash; <?=htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8');?></span> <span class="card-summary-line" id="cardSummary-<?=$user_id_Loginvl;?>-<?=htmlspecialchars($cardFilterClass, ENT_QUOTES, 'UTF-8');?>"></span></h1>
 										<div style="background:#fff;overflow:scroll;width:100%;">
 										<table class="table">
 											<thead>
@@ -399,10 +399,10 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
     $SalesQtyShown = datewiseNetSalesTotal($db_conn, (int)$StockProductID, '2000-01-01', date('Y-m-d'), (string)$user_id_Loginvl, true, $cardWarehouseCond);
 ?>
 												<tr class="product-row" data-product-name="<?php echo htmlspecialchars(strtolower($Result_productDetils['productName']), ENT_QUOTES, 'UTF-8'); ?>">
-													<td><?php echo $Result_productDetils["productName"];?></td>
-													<td><?php echo $Result_OPStock['opening_qty'];?></td>
+													<td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($Result_OPStock['opening_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
-													<td align="right"><?php echo $Result_OPStock['input_qty'];?></td>
+													<td align="right"><?php echo htmlspecialchars((string)($Result_OPStock['input_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td align="right"><?php echo $SalesQtyShown;?></td>
 													<td align="right"><?php echo $ReturnQty;?></td>
 													<td align="right"><?php echo $isUnassignedBucket ? $DfdQty : '&mdash;';?></td>

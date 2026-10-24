@@ -80,7 +80,7 @@ $Cust_Mbile = $resCust['mobile'] ?? '';
                         $res = mysqli_query($db_conn, "SELECT * FROM customers WHERE user_type='".db_esc($Login_user_TYPEvl)."' AND user_id='".db_esc($Login_user_IDvl)."' ORDER BY name ASC");
                         while ($rc = mysqli_fetch_array($res)) {
                             $sel = ($rc['id'] == $CuSTID) ? '' : '';
-                            echo "<option value='{$rc['id']}'>" . htmlspecialchars(strtoupper($rc['name'])) . ", " . htmlspecialchars($rc['mobile']) . "</option>";
+                            echo "<option value='".htmlspecialchars((string)($rc['id']), ENT_QUOTES, 'ISO-8859-1', false)."'>" . htmlspecialchars(strtoupper($rc['name'])) . ", " . htmlspecialchars($rc['mobile']) . "</option>";
                         }
                         ?>
                         </select>

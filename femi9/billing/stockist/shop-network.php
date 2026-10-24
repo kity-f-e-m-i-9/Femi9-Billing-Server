@@ -126,8 +126,8 @@ $taluk_name12=$result_Taluks1212['taluk'];
 ?>
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list1212["name"]);?></td>
-<td><?php echo strtoupper($result_district1212['dist_name']);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list1212["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_district1212['dist_name'])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($taluk_name12);?></td>
 </tr>
 </tbody>
@@ -175,7 +175,7 @@ $pincodeshow=$result_pincodelist['pincode'];
 
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list["name"]);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($district_name);?></td>
 <td><?php echo strtoupper($taluk_name);?></td>
 <td><?php echo strtoupper($pincodeshow);?></td>
@@ -226,7 +226,7 @@ $pincodeshow=$result_pincodelist['pincode'];
 
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list["name"]);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($district_name);?></td>
 <td><?php echo strtoupper($taluk_name);?></td>
 <td><?php echo strtoupper($pincodeshow);?></td>

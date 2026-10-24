@@ -130,22 +130,22 @@ $district_name=	$result_district['dist_name'];
 <hr/>
 <p class="cusdetaiis">
 Consignee (Ship to):<br/>
-<b><?php echo ucwords($result_Customer_Details['name']);?></b><br/>
-GSTIN: <?=$result_Customer_Details['gstin'];?><br/>
+<b><?php echo htmlspecialchars((string)(ucwords($result_Customer_Details['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+GSTIN: <?=htmlspecialchars((string)($result_Customer_Details['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 State : <?=$state_name;?>, District: <?=$district_name?>
 </p>
 <hr/>
 <p class="cusdetaiis">
 Buyer (Bill to):<br/>
-<b><?php echo ucwords($result_Customer_Details['name']);?></b><br/>
-GSTIN: <?=$result_Customer_Details['gstin'];?><br/>
+<b><?php echo htmlspecialchars((string)(ucwords($result_Customer_Details['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+GSTIN: <?=htmlspecialchars((string)($result_Customer_Details['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 State : <?=$state_name;?>, District: <?=$district_name?>
 </p>
 </td>
 <td valign="top">
 <table id="second_topvl">
 <tr id="border_nbottom">
-<td>Invoice #<br/><b><?php echo $result_Invoice_Details['inv_number'];?></b></td>
+<td>Invoice #<br/><b><?php echo htmlspecialchars((string)($result_Invoice_Details['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 <td>Invoice Date:<br/><b><?php echo date("d M Y",strtotime($result_Invoice_Details['date']));?></b></td>
 </tr>
 <tr id="border_nbottom" valign="top">
@@ -209,7 +209,7 @@ Terms of Delivery<br/>
 	?>
 <tr>
 <td>1</td>
-<td><b><?=$result_ProductDetails123['productName'];?></b></td>
+<td><b><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 <td id="rightlaign">961900</td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>

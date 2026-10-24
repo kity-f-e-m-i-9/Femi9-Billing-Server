@@ -116,8 +116,8 @@ $tempID2="".$randum_number2."/STR/".$temp_date2."".$temp_time2."";?>
 	<input type="hidden" name="fromusertype" value="<?=$Login_user_TYPEvl;?>">
 	<input type="hidden" name="fromuserid" value="<?=$Login_user_IDvl;?>">
 	
-	<input type="hidden" name="tousertype" value="<?=$result_LoGuserDtails['onboard_userTYPE'];?>">
-	<input type="hidden" name="touserid" value="<?=$result_LoGuserDtails['onboard_userID'];?>">
+	<input type="hidden" name="tousertype" value="<?=htmlspecialchars((string)($result_LoGuserDtails['onboard_userTYPE']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+	<input type="hidden" name="touserid" value="<?=htmlspecialchars((string)($result_LoGuserDtails['onboard_userID']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
 <label class="form-label">Date</label>
 <input type="date" value="<?=date("Y-m-d");?>" disabled required="" class="form-control">
@@ -131,7 +131,7 @@ $fetchuserprofiles23=db_q($db_conn,$selectuserprofiles23,[$Login_user_TYPEvl,$Lo
 $resultuserprofiles23=mysqli_fetch_array($fetchuserprofiles23);
 ?>
 <label class="form-label">Delivery Address</label>
-<textarea name="delivery_address" required="" onkeypress="restrictSpecialChars(event)" class="form-control"><?=$resultuserprofiles23['deliveryaddress'];?></textarea>
+<textarea name="delivery_address" required="" onkeypress="restrictSpecialChars(event)" class="form-control"><?=htmlspecialchars((string)($resultuserprofiles23['deliveryaddress']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 </br>
 
 <?php
@@ -193,9 +193,9 @@ xmlhttp.send();}
 					while($result_productCurrentst=mysqli_fetch_array($fetch_productCurrentst))
 										{
 										?>
-        <input type="hidden" name="prid[]" value="<?php echo $result_productCurrentst['id']; ?>"/>
+        <input type="hidden" name="prid[]" value="<?php echo htmlspecialchars((string)($result_productCurrentst['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"/>
         <tr>
-                                 <td><?php echo $result_productCurrentst["productName"];?></td>
+                                 <td><?php echo htmlspecialchars((string)($result_productCurrentst["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 		<td><input type="number" name="qty[]" class="form-control" required="" autofocus style="border-color:#000 !important;" placeholder="Qty" min="0" onkeypress="restrictnumber(event)"/></td>
                                                 </tr>
                                            

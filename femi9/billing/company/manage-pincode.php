@@ -153,8 +153,8 @@ $i= $start_from;
 													<td><?php echo $state_name;?></td>
                                                     <td><?php echo $district_name;?></td>
 													<td><?php echo $talulk_name;?></td>
-													<td><?php echo $result_pincode_list['id'];?></td>
-													<td><?php echo $result_pincode_list['pincode'];?></td>
+													<td><?php echo htmlspecialchars((string)($result_pincode_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_pincode_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 																										<td>
 													    <div class="actions-group">
 													        <a href="edit-pincode?prid=<?php echo $row_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>

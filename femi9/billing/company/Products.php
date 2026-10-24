@@ -97,7 +97,7 @@ $temp_time=date("gis");
 $tempID="".$randum_number."/".$temp_date."/".$temp_time."";?>
 
 <input type="hidden" name="temp_id" value="<?=$tempID?>">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <div class="example-container">
                                             <div class="example-content">
                                                 <label for="exampleInputEmail1" class="form-label">Product Name</label>

@@ -157,7 +157,7 @@ $pendingCount = (int)($db_conn->query("SELECT COUNT(*) c FROM tp_courier_amount_
                                                 <?php endif; ?>
                                             </td>
                                             <td style="max-width:200px;white-space:normal;"><?php echo $r['note'] ? htmlspecialchars($r['note']) : '<span class="text-muted">&mdash;</span>'; ?></td>
-                                            <td><span class="car-badge <?php echo $r['status']; ?>"><?php echo ucfirst($r['status']); ?></span></td>
+                                            <td><span class="car-badge <?php echo htmlspecialchars((string)($r['status']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucfirst($r['status'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span></td>
                                             <td style="font-size:11.5px;">
                                                 <?php if ($r['reviewed_by_name']): ?>
                                                     <?php echo htmlspecialchars($r['reviewed_by_name']); ?><br>
@@ -168,9 +168,9 @@ $pendingCount = (int)($db_conn->query("SELECT COUNT(*) c FROM tp_courier_amount_
                                             </td>
                                             <td>
                                                 <?php if ($r['status'] === 'pending'): ?>
-                                                <button type="button" class="btn btn-primary btn-sm" onclick="openCarReview(<?php echo $r['id']; ?>, <?php echo (float)$r['calculated_amount']; ?>)">Review</button>
+                                                <button type="button" class="btn btn-primary btn-sm" onclick="openCarReview(<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo (float)$r['calculated_amount']; ?>)">Review</button>
                                                 <?php elseif ($r['status'] === 'approved'): ?>
-                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openCarEdit(<?php echo $r['id']; ?>, <?php echo (float)$r['approved_amount']; ?>)">Edit</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openCarEdit(<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo (float)$r['approved_amount']; ?>)">Edit</button>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>

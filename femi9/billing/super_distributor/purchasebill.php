@@ -115,7 +115,7 @@ $i= $start_from;
                                             
                                                 <tr valign="top">
                             <td><?php echo ++$i; ?></td>
-							<td><?php echo $result_product_list["inv_number"];?></td>
+							<td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
 				<td><?php echo inr_format($result_product_list["sub_total"], 2);?></td>
@@ -143,7 +143,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 }
 ?>
 				<td><?php echo inr_format($result_product_list["total"], 2);?>
-				<br/><a href="viewpmnt?invid=<?=$result_product_list["inv_id"];?>"><?=$msgpayment;?></a>
+				<br/><a href="viewpmnt?invid=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=$msgpayment;?></a>
 				</td>
 													
 									

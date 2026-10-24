@@ -148,7 +148,7 @@ $taluk_name=$result_Taluk12['taluk'];
                                                     <td><?php echo ++$i; ?></td>
                                  <td><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
 								 
-								<td><b><?=strtoupper($result_distlist['name']);?></b>
+								<td><b><?=htmlspecialchars((string)(strtoupper($result_distlist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b>
 								<br/>
 								<span style="font-size:13px;color:#999;"><?=strtoupper($fromusertype);?></span>
 								</td>	

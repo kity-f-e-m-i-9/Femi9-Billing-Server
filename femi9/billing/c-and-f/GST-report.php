@@ -157,7 +157,7 @@ $CGST=$TotalbillamountGST/2;
 									  
                         <td><?=$i=$i+1; ?></td>
 						<td><?=date("d/m/Y",strtotime($result_pincode_list['date']));?></td>
-                        <td><?=$result_pincode_list['inv_number'];?></td>
+                        <td><?=htmlspecialchars((string)($result_pincode_list['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						<td style="text-align:right;"><?=inr_format($TotalBillAmountFinally, 2);?></td>
 						<td style="text-align:right;">
 						<?php if($gst_type=="inner"){ echo inr_format($CGST, 2); }?>

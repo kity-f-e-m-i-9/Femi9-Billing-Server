@@ -198,7 +198,7 @@ $user_id_Loginvl   = (string) $Login_user_IDvl;
 											$stmtStk->close();
 
 											if (!$stockRow) { ?>
-                        <input type="hidden" name="pr_id[]" value="<?php echo $result_product_list['id']; ?>"/>
+                        <input type="hidden" name="pr_id[]" value="<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"/>
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($result_product_list["productName"]); ?></td>
 													<td><input type="number" name="op_qty[]" class="form-control" required="" style="border-color:#000 !important;" placeholder="Opening Stock Qty" min="0"/></td>
@@ -248,8 +248,8 @@ $user_id_Loginvl   = (string) $Login_user_IDvl;
 												<td style="display:none;"><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
                                                     <td>
 													<a href="#" class="popup-trigger">
-													<?php echo $Result_productDetils["productName"];?></a></td>
-													<td align="right"><?php echo $Result_OPStock['opening_qty'];?></td>
+													<?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
+													<td align="right"><?php echo htmlspecialchars((string)($Result_OPStock['opening_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                 </tr>
 
 										<?php }?>

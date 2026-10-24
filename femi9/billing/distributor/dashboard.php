@@ -398,7 +398,7 @@ xmlhttp.send();}
 						$result_Scrolld_message=mysqli_fetch_array($fetch_Scrolld_message);
 						?>
 						<div class="scroll-horizontal">
-  <div><?=$result_Scrolld_message['dt_msg'];?></div>
+  <div><?=htmlspecialchars((string)($result_Scrolld_message['dt_msg']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
 </div>
 
 						
@@ -426,12 +426,12 @@ xmlhttp.send();}
 			<div class="offer">		
 			
 			<?php if($result_offers['offer_img']!=NULL){?>
-      <a data-fslightbox="gallery" href="../company/offers_img/<?=$result_offers['offer_img'];?>" title="<?=ucwords($result_offers['offer_title']);?>">
-					<img src="../company/offers_img/<?=$result_offers['offer_img'];?>" alt="<?=ucwords($result_offers['offer_title']);?>">
+      <a data-fslightbox="gallery" href="../company/offers_img/<?=htmlspecialchars((string)($result_offers['offer_img']), ENT_QUOTES, 'ISO-8859-1', false);?>" title="<?=htmlspecialchars((string)(ucwords($result_offers['offer_title'])), ENT_QUOTES, 'ISO-8859-1', false);?>">
+					<img src="../company/offers_img/<?=htmlspecialchars((string)($result_offers['offer_img']), ENT_QUOTES, 'ISO-8859-1', false);?>" alt="<?=htmlspecialchars((string)(ucwords($result_offers['offer_title'])), ENT_QUOTES, 'ISO-8859-1', false);?>">
 					</a>
 			<?php }?>
 					
-      <h3><?=ucwords($result_offers['offer_title']);?></h3>
+      <h3><?=htmlspecialchars((string)(ucwords($result_offers['offer_title'])), ENT_QUOTES, 'ISO-8859-1', false);?></h3>
 	  <p>Offers Valid Upto : <?=date("d/m/Y",strtotime($result_offers['expired_date']));?></p>
     </div>
    
@@ -465,11 +465,11 @@ xmlhttp.send();}
 			<div class="offer">
 
 			<?php if($result_top_performers['particulars']!=NULL){?>
-<h3><?=ucwords($result_top_performers['particulars']);?></h3>		
+<h3><?=htmlspecialchars((string)(ucwords($result_top_performers['particulars'])), ENT_QUOTES, 'ISO-8859-1', false);?></h3>		
 			<?php }?>
 			
-      <a data-fslightbox="gallery" href="../company/top_performers_photo/<?=$result_top_performers['per_photo'];?>" title="<?=ucwords($result_top_performers['particulars']);?>">
-					<img src="../company/top_performers_photo/<?=$result_top_performers['per_photo'];?>" alt="<?=ucwords($result_top_performers['particulars']);?>">
+      <a data-fslightbox="gallery" href="../company/top_performers_photo/<?=htmlspecialchars((string)($result_top_performers['per_photo']), ENT_QUOTES, 'ISO-8859-1', false);?>" title="<?=htmlspecialchars((string)(ucwords($result_top_performers['particulars'])), ENT_QUOTES, 'ISO-8859-1', false);?>">
+					<img src="../company/top_performers_photo/<?=htmlspecialchars((string)($result_top_performers['per_photo']), ENT_QUOTES, 'ISO-8859-1', false);?>" alt="<?=htmlspecialchars((string)(ucwords($result_top_performers['particulars'])), ENT_QUOTES, 'ISO-8859-1', false);?>">
 					</a>
       
     </div>
@@ -616,7 +616,7 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Stockist</span>
-                       <span class="widget-stats-amount"><?=$result_stockistcount['numcountstockist'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_stockistcount['numcountstockist']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
                                         </div>
                                     </div>
@@ -701,7 +701,7 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Total Taluk</span>
-                       <span class="widget-stats-amount"><?=$result_counTalluk['TolTalukCount'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_counTalluk['TolTalukCount']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
 										</div>
                                     </div>
@@ -722,7 +722,7 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Total Pincode</span>
-                       <span class="widget-stats-amount"><?=$result_counPincode['TolPINCCount'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_counPincode['TolPINCCount']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
 										</div>
                                     </div>
@@ -744,7 +744,7 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Available Taluk</span>
-                       <span class="widget-stats-amount"><?=$result_counTallukAvailable['TolTalukCountAvailable'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_counTallukAvailable['TolTalukCountAvailable']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
 										</div>
                                     </div>
@@ -765,7 +765,7 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Available Pincode</span>
-                       <span class="widget-stats-amount"><?=$ResultPINCAvailable['TolPINCCountAvailable'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($ResultPINCAvailable['TolPINCCountAvailable']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
 										</div>
                                     </div>

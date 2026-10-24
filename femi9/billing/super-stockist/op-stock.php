@@ -201,7 +201,7 @@ $user_id_Loginvl   = (string) $Login_user_IDvl;
 											$stmtStk->close();
 
 											if (!$stockRow) { ?>
-                        <input type="hidden" name="pr_id[]" value="<?php echo $result_product_list['id']; ?>"/>
+                        <input type="hidden" name="pr_id[]" value="<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"/>
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($result_product_list["productName"]); ?></td>
 													<td><input type="number" name="op_qty[]" class="form-control" required="" style="border-color:#000 !important;" placeholder="Opening Stock Qty" min="0"/></td>

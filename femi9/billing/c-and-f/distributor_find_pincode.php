@@ -12,6 +12,6 @@ $talukID=$_GET['talukID'];  // taluk
 										while($Result_Picode_list=mysqli_fetch_array($fetch_Picode_list))
 										{
 											?>
-											<option value="<?php echo $Result_Picode_list['id'];?>"><?php echo $Result_Picode_list['pincode'];?></option>
+											<option value="<?php echo htmlspecialchars((string)($Result_Picode_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($Result_Picode_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>

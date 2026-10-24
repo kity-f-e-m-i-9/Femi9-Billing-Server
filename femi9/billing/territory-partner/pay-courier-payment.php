@@ -331,15 +331,15 @@ $poolStmt->close();
 
                             <div id="cpayScreenshotList">
                                 <?php foreach ($poolRows as $s): ?>
-                                <div class="cpay-screenshot-card" data-id="<?=$s['id']?>">
+                                <div class="cpay-screenshot-card" data-id="<?=htmlspecialchars((string)($s['id']), ENT_QUOTES, 'ISO-8859-1', false)?>">
                                     <img class="thumb" src="courier_payment_screenshots/<?=htmlspecialchars($s['file_path'])?>" alt="">
                                     <div style="flex:1;min-width:0;font-size:12.5px;color:#4b5563;">
                                         <?php if ($s['detected_amount'] !== null): ?>Amount: &#8377;<?=number_format($s['detected_amount'],2)?><br><?php endif; ?>
-                                        <span class="cpay-status-pill <?=$s['status']?>"><?=str_replace('_',' ',$s['status'])?></span>
+                                        <span class="cpay-status-pill <?=htmlspecialchars((string)($s['status']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=str_replace('_',' ',$s['status'])?></span>
                                         <?php if ($s['status'] === 'rejected' && $s['rejection_reason']): ?><div style="color:#991b1b;margin-top:3px;"><?=htmlspecialchars($s['rejection_reason'])?></div><?php endif; ?>
                                     </div>
                                     <?php if ($s['status'] !== 'accepted'): ?>
-                                    <button type="button" class="cpay-remove-chip" onclick="removeCourierScreenshot(<?=$s['id']?>, this)">Remove</button>
+                                    <button type="button" class="cpay-remove-chip" onclick="removeCourierScreenshot(<?=htmlspecialchars((string)($s['id']), ENT_QUOTES, 'ISO-8859-1', false)?>, this)">Remove</button>
                                     <?php endif; ?>
                                 </div>
                                 <?php endforeach; ?>

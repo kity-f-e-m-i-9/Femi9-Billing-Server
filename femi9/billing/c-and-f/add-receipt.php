@@ -194,7 +194,7 @@ $select_Customers="select * from ".$tablename." where id='$CuSTID'";
 ?>
                                             
                                                 <tr>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $Cust_Name;?><br/>M: <?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 				<td><?php echo inr_format($result_product_list["total"], 2);?></td>
@@ -238,8 +238,8 @@ if($receiptamount>0){
 						<td><?=date("d/m/Y",strtotime($result_pincode_list['date']));?></td>
 						<td><?=inr_format($receiptamount, 2);?></td>
 						
-						<td><?=$result_pincode_list['receipt_method'];?></td>
-						<td><?=$result_pincode_list['receipt_remarks'];?></td>
+						<td><?=htmlspecialchars((string)($result_pincode_list['receipt_method']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+						<td><?=htmlspecialchars((string)($result_pincode_list['receipt_remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						
 						<td><a href="add-receipt.php?invid=<?=htmlspecialchars((string)($_REQUEST['invid']), ENT_QUOTES, 'UTF-8', false);?>&&invuser=<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>&&delreceiptact&&rcptid=<?php echo base64_encode($result_pincode_list['id']);?>" onclick="return confirm('You want to delete confirm?');"><span class='badge badge-style-bordered badge-danger'>Remove</span></a></td>
                                       

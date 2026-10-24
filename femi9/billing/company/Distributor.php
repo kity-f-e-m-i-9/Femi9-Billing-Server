@@ -131,24 +131,24 @@ $pincodeshow=$result_pincodelist['pincode'];
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					D:&nbsp;<?=ucwords($district_name);?><br/>T:&nbsp;<?=ucwords($taluk_name);?>
 					<br/>P:&nbsp;<?=$pincodeshow;?>
 					</td>
-					<td><?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td>
 					<a href="JavaScript:newPopup('update-username.php?pageNme=distributor&&prid=<?php echo $rowid;?>&&ActionUpdate');" data-bs-toggle="tooltip" data-bs-placement="top" title="Update Username">
-			        <b><?php echo $result_product_list["username"];?></b></a>
+			        <b><?php echo htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></b></a>
 					</td>
 					
-					<td>&#8377; <?php echo $result_product_list["plan_amount"];?><br/>
-					<?php echo $result_product_list["valid_months"];?> Months<br/>
+					<td>&#8377; <?php echo htmlspecialchars((string)($result_product_list["plan_amount"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?php echo htmlspecialchars((string)($result_product_list["valid_months"]), ENT_QUOTES, 'ISO-8859-1', false);?> Months<br/>
 					<?php echo date("d/m/Y",strtotime($result_product_list["valid_from"]));?>
 					(to) <?php echo date("d/m/Y",strtotime($result_product_list["valid_to"]));?>
 					</td>
 					
-					<td><?php echo $result_product_list["ref_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["ref_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td>
 			<?php 

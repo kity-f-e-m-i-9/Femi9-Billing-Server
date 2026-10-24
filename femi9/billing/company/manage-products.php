@@ -156,21 +156,21 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["productName"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $result_product_list["pieces_per_pack"] !== null ? $result_product_list["pieces_per_pack"] : '—';?></td>
 													<td><?php echo $result_product_list["packs_per_carton"] !== null ? $result_product_list["packs_per_carton"] : '—';?></td>
 													<td><?php echo ($result_product_list["packs_per_cover"] ?? null) !== null ? $result_product_list["packs_per_cover"] : '—';?></td>
-													<td>&#8377;<?php echo $result_product_list["mrp"];?>.00</td>
+													<td>&#8377;<?php echo htmlspecialchars((string)($result_product_list["mrp"]), ENT_QUOTES, 'ISO-8859-1', false);?>.00</td>
 													
-							<td>&#8377;<?php echo $result_product_list["supersstock_price"];?>.00</td>
-							<td>&#8377;<?php echo $result_product_list["stockist_price"];?>.00</td>
-							<td>&#8377;<?php echo $result_product_list["distributor_price"];?>.00</td>
-							<td>&#8377;<?php echo $result_product_list["outlet_price"];?>.00</td>
+							<td>&#8377;<?php echo htmlspecialchars((string)($result_product_list["supersstock_price"]), ENT_QUOTES, 'ISO-8859-1', false);?>.00</td>
+							<td>&#8377;<?php echo htmlspecialchars((string)($result_product_list["stockist_price"]), ENT_QUOTES, 'ISO-8859-1', false);?>.00</td>
+							<td>&#8377;<?php echo htmlspecialchars((string)($result_product_list["distributor_price"]), ENT_QUOTES, 'ISO-8859-1', false);?>.00</td>
+							<td>&#8377;<?php echo htmlspecialchars((string)($result_product_list["outlet_price"]), ENT_QUOTES, 'ISO-8859-1', false);?>.00</td>
 							
-							<td><?php echo $result_product_list["gst"];?>%</td>
+							<td><?php echo htmlspecialchars((string)($result_product_list["gst"]), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
 							<td><?php echo ucfirst($result_product_list["gst_type"] ?? 'exclusive');?></td>
-							<td><?php echo $result_product_list["hsn"];?></td>
-							<td><?php echo $result_product_list["rwpoints"];?></td>
+							<td><?php echo htmlspecialchars((string)($result_product_list["hsn"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?php echo htmlspecialchars((string)($result_product_list["rwpoints"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 																										<td>
 													    <div class="actions-group">

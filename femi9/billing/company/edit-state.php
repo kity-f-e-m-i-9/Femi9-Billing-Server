@@ -94,13 +94,13 @@ $select_product_list="select * from state where id=?";
        
 <form action="product-action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                 <label for="exampleInputEmail1" class="form-label">State Name</label>
-                                                <input type="text" required="" name="st_name" value="<?php echo $result_product_list["st_name"]?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+                                                <input type="text" required="" name="st_name" value="<?php echo htmlspecialchars((string)($result_product_list["st_name"]), ENT_QUOTES, 'ISO-8859-1', false)?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 												
 												<br/>
 												

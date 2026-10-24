@@ -103,13 +103,13 @@ if (!empty($poIds)) {
                         <?php if (empty($rows)): ?>
                         <div class="text-muted" style="font-size:13.5px;">No orders in this status today.</div>
                         <?php else: foreach ($rows as $r): ?>
-                        <div class="trk-card" data-id="<?=$r['courier_payment_id']?>">
+                        <div class="trk-card" data-id="<?=htmlspecialchars((string)($r['courier_payment_id']), ENT_QUOTES, 'ISO-8859-1', false)?>">
                             <a href="../territory-partner/courier_payment_screenshots/<?=htmlspecialchars($r['file_path'])?>" target="_blank">
                                 <img src="../territory-partner/courier_payment_screenshots/<?=htmlspecialchars($r['file_path'])?>" alt="">
                             </a>
                             <div class="info">
                                 <b><?=htmlspecialchars($r['tp_code'])?></b> — <?=htmlspecialchars($r['tp_name'])?>
-                                <span class="trk-badge <?=$r['product_type']?>"><?=htmlspecialchars(tpProductTypeLabel($r['product_type']))?></span>
+                                <span class="trk-badge <?=htmlspecialchars((string)($r['product_type']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars(tpProductTypeLabel($r['product_type']))?></span>
                                 <br>
                                 <?=htmlspecialchars(implode(', ', $productsByPo[$r['po_id']] ?? []))?>
                                 <br>
@@ -122,8 +122,8 @@ if (!empty($poIds)) {
                             </div>
                             <?php if ($r['status'] === 'pending_review'): ?>
                             <div class="trk-actions">
-                                <button type="button" class="trk-approve" onclick="trackApprove(<?=$r['courier_payment_id']?>, <?=$r['detected_amount'] !== null ? $r['detected_amount'] : $r['required_amount']?>)">Accept</button>
-                                <button type="button" class="trk-reject" onclick="trackReject(<?=$r['courier_payment_id']?>)">Reject</button>
+                                <button type="button" class="trk-approve" onclick="trackApprove(<?=htmlspecialchars((string)($r['courier_payment_id']), ENT_QUOTES, 'ISO-8859-1', false)?>, <?=$r['detected_amount'] !== null ? $r['detected_amount'] : $r['required_amount']?>)">Accept</button>
+                                <button type="button" class="trk-reject" onclick="trackReject(<?=htmlspecialchars((string)($r['courier_payment_id']), ENT_QUOTES, 'ISO-8859-1', false)?>)">Reject</button>
                             </div>
                             <?php endif; ?>
                         </div>

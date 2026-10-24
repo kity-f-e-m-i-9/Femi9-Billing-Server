@@ -214,7 +214,7 @@ if($result_count_product['numCountRcds']==0)
                             <div class="col-md-12">
                                 <div class="card">
                                    <div class="card-header">
-                                        <h5 class="card-title">Order Number : <?=$result_product_list['order_number'];?></h5>
+                                        <h5 class="card-title">Order Number : <?=htmlspecialchars((string)($result_product_list['order_number']), ENT_QUOTES, 'ISO-8859-1', false);?></h5>
                                     </div>
                                     <div class="card-body">
                                        
@@ -223,7 +223,7 @@ if($result_count_product['numCountRcds']==0)
 	 <?php if($result_product_list["amount_received"]==0){?>
 <form method="post" enctype="multipart/form-data" onsubmit="return confirm('Add this return? Stock will be credited back to the selected Godown (physical) immediately.');">
 <input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false)?>">
-<input type="hidden" name="godownid" value="<?=$result_product_list['godownid'];?>">
+<input type="hidden" name="godownid" value="<?=htmlspecialchars((string)($result_product_list['godownid']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
                                         <div class="example-container">
                                         <div class="example-content">
@@ -248,7 +248,7 @@ $select_product_list12="select * from products where id='".$result_product_listS
 $fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
 $result_product_list12=mysqli_fetch_array($fetch_product_list12);
 ?>
-<option value="<?=$result_product_list12['id'];?>" data-maxqty="<?=(int)$result_product_listSD['qty'];?>"><?=$result_product_list12['productName'];?> (Invoiced Qty: <?=(int)$result_product_listSD['qty'];?>)</option>
+<option value="<?=htmlspecialchars((string)($result_product_list12['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" data-maxqty="<?=(int)$result_product_listSD['qty'];?>"><?=htmlspecialchars((string)($result_product_list12['productName']), ENT_QUOTES, 'ISO-8859-1', false);?> (Invoiced Qty: <?=(int)$result_product_listSD['qty'];?>)</option>
 <?php }?>
 </select>
 <input type="number" placeholder="Return Qty" min="0" id="returnQtyInput" name="qty" class="form-control" required=""/>
@@ -318,8 +318,8 @@ $pass_rtnid=base64_encode($result_RtnDetails['id']);
 $pass_tempid=base64_encode($tempid);
 										?>
                                                 <tr>
-                                                    <td><?php echo $result_product_list12SD["productName"];?></td>
-													<td><?php echo $result_RtnDetails["qty"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list12SD["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_RtnDetails["qty"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo date("d/m/Y",strtotime($result_RtnDetails["return_date"]));?></td>
 													
 													

@@ -142,7 +142,7 @@ foreach ($rows as $r) {
                             </div>
                             <div class="mix-amt">
                                 <div class="big">&#8377;<?=number_format((float)$r['amount'], 2)?></div>
-                                <div class="sub">Balance remaining: &#8377;<?=number_format((float)$r['balance_amount'], 2)?> &middot; Currently: <span class="badge-<?=$r['product_type']?>"><?=tpProductTypeLabel($r['product_type'])?></span></div>
+                                <div class="sub">Balance remaining: &#8377;<?=number_format((float)$r['balance_amount'], 2)?> &middot; Currently: <span class="badge-<?=htmlspecialchars((string)($r['product_type']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=tpProductTypeLabel($r['product_type'])?></span></div>
                             </div>
                         </div>
 

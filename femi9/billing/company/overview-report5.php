@@ -200,7 +200,7 @@ $select_Customers="select * from company_godown where id='$godownid' AND " . god
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$result_Customers["gname"];?></td>
+                            <td><?=htmlspecialchars((string)($result_Customers["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=date("d/M/Y",strtotime($resultrecords["input_date"]));?></td>
 													
 				<?php

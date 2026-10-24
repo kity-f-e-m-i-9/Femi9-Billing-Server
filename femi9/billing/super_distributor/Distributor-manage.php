@@ -123,13 +123,13 @@ $rowid=base64_encode($result_product_list["id"]);
                                             
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_product_list["useridtext"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
-					D:&nbsp;<?=ucwords($result_product_list['district_id']);?><br/>T:&nbsp;<?=ucwords($result_product_list['taluk_id']);?>
-					<br/>P:&nbsp;<?=$result_product_list['pincode_id'];?>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+					D:&nbsp;<?=htmlspecialchars((string)(ucwords($result_product_list['district_id'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>T:&nbsp;<?=htmlspecialchars((string)(ucwords($result_product_list['taluk_id'])), ENT_QUOTES, 'ISO-8859-1', false);?>
+					<br/>P:&nbsp;<?=htmlspecialchars((string)($result_product_list['pincode_id']), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</td>
-					<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 				
 					

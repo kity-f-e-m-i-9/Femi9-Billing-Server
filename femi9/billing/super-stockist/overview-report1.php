@@ -222,7 +222,7 @@ $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $userTypee;?></td>
 													<td><?php echo $Cust_Name;?><br/><b>M:</b>&nbsp;<?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
@@ -285,7 +285,7 @@ $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_listCUSTOMER["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_listCUSTOMER["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>Customer</td>
 													<td><?php echo $Cust_Name123;?><br/><b>M:</b>&nbsp;<?php echo $Cust_Mbile123;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_listCUSTOMER["date"]));?></td>

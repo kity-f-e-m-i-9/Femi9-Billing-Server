@@ -609,8 +609,8 @@ elseif ($action === 'preview'):
 <div class="rc">
     <div class="sec-hdr">
         <h3>🔍 Preview — Missing Rewards</h3>
-        <span class="pill p-yellow"><?= $results['total'] ?> records</span>
-        <span class="pill p-blue"><?= $results['points'] ?> pts total</span>
+        <span class="pill p-yellow"><?= htmlspecialchars((string)($results['total']), ENT_QUOTES, 'ISO-8859-1', false) ?> records</span>
+        <span class="pill p-blue"><?= htmlspecialchars((string)($results['points']), ENT_QUOTES, 'ISO-8859-1', false) ?> pts total</span>
     </div>
 
     <?php if ($results['total'] === 0): ?>
@@ -624,9 +624,9 @@ elseif ($action === 'preview'):
     <div class="sbar">
         <div class="sbi"><span class="sbi-lbl">Period</span><span class="sbi-val"><?= BACKFILL_START ?> → <?= $BACKFILL_END ?></span></div>
         <div class="vsep"></div>
-        <div class="sbi"><span class="sbi-lbl">Records</span><span class="sbi-val"><?= $results['total'] ?></span></div>
+        <div class="sbi"><span class="sbi-lbl">Records</span><span class="sbi-val"><?= htmlspecialchars((string)($results['total']), ENT_QUOTES, 'ISO-8859-1', false) ?></span></div>
         <div class="vsep"></div>
-        <div class="sbi"><span class="sbi-lbl">Points</span><span class="sbi-val" style="color:var(--yellow)"><?= $results['points'] ?> pts</span></div>
+        <div class="sbi"><span class="sbi-lbl">Points</span><span class="sbi-val" style="color:var(--yellow)"><?= htmlspecialchars((string)($results['points']), ENT_QUOTES, 'ISO-8859-1', false) ?> pts</span></div>
         <div class="vsep"></div>
         <div class="sbi"><span class="sbi-lbl">Dates</span><span class="sbi-val"><?= count($results['grouped']) ?></span></div>
     </div>
@@ -707,9 +707,9 @@ elseif ($action === 'execute'):
 <div class="rc">
     <div class="sec-hdr">
         <h3>✅ Execute Results</h3>
-        <span class="pill <?= $results['failed'] > 0 ? 'p-red' : 'p-green' ?>"><?= $results['inserted'] ?>/<?= $results['total'] ?> inserted</span>
-        <?php if ($results['failed'] > 0): ?><span class="pill p-red"><?= $results['failed'] ?> failed</span><?php endif; ?>
-        <span class="pill p-yellow"><?= $results['points'] ?> pts awarded</span>
+        <span class="pill <?= $results['failed'] > 0 ? 'p-red' : 'p-green' ?>"><?= htmlspecialchars((string)($results['inserted']), ENT_QUOTES, 'ISO-8859-1', false) ?>/<?= htmlspecialchars((string)($results['total']), ENT_QUOTES, 'ISO-8859-1', false) ?> inserted</span>
+        <?php if ($results['failed'] > 0): ?><span class="pill p-red"><?= htmlspecialchars((string)($results['failed']), ENT_QUOTES, 'ISO-8859-1', false) ?> failed</span><?php endif; ?>
+        <span class="pill p-yellow"><?= htmlspecialchars((string)($results['points']), ENT_QUOTES, 'ISO-8859-1', false) ?> pts awarded</span>
     </div>
 
     <?php if ($results['total'] === 0): ?>
@@ -721,23 +721,23 @@ elseif ($action === 'execute'):
     <?php else: ?>
 
     <div class="sbar">
-        <div class="sbi"><span class="sbi-lbl">Processed</span><span class="sbi-val"><?= $results['total'] ?></span></div>
+        <div class="sbi"><span class="sbi-lbl">Processed</span><span class="sbi-val"><?= htmlspecialchars((string)($results['total']), ENT_QUOTES, 'ISO-8859-1', false) ?></span></div>
         <div class="vsep"></div>
-        <div class="sbi"><span class="sbi-lbl">Inserted</span><span class="sbi-val" style="color:var(--green)"><?= $results['inserted'] ?></span></div>
+        <div class="sbi"><span class="sbi-lbl">Inserted</span><span class="sbi-val" style="color:var(--green)"><?= htmlspecialchars((string)($results['inserted']), ENT_QUOTES, 'ISO-8859-1', false) ?></span></div>
         <div class="vsep"></div>
-        <div class="sbi"><span class="sbi-lbl">Failed</span><span class="sbi-val" style="color:<?= $results['failed']>0?'var(--red)':'var(--muted)' ?>"><?= $results['failed'] ?></span></div>
+        <div class="sbi"><span class="sbi-lbl">Failed</span><span class="sbi-val" style="color:<?= $results['failed']>0?'var(--red)':'var(--muted)' ?>"><?= htmlspecialchars((string)($results['failed']), ENT_QUOTES, 'ISO-8859-1', false) ?></span></div>
         <div class="vsep"></div>
-        <div class="sbi"><span class="sbi-lbl">Points</span><span class="sbi-val" style="color:var(--yellow)"><?= $results['points'] ?> pts</span></div>
+        <div class="sbi"><span class="sbi-lbl">Points</span><span class="sbi-val" style="color:var(--yellow)"><?= htmlspecialchars((string)($results['points']), ENT_QUOTES, 'ISO-8859-1', false) ?> pts</span></div>
     </div>
 
     <?php if ($results['inserted'] > 0): ?>
     <div class="notice n-green">
         <span>✅</span>
-        <span><?= $results['inserted'] ?> records inserted, tagged <code>backfill_jan2025</code>. Audit entries created. Use <strong>Rollback</strong> to undo.</span>
+        <span><?= htmlspecialchars((string)($results['inserted']), ENT_QUOTES, 'ISO-8859-1', false) ?> records inserted, tagged <code>backfill_jan2025</code>. Audit entries created. Use <strong>Rollback</strong> to undo.</span>
     </div>
     <?php endif; ?>
     <?php if ($results['failed'] > 0): ?>
-    <div class="notice n-red"><span>⚠️</span><span><?= $results['failed'] ?> failed — check errors below.</span></div>
+    <div class="notice n-red"><span>⚠️</span><span><?= htmlspecialchars((string)($results['failed']), ENT_QUOTES, 'ISO-8859-1', false) ?> failed — check errors below.</span></div>
     <?php endif; ?>
 
     <?php foreach ($results['grouped_log'] as $date => $entries):
@@ -772,7 +772,7 @@ elseif ($action === 'execute'):
                 : '<span class="s-fail">❌ '.htmlspecialchars($entry['error']??'Error').'</span>' ?></td>
             <td><span class="badge <?= $bc ?>"><?= $USER_LABELS[$type]??$type ?></span></td>
             <td class="mono"><?= htmlspecialchars($row['user_id']) ?></td>
-            <td><span class="badge <?= $pc ?>"><?= $entry['pts'] ?> pts</span></td>
+            <td><span class="badge <?= $pc ?>"><?= htmlspecialchars((string)($entry['pts']), ENT_QUOTES, 'ISO-8859-1', false) ?> pts</span></td>
             <td class="mono"><?= htmlspecialchars($row['first_invoice_number']??'-') ?></td>
             <td class="mono" style="color:var(--muted)"><?= isset($entry['reward_id']) ? '#'.$entry['reward_id'] : '-' ?></td>
         </tr>
@@ -796,9 +796,9 @@ elseif ($action === 'rollback'):
 <div class="rc">
     <div class="sec-hdr">
         <h3>↩️ Rollback Results</h3>
-        <span class="pill p-red"><?= $results['deleted'] ?> deleted</span>
-        <?php if ($results['failed'] > 0): ?><span class="pill p-red"><?= $results['failed'] ?> failed</span><?php endif; ?>
-        <span class="pill p-orange"><?= $results['points'] ?> pts reversed</span>
+        <span class="pill p-red"><?= htmlspecialchars((string)($results['deleted']), ENT_QUOTES, 'ISO-8859-1', false) ?> deleted</span>
+        <?php if ($results['failed'] > 0): ?><span class="pill p-red"><?= htmlspecialchars((string)($results['failed']), ENT_QUOTES, 'ISO-8859-1', false) ?> failed</span><?php endif; ?>
+        <span class="pill p-orange"><?= htmlspecialchars((string)($results['points']), ENT_QUOTES, 'ISO-8859-1', false) ?> pts reversed</span>
     </div>
 
     <?php if ($results['total'] === 0): ?>
@@ -810,16 +810,16 @@ elseif ($action === 'rollback'):
     <?php else: ?>
 
     <div class="sbar">
-        <div class="sbi"><span class="sbi-lbl">Found</span><span class="sbi-val"><?= $results['total'] ?></span></div>
+        <div class="sbi"><span class="sbi-lbl">Found</span><span class="sbi-val"><?= htmlspecialchars((string)($results['total']), ENT_QUOTES, 'ISO-8859-1', false) ?></span></div>
         <div class="vsep"></div>
-        <div class="sbi"><span class="sbi-lbl">Deleted</span><span class="sbi-val" style="color:var(--red)"><?= $results['deleted'] ?></span></div>
+        <div class="sbi"><span class="sbi-lbl">Deleted</span><span class="sbi-val" style="color:var(--red)"><?= htmlspecialchars((string)($results['deleted']), ENT_QUOTES, 'ISO-8859-1', false) ?></span></div>
         <div class="vsep"></div>
-        <div class="sbi"><span class="sbi-lbl">Points reversed</span><span class="sbi-val" style="color:var(--orange)"><?= $results['points'] ?> pts</span></div>
+        <div class="sbi"><span class="sbi-lbl">Points reversed</span><span class="sbi-val" style="color:var(--orange)"><?= htmlspecialchars((string)($results['points']), ENT_QUOTES, 'ISO-8859-1', false) ?> pts</span></div>
     </div>
 
     <div class="notice n-red">
         <span>↩️</span>
-        <span><?= $results['deleted'] ?> backfill records deleted. Audit entries logged. Organically earned rewards were <strong>not touched</strong>.</span>
+        <span><?= htmlspecialchars((string)($results['deleted']), ENT_QUOTES, 'ISO-8859-1', false) ?> backfill records deleted. Audit entries logged. Organically earned rewards were <strong>not touched</strong>.</span>
     </div>
 
     <?php foreach ($results['grouped_log'] as $date => $entries):

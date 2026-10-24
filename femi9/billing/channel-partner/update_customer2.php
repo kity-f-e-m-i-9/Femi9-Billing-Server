@@ -58,8 +58,8 @@ $shopRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE t
                                         <thead><tr><th>Invoice Number</th><th>Shop Name</th><th>Invoice Date</th><th>Invoice Amount</th></tr></thead>
                                         <tbody>
                                         <tr>
-                                            <td><?php echo $inv['inv_number']; ?></td>
-                                            <td><?php echo $shopRow['name']; ?><br/>M:&nbsp;<?php echo $shopRow['mobile_number']; ?></td>
+                                            <td><?php echo htmlspecialchars((string)($inv['inv_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+                                            <td><?php echo htmlspecialchars((string)($shopRow['name']), ENT_QUOTES, 'ISO-8859-1', false); ?><br/>M:&nbsp;<?php echo htmlspecialchars((string)($shopRow['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                             <td><?php echo date("d/M/Y", strtotime($inv['date'])); ?></td>
                                             <td><?php echo inr_format($inv['total'], 2); ?></td>
                                         </tr>
@@ -68,7 +68,7 @@ $shopRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE t
                                     <form action="update_customer_action2.php" method="post" enctype="multipart/form-data" onsubmit="return confirm('Confirm?');">
                                         <input type="hidden" name="invid"           value="<?php echo htmlspecialchars((string)($invid), ENT_QUOTES, 'UTF-8', false); ?>">
                                         <input type="hidden" name="invuser"         value="<?php echo htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>">
-                                        <input type="hidden" name="old_customer_id" value="<?php echo $inv['to_user_id']; ?>">
+                                        <input type="hidden" name="old_customer_id" value="<?php echo htmlspecialchars((string)($inv['to_user_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <div class="example-container"><div class="example-content">
                                         <label class="form-label">Shop Name*</label>
                                         <select required name="new_customer_id" class="js-states form-control">
@@ -76,7 +76,7 @@ $shopRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE t
                                             <?php
                                             $shops = mysqli_query($db_conn, "SELECT * FROM shop WHERE onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' AND onboard_userID='".db_esc($Login_user_IDvl)."' ORDER BY name ASC");
                                             while ($s = mysqli_fetch_array($shops)) { ?>
-                                            <option value="<?php echo $s['temp_id']; ?>"><?php echo strtoupper($s['name']); ?>, <?php echo $s['mobile_number']; ?></option>
+                                            <option value="<?php echo htmlspecialchars((string)($s['temp_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(strtoupper($s['name'])), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($s['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
                                             <?php } ?>
                                         </select><br/>
                                         <button type="submit" name="updateCustomer" class="btn btn-primary"><i class="material-icons">update</i>Update</button>

@@ -313,7 +313,7 @@ $Total_amount_show   = round($gross_before_wallet - $wallet_amount_show, 2);
             <td id="rightlaign"><?= inr_format($rateExcl, 2) ?></td>
             <td id="rightlaign"><?= inr_format($rateIncl, 2) ?></td>
             <td id="rightlaign">Packs</td>
-            <td id="rightlaign"><?= $row['gst'] ?>%</td>
+            <td id="rightlaign"><?= htmlspecialchars((string)($row['gst']), ENT_QUOTES, 'ISO-8859-1', false) ?>%</td>
             <td id="rightlaign">
                 <?= inr_format($row['discount'], 2) ?>
                 (<?= inr_format($discountPercentage, 2) ?>%)

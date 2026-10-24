@@ -145,19 +145,19 @@ select:focus, input[type=number]:focus{background:#fffa8f;}
           
 <label class="form-label">Customer Name*</label>
 <select name="customer_id" class="form-control">
-<option value="<?php echo $CustomerID;?>" hidden=""><?php echo $result_CUSTDetails['name'];?>, <?php echo $result_CUSTDetails['mobile'];?></option>
+<option value="<?php echo $CustomerID;?>" hidden=""><?php echo htmlspecialchars((string)($result_CUSTDetails['name']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php echo htmlspecialchars((string)($result_CUSTDetails['mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php 
 $selectCusList="select * from customers where user_type=? and user_id=? order by name asc";
 $fetch_Customers_list=db_q($db_conn,$selectCusList,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 		{
 ?>
-<option value="<?php echo $result_Customers_list['id'];?>"><?php echo $result_Customers_list['name'];?>, <?php echo $result_Customers_list['mobile'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_Customers_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Customers_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php echo htmlspecialchars((string)($result_Customers_list['mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 
 <label class="form-label">Invoice Date*</label>
-<input type="date" name="date" value="<?php echo $result_InvoieDetails['date'];?>" required="" class="form-control">
+<input type="date" name="date" value="<?php echo htmlspecialchars((string)($result_InvoieDetails['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" class="form-control">
 </br>
 
 
@@ -169,7 +169,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 										while($result_Products_list=mysqli_fetch_array($fetch_Products_list))
 										{
 											?>
-<option value="<?php echo $result_Products_list['id'];?>"><?php echo $result_Products_list['productName'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 </select>
 
@@ -224,9 +224,9 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 	?>
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
-<td><?=$result_ProductDetails123['productName'];?></td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
-<td><?=$result_INVProductDetails['qty'];?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
 <a href="del-inv-product?inv_id=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?php echo $ItemRowid;?>"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
@@ -244,7 +244,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
                                         <div class="row invoice-summary">
                                             <div class="col-lg-4">
                                                 <div class="invoice-info">
-                   <p>Invoice Number: <span><?php echo $result_InvoieDetails['inv_number'];?></span></p>
+                   <p>Invoice Number: <span><?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></span></p>
                    <p>Invoice Date: <span><?php echo date("d/M/Y",strtotime($result_InvoieDetails['date']));?></span></p>
                                                 </div>
                                             </div>
@@ -275,7 +275,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 		   <?php if($result_InvoieDetails['discount']==0){?>
 		  <input type="number" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
 		   <?php }else{ ?>
-		   <input type="number" value="<?=$result_InvoieDetails['discount'];?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
+		   <input type="number" value="<?=htmlspecialchars((string)($result_InvoieDetails['discount']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
 		   <?php }?>
 		 </span></p>
 													<br/>
@@ -334,7 +334,7 @@ $fetch_Customers_list=db_q($db_conn,$selectCusList,[$Login_user_TYPEvl,$Login_us
 while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 		{
 ?>
-<option value="<?php echo $result_Customers_list['id'];?>"><?php echo $result_Customers_list['name'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_Customers_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Customers_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 
@@ -351,7 +351,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 										while($result_Products_list=mysqli_fetch_array($fetch_Products_list))
 										{
 											?>
-<option value="<?php echo $result_Products_list['id'];?>"><?php echo $result_Products_list['productName'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 </select>
 

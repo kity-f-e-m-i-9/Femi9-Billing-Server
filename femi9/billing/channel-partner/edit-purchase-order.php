@@ -318,7 +318,7 @@ $cpDeliveryAddressParts = array_filter([
                                     <select class="form-control mb-2" id="pr_select" onchange="showPoPrice(this.value)">
                                         <option value=""></option>
                                         <?php foreach ($productList as $p): ?>
-                                        <option value="<?=$p['id']?>" data-price="<?=htmlspecialchars($p['mrp'])?>"><?=htmlspecialchars($p['productName'])?></option>
+                                        <option value="<?=htmlspecialchars((string)($p['id']), ENT_QUOTES, 'ISO-8859-1', false)?>" data-price="<?=htmlspecialchars($p['mrp'])?>"><?=htmlspecialchars($p['productName'])?></option>
                                         <?php endforeach; ?>
                                     </select>
 

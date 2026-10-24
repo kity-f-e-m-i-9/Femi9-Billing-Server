@@ -190,7 +190,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-						   <option value="<?php echo $result_stateList['id'];?>"><?php echo $result_stateList['st_name'];?></option>
+						   <option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   
@@ -210,7 +210,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 										while($result_product_list233=mysqli_fetch_array($fetch_product_list233))
 										{
 											?>
-											<option value="<?php echo $result_product_list233['id'];?>"><?php echo $result_product_list233['dist_name'];?></option>
+											<option value="<?php echo htmlspecialchars((string)($result_product_list233['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_product_list233['dist_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>
 												</div>
@@ -231,7 +231,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 			while($result_product_list244=mysqli_fetch_array($fetch_product_list244))
 										{
 											?>
-<option value="<?=$result_product_list244['id'];?>"><?=$result_product_list244['taluk'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list244['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_product_list244['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 								<?php }?>
 												</select>
 												</div>
@@ -318,7 +318,7 @@ $i= $start_from;
 									<td><?php echo $dis_state_name;?></td>
 									<td><?php echo $dis_district_name;?></td>
 									<td><?php echo $dis_taluk_name;?></td>
-									<td><?php echo $result_product_list['pincode'];?></td>
+									<td><?php echo htmlspecialchars((string)($result_product_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>
 <?php if($result_product_list["assigned_SID"]=="Nil"){?>
 <span class='badge badge-style-bordered badge-success'>Available</span>

@@ -185,7 +185,7 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
                             <div class="col">
                                 <div class="card">
                                     <div class="card-body">
-									<h1><?=$result_Godown['gname'];?> &mdash; <?=htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8');?></h1>
+									<h1><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?> &mdash; <?=htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8');?></h1>
 									<div style="background:#fff;overflow:scroll;width:100%;">
 
                                         <table class="table">
@@ -218,7 +218,7 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock):
     $total_closing_pieces += $ClosingStockPieces;
 ?>
                                                 <tr class="product-row" data-product-name="<?php echo htmlspecialchars(strtolower($Result_OPStock['productName']), ENT_QUOTES, 'UTF-8'); ?>">
-                                                    <td><?php echo $Result_OPStock["productName"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($Result_OPStock["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo inr_format($Result_OPStock['opening_qty'], 0);?></td>
 													<td><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
 

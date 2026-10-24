@@ -176,8 +176,8 @@ $i= $start_from;
 										 <td><?php echo ++$i; ?></td>
 							<td><?=date("d/m/Y",strtotime($resultRcd_VLSS1190['date']));?></td>
 							<td><?=$resultTotalQty190[0];?></td>
-                            <td><?=$resultusers134['useridtext'];?></td>
-							<td><?=$resultusers134['name'];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers134['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers134['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
                                         </tr>
                                            
@@ -244,8 +244,8 @@ $reqid=$resultRcd_VLSS1['reqid'];
 										 <td><?php echo ++$i; ?></td>
 							<td><?=date("d/m/Y",strtotime($resultRcd_VLSS1['date']));?></td>
 							<td><?=$resultTotalQty190[0];?></td>
-                            <td><?=$resultusers['useridtext'];?></td>
-							<td><?=$resultusers['name'];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				
@@ -313,8 +313,8 @@ $reqid=$resultRcd_VLSS1['reqid'];
 										 <td><?php echo ++$i; ?></td>
 							<td><?=date("d/m/Y",strtotime($resultRcd_VLSS1['date']));?></td>
 							<td><?=$resultTotalQty190[0];?></td>
-                            <td><?=$resultusers['useridtext'];?></td>
-							<td><?=$resultusers['name'];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				

@@ -161,16 +161,16 @@ $shopcat_name=$result_shopcatt['catlable'];
                                                     </a>
 													</td>-->
 					<td><?=$shopcat_name;?></td>
-					<td><?=$result_product_list["useridtext"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></td>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td><?=ucwords($district_name);?></td>
 					<td><?=ucwords($taluk_name);?></td>
 					<td><?=$pincodeshow;?></td>
 					
-					<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
-					<td><?php echo $result_product_list["landline"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["landline"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 			<!-----<td>
 			<a href="details-shop.php?prid=<?php echo $rowid;?>&&actiondetails" data-bs-toggle="tooltip" data-bs-placement="top" title="View Details">

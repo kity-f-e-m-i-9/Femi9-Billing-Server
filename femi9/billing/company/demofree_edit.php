@@ -90,7 +90,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
 												
 												<label for="exampleInputEmail1" class="form-label">Category*</label>
                                <select required="" name="category" class="form-control">
-							   <option value="<?=$result_product_list['category'];?>" hidden=""><?=$result_product_list['category'];?></option>
+							   <option value="<?=htmlspecialchars((string)($result_product_list['category']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?=htmlspecialchars((string)($result_product_list['category']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <option>Demo</option>
 							   <option>Free</option>
 							   <option>Damage</option>
@@ -98,11 +98,11 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
 							   <br/>	
 							
 <label class="form-label">Date*</label>
-<input type="date" required="" name="date" value="<?php echo $result_product_list['date'];?>" class="form-control">
+<input type="date" required="" name="date" value="<?php echo htmlspecialchars((string)($result_product_list['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 <br/>
 
 <label class="form-label">Remarks*</label>
-<textarea required="" name="remarks" onkeypress="restrictSpecialChars(event)" class="form-control"><?php echo $result_product_list['remarks'];?></textarea>
+<textarea required="" name="remarks" onkeypress="restrictSpecialChars(event)" class="form-control"><?php echo htmlspecialchars((string)($result_product_list['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 <br/>
 												
 												

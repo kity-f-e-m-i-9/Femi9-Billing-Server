@@ -97,7 +97,7 @@ $tempID="".$randum_number."DAWR".$temp_date."".$temp_time."";?>
 <input type="hidden" name="date" value="<?=$Today_date;?>">
 <input type="hidden" name="usertype" value="<?=$Login_user_TYPEvl;?>">
 <input type="hidden" name="userid" value="<?=$Login_user_IDvl;?>">
-<input type="hidden" name="ssid" value="<?=$result_LoGuserDtails['ss_id'];?>">
+<input type="hidden" name="ssid" value="<?=htmlspecialchars((string)($result_LoGuserDtails['ss_id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 <input type="hidden" name="stockist_id" value="Nil">
 <input type="hidden" name="distributor_id" value="Nil">
 

@@ -128,7 +128,7 @@ $i= $start_from;
 								<td><?=strtoupper($distributorname);?></td>		
 <td><?=$totalqty;?></td>							
 
-<td><?=$result_invDetails['inv_number'];?></td>	
+<td><?=htmlspecialchars((string)($result_invDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>	
 <td><?=date("d/m/Y",strtotime($result_invDetails['date']));?></td>	
 													
 													<td>

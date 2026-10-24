@@ -12,7 +12,7 @@ $select_PINlist="select * from pincode where state_id=? and dist_id=? and taluk_
 										while($result_PINlist=mysqli_fetch_array($fetch_PINlist))
 										{
 											?>
-<option value="<?php echo $result_PINlist['id'];?>"><?php echo $result_PINlist['pincode'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_PINlist['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_PINlist['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>
 												

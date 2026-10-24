@@ -185,7 +185,7 @@ else
   <tr valign="top">
                                  <td><?php echo date("d/m/Y",strtotime($result_requestdetails["date"]));?></td>
 								 
-								<td><b><?=strtoupper($result_distlist['name']);?></b>
+								<td><b><?=htmlspecialchars((string)(strtoupper($result_distlist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b>
 								<br/>
 								<span style="font-size:13px;color:#999;"><?=strtoupper($fromusertype);?></span>
 								</td>	
@@ -209,7 +209,7 @@ else
 <?php if($result_requestdetails['screenshot']!="Nil"){ ?>
 <div style="margin-top:0px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -217,7 +217,7 @@ else
 <?php if($result_requestdetails['screenshot2']!="Nil"){ ?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT (2)</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot2'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot2']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -226,7 +226,7 @@ else
 <?php if($result_requestdetails['screenshot3']!="Nil"){ ?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT (3)</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot3'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot3']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -234,7 +234,7 @@ else
 <?php if($result_requestdetails['screenshot4']!="Nil"){ ?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT (4)</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot4'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot4']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -242,7 +242,7 @@ else
 <?php if($result_requestdetails['screenshot5']!="Nil"){ ?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT (5)</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot5'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot5']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -280,11 +280,11 @@ else
 										?>
         <input type="hidden" name="prid[]" value="<?=$prid; ?>"/>
         <tr>
-        <td><a href="#" class="popup-trigger"><?php echo $result_pramount["productName"];?></a></td>
-		<td><?=$result_productCurrentst['qty'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['amount'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['subtotal'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['gsttotal'];?> (<?=$result_productCurrentst['gst'];?>%)</td>
+        <td><a href="#" class="popup-trigger"><?php echo htmlspecialchars((string)($result_pramount["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
+		<td><?=htmlspecialchars((string)($result_productCurrentst['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['subtotal']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['gsttotal']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?=htmlspecialchars((string)($result_productCurrentst['gst']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 		<td align="right" style="display:none;"><?=inr_format($result_productCurrentst['total'], 2);?></td></td>
 		
                                                 </tr>

@@ -133,8 +133,8 @@ if ($getinvuser === 'customer') {
                 <tr>
                     <td><?php echo htmlspecialchars($pr['productName']); ?></td>
                     <td><span class="qty-badge qty-original"><?php echo htmlspecialchars((string)($av['original_qty']), ENT_QUOTES, 'UTF-8', false); ?></span></td>
-                    <td><?php echo $av['returned_qty'] > 0 ? "<span class='qty-badge qty-returned'>{$av['returned_qty']}</span>" : '<span style="color:#999;">-</span>'; ?></td>
-                    <td><?php echo $av['available_qty'] > 0 ? "<span class='qty-badge qty-available'>{$av['available_qty']}</span>" : "<span class='qty-badge qty-none'>0</span>"; ?></td>
+                    <td><?php echo $av['returned_qty'] > 0 ? "<span class='qty-badge qty-returned'>".htmlspecialchars((string)($av['returned_qty']), ENT_QUOTES, 'ISO-8859-1', false)."</span>" : '<span style="color:#999;">-</span>'; ?></td>
+                    <td><?php echo $av['available_qty'] > 0 ? "<span class='qty-badge qty-available'>".htmlspecialchars((string)($av['available_qty']), ENT_QUOTES, 'ISO-8859-1', false)."</span>" : "<span class='qty-badge qty-none'>0</span>"; ?></td>
                 </tr>
                 <?php } ?>
                 </tbody>
@@ -176,7 +176,7 @@ if ($getinvuser === 'customer') {
             $dis  = $dav['available_qty'] <= 0 ? 'disabled' : '';
             $lbl  = $dav['available_qty'] > 0 ? " (Available: {$dav['available_qty']})" : " (Fully Returned)";
         ?>
-        <option value="<?php echo $dpr['id']; ?>"
+        <option value="<?php echo htmlspecialchars((string)($dpr['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"
                 data-available="<?php echo htmlspecialchars((string)($dav['available_qty']), ENT_QUOTES, 'UTF-8', false); ?>"
                 data-original="<?php echo htmlspecialchars((string)($dav['original_qty']), ENT_QUOTES, 'UTF-8', false); ?>"
                 data-returned="<?php echo htmlspecialchars((string)($dav['returned_qty']), ENT_QUOTES, 'UTF-8', false); ?>"
@@ -255,11 +255,11 @@ $TotalAMount123 = 0; $rd = 0;
     ?>
     <tr>
         <th><?php echo ++$rd; ?></th>
-        <td><?php echo $pr2['productName']; ?></td>
-        <td><?php echo $ri['qty']; ?></td>
+        <td><?php echo htmlspecialchars((string)($pr2['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+        <td><?php echo htmlspecialchars((string)($ri['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
         <td>&#8377;<?php echo inr_format($ri['amount'], 2); ?></td>
         <td><?php echo inr_format($ri['subtotal'], 2); ?></td>
-        <td><?php echo inr_format($ri['gstamount_total'], 2); ?> (<?php echo $ri['gst_percentage']; ?>%)</td>
+        <td><?php echo inr_format($ri['gstamount_total'], 2); ?> (<?php echo htmlspecialchars((string)($ri['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
         <td><?php echo inr_format($ri['total'], 2); ?></td>
         <td>
             <a href="cnote_delete.php?returnid=<?php echo htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false); ?>&rowid=<?php echo $ItemRowid; ?>&InvoiceID=<?php echo htmlspecialchars((string)($InvoiceID), ENT_QUOTES, 'UTF-8', false); ?>&redirurl=cnote_new"

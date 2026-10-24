@@ -123,21 +123,21 @@ $noorder_reason=str_replace("'","&#39;",$_POST["noorder_reason"]);
 											
 											<label for="exampleInputEmail1" class="form-label">Shop*</label>
     <select name="shop_id" class="form-control" required="">
-	<option value="<?=$result_shopcatt['id'];?>" hidden=""><?=$result_shopcatt['name'];?></option>
+	<option value="<?=htmlspecialchars((string)($result_shopcatt['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?=htmlspecialchars((string)($result_shopcatt['name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	<?php $selectShopCat="select * from ms_shop where ms_id=? order by id asc";
 	$fetchShopCat=db_q($db_conn,$selectShopCat,[$markeingSTFID]);
 	while($resultShopCat=mysqli_fetch_array($fetchShopCat)){?>
-	<option value="<?php echo $resultShopCat['id'];?>"><?php echo $resultShopCat['name'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($resultShopCat['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($resultShopCat['name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	<?php  } ?>
 	</select>
 	<br/>
 		
 <label class="form-label">Reason*</label>
-            <textarea name="noorder_reason" onkeypress="restrictSpecialChars(event)" class="form-control" required=""><?=$result_product_list['noorder_reason'];?></textarea>
+            <textarea name="noorder_reason" onkeypress="restrictSpecialChars(event)" class="form-control" required=""><?=htmlspecialchars((string)($result_product_list['noorder_reason']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			<label class="form-label">Marketing Tool*</label>
-            <textarea name="marketing_tool" onkeypress="restrictSpecialChars(event)" class="form-control" required=""><?=$result_product_list['marketing_tool'];?></textarea>
+            <textarea name="marketing_tool" onkeypress="restrictSpecialChars(event)" class="form-control" required=""><?=htmlspecialchars((string)($result_product_list['marketing_tool']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>		
 			
 	<button type="submit" name="update_no_order" class="btn btn-primary">

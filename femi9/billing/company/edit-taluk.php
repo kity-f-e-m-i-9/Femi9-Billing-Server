@@ -108,8 +108,8 @@ $select_product_list="select * from taluk where id=?";
  <?php include("validate-scripts.php");?>                                      
 <form action="product-action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <div class="example-container">
                                             <div class="example-content">
                                                 
@@ -133,7 +133,7 @@ xmlhttp.send();}
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-						   <option value="<?php echo $result_stateList['id'];?>"><?php echo $result_stateList['st_name'];?></option>
+						   <option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   
@@ -146,7 +146,7 @@ xmlhttp.send();}
 												
 												
 												<label for="exampleInputEmail1" class="form-label">Taluk Name</label>
-                                                <input type="text" name="taluk" class="form-control" value="<?php echo $result_product_list['taluk'];?>" onkeypress="restrictSpecialChars(event)">
+                                                <input type="text" name="taluk" class="form-control" value="<?php echo htmlspecialchars((string)($result_product_list['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictSpecialChars(event)">
 												
 												<br/>
 												

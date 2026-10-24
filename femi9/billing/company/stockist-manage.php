@@ -299,16 +299,16 @@ $canDeleteSt = hasPermission('st_delete');
                                                 
                                                 <tr>
                                                     <td class="text-center serial-number"><?php echo ++$i; ?></td>
-                                                    <td class="text-center"><?=$result_product_list["useridtext"];?></td>
+                                                    <td class="text-center"><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <td>
-                                                        <div class="user-name"><?php echo ucwords($result_product_list["name"]);?></div>
+                                                        <div class="user-name"><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></div>
                                                         <div class="info-text">
                                                             <strong>D:</strong> <?=ucwords($district_name);?><br/>
                                                             <strong>T:</strong> <?=ucwords($taluk_name);?><br/>
                                                             <strong>P:</strong> <?=$pincode_id;?>
                                                         </div>
                                                     </td>
-                                                    <td class="text-center"><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
+                                                    <td class="text-center"><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     
                                                     <td class="text-center">
                                                         <?php 
@@ -321,7 +321,7 @@ $canDeleteSt = hasPermission('st_delete');
                                                         ?>
                                                             <a href="inactive_user?usr=stockiest&backurl=stockist-manage&usrid=<?=$rowid;?>&usrname=<?=$encoded_name;?>&userlabel=Stockist" 
                                                                class="status-link" 
-                                                               onclick="return confirm('You want to confirm Deactivate this (<?php echo strtoupper($result_product_list["name"]);?>) user?');" 
+                                                               onclick="return confirm('You want to confirm Deactivate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>) user?');" 
                                                                data-bs-toggle="tooltip" 
                                                                data-bs-placement="top" 
                                                                title="Click to Deactivate user">
@@ -334,7 +334,7 @@ $canDeleteSt = hasPermission('st_delete');
                                                         ?>
                                                             <a href="active_user?usr=stockiest&backurl=stockist-manage&usrid=<?=$rowid;?>&usrname=<?=$encoded_name;?>&userlabel=Stockist" 
                                                                class="status-link" 
-                                                               onclick="return confirm('You want to confirm Activate this (<?php echo strtoupper($result_product_list["name"]);?>) user?');" 
+                                                               onclick="return confirm('You want to confirm Activate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>) user?');" 
                                                                data-bs-toggle="tooltip" 
                                                                data-bs-placement="top" 
                                                                title="Click to Activate user">

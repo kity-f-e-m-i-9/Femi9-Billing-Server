@@ -106,12 +106,12 @@ $select_SSIDGet="select * from stockiest where temp_id='".$result_LoGuserDtails[
 $fetch_SSIDGet=mysqli_query($db_conn,$select_SSIDGet);
 $result_SSIDGet=mysqli_fetch_array($fetch_SSIDGet);
 ?>
-<input type="hidden" name="ssid" value="<?php echo $result_SSIDGet['ss_id'];?>">
-<input type="hidden" name="stockist_id" value="<?=$result_LoGuserDtails['stockiest_id'];?>">
+<input type="hidden" name="ssid" value="<?php echo htmlspecialchars((string)($result_SSIDGet['ss_id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="stockist_id" value="<?=htmlspecialchars((string)($result_LoGuserDtails['stockiest_id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
 <?php }else if($result_LoGuserDtails['onboard_userTYPE']=="super_stockiest") {?>
 
-<input type="hidden" name="ssid" value="<?php echo $result_LoGuserDtails['onboard_userID'];?>">
+<input type="hidden" name="ssid" value="<?php echo htmlspecialchars((string)($result_LoGuserDtails['onboard_userID']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 <input type="hidden" name="stockist_id" value="Nil">
 
 <?php }else{?>
