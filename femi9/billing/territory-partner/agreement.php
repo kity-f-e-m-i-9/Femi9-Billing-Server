@@ -46,6 +46,14 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
 // available once locked (read-only) -- there's nothing meaningful to print
 // before the TP has signed.
 $printMode = $isLocked && isset($_GET['print']);
+// The yellow "changed since signing" highlighting is an on-screen review aid
+// only -- a printed/saved PDF agreement must read as a clean, final document,
+// so every highlight source (profile fields, Schedule-1, body wording) is
+// switched off here rather than in each render site.
+if ($printMode) {
+    $profileChanged = array_fill_keys(array_keys($profileChanged), false);
+    $scheduleChanged = false;
+}
 ob_start();
 ?>
 <!DOCTYPE html>
@@ -194,7 +202,7 @@ ob_start();
 
                         <?php
                         $effectiveBody = get_effective_agreement_body($db_conn, $agreement, 'territory_partner');
-                        echo (!empty($agreement['signed_at']))
+                        echo (!empty($agreement['signed_at']) && !$printMode)
                             ? diff_highlight_agreement_body($agreement['snap_body_html'] ?? null, $effectiveBody)
                             : $effectiveBody;
                         ?>

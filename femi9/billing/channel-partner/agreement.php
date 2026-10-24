@@ -33,6 +33,13 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
 // across printed pages once nested in the dashboard chrome, so "Print /
 // Save as PDF" opens ?print=1, a bare standalone document instead.
 $printMode = $isLocked && isset($_GET['print']);
+// See territory-partner/agreement.php's identical block for why -- the
+// yellow "changed since signing" highlighting is an on-screen review aid
+// only and must not appear in the printed/saved PDF agreement.
+if ($printMode) {
+    $profileChanged = array_fill_keys(array_keys($profileChanged), false);
+    $scheduleChanged = false;
+}
 ob_start();
 ?>
 <!DOCTYPE html>
@@ -184,7 +191,7 @@ ob_start();
 
                         <?php
                         $effectiveBody = get_effective_agreement_body($db_conn, $agreement, 'channel_partner');
-                        echo (!empty($agreement['signed_at']))
+                        echo (!empty($agreement['signed_at']) && !$printMode)
                             ? diff_highlight_agreement_body($agreement['snap_body_html'] ?? null, $effectiveBody)
                             : $effectiveBody;
                         ?>

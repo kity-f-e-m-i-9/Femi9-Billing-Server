@@ -206,6 +206,11 @@ $categoryColLetter = Coordinate::stringFromColumnIndex($categoryColIdx);
 //    repeated — demonstrates how a multi-product invoice is entered. ──────
 $exampleFixedValues = [
     'Company Profile*' => $example_godown,
+    // Defaults to G1 (the common case) but stays a plain typed cell, so
+    // changing it (or any continuation row that carries it down) just means
+    // typing a different warehouse code over it, same as every other
+    // invoice-level column.
+    'Warehouse Code' => in_array('G1', $activeWarehouseCodes, true) ? 'G1' : '',
     'Category*' => $example_cat,
     'Date* (YYYY-MM-DD)' => date('Y-m-d'),
     $invNumberHeader => $isTracked ? 'NEXT' : 'EXAMPLE/001',
@@ -317,6 +322,19 @@ if ($refCategoryCount > 0) {
         $validation->setError('Please pick a category from the dropdown list.');
         $validation->setFormula1("'Categories (do not edit)'!\$A\$1:\$A\$" . $refCategoryCount);
     }
+}
+
+// Force a YYYY-MM-DD date display format on every date column, every data
+// row -- without this, a continuation row's carry-down formula (e.g.
+// "=IF(D3="","",D2)") copies row 2's underlying date value correctly, but
+// the new cell's own format defaults to General, so Excel shows the raw
+// date serial number (e.g. 46868) instead of a formatted date the moment a
+// second product line is added to the same invoice.
+foreach (['Date* (YYYY-MM-DD)', 'Order Date (YYYY-MM-DD)', 'Ship Date (YYYY-MM-DD)'] as $dateHeader) {
+    $dateColIdx = array_search($dateHeader, $fixedHeaders, true);
+    if ($dateColIdx === false) continue;
+    $dateColLetter = Coordinate::stringFromColumnIndex($dateColIdx + 1);
+    $sheet->getStyle($dateColLetter . '2:' . $dateColLetter . $dataRowsEnd)->getNumberFormat()->setFormatCode('YYYY-MM-DD');
 }
 
 foreach (range(1, $lastCol) as $i) {

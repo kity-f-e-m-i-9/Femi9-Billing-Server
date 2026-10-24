@@ -570,31 +570,17 @@ if (empty($groups)) {
 }
 
 // ---------------------------------------------------------------------
-// Pre-validate stock across the whole file (per godown+product), same
-// spirit as ot-sale-action.php's pre-check before any DB write.
-// ---------------------------------------------------------------------
-$stockService = new StockService($db_conn);
+// Every imported order lands as a Draft (ot_sales_invoice.status='draft'),
+// exactly like ot-sale-add.php's "Save as Draft" button — never touching
+// stock at import time. The company reviews the drafts on ot-sale-view.php,
+// then uses ot-sale-confirm-action.php's "Confirm Selected" to actually
+// transfer stock and turn them into real sales, one godown/warehouse-aware
+// StockService::otDeduct() per line, at that later point in time (not
+// whatever the file happened to show when it was imported). So there is no
+// stock pre-validation and no otDeduct() call in this file at all — see
+// ot-sale-action.php's own $isDraft branches for the identical pattern.
+$isDraft = true;
 $createdBy = $_SESSION['LOGIN_USER'] ?? 'system';
-
-$neededByKey = []; // "godownid|warehouseIdOrNone|product_id" => total qty
-foreach ($groups as $g) {
-    foreach ($g['lines'] as $line) {
-        $key = $g['godownid'] . '|' . ($g['warehouse_id'] ?? 'none') . '|' . $line['product_id'];
-        $neededByKey[$key] = ($neededByKey[$key] ?? 0) + $line['qty'];
-    }
-}
-
-foreach ($neededByKey as $key => $needed) {
-    [$godownid, $warehouseIdPart, $product_id] = explode('|', $key);
-    $warehouseId = $warehouseIdPart === 'none' ? null : (int)$warehouseIdPart;
-    $available = $stockService->getClosingQty((int)$product_id, $Login_user_TYPEvl, $godownid, $warehouseId);
-    if ($available === null || $available < $needed) {
-        @unlink($stored_path);
-        $pname = $productById[(int)$product_id]['productName'] ?? "#$product_id";
-        $_SESSION['errorMessage'] = "Import cancelled — insufficient stock for product '$pname' in company profile #$godownid. Available: " . ($available ?? 0) . ", Requested across file: $needed";
-        ot_import_back([]);
-    }
-}
 
 // ---------------------------------------------------------------------
 // Insert everything in one transaction — mirrors ot-sale-action.php.
@@ -604,6 +590,13 @@ function ot_import_gen_tempid(): string {
     $rand3 = '';
     for ($i = 0; $i < 3; $i++) { $rand3 .= $chars[random_int(0, strlen($chars) - 1)]; }
     return $rand3 . 'RTST/' . date('dmy') . '/' . date('gis') . mt_rand(100, 999);
+}
+
+// Self-migrating — same guard as ot-sale-action.php, in case this is the
+// first page in the company's session to need the column.
+$_statusCol = $db_conn->query("SHOW COLUMNS FROM ot_sales_invoice LIKE 'status'");
+if ($_statusCol && $_statusCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
 }
 
 $db_conn->begin_transaction();
@@ -617,8 +610,8 @@ try {
         $stmt = $db_conn->prepare(
             "INSERT INTO ot_sales_invoice
                 (tempid, inv_id, inv_number, courier_charges, wallet_amount,
-                 subtotal, round_off, total, buyer_gsttype, cat)
-             VALUES (?, '0', ?, ?, ?, '0', '0', '0', ?, ?)"
+                 subtotal, round_off, total, buyer_gsttype, cat, status)
+             VALUES (?, '0', ?, ?, ?, '0', '0', '0', ?, ?, 'draft')"
         );
         $stmt->bind_param('ssddss', $tempid, $g['inv_number'], $g['courier_charges'], $g['wallet_amount'], $g['buyer_gsttype'], $g['cat']);
         $stmt->execute();
@@ -662,12 +655,9 @@ try {
             $stmt->execute();
             $stmt->close();
             $lineCount++;
-
-            $stockService->otDeduct(
-                $line['product_id'], $Login_user_TYPEvl, (string)$g['godownid'],
-                $line['qty'], $tempid, $createdBy,
-                true, $g['warehouse_id']
-            );
+            // No stock deduction here -- this import always lands as a Draft
+            // (see the $isDraft comment above); stock only moves once the
+            // company confirms it from ot-sale-view.php.
         }
 
         // Recompute rounded total, same formula as ot-sale-action.php:
@@ -692,7 +682,10 @@ try {
         // the coupon code to a CP account, computes commission = per-unit
         // amount × total qty, and logs it to wallet_monthly_sls_report keyed
         // by this invoice's tempid (one row per tempid, never duplicated).
-        if ($g['coupon_code'] !== '') {
+        // Skipped for a draft, same as ot-sale-action.php's own $isDraft
+        // guard -- a draft isn't a real sale yet, so no commission is earned
+        // until it's actually confirmed.
+        if (!$isDraft && $g['coupon_code'] !== '') {
             $coupon_code = $g['coupon_code'];
             preg_match('/-(.*?)-/', $coupon_code, $matches);
             $coupon_usertype = $matches[1] ?? '';
@@ -777,5 +770,5 @@ try {
 }
 
 @unlink($stored_path);
-$_SESSION['sucMessage'] = "Imported $invoiceCount invoice(s) with $lineCount product line(s) successfully.";
+$_SESSION['sucMessage'] = "Imported $invoiceCount invoice(s) with $lineCount product line(s) as Draft. Review them on this page, then use \"Confirm Selected\" to transfer stock and finalise.";
 ot_import_back([]);
