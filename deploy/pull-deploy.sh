@@ -50,4 +50,4 @@ main() {
 
 main "$@"
 exit $?
-# deploy-test: harmless marker to verify the cron picks up pushes
+# deploy-test: second marker (FTP workflow off, cron only)
