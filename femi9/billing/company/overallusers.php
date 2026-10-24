@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; 
 // Load environment variables FIRST
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -458,18 +458,18 @@ $xlurl="excel_distributor_users";
                                                         $passwordError = false;
                                                         
                                                         try {
-                                                            $decryptedPassword = $encryption->decrypt($storedPassword);
+                                                            throw new Exception('hidden'); // passwords are hashed and can no longer be displayed
                                                         } catch (Exception $e) {
                                                             // If decryption fails, it might be plain text
                                                             if (strlen($storedPassword) < 50) {
-                                                                $decryptedPassword = $storedPassword; // Plain text
+                                                                $passwordError = true;
                                                             } else {
                                                                 $passwordError = true;
                                                             }
                                                         }
                                                         
                                                         if ($passwordError) {
-                                                            echo '<span class="text-danger">Error</span>';
+                                                            femi_password_hidden_cell($tablename, $result_product_list['id']);
                                                         } else {
                                                             $rowIdUnique = $result_product_list["id"];
                                                             ?>

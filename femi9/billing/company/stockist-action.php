@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('st');
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('st');
 include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
@@ -108,7 +108,7 @@ $fetc_count_dist=db_q($db_conn,$select_count_dist,[$state_id,$district_id,$taluk
 		?,?,?,?,
 		?,'0',?,?,?,
 		?,?,?,?)";
-		db_q($db_conn,$sql,[$state_id,$temp_id,$insfilename,$name,$district_id,$user_email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$taluk_id,$DummySuperStockistID,$gstin,$onboard_userTYPE,$onboard_userID,$address,$userid,$useridtext,$country_code]);
+		db_q($db_conn,$sql,[$state_id,$temp_id,$insfilename,$name,$district_id,$user_email,$mobile_number,$username_generate,femi_password_hash((string)($user_password)),$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$taluk_id,$DummySuperStockistID,$gstin,$onboard_userTYPE,$onboard_userID,$address,$userid,$useridtext,$country_code]);
 		
 		
 		//INSERT REFERRAL DETAILS

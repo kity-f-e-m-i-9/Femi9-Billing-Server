@@ -7,47 +7,17 @@
  */
 
 require_once __DIR__ . '/../shared/EncryptionService.php';
+require_once __DIR__ . '/../shared/PasswordService.php';
 require_once __DIR__ . '/../shared/user-config.php';
 
 /**
  * Verify a submitted password against a stored value that may be bcrypt/argon2,
- * AES-encrypted (EncryptionService), or legacy plaintext. On a legacy-plaintext
- * match, upgrades the stored value to AES encryption (same auto-upgrade every
+ * AES-encrypted (EncryptionService), or legacy plaintext. On a legacy match,
+ * re-stores the password as a one-way hash (shared/PasswordService.php) (same auto-upgrade every
  * existing CheckLogin.php already performs).
  */
 function verifyStoredPassword(mysqli $db_conn, string $password, string $stored, string $table, string $idField, $idValue): bool {
-    $encryption = new EncryptionService();
-    $isValid = false;
-    $needsUpgrade = false;
-
-    if (password_get_info($stored)['algo']) {
-        $isValid = password_verify($password, $stored);
-        $needsUpgrade = $isValid;
-    } else {
-        try {
-            $decrypted = $encryption->decrypt($stored);
-            $isValid = ($password === $decrypted);
-        } catch (Exception $e) {
-            $isValid = ($password === $stored);
-            $needsUpgrade = $isValid;
-        }
-    }
-
-    if ($isValid && $needsUpgrade) {
-        try {
-            $enc = $encryption->encrypt($password);
-            $upd = mysqli_prepare($db_conn, "UPDATE `$table` SET password = ? WHERE `$idField` = ?");
-            if ($upd) {
-                mysqli_stmt_bind_param($upd, "ss", $enc, $idValue);
-                mysqli_stmt_execute($upd);
-                mysqli_stmt_close($upd);
-            }
-        } catch (Exception $e) {
-            // non-fatal — login still succeeds even if the upgrade write fails
-        }
-    }
-
-    return $isValid;
+    return femi_password_verify($db_conn, $password, $stored, $table, $idField, $idValue);
 }
 
 /**

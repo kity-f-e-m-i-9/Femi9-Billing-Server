@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; /* include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; /* include("include/db-connect.php");
 
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
@@ -167,7 +167,7 @@ $keyIndex =1;
 		?,?,?,
 		?,?,?)";
 
-        if (db_q($conn,$sql,[$temp_id,$uploadfile,$name,$district_id,$email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantTransactionId,$merchantOrderId,$merchantTransactionId,$merchantUserId,$taluk_id,$distributor_id,$pincode_id]) === TRUE) {
+        if (db_q($conn,$sql,[$temp_id,$uploadfile,$name,$district_id,$email,$mobile_number,$username_generate,femi_password_hash((string)($user_password)),$plan_amount,$valid_months,$valid_from,$valid_to,$merchantTransactionId,$merchantOrderId,$merchantTransactionId,$merchantUserId,$taluk_id,$distributor_id,$pincode_id]) === TRUE) {
             // Redirect to the PhonePe payment URL
             header('Location:' . $payUrl);
         } else {

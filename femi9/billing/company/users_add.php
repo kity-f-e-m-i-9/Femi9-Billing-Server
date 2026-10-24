@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; 
 // Load environment variables FIRST (before anything else)
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -103,8 +103,8 @@ if(isset($_REQUEST['add-users']))
 	$username=$_REQUEST['username'];
 	$password=$_REQUEST['password'];
 	
-	// Encrypt password
-	$encryptedPassword = $encryption->encrypt($password);
+	// Stored as a bcrypt hash (hashed where the INSERT binds it below)
+	$encryptedPassword = $password;
 	
 	$usertype="users";
 	$state="0";
@@ -202,7 +202,7 @@ if(isset($_REQUEST['add-users']))
 
 		$insert_users="INSERT INTO admin_log (username,password,usertype,state,dash,report,company_profile,users_demo,reward_points,demo_free,demo_free_edit,demo_free_delete,manage_return,manage_return_edit,manage_return_delete,debit_note,debit_note_edit,debit_note_delete,stock_request,products,products_edit,products_delete,ot_channels,location,ss,ss_edit,ss_delete,st,st_edit,st_delete,dt,dt_edit,dt_delete,sdt,sdt_edit,sdt_delete,shop,shop_edit,shop_delete,cus,cus_edit,cus_delete,ms,ms_edit,ms_delete,salesbdm_manage,salesbdm_manage_edit,salesbdm_manage_delete,unassigned,remap,users_network,payment_entry, manage_payment_entry, manage_payment_entry_edit, manage_payment_entry_delete, consolidated_payment_entry, consolidated_payment_entry_edit, consolidated_payment_entry_delete, bonus_calculator ,manage_bonus_points, manage_bonus_points_edit, manage_bonus_points_delete, add_input_stock,manage_input_stock,manage_input_stock_edit,manage_input_stock_delete ,add_input_stock_users, manage_input_stock_users, manage_input_stock_users_edit, manage_input_stock_users_delete, partner_location, channel_partner, channel_partner_edit, channel_partner_delete, territory_partner, territory_partner_edit, territory_partner_delete, stock_transfers, internal_transfer) values (?,?,?,?,?,?,?,?,
 		?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-		db_q($db_conn,$insert_users,[$username,$encryptedPassword,$usertype,$state,$dash,$report,$company_profile,$users_demo,$reward_points,$demo_free,$demo_free_edit,$demo_free_delete,$manage_return,$manage_return_edit,$manage_return_delete,$debit_note,$debit_note_edit,$debit_note_delete,$stock_request,$products,$products_edit,$products_delete,$ot_channels,$location,$ss,$ss_edit,$ss_delete,$st,$st_edit,$st_delete,$dt,$dt_edit,$dt_delete,$sdt,$sdt_edit,$sdt_delete,$shop,$shop_edit,$shop_delete,$cus,$cus_edit,$cus_delete,$ms,$ms_edit,$ms_delete,$salesbdm_manage,$salesbdm_manage_edit,$salesbdm_manage_delete,$unassigned,$remap,$users_network,$add_payment_entry,$manage_payment_entry,$manage_payment_entry_edit,$manage_payment_entry_delete,$consolidated_payment_entry,$consolidated_payment_entry_edit,$consolidated_payment_entry_delete,$bonus_calculator,$manage_bonus_points,$manage_bonus_points_edit,$manage_bonus_points_delete,$add_input_stock,$manage_input_stock,$manage_input_stock_edit,$manage_input_stock_delete,$add_input_stock_users,$manage_input_stock_users,$manage_input_stock_users_edit,$manage_input_stock_users_delete,$partner_location,$channel_partner,$channel_partner_edit,$channel_partner_delete,$territory_partner,$territory_partner_edit,$territory_partner_delete,$stock_transfers,$internal_transfer]);
+		db_q($db_conn,$insert_users,[$username,femi_password_hash((string)($encryptedPassword)),$usertype,$state,$dash,$report,$company_profile,$users_demo,$reward_points,$demo_free,$demo_free_edit,$demo_free_delete,$manage_return,$manage_return_edit,$manage_return_delete,$debit_note,$debit_note_edit,$debit_note_delete,$stock_request,$products,$products_edit,$products_delete,$ot_channels,$location,$ss,$ss_edit,$ss_delete,$st,$st_edit,$st_delete,$dt,$dt_edit,$dt_delete,$sdt,$sdt_edit,$sdt_delete,$shop,$shop_edit,$shop_delete,$cus,$cus_edit,$cus_delete,$ms,$ms_edit,$ms_delete,$salesbdm_manage,$salesbdm_manage_edit,$salesbdm_manage_delete,$unassigned,$remap,$users_network,$add_payment_entry,$manage_payment_entry,$manage_payment_entry_edit,$manage_payment_entry_delete,$consolidated_payment_entry,$consolidated_payment_entry_edit,$consolidated_payment_entry_delete,$bonus_calculator,$manage_bonus_points,$manage_bonus_points_edit,$manage_bonus_points_delete,$add_input_stock,$manage_input_stock,$manage_input_stock_edit,$manage_input_stock_delete,$add_input_stock_users,$manage_input_stock_users,$manage_input_stock_users_edit,$manage_input_stock_users_delete,$partner_location,$channel_partner,$channel_partner_edit,$channel_partner_delete,$territory_partner,$territory_partner_edit,$territory_partner_delete,$stock_transfers,$internal_transfer]);
 		
 		
     if(isset($_REQUEST['ot_catID']) && is_array($_REQUEST['ot_catID']) && count($_REQUEST['ot_catID']) > 0) {

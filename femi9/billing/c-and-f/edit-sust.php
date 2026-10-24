@@ -175,7 +175,7 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 			<br/>
 			
 			<!-----<label class="form-label">Password</label>
-            <input type="text" onkeypress="restrictSpecialChars(event)" value="<?php echo htmlspecialchars((string)($result_product_list['password']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" name="password" class="form-control">
+            <input type="text" onkeypress="restrictSpecialChars(event)" value="<?php echo '••••••••';?>" required="" name="password" class="form-control">
 	<br/>---->
 	
 	

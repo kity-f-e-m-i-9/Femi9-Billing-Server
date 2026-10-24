@@ -81,8 +81,9 @@ $header .= "From: ".$FromEmail."\r\nReply-To: ".$ToEmail."" . "\r\n";
 mail($ToEmail, $subject, $message123, $header);
 //---------------------------Email Coding start------------------------------------------------
 
-$updatepassword="update ".$forgottable." set password='$randumpassword' where mobile_number='$frmobilenumber'";
-mysqli_query($db_conn,$updatepassword);
+// Pending temporary password (30 min): the real password is only replaced if the owner logs in with it.
+require_once __DIR__ . '/../shared/PasswordService.php';
+femi_reset_issue($db_conn, (string)$forgottable, 'id', $result_LoGuserDtails['id'], (string)$frusertype, (string)$frmobilenumber, (string)$randumpassword);
 
 $selectcountrows="select count(*) as numfrpass from forgotpassword where mobilenumber=?";
 $fetchcountrows=db_q($db_conn,$selectcountrows,[$frmobilenumber]);

@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; 
 // Load environment variables FIRST (before anything else)
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -135,11 +135,11 @@ $i= $start_from;
 											$passwordError = false;
 											
 											try {
-												$decryptedPassword = $encryption->decrypt($storedPassword);
+												throw new Exception('hidden'); // passwords are hashed and can no longer be displayed
 											} catch (Exception $e) {
 												// If decryption fails, it might be plain text
 												if (strlen($storedPassword) < 50) {
-													$decryptedPassword = $storedPassword; // Plain text
+													$passwordError = true;
 												} else {
 													$passwordError = true;
 												}
@@ -151,7 +151,7 @@ $i= $start_from;
                                                     <td>
 													<?php 
 													if ($passwordError) {
-														echo '<span class="text-danger">Decryption Error</span>';
+														femi_password_hidden_cell('admin_log', $result_product_list['id']);
 													} else {
 													?>
 														<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">

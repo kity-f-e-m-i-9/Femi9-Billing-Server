@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage');
 include("config.php");
 require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
@@ -183,20 +183,7 @@ $i= $start_from;
                                                     <td><?php echo htmlspecialchars((string)($result_product_list["bdm_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["bdm_mobile"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
-                                                        <?php
-                                                        $storedPassword = $result_product_list['password'];
-                                                        $rowIdUnique = $result_product_list["id"];
-                                                        ?>
-                                                        <div class="password-container">
-                                                            <span class="password-toggle" id="pwd-toggle-<?=$rowIdUnique?>" onclick="togglePassword(<?=$rowIdUnique?>)">
-                                                                <i class="material-icons-outlined" id="pwd-icon-<?=$rowIdUnique?>" style="font-size:18px;">visibility_off</i>
-                                                                <span class="password-text" id="pwd-text-<?=$rowIdUnique?>">••••••</span>
-                                                            </span>
-                                                            <button onclick="copyPassword('<?=htmlspecialchars($storedPassword, ENT_QUOTES)?>', <?=$rowIdUnique?>)" class="copy-btn" title="Copy password">
-                                                                <i class="material-icons-outlined">content_copy</i>
-                                                            </button>
-                                                            <input type="hidden" id="pwd-value-<?=$rowIdUnique?>" value="<?=htmlspecialchars($storedPassword, ENT_QUOTES)?>">
-                                                        </div>
+                                                        <?php femi_password_hidden_cell('sales_bdm_staff', $result_product_list["id"]); ?>
                                                         </td>
 													<td><?php echo htmlspecialchars((string)($result_product_list["bdm_email"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo htmlspecialchars((string)($result_product_list["bdm_address"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>

@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -33,7 +33,7 @@ $update_id=$_REQUEST['update_id'];
 	
 	//update process
 	$update_ss="update outlet set user_icon=?,name=?,email=?,mobile_number=?,password=?,username=?,address=? where id=?";
-	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,$password,$mobile_number,$address,$update_id]);
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,femi_password_hash((string)$password),$mobile_number,$address,$update_id]);
 	
 	echo "<script>window.location='Outlet-manage?updatedSuccess';</script>";
 	

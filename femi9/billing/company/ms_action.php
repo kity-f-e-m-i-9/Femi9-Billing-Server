@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
 include("config.php");
 include("RemoveSpecialChar.php");
 error_reporting(1);
@@ -48,7 +48,7 @@ if(isset($_REQUEST['add-customer']))
 	if($result_count_product['numProducts']==0)
 	{
 		$insert_products="insert into marketing_staff (ms_name,ms_mobile,password,ms_email,ms_address,country_code,account_status,team_level_id,manager_id,monthly_target_amount)
-		values ('$ms_name','$ms_mobile','$password','$ms_email','$ms_address',
+		values ('$ms_name','$ms_mobile','".db_esc(femi_password_hash((string)($password)))."','$ms_email','$ms_address',
 		'".db_esc($country_code)."','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").")";
 		mysqli_query($db_conn,$insert_products);
 		$new_ms_id = mysqli_insert_id($db_conn);

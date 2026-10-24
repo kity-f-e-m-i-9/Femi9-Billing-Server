@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ss'); include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ss'); include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
 
@@ -123,7 +123,7 @@ $fetc_count_dist=db_q($db_conn,$select_count_dist,[$state_id,$district_id]);
 		?,?,?,?,
 		?,?,'phonepe','pending','Nil','active',
 		?,?,?,?,?,?,?,?,?,?)";
-		db_q($db_conn,$sql,[$temp_id,$uploadfile,$name,$state_id,$district_id,$user_email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$gstin,$address,$userid,$useridtext,$country_code,$onboard_userTYPE,$onboard_userID]);
+		db_q($db_conn,$sql,[$temp_id,$uploadfile,$name,$state_id,$district_id,$user_email,$mobile_number,$username_generate,femi_password_hash((string)($user_password)),$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$gstin,$address,$userid,$useridtext,$country_code,$onboard_userTYPE,$onboard_userID]);
 
 		
 		//assigned super stockist to districtwise

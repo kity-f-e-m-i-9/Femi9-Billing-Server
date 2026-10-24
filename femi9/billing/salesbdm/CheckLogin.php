@@ -130,10 +130,10 @@ try {
         throw new Exception('Your account is inactive. Please contact support.');
     }
 
-    // Verify password — sales_bdm_staff.password is always plaintext by
-    // design (every Sales BDM gets the fixed "salesbdm@123" on creation),
-    // so a direct comparison is enough — no encrypt/decrypt round-trip needed.
-    $isPasswordValid = ($password === $user['password']);
+    // Verify password — hashed (bcrypt); legacy plain-text rows are accepted
+    // once and re-stored as a hash on this successful login.
+    require_once __DIR__ . '/../shared/PasswordService.php';
+    $isPasswordValid = femi_password_verify($db_conn, $password, (string)$user['password'], 'sales_bdm_staff', 'id', $user['id']);
 
     if (!$isPasswordValid) {
         logLoginAttempt($mobileNumber, false, 'Invalid password');
@@ -154,13 +154,7 @@ try {
     mysqli_stmt_close($stmtAdmin);
 
     if ($adminUser) {
-        require_once __DIR__ . '/../shared/EncryptionService.php';
-        $encryption = new EncryptionService();
-        try {
-            $companyPasswordValid = ($password === $encryption->decrypt($adminUser['password']));
-        } catch (Exception $e) {
-            $companyPasswordValid = ($password === $adminUser['password']);
-        }
+        $companyPasswordValid = femi_password_check($password, (string)$adminUser['password'])['valid'];
         if ($companyPasswordValid) {
             session_regenerate_id(true);
             $_SESSION['pending_switch_bdm_id'] = $user['id'];

@@ -4,6 +4,7 @@ include("config.php");
 
 require_once __DIR__ . '/../shared/env-loader.php';
 require_once __DIR__ . '/../shared/EncryptionService.php';
+require_once __DIR__ . '/../shared/PasswordService.php';
 
 $isForced = isset($_GET['forced']) && $_GET['forced'] == '1';
 
@@ -37,17 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$user) throw new Exception('User not found.');
 
-        try {
-            $storedDecrypted = $encryption->decrypt($user['password']);
-        } catch (Exception $e) {
-            $storedDecrypted = $user['password']; // plain text legacy
-        }
-
-        if ($oldPassword !== $storedDecrypted) {
+        // Verify the current password (hash, or legacy AES/plain text)
+        if (!femi_password_check($oldPassword, (string)$user['password'])['valid']) {
             throw new Exception('Old password is incorrect.');
         }
 
-        $encryptedPassword = $encryption->encrypt($newPassword);
+        $encryptedPassword = femi_password_hash($newPassword);
 
         mysqli_begin_transaction($db_conn);
         try {

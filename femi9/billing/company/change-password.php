@@ -7,6 +7,7 @@ include("config.php");
 // Load encryption service
 require_once __DIR__ . '/../shared/env-loader.php';
 require_once __DIR__ . '/../shared/EncryptionService.php';
+require_once __DIR__ . '/../shared/PasswordService.php';
 
 // Check if this is a forced password change
 $isForced = isset($_GET['forced']) && $_GET['forced'] == '1';
@@ -50,20 +51,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             throw new Exception('User not found');
         }
         
-        // Decrypt stored password and verify
-        try {
-            $storedDecrypted = $encryption->decrypt($user['password']);
-        } catch (Exception $e) {
-            // If decryption fails, password might be plain text (old format)
-            $storedDecrypted = $user['password'];
-        }
-        
-        if ($oldPassword !== $storedDecrypted) {
+        // Verify the current password (hash, or legacy AES/plain text)
+        if (!femi_password_check($oldPassword, (string)$user['password'])['valid']) {
             throw new Exception('Old password is incorrect');
         }
         
         // Encrypt new password
-        $encryptedPassword = $encryption->encrypt($newPassword);
+        $encryptedPassword = femi_password_hash($newPassword);
         
         // Begin transaction
         mysqli_begin_transaction($db_conn);

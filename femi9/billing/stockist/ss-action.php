@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("include/db-connect.php");
 include("config.php");
 include("RemoveSpecialChar.php");
@@ -93,7 +93,7 @@ $fetc_count_dist=db_q($db_conn,$select_count_dist,[$temp_id]);
 		?,?,'phonepe','pending','Nil','pending',
 		?,?,?,
 		?,?,?,?,?,?,?,'0','Nil',?,?,?)";
-		db_q($db_conn,$sql,[$state_id,$temp_id,$uploadfile,$name,$district_id,$user_email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$taluk_id,$Login_user_IDvl,$pincode_id,$gstin,$onboard_userTYPE,$onboard_userID,$address,$usertype,$country_code,$shop_onboard]);
+		db_q($db_conn,$sql,[$state_id,$temp_id,$uploadfile,$name,$district_id,$user_email,$mobile_number,$username_generate,femi_password_hash((string)($user_password)),$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$taluk_id,$Login_user_IDvl,$pincode_id,$gstin,$onboard_userTYPE,$onboard_userID,$address,$usertype,$country_code,$shop_onboard]);
 		
 		
 		// Insert Referral & Target Amount Details:-

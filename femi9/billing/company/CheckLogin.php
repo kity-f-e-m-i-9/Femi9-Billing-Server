@@ -125,32 +125,11 @@ try {
         throw new Exception('Invalid mobile number or password');
     }
     
-    // Verify password
-    $encryption = new EncryptionService();
-    $storedPassword = $user['password'];
-    $isPasswordValid = false;
-    
-    try {
-        // Try to decrypt password (new encrypted format)
-        $decryptedPassword = $encryption->decrypt($storedPassword);
-        $isPasswordValid = ($password === $decryptedPassword);
-    } catch (Exception $e) {
-        // If decryption fails, it might be plain text (old format)
-        // Check if it matches plain text
-        $isPasswordValid = ($password === $storedPassword);
-        
-        // If password matches in plain text, encrypt it now for future
-        if ($isPasswordValid) {
-            $encryptedPassword = $encryption->encrypt($password);
-            $updateStmt = mysqli_prepare($db_conn,
-                "UPDATE admin_log SET password = ? WHERE username = ?"
-            );
-            mysqli_stmt_bind_param($updateStmt, "ss", $encryptedPassword, $mobileNumber);
-            mysqli_stmt_execute($updateStmt);
-            mysqli_stmt_close($updateStmt);
-        }
-    }
-    
+    // Verify password (bcrypt hash; legacy AES/plain-text rows are accepted once
+    // and re-stored as a hash on this successful login)
+    require_once __DIR__ . '/../shared/PasswordService.php';
+    $isPasswordValid = femi_password_verify($db_conn, $password, (string)$user['password'], 'admin_log', 'username', $mobileNumber);
+
     if (!$isPasswordValid) {
         logLoginAttempt($mobileNumber, false, 'Invalid password');
         recordFailedAttempt($rateLimitKey);

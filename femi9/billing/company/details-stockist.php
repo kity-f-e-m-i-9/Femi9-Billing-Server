@@ -131,7 +131,7 @@ $taluk_name=$result_district['taluk'];
 					
 					<tr>
                     <th scope="col">Password</th>
-                    <td><?php echo htmlspecialchars((string)($result_product_list['password']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                    <td><?php echo '••••••••';?></td>
                     </tr>
 					
 					 <tr>

@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; 
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; 
 
 
 /*
@@ -36,7 +36,7 @@ $select_count_dist="select count(*) as numdist from super_stockiest where distri
 		?,?,'phonepe','pending','Nil','pending',
 		?,?,?)"; 
 		
-		db_q($db_conn,$insCpns,[$temp_id,$uploadfile,$name,$district_id,$email,$mobile_number,$username,$password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId]);
+		db_q($db_conn,$insCpns,[$temp_id,$uploadfile,$name,$district_id,$email,$mobile_number,$username,femi_password_hash((string)($password)),$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId]);
 		
 		echo "<script>window.location='payment.php?tempid=".base64_encode($temp_id)."';</script>";
 

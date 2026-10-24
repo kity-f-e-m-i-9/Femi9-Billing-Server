@@ -24,18 +24,9 @@ $select_count_users="select * from admin_log where id=?";
 	$fetch_count_users=db_q($db_conn,$select_count_users,[$id]);
 	$result_count_users=mysqli_fetch_array($fetch_count_users);
 	
-// Decrypt password for display
+// Passwords are stored as one-way hashes and can no longer be displayed;
+// the edit form leaves the field blank and keeps the current password unless a new one is typed.
 $displayPassword = '';
-try {
-    $displayPassword = $encryption->decrypt($result_count_users['password']);
-} catch (Exception $e) {
-    // If decryption fails, it might be plain text
-    if (strlen($result_count_users['password']) < 50) {
-        $displayPassword = $result_count_users['password']; // Plain text
-    } else {
-        $displayPassword = ''; // Error case
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -117,8 +108,14 @@ if(isset($_REQUEST['add-users']))
 	$password=$_REQUEST['password'];
 	$update_id=$_REQUEST['update_id'];
 	
-	// Encrypt password
-	$encryptedPassword = $encryption->encrypt($password);
+	// New password -> bcrypt hash; blank -> keep the stored one
+	require_once __DIR__ . '/../shared/PasswordService.php';
+	if (trim((string)$password) !== '') {
+		$encryptedPassword = femi_password_hash((string)$password);
+	} else {
+		$__cur = mysqli_fetch_assoc(db_q($db_conn,"select password from admin_log where id=?",[$update_id]));
+		$encryptedPassword = $__cur['password'] ?? '';
+	}
 	
 	//Truncate
 	$select_count_users12_truncate="delete from admin_log_ot where username=?";
@@ -267,7 +264,7 @@ $ex_catid = array_filter(explode("#", $catid));
 <br/>
 
 <label class="form-label">Password*</label>
-<input type="text" required="" name="password" value="<?=$displayPassword;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="text" name="password" value="" placeholder="Leave blank to keep the current password" autocomplete="new-password" class="form-control" onkeypress="restrictSpecialChars(event)">
 <br/>
 				
 				<div class="view-only-row">
