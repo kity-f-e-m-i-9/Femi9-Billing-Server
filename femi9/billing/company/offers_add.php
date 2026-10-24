@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -19,7 +19,7 @@ $DATETIME_PRPH4=date("YmdHis");
 $filename_PRPH4="Pr4".$DATETIME_PRPH4."".$tempid.".".$file_extension_PRPH4."";
 $uploaddir_PRPH4='offers_img/';
 $uploadfile_PRPH4=$uploaddir_PRPH4.$filename_PRPH4;
-move_uploaded_file($_FILES['offer_img']['tmp_name'],$uploadfile_PRPH4);
+safe_move_uploaded_file($_FILES['offer_img']['tmp_name'],$uploadfile_PRPH4);
    
 }
 else

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 require_once __DIR__ . '/../shared/AgreementService.php';
 include("config.php");
@@ -63,7 +63,7 @@ if (!empty($_FILES['pan_card']['name'])) {
     $uploadDir = __DIR__ . '/kyc_documents/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
     $newName = 'pan_tp_' . $tp_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-    if (move_uploaded_file($_FILES['pan_card']['tmp_name'], $uploadDir . $newName)) {
+    if (safe_move_uploaded_file($_FILES['pan_card']['tmp_name'], $uploadDir . $newName)) {
         $panCardPath = $newName;
     }
 }

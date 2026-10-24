@@ -1,4 +1,4 @@
-<?php include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); include("include/db-connect.php");
 include("config.php");
 include("RemoveSpecialChar.php");
 
@@ -53,7 +53,7 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	   
                  $uploaddir='../distributor/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 	}else{$insfilename="Nil";}

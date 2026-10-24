@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -18,7 +18,7 @@ if(isset($_REQUEST['add-offers']))
 {
 
 $tempid=$_REQUEST['tempid'];
-$old_img=$_REQUEST['old_img'];
+$old_img=safe_old_file_param($_REQUEST['old_img']);
 
 	//UPLOAD BUSINESS LOGO
 	$file_extension_PRPH4 = pathinfo($_FILES['per_photo']['name'], PATHINFO_EXTENSION);
@@ -30,7 +30,7 @@ $DATETIME_PRPH4=date("YmdHis");
 $filename_PRPH4="Pr4".$DATETIME_PRPH4."".$tempid.".".$file_extension_PRPH4."";
 $uploaddir_PRPH4='top_performers_photo/';
 $uploadfile_PRPH4=$uploaddir_PRPH4.$filename_PRPH4;
-move_uploaded_file($_FILES['per_photo']['tmp_name'],$uploadfile_PRPH4);
+safe_move_uploaded_file($_FILES['per_photo']['tmp_name'],$uploadfile_PRPH4);
    
    unlink("top_performers_photo/".$old_img."");
 }

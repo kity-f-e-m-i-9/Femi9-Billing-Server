@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
@@ -33,7 +33,7 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		
                  $uploaddir='demo_photo/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['photo']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['photo']['tmp_name'],$uploadfile);
 	}else{$uploadfile="Nil";}
 	
         $InsertRecords="insert into demo_awareness (tempid,date,photo,title,usertype,userid,ssid,stockist_id,distributor_id)
@@ -51,7 +51,7 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 if (isset($_REQUEST['UPDATEDEMO'])) {
 	
 	$update_id=$_REQUEST["update_id"];
-	$old_photo=$_REQUEST["old_photo"];
+	$old_photo=safe_old_file_param($_REQUEST["old_photo"]);
 	$title=RemoveSpecialChar($_REQUEST["title"]);
 	
 	//UPLOAD PHOTO
@@ -64,7 +64,7 @@ if (isset($_REQUEST['UPDATEDEMO'])) {
 		
                  $uploaddir='demo_photo/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['photo']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['photo']['tmp_name'],$uploadfile);
 	   
 	   //UNLINK photo
 	   unlink("".$old_photo."");

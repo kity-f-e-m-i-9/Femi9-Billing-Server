@@ -41,6 +41,31 @@ function checkLoginRateLimit($key, $maxAttempts = 5, $timeWindow = 900) {
     return true;
 }
 
+
+// Function to record a failed attempt (without this the limiter never triggers)
+function recordFailedAttempt($key) {
+    $rateLimitFile = __DIR__ . '/logs/login_rate_limit.json';
+    $fp = @fopen($rateLimitFile, 'c+');
+    if (!$fp) { return; }
+    if (flock($fp, LOCK_EX)) {
+        $raw = stream_get_contents($fp);
+        $rateLimits = json_decode($raw ?: '[]', true);
+        if (!is_array($rateLimits)) { $rateLimits = []; }
+        $now = time();
+        foreach ($rateLimits as $k => $v) {            // drop stale entries
+            if (($now - ($v['time'] ?? 0)) > 3600) { unset($rateLimits[$k]); }
+        }
+        $count = ($rateLimits[$key]['count'] ?? 0) + 1;
+        $rateLimits[$key] = ['count' => $count, 'time' => $now];
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($rateLimits));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+    }
+    fclose($fp);
+}
+
 // Check if form was submitted
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['login'])) {
     header('Location: index.php');
@@ -95,6 +120,7 @@ try {
     // Check if user exists
     if (!$user) {
         logLoginAttempt($mobileNumber, false, 'User not found');
+        recordFailedAttempt($rateLimitKey);
         // Don't reveal if user exists or not (security best practice)
         throw new Exception('Invalid mobile number or password');
     }
@@ -127,6 +153,7 @@ try {
     
     if (!$isPasswordValid) {
         logLoginAttempt($mobileNumber, false, 'Invalid password');
+        recordFailedAttempt($rateLimitKey);
         throw new Exception('Invalid mobile number or password');
     }
     

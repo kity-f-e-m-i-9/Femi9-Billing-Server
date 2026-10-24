@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 require_once("include/AssignedLocations.php");
 error_reporting(0);
@@ -97,7 +97,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 		
                  $uploaddir='shop_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	}else{$uploadfile="Nil";}
 	
 	

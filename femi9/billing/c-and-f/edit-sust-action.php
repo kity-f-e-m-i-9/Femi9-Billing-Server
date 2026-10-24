@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -6,7 +6,7 @@ include("RemoveSpecialChar.php");
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $update_id=$_REQUEST['update_id'];
-	$old_icon=$_REQUEST['old_icon'];
+	$old_icon=safe_old_file_param($_REQUEST['old_icon']);
 	$country_code=$_POST["country_code"];
 	
 	$name=str_replace("'","&#39;",$_REQUEST['name']);
@@ -41,7 +41,7 @@ $insfilename=$old_icon;
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfilename=$uploadfile;
 	   if($old_icon!="Nil")
 	   {
@@ -62,7 +62,7 @@ $insfilename=$old_icon;
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   unlink("".$old_icon."");
 	}else{$uploadfile=$old_icon;}*/
 	

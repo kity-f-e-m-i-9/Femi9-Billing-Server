@@ -165,7 +165,7 @@ echo "<script>window.location='index.php?mailsentsuccess';</script>";
 		
 		<?php function GeraHash($qtd){ $Caracteres = '123456789abcd'; 
 $QuantidadeCaracteres = strlen($Caracteres); $QuantidadeCaracteres--; $Hash=NULL; 
-for($x=1;$x<=$qtd;$x++){ $Posicao = rand(0,$QuantidadeCaracteres); $Hash .= substr($Caracteres,$Posicao,1); } 
+for($x=1;$x<=$qtd;$x++){ $Posicao = random_int(0,$QuantidadeCaracteres); $Hash .= substr($Caracteres,$Posicao,1); } 
 return $Hash; } $randum_number=GeraHash(5);
 ?>
 <input type="hidden" name="randumpassword" value="<?=$randum_number;?>">

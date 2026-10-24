@@ -1,4 +1,4 @@
-<?php
+<?php include("checksession.php");
 /**
  * Monthly Target Rewards Backfill Processor
  * 

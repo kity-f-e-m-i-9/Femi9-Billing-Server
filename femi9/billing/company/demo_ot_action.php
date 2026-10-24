@@ -1,4 +1,4 @@
-<?php
+<?php include("checksession.php");
 include("RemoveSpecialChar.php");
 require_once("include/StockService.php");
 

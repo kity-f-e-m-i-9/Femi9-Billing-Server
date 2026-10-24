@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -40,7 +40,7 @@ $filename_SCR1=$rand_isd_SCR1 . '.' . $file_extension_SCR1;
 $filenameINS_SCR1="".$datefile."".$timefile."SCR1".$filename_SCR1."";
                  $uploaddir_SCR1='screenshot/';
                  $uploadfile_SCR1=$uploaddir_SCR1.$filenameINS_SCR1;
-	   move_uploaded_file($_FILES['screenshot']['tmp_name'],$uploadfile_SCR1);
+	   safe_move_uploaded_file($_FILES['screenshot']['tmp_name'],$uploadfile_SCR1);
 	}else{$filenameINS_SCR1="Nil";}
 	
 	
@@ -54,7 +54,7 @@ $filename_SCR2=$rand_isd_SCR2 . '.' . $file_extension_SCR2;
 $filenameINS_SCR2="".$datefile."".$timefile."SCR2".$filename_SCR2."";
                  $uploaddir_SCR2='screenshot/';
                  $uploadfile_SCR2=$uploaddir_SCR2.$filenameINS_SCR2;
-	   move_uploaded_file($_FILES['screenshot2']['tmp_name'],$uploadfile_SCR2);
+	   safe_move_uploaded_file($_FILES['screenshot2']['tmp_name'],$uploadfile_SCR2);
 	}else{$filenameINS_SCR2="Nil";}
 	
 	
@@ -69,7 +69,7 @@ $filename_SCR3=$rand_isd_SCR3 . '.' . $file_extension_SCR3;
 $filenameINS_SCR3="".$datefile."".$timefile."SCR3".$filename_SCR3."";
                  $uploaddir_SCR3='screenshot/';
                  $uploadfile_SCR3=$uploaddir_SCR3.$filenameINS_SCR3;
-	   move_uploaded_file($_FILES['screenshot3']['tmp_name'],$uploadfile_SCR3);
+	   safe_move_uploaded_file($_FILES['screenshot3']['tmp_name'],$uploadfile_SCR3);
 	}else{$filenameINS_SCR3="Nil";}
 	
 	
@@ -83,7 +83,7 @@ $filename_SCR4=$rand_isd_SCR4 . '.' . $file_extension_SCR4;
 $filenameINS_SCR4="".$datefile."".$timefile."SCR4".$filename_SCR4."";
                  $uploaddir_SCR4='screenshot/';
                  $uploadfile_SCR4=$uploaddir_SCR4.$filenameINS_SCR4;
-	   move_uploaded_file($_FILES['screenshot4']['tmp_name'],$uploadfile_SCR4);
+	   safe_move_uploaded_file($_FILES['screenshot4']['tmp_name'],$uploadfile_SCR4);
 	}else{$filenameINS_SCR4="Nil";}
 	
 	
@@ -97,7 +97,7 @@ $filename_SCR5=$rand_isd_SCR5 . '.' . $file_extension_SCR5;
 $filenameINS_SCR5="".$datefile."".$timefile."SCR5".$filename_SCR5."";
                  $uploaddir_SCR5='screenshot/';
                  $uploadfile_SCR5=$uploaddir_SCR5.$filenameINS_SCR5;
-	   move_uploaded_file($_FILES['screenshot5']['tmp_name'],$uploadfile_SCR5);
+	   safe_move_uploaded_file($_FILES['screenshot5']['tmp_name'],$uploadfile_SCR5);
 	}else{$filenameINS_SCR5="Nil";}
 	*/
 		

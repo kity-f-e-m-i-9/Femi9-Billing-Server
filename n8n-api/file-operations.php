@@ -10,8 +10,6 @@ declare(strict_types=1);
  */
 
 const BASE_DIR = '/home/billing0femi9/public_html'; // consider moving to env
-// Prefer getenv('API_SECRET') in production
-const API_SECRET_FALLBACK = '1234';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -99,6 +97,20 @@ function resolve_requested_path(string $requestedPath): string
         send_json(['error' => 'Invalid path'], 403);
     }
 
+    // Never expose secrets, source, dumps, logs or archives, even inside BASE_DIR.
+    $rel = strtolower(substr($real, strlen($baseReal)));
+    foreach (explode('/', trim($rel, '/')) as $seg) {
+        if ($seg !== '' && $seg[0] === '.') {
+            send_json(['error' => 'Forbidden path'], 403);
+        }
+    }
+    $ext = strtolower(pathinfo($real, PATHINFO_EXTENSION));
+    $blockedExt = ['php', 'phtml', 'phar', 'env', 'sql', 'log', 'bak', 'zip', 'tar', 'gz', 'ini', 'pem', 'key', 'lock', 'json'];
+    if (in_array($ext, $blockedExt, true) || basename($real) === 'error_log'
+        || preg_match('#/(include|includes|config|shared|vendor|logs|kyc_documents)(/|$)#', $rel)) {
+        send_json(['error' => 'Forbidden path'], 403);
+    }
+
     return $real;
 }
 
@@ -137,9 +149,17 @@ function is_binary_file(string $filename): bool
 try {
     // Authentication
     $token = get_bearer_token();
-    $expected = getenv('API_SECRET') ?: API_SECRET_FALLBACK;
+    $envFile = __DIR__ . '/../femi9/billing/shared/env-loader.php';
+    if (is_file($envFile)) {
+        require_once $envFile;
+    }
+    $expected = (string)(getenv('API_SECRET') ?: ($_ENV['API_SECRET'] ?? ''));
 
-    if ($token === null || !hash_equals((string)$expected, (string)$token)) {
+    // Fail closed: no (or a weak) secret configured means the API is disabled.
+    if (strlen($expected) < 24) {
+        send_json(['error' => 'Service not configured'], 503);
+    }
+    if ($token === null || !hash_equals($expected, (string)$token)) {
         send_json(['error' => 'Unauthorized'], 401);
     }
 

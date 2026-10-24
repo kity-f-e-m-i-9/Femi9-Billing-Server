@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -44,7 +44,7 @@ if(isset($_REQUEST['updateprofile']))
 	$upinumber=str_replace("'","&#39;",$_REQUEST['upinumber']);
 	
 	//UPLOAD BUSINESS LOGO
-	$old_logo=$_REQUEST['old_logo'];
+	$old_logo=safe_old_file_param($_REQUEST['old_logo']);
 	$small_LOGO= $_FILES['logo']['name'];
 	if($small_LOGO!=NULL)
 	{
@@ -62,7 +62,7 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	   $fileLogo=$rand_isdLG.$small_LOGO;
                  $uploaddirLG='bussiness_logo/';
                  $uploadfileLG=$uploaddirLG.$fileLogo;
-	   move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
+	   safe_move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
 	   $insfoldernameLG="bussiness_logo/";
 	   $insfilenameLG=$insfoldernameLG.$fileLogo;
 	   unlink("bussiness_logo/".$old_logo."");
@@ -99,7 +99,7 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	$address=str_replace("'","&#39;",$_REQUEST['address']);
 	
 	//upload user icon
-	$old_user_icon=$_REQUEST['old_user_icon'];
+	$old_user_icon=safe_old_file_param($_REQUEST['old_user_icon']);
 	$small_jpg= $_FILES['user_icon']['name'];
 	if($small_jpg!=NULL)
 	{
@@ -115,7 +115,7 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='../company/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 	   unlink("../company/".$old_user_icon."");

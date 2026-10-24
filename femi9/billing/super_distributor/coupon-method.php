@@ -1,4 +1,4 @@
-<?php /*
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; /*
 //-------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------	
 $select_count_cpnvalid="select count(*) as numcpnsvalid from coupons where coupon_number='$ref_number' and coupon_status='none'";
@@ -22,7 +22,7 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	}else{$uploadfile="Nil";}
 	
 	date_default_timezone_set("Asia/Kolkata");

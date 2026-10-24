@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 require_once("include/GodownAccess.php");
 require_once __DIR__ . '/../shared/AgreementService.php';
@@ -47,7 +47,7 @@ if ($action === 'save_settings') {
         $uploadDir = __DIR__ . '/company_signature/';
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
         $newName = 'company_signature_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-        if (move_uploaded_file($_FILES['authorized_signatory_signature']['tmp_name'], $uploadDir . $newName)) {
+        if (safe_move_uploaded_file($_FILES['authorized_signatory_signature']['tmp_name'], $uploadDir . $newName)) {
             $signatoryImagePath = $newName;
             // A signature photo/scan is usually mostly blank margin around
             // the actual ink; left uncropped it shrinks to an invisible

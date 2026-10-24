@@ -1,4 +1,4 @@
-<?php include("include/db-connect.php");
+<?php include("checksession.php"); include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
 

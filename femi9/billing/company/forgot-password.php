@@ -59,10 +59,10 @@ function generateSecurePassword($length = 10) {
     $maxIndex = strlen($chars) - 1;
     
     // Ensure password meets requirements
-    $password .= chr(rand(65, 90));  // One uppercase
-    $password .= chr(rand(97, 122)); // One lowercase
-    $password .= chr(rand(48, 57));  // One number
-    $password .= $chars[rand(62, $maxIndex)]; // One special char
+    $password .= chr(random_int(65, 90));  // One uppercase
+    $password .= chr(random_int(97, 122)); // One lowercase
+    $password .= chr(random_int(48, 57));  // One number
+    $password .= $chars[random_int(62, $maxIndex)]; // One special char
     
     // Fill remaining length with random chars
     for ($i = 4; $i < $length; $i++) {
@@ -70,7 +70,9 @@ function generateSecurePassword($length = 10) {
     }
     
     // Shuffle to make it random
-    return str_shuffle($password);
+    $a = str_split($password);
+    for ($i = count($a) - 1; $i > 0; $i--) { $j = random_int(0, $i); [$a[$i], $a[$j]] = [$a[$j], $a[$i]]; }
+    return implode('', $a);
 }
 
 $message = '';

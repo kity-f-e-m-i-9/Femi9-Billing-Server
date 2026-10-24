@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpCourierPayment.php';
@@ -34,7 +34,7 @@ if (isset($_POST['upload_qr'])) {
             if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) $ext = 'jpg';
             $fileName = 'courier_qr_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
 
-            if (move_uploaded_file($file['tmp_name'], $qrDir . $fileName)) {
+            if (safe_move_uploaded_file($file['tmp_name'], $qrDir . $fileName)) {
                 // Remove the previous image so unused files don't accumulate.
                 $prevStmt = $db_conn->query("SELECT qr_image_path FROM courier_payment_settings WHERE id = 1");
                 $prev = $prevStmt->fetch_assoc()['qr_image_path'] ?? null;

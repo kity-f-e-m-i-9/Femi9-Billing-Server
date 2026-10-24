@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 error_reporting(0);
 
@@ -98,7 +98,7 @@ if ($action === 'insert-territory-partner') {
         if (in_array($ext, $allowed) && $_FILES['tp_photo']['size'] <= 2097152) {
             $filename = 'tp_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
             $dest     = __DIR__ . '/tp_photo/' . $filename;
-            if (move_uploaded_file($_FILES['tp_photo']['tmp_name'], $dest)) {
+            if (safe_move_uploaded_file($_FILES['tp_photo']['tmp_name'], $dest)) {
                 $photo = $filename;
             }
         }
@@ -227,7 +227,7 @@ if ($action === 'update-territory-partner') {
         if (in_array($ext, $allowed) && $_FILES['tp_photo']['size'] <= 2097152) {
             $filename = 'tp_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
             $dest     = __DIR__ . '/tp_photo/' . $filename;
-            if (move_uploaded_file($_FILES['tp_photo']['tmp_name'], $dest)) {
+            if (safe_move_uploaded_file($_FILES['tp_photo']['tmp_name'], $dest)) {
                 $photo_update = $filename;
             }
         }

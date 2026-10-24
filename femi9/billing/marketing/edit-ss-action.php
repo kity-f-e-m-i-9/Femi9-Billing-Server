@@ -1,11 +1,11 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("RemoveSpecialChar.php");
 error_reporting(0);
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $update_id=$_REQUEST['update_id'];
-	$old_icon=$_REQUEST['old_icon'];
+	$old_icon=safe_old_file_param($_REQUEST['old_icon']);
 	$shop_cat=$_POST["shop_cat"];
 	
 	$name=str_replace("'","&#39;",$_POST["name"]);
@@ -109,7 +109,7 @@ $insfilename=$old_icon;
 		
                  $uploaddir='shop_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfilename=$uploadfile;
 	   if($old_icon!="Nil")
 	   {

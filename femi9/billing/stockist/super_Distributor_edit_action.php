@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; 
 include("checksession.php");
 include("config.php"); // Make sure this is included!
 
@@ -11,7 +11,7 @@ include("RemoveSpecialChar.php");
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     
     $update_id = mysqli_real_escape_string($db_conn, $_REQUEST['update_id']);
-    $old_icon = mysqli_real_escape_string($db_conn, $_REQUEST['old_icon']);
+    $old_icon = mysqli_real_escape_string($db_conn, safe_old_file_param($_REQUEST['old_icon']));
     
     $name = str_replace("'","&#39;", $_REQUEST['name']);
     $name = RemoveSpecialChar($name);
@@ -77,7 +77,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             
             $uploadfile = $uploaddir . $filename;
             
-            if(move_uploaded_file($_FILES['user_icon']['tmp_name'], $uploadfile)) {
+            if(safe_move_uploaded_file($_FILES['user_icon']['tmp_name'], $uploadfile)) {
                 $insfoldername = "user_icon/";
                 $insfilename = $insfoldername . $filename;
                 

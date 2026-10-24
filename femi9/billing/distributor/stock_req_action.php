@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -33,7 +33,7 @@ $filename_SCR1=$rand_isd_SCR1 . '.' . $file_extension_SCR1;
 $filenameINS_SCR1="".$datefile."".$timefile."SCR1".$filename_SCR1."";
                  $uploaddir_SCR1='screenshot/';
                  $uploadfile_SCR1=$uploaddir_SCR1.$filenameINS_SCR1;
-	   move_uploaded_file($_FILES['screenshot']['tmp_name'],$uploadfile_SCR1);
+	   safe_move_uploaded_file($_FILES['screenshot']['tmp_name'],$uploadfile_SCR1);
 	}else{$filenameINS_SCR1="Nil";}
 	
 	
@@ -47,7 +47,7 @@ $filename_SCR2=$rand_isd_SCR2 . '.' . $file_extension_SCR2;
 $filenameINS_SCR2="".$datefile."".$timefile."SCR2".$filename_SCR2."";
                  $uploaddir_SCR2='screenshot/';
                  $uploadfile_SCR2=$uploaddir_SCR2.$filenameINS_SCR2;
-	   move_uploaded_file($_FILES['screenshot2']['tmp_name'],$uploadfile_SCR2);
+	   safe_move_uploaded_file($_FILES['screenshot2']['tmp_name'],$uploadfile_SCR2);
 	}else{$filenameINS_SCR2="Nil";}
 	
 	$select_count_invoice="select count(*) as numrequest from stock_request where reqid='$reqid'";

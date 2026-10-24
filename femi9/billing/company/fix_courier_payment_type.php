@@ -1,4 +1,4 @@
-<?php
+<?php include("checksession.php");
 /**
  * fix_courier_payment_type.php
  *
@@ -30,8 +30,8 @@ declare(strict_types=1);
 // !! Move these to an .env file or a config outside webroot in production !!
 const DB_HOST = 'localhost';
 const DB_NAME = 'billing0femi9_billingapp';
-const DB_USER = 'billing0femi9_femi9admin';
-const DB_PASS = 'mavNip-xukvyk-9veqra';
+define('DB_USER', $_ENV['DB_USERNAME'] ?? '');
+define('DB_PASS', $_ENV['DB_PASSWORD'] ?? '');
 const DB_PORT = 3306;
 
 

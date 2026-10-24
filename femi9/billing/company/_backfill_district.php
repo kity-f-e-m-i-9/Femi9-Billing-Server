@@ -1,4 +1,4 @@
-<?php
+<?php include("checksession.php");
 require_once "include/db-connect.php";
 require_once "../shared/PartnerLocationDistrict.php";
 

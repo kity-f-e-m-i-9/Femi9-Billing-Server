@@ -1,4 +1,4 @@
-<?php
+<?php include("checksession.php");
 /**
  * Invoice ID Format Comparison & Fix Generator
  * This will show exactly why the JOIN is failing and how to fix it

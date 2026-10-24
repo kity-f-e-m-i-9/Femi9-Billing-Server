@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -76,7 +76,7 @@ if (isset($_REQUEST['updateprofile'])) {
         if (in_array($ext, $allowed) && $_FILES['cp_photo']['size'] <= 2097152) {
             $filename = 'cp_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
             $dest     = __DIR__ . '/../company/cp_photo/' . $filename;
-            if (move_uploaded_file($_FILES['cp_photo']['tmp_name'], $dest)) {
+            if (safe_move_uploaded_file($_FILES['cp_photo']['tmp_name'], $dest)) {
                 $photo_update = $filename;
             }
         }

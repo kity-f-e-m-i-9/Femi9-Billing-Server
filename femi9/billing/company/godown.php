@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('company_profile');
 require_once("include/GodownAccess.php");
 error_reporting(0);
@@ -25,7 +25,7 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	   $fileLogo=$rand_isdLG.$small_LOGO;
                  $uploaddirLG='bussiness_logo/';
                  $uploadfileLG=$uploaddirLG.$fileLogo;
-	   move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
+	   safe_move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
 	   $insfoldernameLG="bussiness_logo/";
 	   $insfilenameLG=$insfoldernameLG.$fileLogo;
 	   

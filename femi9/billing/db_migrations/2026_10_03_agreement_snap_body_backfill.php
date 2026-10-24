@@ -31,8 +31,8 @@ require_once __DIR__ . '/../shared/AgreementService.php';
 
 $servername = $_ENV['DB_HOST']     ?? 'localhost';
 $db_port    = (int)($_ENV['DB_PORT'] ?? 3306);
-$username   = $_ENV['DB_USERNAME'] ?? 'billing0femi9_femi9admin';
-$password   = $_ENV['DB_PASSWORD'] ?? 'mavNip-xukvyk-9veqra';
+$username   = $_ENV['DB_USERNAME'] ?? '';
+$password   = $_ENV['DB_PASSWORD'] ?? '';
 $dbname     = $_ENV['DB_NAME']     ?? 'billing0femi9_billingapp';
 
 $db_conn = mysqli_connect($servername, $username, $password, $dbname, $db_port);

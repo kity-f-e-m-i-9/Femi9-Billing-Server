@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -34,7 +34,7 @@ $rand_isd_AADHAR=bin2hex(random_bytes(32));
 $filename_bill="".$DATETIME_AADHAR."".$rand_isd_AADHAR.".".$file_extension_AADHAR."";
 $uploaddir_AADHAR='bill_copy_photos/';
 $uploadfile_AADHAR=$uploaddir_AADHAR.$filename_bill;
-move_uploaded_file($_FILES['photos']['tmp_name'],$uploadfile_AADHAR);
+safe_move_uploaded_file($_FILES['photos']['tmp_name'],$uploadfile_AADHAR);
 }else{
 	$filename_bill="";
 }

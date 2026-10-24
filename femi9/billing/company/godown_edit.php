@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
@@ -63,7 +63,7 @@ if(isset($_REQUEST['add-godown']))
 	$upinumber = RemoveSpecialChar($upinumber);
 	
 	//UPLOAD BUSINESS LOGO
-	$old_logo=$_REQUEST['old_logo'];
+	$old_logo=safe_old_file_param($_REQUEST['old_logo']);
 	$small_LOGO= $_FILES['logo']['name'];
 	if($small_LOGO!=NULL)
 	{
@@ -82,7 +82,7 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
                  $uploaddirLG=__DIR__.'/bussiness_logo/';
                  if(!is_dir($uploaddirLG)) mkdir($uploaddirLG, 0755, true);
                  $uploadfileLG=$uploaddirLG.$fileLogo;
-	   move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
+	   safe_move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
 	   $insfilenameLG="bussiness_logo/".$fileLogo;
 	   if($old_logo!=NULL && file_exists($old_logo)) unlink($old_logo);
 	   

@@ -26,3 +26,14 @@ femi9/billing/super-stockist/.env
 femi9/billing/company/logs/login_attempts.log
 femi9/billing/login/logs/login_attempts.log
 femi9/billing/salesbdm/logs/login_attempts.log
+
+# Runtime logs / rate-limit state - contain mobile numbers, paths, reset activity
+error_log
+**/error_log
+**/*.log
+femi9/billing/company/logs/rate_limit.json
+femi9/billing/login/logs/login_rate_limit.json
+# Never commit secrets, archives or backups
+*.zip
+*.bak
+*-backup.php

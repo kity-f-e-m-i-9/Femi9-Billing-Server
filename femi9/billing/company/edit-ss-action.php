@@ -8,6 +8,7 @@
  */
 
 declare(strict_types=1);
+require_once __DIR__ . '/../shared/safe-upload.php';
 
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ss_edit');
@@ -44,7 +45,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     
     // Get and validate form data
     $update_id = filter_var($_POST['update_id'] ?? 0, FILTER_VALIDATE_INT);
-    $old_icon = sanitizeInput($_POST['old_icon'] ?? '');
+    $old_icon = sanitizeInput(safe_old_file_param($_POST['old_icon']) ?? '');
     $current_district_id = filter_var($_POST['current_district_id'] ?? 0, FILTER_VALIDATE_INT);
     
     // Validate update_id
@@ -129,7 +130,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         
         $uploadfile = $uploaddir . $filename;
         
-        if (move_uploaded_file($_FILES['user_icon']['tmp_name'], $uploadfile)) {
+        if (safe_move_uploaded_file($_FILES['user_icon']['tmp_name'], $uploadfile)) {
             $insfilename = $uploadfile;
             
             // Delete old icon if exists and not default

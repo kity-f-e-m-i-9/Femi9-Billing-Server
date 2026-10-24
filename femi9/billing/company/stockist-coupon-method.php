@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 //-------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------	
 $select_count_cpnvalid="select count(*) as numcpnsvalid from coupons where coupon_number='$ref_number' and coupon_status='none' and user_type='$Login_user_TYPEvl' and category='$Coupon_category'";
@@ -22,7 +22,7 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='../super-stockist/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 	}else{$insfilename="Nil";}
