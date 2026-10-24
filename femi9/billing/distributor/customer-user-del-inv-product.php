@@ -8,7 +8,7 @@ if (isset($_REQUEST['inv_id'])) {
     $rowid = (int) base64_decode($_REQUEST['rowid'] ?? '');
 
     if ($rowid <= 0) {
-        echo "<script>window.location='customer-user-invoice-add.php?InvoiceID={$invoice_id_encode}&&DeleteSuccess&&ActionRemove';</script>";
+        echo "<script>window.location='customer-user-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&ActionRemove';</script>";
         exit;
     }
 
@@ -62,6 +62,6 @@ if (isset($_REQUEST['inv_id'])) {
         error_log("customer-user-del-inv-product.php error: " . $e->getMessage());
     }
 
-    echo "<script>window.location='customer-user-invoice-add.php?InvoiceID={$invoice_id_encode}&&DeleteSuccess&&ActionRemove';</script>";
+    echo "<script>window.location='customer-user-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&ActionRemove';</script>";
 }
 ?>

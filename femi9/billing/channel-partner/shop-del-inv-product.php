@@ -50,4 +50,4 @@ $stmtDel = $db_conn->prepare("DELETE FROM user_invoice_items WHERE id=?");
 $stmtDel->bind_param('i', $rowid);
 $stmtDel->execute(); $stmtDel->close();
 
-echo "<script>window.location='shop-invoice-add.php?InvoiceID={$invoice_id_encode}&&DeleteSuccess&&invuser={$invuser}&&ActionRemove&&action={$actionEdit}';</script>";
+echo "<script>window.location='shop-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&ActionRemove&&action={$actionEdit}';</script>";

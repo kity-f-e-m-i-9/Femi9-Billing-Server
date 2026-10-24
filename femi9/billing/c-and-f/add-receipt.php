@@ -67,7 +67,7 @@ $invtable_name="invoice";
 		$delreceipt="delete from receipt where id=?";
 		db_q($db_conn,$delreceipt,[$rcptid]);
 		
-		echo "<script>window.location='add-receipt.php?invid=".$_REQUEST['invid']."&&invuser=".$_REQUEST['invuser']."&&DeletedSuccess';</script>";
+		echo "<script>window.location='add-receipt.php?invid=".urlencode($_REQUEST['invid'])."&&invuser=".urlencode($_REQUEST['invuser'])."&&DeletedSuccess';</script>";
 		
 		
 	}
@@ -131,7 +131,7 @@ $invtable_name="invoice";
 									<table class="headertble">
 									<tr>
 									<td><?php echo $title;?></td>
-									<td><a href="<?=$backlink;?>" title="Go Back">&#9776;</a></td>
+									<td><a href="<?=htmlspecialchars((string)($backlink), ENT_QUOTES, 'UTF-8', false);?>" title="Go Back">&#9776;</a></td>
 									</tr>
 									</table>
 									</h1>
@@ -241,7 +241,7 @@ if($receiptamount>0){
 						<td><?=$result_pincode_list['receipt_method'];?></td>
 						<td><?=$result_pincode_list['receipt_remarks'];?></td>
 						
-						<td><a href="add-receipt.php?invid=<?=$_REQUEST['invid'];?>&&invuser=<?=$_REQUEST['invuser'];?>&&delreceiptact&&rcptid=<?php echo base64_encode($result_pincode_list['id']);?>" onclick="return confirm('You want to delete confirm?');"><span class='badge badge-style-bordered badge-danger'>Remove</span></a></td>
+						<td><a href="add-receipt.php?invid=<?=htmlspecialchars((string)($_REQUEST['invid']), ENT_QUOTES, 'UTF-8', false);?>&&invuser=<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>&&delreceiptact&&rcptid=<?php echo base64_encode($result_pincode_list['id']);?>" onclick="return confirm('You want to delete confirm?');"><span class='badge badge-style-bordered badge-danger'>Remove</span></a></td>
                                       
                                      </tr>
 									<?php }?>
@@ -316,10 +316,10 @@ if($receiptamount>0){
 		db_q($db_conn,$insertreceipt,[$receiptid,$invid,$receivableamount,$receivedamount,$balanceamountvl,$receiptdate,$from_user_type,$from_user_id,$to_user_type,$to_user_id,$receipt_method,$receipt_remarks]);
 	}
 	
-	echo "<script>window.location='add-receipt.php?invid=$invid&&invuser=$invuser&&ReceiptAddedSuc';</script>";
+	echo "<script>window.location='add-receipt.php?invid=".urlencode($invid)."&&invuser=".urlencode($invuser)."&&ReceiptAddedSuc';</script>";
 	
 										}else{
-	echo "<script>window.location='add-receipt.php?invid=$invid&&invuser=$invuser&&InvalidAmount';</script>";		
+	echo "<script>window.location='add-receipt.php?invid=".urlencode($invid)."&&invuser=".urlencode($invuser)."&&InvalidAmount';</script>";		
 										}
 	
 									}
@@ -330,7 +330,7 @@ if($receiptamount>0){
 									{
 									?>
 										
-				<form action="<?=$_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data" onsubmit="return confirm('Please make a confirm!')">
+				<form action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" method="post" enctype="multipart/form-data" onsubmit="return confirm('Please make a confirm!')">
 				<?php function GeraHash($qtd){ $Caracteres = '123456789ABDEFGHJKMNPQRS'; 
 $QuantidadeCaracteres = strlen($Caracteres); $QuantidadeCaracteres--; $Hash=NULL; 
 for($x=1;$x<=$qtd;$x++){ $Posicao = rand(0,$QuantidadeCaracteres); $Hash .= substr($Caracteres,$Posicao,1); } 
@@ -342,9 +342,9 @@ $temp_date=date("dmy");
 $temp_time=date("gis"); 
 $receiptid="".$inv_randum_number."/RCPT/".$temp_date."/".$temp_time."";?>
 
-				<input type="hidden" name="receiptid" value="<?=$receiptid;?>"/>
-				<input type="hidden" name="invid" value="<?=$_REQUEST['invid'];?>"/>
-				<input type="hidden" name="invuser" value="<?=$_REQUEST['invuser'];?>"/>
+				<input type="hidden" name="receiptid" value="<?=htmlspecialchars((string)($receiptid), ENT_QUOTES, 'UTF-8', false);?>"/>
+				<input type="hidden" name="invid" value="<?=htmlspecialchars((string)($_REQUEST['invid']), ENT_QUOTES, 'UTF-8', false);?>"/>
+				<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>"/>
 				<input type="hidden" name="receivableamount" value="<?=$balanceAmount;?>"/>
 				<input type="hidden" name="date" value="<?=date("Y-m-d");?>"/>
 

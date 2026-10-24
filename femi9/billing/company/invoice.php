@@ -138,7 +138,7 @@ select:focus, input[type=number]:focus{background:#fffa8f;}
 									
 <form action="invoice-action2" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="inv_id" value="<?=$Invoice_ID;?>">
+<input type="hidden" name="inv_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                            <div class="example-content">
@@ -229,7 +229,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 <td><?=$result_INVProductDetails['qty'];?></td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
-<a href="del-inv-product?inv_id=<?php echo $Invoice_ID_encode;?>&&rowid=<?php echo $ItemRowid;?>"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="del-inv-product?inv_id=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?php echo $ItemRowid;?>"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>
                                                         </tr>
                                                         
@@ -262,7 +262,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
                                                 <div class="invoice-info">
 												
 <form action="invoice-submit" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
-<input type="hidden" name="invoice_id" value="<?=$Invoice_ID;?>"/>
+<input type="hidden" name="invoice_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
             <p class="bold">Subtotal <span>

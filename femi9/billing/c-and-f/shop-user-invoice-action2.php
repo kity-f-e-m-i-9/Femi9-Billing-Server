@@ -79,7 +79,7 @@ user_id=?";
 	if($AVMstock<$qty)
 	{
 		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id).
-"&&InvalidStock&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&AlertStockError';</script>";
+"&&InvalidStock&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&AlertStockError';</script>";
 		
 	}else{
 	
@@ -118,12 +118,12 @@ and user_id=?";
 		
 		
 		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id).
-"&&AddedSuccess&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&FemiAdded';</script>";
+"&&AddedSuccess&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&FemiAdded';</script>";
 		
 	}else{
 		
 		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id).
-"&&ItemAlreadyExists&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&AlertMessage';</script>";
+"&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&AlertMessage';</script>";
 	}
 		
 }

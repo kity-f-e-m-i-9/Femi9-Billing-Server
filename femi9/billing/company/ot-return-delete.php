@@ -50,7 +50,7 @@ $select_count_product="select * from ot_sales_return where id=?";
 			);
 		} catch (StockException $e) {
 			$_SESSION['errorMessage'] = "Stock error: " . $e->getMessage();
-			echo "<script>window.location='ot-sale-return?stockerror&&tempid=$tempid';</script>";
+			echo "<script>window.location='ot-sale-return?stockerror&&tempid=".urlencode($tempid)."';</script>";
 			exit;
 		}
 	}
@@ -58,5 +58,5 @@ $select_count_product="select * from ot_sales_return where id=?";
 $del_product="delete from ot_sales_return where id=?";
 db_q($db_conn,$del_product,[$Roowid]);
 
-echo "<script>window.location='ot-sale-return?deletedDone&&tempid=$tempid';</script>";
+echo "<script>window.location='ot-sale-return?deletedDone&&tempid=".urlencode($tempid)."';</script>";
 ?>

@@ -82,7 +82,7 @@ $distributorid=$_REQUEST['distributorid'];
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
-								<a href="distributor-network.php?stockistid=<?=$stockistid?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+								<a href="distributor-network.php?stockistid=<?=htmlspecialchars((string)($stockistid), ENT_QUOTES, 'UTF-8', false)?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
                                     <h1>
 									<table class="headertble">
 									<tr>

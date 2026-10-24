@@ -86,7 +86,7 @@ $seuser=$_REQUEST['seuser'];
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report_outlet?frdate=<?=$start_date;?>&&todate=<?=$endDate;?>&&lable=<?=$_REQUEST['lable'];?>&&rptlable=<?=$_REQUEST['rptlable'];?>&&out1=<?=$_REQUEST['out1'];?>&&out2=<?=$_REQUEST['out2'];?>&&out3=<?=$_REQUEST['out3'];?>&&out4=<?=$_REQUEST['out4'];?>&&seuser=<?=$seuser;?>&&indistinct=<?=$indistinct;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report_outlet?frdate=<?=htmlspecialchars((string)($start_date), ENT_QUOTES, 'UTF-8', false);?>&&todate=<?=htmlspecialchars((string)($endDate), ENT_QUOTES, 'UTF-8', false);?>&&lable=<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>&&rptlable=<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>&&out2=<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>&&out3=<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>&&out4=<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?>&&seuser=<?=htmlspecialchars((string)($seuser), ENT_QUOTES, 'UTF-8', false);?>&&indistinct=<?=$indistinct;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -104,19 +104,19 @@ $seuser=$_REQUEST['seuser'];
 												<table id="reportdash">
 												<tr>
 												<th>Today</th>
-												<td>:&nbsp;<?=$_REQUEST['out1'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Yesterday</th>
-												<td>:&nbsp;<?=$_REQUEST['out2'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>This&nbsp;Month</th>
-												<td>:&nbsp;<?=$_REQUEST['out3'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Last&nbsp;Month&nbsp;Till&nbsp;Date</th>
-												<td>:&nbsp;<?=$_REQUEST['out4'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												</table>
                                             </div>
@@ -154,27 +154,27 @@ $i= $start_from;
 <!-----------------------DISTRIBUTOR-------------------------------->
 									<?PHP if($_REQUEST['lable']==3){?>
 									
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="lable" value="<?=$_REQUEST['lable'];?>"/>
-<input type="hidden" name="rptlable" value="<?=$_REQUEST['rptlable'];?>"/>
-<input type="hidden" name="out1" value="<?=$_REQUEST['out1'];?>"/>
-<input type="hidden" name="out2" value="<?=$_REQUEST['out2'];?>"/>
-<input type="hidden" name="out3" value="<?=$_REQUEST['out3'];?>"/>
-<input type="hidden" name="out4" value="<?=$_REQUEST['out4'];?>"/>
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="lable" value="<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="rptlable" value="<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out1" value="<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out2" value="<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out3" value="<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out4" value="<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="seaction" value="searchfilter"/>
 
 <div class="overviewcontainar">
 <div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$start_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($start_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$endDate;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($endDate), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">Distributor</label>
-<input type="text" name="seuser" placeholder="%Like%" value="<?=$seuser;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="text" name="seuser" placeholder="%Like%" value="<?=htmlspecialchars((string)($seuser), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchcheckbox">
 <label class="form-label">indistinct</label>

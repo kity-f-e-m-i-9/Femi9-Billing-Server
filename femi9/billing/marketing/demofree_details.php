@@ -147,7 +147,7 @@ $i= $start_from;
 					<td><?php echo inr_format($PR_qty, 1);?></td>
 													
 													<td>
-<a href="demofree_delete?Roowid=<?=$RowID;?>&&tempid=<?=$tempid;?>"onclick="return confirm('You want to delete confirm?');">
+<a href="demofree_delete?Roowid=<?=$RowID;?>&&tempid=<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>"onclick="return confirm('You want to delete confirm?');">
 <img src="../../assets/images/delete-32.png"/></a>
 													</td>
                                                 </tr>

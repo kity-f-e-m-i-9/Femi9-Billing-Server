@@ -381,7 +381,7 @@ $xlurl="super_Distributor_ex_overallusers";
                                                                     </div>
                                                                     <form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_mobile_action">	
                                                                         <input type="hidden" name="old_mobile_number" value="<?=$result_product_list["mobile_number"];?>">
-                                                                        <input type="hidden" name="update_usertype" value="<?=$_REQUEST['invuser'];?>">
+                                                                        <input type="hidden" name="update_usertype" value="<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>">
                                                                         
                                                                         <div class="example-content" style="padding:20px;">
                                                                             <div class="form-floating mb-3">

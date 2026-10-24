@@ -65,7 +65,7 @@ $Report_LABLE="Competetion Stock Report";
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report_competition?modelval=<?=$_REQUEST['modelval'];?>&&out1=<?=$_REQUEST['out1'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report_competition?modelval=<?=htmlspecialchars((string)($_REQUEST['modelval']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -85,7 +85,7 @@ $Report_LABLE="Competetion Stock Report";
 						<a href="#" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title">Shop</span>
-                                                <span class="widget-stats-amount"><?=base64_decode($_REQUEST['out1']);?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)(base64_decode($_REQUEST['out1'])), ENT_QUOTES, 'UTF-8', false);?></span>
                                             </div>
 											</a>
                                         </div>

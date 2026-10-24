@@ -99,7 +99,7 @@ if(isset($_REQUEST['update-product']))
                                     </div>--->
                                     <div class="card-body">
 <?php include("validate-scripts.php");?>                                       
-<form action="<?php echo $_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data">
+<form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" method="post" enctype="multipart/form-data">
 
 <input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
 

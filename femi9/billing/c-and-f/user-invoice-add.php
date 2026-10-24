@@ -136,7 +136,7 @@ else
 									<td>
 									<?php if($_REQUEST['action']=="edit"){ echo "Update > ";} ;?>
 									<?=$displaytitle;?></td>
-									<td><a href="user-manage-invoice.php?invuser=<?=$getinvuser;?>" title="Add Invoice">&#9776;</a></td>
+									<td><a href="user-manage-invoice.php?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>" title="Add Invoice">&#9776;</a></td>
 									</tr>
 									</table>
 									</h1>
@@ -163,7 +163,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintPrice").innerHTML=xmlhttp.responseText;}}
-var invuser="<?=$getinvuser;?>";
+var invuser="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>";
 xmlhttp.open("GET","loadPrice.php?q="+str + '&invuser='+ invuser,true);
 xmlhttp.send();}
 </script>
@@ -225,8 +225,8 @@ else{ $amount_received_fully="0";}
 													
 <form action="user-invoice-action2.php" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="inv_id" value="<?=$Invoice_ID;?>">
-<input type="hidden" name="invuser" value="<?=$getinvuser?>">
+<input type="hidden" name="inv_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>">
+<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>">
 
 <div class="example-container">
 <div class="example-content">
@@ -377,7 +377,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 			if($result_count_return==0){
 			?>
 			
-<a href="user-del-inv-product.php?inv_id=<?php echo $Invoice_ID_encode;?>&&rowid=<?php echo $ItemRowid;?>&&&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="user-del-inv-product.php?inv_id=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?php echo $ItemRowid;?>&&&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&userid=<?=$CustomerID;?>&&actionremove"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 
 <?php } else{ echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";}?>
 
@@ -476,7 +476,7 @@ $usertype=$result_InvoieDetails['to_user_type'];
                                             <div class="col-lg-3">
                                                 <div class="invoice-info">
 <form action="user-invoice-submit.php" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
-<input type="hidden" name="invoice_id" value="<?=$Invoice_ID;?>"/>
+<input type="hidden" name="invoice_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
 <?php $_SESSION['INVOICEFINISH']="1";?>
@@ -637,7 +637,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";?>
 
 <input type="hidden" name="randum_number" value="<?=$randum_number?>">
 <input type="hidden" name="inv_id" value="<?=$inv_id?>">
-<input type="hidden" name="invuser" value="<?=$getinvuser?>">
+<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>">
 
                                         <div class="example-container">
                                            <div class="example-content">
@@ -676,7 +676,7 @@ xmlhttp.send();}
 			    var invField = document.getElementById('inv_number');
 			    if (!invField) { return; }
 			    if (invField.value.trim() !== '' && !invNumberAutoFilled) { return; }
-			    var invuser = '<?=$getinvuser;?>';
+			    var invuser = '<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>';
 			    var url = 'load_next_invoice_number.php?invuser=' + encodeURIComponent(invuser) + (productId ? '&pid=' + encodeURIComponent(productId) : '');
 			    fetch(url)
 			        .then(function(r) { return r.json(); })
@@ -701,7 +701,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintstock").innerHTML=xmlhttp.responseText;}}
-var invuser="<?=$getinvuser;?>";
+var invuser="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>";
 xmlhttp.open("GET","loadstockcheck.php?q="+str + '&invuser='+ invuser,true);
 xmlhttp.send();}
 </script>
@@ -805,10 +805,10 @@ while($result_Products_list=mysqli_fetch_array($fetch_Products_list))
                                                             </div>
 				<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_invoice_action">	
 									
-				<input type="hidden" name="invuser" value="<?php echo $_REQUEST['invuser'];?>">
-				<input type="hidden" name="InvoiceID" value="<?php echo $_REQUEST['InvoiceID'];?>">
-				<input type="hidden" name="action" value="<?php echo $_REQUEST['action'];?>">
-				<input type="hidden" name="gid" value="<?php echo $_REQUEST['gid'];?>">
+				<input type="hidden" name="invuser" value="<?php echo htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>">
+				<input type="hidden" name="InvoiceID" value="<?php echo htmlspecialchars((string)($_REQUEST['InvoiceID']), ENT_QUOTES, 'UTF-8', false);?>">
+				<input type="hidden" name="action" value="<?php echo htmlspecialchars((string)($_REQUEST['action']), ENT_QUOTES, 'UTF-8', false);?>">
+				<input type="hidden" name="gid" value="<?php echo htmlspecialchars((string)($_REQUEST['gid']), ENT_QUOTES, 'UTF-8', false);?>">
 				<input type="hidden" name="redirurl" value="user-invoice-add">
 				<input type="hidden" name="tblenme" value="1">
 															

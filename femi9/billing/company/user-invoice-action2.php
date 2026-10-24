@@ -25,7 +25,7 @@ if(isset($_REQUEST['addInvoice2']))
 	$invuser=$_REQUEST['invuser'];
 	
 	$customer_id=$_REQUEST['customer_id'];
-	echo $customer_id;
+	echo htmlspecialchars((string)($customer_id), ENT_QUOTES, 'UTF-8', false);
 	$date=date("Y-m-d",strtotime($_REQUEST['date']));
 	echo $date;
 	$inv_year=date("Y",strtotime($_REQUEST['date']));
@@ -103,7 +103,7 @@ if ($product_gst_type === 'inclusive' && $gst_percentage > 0) {
 	
 	if($AVMstock<$qty)
 	{
-		echo "<script>window.location='user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".$invuser."&&AlertStockError&&action=".$_SESSION['ACTIONEDIT']."&&gid=".$godownid."';</script>";
+		echo "<script>window.location='user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".urlencode($invuser)."&&AlertStockError&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 	
@@ -132,11 +132,11 @@ if ($product_gst_type === 'inclusive' && $gst_percentage > 0) {
 		}
 		
 
-		echo "<script>window.location='user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".$invuser."&&FemiAdded&&action=".$_SESSION['ACTIONEDIT']."&&gid=".$godownid."';</script>";
+		echo "<script>window.location='user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".urlencode($invuser)."&&FemiAdded&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".$invuser."&&AlertMessage&&action=".$_SESSION['ACTIONEDIT']."&&gid=".$godownid."';</script>";
+		echo "<script>window.location='user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&AlertMessage&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
 	}
 		
 }

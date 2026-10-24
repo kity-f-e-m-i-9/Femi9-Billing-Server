@@ -19,12 +19,12 @@ if($Result_Count_Invoice==0){
 	$update_DLNote="update internal_transfer_invoice set inv_number=? where tempid=?";
 	db_q($db_conn,$update_DLNote,[$invnumber,$tempid]);
 	
-	echo "<script>window.location='internal_transfer_details?tempid=$tempid&&InvoiceUpdatedSuccess';</script>";
+	echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."&&InvoiceUpdatedSuccess';</script>";
 	
 }
 else{
 	
-	echo "<script>window.location='internal_transfer_details?tempid=$tempid&&invoicealready';</script>";
+	echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."&&invoicealready';</script>";
 }
 	
 }

@@ -163,7 +163,7 @@ include("config.php");
 <?php if($result_invoicedtails['status']=="pending" && $count_products_return>0){?>
 												
 <form action="cnote_finish.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
-<input type="hidden" name="returnid" value="<?=$_REQUEST['returnid'];?>"/>
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
 

@@ -125,7 +125,7 @@ $to_date=date("Y-m-d");
 $from_date = date ("Y-m-d", strtotime("-2 days", strtotime($to_date)));
 						}
 ?>
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">

@@ -59,7 +59,7 @@ if(isset($_REQUEST['update-username-action']))
 	{
 		$update_id_encode=base64_encode($update_id);
 		
-		echo "<script>window.location='update-username?pageNme=".$page_name."&&prid=".$update_id_encode."&&InvalidUsrname&&ActionUpdate';</script>";
+		echo "<script>window.location='update-username?pageNme=".urlencode($page_name)."&&prid=".$update_id_encode."&&InvalidUsrname&&ActionUpdate';</script>";
 	}
 	
 	
@@ -134,11 +134,11 @@ function closerefresh()
 			<?php }?>
 			</div>
 
-<form method="post" enctype="multipart/form-data" action="<?php echo $_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
-<input type="hidden" name="update_id" value="<?php echo $get_row_id_DECODE;?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($get_row_id_DECODE), ENT_QUOTES, 'UTF-8', false);?>">
 <input type="hidden" name="update_table" value="<?php echo $updae_table_name;?>">
-<input type="hidden" name="page_name" value="<?php echo $pageNme;?>">
+<input type="hidden" name="page_name" value="<?php echo htmlspecialchars((string)($pageNme), ENT_QUOTES, 'UTF-8', false);?>">
 
  <table class="table123">
                     <tr>

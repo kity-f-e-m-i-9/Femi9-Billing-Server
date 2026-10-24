@@ -104,7 +104,7 @@ if(isset($_REQUEST['add-product']))
 									<?php if(isset($_REQUEST['alreadyexists'])){?><div class="alert alert-danger">Shop (Retailers) Category already exists !</div>
 									<?php }?>
   <?php include("validate-scripts.php");?>                                     
-<form action="<?php echo $_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data">
+<form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" method="post" enctype="multipart/form-data">
 
                                         <div class="example-container">
                                             <div class="example-content">

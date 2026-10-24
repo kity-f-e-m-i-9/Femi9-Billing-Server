@@ -148,7 +148,7 @@ if(isset($_REQUEST['addInvoice2']))
 		error_log("[SS-ACTION2] ERROR: Insufficient stock. Available: $AVMstock, Required: $qty");
 		echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . 
 		     "&&InvalidStock&&invuser=" . $invuser . 
-		     "&&AlertStockError&&action=" . $_SESSION['ACTIONEDIT'] . "';</script>";
+		     "&&AlertStockError&&action=".urlencode($_SESSION['ACTIONEDIT'])."';</script>";
 		exit;
 	}
 	
@@ -191,14 +191,14 @@ if(isset($_REQUEST['addInvoice2']))
 		// ✅ Redirect without gid parameter
 		echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . 
 		     "&&AddedSuccess&&invuser=" . $invuser . 
-		     "&&FemiAdded&&action=" . $_SESSION['ACTIONEDIT'] . "';</script>";
+		     "&&FemiAdded&&action=".urlencode($_SESSION['ACTIONEDIT'])."';</script>";
 		
 	} else {
 		// Product already exists
 		error_log("[SS-ACTION2] ERROR: Product already exists in invoice");
 		echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . 
 		     "&&ItemAlreadyExists&&invuser=" . $invuser . 
-		     "&&AlertMessage&&action=" . $_SESSION['ACTIONEDIT'] . "';</script>";
+		     "&&AlertMessage&&action=".urlencode($_SESSION['ACTIONEDIT'])."';</script>";
 	}
 }
 	

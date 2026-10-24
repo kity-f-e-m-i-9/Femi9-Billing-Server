@@ -4,7 +4,7 @@ $stateid=$_GET['subcourseID']; //state
 $districtid=$_GET['techID'];  // district
 ?>
 
-<select required="" name="taluk_id" class="form-control" onChange="getPincode(<?php echo $stateid;?>,<?php echo $districtid;?>,this.value)">
+<select required="" name="taluk_id" class="form-control" onChange="getPincode(<?php echo htmlspecialchars((string)($stateid), ENT_QUOTES, 'UTF-8', false);?>,<?php echo htmlspecialchars((string)($districtid), ENT_QUOTES, 'UTF-8', false);?>,this.value)">
 <option value="" hidden="">Select</option>
 <?php $select_Taluk_list="select * from taluk where state_id=? and dist_id=? order by taluk asc";
 										$fetch_Taluk_list=db_q($db_conn,$select_Taluk_list,[$stateid,$districtid]);

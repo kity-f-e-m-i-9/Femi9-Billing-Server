@@ -329,7 +329,7 @@ $district_name=$result_district['dist_name'];
             <td colspan="2">
                 <form method="post" enctype="mutipart/form-data" action="active-users" onSubmit="return confirm('Please make a confirm!');">
                     <input type="hidden" name="usertype" value="stockist">
-                    <input type="hidden" name="userrowid" value="<?=$get_id;?>">
+                    <input type="hidden" name="userrowid" value="<?=htmlspecialchars((string)($get_id), ENT_QUOTES, 'UTF-8', false);?>">
                     
                     <div class="d-grid gap-2">
                         <button class="btn btn-primary" type="submit">Click to Activate</button>

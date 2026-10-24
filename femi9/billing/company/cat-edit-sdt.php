@@ -90,7 +90,7 @@ $select_product_list="select * from super_distributor_category where id=?";
 <form action="product-action" method="post" enctype="multipart/form-data">
 
 <input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
-<input type="hidden" name="prid" value="<?php echo $prid?>">
+<input type="hidden" name="prid" value="<?php echo htmlspecialchars((string)($prid), ENT_QUOTES, 'UTF-8', false)?>">
 
                                         <div class="example-container">
                                             <div class="example-content">

@@ -25,7 +25,7 @@ $invnumber        = (string) ($hdr['invnumber']      ?? '');
 $invnumber_encode = base64_encode($invnumber);
 
 if ($rowid_decode <= 0) {
-    echo "<script>window.location='stock_return_add2.php?returnid={$returnid}&&invnumber={$invnumber_encode}&&DeleteSuccess';</script>";
+    echo "<script>window.location='stock_return_add2.php?returnid=".urlencode($returnid)."&&invnumber={$invnumber_encode}&&DeleteSuccess';</script>";
     exit;
 }
 
@@ -68,5 +68,5 @@ if ($item && (int)$item['prid'] > 0) {
     $stmtDel->close();
 }
 
-echo "<script>window.location='stock_return_add2.php?returnid={$returnid}&&invnumber={$invnumber_encode}&&DeleteSuccess';</script>";
+echo "<script>window.location='stock_return_add2.php?returnid=".urlencode($returnid)."&&invnumber={$invnumber_encode}&&DeleteSuccess';</script>";
 ?>

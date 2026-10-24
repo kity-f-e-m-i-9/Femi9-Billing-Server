@@ -184,7 +184,7 @@ $preselected_json = json_encode(array_map(function($loc) {
                     <form action="channel-partner-action" method="post" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         <input type="hidden" name="action" value="update-channel-partner">
-                        <input type="hidden" name="cp_db_id" value="<?php echo $enc_id; ?>">
+                        <input type="hidden" name="cp_db_id" value="<?php echo htmlspecialchars((string)($enc_id), ENT_QUOTES, 'UTF-8', false); ?>">
 
                     <div class="row">
 

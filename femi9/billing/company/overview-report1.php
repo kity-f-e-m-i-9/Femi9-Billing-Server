@@ -865,7 +865,7 @@ if ($search !== '') {
                                                     Showing
                                                     <strong><?= inr_format($globalOffset + 1, 0) ?></strong>–<strong><?= inr_format(min($globalOffset + $recordsPerPage, $totalRows), 0) ?></strong>
                                                     of <strong><?= inr_format($totalRows, 0) ?></strong>
-                                                    &nbsp;|&nbsp; Page <strong><?= $currentPage ?></strong> of <strong><?= $totalPages ?></strong>
+                                                    &nbsp;|&nbsp; Page <strong><?= htmlspecialchars((string)($currentPage), ENT_QUOTES, 'UTF-8', false) ?></strong> of <strong><?= $totalPages ?></strong>
                                                 <?php endif; ?>
                                             </div>
                                         </div>

@@ -51,7 +51,7 @@ if(isset($_REQUEST['inv_id']))
 	$delRecord="delete from user_invoice_items where id=?";
 	db_q($db_conn,$delRecord,[$rowid_decode]);
 	
-	echo "<script>window.location='user-invoice-add.php?InvoiceID=".$invoice_id_encode."&&DeleteSuccess&&invuser=".$invuser."&&ActionRemove&&action=".$_SESSION['ACTIONEDIT']."';</script>";
+	echo "<script>window.location='user-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&ActionRemove&&action=".urlencode($_SESSION['ACTIONEDIT'])."';</script>";
 	
 }
 ?>

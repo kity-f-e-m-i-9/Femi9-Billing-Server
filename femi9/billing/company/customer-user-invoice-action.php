@@ -33,7 +33,7 @@ $fetch_count_opstock13=db_q($db_conn,$select_count_opstock13,[$Login_user_TYPEvl
 $result_count_opstock13=mysqli_fetch_array($fetch_count_opstock13);
 if($result_count_opstock13['numopstock12']==0)
 {
-	echo "<script>window.location='customer-user-invoice-add?gid=".$godownid."&&stocknotupdated';</script>";
+	echo "<script>window.location='customer-user-invoice-add?gid=".urlencode($godownid)."&&stocknotupdated';</script>";
 	
 }else{
 	
@@ -140,7 +140,7 @@ $gst_type="inner";
 	
 	if($AVMstock<$qty)
 	{
-		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".$godownid."';</script>";
+		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 		
@@ -163,11 +163,11 @@ $gst_type="inner";
 		
 		
 		
-		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded&&gid=".$godownid."';</script>";
+		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&AlertMessage&&gid=".$godownid."';</script>";
+		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&AlertMessage&&gid=".urlencode($godownid)."';</script>";
 	}
 		
 }

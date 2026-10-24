@@ -33,7 +33,7 @@ if($state_id!=NULL)
 											}
 										
 	
-	//echo "<script>window.location='untaluk?sestate=".$state_id."&&sedist=".$dist_id."';</script>";
+	//echo "<script>window.location='untaluk?sestate=".urlencode($state_id)."&&sedist=".urlencode($dist_id)."';</script>";
 }
 
 
@@ -100,7 +100,7 @@ if($state_id!=NULL)
 									<td><?php echo $title;?></td>
 									<td>
 									<?php if($state_id!=NULL){?>
-									<a href="export_untaluk?stid=<?=$state_id;?>&&did=<?=$dist_id;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
+									<a href="export_untaluk?stid=<?=htmlspecialchars((string)($state_id), ENT_QUOTES, 'UTF-8', false);?>&&did=<?=htmlspecialchars((string)($dist_id), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
 									<?php }else{?>
 									<a href="#" title="Export" onclick="return confirm('Please select any one search criteria');"><img src="../../assets/images/excel-3-32.png"></a>
 									<?php }?>
@@ -133,7 +133,7 @@ xmlhttp.send();}
 							   <?php if($state_id==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$state_id;?>" hidden=""><?=$state_name;?></option>
+							   <option value="<?=htmlspecialchars((string)($state_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$state_name;?></option>
 							   <?php }?>
 							   <?php $select_stateList="select * from `state` order by `st_name` asc";
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
@@ -149,7 +149,7 @@ xmlhttp.send();}
 												<?php if($dist_id==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$dist_id;?>" hidden=""><?=$district_name;?></option>
+							   <option value="<?=htmlspecialchars((string)($dist_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$district_name;?></option>
 							   <option value="">--All--</option>
 							   <?php }?>
 							   

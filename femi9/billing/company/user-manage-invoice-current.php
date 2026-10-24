@@ -551,9 +551,9 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
                         <div class="page-header-section">
                             <div>
                                 <h1 class="page-title">Invoice Management</h1>
-                                <p class="page-subtitle"><?php echo $user_label; ?> Invoices</p>
+                                <p class="page-subtitle"><?php echo htmlspecialchars((string)($user_label), ENT_QUOTES, 'UTF-8', false); ?> Invoices</p>
                             </div>
-                            <a href="user-invoice-add.php?invuser=<?= $getinvuser; ?>" class="btn-create">
+                            <a href="user-invoice-add.php?invuser=<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>" class="btn-create">
                                 <i class="material-icons">add_circle</i>
                                 Create New Invoice
                             </a>
@@ -562,24 +562,24 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
                         <!-- Date Filter Section -->
                         <div class="filter-section">
                             <form method="GET" action="" id="filterForm">
-                                <input type="hidden" name="invuser" value="<?= $getinvuser; ?>">
+                                <input type="hidden" name="invuser" value="<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>">
                                 <div class="row align-items-end">
                                     <div class="col-md-3">
                                         <label class="form-label">From Date</label>
                                         <input type="date" name="from_date" id="from_date" class="form-control" 
-                                               value="<?= $_GET['from_date'] ?? ''; ?>">
+                                               value="<?= htmlspecialchars((string)($_GET['from_date'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label">To Date</label>
                                         <input type="date" name="to_date" id="to_date" class="form-control" 
-                                               value="<?= $_GET['to_date'] ?? ''; ?>">
+                                               value="<?= htmlspecialchars((string)($_GET['to_date'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
                                     </div>
                                     <div class="col-md-6">
                                         <button type="submit" class="btn btn-filter">
                                             <i class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">filter_list</i>
                                             Apply Filter
                                         </button>
-                                        <a href="?invuser=<?= $getinvuser; ?>" class="btn btn-reset">
+                                        <a href="?invuser=<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>" class="btn btn-reset">
                                             <i class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">refresh</i>
                                             Reset
                                         </a>
@@ -599,7 +599,7 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
                                 <?php if (!empty($_GET['from_date'])) echo "From: " . date('d/m/Y', strtotime($_GET['from_date'])); ?>
                                 <?php if (!empty($_GET['from_date']) && !empty($_GET['to_date'])) echo " "; ?>
                                 <?php if (!empty($_GET['to_date'])) echo "To: " . date('d/m/Y', strtotime($_GET['to_date'])); ?>
-                                <a href="?invuser=<?= $getinvuser; ?>" style="margin-left: 12px; color: #0c63e4; text-decoration: none; font-weight: 500;">Clear Filter</a>
+                                <a href="?invuser=<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>" style="margin-left: 12px; color: #0c63e4; text-decoration: none; font-weight: 500;">Clear Filter</a>
                             </div>
                         <?php } ?>
                         
@@ -776,22 +776,22 @@ if ($show_advance_indicator && file_exists("advance-payment-functions.php")) {
                                                 <?php } ?>
                                                 <td>
                                                     <div class="action-btns">
-                                                        <a href="user-invoice-print.php?invoiceid=<?= base64_encode($invoice['inv_id']); ?>&invuser=<?= $getinvuser; ?>"
+                                                        <a href="user-invoice-print.php?invoiceid=<?= base64_encode($invoice['inv_id']); ?>&invuser=<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>"
                                                            class="btn-action btn-print" target="_blank">
                                                             <i class="material-icons">print</i>
                                                             Print
                                                         </a>
-                                                        <a href="add-receipt.php?invid=<?= $invoice['inv_id']; ?>&invuser=<?= $getinvuser; ?>"
+                                                        <a href="add-receipt.php?invid=<?= $invoice['inv_id']; ?>&invuser=<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>"
                                                            class="btn-action btn-receipt">
                                                             <i class="material-icons">receipt_long</i>
                                                             Receipt
                                                         </a>
-                                                        <a href="user-invoice-add.php?InvoiceID=<?= base64_encode($invoice['inv_id']); ?>&invuser=<?= $getinvuser; ?>&action=edit" 
+                                                        <a href="user-invoice-add.php?InvoiceID=<?= base64_encode($invoice['inv_id']); ?>&invuser=<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>&action=edit" 
                                                            class="btn-action btn-edit">
                                                             <i class="material-icons">edit</i>
                                                             Edit
                                                         </a>
-                                                        <a href="delete-invoice.php?invid=<?= base64_encode($invoice['inv_id']); ?>&invuser=<?= $getinvuser; ?>" 
+                                                        <a href="delete-invoice.php?invid=<?= base64_encode($invoice['inv_id']); ?>&invuser=<?= htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>" 
                                                            class="btn-action btn-delete" 
                                                            onclick="return confirm('Are you sure you want to delete this invoice?');">
                                                             <i class="material-icons">delete</i>

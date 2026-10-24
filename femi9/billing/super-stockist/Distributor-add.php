@@ -111,7 +111,7 @@ $tempID="".$randum_number."FDST".$temp_date."".$temp_time."";?>
 										
 			<label class="form-label">Type*</label>
             <select name="usertype" class="form-control">
-			<option value="<?=$_REQUEST['usertype'];?>"><?=$_REQUEST['usertype'];?></option>
+			<option value="<?=htmlspecialchars((string)($_REQUEST['usertype']), ENT_QUOTES, 'UTF-8', false);?>"><?=htmlspecialchars((string)($_REQUEST['usertype']), ENT_QUOTES, 'UTF-8', false);?></option>
 			</select>
 			<br/>
 			

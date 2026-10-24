@@ -19,4 +19,4 @@ $csv .= '"Inter-state supplies to unregistered person","' . $get_t4 . '","0","0"
 ob_end_clean();
 header("Content-type: text/csv");
 header("Content-Disposition: attachment; filename=$file");
-echo $csv;
+echo htmlspecialchars((string)($csv), ENT_QUOTES, 'UTF-8', false);

@@ -63,13 +63,13 @@ $stmtStk->close();
 $available = $stockRow ? (int)$stockRow['closing_qty'] : 0;
 
 if ($available < $qty) {
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=$invuser&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".urlencode($invuser)."&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
     exit;
 }
 
 $dupChk = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id='".db_esc($inv_id)."' AND pr_id='".db_esc($pr_id)."' AND from_user_type='".db_esc($Login_user_TYPEvl)."' AND from_user_id='".db_esc($Login_user_IDvl)."'"));
 if ((int)$dupChk['n'] > 0) {
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=$invuser&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
     exit;
 }
 
@@ -82,4 +82,4 @@ mysqli_query($db_conn, "INSERT INTO user_invoice_items
     '".db_esc($gst_percentage)."','".db_esc($gstamount_singlepr)."','".db_esc($gstamount_total)."','".db_esc($subtotal)."',
     '".db_esc($discount_percentage)."','".db_esc($discount_amount)."','".db_esc($gst_type)."','".db_esc($hsn)."','".db_esc($date)."','0','".db_esc($buyer_gsttype)."','".db_esc($rwpoints)."')");
 
-echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=$invuser&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
+echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".urlencode($invuser)."&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";

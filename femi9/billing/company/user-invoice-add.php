@@ -736,7 +736,7 @@ $is_advance_mandatory = isAdvancePaymentMandatory($getinvuser);
 								        <?php } ?>
 								        <?=$displaytitle;?>
 								    </h1>
-								    <a href="user-manage-invoice?invuser=<?=$getinvuser;?>" class="menu-link" title="Manage Invoices">
+								    <a href="user-manage-invoice?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>" class="menu-link" title="Manage Invoices">
 								        <i class="material-icons">list</i>
 								    </a>
 								</div>
@@ -752,7 +752,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintPrice").innerHTML=xmlhttp.responseText;}}
-var invuser="<?=$getinvuser;?>";
+var invuser="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>";
 xmlhttp.open("GET","loadPrice.php?q="+str + '&invuser='+ invuser,true);
 xmlhttp.send();}
 </script>
@@ -797,8 +797,8 @@ else{ $amount_received_fully="0";}
 													
 <form action="user-invoice-action2" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="inv_id" value="<?=$Invoice_ID;?>">
-<input type="hidden" name="invuser" value="<?=$getinvuser?>">
+<input type="hidden" name="inv_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>">
+<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>">
 <input type="hidden" name="godownid" value="<?=$result_InvoieDetails['from_user_id'];?>">
 
 <!-- Invoice Details Section -->
@@ -1032,7 +1032,7 @@ else{ $amount_received_fully="0";}
                 $result_count_return=mysqli_num_rows($fetch_count_return);
                 if($result_count_return==0){
                 ?>
-                <a href="user-del-inv-product?inv_id=<?php echo $Invoice_ID_encode;?>&&rowid=<?php echo $ItemRowid;?>&&&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove" 
+                <a href="user-del-inv-product?inv_id=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?php echo $ItemRowid;?>&&&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&userid=<?=$CustomerID;?>&&actionremove" 
                    onclick="return confirm('Delete this product from invoice?');" 
                    class="badge-remove">
                    <i class="material-icons" style="font-size: 14px; vertical-align: middle;">delete</i> Remove
@@ -1076,10 +1076,10 @@ else{ $amount_received_fully="0";}
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <form method="post" onsubmit="return confirm('Confirm update?');" action="update_invoice_action">	
-                                <input type="hidden" name="invuser" value="<?php echo $_REQUEST['invuser'];?>">
-                                <input type="hidden" name="InvoiceID" value="<?php echo $_REQUEST['InvoiceID'];?>">
-                                <input type="hidden" name="action" value="<?php echo $_REQUEST['action'];?>">
-                                <input type="hidden" name="gid" value="<?php echo $_REQUEST['gid'];?>">
+                                <input type="hidden" name="invuser" value="<?php echo htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>">
+                                <input type="hidden" name="InvoiceID" value="<?php echo htmlspecialchars((string)($_REQUEST['InvoiceID']), ENT_QUOTES, 'UTF-8', false);?>">
+                                <input type="hidden" name="action" value="<?php echo htmlspecialchars((string)($_REQUEST['action']), ENT_QUOTES, 'UTF-8', false);?>">
+                                <input type="hidden" name="gid" value="<?php echo htmlspecialchars((string)($_REQUEST['gid']), ENT_QUOTES, 'UTF-8', false);?>">
                                 <input type="hidden" name="redirurl" value="user-invoice-add">
                                 <input type="hidden" name="tblenme" value="1">
                                 
@@ -1140,7 +1140,7 @@ else{ $amount_received_fully="0";}
             }
             
             function validateForm() {
-                const customerType = '<?php echo $getinvuser; ?>';
+                const customerType = '<?php echo htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>';
                 const advanceTypes = ['super_stockiest', 'stockiest'];
                 const requiresAdvance = advanceTypes.includes(customerType);
                 
@@ -1171,7 +1171,7 @@ else{ $amount_received_fully="0";}
             </script>
             
             <form action="user-invoice-submit" id="myForm" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
-                <input type="hidden" name="invoice_id" value="<?=$Invoice_ID;?>"/>
+                <input type="hidden" name="invoice_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>"/>
                 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
                 <?php $_SESSION['INVOICEFINISH']="1";?>
                 
@@ -1400,7 +1400,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
 
 <input type="hidden" name="randum_number" value="<?=$randum_number?>">
 <input type="hidden" name="inv_id" value="<?=$inv_id?>">
-<input type="hidden" name="invuser" value="<?=$getinvuser?>">
+<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>">
 <input type="hidden" name="username" value="<?=$_SESSION['LOGIN_USER'];?>">
 <input type="hidden" name="usertype" value="<?=$Result_Log_users_Dtails134['usertype'];?>">
 
@@ -1435,7 +1435,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
             var invField = document.getElementById('inv_number');
             if (!invField) { return; }
             if (invField.value.trim() !== '' && !invNumberAutoFilled) { return; }
-            var invuser = '<?=$getinvuser;?>';
+            var invuser = '<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>';
             var url = 'load_next_invoice_number.php?invuser=' + encodeURIComponent(invuser) + (productId ? '&pid=' + encodeURIComponent(productId) : '');
             fetch(url)
                 .then(function(r) { return r.json(); })
@@ -1551,7 +1551,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
             xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
             if (xmlhttp.readyState==4 && xmlhttp.status==200){
             document.getElementById("txtHintstock").innerHTML=xmlhttp.responseText;}}
-            var invuser="<?=$getinvuser;?>";
+            var invuser="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>";
             xmlhttp.open("GET","loadstockcheck.php?q="+str + '&invuser='+ invuser,true);
             xmlhttp.send();
         }
@@ -1686,7 +1686,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
         if (!customerSelect || !godownSelect) return;
         
         const customerId = customerSelect.value;
-        const customerType = '<?php echo $getinvuser; ?>';
+        const customerType = '<?php echo htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>';
         const godownId = godownSelect.value;
         
         if (!customerId || !godownId) {

@@ -96,16 +96,16 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
                             </div>
 							
 							
-							<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+							<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
 <label class="form-label">From Month</label>
-<input type="month" required="" name="frdate" value="<?=$from_month;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="month" required="" name="frdate" value="<?=htmlspecialchars((string)($from_month), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Month</label>
-<input type="month" required="" name="todate" value="<?=$to_month;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="month" required="" name="todate" value="<?=htmlspecialchars((string)($to_month), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 
 <div id="searchleftcont">
@@ -171,17 +171,17 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 						   <tr>
 						   <th>Total Sales (SS,ST, DT, SHP, CUS, TP)</th>
-						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_register_intra, 2);?></a></td>
-						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_unregister_intra, 2);?></a></td>
+						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($Total_sls_register_intra, 2);?></a></td>
+						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($Total_sls_unregister_intra, 2);?></a></td>
 						   </tr>
 						   <tr>
 						   <th>Total OT Sales</th>
-						   <td><a href="gst_otsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLS_intra, 2);?></a></td>
-						   <td><a href="gst_otsls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLSUN_intra, 2);?></a></td>
+						   <td><a href="gst_otsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_OTSLS_intra, 2);?></a></td>
+						   <td><a href="gst_otsls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_OTSLSUN_intra, 2);?></a></td>
 						   </tr>
 						    <tr>
 						   <th>Total Internal Transfer Sales</th>
-						    <td><a href="gst_intrsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_INTR, 2);?></a></td>
+						    <td><a href="gst_intrsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_INTR, 2);?></a></td>
 							 <td>0.00</td>
 						   </tr>
 						   <?php
@@ -213,21 +213,21 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   ?>
 						   <tr>
 						   <th>Sales Return<br/>(SS,ST, DT, SHP, CUS, TP)</th>
-						   <td><a href="gst_credit_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						   <td><a href="gst_credit_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						   <?=inr_format($Total_sls_register_intra_credit, 2);?></a>
 						   </td>
 						   <td>
-						   <a href="gst_credit_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						   <a href="gst_credit_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						   <?=inr_format($Total_sls_unregister_intra_credit, 2);?></a>
 						   </td>
 						   </tr>
 						   <tr>
 						   <th>OT Sales Return</th>
 						  <td>
-						  <a href="gst_credit_otsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						  <a href="gst_credit_otsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						  <?=inr_format($total_intra_register_creditOT, 2);?></a>
 						  </td>
-						  <td><a href="gst_credit_otsls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						  <td><a href="gst_credit_otsls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						  <?=inr_format($total_intra_unregister_creditOT, 2);?></a>
 						  </td>
 						   </tr>
@@ -272,14 +272,14 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 						   <tr>
 						   <th>Total Sales (SS,ST, DT, SHP, CUS, TP)</th>
-						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_register_inter, 2);?></a></td>
-						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_unregister_inter, 2);?></a></td>
+						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($Total_sls_register_inter, 2);?></a></td>
+						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($Total_sls_unregister_inter, 2);?></a></td>
 						   </tr>
 
 						   <tr>
 						   <th>Total OT Sales</th>
-						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLS_inter, 2);?></a></td>
-						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLSUN_inter, 2);?></a></td>
+						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_OTSLS_inter, 2);?></a></td>
+						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_OTSLSUN_inter, 2);?></a></td>
 						   </tr>
 
 						   <?php
@@ -311,10 +311,10 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   <tr>
 						   <th>Sales Return<br/>(SS,ST, DT, SHP, CUS, TP)</th>
 						   <td>
-						   <a href="gst_credit_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						   <a href="gst_credit_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						   <?=inr_format($Total_sls_register_inter_credit, 2);?></a>
 						   </td>
-						   <td><a href="gst_credit_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						   <td><a href="gst_credit_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						   <?=inr_format($Total_sls_unregister_inter_credit, 2);?></a>
 						   </td>
 						   </tr>
@@ -322,10 +322,10 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   <tr>
 						   <th>OT Sales Return</th>
 						   <td>
-						   <a href="gst_credit_otsls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_inter_register_creditOT, 2);?></a>
+						   <a href="gst_credit_otsls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_inter_register_creditOT, 2);?></a>
 						   </td>
 						   <td>
-						   <a href="gst_credit_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_inter_unregister_creditOT, 2);?></a>
+						   <a href="gst_credit_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_inter_unregister_creditOT, 2);?></a>
 						   </td>
 						   </tr>
 
@@ -622,7 +622,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<th>IGST</th>
 							</tr>
 							<tr>
-							<td style="text-align:left;"><a href="gst_b2b_buyer_report?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><b>Total B2B Supplies (view buyer-wise detail)</b></a></td>
+							<td style="text-align:left;"><a href="gst_b2b_buyer_report?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><b>Total B2B Supplies (view buyer-wise detail)</b></a></td>
 							<td style="text-align:left;"><?=$b2b_buyer_count;?></td>
 							<td style="text-align:left;"><b><?=inr_format($b2b_grand_taxable, 2);?></b></td>
 							<td style="text-align:left;"><b><?=inr_format($b2b_grand_cgst, 2);?></b></td>
@@ -648,7 +648,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<th>IGST</th>
 							</tr>
 							<tr>
-							<td style="text-align:left;"><a href="gst_b2c_invoice_report?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><b>Total B2C (Others) Supplies (view invoice-wise detail)</b></a></td>
+							<td style="text-align:left;"><a href="gst_b2c_invoice_report?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><b>Total B2C (Others) Supplies (view invoice-wise detail)</b></a></td>
 							<td style="text-align:left;"><b><?=inr_format($b2c_totals['taxable'], 2);?></b></td>
 							<td style="text-align:left;"><b><?=inr_format($b2c_totals['cgst'], 2);?></b></td>
 							<td style="text-align:left;"><b><?=inr_format($b2c_totals['sgst'], 2);?></b></td>

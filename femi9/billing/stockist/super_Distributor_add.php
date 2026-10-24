@@ -195,7 +195,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 	}
 	
 	function getPincode(courseId,scourseID,talukID) {		
-		var usertype="<?=$_REQUEST['usertype'];?>";
+		var usertype="<?=htmlspecialchars((string)($_REQUEST['usertype']), ENT_QUOTES, 'UTF-8', false);?>";
 		var strURL="distributor_find_pincode.php?subcourseID="+courseId+"&techID="+scourseID+"&talukID="+talukID+"&usertype="+usertype;
 		var req = getXMLHTTP();
 		if (req) {

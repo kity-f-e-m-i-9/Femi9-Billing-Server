@@ -229,7 +229,7 @@ $exportParams = 'from_date=' . urlencode($fromDate) . '&to_date=' . urlencode($t
                                             <td><?php echo $district !== '' ? htmlspecialchars($district) : '<span class="text-muted">&mdash;</span>'; ?></td>
                                             <td><?php echo (int)$sum['shops']; ?></td>
                                             <td><?php echo (int)$sum['ordered']; ?></td>
-                                            <td><span class="cov-pill" style="background:<?php echo $pillColor; ?>"><?php echo $pct; ?>%</span></td>
+                                            <td><span class="cov-pill" style="background:<?php echo htmlspecialchars((string)($pillColor), ENT_QUOTES, 'UTF-8', false); ?>"><?php echo htmlspecialchars((string)($pct), ENT_QUOTES, 'UTF-8', false); ?>%</span></td>
                                             <td><?php echo (int)$sum['new_shop_orders']; ?></td>
                                             <td>&#8377;<?php echo inr_format($sum['new_shop_order_value'], 0); ?></td>
                                             <td>&#8377;<?php echo inr_format($sum['invoiced_value'], 0); ?></td>
@@ -269,7 +269,7 @@ $exportParams = 'from_date=' . urlencode($fromDate) . '&to_date=' . urlencode($t
                                             <td><b><?php echo htmlspecialchars($row['ms_name']); ?></b></td>
                                             <td><?php echo (int)$sum['shops']; ?></td>
                                             <td><?php echo (int)$sum['ordered']; ?></td>
-                                            <td><?php echo $pct; ?>%</td>
+                                            <td><?php echo htmlspecialchars((string)($pct), ENT_QUOTES, 'UTF-8', false); ?>%</td>
                                             <td><?php echo (int)$sum['new_shop_orders']; ?></td>
                                             <td>&#8377;<?php echo inr_format($sum['new_shop_order_value'], 0); ?></td>
                                             <td>&#8377;<?php echo inr_format($sum['invoiced_value'], 0); ?></td>

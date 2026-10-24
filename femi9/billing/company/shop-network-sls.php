@@ -91,7 +91,7 @@ $select_stateList="select * from `state` where id=?";
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
-								<a href="distributor-network-sls?superid=<?=$superstockistid;?>&&stockistid=<?=$stockistid?>&&stataeid=<?=$getstateid?>&&frd=<?=$get_from_date;?>&&tod=<?=$get_to_date;?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+								<a href="distributor-network-sls?superid=<?=htmlspecialchars((string)($superstockistid), ENT_QUOTES, 'UTF-8', false);?>&&stockistid=<?=htmlspecialchars((string)($stockistid), ENT_QUOTES, 'UTF-8', false)?>&&stataeid=<?=htmlspecialchars((string)($getstateid), ENT_QUOTES, 'UTF-8', false)?>&&frd=<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>&&tod=<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false);?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
                                     <h1>
 									<table class="headertble">
 									<tr>
@@ -314,7 +314,7 @@ while($result_totalsls_invcount_qty=mysqli_fetch_array($fetch_totalsls_invcount_
 
 }
 ?>
-<a href="JavaScript:newPopup('prdetails?userid=<?=$userid_invoice;?>&&usertype=<?=$usertype_invoice?>&&frd=<?=$get_from_date;?>&&tod=<?=$get_to_date;?>');" style="text-decoration:none;">
+<a href="JavaScript:newPopup('prdetails?userid=<?=$userid_invoice;?>&&usertype=<?=$usertype_invoice?>&&frd=<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>&&tod=<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false);?>');" style="text-decoration:none;">
 <table>
 <tr>
 <th>Total Purchased Count</th>

@@ -504,7 +504,7 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
                         </div>
 
 
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 <?php if ($isTeamMode): ?>
 <input type="hidden" name="view_ms_ids" value="<?=htmlspecialchars(implode(',', $viewMsIds));?>">
 <?php else: ?>

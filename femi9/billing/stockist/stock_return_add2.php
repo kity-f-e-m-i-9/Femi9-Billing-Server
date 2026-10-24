@@ -90,7 +90,7 @@ include("config.php");
 									<td><?=$displaytitle;?>
 									<br/>
 									<div style="font-size:14px;margin-top:10px;">Invoice Number:-</div>
-									<div style="font-size:17px;"><?=$invnumber_decode;?></div>
+									<div style="font-size:17px;"><?=htmlspecialchars((string)($invnumber_decode), ENT_QUOTES, 'UTF-8', false);?></div>
 									</td>
 									<td>&nbsp;</td>
 									</tr>
@@ -169,8 +169,8 @@ include("config.php");
 <input type="hidden" name="to_usertype" value="<?=$tousertype;?>">
 <input type="hidden" name="to_userid" value="<?=$touserid;?>">
 
-<input type="hidden" name="returnid" value="<?=$returnid_decode;?>">
-<input type="hidden" name="invnumber" value="<?=$invnumber_decode;?>">
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($returnid_decode), ENT_QUOTES, 'UTF-8', false);?>">
+<input type="hidden" name="invnumber" value="<?=htmlspecialchars((string)($invnumber_decode), ENT_QUOTES, 'UTF-8', false);?>">
 <input type="hidden" name="invid" value="<?=$invid;?>">
 									
 									<label class="form-label">Product Name*</label>
@@ -257,7 +257,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 <td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
-<a href="stock_return_delete.php?returnid=<?=$returnid;?>&&rowid=<?=$ItemRowid;?>"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="stock_return_delete.php?returnid=<?=htmlspecialchars((string)($returnid), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?=$ItemRowid;?>"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>
                                                         </tr>
                                                         
@@ -289,7 +289,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
                                             <div class="col-lg-3">
                                                 <div class="invoice-info">
 <form action="stock_return_finish.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
-<input type="hidden" name="returnid" value="<?=$returnid_decode;?>"/>
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($returnid_decode), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
 

@@ -89,11 +89,11 @@ $to_userid=$result_Returndetails['to_userid'];
 	
 	if($_REQUEST['redirurl']=="cnote_details")
 	{
-	echo "<script>window.location='cnote_details.php?returnid=$returnid&&DeleteSuccess';</script>";
+	echo "<script>window.location='cnote_details.php?returnid=".urlencode($returnid)."&&DeleteSuccess';</script>";
 		
 	}else{
 	
-	echo "<script>window.location='cnote_new.php?returnid=$returnid&&InvoiceID=".$_REQUEST['InvoiceID']."&&DeleteSuccess';</script>";
+	echo "<script>window.location='cnote_new.php?returnid=".urlencode($returnid)."&&InvoiceID=".urlencode($_REQUEST['InvoiceID'])."&&DeleteSuccess';</script>";
 	}
 
 ?>

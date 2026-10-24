@@ -69,5 +69,5 @@ if ($rowid > 0) {
     }
 }
 
-echo "<script>window.location='stock_return_add2.php?returnid={$returnid}&&invnumber={$invnumber_encode}&&DeleteSuccess';</script>";
+echo "<script>window.location='stock_return_add2.php?returnid=".urlencode($returnid)."&&invnumber={$invnumber_encode}&&DeleteSuccess';</script>";
 ?>

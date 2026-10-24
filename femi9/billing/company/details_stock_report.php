@@ -80,7 +80,7 @@ while($result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLD
 
 <tr>
   <td></td>
-  <td style="text-align:right;font-weight:bold;"><?=$_REQUEST['stock'];?></td>
+  <td style="text-align:right;font-weight:bold;"><?=htmlspecialchars((string)($_REQUEST['stock']), ENT_QUOTES, 'UTF-8', false);?></td>
   </tr>                                                  
 </table>
                         

@@ -105,7 +105,7 @@ $successMessage = $_SESSION['successMessage'];
 						
 						
 						
-						<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+						<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">

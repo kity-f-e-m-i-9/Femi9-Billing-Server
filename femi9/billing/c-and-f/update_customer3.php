@@ -124,8 +124,8 @@ $lablenamedisplay="Customer Name";
 										
 				<form action="update_customer_action3.php" method="post" enctype="multipart/form-data" onsubmit="return confirm('Please make a confirm!')">
 				
-				<input type="hidden" name="invid" value="<?=$invid;?>"/>
-				<input type="hidden" name="invuser" value="<?=$_REQUEST['invuser'];?>"/>
+				<input type="hidden" name="invid" value="<?=htmlspecialchars((string)($invid), ENT_QUOTES, 'UTF-8', false);?>"/>
+				<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>"/>
 				<input type="hidden" name="old_customer_id" value="<?=$CuSTID;?>"/>
 				
                 <div class="example-container">

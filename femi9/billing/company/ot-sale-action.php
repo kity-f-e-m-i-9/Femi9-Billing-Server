@@ -363,7 +363,7 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
         exit;
     }
 
-    echo "<script>window.location='ot-sale-print?tempid=$tempid';</script>";
+    echo "<script>window.location='ot-sale-print?tempid=".urlencode($tempid)."';</script>";
     exit;
 }
 

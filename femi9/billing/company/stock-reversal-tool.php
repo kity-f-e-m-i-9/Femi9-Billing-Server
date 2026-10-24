@@ -715,7 +715,7 @@ body {
     ];
     $b = $bm[$mode] ?? ['cls'=>'mb-dry','label'=>$mode];
     ?>
-    <div class="mode-badge <?= $b['cls'] ?> fi">
+    <div class="mode-badge <?= htmlspecialchars((string)($b['cls']), ENT_QUOTES, 'UTF-8', false) ?> fi">
         <span class="dot"></span>
         <?= htmlspecialchars($b['label']) ?>
     </div>

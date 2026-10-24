@@ -20,7 +20,7 @@ $Fetch_Count_MobilenUmber=db_q($db_conn,$Select_CNTMoblenm,[$mobile_number]);
 $Result_Count_MobilenUmber=mysqli_fetch_array($Fetch_Count_MobilenUmber);
 if($Result_Count_MobilenUmber['numMob']==1)
 {
-	echo "<script>window.location='add_ss?InvalidMobileNumber&&usertype=$usertype';</script>";
+	echo "<script>window.location='add_ss?InvalidMobileNumber&&usertype=".urlencode($usertype)."';</script>";
 	exit;
 	
 }else{
@@ -121,7 +121,7 @@ db_q($db_conn,$UPTassignedID,[$temp_id,$state_id,$district_id,$taluk_id,$value])
 echo "<script>window.location='manage_ss.php?addedsuccess';</script>";
 
 }else{
-		echo "<script>window.location='add_ss.php?distalready&&usertype=$usertype';</script>";
+		echo "<script>window.location='add_ss.php?distalready&&usertype=".urlencode($usertype)."';</script>";
 	}
 	
 	

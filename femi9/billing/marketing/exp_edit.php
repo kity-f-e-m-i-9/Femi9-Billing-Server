@@ -90,7 +90,7 @@ $select_product_list="select * from ms_exp where id=?";
 <?php include("validate-scripts.php");?>
 <form action="exp_action_update" method="post" enctype="multipart/form-data" id="uploadForm">
 
-<input type="hidden" name="update_id" value="<?=$get_id;?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($get_id), ENT_QUOTES, 'UTF-8', false);?>">
 <input type="hidden" name="old_icon" value="<?=$result_product_list["photos"];?>">
 
                                         <div class="example-container">

@@ -220,7 +220,7 @@ $i= $start_from;
 																										<td>
 													    <div class="actions-group">
 													        <a href="#" class="action-link" title="Edit" onclick="toggleEditRow('<?=$RowID;?>'); return false;"><i class="material-icons-outlined" style="font-size:17px;color:#3b82f6;">edit</i></a>
-													        <a href="ot-sale-delete.php?id=<?=$RowID;?>&&tempid=<?=$tempid;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <a href="ot-sale-delete.php?id=<?=$RowID;?>&&tempid=<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 													</td>
                                                 </tr>

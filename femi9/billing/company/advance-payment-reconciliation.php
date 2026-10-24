@@ -1732,7 +1732,7 @@ $stmt->close();
     <div class="card">
         <div class="card-header">
             <i class="material-icons">assessment</i>
-            Dry Run Results (<?= $dry_run_results['date_from'] ?> to <?= $dry_run_results['date_to'] ?>)
+            Dry Run Results (<?= htmlspecialchars((string)($dry_run_results['date_from']), ENT_QUOTES, 'UTF-8', false) ?> to <?= htmlspecialchars((string)($dry_run_results['date_to']), ENT_QUOTES, 'UTF-8', false) ?>)
         </div>
         
         <div class="stats-grid">

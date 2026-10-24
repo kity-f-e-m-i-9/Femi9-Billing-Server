@@ -19,7 +19,7 @@ require_once("include/GodownAccess.php");
 
 	if (!$warehouseId) {
 		$_SESSION['errorMessage'] = "Please select a warehouse (physical).";
-		echo "<script>window.location='shop-user-invoice-add?invuser=$invuser&missing_warehouse=1';</script>";
+		echo "<script>window.location='shop-user-invoice-add?invuser=".urlencode($invuser)."&missing_warehouse=1';</script>";
 		exit;
 	}
 
@@ -41,7 +41,7 @@ $fetch_count_opstock13=db_q($db_conn,$select_count_opstock13,[$Login_user_TYPEvl
 $result_count_opstock13=mysqli_fetch_array($fetch_count_opstock13);
 if($result_count_opstock13['numopstock12']==0)
 {
-	echo "<script>window.location='shop-user-invoice-add?invuser=".$invuser."&&gid=".$godownid."&&action=".$_SESSION['ACTIONEDIT']."&&stocknotupdated';</script>";
+	echo "<script>window.location='shop-user-invoice-add?invuser=".urlencode($invuser)."&&gid=".urlencode($godownid)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&stocknotupdated';</script>";
 	
 }else{
 	
@@ -166,7 +166,7 @@ else{$gst_type="outer";}
 	
 	if($AVMstock<$qty)
 	{
-		echo "<script>window.location='shop-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".$invuser."&&AlertStockError&&action=".$_SESSION['ACTIONEDIT']."&&gid=".$godownid."';</script>";
+		echo "<script>window.location='shop-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".urlencode($invuser)."&&AlertStockError&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 		
@@ -189,11 +189,11 @@ else{$gst_type="outer";}
 		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$invuser,$customer_id,$Login_user_TYPEvl,$Login_user_IDvl,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_percentage,$discount_amount,$gst_type,$hsn,$date,$rwpoints,$buyer_gsttype]);
 	
 		
-		echo "<script>window.location='shop-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".$invuser."&&FemiAdded&&action=".$_SESSION['ACTIONEDIT']."&&gid=".$godownid."';</script>";
+		echo "<script>window.location='shop-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".urlencode($invuser)."&&FemiAdded&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='shop-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".$invuser."&&AlertMessage&&action=".$_SESSION['ACTIONEDIT']."&&gid=".$godownid."';</script>";
+		echo "<script>window.location='shop-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&AlertMessage&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
 	}
 		
 }

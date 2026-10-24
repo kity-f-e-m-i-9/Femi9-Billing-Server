@@ -116,7 +116,7 @@ $errorMessage = $_SESSION['errorMessage'];
 									<table class="headertble">
 									<tr>
 									<td><?=$displaytitle;?></td>
-									<td><a href="user-invoice-add?invuser=<?=$_REQUEST['invuser'];?>" title="Add Invoice">&#10011;</a></td>
+									<td><a href="user-invoice-add?invuser=<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>" title="Add Invoice">&#10011;</a></td>
 									</tr>
 									</table>
 									</h1>
@@ -277,10 +277,10 @@ $Result_DLDetails=mysqli_fetch_array($Fetch_DLDetails);
 			?>
 													
 													<?php if($_REQUEST['invuser']=='shop'){?>
-													<a href="update_customer2.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$result_product_list["inv_id"];?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
+													<a href="update_customer2.php?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=$result_product_list["inv_id"];?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
 													</a>
 													<?php }else{?>
-													<a href="update_customer.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$result_product_list["inv_id"];?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
+													<a href="update_customer.php?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=$result_product_list["inv_id"];?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
 													</a>
 													<?php }?>
 													
@@ -314,7 +314,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 }
 ?>
 				<td><?php echo inr_format($result_product_list["total"], 2);?>
-				<br/><a href="add-receipt?invid=<?=$result_product_list["inv_id"];?>&&invuser=<?=$getinvuser;?>"><?=$msgpayment;?></a>
+				<br/><a href="add-receipt?invid=<?=$result_product_list["inv_id"];?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>"><?=$msgpayment;?></a>
 				</td>					
 												
 <td>
@@ -328,7 +328,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 
 													
 													<td>
-<a href="user-invoice-add?invuser=<?=$getinvuser;?>&&action=edit&&InvoiceID=<?php echo $INVID_encode;?>" title="Edit"><img src="../../assets/images/edit-32.png"/></a>
+<a href="user-invoice-add?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&action=edit&&InvoiceID=<?php echo $INVID_encode;?>" title="Edit"><img src="../../assets/images/edit-32.png"/></a>
 													</td>
 													
 													<!----<td>
@@ -338,7 +338,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 													
 													<td>
 													<?php if($result_product_list["sub_total"]>0){?>
-<a href="cnote_new.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$INVID_encode;?>">
+<a href="cnote_new.php?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=$INVID_encode;?>">
 <span class="badge badge-warning">Return</span></a>
 <?php } else{ echo "---";}?>
 </td>
@@ -346,7 +346,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 
 <td>
 <?php if($result_product_list["sub_total"]==0){?>
-<a href="delinvoice?invtype=noncustomer&&invuser=<?=$getinvuser;?>&&invid=<?=$INVID_encode;?>"onclick="return confirm('You want to delete confirm?');" title="Delete">
+<a href="delinvoice?invtype=noncustomer&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&invid=<?=$INVID_encode;?>"onclick="return confirm('You want to delete confirm?');" title="Delete">
 <img src="../../assets/images/delete-32.png"/></a>
 <?php } else{ echo "---";}?>
 </td>

@@ -125,7 +125,7 @@ $district_name=	$result_district['dist_name'];
 <td><?php echo strtoupper($result_product_list["name"]);?></td>
 <td><?php echo strtoupper($district_name);?></td>
 </tr>
-<tr><td colspan="2"><a href="stockist-network?ssid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=$get_state_id;?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="2"><a href="stockist-network?ssid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

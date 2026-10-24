@@ -190,7 +190,7 @@ while($result_currency=mysqli_fetch_array($fetch_currency))
     document.getElementById("currencySelect").addEventListener("change", function() {
         let selectedValue = this.value;
         if (selectedValue) {
-            window.location.href = "customer-user-invoice-print?invoiceid=<?=$_REQUEST['invoiceid'] ?>&crcode=" + selectedValue;
+            window.location.href = "customer-user-invoice-print?invoiceid=<?=htmlspecialchars((string)($_REQUEST['invoiceid']), ENT_QUOTES, 'UTF-8', false) ?>&crcode=" + selectedValue;
         }
     });
 </script>

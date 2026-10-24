@@ -10,7 +10,7 @@ $rowid  = (int) base64_decode($_REQUEST['Roowid'] ?? '');
 $tempid = $_REQUEST['tempid'] ?? '';
 
 if ($rowid <= 0) {
-    echo "<script>window.location='demofree_details?deletedDone&&tempid=$tempid';</script>";
+    echo "<script>window.location='demofree_details?deletedDone&&tempid=".urlencode($tempid)."';</script>";
     exit;
 }
 
@@ -79,4 +79,4 @@ if ($record && (int)$record['product_id'] > 0) {
 }
 
 $_SESSION['sucMessage'] = "One Product Details Deleted! (Demo/Free/Damage)";
-echo "<script>window.location='demofree_details?deletedDone&&tempid=$tempid';</script>";
+echo "<script>window.location='demofree_details?deletedDone&&tempid=".urlencode($tempid)."';</script>";

@@ -2,7 +2,7 @@
 $stateid=$_REQUEST['subcourseID'];
 $districtid=$_REQUEST['techID'];
 
-/*onChange="showPincode(<?php echo $stateid;?>,<?php echo $districtid;?>,this.value)"*/
+/*onChange="showPincode(<?php echo htmlspecialchars((string)($stateid), ENT_QUOTES, 'UTF-8', false);?>,<?php echo htmlspecialchars((string)($districtid), ENT_QUOTES, 'UTF-8', false);?>,this.value)"*/
 ?>
 
  <select required="" name="taluk_id" class="form-control">

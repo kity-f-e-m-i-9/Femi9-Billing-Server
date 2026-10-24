@@ -108,7 +108,7 @@ $_SESSION['invuser']=$getinvuser;
 									<?php if($getinvuser=="customer"){?>
 		<a href="customer-user-manage-invoice" id="linkbackvl">&#8630;&nbsp;Go Back</a>
 									<?php }else{?>
-		<a href="user-manage-invoice?invuser=<?=$getinvuser;?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+		<a href="user-manage-invoice?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
 									<?php }?>
 									
 								<h1>
@@ -118,7 +118,7 @@ $_SESSION['invuser']=$getinvuser;
 									<br/>
 					<div style="font-size:15px;margin-top:10px;">Invoice Number:-</div>
 					<div style="font-size:22px;font-weight:600;color:blue;"><?=$result_invoicedtails['inv_number'];?></div>
-					<div style="font-size:12px;margin-top:5px;"><?=$getinvuser;?></div>
+					<div style="font-size:12px;margin-top:5px;"><?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?></div>
 									</td>
 									<td>&nbsp;</td>
 									</tr>
@@ -211,8 +211,8 @@ $return_id="".$randum_number."RTN".$temp_date."".$temp_time."";
 }else{$return_id=$get_returnid;}
 ?>
 
-<input type="hidden" name="returnid" value="<?=$return_id;?>">
-<input type="hidden" name="invid" value="<?=$invid_decode;?>">
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($return_id), ENT_QUOTES, 'UTF-8', false);?>">
+<input type="hidden" name="invid" value="<?=htmlspecialchars((string)($invid_decode), ENT_QUOTES, 'UTF-8', false);?>">
 						
 <input type="hidden" name="from_usertype" value="<?=$fromusertype;?>">
 <input type="hidden" name="from_userid" value="<?=$fromuserid;?>">
@@ -315,7 +315,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 <td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
-<a href="cnote_delete.php?returnid=<?=$_REQUEST['returnid'];?>&&rowid=<?=$ItemRowid;?>&&InvoiceID=<?=$InvoiceID;?>&&redirurl=cnote_new&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="cnote_delete.php?returnid=<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?=$ItemRowid;?>&&InvoiceID=<?=htmlspecialchars((string)($InvoiceID), ENT_QUOTES, 'UTF-8', false);?>&&redirurl=cnote_new&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>
                                                         </tr>
                                                         
@@ -347,7 +347,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 												<?php if($count_products_return>0){?>
 												
 <form action="cnote_finish.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
-<input type="hidden" name="returnid" value="<?=$_REQUEST['returnid'];?>"/>
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
 

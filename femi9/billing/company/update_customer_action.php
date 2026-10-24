@@ -71,7 +71,7 @@ db_q($db_conn,$update_user_receipt,[$new_customer_id,$invid]);
 //------------------------------------------------------------------	
 	
 	//$_SESSION['successMessage']="Customer Update Success!";
-	echo "<script>window.location='update_customer?invuser=$invuser&&InvoiceID=$invid&&updatedsuccess';</script>";
+	echo "<script>window.location='update_customer?invuser=".urlencode($invuser)."&&InvoiceID=".urlencode($invid)."&&updatedsuccess';</script>";
 	
 	
 	

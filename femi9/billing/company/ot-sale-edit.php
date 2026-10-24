@@ -88,7 +88,7 @@ $result_Records=mysqli_fetch_array($fetch_Records);
 	 <?php include("validate-scripts.php");?>	 
 <form action="ot-sale-action" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
 
-<input type="hidden" name="tempid" value="<?=$tempid?>">
+<input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false)?>">
 
                                         <div class="example-container">
                                         <div class="example-content">

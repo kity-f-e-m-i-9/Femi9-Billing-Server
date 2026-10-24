@@ -58,12 +58,12 @@ if(isset($_REQUEST['truncate']))
 	$delRecord="delete from user_invoice_items where id=?";
 	db_q($db_conn,$delRecord,[$rowid_decode]);
 	
-	echo "<script>window.location='stock_request_details.php?reqid=".$reqid_encode."&&DeleteSuccess&&ActionRemove';</script>";
+	echo "<script>window.location='stock_request_details.php?reqid=".urlencode($reqid_encode)."&&DeleteSuccess&&ActionRemove';</script>";
 	
 }
 else{
 	
-	echo "<script>window.location='stock_request_details.php?reqid=".$reqid_encode."';</script>";
+	echo "<script>window.location='stock_request_details.php?reqid=".urlencode($reqid_encode)."';</script>";
 	
 }
 ?>

@@ -48,7 +48,7 @@ if (isset($_REQUEST['delreceiptact'])) {
     } else {
         mysqli_query($db_conn, "DELETE FROM receipt WHERE id='".db_esc($rcptid)."'");
     }
-    echo "<script>window.location='add-receipt.php?invid=" . urlencode($invid) . "&invuser=$getinvuser&DeletedSuccess';</script>";
+    echo "<script>window.location='add-receipt.php?invid=" . urlencode($invid) . "&invuser=".urlencode($getinvuser)."&DeletedSuccess';</script>";
     exit;
 }
 
@@ -89,9 +89,9 @@ if (isset($_POST['addreceipt'])) {
             VALUES ('".db_esc($receiptid)."','".db_esc($invid)."','".db_esc($invoice_total)."','".db_esc($received)."','".db_esc($balance)."','".db_esc($receipt_date)."',
             '".db_esc($from_utype)."','".db_esc($from_uid)."','".db_esc($to_utype)."','".db_esc($to_uid)."',
             '$receipt_method','$receipt_remarks','regular')");
-        echo "<script>window.location='add-receipt.php?invid=" . urlencode($invid) . "&invuser=$getinvuser&ReceiptAddedSuc';</script>";
+        echo "<script>window.location='add-receipt.php?invid=" . urlencode($invid) . "&invuser=".urlencode($getinvuser)."&ReceiptAddedSuc';</script>";
     } else {
-        echo "<script>window.location='add-receipt.php?invid=" . urlencode($invid) . "&invuser=$getinvuser&InvalidAmount';</script>";
+        echo "<script>window.location='add-receipt.php?invid=" . urlencode($invid) . "&invuser=".urlencode($getinvuser)."&InvalidAmount';</script>";
     }
     exit;
 }
@@ -129,7 +129,7 @@ $receipts    = mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='".db_
                     <div class="row"><div class="col"><div class="page-description">
                         <h1><table class="headertble"><tr>
                             <td>Receipt</td>
-                            <td><a href="<?php echo $backlink; ?>" title="Go Back">&#9776;</a></td>
+                            <td><a href="<?php echo htmlspecialchars((string)($backlink), ENT_QUOTES, 'UTF-8', false); ?>" title="Go Back">&#9776;</a></td>
                         </tr></table></h1>
                     </div></div></div>
 
@@ -165,7 +165,7 @@ $receipts    = mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='".db_
                                 <td><b>&#8377;<?php echo inr_format((float)$r['received'], 2); ?></b></td>
                                 <td><?php echo htmlspecialchars($r['receipt_method']); ?></td>
                                 <td><?php echo htmlspecialchars($r['receipt_remarks']); ?></td>
-                                <td><?php if (($r['payment_type'] ?? '') !== 'credit_note'): ?><a href="add-receipt.php?invid=<?php echo urlencode($invid); ?>&invuser=<?php echo $getinvuser; ?>&delreceiptact=1&rcptid=<?php echo base64_encode($r['id']); ?>" onclick="return confirm('Delete this receipt?');" style="color:red;">Remove</a><?php else: $cn_print_page = ($getinvuser === 'customer') ? 'customer-invoice-print.php' : 'shop-invoice-print.php'; ?><a href="<?php echo $cn_print_page; ?>?invoiceid=<?php echo base64_encode($invid); ?>" target="_blank" style="color:#7c3aed;font-size:12px;">📄 <?php echo htmlspecialchars($r['receiptid']); ?></a><?php endif; ?></td>
+                                <td><?php if (($r['payment_type'] ?? '') !== 'credit_note'): ?><a href="add-receipt.php?invid=<?php echo urlencode($invid); ?>&invuser=<?php echo htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>&delreceiptact=1&rcptid=<?php echo base64_encode($r['id']); ?>" onclick="return confirm('Delete this receipt?');" style="color:red;">Remove</a><?php else: $cn_print_page = ($getinvuser === 'customer') ? 'customer-invoice-print.php' : 'shop-invoice-print.php'; ?><a href="<?php echo htmlspecialchars((string)($cn_print_page), ENT_QUOTES, 'UTF-8', false); ?>?invoiceid=<?php echo base64_encode($invid); ?>" target="_blank" style="color:#7c3aed;font-size:12px;">📄 <?php echo htmlspecialchars($r['receiptid']); ?></a><?php endif; ?></td>
                             </tr>
                             <?php } ?>
                             </tbody>
@@ -176,8 +176,8 @@ $receipts    = mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='".db_
                         <?php if ($balance_due > 0): ?>
                         <h5 style="margin-bottom:12px;">Add Receipt</h5>
                         <form method="post" onsubmit="return confirm('Submit receipt?');">
-                        <input type="hidden" name="invid"           value="<?php echo $invid; ?>">
-                        <input type="hidden" name="invuser"         value="<?php echo $getinvuser; ?>">
+                        <input type="hidden" name="invid"           value="<?php echo htmlspecialchars((string)($invid), ENT_QUOTES, 'UTF-8', false); ?>">
+                        <input type="hidden" name="invuser"         value="<?php echo htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>">
                         <input type="hidden" name="receivableamount" id="receivableamount" value="<?php echo $balance_due; ?>">
                         <div class="example-container"><div class="example-content">
 

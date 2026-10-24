@@ -158,16 +158,16 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
                                 </div>
                             </div>
 							
-							<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+							<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
 <label class="form-label">From Month</label>
-<input type="month" required="" name="frdate" value="<?=$from_month;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="month" required="" name="frdate" value="<?=htmlspecialchars((string)($from_month), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Month</label>
-<input type="month" required="" name="todate" value="<?=$to_month;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="month" required="" name="todate" value="<?=htmlspecialchars((string)($to_month), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 
 <div id="searchleftcont">
@@ -176,7 +176,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							   <?php if($get_godown_id==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$get_godown_id;?>" hidden=""><?=$result_Godown_details['gname'];?></option>
+							   <option value="<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$result_Godown_details['gname'];?></option>
 							   <?php }?>
 							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);

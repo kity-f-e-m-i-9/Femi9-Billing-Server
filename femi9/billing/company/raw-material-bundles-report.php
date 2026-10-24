@@ -271,14 +271,14 @@ $filterQueryString = http_build_query(array_filter([
                         </div>
                         <div class="ata-filter-actions">
                             <button type="submit" class="ata-btn ata-btn-primary"><i class="material-icons-outlined" style="font-size:16px;">filter_alt</i>Apply</button>
-                            <a href="raw-material-bundles-report.php?tab=<?php echo $activeTab; ?>" class="ata-btn ata-btn-outline">Clear</a>
-                            <a href="export-bundle-report.php?tab=<?php echo $activeTab; ?>&<?php echo $filterQueryString; ?>" class="ata-btn ata-btn-export"><i class="material-icons-outlined" style="font-size:16px;">download</i>Export CSV</a>
+                            <a href="raw-material-bundles-report.php?tab=<?php echo htmlspecialchars((string)($activeTab), ENT_QUOTES, 'UTF-8', false); ?>" class="ata-btn ata-btn-outline">Clear</a>
+                            <a href="export-bundle-report.php?tab=<?php echo htmlspecialchars((string)($activeTab), ENT_QUOTES, 'UTF-8', false); ?>&<?php echo htmlspecialchars((string)($filterQueryString), ENT_QUOTES, 'UTF-8', false); ?>" class="ata-btn ata-btn-export"><i class="material-icons-outlined" style="font-size:16px;">download</i>Export CSV</a>
                         </div>
                     </form>
 
                     <div class="ata-report-tabs">
-                        <a href="?tab=summary&<?php echo $filterQueryString; ?>" class="ata-report-tab <?php echo $activeTab === 'summary' ? 'active' : ''; ?>">By Bundle</a>
-                        <a href="?tab=transactions&<?php echo $filterQueryString; ?>" class="ata-report-tab <?php echo $activeTab === 'transactions' ? 'active' : ''; ?>">By Transaction</a>
+                        <a href="?tab=summary&<?php echo htmlspecialchars((string)($filterQueryString), ENT_QUOTES, 'UTF-8', false); ?>" class="ata-report-tab <?php echo $activeTab === 'summary' ? 'active' : ''; ?>">By Bundle</a>
+                        <a href="?tab=transactions&<?php echo htmlspecialchars((string)($filterQueryString), ENT_QUOTES, 'UTF-8', false); ?>" class="ata-report-tab <?php echo $activeTab === 'transactions' ? 'active' : ''; ?>">By Transaction</a>
                     </div>
 
                     <?php if ($activeTab === 'summary'): ?>

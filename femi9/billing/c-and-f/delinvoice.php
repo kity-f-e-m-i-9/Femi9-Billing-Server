@@ -21,10 +21,10 @@ $del_receipt="delete from receipt where inv_id=?";
 db_q($db_conn,$del_receipt,[$invid]);
 
 $_SESSION['successMessage']="One Invoice Deleted!";
-echo "<script>window.location='user-manage-invoice?deletedsuccess&&invuser=$invuser';</script>";
+echo "<script>window.location='user-manage-invoice?deletedsuccess&&invuser=".urlencode($invuser)."';</script>";
 	}else{
 		$_SESSION['errorMessage']="This Invoice contains no empty items!";
-		echo "<script>window.location='user-manage-invoice?productnonempty&&invuser=$invuser';</script>";
+		echo "<script>window.location='user-manage-invoice?productnonempty&&invuser=".urlencode($invuser)."';</script>";
 	}
 }
 

@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 if($old_customer_id==$new_customer_id)
 {
-	echo "<script>window.location='update_customer2?invuser=$invuser&&InvoiceID=$invid&&alreadyexists';</script>";
+	echo "<script>window.location='update_customer2?invuser=".urlencode($invuser)."&&InvoiceID=".urlencode($invid)."&&alreadyexists';</script>";
 	
 }else{
 //-------------------------------------------------------------------	
@@ -32,7 +32,7 @@ db_q($db_conn,$update_user_receipt,[$new_customer_id,$invid]);
 //------------------------------------------------------------------	
 	
 	//$_SESSION['successMessage']="Customer Update Success!";
-	echo "<script>window.location='update_customer2?invuser=$invuser&&InvoiceID=$invid&&updatedsuccess';</script>";
+	echo "<script>window.location='update_customer2?invuser=".urlencode($invuser)."&&InvoiceID=".urlencode($invid)."&&updatedsuccess';</script>";
 	
 }
 	

@@ -153,7 +153,7 @@ include("config.php");
 <td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
-<a href="cnote_delete.php?returnid=<?=$_REQUEST['returnid'];?>&&rowid=<?=$ItemRowid;?>&&redirurl=cnote_details&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="cnote_delete.php?returnid=<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?=$ItemRowid;?>&&redirurl=cnote_details&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>
                                                         </tr>
                                                         
@@ -171,7 +171,7 @@ include("config.php");
                                             
                                               <?php if($count_products_return==0){?>	
 											  <div class="col-lg-12" style="text-align:center;">
-							<a href="cnote_del?returnid=<?=$_REQUEST['returnid'];?>" class="btn btn-primary badge badge-style-bordered badge-danger" type="button" style="width:auto;">Delete Credit Note</a>
+							<a href="cnote_del?returnid=<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>" class="btn btn-primary badge badge-style-bordered badge-danger" type="button" style="width:auto;">Delete Credit Note</a>
 							 </div>
 									<?php }?>
                                            
@@ -191,7 +191,7 @@ include("config.php");
 <?php if($result_invoicedtails['status']=="pending" && $count_products_return>0){?>
 												
 <form action="cnote_finish.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
-<input type="hidden" name="returnid" value="<?=$_REQUEST['returnid'];?>"/>
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
 

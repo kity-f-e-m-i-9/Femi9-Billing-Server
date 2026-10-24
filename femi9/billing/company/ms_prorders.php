@@ -296,7 +296,7 @@ if (!empty($se_msids)) {
 									<tr>
 									<td>Marketing Staff > <?php echo $showAllOrders ? 'Total Get Orders (all, incl. TP-assigned)' : 'Product Orders'; ?><?php if ($isTeamMode): ?> &mdash; <?php echo htmlspecialchars($teamRootName ?? 'Team'); ?>'s team (<?php echo count($se_msids); ?>)<?php endif; ?></td>
 									<td>
-									<a href="ms_orders_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=$se_msid;?>&&se_msids=<?=htmlspecialchars(implode(',', $se_msids));?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
+									<a href="ms_orders_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>&&se_msids=<?=htmlspecialchars(implode(',', $se_msids));?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
 									</td>
 									</tr>
 									</table>
@@ -307,7 +307,7 @@ if (!empty($se_msids)) {
 						
 						
 						
-						<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+						<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -337,7 +337,7 @@ if (!empty($se_msids)) {
 <?php if($se_msid==NULL){?>
 <option value="" hidden="">Select</option>
 <?php }else{?>
-<option value="<?=$se_msid;?>" hidden=""><?=strtoupper($result_msDetails12['ms_name']);?>, <?=$result_msDetails12['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=strtoupper($result_msDetails12['ms_name']);?>, <?=$result_msDetails12['ms_mobile'];?></option>
 <?php }?>
 <?php $select_msDetailsOPT="select * from marketing_staff order by ms_name asc";
 $fetch_msDetailsOPT=mysqli_query($db_conn,$select_msDetailsOPT);

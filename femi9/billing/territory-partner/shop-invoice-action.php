@@ -54,7 +54,7 @@ if ($isBrandNewInvoice && $customer_id !== '') {
     $stmtPending->close();
     if ($hasPendingOrder) {
         $_SESSION['errorMessage'] = "This shop has a pending field order. Please invoice it from Manage Orders instead of adding a new invoice directly.";
-        echo "<script>window.location='shop-invoice-add.php?invuser=$invuser';</script>";
+        echo "<script>window.location='shop-invoice-add.php?invuser=".urlencode($invuser)."';</script>";
         exit;
     }
 }
@@ -62,7 +62,7 @@ if ($isBrandNewInvoice && $customer_id !== '') {
 // Check invoice number duplicate (set by AJAX in form)
 if (($_REQUEST['invoice_number_accept'] ?? '1') == '0') {
     $_SESSION['errorMessage'] = "Invoice Number already exists!";
-    echo "<script>window.location='shop-invoice-add.php?invoicealready&&invuser=$invuser';</script>";
+    echo "<script>window.location='shop-invoice-add.php?invoicealready&&invuser=".urlencode($invuser)."';</script>";
     exit;
 }
 
@@ -237,7 +237,7 @@ $stmtStk->close();
 $available = $stockRow ? (int)$stockRow['closing_qty'] : 0;
 
 if ($available < $qty) {
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=$invuser&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertStockError';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=".urlencode($invuser)."&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertStockError';</script>";
     exit;
 }
 
@@ -248,7 +248,7 @@ $stmtDup->execute();
 $dupChk = $stmtDup->get_result()->fetch_assoc();
 $stmtDup->close();
 if ((int)$dupChk['n'] > 0) {
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&ItemAlreadyExists&&invuser=$invuser&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertMessage';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertMessage';</script>";
     exit;
 }
 
@@ -275,4 +275,4 @@ $stmtItem->execute(); $stmtItem->close();
 
 logShopInvoiceChange($db_conn, $inv_id, $pr_id, 'added', null, $qty, $Login_user_TYPEvl, (string)$Login_user_IDvl);
 
-echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&AddedSuccess&&invuser=$invuser&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&FemiAdded';</script>";
+echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&AddedSuccess&&invuser=".urlencode($invuser)."&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&FemiAdded';</script>";

@@ -36,5 +36,5 @@ $del_product="delete from demofreedamage where id=?";
 db_q($db_conn,$del_product,[$Roowid]);
 
 $_SESSION['sucMessage']="One Product Details Deleted! (Demo/Free/Damage)";
-echo "<script>window.location='demofree_details?deletedDone&&tempid=$tempid';</script>";
+echo "<script>window.location='demofree_details?deletedDone&&tempid=".urlencode($tempid)."';</script>";
 ?>

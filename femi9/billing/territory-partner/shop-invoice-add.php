@@ -257,7 +257,7 @@ select:focus, input[type=number]:focus { background:#fff; }
 ?>
 
 <form action="shop-invoice-action2.php" method="post" enctype="multipart/form-data">
-<input type="hidden" name="inv_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="inv_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 <input type="hidden" name="invuser" value="<?php echo $getinvuser; ?>">
 
 <div class="form-section">
@@ -411,7 +411,7 @@ while ($ri = mysqli_fetch_array($res_items)) {
             <?php if ($canEditLine) { ?>
             <input type="number" min="0" step="any" id="qty_<?php echo $ri['id']; ?>"
                    value="<?php echo $ri['qty']; ?>"
-                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
+                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false); ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
                    class="form-control form-control-sm" style="width:70px;">
             <?php } else { ?>
             <?php echo $ri['qty']; ?>
@@ -422,7 +422,7 @@ while ($ri = mysqli_fetch_array($res_items)) {
             <?php if ($canEditPrice) { ?>
             <input type="number" min="0" step="any" id="price_<?php echo $ri['id']; ?>"
                    value="<?php echo $ri['amount']; ?>"
-                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>', <?php echo (float)$ri['qty']; ?>, <?php echo (float)$ri['discount_amount']; ?>, <?php echo (float)$ri['gst_percentage']; ?>)"
+                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false); ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>', <?php echo (float)$ri['qty']; ?>, <?php echo (float)$ri['discount_amount']; ?>, <?php echo (float)$ri['gst_percentage']; ?>)"
                    class="form-control form-control-sm" style="width:80px;">
             <?php } else { ?>
             &#8377;<?php echo inr_format($ri['amount'], 2); ?>
@@ -432,7 +432,7 @@ while ($ri = mysqli_fetch_array($res_items)) {
             <?php if ($canEditLine) { ?>
             <input type="number" min="0" step="any" id="discamt_<?php echo $ri['id']; ?>"
                    value="<?php echo $ri['discount_amount']; ?>" placeholder="Rs."
-                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo $Invoice_ID_encode; ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
+                   onchange="saveLineEdit(<?php echo $ri['id']; ?>, '<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false); ?>', '<?php echo $ItemRowid; ?>', '<?php echo $getinvuser; ?>')"
                    class="form-control form-control-sm" style="width:80px;">
             <div style="font-size:11px;color:#6b7280;">(<?php echo $ri['discount_percentage']; ?>%)</div>
             <?php } else { ?>
@@ -459,11 +459,11 @@ while ($ri = mysqli_fetch_array($res_items)) {
         // Still a draft (never submitted) — Remove is the TP's own call, no BDM approval needed.
         if ($cnt_ret > 0) { echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>"; }
         elseif (!$hasReceipt) { ?>
-        <a href="shop-del-inv-product.php?invid=<?php echo $Invoice_ID_encode; ?>&&rowid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+        <a href="shop-del-inv-product.php?invid=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false); ?>&&rowid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
         <?php } else {
         $removeReqStatus = tpShopInvoiceActionStatus($db_conn, (int)$Login_user_IDvl, $Invoice_ID, 'remove');
         if ($removeReqStatus === 'approved') { ?>
-        <a href="shop-del-inv-product.php?invid=<?php echo $Invoice_ID_encode; ?>&&rowid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+        <a href="shop-del-inv-product.php?invid=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false); ?>&&rowid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
         <?php } elseif ($removeReqStatus === 'pending') { ?>
         <span class="badge badge-style-bordered badge-warning" title="Waiting for your Sales BDM to review">Pending Remove</span>
         <?php } else { ?>
@@ -609,7 +609,7 @@ function totalamount() {
 
 <div class="col-lg-7"><div class="invoice-info">
 
-<input type="hidden" name="invoice_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="invoice_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 <input type="hidden" name="SubTotal" value="<?php echo $TotalAMount123; ?>">
 
 <p><b>Subtotal</b>
@@ -887,10 +887,10 @@ function discamount() {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_invoice_action.php">
-                <input type="hidden" name="invuser"   value="<?php echo $_REQUEST['invuser']   ?? ''; ?>">
-                <input type="hidden" name="InvoiceID" value="<?php echo $_REQUEST['InvoiceID'] ?? ''; ?>">
-                <input type="hidden" name="action"    value="<?php echo $_REQUEST['action']    ?? ''; ?>">
-                <input type="hidden" name="gid"       value="<?php echo $_REQUEST['gid']       ?? ''; ?>">
+                <input type="hidden" name="invuser"   value="<?php echo htmlspecialchars((string)($_REQUEST['invuser']   ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+                <input type="hidden" name="InvoiceID" value="<?php echo htmlspecialchars((string)($_REQUEST['InvoiceID'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+                <input type="hidden" name="action"    value="<?php echo htmlspecialchars((string)($_REQUEST['action']    ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+                <input type="hidden" name="gid"       value="<?php echo htmlspecialchars((string)($_REQUEST['gid']       ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
                 <input type="hidden" name="redirurl"  value="shop-invoice-add">
                 <input type="hidden" name="tblenme"   value="1">
                 <div class="example-content" style="padding:20px;">

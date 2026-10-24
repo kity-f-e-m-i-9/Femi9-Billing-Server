@@ -111,11 +111,11 @@ function closerefresh()
 			echo "<script> opener.location.reload(true);
      self.close();</script>";
 	 
-		//echo "<script>window.location='update_referral?referedupdated&&stockistid=$stockist_id';</script>";
+		//echo "<script>window.location='update_referral?referedupdated&&stockistid=".urlencode($stockist_id)."';</script>";
 							
 		}else{
 			
-			echo "<script>window.location='update_referral?InvalidReferedID&&stockistid=$stockist_id';</script>";
+			echo "<script>window.location='update_referral?InvalidReferedID&&stockistid=".urlencode($stockist_id)."';</script>";
 		}
 		
 		
@@ -154,7 +154,7 @@ function closerefresh()
 						
 						
 <form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" method="post" enctype="multipart/form-data" onsubmit="return confirm('Please make a confirm!')">
-<input type="hidden" name="stockist_id" value="<?=$stockistid;?>">
+<input type="hidden" name="stockist_id" value="<?=htmlspecialchars((string)($stockistid), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">

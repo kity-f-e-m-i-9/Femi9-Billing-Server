@@ -162,7 +162,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintPrreq").innerHTML=xmlhttp.responseText;}}
-var reqid="<?=$get_req_id?>";
+var reqid="<?=htmlspecialchars((string)($get_req_id), ENT_QUOTES, 'UTF-8', false)?>";
 xmlhttp.open("GET","loadproductreq.php?q="+str + '&reqid='+ reqid,true);
 xmlhttp.send();}
 </script>
@@ -215,7 +215,7 @@ $temp_time=date("gis");
 $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";?>
 
 <input type="hidden" name="randum_number" value="<?=$randum_number?>">
-<input type="hidden" name="inv_id" value="<?=$get_req_id_DECODE?>">
+<input type="hidden" name="inv_id" value="<?=htmlspecialchars((string)($get_req_id_DECODE), ENT_QUOTES, 'UTF-8', false)?>">
 <input type="hidden" name="invuser" value="<?=$getinvuser?>">
 <input type="hidden" name="godownid" value="<?=$Login_user_IDvl?>">
 
@@ -390,7 +390,7 @@ $select_requestdetails12="select * from stock_request_items where reqid=?and qty
 <td><?=$result_INVProductDetails['gstamount_total'];?>(<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
-<a href="user-del-inv-product-req.php?inv_id=<?php echo $get_req_id;?>&&rowid=<?php echo $ItemRowid;?>&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="user-del-inv-product-req.php?inv_id=<?php echo htmlspecialchars((string)($get_req_id), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?php echo $ItemRowid;?>&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>
                                                         </tr>
                                                         
@@ -479,7 +479,7 @@ $usertype=$result_invoice_details['to_user_type'];
 	
 <form action="invoice-submit-req.php" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
 
-<input type="hidden" name="invoice_id" value="<?=$get_req_id_DECODE;?>"/>
+<input type="hidden" name="invoice_id" value="<?=htmlspecialchars((string)($get_req_id_DECODE), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
 <?php $_SESSION['INVOICEFINISH']="1";?>

@@ -813,7 +813,7 @@ $availableExecutions = getAvailableWalletReferralExecutions($dbConn);
                                     <div class="stat-card primary">
                                         <div class="stat-label">Total TPs</div>
                                         <div class="stat-value"><?php echo (int)$summary['total_tps_processed']; ?></div>
-                                        <small class="text-muted">Processed<?php echo $modeLabel; ?></small>
+                                        <small class="text-muted">Processed<?php echo htmlspecialchars((string)($modeLabel), ENT_QUOTES, 'UTF-8', false); ?></small>
                                     </div>
                                 </div>
                                 <div class="col-md-3 col-sm-6 mb-3">

@@ -77,7 +77,7 @@ else
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report_notpur?modelval=<?=$_REQUEST['modelval'];?>&&out1=<?=$_REQUEST['out1'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report_notpur?modelval=<?=htmlspecialchars((string)($_REQUEST['modelval']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -98,7 +98,7 @@ else
 						<a href="#" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title"><?=$DISPLAY_LABLE;?></span>
-                                                <span class="widget-stats-amount"><?=base64_decode($_REQUEST['out1']);?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)(base64_decode($_REQUEST['out1'])), ENT_QUOTES, 'UTF-8', false);?></span>
                                             </div>
 											</a>
                                         </div>
@@ -284,7 +284,7 @@ while($result_nonpurchase_stockiest=mysqli_fetch_array($fetch_nonpurchase_stocki
 	
 }
 											
-	echo "<script>window.location='overview_notpurchased?modelval=$get_data1&&out1=$get_data2&&frdate=$get_data4&&todate=$get_data5&&seaction=$get_data3';</script>";
+	echo "<script>window.location='overview_notpurchased?modelval=".urlencode($get_data1)."&&out1=".urlencode($get_data2)."&&frdate=".urlencode($get_data4)."&&todate=".urlencode($get_data5)."&&seaction=".urlencode($get_data3)."';</script>";
 										}
 										
 										
@@ -297,19 +297,19 @@ $show_nonpur_DTUSER=$result_count_non_DTUSER['numDTUSER'];
 										
 <h1><?=$DISPLAY_LABLE;?> <?php if($show_nonpur_DTUSER>0){ echo " (Count : ".$show_nonpur_DTUSER.")"; }?></h1>
 									
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="modelval" value="<?=$_REQUEST['modelval'];?>"/>
-<input type="hidden" name="out1" value="<?=$_REQUEST['out1'];?>"/>
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="modelval" value="<?=htmlspecialchars((string)($_REQUEST['modelval']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out1" value="<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="seaction" value="1"/>
 
 <div class="overviewcontainar">
 <div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$get_from_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$get_to_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>

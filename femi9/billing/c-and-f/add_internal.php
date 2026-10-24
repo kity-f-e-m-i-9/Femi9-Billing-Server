@@ -62,7 +62,7 @@ date_default_timezone_set("Asia/Kolkata");
 									<table class="headertble">
 									<tr>
 									<td>Add Internal Stock Transfer<br/>
-									<h4>(to) <?=$_REQUEST['to_usertype'];?></h4>
+									<h4>(to) <?=htmlspecialchars((string)($_REQUEST['to_usertype']), ENT_QUOTES, 'UTF-8', false);?></h4>
 									</td>
 		<td><a href="manage_internal" title="Manage Internal Stock Transfer">&#9776;</a></td>
 									</tr>
@@ -102,7 +102,7 @@ $tempid="".$randum_number."INTTRNS".$temp_date."".$temp_time."";?>
 <input type="hidden" name="tempid" value="<?=$tempid?>">
 <input type="hidden" name="from_usertype" value="<?=$Login_user_TYPEvl?>">
 <input type="hidden" name="from_userid" value="<?=$Login_user_IDvl?>">
-<input type="hidden" name="to_usertype" value="<?=$_REQUEST['to_usertype'];?>">
+<input type="hidden" name="to_usertype" value="<?=htmlspecialchars((string)($_REQUEST['to_usertype']), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                         <div class="example-content">
@@ -114,7 +114,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintstock").innerHTML=xmlhttp.responseText;}}
-var invuser="<?=$_REQUEST['to_usertype'];?>";
+var invuser="<?=htmlspecialchars((string)($_REQUEST['to_usertype']), ENT_QUOTES, 'UTF-8', false);?>";
 xmlhttp.open("GET","loadstockcheck.php?q="+str + '&invuser='+ invuser,true);
 xmlhttp.send();}
 </script>

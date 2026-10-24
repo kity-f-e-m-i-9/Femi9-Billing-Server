@@ -287,7 +287,7 @@ if($get_ccode == "Default" || $get_ccode == NULL) {
     document.getElementById("currencySelect").addEventListener("change", function() {
         let selectedValue = this.value;
         if (selectedValue) {
-            window.location.href = "user-invoice-print?invoiceid=<?=$_REQUEST['invoiceid'] ?>&crcode=" + selectedValue;
+            window.location.href = "user-invoice-print?invoiceid=<?=htmlspecialchars((string)($_REQUEST['invoiceid']), ENT_QUOTES, 'UTF-8', false) ?>&crcode=" + selectedValue;
         }
     });
 </script>

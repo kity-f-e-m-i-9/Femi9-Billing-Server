@@ -53,5 +53,5 @@ $stmt->execute();
 $stmt->close();
 
 $_SESSION['sucMessage'] = "One OT Sales record deleted successfully.";
-echo "<script>window.location='ot-sale-details?deletedDone&&tempid=$tempid';</script>";
+echo "<script>window.location='ot-sale-details?deletedDone&&tempid=".urlencode($tempid)."';</script>";
 ?>

@@ -116,7 +116,7 @@ $noorder_reason=str_replace("'","&#39;",$_POST["noorder_reason"]);
                                <?php include("validate-scripts.php");?>        
 <form method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?=$get_id;?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($get_id), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">

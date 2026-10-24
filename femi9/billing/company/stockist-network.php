@@ -86,7 +86,7 @@ $select_stateList="select * from `state` where id=?";
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
-								<a href="users-network2?state_id=<?=$get_state_id;?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+								<a href="users-network2?state_id=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
                                     <h1>
 									<table class="headertble">
 									<tr>
@@ -165,7 +165,7 @@ $taluk_name=$result_Taluks12['taluk'];
 <td><?php echo strtoupper($district_name);?></td>
 <td><?php echo strtoupper($taluk_name);?></td>
 </tr>
-<tr><td colspan="3"><a href="distributor-network?superid=<?=$superstockistid;?>&&stockistid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=$get_state_id;?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="3"><a href="distributor-network?superid=<?=htmlspecialchars((string)($superstockistid), ENT_QUOTES, 'UTF-8', false);?>&&stockistid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

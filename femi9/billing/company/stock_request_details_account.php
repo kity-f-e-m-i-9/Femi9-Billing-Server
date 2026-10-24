@@ -330,7 +330,7 @@ $(document).ready(function(){
 												
 		<!------------------------------------------------------------------------------>
 		<!------------------------------------------------------------------------------>
-		<a href="approved_accounts?reqid=<?=$get_req_id;?>">
+		<a href="approved_accounts?reqid=<?=htmlspecialchars((string)($get_req_id), ENT_QUOTES, 'UTF-8', false);?>">
 <button class="btn btn-primary footersubact" type="button" onclick="return confirm('Please make a confirm!');" style="width:100%;">Approved Request</button></a>
 
 

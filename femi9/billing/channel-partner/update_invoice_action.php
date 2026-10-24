@@ -13,7 +13,7 @@ $InvoiceID = base64_decode($_POST['InvoiceID'] ?? '');
 $action    = $_POST['action']    ?? '';
 $gid       = $_POST['gid']       ?? '';
 $tblenme   = $_POST['tblenme']   ?? '1';
-$redirurl  = $_POST['redirurl']  ?? 'shop-invoice-add';
+$redirurl  = preg_replace('/[^A-Za-z0-9_\-\/]/', '', (string)($_POST['redirurl']  ?? 'shop-invoice-add'));
 
 $invnumber = RemoveSpecialChar($_POST['invnumber'] ?? '');
 $invnumber = str_replace("'", '', $invnumber);
@@ -31,7 +31,7 @@ if ($tblenme == '1') {
 $InvoiceID_enc = base64_encode($InvoiceID);
 if ((int)$chk['n'] === 0) {
     mysqli_query($db_conn, "UPDATE $tablename SET inv_number='".db_esc($invnumber)."' WHERE inv_id='".db_esc($InvoiceID)."'");
-    echo "<script>window.location='{$redirurl}.php?invuser=$invuser&&InvoiceID={$InvoiceID_enc}&&action=$action&&gid=$gid&&InvoiceUpdatedSuccess';</script>";
+    echo "<script>window.location='".preg_replace('/[^A-Za-z0-9_\-\/]/','',$redirurl).".php?invuser=".urlencode($invuser)."&&InvoiceID={$InvoiceID_enc}&&action=".urlencode($action)."&&gid=".urlencode($gid)."&&InvoiceUpdatedSuccess';</script>";
 } else {
-    echo "<script>window.location='{$redirurl}.php?invuser=$invuser&&InvoiceID={$InvoiceID_enc}&&action=$action&&gid=$gid&&invoicealready';</script>";
+    echo "<script>window.location='".preg_replace('/[^A-Za-z0-9_\-\/]/','',$redirurl).".php?invuser=".urlencode($invuser)."&&InvoiceID={$InvoiceID_enc}&&action=".urlencode($action)."&&gid=".urlencode($gid)."&&invoicealready';</script>";
 }

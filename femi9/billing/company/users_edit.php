@@ -255,7 +255,7 @@ $ex_catid = array_filter(explode("#", $catid));
 	
 <form method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!')">
 
-<input type="hidden" name="update_id" value="<?=$id;?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($id), ENT_QUOTES, 'UTF-8', false);?>">
 <input type="hidden" name="username" value="<?=$result_count_users['username'];?>">
 			
                                         <div class="example-container">

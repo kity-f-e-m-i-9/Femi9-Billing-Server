@@ -5,7 +5,7 @@ include("config.php");
  $returnid=$_REQUEST['returnid'];
 $returnid_decode=base64_decode($returnid);
  
-$urlname=$_REQUEST['urlname'];
+$urlname=preg_replace('/[^A-Za-z0-9_\-\/]/', '', (string)($_REQUEST['urlname']));
 $updatestatus=$_REQUEST['updatestatus'];
  
 //------------------UPDATE DAMAGED QTY------------------------
@@ -134,6 +134,6 @@ db_q($db_conn,$updatereject12,[$returnid_decode]);
 				}
 				
 				
-				echo "<script>window.location='".$urlname.".php?updatedsuccess';</script>";
+				echo "<script>window.location='".preg_replace('/[^A-Za-z0-9_\-\/]/','',$urlname).".php?updatedsuccess';</script>";
  
  ?>

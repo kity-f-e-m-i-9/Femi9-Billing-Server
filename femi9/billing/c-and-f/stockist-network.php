@@ -161,7 +161,7 @@ $taluk_name=$result_Taluks12['taluk'];
 <td><?php echo strtoupper($district_name);?></td>
 <td><?php echo strtoupper($taluk_name);?></td>
 </tr>
-<tr><td colspan="3"><a href="distributor-network.php?superid=<?=$superstockistid;?>&&stockistid=<?=$result_product_list['temp_id'];?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="3"><a href="distributor-network.php?superid=<?=htmlspecialchars((string)($superstockistid), ENT_QUOTES, 'UTF-8', false);?>&&stockistid=<?=$result_product_list['temp_id'];?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

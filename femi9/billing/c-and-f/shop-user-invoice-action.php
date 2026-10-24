@@ -125,7 +125,7 @@ else{$gst_type="outer";}
 	
 	if($AVMstock<$qty)
 	{
-		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&AlertStockError';</script>";
+		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&AlertStockError';</script>";
 		
 	}else{
 		
@@ -161,11 +161,11 @@ else{$gst_type="outer";}
 		db_q($db_conn,$update_stockDetails,[$update_Sales_stock,$update_Closing_stock,$pr_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 		
 		
-		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&FemiAdded';</script>";
+		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&FemiAdded';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&AlertMessage';</script>";
+		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&AlertMessage';</script>";
 	}
 		
 }

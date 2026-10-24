@@ -23,7 +23,7 @@ $s->bind_param('sssss' . 'i', $customer_id, $date, $inv_year, $inv_id, $Login_us
 $s->execute(); $s->close();
 
 if (isset($_POST['updateHeaderOnly'])) {
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&DateUpdated&&invuser=$invuser&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&DateUpdated&&invuser=".urlencode($invuser)."&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
     exit;
 }
 
@@ -79,7 +79,7 @@ $s->close();
 $available = $stockRow ? (int)$stockRow['closing_qty'] : 0;
 
 if ($available < $qty) {
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=$invuser&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".urlencode($invuser)."&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
     exit;
 }
 
@@ -89,7 +89,7 @@ $s->execute();
 $dupChk = $s->get_result()->fetch_assoc();
 $s->close();
 if ((int)$dupChk['n'] > 0) {
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=$invuser&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&action=".($_SESSION['ACTIONEDIT']??'')."';</script>";
     exit;
 }
 
@@ -112,4 +112,4 @@ $s->bind_param('sididsssi' . 'dsddddsssisi',
 );
 $s->execute(); $s->close();
 
-echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=$invuser&&action=".($_SESSION['ACTIONEDIT']??'')."&&FemiAdded';</script>";
+echo "<script>window.location='shop-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".urlencode($invuser)."&&action=".($_SESSION['ACTIONEDIT']??'')."&&FemiAdded';</script>";

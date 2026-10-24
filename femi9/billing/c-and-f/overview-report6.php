@@ -104,15 +104,15 @@ $to_date=$_REQUEST['todate'];
 												<table id="reportdash">
 												<tr>
 												<th>Invoice&nbsp;Count</th>
-												<td>:&nbsp;<?=$_REQUEST['out1'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Product&nbsp;Qty</th>
-												<td>:&nbsp;<?=$_REQUEST['out2'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Total&nbsp;Amount</th>
-												<td>:&nbsp;&#x20B9;<?=$_REQUEST['out3'];?></td>
+												<td>:&nbsp;&#x20B9;<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												</table>
                                             </div>

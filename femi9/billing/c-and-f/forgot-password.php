@@ -161,7 +161,7 @@ echo "<script>window.location='index.php?mailsentsuccess';</script>";
 			<?php if(isset($_REQUEST['mailsentsuccess'])){?><div class="alert alert-success">Password sent successfully, please check your Whatsapp.</div>
 			<?php }?>
 			<?php include("validate-scripts.php");?>
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 		
 		<?php function GeraHash($qtd){ $Caracteres = '123456789abcd'; 
 $QuantidadeCaracteres = strlen($Caracteres); $QuantidadeCaracteres--; $Hash=NULL; 

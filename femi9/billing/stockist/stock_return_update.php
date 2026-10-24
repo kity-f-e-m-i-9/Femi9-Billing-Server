@@ -6,7 +6,7 @@ error_reporting(0);
 
 $returnid        = $_REQUEST['returnid'] ?? '';
 $returnid_decode = (string) base64_decode($returnid);
-$urlname         = $_REQUEST['urlname']      ?? 'stock_return_pending';
+$urlname         = preg_replace('/[^A-Za-z0-9_\-\/]/', '', (string)($_REQUEST['urlname']      ?? 'stock_return_pending'));
 $updatestatus    = $_REQUEST['updatestatus'] ?? '';
 
 // Fetch return header
@@ -20,7 +20,7 @@ $hdr = $stmtHdr->get_result()->fetch_assoc();
 $stmtHdr->close();
 
 if (!$hdr) {
-    echo "<script>window.location='{$urlname}.php?updatedsuccess';</script>";
+    echo "<script>window.location='".preg_replace('/[^A-Za-z0-9_\-\/]/','',$urlname).".php?updatedsuccess';</script>";
     exit;
 }
 
@@ -168,5 +168,5 @@ if ($updatestatus === 'reject') {
     }
 }
 
-echo "<script>window.location='{$urlname}.php?updatedsuccess';</script>";
+echo "<script>window.location='".preg_replace('/[^A-Za-z0-9_\-\/]/','',$urlname).".php?updatedsuccess';</script>";
 ?>

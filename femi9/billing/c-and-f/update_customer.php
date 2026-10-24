@@ -91,7 +91,7 @@ else
 									<table class="headertble">
 									<tr>
 									<td><?php echo $title;?></td>
-									<td><a href="<?=$backlink;?>" title="Go Back">&#9776;</a></td>
+									<td><a href="<?=htmlspecialchars((string)($backlink), ENT_QUOTES, 'UTF-8', false);?>" title="Go Back">&#9776;</a></td>
 									</tr>
 									</table>
 									</h1>
@@ -150,8 +150,8 @@ else
 										
 				<form action="update_customer_action" method="post" enctype="multipart/form-data" onsubmit="return confirm('Please make a confirm!')">
 				
-				<input type="hidden" name="invid" value="<?=$invid;?>"/>
-				<input type="hidden" name="invuser" value="<?=$_REQUEST['invuser'];?>"/>
+				<input type="hidden" name="invid" value="<?=htmlspecialchars((string)($invid), ENT_QUOTES, 'UTF-8', false);?>"/>
+				<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>"/>
 				<input type="hidden" name="old_customer_id" value="<?=$CuSTID;?>"/>
 				
 
@@ -166,7 +166,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintstock").innerHTML=xmlhttp.responseText;}}
-var invuser="<?=$getinvuser;?>";
+var invuser="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>";
 var oldcustomerid="<?=$CuSTID;?>";
 xmlhttp.open("GET","loadstockcheck2.php?q="+str + '&invuser='+ invuser + '&oldcustomerid='+ oldcustomerid,true);
 xmlhttp.send();}

@@ -85,7 +85,7 @@ error_reporting(0);
 									}
 									?>
 									
-<form action="<?=$_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data">
+<form action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" method="post" enctype="multipart/form-data">
 
                                         <div class="example-container">
                                             <div class="example-content">

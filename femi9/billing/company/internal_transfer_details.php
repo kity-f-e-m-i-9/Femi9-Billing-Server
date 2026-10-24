@@ -204,7 +204,7 @@ $i= $start_from;
                                                             </div>
 				<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_invoice_action_itr">	
 									
-				<input type="hidden" name="tempid" value="<?php echo $_REQUEST['tempid'];?>">
+				<input type="hidden" name="tempid" value="<?php echo htmlspecialchars((string)($_REQUEST['tempid']), ENT_QUOTES, 'UTF-8', false);?>">
 															
                                                  <div class="example-content" style="padding:20px;">
                                                 <div class="form-floating mb-3">
@@ -278,7 +278,7 @@ $i= $start_from;
 													        <?php if($PR_returnable > 0){ ?>
 													        <a href="#" class="action-link" title="Return Stock" data-bs-toggle="modal" data-bs-target="#returnModal<?=$ResultRecords['id'];?>"><i class="material-icons-outlined" style="font-size:17px;color:#f59e0b;">undo</i></a>
 													        <?php } ?>
-													        <a href="internal_transfer_delete?Roowid=<?=$RowID;?>&&tempid=<?=$tempid;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <a href="internal_transfer_delete?Roowid=<?=$RowID;?>&&tempid=<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 
 													    <?php if($PR_returnable > 0){ ?>
@@ -291,7 +291,7 @@ $i= $start_from;
 													                </div>
 													                <form method="post" onsubmit="return confirm('Return this quantity to the source godown?');" action="internal_transfer_return_action">
 													                    <input type="hidden" name="Roowid" value="<?=$RowID;?>">
-													                    <input type="hidden" name="tempid" value="<?=$tempid;?>">
+													                    <input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>">
 													                    <div class="example-content" style="padding:20px;">
 													                        <div class="form-floating mb-3">
 													                            <input type="number" name="return_qty" placeholder="Quantity to Return" class="form-control" id="returnQty<?=$ResultRecords['id'];?>" min="1" max="<?=$PR_returnable;?>" required>

@@ -45,6 +45,6 @@ if (isset($_REQUEST['inv_id'])) {
     $stmt->execute();
     $stmt->close();
 
-    echo "<script>window.location='invoice?InvoiceID={$invoice_id_encode}&&DeleteSuccess&&ActionRemove';</script>";
+    echo "<script>window.location='invoice?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&ActionRemove';</script>";
 }
 ?>

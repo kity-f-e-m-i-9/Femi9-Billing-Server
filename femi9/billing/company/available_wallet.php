@@ -136,7 +136,7 @@ $tablename_USER=base64_decode($_REQUEST['tablename']);
 			<?php if($se_usertype==NULL){?>
 			<option value="" hidden>Select Usertype</option>
 			<?php }else{?>
-			<option value="<?=$se_usertype;?>" hidden><?=$se_usertype;?></option>
+			<option value="<?=htmlspecialchars((string)($se_usertype), ENT_QUOTES, 'UTF-8', false);?>" hidden><?=htmlspecialchars((string)($se_usertype), ENT_QUOTES, 'UTF-8', false);?></option>
 			<?php }?>
 			<option value="super_stockiest">super_stockiest</option>
 			<option value="stockiest">stockiest</option>

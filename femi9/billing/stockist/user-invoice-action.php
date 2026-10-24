@@ -13,7 +13,7 @@ if(isset($_REQUEST['addInvoice']))
 	if($_REQUEST['invoice_number_accept']==0)
 	{
 	$_SESSION['errorMessage']="Invoice Number already exists!";
-	echo "<script>window.location='user-invoice-add.php?invoicealready&&invuser=$invuser';</script>";
+	echo "<script>window.location='user-invoice-add.php?invoicealready&&invuser=".urlencode($invuser)."';</script>";
 	}else{
 	$inv_number=str_replace("'","",$_REQUEST['inv_number']);
 	$id_only="0";
@@ -134,7 +134,7 @@ else{$gst_type="outer";}
 	
 	if($AVMstock<$qty)
 	{
-		echo "<script>window.location='user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".$invuser."&&AlertStockError&&action=".$_SESSION['ACTIONEDIT']."';</script>";
+		echo "<script>window.location='user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".urlencode($invuser)."&&AlertStockError&&action=".urlencode($_SESSION['ACTIONEDIT'])."';</script>";
 		
 	}else{
 		
@@ -158,11 +158,11 @@ else{$gst_type="outer";}
 		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$invuser,$customer_id,$Login_user_TYPEvl,$Login_user_IDvl,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_percentage,$discount_amount,$gst_type,$hsn,$date,$rwpoints,$buyer_gsttype,$rwpoints]);
 		
 		
-		echo "<script>window.location='user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".$invuser."&&FemiAdded&&action=".$_SESSION['ACTIONEDIT']."';</script>";
+		echo "<script>window.location='user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".urlencode($invuser)."&&FemiAdded&&action=".urlencode($_SESSION['ACTIONEDIT'])."';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".$invuser."&&AlertMessage&&action=".$_SESSION['ACTIONEDIT']."';</script>";
+		echo "<script>window.location='user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&AlertMessage&&action=".urlencode($_SESSION['ACTIONEDIT'])."';</script>";
 	}
 		
 }

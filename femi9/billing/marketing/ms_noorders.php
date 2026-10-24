@@ -99,7 +99,7 @@ else
                         </div>
 
                         <!-- Search Form -->
-                        <form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+                        <form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
                             <div class="overviewcontainar">
 
                                 <div id="searchleftcont">
@@ -133,7 +133,7 @@ else
                                         <?php if(empty($se_msid)): ?>
                                         <option value="" hidden>Select</option>
                                         <?php else: ?>
-                                        <option value="<?=$se_msid?>" hidden><?=strtoupper($result_msDetails12['ms_name'])?>, <?=$result_msDetails12['ms_mobile']?></option>
+                                        <option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false)?>" hidden><?=strtoupper($result_msDetails12['ms_name'])?>, <?=$result_msDetails12['ms_mobile']?></option>
                                         <?php endif; ?>
                                         <?php
                                         $fetch_ms = mysqli_query($db_conn, "SELECT * FROM marketing_staff ORDER BY ms_name ASC");

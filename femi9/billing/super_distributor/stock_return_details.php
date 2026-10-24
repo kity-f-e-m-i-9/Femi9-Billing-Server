@@ -9,7 +9,7 @@ include("config.php");
 				$fetch_details123=db_q($db_conn,$select_details123,[$returnid_decode]);
 				$result_details123=mysqli_fetch_array($fetch_details123);
 				
-				$urlname=$_REQUEST['pagename'];
+				$urlname=preg_replace('/[^A-Za-z0-9_\-\/]/', '', (string)($_REQUEST['pagename']));
  
  ?>
 <!DOCTYPE html>
@@ -69,7 +69,7 @@ include("config.php");
                             <div class="col">
                                 <div class="page-description">
 								
-								<a href="<?=$urlname;?>.php" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+								<a href="<?=htmlspecialchars((string)($urlname), ENT_QUOTES, 'UTF-8', false);?>.php" id="linkbackvl">&#8630;&nbsp;Go Back</a>
 								
                                     <h1>
 									Stock Return Details
@@ -159,8 +159,8 @@ $i= $start_from;
 													
 <form action="stock_return_update.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
 
-<input type="hidden" name="returnid" value="<?=$returnid;?>">	
-<input type="hidden" name="urlname" value="<?=$urlname;?>">									   
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($returnid), ENT_QUOTES, 'UTF-8', false);?>">	
+<input type="hidden" name="urlname" value="<?=htmlspecialchars((string)($urlname), ENT_QUOTES, 'UTF-8', false);?>">									   
 
                                         <div class="example-container">
                                         <div class="example-content">

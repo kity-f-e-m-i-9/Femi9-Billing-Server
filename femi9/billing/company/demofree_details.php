@@ -156,7 +156,7 @@ $i= $start_from;
 													
 																										<td>
 													    <div class="actions-group">
-													        <?php if ($canDeleteDemoFree): ?><a href="demofree_delete?Roowid=<?=$RowID;?>&&tempid=<?=$tempid;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a><?php endif; ?>
+													        <?php if ($canDeleteDemoFree): ?><a href="demofree_delete?Roowid=<?=$RowID;?>&&tempid=<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a><?php endif; ?>
 													    </div>
 													</td>
                                                 </tr>

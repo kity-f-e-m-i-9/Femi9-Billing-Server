@@ -147,7 +147,7 @@ if ($selected_tp_db_id > 0) {
                                     <h5 class="card-title mb-0">Select Territory Partner</h5>
                                 </div>
                                 <div class="card-body">
-                                    <form method="get" action="<?= $_SERVER['PHP_SELF']; ?>" id="tpSelectForm">
+                                    <form method="get" action="<?= htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>" id="tpSelectForm">
                                         <div class="mb-3">
                                             <select name="tp_db_id" id="tpSelect" class="form-control" required>
                                                 <option value="">— Choose a Territory Partner —</option>

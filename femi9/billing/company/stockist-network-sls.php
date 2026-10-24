@@ -89,7 +89,7 @@ $select_stateList="select * from `state` where id=?";
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
-								<a href="users-network2-sls?state_id=<?=$get_state_id;?>&&fromdate=<?=$get_from_date;?>&&todate=<?=$get_to_date;?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+								<a href="users-network2-sls?state_id=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>&&fromdate=<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>&&todate=<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false);?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
                                     <h1>
 									<table class="headertble">
 									<tr>
@@ -214,7 +214,7 @@ while($result_totalsls_invcount_qty=mysqli_fetch_array($fetch_totalsls_invcount_
 
 }
 ?>
-<a href="JavaScript:newPopup('prdetails?userid=<?=$userid_invoice;?>&&usertype=<?=$usertype_invoice?>&&frd=<?=$get_from_date;?>&&tod=<?=$get_to_date;?>');" style="text-decoration:none;">
+<a href="JavaScript:newPopup('prdetails?userid=<?=$userid_invoice;?>&&usertype=<?=$usertype_invoice?>&&frd=<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>&&tod=<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false);?>');" style="text-decoration:none;">
 <table>
 <tr>
 <th>Total Sales Count</th>
@@ -252,7 +252,7 @@ function newPopup(url) {
 <!--------------------COUNT AREA END--****---------------------->
 
 
-<tr><td colspan="3"><a href="distributor-network-sls?superid=<?=$superstockistid;?>&&stockistid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=$get_state_id;?>&&frd=<?=$get_from_date;?>&&tod=<?=$get_to_date;?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="3"><a href="distributor-network-sls?superid=<?=htmlspecialchars((string)($superstockistid), ENT_QUOTES, 'UTF-8', false);?>&&stockistid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>&&frd=<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>&&tod=<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false);?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

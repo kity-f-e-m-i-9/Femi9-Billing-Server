@@ -193,7 +193,7 @@ else{ $amount_received_fully="0";}
 													
 <form action="shop-user-invoice-action2.php" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="inv_id" value="<?=$Invoice_ID;?>">
+<input type="hidden" name="inv_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>">
 <input type="hidden" name="invuser" value="<?=$getinvuser?>">
 
 <div class="example-container">
@@ -341,7 +341,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 			if($result_count_return==0){
 			?>
 			
-<a href="shop-user-del-inv-product.php?inv_id=<?php echo $Invoice_ID_encode;?>&&rowid=<?php echo $ItemRowid;?>&&&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="shop-user-del-inv-product.php?inv_id=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?php echo $ItemRowid;?>&&&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 
 <?php } else{ echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";}?>
 
@@ -378,7 +378,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
                                             <div class="col-lg-3">
                                                 <div class="invoice-info">
 <form action="shop-user-invoice-submit.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
-<input type="hidden" name="invoice_id" value="<?=$Invoice_ID;?>"/>
+<input type="hidden" name="invoice_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
             <p class="bold">Subtotal <span>
@@ -563,7 +563,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
                                             <div class="col-lg-3">
                                                 <div class="invoice-info">
 
-<input type="hidden" name="invoice_id" value="<?=$Invoice_ID;?>"/>
+<input type="hidden" name="invoice_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
             <p><b>Subtotal</b>
@@ -878,10 +878,10 @@ while($result_Products_list=mysqli_fetch_array($fetch_Products_list))
                                                             </div>
 				<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_invoice_action">	
 									
-				<input type="hidden" name="invuser" value="<?php echo $_REQUEST['invuser'];?>">
-				<input type="hidden" name="InvoiceID" value="<?php echo $_REQUEST['InvoiceID'];?>">
-				<input type="hidden" name="action" value="<?php echo $_REQUEST['action'];?>">
-				<input type="hidden" name="gid" value="<?php echo $_REQUEST['gid'];?>">
+				<input type="hidden" name="invuser" value="<?php echo htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>">
+				<input type="hidden" name="InvoiceID" value="<?php echo htmlspecialchars((string)($_REQUEST['InvoiceID']), ENT_QUOTES, 'UTF-8', false);?>">
+				<input type="hidden" name="action" value="<?php echo htmlspecialchars((string)($_REQUEST['action']), ENT_QUOTES, 'UTF-8', false);?>">
+				<input type="hidden" name="gid" value="<?php echo htmlspecialchars((string)($_REQUEST['gid']), ENT_QUOTES, 'UTF-8', false);?>">
 				<input type="hidden" name="redirurl" value="shop-user-invoice-add">
 				<input type="hidden" name="tblenme" value="1">
 															

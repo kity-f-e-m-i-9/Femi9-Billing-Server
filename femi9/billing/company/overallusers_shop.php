@@ -313,7 +313,7 @@ $fetch_product_list  = mysqli_query($db_conn, $select_product_list);
                                                                     </div>
                                                                     <form method="post" onsubmit="return confirm('Please confirm!');" enctype="multipart/form-data" action="update_mobile_action">
                                                                         <input type="hidden" name="old_mobile_number" value="<?=$result_product_list["mobile_number"];?>">
-                                                                        <input type="hidden" name="update_usertype"   value="<?=$getinvuser;?>">
+                                                                        <input type="hidden" name="update_usertype"   value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>">
                                                                         <div class="example-content" style="padding:20px;">
                                                                             <div class="form-floating mb-3">
                                                                                 <input type="number" name="new_mobile_number" placeholder="New Mobile Number" min="0" class="form-control">

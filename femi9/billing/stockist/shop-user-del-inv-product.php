@@ -11,7 +11,7 @@ if (isset($_REQUEST['inv_id'])) {
 
     $rowid = (int) base64_decode($_REQUEST['rowid'] ?? '');
     if ($rowid <= 0) {
-        echo "<script>window.location='shop-user-invoice-add.php?InvoiceID={$invoice_id_encode}&&invuser={$invuser}&&ActionRemove&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "';</script>";
+        echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&invuser=".urlencode($invuser)."&&ActionRemove&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "';</script>";
         exit;
     }
 
@@ -89,6 +89,6 @@ if (isset($_REQUEST['inv_id'])) {
     }
 
     $actionEdit = $_SESSION['ACTIONEDIT'] ?? '';
-    echo "<script>window.location='shop-user-invoice-add.php?InvoiceID={$invoice_id_encode}&&DeleteSuccess&&invuser={$invuser}&&ActionRemove&&action={$actionEdit}';</script>";
+    echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&ActionRemove&&action={$actionEdit}';</script>";
 }
 ?>

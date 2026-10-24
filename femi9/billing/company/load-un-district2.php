@@ -2,7 +2,7 @@
 
 $state_id=$_REQUEST['subcourseID'];
 ?>
-<select name="dist_id" class="form-control" onChange="getCity(<?=$state_id;?>,this.value)">
+<select name="dist_id" class="form-control" onChange="getCity(<?=htmlspecialchars((string)($state_id), ENT_QUOTES, 'UTF-8', false);?>,this.value)">
 <option value="" hidden="">Select</option>
 <?php 
 $select_product_list="select * from district where state_id=? order by dist_name asc";

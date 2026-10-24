@@ -71,7 +71,7 @@ if(isset($_REQUEST['inv_id']))
 			$db_conn->rollback();
 			error_log("customer-user-del-inv-product.php error: " . $e->getMessage());
 			$_SESSION['errorMessage'] = "Failed to remove item. Please try again.";
-			echo "<script>window.location='customer-user-invoice-add?InvoiceID=".$invoice_id_encode."&&gid=".$Login_user_IDvl."';</script>";
+			echo "<script>window.location='customer-user-invoice-add?InvoiceID=".urlencode($invoice_id_encode)."&&gid=".$Login_user_IDvl."';</script>";
 			exit;
 		}
 	}
@@ -84,7 +84,7 @@ if(isset($_REQUEST['inv_id']))
 		$stmtDel->close();
 	}
 
-	echo "<script>window.location='customer-user-invoice-add?InvoiceID=".$invoice_id_encode."&&DeleteSuccess&&ActionRemove&&gid=".$Login_user_IDvl."';</script>";
+	echo "<script>window.location='customer-user-invoice-add?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&ActionRemove&&gid=".$Login_user_IDvl."';</script>";
 
 }
 ?>

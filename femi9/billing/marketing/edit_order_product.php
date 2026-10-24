@@ -292,7 +292,7 @@ if($result_count_dist['numShop']==0)
 <form method="post" enctype="multipart/form-data" id="editOrderForm" onsubmit="return confirmEditOrderLocation();">
 
 <input type="hidden" name="update_no_order" value="1">
-<input type="hidden" name="update_orderid" value="<?=$orderid;?>">
+<input type="hidden" name="update_orderid" value="<?=htmlspecialchars((string)($orderid), ENT_QUOTES, 'UTF-8', false);?>">
 <input type="hidden" name="ms_id" value="<?=$result_product_list['ms_id'];?>">
 <input type="hidden" name="order_date" value="<?=$result_product_list['order_date'];?>">
 <input type="hidden" name="latitude"  id="edit_order_latitude"  value="<?=htmlspecialchars($result_product_list['latitude'] ?? '');?>">

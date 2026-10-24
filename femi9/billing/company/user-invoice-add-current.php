@@ -199,7 +199,7 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                             $temp_time = date("gis");
                                             $inv_id = $inv_randum_number . $invidprefix . $temp_date . $temp_time;
                                             ?>
-                                            <input type="hidden" name="inv_id" value="<?php echo $inv_id; ?>">
+                                            <input type="hidden" name="inv_id" value="<?php echo htmlspecialchars((string)($inv_id), ENT_QUOTES, 'UTF-8', false); ?>">
                                             <input type="hidden" name="randum_number" value="<?php echo $randum_number; ?>">
                                             
                                             <!-- Step 1: Company Profile -->

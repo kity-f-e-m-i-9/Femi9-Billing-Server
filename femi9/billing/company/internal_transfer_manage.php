@@ -166,7 +166,7 @@ if (isset($_SESSION['autoTransferShortfalls'])) {
 									$se_billType = in_array($_REQUEST['billtype'] ?? '', ['napkin','diaper'], true) ? $_REQUEST['billtype'] : 'all';
 									?>
 
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 <div class="overviewcontainar">
 <div id="searchleftcont">
 <label class="form-label">From Date</label>

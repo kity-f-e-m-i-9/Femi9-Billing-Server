@@ -177,7 +177,7 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 									
  <?php include("validate-scripts.php");?>                                      
 <form method="post" enctype="multipart/form-data">
-<input type="hidden" name="updateid" value="<?=$prid;?>">
+<input type="hidden" name="updateid" value="<?=htmlspecialchars((string)($prid), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">

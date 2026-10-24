@@ -904,14 +904,14 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         districtSelect.html('<option value="">All Districts</option>');
                         
                         response.data.forEach(function(district) {
-                            const selected = '<?php echo $filter_payer_district_id; ?>' == district.id ? 'selected' : '';
+                            const selected = '<?php echo htmlspecialchars((string)($filter_payer_district_id), ENT_QUOTES, 'UTF-8', false); ?>' == district.id ? 'selected' : '';
                             districtSelect.append(
                                 '<option value="' + escapeHtml(district.id) + '" ' + selected + '>' + 
                                 escapeHtml(district.name) + '</option>'
                             );
                         });
                         
-                        if ('<?php echo $filter_payer_district_id; ?>') {
+                        if ('<?php echo htmlspecialchars((string)($filter_payer_district_id), ENT_QUOTES, 'UTF-8', false); ?>') {
                             loadPayerNames();
                         }
                     }
@@ -971,14 +971,14 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         districtSelect.html('<option value="">All Districts</option>');
                         
                         response.data.forEach(function(district) {
-                            const selected = '<?php echo $filter_receiver_district_id; ?>' == district.id ? 'selected' : '';
+                            const selected = '<?php echo htmlspecialchars((string)($filter_receiver_district_id), ENT_QUOTES, 'UTF-8', false); ?>' == district.id ? 'selected' : '';
                             districtSelect.append(
                                 '<option value="' + escapeHtml(district.id) + '" ' + selected + '>' + 
                                 escapeHtml(district.name) + '</option>'
                             );
                         });
                         
-                        if ('<?php echo $filter_receiver_district_id; ?>') {
+                        if ('<?php echo htmlspecialchars((string)($filter_receiver_district_id), ENT_QUOTES, 'UTF-8', false); ?>') {
                             loadReceiverNames();
                         }
                     }

@@ -331,19 +331,19 @@ $renderMovementTable = function($thisDate, $idsSqlForLeaf, $warehouseCondForBuck
 						// making the net figure negative — mathematically correct (Closing
 						// below already accounts for it) but reads oddly as "input". Shown
 						// as 0 with a tooltip instead of a bare negative number. ?>
-						<td align="right"<?php if ($m['input_qty'] < 0): ?> title="Net figure is <?=$m['input_qty'];?> (a same-day reversal outweighed new input); shown as 0"<?php endif; ?>><?php echo max(0, $m['input_qty']);?></td>
+						<td align="right"<?php if ($m['input_qty'] < 0): ?> title="Net figure is <?=htmlspecialchars((string)($m['input_qty']), ENT_QUOTES, 'UTF-8', false);?> (a same-day reversal outweighed new input); shown as 0"<?php endif; ?>><?php echo max(0, $m['input_qty']);?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo max(0, $m['input_qty'])*$PiecesPerPack;?></td><?php endif; ?>
-						<td align="right"><?php echo $m['total_sales'];?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($m['total_sales']), ENT_QUOTES, 'UTF-8', false);?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sales']*$PiecesPerPack;?></td><?php endif; ?>
-						<td align="right"><?php echo $m['dfd_qty'];?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($m['dfd_qty']), ENT_QUOTES, 'UTF-8', false);?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['dfd_qty']*$PiecesPerPack;?></td><?php endif; ?>
-						<td align="right"><?php echo $m['total_sales_return'];?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($m['total_sales_return']), ENT_QUOTES, 'UTF-8', false);?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['total_sales_return']*$PiecesPerPack;?></td><?php endif; ?>
-						<td align="right"><?php if ($m['internal_transfer'] > 0): ?><a href="javascript:void(0)" class="intrn-transfer-link" data-product-id="<?=$report_prid;?>" data-godown-id="<?=htmlspecialchars($idsSqlForLeaf, ENT_QUOTES, 'UTF-8');?>" data-warehouse="<?=htmlspecialchars((string)$whParamForBucket, ENT_QUOTES, 'UTF-8');?>" data-from-date="<?=$thisDate;?>" data-to-date="<?=$thisDate;?>"><?php echo $m['internal_transfer'];?></a><?php else: ?><?php echo $m['internal_transfer'];?><?php endif; ?></td>
+						<td align="right"><?php if ($m['internal_transfer'] > 0): ?><a href="javascript:void(0)" class="intrn-transfer-link" data-product-id="<?=$report_prid;?>" data-godown-id="<?=htmlspecialchars($idsSqlForLeaf, ENT_QUOTES, 'UTF-8');?>" data-warehouse="<?=htmlspecialchars((string)$whParamForBucket, ENT_QUOTES, 'UTF-8');?>" data-from-date="<?=$thisDate;?>" data-to-date="<?=$thisDate;?>"><?php echo htmlspecialchars((string)($m['internal_transfer']), ENT_QUOTES, 'UTF-8', false);?></a><?php else: ?><?php echo htmlspecialchars((string)($m['internal_transfer']), ENT_QUOTES, 'UTF-8', false);?><?php endif; ?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['internal_transfer']*$PiecesPerPack;?></td><?php endif; ?>
-						<td align="right"><?php if ($m['movement_to_cp'] > 0): ?><a href="javascript:void(0)" class="cp-movement-link" data-product-id="<?=$report_prid;?>" data-godown-id="<?=htmlspecialchars($idsSqlForLeaf, ENT_QUOTES, 'UTF-8');?>" data-warehouse="<?=htmlspecialchars((string)$whParamForBucket, ENT_QUOTES, 'UTF-8');?>" data-from-date="<?=$thisDate;?>" data-to-date="<?=$thisDate;?>"><?php echo $m['movement_to_cp'];?></a><?php else: ?><?php echo $m['movement_to_cp'];?><?php endif; ?></td>
+						<td align="right"><?php if ($m['movement_to_cp'] > 0): ?><a href="javascript:void(0)" class="cp-movement-link" data-product-id="<?=$report_prid;?>" data-godown-id="<?=htmlspecialchars($idsSqlForLeaf, ENT_QUOTES, 'UTF-8');?>" data-warehouse="<?=htmlspecialchars((string)$whParamForBucket, ENT_QUOTES, 'UTF-8');?>" data-from-date="<?=$thisDate;?>" data-to-date="<?=$thisDate;?>"><?php echo htmlspecialchars((string)($m['movement_to_cp']), ENT_QUOTES, 'UTF-8', false);?></a><?php else: ?><?php echo htmlspecialchars((string)($m['movement_to_cp']), ENT_QUOTES, 'UTF-8', false);?><?php endif; ?></td>
 						<?php if (is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['movement_to_cp']*$PiecesPerPack;?></td><?php endif; ?>
-						<?php if ($showManufPurchases): ?><td align="right"><?php echo $m['manuf_qty'];?></td><?php endif; ?>
+						<?php if ($showManufPurchases): ?><td align="right"><?php echo htmlspecialchars((string)($m['manuf_qty']), ENT_QUOTES, 'UTF-8', false);?></td><?php endif; ?>
 						<?php if ($showManufPurchases && is_neksomo_login($db_conn)): ?><td align="right"><?php echo $m['manuf_qty']*$PiecesPerPack;?></td><?php endif; ?>
 						<?php // Closing stock is only meaningful once scoped to specific company
 						// godown(s) — the "all channels" movement figures above (used when no

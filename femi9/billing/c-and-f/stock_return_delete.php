@@ -47,6 +47,6 @@ $invnumber_encode=base64_encode($invnumber);
 	$delRecord="delete from user_return_stock_items where id=?";
 	db_q($db_conn,$delRecord,[$rowid_decode]);
 	
-	echo "<script>window.location='stock_return_add2.php?returnid=$returnid&&invnumber=$invnumber_encode&&DeleteSuccess';</script>";
+	echo "<script>window.location='stock_return_add2.php?returnid=".urlencode($returnid)."&&invnumber=$invnumber_encode&&DeleteSuccess';</script>";
 
 ?>

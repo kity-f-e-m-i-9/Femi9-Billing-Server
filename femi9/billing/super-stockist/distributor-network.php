@@ -83,7 +83,7 @@ $stockistid=$_REQUEST['stockistid'];
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
-								<a href="stockist-network.php?ssid=<?=$superstockistid;?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+								<a href="stockist-network.php?ssid=<?=htmlspecialchars((string)($superstockistid), ENT_QUOTES, 'UTF-8', false);?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
                                     <h1>
 									<table class="headertble">
 									<tr>
@@ -203,7 +203,7 @@ $pincodeshow=$result_pincodelist['pincode'];
 <td><?php echo strtoupper($taluk_name);?></td>
 <td><?php echo strtoupper($pincodeshow);?></td>
 </tr>
-<tr><td colspan="4"><a href="shop-network.php?superid=<?=$superstockistid;?>&&stockistid=<?=$stockistid;?>&&distributorid=<?=$result_product_list['temp_id'];?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="4"><a href="shop-network.php?superid=<?=htmlspecialchars((string)($superstockistid), ENT_QUOTES, 'UTF-8', false);?>&&stockistid=<?=htmlspecialchars((string)($stockistid), ENT_QUOTES, 'UTF-8', false);?>&&distributorid=<?=$result_product_list['temp_id'];?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

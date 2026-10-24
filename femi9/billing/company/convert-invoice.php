@@ -106,7 +106,7 @@ $gstamount_singlepr="0";
 
 	if($AVMstock===null || $AVMstock<$qty)
 	{
-		echo "<script>window.location='stock_request_details?reqid=".$reqid_encode."&&InvalidStock&&AlertStockError';</script>";
+		echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."&&InvalidStock&&AlertStockError';</script>";
 		
 	}else{
 		
@@ -136,15 +136,15 @@ $gstamount_singlepr="0";
 				'user_invoice', $inv_id, $Login_user_IDvl
 			);
 		} catch (StockException $e) {
-			echo "<script>window.location='stock_request_details?reqid=".$reqid_encode."&&InvalidStock&&AlertStockError';</script>";
+			echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."&&InvalidStock&&AlertStockError';</script>";
 			exit;
 		}
 
-		echo "<script>window.location='stock_request_details?reqid=".$reqid_encode."&&AddedSuccess&&&&FemiAdded';</script>";
+		echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."&&AddedSuccess&&&&FemiAdded';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='stock_request_details?reqid=".$reqid_encode."&&ItemAlreadyExists&&AlertMessage';</script>";
+		echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."&&ItemAlreadyExists&&AlertMessage';</script>";
 	}
 		
 }

@@ -216,7 +216,7 @@ if (isset($_SESSION['errorMessage'])) {
 <div class="overviewcontainar">
 <div id="searchleftcont">
 <label class="form-label">Invoice Number</label>
-<input type="text" required="" name="se_invoice" value="<?=$se_invoice;?>" class="form-control">
+<input type="text" required="" name="se_invoice" value="<?=htmlspecialchars((string)($se_invoice), ENT_QUOTES, 'UTF-8', false);?>" class="form-control">
 </div>
 
 <div id="searchbuttoncont">

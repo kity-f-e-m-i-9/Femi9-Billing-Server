@@ -66,7 +66,7 @@ if(isset($_REQUEST['convertinvoice']))
 	
 	if($AVMstock<$qty)
 	{
-		echo "<script>window.location='stock_request_details.php?reqid=".$reqid_encode."&&InvalidStock&&AlertStockError';</script>";
+		echo "<script>window.location='stock_request_details.php?reqid=".urlencode($reqid_encode)."&&InvalidStock&&AlertStockError';</script>";
 		
 	}else{
 		
@@ -112,11 +112,11 @@ if(isset($_REQUEST['convertinvoice']))
 		db_q($db_conn,$update_stockDetails,[$update_Sales_stock12,$update_Closing_stock12,$prid,$invuser,$customer_id]);
 		
 		
-		echo "<script>window.location='stock_request_details.php?reqid=".$reqid_encode."&&AddedSuccess&&&&FemiAdded';</script>";
+		echo "<script>window.location='stock_request_details.php?reqid=".urlencode($reqid_encode)."&&AddedSuccess&&&&FemiAdded';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='stock_request_details.php?reqid=".$reqid_encode."&&ItemAlreadyExists&&AlertMessage';</script>";
+		echo "<script>window.location='stock_request_details.php?reqid=".urlencode($reqid_encode)."&&ItemAlreadyExists&&AlertMessage';</script>";
 	}
 		
 }

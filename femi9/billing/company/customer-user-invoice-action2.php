@@ -97,7 +97,7 @@ if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
 	if($AVMstock<$qty)
 	{
 		
-		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".$godownid."';</script>";
+		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".urlencode($godownid)."';</script>";
 		exit;
 		
 	}else{
@@ -117,12 +117,12 @@ if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
 		?,?,?)";
 		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$Login_user_TYPEvl,$Login_user_IDvl,$customer_id,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_percentage,$discount_amount,$gst_type,$hsn,$date,$buyer_gsttype,$rwpoints,$rwpoints]);
 		
-		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded&&gid=".$godownid."';</script>";
+		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded&&gid=".urlencode($godownid)."';</script>";
 		exit;
 		
 	}else{ 
 		
-		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&AlertMessage&&gid=".$godownid."';</script>";
+		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&AlertMessage&&gid=".urlencode($godownid)."';</script>";
 		exit;
 	}
 		

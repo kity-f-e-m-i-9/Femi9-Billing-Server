@@ -178,7 +178,7 @@ while($result_totalsls_invcount_qty=mysqli_fetch_array($fetch_totalsls_invcount_
 
 }
 ?>
-<a href="JavaScript:newPopup('prdetails?userid=<?=$userid_invoice;?>&&usertype=<?=$usertype_invoice?>&&frd=<?=$get_from_date;?>&&tod=<?=$get_to_date;?>');" style="text-decoration:none;">
+<a href="JavaScript:newPopup('prdetails?userid=<?=$userid_invoice;?>&&usertype=<?=$usertype_invoice?>&&frd=<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>&&tod=<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false);?>');" style="text-decoration:none;">
 <table>
 <tr>
 <th>Total Sales Count</th>
@@ -216,7 +216,7 @@ function newPopup(url) {
 <!--------------------COUNT AREA END--****---------------------->
 
 
-<tr><td colspan="2"><a href="stockist-network-sls?ssid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=$get_state_id;?>&&frd=<?=$get_from_date;?>&&tod=<?=$get_to_date?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="2"><a href="stockist-network-sls?ssid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>&&frd=<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>&&tod=<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false)?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

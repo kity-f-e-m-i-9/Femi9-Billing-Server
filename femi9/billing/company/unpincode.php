@@ -41,7 +41,7 @@ if($state_id!=NULL)
 										$talukname=$result_taluk['taluk'];
 										}	
 	
-	//echo "<script>window.location='untaluk?sestate=".$state_id."&&sedist=".$dist_id."';</script>";
+	//echo "<script>window.location='untaluk?sestate=".urlencode($state_id)."&&sedist=".urlencode($dist_id)."';</script>";
 }
 ?>
 <!DOCTYPE html>
@@ -102,7 +102,7 @@ if($state_id!=NULL)
 									<td><?php echo $title;?></td>
 									<td>
 									<?php if($state_id!=NULL){?>
-									<a href="export_unpincode?stid=<?=$state_id;?>&&did=<?=$dist_id;?>&&tid=<?=$talukid;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
+									<a href="export_unpincode?stid=<?=htmlspecialchars((string)($state_id), ENT_QUOTES, 'UTF-8', false);?>&&did=<?=htmlspecialchars((string)($dist_id), ENT_QUOTES, 'UTF-8', false);?>&&tid=<?=htmlspecialchars((string)($talukid), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
 									<?php }else{?>
 									<a href="#" title="Export" onclick="return confirm('Please select any one search criteria');"><img src="../../assets/images/excel-3-32.png"></a>
 									<?php }?>
@@ -184,7 +184,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 							   <?php if($state_id==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$state_id;?>" hidden=""><?=$state_name;?></option>
+							   <option value="<?=htmlspecialchars((string)($state_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$state_name;?></option>
 							   <?php }?>
 							   <?php $select_stateList="select * from `state` order by `st_name` asc";
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
@@ -197,11 +197,11 @@ function getXMLHTTP() { //fuction to return the xml http object
 							   <!------------District Name--------->
 							   <label for="exampleInputEmail1" class="form-label">District Name</label>
 <div id="statediv">                                               
-		<select name="dist_id" class="form-control" onChange="getCity(<?=$state_id;?>,this.value)">
+		<select name="dist_id" class="form-control" onChange="getCity(<?=htmlspecialchars((string)($state_id), ENT_QUOTES, 'UTF-8', false);?>,this.value)">
 												<?php if($dist_id==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$dist_id;?>" hidden=""><?=$district_name;?></option>
+							   <option value="<?=htmlspecialchars((string)($dist_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$district_name;?></option>
 							   <option value="">--All--</option>
 							   <?php }?>
 							   
@@ -222,7 +222,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 								<?php if($talukid==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$talukid;?>" hidden=""><?=$talukname;?></option>
+							   <option value="<?=htmlspecialchars((string)($talukid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$talukname;?></option>
 							   <option value="">--All--</option>
 							   <?php }?>
 							   

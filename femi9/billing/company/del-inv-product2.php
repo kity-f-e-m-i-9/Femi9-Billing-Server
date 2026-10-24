@@ -7,7 +7,7 @@ error_reporting(0);
 
 if (!isset($_REQUEST['truncate'])) {
     $reqid_encode = $_REQUEST['reqid'] ?? '';
-    echo "<script>window.location='stock_request_details?reqid=$reqid_encode';</script>";
+    echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."';</script>";
     exit;
 }
 
@@ -25,7 +25,7 @@ $reqRow = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$reqRow) {
-    echo "<script>window.location='stock_request_details?reqid=$reqid_encode';</script>";
+    echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."';</script>";
     exit;
 }
 
@@ -108,4 +108,4 @@ if ($item && (int)$item['pr_id'] > 0) {
     $stmtDel->close();
 }
 
-echo "<script>window.location='stock_request_details?reqid=$reqid_encode&&DeleteSuccess&&ActionRemove';</script>";
+echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."&&DeleteSuccess&&ActionRemove';</script>";

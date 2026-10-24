@@ -108,8 +108,8 @@ $current_to_date=date("Y-m-d",strtotime($_REQUEST['todate']));
                         </div>
 						
 							
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="femiusr" value="<?=$getinvuser;?>"/>
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="femiusr" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>"/>
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">

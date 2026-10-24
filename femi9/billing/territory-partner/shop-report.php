@@ -217,7 +217,7 @@ $exportQuery = http_build_query([
                             <div class="kpi-card">
                                 <span class="kpi-icon-chip chip-indigo"><i class="material-icons-outlined">storefront</i></span>
                                 <div class="kpi-title">Shops with Sales</div>
-                                <div class="kpi-value"><?php echo $shops_with_sales; ?></div>
+                                <div class="kpi-value"><?php echo htmlspecialchars((string)($shops_with_sales), ENT_QUOTES, 'UTF-8', false); ?></div>
                                 <div class="kpi-sub">of <?php echo count($shops); ?> shown</div>
                             </div>
                         </div>
@@ -254,7 +254,7 @@ $exportQuery = http_build_query([
                                 <div class="card-header">
                                     <span class="hdr-icon chip-indigo"><i class="material-icons-outlined">storefront</i></span>
                                     <h5 class="card-title">Shop-wise Sales &amp; Payment Summary</h5>
-                                    <a href="shop-report-export.php?<?php echo $exportQuery; ?>" class="view-btn" style="margin-left:auto;background:var(--green-soft);color:var(--green);">
+                                    <a href="shop-report-export.php?<?php echo htmlspecialchars((string)($exportQuery), ENT_QUOTES, 'UTF-8', false); ?>" class="view-btn" style="margin-left:auto;background:var(--green-soft);color:var(--green);">
                                         <i class="material-icons-outlined">file_download</i> Export Excel
                                     </a>
                                 </div>

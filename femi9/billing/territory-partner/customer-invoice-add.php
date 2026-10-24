@@ -233,7 +233,7 @@ if (isset($_REQUEST['InvoiceID'])) {
     }
 ?>
 <form action="customer-invoice-action2.php" method="post" enctype="multipart/form-data">
-<input type="hidden" name="inv_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="inv_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 
 <div class="form-section">
 <div class="section-header"><i class="material-icons">edit_document</i>Invoice Details</div>
@@ -367,7 +367,7 @@ $rd = 0;
             <?php
             $cnt_ret2 = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='".db_esc($Invoice_ID)."' AND prid='" . $ri['pr_id'] . "'"));
             if ($cnt_ret2 == 0) {
-                echo "<a href='customer-del-inv-product.php?inv_id=$Invoice_ID_encode&&rowid=$ItemRowid&&userid=$CustomerID&&actionremove' onclick=\"return confirm('Delete?');\"><span class='badge bg-danger'>Remove</span></a>";
+                echo "<a href='customer-del-inv-product.php?inv_id=".urlencode($Invoice_ID_encode)."&&rowid=$ItemRowid&&userid=$CustomerID&&actionremove' onclick=\"return confirm('Delete?');\"><span class='badge bg-danger'>Remove</span></a>";
             } else {
                 echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";
             }
@@ -412,9 +412,9 @@ $res_receipt    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM recei
             </div>
             <form method="post" onsubmit="return confirm('Confirm update?');" action="update_invoice_action.php">
             <input type="hidden" name="invuser" value="customer">
-            <input type="hidden" name="InvoiceID" value="<?php echo $_REQUEST['InvoiceID'] ?? ''; ?>">
-            <input type="hidden" name="action" value="<?php echo $_REQUEST['action'] ?? ''; ?>">
-            <input type="hidden" name="gid" value="<?php echo $_REQUEST['gid'] ?? ''; ?>">
+            <input type="hidden" name="InvoiceID" value="<?php echo htmlspecialchars((string)($_REQUEST['InvoiceID'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+            <input type="hidden" name="action" value="<?php echo htmlspecialchars((string)($_REQUEST['action'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+            <input type="hidden" name="gid" value="<?php echo htmlspecialchars((string)($_REQUEST['gid'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
             <input type="hidden" name="redirurl" value="customer-invoice-add">
             <input type="hidden" name="tblenme" value="2">
             <div class="example-content" style="padding:20px;">
@@ -433,7 +433,7 @@ $res_receipt    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM recei
 <div class="col-lg-7"><div class="invoice-info">
 <?php if ($amount_received_fully == 0): ?>
 <form action="customer-invoice-submit.php" method="post" enctype="multipart/form-data" onsubmit="return confirm('Submit invoice?');">
-<input type="hidden" name="invoice_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="invoice_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 <input type="hidden" name="sub_total" value="<?php echo $TotalAMount123; ?>">
 <input type="hidden" name="discount" value="0">
 <input type="hidden" name="roundoff" value="<?php echo number_format($roundoff, 2, '.', ''); ?>">

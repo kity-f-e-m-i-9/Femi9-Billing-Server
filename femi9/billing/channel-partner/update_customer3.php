@@ -68,8 +68,8 @@ $Cust_Mbile = $resCust['mobile'] ?? '';
                         </table>
 
                         <form action="update_customer_action3.php" method="post" enctype="multipart/form-data" onsubmit="return confirm('Confirm update?');">
-                        <input type="hidden" name="invid" value="<?php echo $invid; ?>">
-                        <input type="hidden" name="invuser" value="<?php echo $getinvuser; ?>">
+                        <input type="hidden" name="invid" value="<?php echo htmlspecialchars((string)($invid), ENT_QUOTES, 'UTF-8', false); ?>">
+                        <input type="hidden" name="invuser" value="<?php echo htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>">
                         <input type="hidden" name="old_customer_id" value="<?php echo $CuSTID; ?>">
                         <div class="example-container"><div class="example-content">
 

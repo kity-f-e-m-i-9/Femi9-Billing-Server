@@ -81,7 +81,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
 <?php include("validate-scripts.php");?>                                       
 <form action="demofree_action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_tempid" value="<?php echo $tempid;?>">
+<input type="hidden" name="update_tempid" value="<?php echo htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">

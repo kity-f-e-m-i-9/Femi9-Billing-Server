@@ -75,7 +75,7 @@ $total=$subtotal+$gstamount_total;
 	
 	if($AVMstock<$qty)
 	{
-		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&AlertStockError';</script>";
+		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&InvalidStock&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&AlertStockError';</script>";
 		
 	}else{
 	
@@ -98,11 +98,11 @@ $total=$subtotal+$gstamount_total;
 		?,'0',?,?)";
 		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$invuser,$customer_id,$Login_user_TYPEvl,$Login_user_IDvl,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_percentage,$discount_amount,$gst_type,$hsn,$date,$buyer_gsttype,$rwpoints]);
 		
-		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&FemiAdded';</script>";
+		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&FemiAdded';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&AlertMessage';</script>";
+		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id)."&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&AlertMessage';</script>";
 	}
 		
 }

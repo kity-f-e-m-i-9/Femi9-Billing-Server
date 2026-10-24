@@ -13,4 +13,4 @@ if ($rowid > 0) {
     }
 }
 
-echo "<script>window.location='customer-invoice-add.php?InvoiceID=$inv_id_encode&&ActionRemove';</script>";
+echo "<script>window.location='customer-invoice-add.php?InvoiceID=".urlencode($inv_id_encode)."&&ActionRemove';</script>";

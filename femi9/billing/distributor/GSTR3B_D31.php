@@ -104,16 +104,16 @@ if($from_date!=NULL)
                             </div>
 							
 							
-							<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+							<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$from_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($from_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$to_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($to_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>

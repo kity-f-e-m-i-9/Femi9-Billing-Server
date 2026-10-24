@@ -73,8 +73,8 @@ $to_date=date("Y-m-d");
 $from_date = date ("Y-m-d", strtotime("-2 days", strtotime($to_date)));
 						}
 ?>
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="invuser" value="<?=$_REQUEST['invuser'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>">
 
 <div class="overviewcontainar">
 <div id="searchleftcont">

@@ -38,7 +38,7 @@ $Fetch_Count_MobilenUmber=db_q($db_conn,$Select_CNTMoblenm,[$mobile_number]);
 $Result_Count_MobilenUmber=mysqli_fetch_array($Fetch_Count_MobilenUmber);
 if($Result_Count_MobilenUmber['numMob']==1)
 {
-	echo "<script>window.location='Distributor-add?InvalidMobileNumber&&usertype=$usertype';</script>";
+	echo "<script>window.location='Distributor-add?InvalidMobileNumber&&usertype=".urlencode($usertype)."';</script>";
 	exit;
 	
 }else{
@@ -132,7 +132,7 @@ exit;
 
 }else{
 		//this districtwise super stockiest already exists.
-		echo "<script>window.location='Distributor-add.php?distalready&&usertype=$usertype';</script>";
+		echo "<script>window.location='Distributor-add.php?distalready&&usertype=".urlencode($usertype)."';</script>";
 		exit;
 	}
 	

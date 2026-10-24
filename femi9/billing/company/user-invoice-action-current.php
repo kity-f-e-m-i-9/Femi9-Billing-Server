@@ -33,7 +33,7 @@ $godownid = $_REQUEST['godownid'];
 // Check invoice number duplicate
 if (isset($_REQUEST['invoice_number_accept']) && $_REQUEST['invoice_number_accept'] == 0) {
     $_SESSION['errorMessage'] = "Invoice Number already exists!";
-    echo "<script>window.location='user-invoice-add?invuser=$invuser&&invoicealready';</script>";
+    echo "<script>window.location='user-invoice-add?invuser=".urlencode($invuser)."&&invoicealready';</script>";
     exit;
 }
 
@@ -46,7 +46,7 @@ $fetch_count_opstock13 = db_q($db_conn,$select_count_opstock13,[$Login_user_TYPE
 $result_count_opstock13 = mysqli_fetch_array($fetch_count_opstock13);
 
 if ($result_count_opstock13['numopstock12'] == 0) {
-    echo "<script>window.location='user-invoice-add?invuser=" . $invuser . "&&gid=" . $godownid . "&&stocknotupdated&&action=" . $_SESSION['ACTIONEDIT'] . "&&stockerror';</script>";
+    echo "<script>window.location='user-invoice-add?invuser=".urlencode($invuser)."&&gid=".urlencode($godownid)."&&stocknotupdated&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&stockerror';</script>";
     exit;
 }
 
@@ -158,7 +158,7 @@ $stockService = new StockService($db_conn);
 $AVMstock = $stockService->getClosingQty($pr_id, $Login_user_TYPEvl, $godownid);
 
 if ($AVMstock === null || $AVMstock < $qty) {
-    echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=" . $invuser . "&&AlertStockError&&action=" . $_SESSION['ACTIONEDIT'] . "&&gid=" . $godownid . "';</script>";
+    echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=".urlencode($invuser)."&&AlertStockError&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
     exit;
 }
 
@@ -185,12 +185,12 @@ if ($result_count_invoiceItem['numInvoiceItem'] == 0) {
             'user_invoice', $inv_id, $Login_user_IDvl ?? $godownid
         );
     } catch (StockException $e) {
-        echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=" . $invuser . "&&AlertStockError&&action=" . $_SESSION['ACTIONEDIT'] . "&&gid=" . $godownid . "';</script>";
+        echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=".urlencode($invuser)."&&AlertStockError&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
         exit;
     }
 
-    echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&AddedSuccess&&invuser=" . $invuser . "&&FemiAdded&&action=" . $_SESSION['ACTIONEDIT'] . "&&gid=" . $godownid . "';</script>";
+    echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&AddedSuccess&&invuser=".urlencode($invuser)."&&FemiAdded&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
 } else {
-    echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&ItemAlreadyExists&&invuser=" . $invuser . "&&AlertMessage&&action=" . $_SESSION['ACTIONEDIT'] . "&&gid=" . $godownid . "';</script>";
+    echo "<script>window.location='user-invoice-add?InvoiceID=" . base64_encode($inv_id) . "&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&AlertMessage&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($godownid)."';</script>";
 }
 ?>

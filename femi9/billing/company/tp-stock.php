@@ -293,7 +293,7 @@ if ($tp_list_res) while ($r = mysqli_fetch_assoc($tp_list_res)) $tp_list[] = $r;
                         <div class="col">
                             <div class="card">
                                 <div class="card-body">
-                                    <form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="filterForm">
+                                    <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>" id="filterForm">
                                         <input type="hidden" name="filter_type" id="filterTypeInput" value="<?= htmlspecialchars($filter_type); ?>">
 
                                         <!-- Toggle -->
@@ -395,7 +395,7 @@ if ($tp_list_res) while ($r = mysqli_fetch_assoc($tp_list_res)) $tp_list[] = $r;
                                 <div class="card-header py-3">
                                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
 
-                                        <form method="post" action="<?= $_SERVER['PHP_SELF']; ?>"
+                                        <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>"
                                               class="d-flex align-items-center gap-2">
                                             <input type="hidden" name="filter_type" value="<?= htmlspecialchars($filter_type); ?>">
                                             <input type="hidden" name="location_id" value="<?= $selected_location_id; ?>">

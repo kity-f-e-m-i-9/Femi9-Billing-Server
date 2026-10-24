@@ -222,7 +222,7 @@ if($result_count_product['numCountRcds']==0)
 	 
 	 <?php if($result_product_list["amount_received"]==0){?>
 <form method="post" enctype="multipart/form-data" onsubmit="return confirm('Add this return? Stock will be credited back to the selected Godown (physical) immediately.');">
-<input type="hidden" name="tempid" value="<?=$tempid?>">
+<input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false)?>">
 <input type="hidden" name="godownid" value="<?=$result_product_list['godownid'];?>">
 
                                         <div class="example-container">

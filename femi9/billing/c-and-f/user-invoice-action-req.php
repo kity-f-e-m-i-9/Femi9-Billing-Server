@@ -25,7 +25,7 @@ $fetch_count_opstock13=db_q($db_conn,$select_count_opstock13,[$Login_user_TYPEvl
 $result_count_opstock13=mysqli_fetch_array($fetch_count_opstock13);
 if($result_count_opstock13['numopstock12']==0)
 {
-	echo "<script>window.location='stock_request_details.php?reqid=".base64_encode($inv_id)."&&gid=".$godownid."&&stocknotupdated';</script>";
+	echo "<script>window.location='stock_request_details.php?reqid=".base64_encode($inv_id)."&&gid=".urlencode($godownid)."&&stocknotupdated';</script>";
 	
 }else{
 	
@@ -145,7 +145,7 @@ else{$gst_type="outer";}
 	
 	if($AVMstock<$qty)
 	{
-		echo "<script>window.location='stock_request_details.php?reqid=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".$godownid."';</script>";
+		echo "<script>window.location='stock_request_details.php?reqid=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 		
@@ -210,11 +210,11 @@ else{$gst_type="outer";}
 		db_q($db_conn,$update_stockDetails,[$update_Sales_stock12,$update_Closing_stock12,$pr_id,$invuser,$customer_id]);
 		
 		
-		echo "<script>window.location='stock_request_details.php?reqid=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded&&gid=".$godownid."';</script>";
+		echo "<script>window.location='stock_request_details.php?reqid=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='stock_request_details.php?reqid=".base64_encode($inv_id)."&&ItemAlreadyExists&&AlertMessage&&gid=".$godownid."';</script>";
+		echo "<script>window.location='stock_request_details.php?reqid=".base64_encode($inv_id)."&&ItemAlreadyExists&&AlertMessage&&gid=".urlencode($godownid)."';</script>";
 	}
 		
 }

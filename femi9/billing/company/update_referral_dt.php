@@ -117,7 +117,7 @@ function closerefresh()
 							
 		}else{
 			
-			echo "<script>window.location='super_Distributor_update_referral?InvalidReferedID&&sdid=$sdid';</script>";
+			echo "<script>window.location='super_Distributor_update_referral?InvalidReferedID&&sdid=".urlencode($sdid)."';</script>";
 			exit;
 		}
 		
@@ -157,7 +157,7 @@ function closerefresh()
 						
 						
 <form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" method="post" enctype="multipart/form-data" onsubmit="return confirm('Please make a confirm!')">
-<input type="hidden" name="sdid" value="<?=$sdid;?>">
+<input type="hidden" name="sdid" value="<?=htmlspecialchars((string)($sdid), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">

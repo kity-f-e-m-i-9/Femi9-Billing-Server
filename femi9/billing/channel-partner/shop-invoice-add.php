@@ -122,7 +122,7 @@ select:focus, input[type=number]:focus { background:#fffa8f; }
 ?>
 
 <form action="shop-invoice-action2.php" method="post" enctype="multipart/form-data">
-<input type="hidden" name="inv_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="inv_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 <input type="hidden" name="invuser" value="<?php echo $getinvuser; ?>">
 <div class="example-container"><div class="example-content">
 
@@ -206,7 +206,7 @@ while ($ri = mysqli_fetch_array($res_items)) {
         <?php
         $cnt_ret = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='".db_esc($Invoice_ID)."' AND prid='".db_esc($InV_Product_ID)."'"));
         if ($cnt_ret == 0) { ?>
-        <a href="shop-del-inv-product.php?invid=<?php echo $Invoice_ID_encode; ?>&&itemid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+        <a href="shop-del-inv-product.php?invid=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false); ?>&&itemid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
         <?php } else { echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>"; } ?>
         </td>
         <?php } ?>
@@ -281,7 +281,7 @@ function totalamount() {
 
 <div class="col-lg-3"><div class="invoice-info">
 
-<input type="hidden" name="invoice_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="invoice_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 <input type="hidden" name="SubTotal" value="<?php echo $TotalAMount123; ?>">
 
 <p><b>Subtotal</b>
@@ -518,10 +518,10 @@ function discamount() {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_invoice_action.php">
-                <input type="hidden" name="invuser"   value="<?php echo $_REQUEST['invuser']   ?? ''; ?>">
-                <input type="hidden" name="InvoiceID" value="<?php echo $_REQUEST['InvoiceID'] ?? ''; ?>">
-                <input type="hidden" name="action"    value="<?php echo $_REQUEST['action']    ?? ''; ?>">
-                <input type="hidden" name="gid"       value="<?php echo $_REQUEST['gid']       ?? ''; ?>">
+                <input type="hidden" name="invuser"   value="<?php echo htmlspecialchars((string)($_REQUEST['invuser']   ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+                <input type="hidden" name="InvoiceID" value="<?php echo htmlspecialchars((string)($_REQUEST['InvoiceID'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+                <input type="hidden" name="action"    value="<?php echo htmlspecialchars((string)($_REQUEST['action']    ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+                <input type="hidden" name="gid"       value="<?php echo htmlspecialchars((string)($_REQUEST['gid']       ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
                 <input type="hidden" name="redirurl"  value="shop-invoice-add">
                 <input type="hidden" name="tblenme"   value="1">
                 <div class="example-content" style="padding:20px;">

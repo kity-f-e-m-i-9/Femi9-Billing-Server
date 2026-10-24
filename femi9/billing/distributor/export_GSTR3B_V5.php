@@ -41,7 +41,7 @@ header("Content-type: text/csv");
 header("Content-Disposition: attachment; filename=$file");
 
 // Output the CSV content
-echo $csv_content;
+echo htmlspecialchars((string)($csv_content), ENT_QUOTES, 'UTF-8', false);
 ?>
 
 

@@ -80,7 +80,7 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 									<tr>
 									<td>Marketing Staff > Expenses Report</td>
 									<td>
-									<a href="ms_expenses_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=$se_msid;?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
+									<a href="ms_expenses_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
 									</td>
 									</tr>
 									</table>
@@ -90,7 +90,7 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
                         </div>
 						
 						
-						<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+						<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -107,7 +107,7 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 <?php if($se_msid==NULL){?>
 <option value="" hidden="">Select</option>
 <?php }else{?>
-<option value="<?=$se_msid;?>" hidden=""><?=strtoupper($result_msDetails12['ms_name']);?>, <?=$result_msDetails12['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=strtoupper($result_msDetails12['ms_name']);?>, <?=$result_msDetails12['ms_mobile'];?></option>
 <?php }?>
 <?php $select_msDetailsOPT="select * from marketing_staff order by ms_name asc";
 $fetch_msDetailsOPT=mysqli_query($db_conn,$select_msDetailsOPT);

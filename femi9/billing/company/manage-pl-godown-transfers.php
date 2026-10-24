@@ -396,7 +396,7 @@ $i = 0;
                             <span class="card-header-title"><i class="material-icons-outlined">filter_list</i> Filters</span>
                         </div>
                         <div class="card-body">
-                            <form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="filterForm">
+                            <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>" id="filterForm">
 
                                 <div class="row mb-3">
                                     <!-- Location picker -->
@@ -515,7 +515,7 @@ $i = 0;
                         <div class="card-header py-3 bg-white border-0" style="border-radius:0 !important;">
                             <div class="d-flex align-items-center justify-content-between">
                                 <!-- Show entries -->
-                                <form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" class="d-flex align-items-center gap-2">
+                                <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>" class="d-flex align-items-center gap-2">
                                     <input type="hidden" name="location_id" value="<?= $selected_location_id; ?>">
                                     <input type="hidden" name="transfer_type" value="<?= htmlspecialchars($selected_type); ?>">
                                     <input type="hidden" name="cp_id" value="<?= htmlspecialchars($selected_cp_id, ENT_QUOTES); ?>">
@@ -534,7 +534,7 @@ $i = 0;
 
                                 <!-- Search + page info -->
                                 <div class="d-flex align-items-center gap-3">
-                                    <form method="get" action="<?= $_SERVER['PHP_SELF']; ?>" class="d-flex align-items-center gap-2">
+                                    <form method="get" action="<?= htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>" class="d-flex align-items-center gap-2">
                                         <input type="hidden" name="page" value="1">
                                         <input type="text" name="q"
                                                value="<?= htmlspecialchars($search, ENT_QUOTES); ?>"

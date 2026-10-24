@@ -61,7 +61,7 @@ db_q($db_conn,$updaterwMULTI,[$rwpoints12,$invoiceid,$pr_id2]);
 		}
 		
 $_SESSION['successMessage']="Invoice Number ".base64_decode($_REQUEST['invnumber'])."  Reward Points Enabled Success";
-echo "<script>window.location='user-manage-invoice?invuser=$invuser';</script>";
+echo "<script>window.location='user-manage-invoice?invuser=".urlencode($invuser)."';</script>";
 	 
 	}
 	else
@@ -86,7 +86,7 @@ echo "<script>window.location='user-manage-invoice?invuser=$invuser';</script>";
 		}
 		
 $_SESSION['successMessage']="Invoice Number ".base64_decode($_REQUEST['invnumber'])."  Reward Points Disabled Success";
-echo "<script>window.location='user-manage-invoice?invuser=$invuser';</script>";
+echo "<script>window.location='user-manage-invoice?invuser=".urlencode($invuser)."';</script>";
 	
 	}
 	
