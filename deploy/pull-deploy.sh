@@ -50,3 +50,4 @@ main() {
 
 main "$@"
 exit $?
+# deploy-test: harmless marker to verify the cron picks up pushes
