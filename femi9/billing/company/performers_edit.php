@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -6,8 +6,8 @@ include("config.php");
 
 $get_id=base64_decode($_REQUEST['prid']);
 
-$select_product_list="select * from top_performar where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from top_performar where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 
 if($result_product_list["per_photo"]!=NULL){
@@ -45,9 +45,9 @@ else
 	
 	$usertype=$_REQUEST['usertype'];
 		
-		$insertrecords="UPDATE top_performar SET usertype='$usertype',particulars='$particulars',
-		per_photo='$filename_PRPH4' WHERE tempid='$tempid'";
-		mysqli_query($db_conn,$insertrecords);
+		$insertrecords="UPDATE top_performar SET usertype=?,particulars=?,
+		per_photo=? WHERE tempid=?";
+		db_q($db_conn,$insertrecords,[$usertype,$particulars,$filename_PRPH4,$tempid]);
 
 	echo "<script>window.location='performers_manage?updatedSuccess';</script>";
 }

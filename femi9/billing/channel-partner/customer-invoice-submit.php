@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -19,11 +19,11 @@ $created_by     = $_SESSION['LOGIN_USER'] ?? 'system';
 // Update invoice date if editing
 if (!empty($_REQUEST['update_invoice_date'])) {
     $upd_date = date("Y-m-d", strtotime($_REQUEST['update_invoice_date']));
-    mysqli_query($db_conn, "UPDATE invoice SET date='$upd_date' WHERE inv_id='$invoice_id' AND user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl'");
-    mysqli_query($db_conn, "UPDATE invoice_items SET date='$upd_date' WHERE inv_id='$invoice_id' AND user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl'");
+    mysqli_query($db_conn, "UPDATE invoice SET date='".db_esc($upd_date)."' WHERE inv_id='".db_esc($invoice_id)."' AND user_type='".db_esc($Login_user_TYPEvl)."' AND user_id='".db_esc($Login_user_IDvl)."'");
+    mysqli_query($db_conn, "UPDATE invoice_items SET date='".db_esc($upd_date)."' WHERE inv_id='".db_esc($invoice_id)."' AND user_type='".db_esc($Login_user_TYPEvl)."' AND user_id='".db_esc($Login_user_IDvl)."'");
 }
 
-$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='$invoice_id' LIMIT 1"));
+$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='".db_esc($invoice_id)."' LIMIT 1"));
 
 // Reverse previous stock deductions on edit
 if ($is_edit) {
@@ -72,8 +72,8 @@ foreach ($items as $item) {
 }
 
 // Update invoice totals
-mysqli_query($db_conn, "UPDATE invoice SET sub_total='$SubTotal',discount='$discount',total='$total_amount',roundoff='$roundoff',courier_charges='$courier'
-    WHERE inv_id='$invoice_id' AND user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl'");
+mysqli_query($db_conn, "UPDATE invoice SET sub_total='".db_esc($SubTotal)."',discount='".db_esc($discount)."',total='".db_esc($total_amount)."',roundoff='".db_esc($roundoff)."',courier_charges='".db_esc($courier)."'
+    WHERE inv_id='".db_esc($invoice_id)."' AND user_type='".db_esc($Login_user_TYPEvl)."' AND user_id='".db_esc($Login_user_IDvl)."'");
 
 // Insert/update receipt
 $receivedamount  = (float)($_REQUEST['receivedamount']  ?? 0);
@@ -85,17 +85,17 @@ $to_user_id      = $inv['customer_id']    ?? '';
 $from_utype      = $inv['user_type']      ?? $Login_user_TYPEvl;
 $from_uid        = $inv['user_id']        ?? $Login_user_IDvl;
 
-$existingReceipt = mysqli_fetch_array(mysqli_query($db_conn, "SELECT id,received FROM receipt WHERE inv_id='$invoice_id' LIMIT 1"));
+$existingReceipt = mysqli_fetch_array(mysqli_query($db_conn, "SELECT id,received FROM receipt WHERE inv_id='".db_esc($invoice_id)."' LIMIT 1"));
 if ($existingReceipt) {
     $new_received   = (float)$existingReceipt['received'] + $receivedamount;
     $new_receivable = round($total_amount - $new_received);
-    mysqli_query($db_conn, "UPDATE receipt SET received='$new_received',receivable='$new_receivable',invoice_amount='$total_amount',receipt_method='$receipt_method',receipt_remarks='$receipt_remarks' WHERE inv_id='$invoice_id'");
+    mysqli_query($db_conn, "UPDATE receipt SET received='".db_esc($new_received)."',receivable='".db_esc($new_receivable)."',invoice_amount='".db_esc($total_amount)."',receipt_method='".db_esc($receipt_method)."',receipt_remarks='".db_esc($receipt_remarks)."' WHERE inv_id='".db_esc($invoice_id)."'");
 } else {
     $receivable = round($total_amount - $receivedamount);
     mysqli_query($db_conn, "INSERT INTO receipt
         (receiptid,inv_id,invoice_amount,received,receivable,date,from_user_type,from_user_id,to_user_type,to_user_id,receipt_method,receipt_remarks)
-        VALUES ('$invoice_id','$invoice_id','$total_amount','$receivedamount','$receivable','$receiptdate',
-        '$from_utype','$from_uid','$to_user_type','$to_user_id','$receipt_method','$receipt_remarks')");
+        VALUES ('".db_esc($invoice_id)."','".db_esc($invoice_id)."','".db_esc($total_amount)."','".db_esc($receivedamount)."','".db_esc($receivable)."','".db_esc($receiptdate)."',
+        '".db_esc($from_utype)."','".db_esc($from_uid)."','".db_esc($to_user_type)."','".db_esc($to_user_id)."','".db_esc($receipt_method)."','".db_esc($receipt_remarks)."')");
 }
 
 unset($_SESSION['ACTIONEDIT']);

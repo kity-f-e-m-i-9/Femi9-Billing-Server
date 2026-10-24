@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $title="Other Channel Sales Report";
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");
@@ -139,22 +139,22 @@ error_reporting(0);
 										<?php 
 										if($get_from_date!=NULL && $get_to_date!=NULL && $get_catname==NULL)
 										{
-						$select_picnode_list="select * from ot_sales where date between '$get_from_date' and '$get_to_date' order by id asc";
+						$select_picnode_list="select * from ot_sales where date between '".db_esc($get_from_date)."' and '".db_esc($get_to_date)."' order by id asc";
 										}
 										if($get_from_date!=NULL && $get_to_date!=NULL && $get_catname!=NULL)
 										{
-						$select_picnode_list="select * from ot_sales where date between '$get_from_date' and '$get_to_date' and cat='$get_catname' order by id asc";
+						$select_picnode_list="select * from ot_sales where date between ? and ? and cat=? order by id asc";
 										}
 										
 										
-										$fetch_picnode_list=mysqli_query($db_conn,$select_picnode_list);
+										$fetch_picnode_list=db_q($db_conn,$select_picnode_list,[$get_from_date,$get_to_date,$get_catname]);
 										while($result_pincode_list=mysqli_fetch_array($fetch_picnode_list))
 										{
 											
 											//state details
 											$prid=$result_pincode_list['prid'];
-								$select_stateList="select * from products where id='$prid'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+								$select_stateList="select * from products where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$prid]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $productname=$result_stateList['productName'];
 							   

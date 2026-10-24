@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
 $title="Website Order Commission Setup";
 error_reporting(0);
@@ -17,8 +17,8 @@ for ($i=0; $i<=$number; $i++)
      $updateid_value = $updateid_ex[$i]; 
      $amount_value = $amount_ex[$i]; 
 	 
-			$update_news_password="update admin_website_coupon_commission set amount='$amount_value' where id='$updateid_value'";
-			mysqli_query($db_conn,$update_news_password);
+			$update_news_password="update admin_website_coupon_commission set amount=? where id=?";
+			db_q($db_conn,$update_news_password,[$amount_value,$updateid_value]);
 } 
  
  echo "<script>window.location='web-commission?UpdatedSuccess';</script>";

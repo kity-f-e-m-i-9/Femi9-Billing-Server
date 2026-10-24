@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Update Pincode";
 $manage_url="manage-pincode.php";
@@ -9,14 +9,14 @@ $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
 
 //fetch product details
-$select_product_list="select * from pincode where id='$prid'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from pincode where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 $result_picnode_list=mysqli_fetch_array($fetch_product_list);
 
 //state details
 											$state_id=$result_picnode_list['state_id'];
-								$select_stateList="select * from `state` where id='$state_id'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+								$select_stateList="select * from `state` where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$state_id]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];
 							   
@@ -133,8 +133,8 @@ $result_picnode_list=mysqli_fetch_array($fetch_product_list);
 												<label for="exampleInputEmail1" class="form-label">Taluk Name</label>
                                                 <select required="" name="taluk_id" class="form-control">
 												<option value="<?=$taluk_id;?>" hidden=""><?=$talulk_name;?></option>
-		<?php $select_Taluk_list12="select * from taluk where state_id='$loguser_StateID' and dist_id='$loguser_DistrictID' order by taluk asc";
-										$fetch_Taluk_list12=mysqli_query($db_conn,$select_Taluk_list12);
+		<?php $select_Taluk_list12="select * from taluk where state_id=? and dist_id=? order by taluk asc";
+										$fetch_Taluk_list12=db_q($db_conn,$select_Taluk_list12,[$loguser_StateID,$loguser_DistrictID]);
 										while($Result_Taluk_list12=mysqli_fetch_array($fetch_Taluk_list12))
 										{
 											?>

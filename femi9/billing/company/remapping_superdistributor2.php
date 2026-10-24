@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");
@@ -120,8 +120,8 @@ $print_userMobile=$result890['mobile_number'];
                                     <div class="card-body">
 									
 <?php 
-$select_supersotkistCOUNT="select count(*) as numMAPP from super_distributor where onboard_userTYPE='$get_from_user_type' and onboard_userID='$get_from_user_id'";
-$fetch_supersotkistCNT=mysqli_query($db_conn,$select_supersotkistCOUNT);
+$select_supersotkistCOUNT="select count(*) as numMAPP from super_distributor where onboard_userTYPE=? and onboard_userID=?";
+$fetch_supersotkistCNT=db_q($db_conn,$select_supersotkistCOUNT,[$get_from_user_type,$get_from_user_id]);
 $result_supersotkistCNT=mysqli_fetch_array($fetch_supersotkistCNT);
 if($result_supersotkistCNT['numMAPP']!=0)
 {
@@ -151,8 +151,8 @@ if($result_supersotkistCNT['numMAPP']!=0)
 											<ul class="list-group">
 											
 					<?php 
-					$select_supersotkist="select * from super_distributor where onboard_userTYPE='$get_from_user_type' and onboard_userID='$get_from_user_id' order by id asc";
-						$fetch_supersotkist=mysqli_query($db_conn,$select_supersotkist);
+					$select_supersotkist="select * from super_distributor where onboard_userTYPE=? and onboard_userID=? order by id asc";
+						$fetch_supersotkist=db_q($db_conn,$select_supersotkist,[$get_from_user_type,$get_from_user_id]);
 						while($result_supersotkist=mysqli_fetch_array($fetch_supersotkist))
 										{
 											?>

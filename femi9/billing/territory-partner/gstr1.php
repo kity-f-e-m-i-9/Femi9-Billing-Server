@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -78,16 +78,16 @@ if ($from_month != '') {
         $hsn_rate = (float)$h['gst'];
         $rate_filter = $hsn_rate == 0 ? '=0' : '>0';
 
-        $q = "select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn='$hsn_code' and gst_percentage$rate_filter and date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and from_user_id='$tp_id'";
-        $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+        $q = "select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn=? and gst_percentage$rate_filter and date between ? and ? and from_user_type=? and from_user_id=?";
+        $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
         $qty = (float)($r[0] ?? 0); $val = (float)($r[1] ?? 0);
 
-        $q = "select sum(qty), sum(total-gstamount_total) from invoice_items where hsn='$hsn_code' and gst_percentage$rate_filter and date between '$from_date' and '$to_date' and user_type='$Login_user_TYPEvl' and user_id='$tp_id'";
-        $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+        $q = "select sum(qty), sum(total-gstamount_total) from invoice_items where hsn=? and gst_percentage$rate_filter and date between ? and ? and user_type=? and user_id=?";
+        $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
         $qty += (float)($r[0] ?? 0); $val += (float)($r[1] ?? 0);
 
-        $q = "select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn='$hsn_code' and gst_percentage$rate_filter and date between '$from_date' and '$to_date' and to_usertype='$Login_user_TYPEvl' and to_userid='$tp_id'";
-        $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+        $q = "select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn=? and gst_percentage$rate_filter and date between ? and ? and to_usertype=? and to_userid=?";
+        $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
         $qty -= (float)($r[0] ?? 0); $val -= (float)($r[1] ?? 0);
 
         if ($qty == 0 && $val == 0) continue;
@@ -116,16 +116,16 @@ if ($from_month != '') {
         $hsn_rate = (float)$h['gst'];
         $b2b_qty = 0; $b2b_val = 0; $b2c_qty = 0; $b2c_val = 0;
         foreach (['register' => true, 'unregister' => false] as $bg => $is_b2b) {
-            $q = "select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn='$hsn_code' and gst_percentage>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and from_user_id='$tp_id'";
-            $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+            $q = "select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn=? and gst_percentage>0 and buyer_gsttype=? and date between ? and ? and from_user_type=? and from_user_id=?";
+            $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$bg,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
             $qty = (float)($r[0] ?? 0); $val = (float)($r[1] ?? 0);
 
-            $q = "select sum(qty), sum(total-gstamount_total) from invoice_items where hsn='$hsn_code' and gst_percentage>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and user_type='$Login_user_TYPEvl' and user_id='$tp_id'";
-            $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+            $q = "select sum(qty), sum(total-gstamount_total) from invoice_items where hsn=? and gst_percentage>0 and buyer_gsttype=? and date between ? and ? and user_type=? and user_id=?";
+            $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$bg,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
             $qty += (float)($r[0] ?? 0); $val += (float)($r[1] ?? 0);
 
-            $q = "select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn='$hsn_code' and gst_percentage>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and to_usertype='$Login_user_TYPEvl' and to_userid='$tp_id'";
-            $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+            $q = "select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn=? and gst_percentage>0 and buyer_gsttype=? and date between ? and ? and to_usertype=? and to_userid=?";
+            $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$bg,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
             $qty -= (float)($r[0] ?? 0); $val -= (float)($r[1] ?? 0);
 
             if ($is_b2b) { $b2b_qty = $qty; $b2b_val = $val; } else { $b2c_qty = $qty; $b2c_val = $val; }
@@ -159,8 +159,8 @@ if ($from_month != '') {
     $doc_grand_total = 0;
     $doc_rows = [];
     foreach ($doc_channels as $dc) {
-        $dq = "select {$dc['num_col']} as num from {$dc['table']} where {$dc['where']} and {$dc['date_col']} between '$from_date' and '$to_date' order by {$dc['date_col']} asc, {$dc['num_col']} asc";
-        $dres = mysqli_query($db_conn, $dq);
+        $dq = "select {$dc['num_col']} as num from {$dc['table']} where {$dc['where']} and {$dc['date_col']} between ? and ? order by {$dc['date_col']} asc, {$dc['num_col']} asc";
+        $dres = db_q($db_conn,$dq,[$from_date,$to_date]);
         $series_groups = [];
         while ($drow = mysqli_fetch_assoc($dres)) {
             $series_groups[doc_series_code($drow['num'])][] = $drow['num'];

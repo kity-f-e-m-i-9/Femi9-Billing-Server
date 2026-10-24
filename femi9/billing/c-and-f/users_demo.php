@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0); include("config.php");?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0); include("config.php");?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -97,8 +97,8 @@ $i= $start_from;
 											
 											<tbody>
 <?php
-$select_product_list="select * from demo_awareness where ssid='$Login_user_IDvl' order by date desc";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from demo_awareness where ssid=? order by date desc";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_IDvl]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {
 											
@@ -114,8 +114,8 @@ $result_Userdetails=mysqli_fetch_array($fetch_Userdetails);
 										
 //DISTRICT DETAILS										
 $district_id=$result_Userdetails['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
@@ -123,8 +123,8 @@ $district_name=	$result_district['dist_name'];
 $taluk_id=$result_Userdetails['taluk_id'];
 if($taluk_id!=NULL)
 {
-$select_Taluk12="select * from taluk where id='$taluk_id'";
-$fetch_Taluk12=mysqli_query($db_conn,$select_Taluk12);
+$select_Taluk12="select * from taluk where id=?";
+$fetch_Taluk12=db_q($db_conn,$select_Taluk12,[$taluk_id]);
 $result_Taluk12=mysqli_fetch_array($fetch_Taluk12);
 $taluk_name=$result_Taluk12['taluk'];
 }

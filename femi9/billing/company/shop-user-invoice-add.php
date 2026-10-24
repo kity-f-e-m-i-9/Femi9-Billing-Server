@@ -1,4 +1,4 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); 
 require_once("include/PermissionCheck.php"); requirePermission('shop');
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
@@ -164,8 +164,8 @@ select:focus, input[type=number]:focus{background:#fffa8f;}
 		$Invoice_ID=base64_decode($_REQUEST['InvoiceID']);
 					
 		//get invoice details
-		$select_InvoieDetails="select * from user_invoice where inv_id='$Invoice_ID'";
-		$fetch_InvoieDetails=mysqli_query($db_conn,$select_InvoieDetails);
+		$select_InvoieDetails="select * from user_invoice where inv_id=?";
+		$fetch_InvoieDetails=db_q($db_conn,$select_InvoieDetails,[$Invoice_ID]);
 		$result_InvoieDetails=mysqli_fetch_array($fetch_InvoieDetails);
 		
 		//RECEIPT AMOUNT		
@@ -210,8 +210,8 @@ else{ $amount_received_fully="0";}
 <label class="form-label"><?=$lablenamedisplay;?>*</label>
 
 <?php
-$select_countitems="select count(*) as numitemscount from user_invoice_items where inv_id='$Invoice_ID'";
-$fetch_countitems=mysqli_query($db_conn,$select_countitems);
+$select_countitems="select count(*) as numitemscount from user_invoice_items where inv_id=?";
+$fetch_countitems=db_q($db_conn,$select_countitems,[$Invoice_ID]);
 $result_countitems=mysqli_fetch_array($fetch_countitems);
 $totalcountitems=$result_countitems['numitemscount'];
 ?>
@@ -309,8 +309,8 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
                                                     </thead>
                                                     <tbody>
 													<?php
-	$select_INVProductDetails="select * from user_invoice_items where inv_id='$Invoice_ID' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_invoice_items where inv_id=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
 	$CountProducts=mysqli_num_rows($fetch_INVProductDetails);
 
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
@@ -318,8 +318,8 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 	
 	//product details
 		$InV_Product_ID=$result_INVProductDetails['pr_id'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		$TotalAMount=$result_INVProductDetails['total'];
@@ -343,8 +343,8 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 
 <?php 
 			//COUNT return
-			$select_count_return="select * from user_return_stock_items where invnumber='$Invoice_ID' and prid='$InV_Product_ID'";
-			$fetch_count_return=mysqli_query($db_conn,$select_count_return);
+			$select_count_return="select * from user_return_stock_items where invnumber=? and prid=?";
+			$fetch_count_return=db_q($db_conn,$select_count_return,[$Invoice_ID,$InV_Product_ID]);
 			$result_count_return=mysqli_num_rows($fetch_count_return);
 			if($result_count_return==0){
 			?>
@@ -450,8 +450,8 @@ function receiptamount(){
 			//UPDATE INVOICE AMOUNT TO ZERO
 			if($CountProducts==0 && $result_InvoieDetails['sub_total']>0)
 			{
-$update_zero_invoice="update user_invoice set sub_total='0',discount='0',total='0' where inv_id='$Invoice_ID'";
-mysqli_query($db_conn,$update_zero_invoice);		
+$update_zero_invoice="update user_invoice set sub_total='0',discount='0',total='0' where inv_id=?";
+db_q($db_conn,$update_zero_invoice,[$Invoice_ID]);		
 			}
 			?>
            

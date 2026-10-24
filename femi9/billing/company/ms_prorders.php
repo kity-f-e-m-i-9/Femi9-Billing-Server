@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 <!DOCTYPE html>
 <html lang="en">
@@ -142,8 +142,8 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 						// needing company follow-up (the default/"Orders" link's tp_id IS NULL view).
 						$showAllOrders = (($_REQUEST['view'] ?? '') === 'all');
 						//
-						$select_msDetails12="select * from marketing_staff where id='$se_msid'";
-$fetch_msDetails12=mysqli_query($db_conn,$select_msDetails12);
+						$select_msDetails12="select * from marketing_staff where id=?";
+$fetch_msDetails12=db_q($db_conn,$select_msDetails12,[$se_msid]);
 $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 
 // Team-mode header — name of the manager whose subtree this is (always
@@ -164,7 +164,7 @@ if (!empty($se_msids)) {
     $getOrderCount = 0; $noOrderCount = 0;
     $resGN = mysqli_query($db_conn,
         "SELECT new_order, COUNT(DISTINCT order_id) c FROM ms_orders
-         WHERE ms_id IN ($msIdListSql) AND order_date BETWEEN '$from_date' AND '$to_date'
+         WHERE ms_id IN ($msIdListSql) AND order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
          GROUP BY new_order"
     );
     while ($gr = mysqli_fetch_assoc($resGN)) {
@@ -181,7 +181,7 @@ if (!empty($se_msids)) {
     $resAssigned = mysqli_query($db_conn,
         "SELECT COUNT(DISTINCT order_id) c FROM ms_orders
          WHERE ms_id IN ($msIdListSql) AND new_order='yes' AND tp_id IS NOT NULL
-               AND order_date BETWEEN '$from_date' AND '$to_date'"
+               AND order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'"
     );
     $arow = mysqli_fetch_assoc($resAssigned);
     $assignedToTpCount = (int)($arow['c'] ?? 0);
@@ -195,7 +195,7 @@ if (!empty($se_msids)) {
                 SUM(mo.qty * p.outlet_price * (1 - mo.discount_percentage/100)) totalvalue
          FROM ms_orders mo LEFT JOIN products p ON p.id=mo.pr_id
          WHERE mo.ms_id IN ($msIdListSql) AND mo.new_order='yes'
-               AND mo.order_date BETWEEN '$from_date' AND '$to_date'
+               AND mo.order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
          GROUP BY mo.pr_id, p.productName, p.outlet_price ORDER BY totalqty DESC"
     );
     while ($pr = mysqli_fetch_assoc($resPQ)) {
@@ -211,7 +211,7 @@ if (!empty($se_msids)) {
         "SELECT DISTINCT t.invoiced_inv_id
          FROM ms_orders o JOIN tp_orders t ON t.order_id=o.order_id
          WHERE o.ms_id IN ($msIdListSql) AND o.new_order='yes'
-               AND o.order_date BETWEEN '$from_date' AND '$to_date'
+               AND o.order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
                AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''"
     );
     while ($ir = mysqli_fetch_assoc($resInv)) { $invoiceIds[] = $ir['invoiced_inv_id']; }

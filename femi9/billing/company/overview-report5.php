@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
@@ -174,8 +174,8 @@ $i= $start_from;
 											
 											<tbody>
 										<?php
-$select_Count_records="select count(*) as numRecords from input_stock where input_date between '$from_date' and '$to_date'";
-										$fetch_Count_records=mysqli_query($db_conn,$select_Count_records);
+$select_Count_records="select count(*) as numRecords from input_stock where input_date between ? and ?";
+										$fetch_Count_records=db_q($db_conn,$select_Count_records,[$from_date,$to_date]);
 										$result_Count_records=mysqli_fetch_array($fetch_Count_records);
 										if($result_Count_records['numRecords']>0)
 										{
@@ -187,8 +187,8 @@ $select_Count_records="select count(*) as numRecords from input_stock where inpu
 											
 											$ot_tempid=$result_product_list['tempid'];
 
-										$selectrecords="select * from input_stock where tempid='$ot_tempid'";
-										$fetchrecords=mysqli_query($db_conn,$selectrecords);
+										$selectrecords="select * from input_stock where tempid=?";
+										$fetchrecords=db_q($db_conn,$selectrecords,[$ot_tempid]);
 										$resultrecords=mysqli_fetch_array($fetchrecords);
 											
 											//company profile details
@@ -204,8 +204,8 @@ $select_Customers="select * from company_godown where id='$godownid' AND " . god
 							<td><?=date("d/M/Y",strtotime($resultrecords["input_date"]));?></td>
 													
 				<?php
-				$selectsumTotalQTY="select sum(input_qty) from input_stock where tempid='$ot_tempid'";
-				$fetchsumTotalQTY=mysqli_query($db_conn,$selectsumTotalQTY);
+				$selectsumTotalQTY="select sum(input_qty) from input_stock where tempid=?";
+				$fetchsumTotalQTY=db_q($db_conn,$selectsumTotalQTY,[$ot_tempid]);
 				$resultsumTotalQTY=mysqli_fetch_array($fetchsumTotalQTY);
 				if($resultsumTotalQTY[0]!=NULL){
 				$TotalPrQty=$resultsumTotalQTY[0];

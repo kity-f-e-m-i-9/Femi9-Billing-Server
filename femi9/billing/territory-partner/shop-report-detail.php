@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -14,7 +14,7 @@ $to      = isset($_GET['to'])   && $_GET['to']   ? date('Y-m-d', strtotime($_GET
 $shop = mysqli_fetch_assoc(mysqli_query($db_conn, "
     SELECT s.*, sc.catlable
     FROM shop s LEFT JOIN shop_category sc ON sc.id = s.shop_cat
-    WHERE s.id='$shop_id' AND s.onboard_userID='$uid' AND s.onboard_userTYPE='$utype' LIMIT 1
+    WHERE s.id='".db_esc($shop_id)."' AND s.onboard_userID='".db_esc($uid)."' AND s.onboard_userTYPE='".db_esc($utype)."' LIMIT 1
 "));
 
 if (!$shop) {
@@ -29,8 +29,8 @@ $invoices = [];
 $res = mysqli_query($db_conn, "
     SELECT * FROM user_invoice
     WHERE to_user_id='$temp_id' AND to_user_type='shop'
-      AND from_user_id='$uid' AND from_user_type='$utype'
-      AND `date` BETWEEN '$from' AND '$to'
+      AND from_user_id='".db_esc($uid)."' AND from_user_type='".db_esc($utype)."'
+      AND `date` BETWEEN '".db_esc($from)."' AND '".db_esc($to)."'
     ORDER BY `date` DESC, id DESC
 ");
 while ($inv = mysqli_fetch_assoc($res)) {
@@ -62,8 +62,8 @@ $total_due      = max(0, $total_billed - $total_received);
 $total_units    = (int)(mysqli_fetch_array(mysqli_query($db_conn, "
     SELECT COALESCE(SUM(qty),0) q FROM user_invoice_items
     WHERE to_user_id='$temp_id' AND to_user_type='shop'
-      AND from_user_id='$uid' AND from_user_type='$utype'
-      AND `date` BETWEEN '$from' AND '$to'
+      AND from_user_id='".db_esc($uid)."' AND from_user_type='".db_esc($utype)."'
+      AND `date` BETWEEN '".db_esc($from)."' AND '".db_esc($to)."'
 "))['q']);
 
 // ── Payment / receipt history for this shop's invoices in range ─────────────

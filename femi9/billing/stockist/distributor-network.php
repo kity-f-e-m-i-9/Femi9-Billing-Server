@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $title="Users Network";
@@ -106,18 +106,18 @@ $stockistid=$Login_user_IDvl;
 <th>Taluk</th>
 </thead>
 <?php 
-$select_product_list1212="select * from stockiest where temp_id='$stockistid'";
+$select_product_list1212="select * from stockiest where temp_id='".db_esc($stockistid)."'";
 $fetch_product_list1212=mysqli_query($db_conn,$select_product_list1212);
 while($result_product_list1212=mysqli_fetch_array($fetch_product_list1212))
 {
 //
 $district_id1212=$result_product_list1212['district_id'];
-$select_distict1212="select * from district where id='$district_id1212'";
+$select_distict1212="select * from district where id='".db_esc($district_id1212)."'";
 $fetch_district1212=mysqli_query($db_conn,$select_distict1212);
 $result_district1212=mysqli_fetch_array($fetch_district1212);
 //
 $taluk_id12=$result_product_list1212['taluk_id'];
-$select_Taluks1212="select * from taluk where id='$taluk_id12'";
+$select_Taluks1212="select * from taluk where id='".db_esc($taluk_id12)."'";
 	$fetch_Taluks1212=mysqli_query($db_conn,$select_Taluks1212);
 	$result_Taluks1212=mysqli_fetch_array($fetch_Taluks1212);
 $taluk_name12=$result_Taluks1212['taluk'];
@@ -142,7 +142,7 @@ $taluk_name12=$result_Taluks1212['taluk'];
 </thead>
 
 <?php 
-$select_product_list="select * from distributor where stockiest_id='$stockistid'";
+$select_product_list="select * from distributor where stockiest_id='".db_esc($stockistid)."'";
 				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
@@ -150,19 +150,19 @@ $select_product_list="select * from distributor where stockiest_id='$stockistid'
 									
 //
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
+$select_distict="select * from district where id='".db_esc($district_id)."'";
 	$fetch_district=mysqli_query($db_conn,$select_distict);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 //
 $taluk_id=$result_product_list['taluk_id'];
-$select_Taluks12="select * from taluk where id='$taluk_id'";
+$select_Taluks12="select * from taluk where id='".db_esc($taluk_id)."'";
 	$fetch_Taluks12=mysqli_query($db_conn,$select_Taluks12);
 	$result_Taluks12=mysqli_fetch_array($fetch_Taluks12);
 $taluk_name=$result_Taluks12['taluk'];
 //
 $pincode_id=$result_product_list['pincode_id'];
-$select_pincodelist="select * from pincode where id='$pincode_id'";
+$select_pincodelist="select * from pincode where id='".db_esc($pincode_id)."'";
 	$fetch_pincodelist=mysqli_query($db_conn,$select_pincodelist);
 	$result_pincodelist=mysqli_fetch_array($fetch_pincodelist);
 $pincodeshow=$result_pincodelist['pincode'];

@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); 
 require_once("include/PermissionCheck.php"); requirePermission('dt');
 error_reporting(0);
@@ -258,8 +258,8 @@ $Coupon_category="Distributor";
                                                 
                                                 <tbody>
                                                 <?php 
-                                                $select_product_list="select * from distributor where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' order by id desc";
-                                                $fetch_product_list=mysqli_query($db_conn,$select_product_list);
+                                                $select_product_list="select * from distributor where onboard_userTYPE=? and onboard_userID=? order by id desc";
+                                                $fetch_product_list=db_q($db_conn,$select_product_list,[$onboard_userTYPE,$onboard_userID]);
                                                 while($result_product_list=mysqli_fetch_array($fetch_product_list))
                                                 {											
                                                     $rowid=base64_encode($result_product_list["id"]);

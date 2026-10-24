@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -10,31 +10,31 @@ $to_date   = $_REQUEST['todate'] ?? null;
 
 if ($from_date != NULL) {
     // Intra-state registered
-    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type='$Login_user_TYPEvl' AND from_user_id='$Login_user_IDvl' AND buyer_gsttype='register' AND gst_type='inner' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total_intra_register = mysqli_fetch_array(mysqli_query($db_conn, $q))[0] ?? 0;
-    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl' AND buyer_gsttype='register' AND gst_type='inner' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total_intra_register2 = mysqli_fetch_array(mysqli_query($db_conn, $q2))[0] ?? 0;
+    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type=? AND from_user_id=? AND buyer_gsttype='register' AND gst_type='inner' AND date BETWEEN ? AND ?";
+    $total_intra_register = mysqli_fetch_array(db_q($db_conn,$q,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
+    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type=? AND user_id=? AND buyer_gsttype='register' AND gst_type='inner' AND date BETWEEN ? AND ?";
+    $total_intra_register2 = mysqli_fetch_array(db_q($db_conn,$q2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
     $show_total_intra_register = $total_intra_register + $total_intra_register2;
 
     // Intra-state unregistered
-    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type='$Login_user_TYPEvl' AND from_user_id='$Login_user_IDvl' AND buyer_gsttype='unregister' AND gst_type='inner' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total_intra_unregister = mysqli_fetch_array(mysqli_query($db_conn, $q))[0] ?? 0;
-    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl' AND buyer_gsttype='unregister' AND gst_type='inner' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total_intra_unregister2 = mysqli_fetch_array(mysqli_query($db_conn, $q2))[0] ?? 0;
+    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type=? AND from_user_id=? AND buyer_gsttype='unregister' AND gst_type='inner' AND date BETWEEN ? AND ?";
+    $total_intra_unregister = mysqli_fetch_array(db_q($db_conn,$q,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
+    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type=? AND user_id=? AND buyer_gsttype='unregister' AND gst_type='inner' AND date BETWEEN ? AND ?";
+    $total_intra_unregister2 = mysqli_fetch_array(db_q($db_conn,$q2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
     $show_total_intra_unregister = $total_intra_unregister + $total_intra_unregister2;
 
     // Inter-state registered
-    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type='$Login_user_TYPEvl' AND from_user_id='$Login_user_IDvl' AND buyer_gsttype='register' AND gst_type='outer' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total_inter_register = mysqli_fetch_array(mysqli_query($db_conn, $q))[0] ?? 0;
-    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl' AND buyer_gsttype='register' AND gst_type='outer' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total_inter_register2 = mysqli_fetch_array(mysqli_query($db_conn, $q2))[0] ?? 0;
+    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type=? AND from_user_id=? AND buyer_gsttype='register' AND gst_type='outer' AND date BETWEEN ? AND ?";
+    $total_inter_register = mysqli_fetch_array(db_q($db_conn,$q,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
+    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type=? AND user_id=? AND buyer_gsttype='register' AND gst_type='outer' AND date BETWEEN ? AND ?";
+    $total_inter_register2 = mysqli_fetch_array(db_q($db_conn,$q2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
     $show_total_inter_register = $total_inter_register + $total_inter_register2;
 
     // Inter-state unregistered
-    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type='$Login_user_TYPEvl' AND from_user_id='$Login_user_IDvl' AND buyer_gsttype='unregister' AND gst_type='outer' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total_inter_unregister = mysqli_fetch_array(mysqli_query($db_conn, $q))[0] ?? 0;
-    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl' AND buyer_gsttype='unregister' AND gst_type='outer' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total_inter_unregister2 = mysqli_fetch_array(mysqli_query($db_conn, $q2))[0] ?? 0;
+    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type=? AND from_user_id=? AND buyer_gsttype='unregister' AND gst_type='outer' AND date BETWEEN ? AND ?";
+    $total_inter_unregister = mysqli_fetch_array(db_q($db_conn,$q,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
+    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type=? AND user_id=? AND buyer_gsttype='unregister' AND gst_type='outer' AND date BETWEEN ? AND ?";
+    $total_inter_unregister2 = mysqli_fetch_array(db_q($db_conn,$q2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
     $show_total_inter_unregister = $total_inter_unregister + $total_inter_unregister2;
 }
 ?>

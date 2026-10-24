@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -25,7 +25,7 @@ if (isset($_REQUEST['add-customer'])) {
     $user_id        = $Login_user_IDvl;
 
     $chk = mysqli_fetch_array(mysqli_query($db_conn,
-        "SELECT COUNT(*) AS n FROM customers WHERE mobile='$mobile' AND user_type='$user_type' AND user_id='$user_id'"));
+        "SELECT COUNT(*) AS n FROM customers WHERE mobile='".db_esc($mobile)."' AND user_type='".db_esc($user_type)."' AND user_id='".db_esc($user_id)."'"));
     if ($chk['n'] == 0) {
         $maxRow     = mysqli_fetch_array(mysqli_query($db_conn, "SELECT MAX(userid) AS numid FROM customers"));
         $userid     = (int)$maxRow['numid'] + 1;
@@ -33,8 +33,8 @@ if (isset($_REQUEST['add-customer'])) {
 
         mysqli_query($db_conn, "INSERT INTO customers
             (name,mobile,email,address,marketing_date,date,user_type,user_id,gstin,userid,useridtext,country_code)
-            VALUES ('$name','$mobile','$email','$address','$marketing_date','$date',
-            '$user_type','$user_id','$gstin','$userid','$useridtext','$country_code')");
+            VALUES ('".db_esc($name)."','".db_esc($mobile)."','".db_esc($email)."','".db_esc($address)."','".db_esc($marketing_date)."','".db_esc($date)."',
+            '".db_esc($user_type)."','".db_esc($user_id)."','".db_esc($gstin)."','".db_esc($userid)."','".db_esc($useridtext)."','".db_esc($country_code)."')");
 
         echo "<script>window.location='$viewurl';</script>";
     } else {
@@ -55,9 +55,9 @@ if (isset($_REQUEST['update-customer'])) {
     $country_code   = $_POST['country_code'] ?? '';
 
     mysqli_query($db_conn, "UPDATE customers SET
-        name='$name', mobile='$mobile', email='$email', address='$address',
-        marketing_date='$marketing_date', date='$date', gstin='$gstin', country_code='$country_code'
-        WHERE id='$update_id'");
+        name='".db_esc($name)."', mobile='".db_esc($mobile)."', email='".db_esc($email)."', address='".db_esc($address)."',
+        marketing_date='".db_esc($marketing_date)."', date='".db_esc($date)."', gstin='".db_esc($gstin)."', country_code='".db_esc($country_code)."'
+        WHERE id='".db_esc($update_id)."'");
 
     echo "<script>window.location='customer-manage.php?updatedSuccess';</script>";
     exit;

@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 
 include("checksession.php");
 include("config.php"); error_reporting(0);
@@ -18,9 +18,9 @@ while($fetch_user_invoiceGST=mysqli_fetch_array($exe_user_invoiceGST))
 // get gst type (inner/outer)
 if($from_usertype!="customer")
 {
-$select_gst_type="select gst_type from user_invoice where inv_id='$invnumber'";
+$select_gst_type="select gst_type from user_invoice where inv_id='".db_esc($invnumber)."'";
 }else{
-$select_gst_type="select gst_type from invoice where inv_id='$invnumber'";
+$select_gst_type="select gst_type from invoice where inv_id='".db_esc($invnumber)."'";
 }
 $fetch_gst_type=mysqli_query($db_conn,$select_gst_type);
 $result_gst_type=mysqli_fetch_array($fetch_gst_type);
@@ -53,10 +53,10 @@ if($buyer_GSTIN_count==15){ $buyer_gsttype="register";}else {$buyer_gsttype="unr
 //-------------------------------------------------------------------------------
 
 //UPDATE BUYER-GST-TYPE
-$update_invoice_gsttype="update user_return_stock set buyer_gsttype='$buyer_gsttype',gst_type='$gst_type' where invnumber='$invnumber'";
+$update_invoice_gsttype="update user_return_stock set buyer_gsttype='".db_esc($buyer_gsttype)."',gst_type='".db_esc($gst_type)."' where invnumber='".db_esc($invnumber)."'";
 mysqli_query($db_conn,$update_invoice_gsttype);
 //
-$update_invoice_gsttype2="update user_return_stock_items set buyer_gsttype='$buyer_gsttype',gst_type='$gst_type' where invnumber='$invnumber'";
+$update_invoice_gsttype2="update user_return_stock_items set buyer_gsttype='".db_esc($buyer_gsttype)."',gst_type='".db_esc($gst_type)."' where invnumber='".db_esc($invnumber)."'";
 mysqli_query($db_conn,$update_invoice_gsttype2);
 	
 }

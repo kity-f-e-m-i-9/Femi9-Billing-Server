@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $st_user_type=$_GET['q']; 
 error_reporting(0);
 		
@@ -39,8 +39,8 @@ error_reporting(0);
 			$usr_district_id=$result_userdetails['district_id'] ?? 0;
 			if(is_numeric($usr_district_id))
 {	
-$select_distict="select * from district where id='$usr_district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$usr_district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'] ?? 'Nil';
 }else{
@@ -53,8 +53,8 @@ if($st_user_type!="super_stockiest")
 			$usr_taluk_id=$result_userdetails['taluk_id'] ?? 0;
 			if(is_numeric($usr_taluk_id))
 {	
-$select_taluk="select taluk from taluk where id='$usr_taluk_id'";
-	$fetch_taluk=mysqli_query($db_conn,$select_taluk);
+$select_taluk="select taluk from taluk where id=?";
+	$fetch_taluk=db_q($db_conn,$select_taluk,[$usr_taluk_id]);
 	$result_taluk=mysqli_fetch_array($fetch_taluk);
 $talk_name=	$result_taluk['taluk'] ?? 'Nil';
 }else{

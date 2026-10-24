@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php");
 include("config.php");
 include("RemoveSpecialChar.php");
@@ -33,8 +33,8 @@ if(isset($_REQUEST['add-customer']))
 	$user_type=$Login_user_TYPEvl;
 	$user_id=$Login_user_IDvl;
 	
-	$select_count_product="select count(*) as numProducts from customers where mobile='$mobile' and user_type='$Login_user_TYPEvl'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	$select_count_product="select count(*) as numProducts from customers where mobile=? and user_type=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$mobile,$Login_user_TYPEvl]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numProducts']==0)
 	{
@@ -47,9 +47,9 @@ if(isset($_REQUEST['add-customer']))
 	$useridtext="FEMI9-".$format_num."";
 	
 		$insert_products="insert into customers (name,mobile,email,address,marketing_date,date,user_type,user_id,gstin,userid,useridtext,country_code)
-		values ('$name','$mobile','$email','$address','$marketing_date','$date','$user_type','$user_id',
-		'$gstin','$userid','$useridtext','$country_code')";
-		mysqli_query($db_conn,$insert_products);
+		values (?,?,?,?,?,?,?,?,
+		?,?,?,?)";
+		db_q($db_conn,$insert_products,[$name,$mobile,$email,$address,$marketing_date,$date,$user_type,$user_id,$gstin,$userid,$useridtext,$country_code]);
 		
 		echo "<script>window.location='manage-customer?addesuccess';</script>";
 	}else{
@@ -84,10 +84,10 @@ if(isset($_REQUEST['update-customer']))
 	$date=date("d",strtotime($marketing_date));
 	$country_code=$_POST["country_code"];
 	
-	$update_products="update customers set name='$name',mobile='$mobile',
-	email='$email',address='$address',marketing_date='$marketing_date',
-	date='$date',gstin='$gstin',country_code='$country_code' where id='$update_id'";
-	mysqli_query($db_conn,$update_products);
+	$update_products="update customers set name=?,mobile=?,
+	email=?,address=?,marketing_date=?,
+	date=?,gstin=?,country_code=? where id=?";
+	db_q($db_conn,$update_products,[$name,$mobile,$email,$address,$marketing_date,$date,$gstin,$country_code,$update_id]);
 		
 		echo "<script>window.location='manage-customer?updatedSuccess';</script>";
 	

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
@@ -100,7 +100,7 @@ $i          = $start_from;
                                         <tbody>
 <?php
 $fetch_invoices = mysqli_query($db_conn,
-    "SELECT * FROM user_invoice WHERE from_user_id='$Login_user_IDvl' AND from_user_type='$Login_user_TYPEvl' AND to_user_type='$getinvuser' ORDER BY id DESC");
+    "SELECT * FROM user_invoice WHERE from_user_id='".db_esc($Login_user_IDvl)."' AND from_user_type='".db_esc($Login_user_TYPEvl)."' AND to_user_type='".db_esc($getinvuser)."' ORDER BY id DESC");
 // Delivery-note modals are buffered here and printed once, after </table>,
 // instead of inline inside each <tr> — a <div> nested directly between two
 // <td>s is invalid HTML that browsers silently "fix" by relocating it out
@@ -109,7 +109,7 @@ $fetch_invoices = mysqli_query($db_conn,
 $dlModalsHtml = '';
 while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
     $CuSTID       = $result_product_list['to_user_id'];
-    $result_cust  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='$CuSTID'"));
+    $result_cust  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='".db_esc($CuSTID)."'"));
     $Cust_Name    = $result_cust['name']          ?? '---';
     $Cust_Mbile   = $result_cust['mobile_number'] ?? '';
     $RowID_encode = base64_encode($result_product_list["id"]);

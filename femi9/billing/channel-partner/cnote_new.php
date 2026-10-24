@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 include("return-validation-functions.php");
@@ -115,7 +115,7 @@ if ($getinvuser === 'customer') {
                 $items_r = mysqli_query($db_conn, $items_q);
                 while ($il = mysqli_fetch_array($items_r)) {
                     $pid = $il['pr_id'];
-                    $pr  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT productName FROM products WHERE id='$pid' LIMIT 1"));
+                    $pr  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT productName FROM products WHERE id='".db_esc($pid)."' LIMIT 1"));
                     $av  = getReturnAvailability($db_conn, $invid_decode, $pid, $fromusertype, $get_returnid);
                 ?>
                 <tr>
@@ -159,7 +159,7 @@ if ($getinvuser === 'customer') {
         $drop_r = mysqli_query($db_conn, $drop_q);
         while ($dl = mysqli_fetch_array($drop_r)) {
             $dpid = $dl['pr_id'];
-            $dpr  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='$dpid' LIMIT 1"));
+            $dpr  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='".db_esc($dpid)."' LIMIT 1"));
             $dav  = getReturnAvailability($db_conn, $invid_decode, $dpid, $fromusertype, $get_returnid);
             $dis  = $dav['available_qty'] <= 0 ? 'disabled' : '';
             $lbl  = $dav['available_qty'] > 0 ? " (Available: {$dav['available_qty']})" : " (Fully Returned)";
@@ -225,8 +225,8 @@ function updateProductInfo() {
 
 <?php if (!empty($get_returnid)): ?>
 <?php
-$ret_master = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_return_stock WHERE returnid='$get_returnid' LIMIT 1"));
-$ret_items  = mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE returnid='$get_returnid' ORDER BY id DESC");
+$ret_master = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_return_stock WHERE returnid='".db_esc($get_returnid)."' LIMIT 1"));
+$ret_items  = mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE returnid='".db_esc($get_returnid)."' ORDER BY id DESC");
 $count_ri   = mysqli_num_rows($ret_items);
 $TotalAMount123 = 0; $rd = 0;
 ?>

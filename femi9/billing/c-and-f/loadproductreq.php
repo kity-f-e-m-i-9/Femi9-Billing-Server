@@ -1,11 +1,11 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $prid=$_GET['q'];
 $reqid=$_GET['reqid'];
 $reqid=base64_decode($reqid); 
 error_reporting(0);
 
-$select_ProductsPrice="select * from stock_request_items where prid='$prid' and reqid='$reqid'";
-		$fetch_ProductsPrice=mysqli_query($db_conn,$select_ProductsPrice);
+$select_ProductsPrice="select * from stock_request_items where prid=? and reqid=?";
+		$fetch_ProductsPrice=db_q($db_conn,$select_ProductsPrice,[$prid,$reqid]);
 		$Result_ProductsPrice=mysqli_fetch_array($fetch_ProductsPrice);
 		 
 ?>

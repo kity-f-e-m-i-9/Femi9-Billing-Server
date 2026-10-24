@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 /**
  * User Invoice Action - Product Addition Only
  * Femi9 Billing Application
@@ -41,8 +41,8 @@ $inv_number = str_replace("'", "", $_REQUEST['inv_number']);
 $id_only = "0";
 
 // Check opening stock exists
-$select_count_opstock13 = "select count(*) as numopstock12 from stock where user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-$fetch_count_opstock13 = mysqli_query($db_conn, $select_count_opstock13);
+$select_count_opstock13 = "select count(*) as numopstock12 from stock where user_type=? and user_id=?";
+$fetch_count_opstock13 = db_q($db_conn,$select_count_opstock13,[$Login_user_TYPEvl,$godownid]);
 $result_count_opstock13 = mysqli_fetch_array($fetch_count_opstock13);
 
 if ($result_count_opstock13['numopstock12'] == 0) {
@@ -59,8 +59,8 @@ $qty = $_REQUEST['qty'];
 $totalamount = $amount * $qty;
 
 // Get product details (GST, HSN, Reward Points)
-$selectproducts = "select * from products where id='$pr_id'";
-$fetchproducts = mysqli_query($db_conn, $selectproducts);
+$selectproducts = "select * from products where id=?";
+$fetchproducts = db_q($db_conn,$selectproducts,[$pr_id]);
 $resultproducts = mysqli_fetch_array($fetchproducts);
 $gst_percentage = $resultproducts['gst'];
 // The product's own price-tax setting ('inclusive'/'exclusive' — distinct from
@@ -138,18 +138,18 @@ if ($customer_state == $admin_statecode) {
 }
 
 // Check if invoice already exists
-$select_count_invoice = "select count(*) as numInvoice from user_invoice where inv_id='$inv_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$godownid' and to_user_type='$invuser' and to_user_id='$customer_id'";
-$fetch_count_invoice = mysqli_query($db_conn, $select_count_invoice);
+$select_count_invoice = "select count(*) as numInvoice from user_invoice where inv_id=? and from_user_type=? and from_user_id=? and to_user_type=? and to_user_id=?";
+$fetch_count_invoice = db_q($db_conn,$select_count_invoice,[$inv_id,$Login_user_TYPEvl,$godownid,$invuser,$customer_id]);
 $result_count_invoice = mysqli_fetch_array($fetch_count_invoice);
 
 if ($result_count_invoice['numInvoice'] == 0) {
     // Insert invoice header
     $insert_Invoice = "insert into user_invoice (inv_id,id_only,inv_number,date,inv_year,sub_total,discount,total,to_user_type,to_user_id,from_user_type,from_user_id,gst_type,credit,roundoff,courier_charges,rwpoints_enable,buyer_gsttype,username,usertype)
     values 
-    ('$inv_id','$id_only','$inv_number','$date','$inv_year','0','0','0',
-    '$invuser','$customer_id','$Login_user_TYPEvl','$godownid','$gst_type','0','0','0','1',
-    '$buyer_gsttype','$username','$usertype')";
-    mysqli_query($db_conn, $insert_Invoice);
+    (?,?,?,?,?,'0','0','0',
+    ?,?,?,?,?,'0','0','0','1',
+    ?,?,?)";
+    db_q($db_conn,$insert_Invoice,[$inv_id,$id_only,$inv_number,$date,$inv_year,$invuser,$customer_id,$Login_user_TYPEvl,$godownid,$gst_type,$buyer_gsttype,$username,$usertype]);
 }
 
 // Check available stock — same unassigned row deductAndCredit() below will
@@ -163,8 +163,8 @@ if ($AVMstock === null || $AVMstock < $qty) {
 }
 
 // Check if product already in invoice
-$select_count_invoiceItem = "select count(*) as numInvoiceItem from user_invoice_items where inv_id='$inv_id' and pr_id='$pr_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$godownid' and to_user_type='$invuser' and to_user_id='$customer_id'";
-$fetch_count_invoiceItem = mysqli_query($db_conn, $select_count_invoiceItem);
+$select_count_invoiceItem = "select count(*) as numInvoiceItem from user_invoice_items where inv_id=? and pr_id=? and from_user_type=? and from_user_id=? and to_user_type=? and to_user_id=?";
+$fetch_count_invoiceItem = db_q($db_conn,$select_count_invoiceItem,[$inv_id,$pr_id,$Login_user_TYPEvl,$godownid,$invuser,$customer_id]);
 $result_count_invoiceItem = mysqli_fetch_array($fetch_count_invoiceItem);
 
 if ($result_count_invoiceItem['numInvoiceItem'] == 0) {
@@ -172,9 +172,9 @@ if ($result_count_invoiceItem['numInvoiceItem'] == 0) {
     $insert_InvoiceItems = "insert into user_invoice_items (inv_id,pr_id,amount,qty,total,to_user_type,to_user_id,from_user_type,from_user_id,
     gst_percentage,gstamount_singlepr,gstamount_total,subtotal,
     discount_percentage,discount_amount,gst_type,hsn,date,rwpoints,buyer_gsttype)
-    values ('$inv_id','$pr_id','$amount','$qty','$total','$invuser','$customer_id','$Login_user_TYPEvl','$godownid','$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal',
-    '$discount_percentage','$discount_amount','$gst_type','$hsn','$date','$rwpoints','$buyer_gsttype')";
-    mysqli_query($db_conn, $insert_InvoiceItems);
+    values (?,?,?,?,?,?,?,?,?,?,?,?,?,
+    ?,?,?,?,?,?,?)";
+    db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$invuser,$customer_id,$Login_user_TYPEvl,$godownid,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_percentage,$discount_amount,$gst_type,$hsn,$date,$rwpoints,$buyer_gsttype]);
 
     // Move stock from company (godownid) to the buyer via StockService —
     // scoped to the same unassigned rows on both sides, with a proper

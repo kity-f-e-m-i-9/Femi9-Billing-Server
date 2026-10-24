@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php"); 
 error_reporting(0);
 
@@ -27,7 +27,7 @@ while($result_nonusers=mysqli_fetch_array($fetch_nonusers))
 	
 	if($nonuser_invid!=NULL)
 	{
-$select_nonusers232="select * from user_invoice where inv_id='$nonuser_invid'";
+$select_nonusers232="select * from user_invoice where inv_id='".db_esc($nonuser_invid)."'";
 $fetch_nonusers232=mysqli_query($db_conn,$select_nonusers232);
 $result_nonusers232=mysqli_fetch_array($fetch_nonusers232);
 
@@ -36,7 +36,7 @@ $get_from_userid=$result_nonusers232['from_user_id'];
 $get_to_usertype=$result_nonusers232['to_user_type'];
 $get_to_userid=$result_nonusers232['to_user_id'];
 
-$updatenonusers="update receipt set from_user_type='$get_from_usertype',from_user_id='$get_from_userid',to_user_type='$get_to_usertype',to_user_id='$get_to_userid' where inv_id='$nonuser_invid'";
+$updatenonusers="update receipt set from_user_type='".db_esc($get_from_usertype)."',from_user_id='".db_esc($get_from_userid)."',to_user_type='".db_esc($get_to_usertype)."',to_user_id='".db_esc($get_to_userid)."' where inv_id='".db_esc($nonuser_invid)."'";
 mysqli_query($db_conn,$updatenonusers);
 	}
 

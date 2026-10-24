@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
@@ -143,23 +143,23 @@ $i= $start_from;
 
                                         <tbody>
                                     <?php
-                                $select_product_list12="select distinct `tempid` from `internal_transfer` where date between '$se_fromDate' and '$se_toDate' and send_from='$from_id' and send_to='$to_id'";
-                                    $fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
+                                $select_product_list12="select distinct `tempid` from `internal_transfer` where date between ? and ? and send_from=? and send_to=?";
+                                    $fetch_product_list12=db_q($db_conn,$select_product_list12,[$se_fromDate,$se_toDate,$from_id,$to_id]);
                                     while($ResultRecords12=mysqli_fetch_array($fetch_product_list12))
                                     {
 
                                         $tempid=$ResultRecords12["tempid"];
 
-                                    $select_product_list="select * from internal_transfer where tempid='$tempid'";
-                                    $fetch_product_list=mysqli_query($db_conn,$select_product_list);
+                                    $select_product_list="select * from internal_transfer where tempid=?";
+                                    $fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
                                     $ResultRecords=mysqli_fetch_array($fetch_product_list);
 
-                                    $select_INVOICE="select * from internal_transfer_invoice where tempid='$tempid'";
-                                    $fetch_INVOICE=mysqli_query($db_conn,$select_INVOICE);
+                                    $select_INVOICE="select * from internal_transfer_invoice where tempid=?";
+                                    $fetch_INVOICE=db_q($db_conn,$select_INVOICE,[$tempid]);
                                     $result_INVOICE=mysqli_fetch_array($fetch_INVOICE);
 
-                                    $select_SUM_TOTAL="select sum(total) as grand_total from internal_transfer where tempid='$tempid'";
-                                    $fetch_SUM_TOTAL=mysqli_query($db_conn,$select_SUM_TOTAL);
+                                    $select_SUM_TOTAL="select sum(total) as grand_total from internal_transfer where tempid=?";
+                                    $fetch_SUM_TOTAL=db_q($db_conn,$select_SUM_TOTAL,[$tempid]);
                                     $result_SUM_TOTAL=mysqli_fetch_array($fetch_SUM_TOTAL);
                                         ?>
 
@@ -174,8 +174,8 @@ $i= $start_from;
 
                         $prid_header=$result_prdetails_header['id'];
 
-                        $select_SUM_QTY="select qty from internal_transfer where tempid='$tempid' and product_id='$prid_header'";
-                        $fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
+                        $select_SUM_QTY="select qty from internal_transfer where tempid=? and product_id=?";
+                        $fetch_SUM_QTY=db_q($db_conn,$select_SUM_QTY,[$tempid,$prid_header]);
                         $result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
                         if($result_SUM_QTY['qty']!=NULL){ $slsqty=$result_SUM_QTY['qty'];} else{ $slsqty="0";}
 

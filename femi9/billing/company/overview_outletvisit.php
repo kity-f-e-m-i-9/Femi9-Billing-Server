@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -212,7 +212,7 @@ $i= $start_from;
 if($seuser==NULL){	
 $select_records="select * from distributor order by id asc";
 }else{
-$select_records="select * from distributor where name LIKE '%$seuser%' order by id asc";	
+$select_records="select * from distributor where name LIKE '%".db_esc($seuser)."%' order by id asc";	
 }	
 $exe_records=mysqli_query($db_conn,$select_records);
 while($fetch_records=mysqli_fetch_array($exe_records))
@@ -222,11 +222,11 @@ while($fetch_records=mysqli_fetch_array($exe_records))
 	//
 	if($_REQUEST['indistinct']==NULL)
 	{
-	$select_visitcnt="select count(distinct date) numvstoutlet from user_invoice where to_user_type='shop' and from_user_type='distributor' and from_user_id='$distributorID'";
+	$select_visitcnt="select count(distinct date) numvstoutlet from user_invoice where to_user_type='shop' and from_user_type='distributor' and from_user_id='".db_esc($distributorID)."'";
 	}else{
-	$select_visitcnt="select count(*) numvstoutlet from user_invoice where to_user_type='shop' and from_user_type='distributor' and from_user_id='$distributorID'";	
+	$select_visitcnt="select count(*) numvstoutlet from user_invoice where to_user_type='shop' and from_user_type='distributor' and from_user_id=?";	
 	}
-	$exe_visitcnt=mysqli_query($db_conn,$select_visitcnt);
+	$exe_visitcnt=db_q($db_conn,$select_visitcnt,[$distributorID]);
 	$fetch_visitcnt=mysqli_fetch_array($exe_visitcnt);
 	$Total_Visit_Count=$fetch_visitcnt['numvstoutlet'];
 	
@@ -237,22 +237,22 @@ $stateid=$fetch_records['state_id'];
 $distid=$fetch_records['district_id'];
 						
 //District Details						
-$selectrecords_VLSS1="select * from district where state_id='$stateid' and id='$distid'";
-$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$stateid,$distid]);
 $resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 $district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 				
 //Taluk Details				
 $talukid=$fetch_records['taluk_id'];
-$selectrecordstaluk="select * from taluk where state_id='$stateid' and dist_id='$distid' and id='$talukid'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecordstaluk);
+$selectrecordstaluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecordstaluk,[$stateid,$distid,$talukid]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
 //Pincode Details				
 $pincodeid=$fetch_records['pincode_id'];
-$selectrecordspincode="select * from pincode where state_id='$stateid' and dist_id='$distid' and taluk_id='$talukid' and id='$pincodeid'";
-$exerecordspincode=mysqli_query($db_conn,$selectrecordspincode);
+$selectrecordspincode="select * from pincode where state_id=? and dist_id=? and taluk_id=? and id=?";
+$exerecordspincode=db_q($db_conn,$selectrecordspincode,[$stateid,$distid,$talukid,$pincodeid]);
 $fetchrecordspincode=mysqli_fetch_array($exerecordspincode);
 $pincodeshow=$fetchrecordspincode['pincode'];
 

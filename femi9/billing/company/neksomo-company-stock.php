@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/GodownAccess.php");
 include("config.php");
 
@@ -159,7 +159,7 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
                                     s.sent_qty, s.extra_pieces, s.closing_qty
                                 FROM stock s
                                 JOIN products p ON p.id = s.product_id
-                                WHERE s.user_type = 'company' AND s.user_id = '$user_id_Loginvl'
+                                WHERE s.user_type = 'company' AND s.user_id = '".db_esc($user_id_Loginvl)."'
                                   $nks_condition
                                 ORDER BY p.productName ASC";
                             $Fetch_OPStock = mysqli_query($db_conn, $select_OPStock);

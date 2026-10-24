@@ -1,10 +1,10 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $prid=$_GET['q']; 
 error_reporting(0);
 
 //
-$select_ProductsPrice="select * from products where id='$prid'";
-		$fetch_ProductsPrice=mysqli_query($db_conn,$select_ProductsPrice);
+$select_ProductsPrice="select * from products where id=?";
+		$fetch_ProductsPrice=db_q($db_conn,$select_ProductsPrice,[$prid]);
 		$Result_ProductsPrice=mysqli_fetch_array($fetch_ProductsPrice);
 		
 		

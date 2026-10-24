@@ -1,5 +1,5 @@
 <?php 
-declare(strict_types=1);
+declare(strict_types=1); require_once __DIR__ . '/../shared/db-helpers.php';
 
 // Start output buffering to prevent header issues
 ob_start();
@@ -104,11 +104,11 @@ if (isset($_REQUEST['invoice-submit'])) {
         $new_receivable      = round($total_amount - $new_total_received);
     
         $updateReceipt = "UPDATE receipt 
-                          SET received        = '$new_total_received',
-                              receivable      = '$new_receivable',
-                              invoice_amount  = '$total_amount',
-                              receipt_method  = '$receipt_method',
-                              receipt_remarks = '$receipt_remarks'
+                          SET received        = '".db_esc($new_total_received)."',
+                              receivable      = '".db_esc($new_receivable)."',
+                              invoice_amount  = '".db_esc($total_amount)."',
+                              receipt_method  = '".db_esc($receipt_method)."',
+                              receipt_remarks = '".db_esc($receipt_remarks)."'
                           WHERE inv_id='$invoice_id'";
         mysqli_query($db_conn, $updateReceipt);
     

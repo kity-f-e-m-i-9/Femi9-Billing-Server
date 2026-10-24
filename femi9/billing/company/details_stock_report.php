@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $usrtype=base64_decode($_REQUEST['usrtype']);
 $usrid=base64_decode($_REQUEST['usrid']);
@@ -59,15 +59,15 @@ $usrid=base64_decode($_REQUEST['usrid']);
 					</tr>
 					
 					<?php 
-$select_marketstock_VLDIST_VLSS1="select * from stock where user_type='$usrtype' and user_id='$usrid'";
-$fetch_marketstock_VLDIST_VLSS1=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS1);
+$select_marketstock_VLDIST_VLSS1="select * from stock where user_type=? and user_id=?";
+$fetch_marketstock_VLDIST_VLSS1=db_q($db_conn,$select_marketstock_VLDIST_VLSS1,[$usrtype,$usrid]);
 while($result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS1))
 {
 	
 	$productID=$result_marketstock_VLDIST_VLSS1['product_id'];
 	//
-	$select_productDetils="select * from products where id='$productID'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+	$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$productID]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						$closing_stock=$result_marketstock_VLDIST_VLSS1['closing_qty'];

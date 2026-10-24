@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 include("checksession.php");
@@ -56,7 +56,7 @@ $orderValueMap = [];
 $resOrders = mysqli_query($db_conn,
 	"SELECT order_id, shop_id, order_date, marketing_tool, latitude, longitude, pr_id, qty, discount_percentage
 	 FROM ms_orders
-	 WHERE ms_id='$viewMsIdEsc' AND new_order='yes' AND order_date BETWEEN '$from_date' AND '$to_date'
+	 WHERE ms_id='$viewMsIdEsc' AND new_order='yes' AND order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
 	 ORDER BY order_date DESC, order_id DESC"
 );
 while ($orow = mysqli_fetch_assoc($resOrders)) {

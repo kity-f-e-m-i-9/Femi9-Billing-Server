@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $file = "super-distributor-list.csv";
@@ -9,7 +9,7 @@ header("Content-Disposition: attachment; filename=$file");
 $output = fopen("php://output", "w");
 fputcsv($output, ['ID', 'Name', 'District', 'Taluk', 'Pincode', 'Mobile', 'Account Status']);
 
-$select_product_list = "select * from super_distributor where onboard_userID='$onboard_userID' order by id desc";
+$select_product_list = "select * from super_distributor where onboard_userID='".db_esc($onboard_userID)."' order by id desc";
 $fetch_product_list = mysqli_query($db_conn, $select_product_list);
 while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
 	fputcsv($output, [

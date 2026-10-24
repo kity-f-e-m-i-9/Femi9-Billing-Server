@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 include("RemoveSpecialChar.php");
 
@@ -8,13 +8,13 @@ $manage_title="Manage Orders";
 $message_title="Orders";
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from ms_orders where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from ms_orders where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 				
 				$shop_id=$result_product_list['shop_id'];
-$select_shopcatt="select * from ms_shop where id='$shop_id'";
-$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
+$select_shopcatt="select * from ms_shop where id=?";
+$fetch_shopcatt=db_q($db_conn,$select_shopcatt,[$shop_id]);
 $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 
 
@@ -30,9 +30,9 @@ $noorder_reason=str_replace("'","&#39;",$_POST["noorder_reason"]);
 	$marketing_tool=$_POST["marketing_tool"];
 	$marketing_tool=RemoveSpecialChar($marketing_tool);	
 	
-	$update_orders="update ms_orders set noorder_reason='$noorder_reason',marketing_tool='$marketing_tool',
-	shop_id='$shop_id' where id='$update_id'";
-	mysqli_query($db_conn,$update_orders);
+	$update_orders="update ms_orders set noorder_reason=?,marketing_tool=?,
+	shop_id=? where id=?";
+	db_q($db_conn,$update_orders,[$noorder_reason,$marketing_tool,$shop_id,$update_id]);
 	
 	$_SESSION['successMessage']="Changes saved successfully!";
 	echo "<script>window.location='manage_order';</script>";
@@ -124,8 +124,8 @@ $noorder_reason=str_replace("'","&#39;",$_POST["noorder_reason"]);
 											<label for="exampleInputEmail1" class="form-label">Shop*</label>
     <select name="shop_id" class="form-control" required="">
 	<option value="<?=$result_shopcatt['id'];?>" hidden=""><?=$result_shopcatt['name'];?></option>
-	<?php $selectShopCat="select * from ms_shop where ms_id='$markeingSTFID' order by id asc";
-	$fetchShopCat=mysqli_query($db_conn,$selectShopCat);
+	<?php $selectShopCat="select * from ms_shop where ms_id=? order by id asc";
+	$fetchShopCat=db_q($db_conn,$selectShopCat,[$markeingSTFID]);
 	while($resultShopCat=mysqli_fetch_array($fetchShopCat)){?>
 	<option value="<?php echo $resultShopCat['id'];?>"><?php echo $resultShopCat['name'];?></option>
 	<?php  } ?>

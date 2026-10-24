@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); 
 include("config.php"); 
 error_reporting(0);
@@ -18,8 +18,8 @@ if (isset($_REQUEST['invoice-submit'])) {
     // =========================================================================
     // STEP 1: Fetch invoice details  (using $resultdetails consistently)
     // =========================================================================
-    $selectdetails = "SELECT * FROM invoice WHERE inv_id='$invoice_id'";
-    $fetchdetails  = mysqli_query($db_conn, $selectdetails);
+    $selectdetails = "SELECT * FROM invoice WHERE inv_id=?";
+    $fetchdetails  = db_q($db_conn,$selectdetails,[$invoice_id]);
     $resultdetails = mysqli_fetch_array($fetchdetails);
 
     if (!$resultdetails) {
@@ -37,18 +37,18 @@ if (isset($_REQUEST['invoice-submit'])) {
         $update_invoice_date = date("Y-m-d", strtotime($_REQUEST['update_invoice_date']));
 
         $update_invoice12 = "UPDATE invoice 
-                             SET date='$update_invoice_date' 
-                             WHERE inv_id='$invoice_id' 
-                             AND user_type='$Login_user_TYPEvl' 
-                             AND user_id='$Login_user_IDvl'";
-        mysqli_query($db_conn, $update_invoice12);
+                             SET date=? 
+                             WHERE inv_id=? 
+                             AND user_type=? 
+                             AND user_id=?";
+        db_q($db_conn,$update_invoice12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
         $update_invoice_ITEMS12 = "UPDATE invoice_items 
-                                   SET date='$update_invoice_date' 
-                                   WHERE inv_id='$invoice_id' 
-                                   AND user_type='$Login_user_TYPEvl' 
-                                   AND user_id='$Login_user_IDvl'";
-        mysqli_query($db_conn, $update_invoice_ITEMS12);
+                                   SET date=? 
+                                   WHERE inv_id=? 
+                                   AND user_type=? 
+                                   AND user_id=?";
+        db_q($db_conn,$update_invoice_ITEMS12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
     }
 
     // =========================================================================
@@ -79,8 +79,8 @@ if (isset($_REQUEST['invoice-submit'])) {
     $to_user_id     = $resultdetails['customer_id'];
 
     // Check if receipt row already exists
-    $checkReceipt      = "SELECT id, received FROM receipt WHERE inv_id='$invoice_id' LIMIT 1";
-    $fetchCheckReceipt = mysqli_query($db_conn, $checkReceipt);
+    $checkReceipt      = "SELECT id, received FROM receipt WHERE inv_id=? LIMIT 1";
+    $fetchCheckReceipt = db_q($db_conn,$checkReceipt,[$invoice_id]);
     $existingReceipt   = mysqli_fetch_array($fetchCheckReceipt);
 
     if ($existingReceipt) {
@@ -89,13 +89,13 @@ if (isset($_REQUEST['invoice-submit'])) {
         $new_receivable     = round($total_amount - $new_total_received);
 
         $updateReceipt = "UPDATE receipt 
-                          SET received        = '$new_total_received',
-                              receivable      = '$new_receivable',
-                              invoice_amount  = '$total_amount',
-                              receipt_method  = '$receipt_method',
-                              receipt_remarks = '$receipt_remarks'
-                          WHERE inv_id='$invoice_id'";
-        mysqli_query($db_conn, $updateReceipt);
+                          SET received        = ?,
+                              receivable      = ?,
+                              invoice_amount  = ?,
+                              receipt_method  = ?,
+                              receipt_remarks = ?
+                          WHERE inv_id=?";
+        db_q($db_conn,$updateReceipt,[$new_total_received,$new_receivable,$total_amount,$receipt_method,$receipt_remarks,$invoice_id]);
 
     } else {
         // No receipt yet — insert fresh row
@@ -106,12 +106,12 @@ if (isset($_REQUEST['invoice-submit'])) {
                            from_user_type, from_user_id, to_user_type, to_user_id,
                            receipt_method, receipt_remarks) 
                           VALUES 
-                          ('$invoice_id', '$invoice_id', '$total_amount', '$receivedamount',
-                           '$receivableamount', '$receiptdate',
-                           '$from_user_type', '$from_user_id',
-                           '$to_user_type', '$to_user_id',
-                           '$receipt_method', '$receipt_remarks')";
-        mysqli_query($db_conn, $insertreceipt);
+                          (?, ?, ?, ?,
+                           ?, ?,
+                           ?, ?,
+                           ?, ?,
+                           ?, ?)";
+        db_q($db_conn,$insertreceipt,[$invoice_id,$invoice_id,$total_amount,$receivedamount,$receivableamount,$receiptdate,$from_user_type,$from_user_id,$to_user_type,$to_user_id,$receipt_method,$receipt_remarks]);
     }
 
     // =========================================================================
@@ -119,15 +119,15 @@ if (isset($_REQUEST['invoice-submit'])) {
     // =========================================================================
     if (!empty($_REQUEST['invoice_id'])) {
         $update_invoice = "UPDATE invoice 
-                           SET sub_total        = '$SubTotal',
-                               discount         = '$discount',
-                               total            = '$total_amount',
-                               roundoff         = '$roundoff',
-                               courier_charges  = '$courier_charges'
-                           WHERE inv_id='$invoice_id' 
-                           AND user_type='$Login_user_TYPEvl' 
-                           AND user_id='$Login_user_IDvl'";
-        $invoice_update_result = mysqli_query($db_conn, $update_invoice);
+                           SET sub_total        = ?,
+                               discount         = ?,
+                               total            = ?,
+                               roundoff         = ?,
+                               courier_charges  = ?
+                           WHERE inv_id=? 
+                           AND user_type=? 
+                           AND user_id=?";
+        $invoice_update_result = db_q($db_conn,$update_invoice,[$SubTotal,$discount,$total_amount,$roundoff,$courier_charges,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
         // =====================================================================
         // ✨ DAILY REWARD — new invoices only

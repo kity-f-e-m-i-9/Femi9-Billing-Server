@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 ?>
 <!DOCTYPE html>
@@ -100,8 +100,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from user_return_stock where to_usertype='$Login_user_TYPEvl' and to_userid='$Login_user_IDvl' and status='accept' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+					<?php $select_product_list="select * from user_return_stock where to_usertype=? and to_userid=? and status='accept' order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											$returnid=$result_product_list['returnid'];
@@ -135,15 +135,15 @@ $i= $start_from;
 				$distributorname=$result_distlist['name'];
 				
 				//get qty total
-				$select_qtytotal="select sum(qty) from user_return_stock_items where returnid='$returnid'";
-				$fetch_qtytotal=mysqli_query($db_conn,$select_qtytotal);
+				$select_qtytotal="select sum(qty) from user_return_stock_items where returnid=?";
+				$fetch_qtytotal=db_q($db_conn,$select_qtytotal,[$returnid]);
 				$result_qtytotal=mysqli_fetch_array($fetch_qtytotal);
 				if($result_qtytotal[0]!=NULL){
 				$totalqty=$result_qtytotal[0];}else{$totalqty="0";}
 				
 				//get damaged qty total
-				$select_qtytotalDMGD="select sum(damaged_qty) from user_return_stock_items where returnid='$returnid'";
-				$fetch_qtytotalDMGD=mysqli_query($db_conn,$select_qtytotalDMGD);
+				$select_qtytotalDMGD="select sum(damaged_qty) from user_return_stock_items where returnid=?";
+				$fetch_qtytotalDMGD=db_q($db_conn,$select_qtytotalDMGD,[$returnid]);
 				$result_qtytotalDMGD=mysqli_fetch_array($fetch_qtytotalDMGD);
 				if($result_qtytotalDMGD[0]!=NULL){
 				$totalqtyDMNGED=$result_qtytotalDMGD[0];}else{$totalqtyDMNGED="0";}

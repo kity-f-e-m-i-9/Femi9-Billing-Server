@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../../shared/db-helpers.php';
 /**
  * Table 4 (GSTR-1) B2B buyer-wise computation, shared between GSTR1.php (the
  * summary row) and gst_b2b_buyer_report.php (the full buyer-wise detail page)
@@ -93,7 +93,7 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
     $b2b_buyers = [];
 
     $godown_state_code = '';
-    $gres = mysqli_query($db_conn, "select state_code from company_godown where id='$get_godown_id'");
+    $gres = mysqli_query($db_conn, "select state_code from company_godown where id='".db_esc($get_godown_id)."'");
     if ($grow = mysqli_fetch_assoc($gres)) { $godown_state_code = $grow['state_code']; }
 
     // Network sales (SS/ST/DT/Shop). gst_percentage>0 only. Grouped by
@@ -113,8 +113,8 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
         LEFT JOIN stockiest       st ON uii.to_user_type='stockiest'       AND st.temp_id=uii.to_user_id
         LEFT JOIN distributor     dt ON uii.to_user_type='distributor'     AND dt.temp_id=uii.to_user_id
         LEFT JOIN shop            sh ON uii.to_user_type='shop'            AND sh.temp_id=uii.to_user_id
-        WHERE uii.from_user_type='$Login_user_TYPEvl' AND uii.from_user_id='$get_godown_id'
-          AND uii.buyer_gsttype='register' AND uii.gst_percentage>0 AND uii.date BETWEEN '$from_date' AND '$to_date'
+        WHERE uii.from_user_type='".db_esc($Login_user_TYPEvl)."' AND uii.from_user_id='".db_esc($get_godown_id)."'
+          AND uii.buyer_gsttype='register' AND uii.gst_percentage>0 AND uii.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY uii.to_user_type, uii.to_user_id, ui.inv_number, uii.gst_type, p.unit_type, ss.name, st.name, dt.name, sh.name, ss.gstin, st.gstin, dt.gstin, sh.gstin
     ";
     $res = mysqli_query($db_conn, $q);
@@ -132,8 +132,8 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
         LEFT JOIN invoice i ON i.inv_id = ii.inv_id
         LEFT JOIN customers c ON c.id = ii.customer_id
         LEFT JOIN products p ON p.id = ii.pr_id
-        WHERE ii.user_type='$Login_user_TYPEvl' AND ii.user_id='$get_godown_id'
-          AND ii.buyer_gsttype='register' AND ii.gst_percentage>0 AND ii.date BETWEEN '$from_date' AND '$to_date'
+        WHERE ii.user_type='".db_esc($Login_user_TYPEvl)."' AND ii.user_id='".db_esc($get_godown_id)."'
+          AND ii.buyer_gsttype='register' AND ii.gst_percentage>0 AND ii.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY ii.customer_id, i.inv_number, ii.gst_type, p.unit_type, c.name, c.gstin
     ";
     $res = mysqli_query($db_conn, $q);
@@ -149,7 +149,7 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
         FROM ot_sales s
         LEFT JOIN ot_sales_invoice i ON i.tempid = s.tempid
         LEFT JOIN products p ON p.id = s.prid
-        WHERE s.godownid='$get_godown_id' AND s.buyer_gsttype='register' AND s.gst>0 AND s.date BETWEEN '$from_date' AND '$to_date'
+        WHERE s.godownid='".db_esc($get_godown_id)."' AND s.buyer_gsttype='register' AND s.gst>0 AND s.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY s.tempid, i.inv_number, s.gst_type, p.unit_type, s.customer_name, s.gst_number
     ";
     $res = mysqli_query($db_conn, $q);
@@ -181,7 +181,7 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
         LEFT JOIN products p ON p.id = it.product_id
         JOIN company_godown cg ON cg.id = it.send_to
         JOIN company_godown it_from ON it_from.id = it.send_from
-        WHERE it.send_from='$get_godown_id' AND it.gst>0 AND it.date BETWEEN '$from_date' AND '$to_date'
+        WHERE it.send_from='".db_esc($get_godown_id)."' AND it.gst>0 AND it.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY it.send_to, cg.gname, cg.gstin, cg.state, it_from.state, COALESCE(iti.inv_number, it.tempid), it.gst_type, p.unit_type
     ";
     $res = mysqli_query($db_conn, $q);
@@ -198,9 +198,9 @@ function compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
         SELECT rsi.from_usertype, rsi.from_userid, rsi.gst_type,
                SUM(rsi.total-rsi.gstamount_total) AS taxable, SUM(rsi.gstamount_total) AS gst_amt
         FROM user_return_stock_items rsi
-        WHERE rsi.to_usertype='$Login_user_TYPEvl' AND rsi.to_userid='$get_godown_id'
+        WHERE rsi.to_usertype='".db_esc($Login_user_TYPEvl)."' AND rsi.to_userid='".db_esc($get_godown_id)."'
           AND rsi.buyer_gsttype='register' AND rsi.from_usertype != 'customer'
-          AND rsi.gst_percentage>0 AND rsi.date BETWEEN '$from_date' AND '$to_date'
+          AND rsi.gst_percentage>0 AND rsi.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY rsi.from_usertype, rsi.from_userid, rsi.gst_type
     ";
     $res = mysqli_query($db_conn, $q);

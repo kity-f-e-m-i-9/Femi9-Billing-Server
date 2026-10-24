@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('sdt_edit');
 error_reporting(0);
 
@@ -73,18 +73,18 @@ $insfilename=$old_icon;
 	
 	
 	//update process
-	$update_ss="update super_distributor set user_icon='$insfilename',name='$name',email='$email',
-	address='$address',gstin='$gstin',
-	country_code='$country_code',state_id='$state_id',district_id='$district_id',taluk_id='$taluk_id',
-	pincode_id='$pincode_id',shop_onboard='$shop_onboard' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update super_distributor set user_icon=?,name=?,email=?,
+	address=?,gstin=?,
+	country_code=?,state_id=?,district_id=?,taluk_id=?,
+	pincode_id=?,shop_onboard=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$address,$gstin,$country_code,$state_id,$district_id,$taluk_id,$pincode_id,$shop_onboard,$update_id]);
 	
 	//Update target amount
 	$target_amount=$_REQUEST['target_amount'];
 	$sd_id=$_REQUEST['sd_id'];
 	
-	$upadte129="update super_distributor_referral set target_amount='$target_amount' where sd_id='$sd_id'";
-	mysqli_query($db_conn,$upadte129);
+	$upadte129="update super_distributor_referral set target_amount=? where sd_id=?";
+	db_q($db_conn,$upadte129,[$target_amount,$sd_id]);
 	
 	echo "<script>window.location='super_Distributor_manage?updatedSuccess';</script>";
 	exit;

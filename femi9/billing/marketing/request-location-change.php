@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 require_once __DIR__ . "/../shared/ShopLocationChangeRequest.php";
@@ -23,7 +23,7 @@ if ($shop_id <= 0 || $ms_id <= 0) {
 	respond(false, 'Invalid request.');
 }
 
-$shopRes = mysqli_query($db_conn, "SELECT district_name, taluk_name, location_recapture_count FROM ms_shop WHERE id='$shop_id' LIMIT 1");
+$shopRes = mysqli_query($db_conn, "SELECT district_name, taluk_name, location_recapture_count FROM ms_shop WHERE id='".db_esc($shop_id)."' LIMIT 1");
 $shopRow = $shopRes ? mysqli_fetch_assoc($shopRes) : null;
 if (!$shopRow) {
 	respond(false, 'Shop not found.');
@@ -80,9 +80,9 @@ $district_name = mysqli_real_escape_string($db_conn, $canonicalDistrict);
 // can't both pass the check and both insert a duplicate pending row.
 $ok = mysqli_query($db_conn, "
 	INSERT INTO ms_shop_location_requests (shop_id, ms_id, district_name, status)
-	SELECT '$shop_id', '$ms_id', '$district_name', 'pending' FROM DUAL
+	SELECT '".db_esc($shop_id)."', '".db_esc($ms_id)."', '$district_name', 'pending' FROM DUAL
 	WHERE NOT EXISTS (
-		SELECT 1 FROM ms_shop_location_requests WHERE shop_id='$shop_id' AND status='pending'
+		SELECT 1 FROM ms_shop_location_requests WHERE shop_id='".db_esc($shop_id)."' AND status='pending'
 	)
 ");
 

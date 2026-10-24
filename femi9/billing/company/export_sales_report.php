@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 ob_start();
 include("checksession.php");
 include("config.php");
@@ -58,12 +58,12 @@ $grand_total = 0;
 // USER INVOICES
 if($selected_category != 'customer') {
     $select_product_list = "select * from user_invoice 
-                            where date between '$from_date' and '$to_date' 
-                            and from_user_type='$Login_user_TYPEvl' 
+                            where date between ? and ? 
+                            and from_user_type=? 
                             and sub_total>0 
                             $category_filter 
                             order by id asc";
-    $fetch_product_list = mysqli_query($db_conn, $select_product_list);
+    $fetch_product_list = db_q($db_conn,$select_product_list,[$from_date,$to_date,$Login_user_TYPEvl]);
     
     while($result_product_list = mysqli_fetch_array($fetch_product_list)) {
         $tousertype = $result_product_list['to_user_type'];
@@ -86,14 +86,14 @@ if($selected_category != 'customer') {
         $category_name = "-";
         if($tousertype == 'stockiest') {
             $stockist_temp_id = $result_Customers['temp_id'];
-            $select_category = "select st_cat_id from stockist_referral where stockist_id='$stockist_temp_id'";
-            $fetch_category = mysqli_query($db_conn, $select_category);
+            $select_category = "select st_cat_id from stockist_referral where stockist_id=?";
+            $fetch_category = db_q($db_conn,$select_category,[$stockist_temp_id]);
             $result_category = mysqli_fetch_array($fetch_category);
             
             if($result_category['st_cat_id']) {
                 $cat_id = $result_category['st_cat_id'];
-                $select_cat_name = "select catname from stockist_category where id='$cat_id'";
-                $fetch_cat_name = mysqli_query($db_conn, $select_cat_name);
+                $select_cat_name = "select catname from stockist_category where id=?";
+                $fetch_cat_name = db_q($db_conn,$select_cat_name,[$cat_id]);
                 $result_cat_name = mysqli_fetch_array($fetch_cat_name);
                 $category_name = $result_cat_name['catname'] ? $result_cat_name['catname'] : "-";
             }
@@ -103,8 +103,8 @@ if($selected_category != 'customer') {
         $district_name = "-";
         if($result_Customers['district_id']) {
             $district_id = $result_Customers['district_id'];
-            $select_district = "select dist_name from district where id='$district_id'";
-            $fetch_district = mysqli_query($db_conn, $select_district);
+            $select_district = "select dist_name from district where id=?";
+            $fetch_district = db_q($db_conn,$select_district,[$district_id]);
             $result_district = mysqli_fetch_array($fetch_district);
             $district_name = $result_district['dist_name'] ? $result_district['dist_name'] : "-";
         }
@@ -114,8 +114,8 @@ if($selected_category != 'customer') {
         if($result_Customers['taluk_id']) {
             $taluk_id = $result_Customers['taluk_id'];
             if(is_numeric($taluk_id)) {
-                $select_taluk = "select taluk from taluk where id='$taluk_id'";
-                $fetch_taluk = mysqli_query($db_conn, $select_taluk);
+                $select_taluk = "select taluk from taluk where id=?";
+                $fetch_taluk = db_q($db_conn,$select_taluk,[$taluk_id]);
                 $result_taluk = mysqli_fetch_array($fetch_taluk);
                 $taluk_name = $result_taluk['taluk'] ? $result_taluk['taluk'] : "-";
             } else {
@@ -151,8 +151,8 @@ if($selected_category != 'customer') {
         // Add product quantities and prices — 'amount' on user_invoice_items
         // is the per-unit rate (qty * amount = subtotal), not the line total.
         foreach($products as $prid_header) {
-            $select_sumprqty = "select qty, amount from user_invoice_items where inv_id='$inv_id' and pr_id='$prid_header'";
-            $fetch_sumprqty = mysqli_query($db_conn, $select_sumprqty);
+            $select_sumprqty = "select qty, amount from user_invoice_items where inv_id=? and pr_id=?";
+            $fetch_sumprqty = db_q($db_conn,$select_sumprqty,[$inv_id,$prid_header]);
             $result_sumprqty = mysqli_fetch_array($fetch_sumprqty);
             $row[] = ($result_sumprqty['qty']!=NULL) ? $result_sumprqty['qty'] : "0";
             $row[] = ($result_sumprqty['qty']!=NULL) ? inr_format((float)$result_sumprqty['amount'], 2) : "";
@@ -165,11 +165,11 @@ if($selected_category != 'customer') {
 // CUSTOMER INVOICES
 if(empty($selected_category) || $selected_category == 'customer') {
     $select_product_listcUSTOMER = "select * from invoice 
-                                    where date between '$from_date' and '$to_date' 
-                                    and user_type='$Login_user_TYPEvl' 
+                                    where date between ? and ? 
+                                    and user_type=? 
                                     and sub_total>0 
                                     order by id asc";
-    $fetch_product_listCUTOMER = mysqli_query($db_conn, $select_product_listcUSTOMER);
+    $fetch_product_listCUTOMER = db_q($db_conn,$select_product_listcUSTOMER,[$from_date,$to_date,$Login_user_TYPEvl]);
     
     while($result_product_listCUSTOMER = mysqli_fetch_array($fetch_product_listCUTOMER)) {
         $company_id2 = $result_product_listCUSTOMER['user_id'];
@@ -183,8 +183,8 @@ if(empty($selected_category) || $selected_category == 'customer') {
             $Cust_Name123 = "Walking Customer";
             $Cust_Mbile123 = "";
         } else {
-            $select_Customers = "select * from customers where id='$CuSTID'";
-            $fetch_Customers = mysqli_query($db_conn, $select_Customers);
+            $select_Customers = "select * from customers where id=?";
+            $fetch_Customers = db_q($db_conn,$select_Customers,[$CuSTID]);
             $result_Customers = mysqli_fetch_array($fetch_Customers);
             $Cust_Name123 = $result_Customers['name'];
             $Cust_Mbile123 = $result_Customers['mobile'];
@@ -212,8 +212,8 @@ if(empty($selected_category) || $selected_category == 'customer') {
         // Add product quantities and prices — 'amount' on invoice_items is
         // the per-unit rate (qty * amount = subtotal), not the line total.
         foreach($products as $prid_header_cus) {
-            $select_sumprqty12 = "select qty, amount from invoice_items where inv_id='$inv_id_cus' and pr_id='$prid_header_cus'";
-            $fetch_sumprqty12 = mysqli_query($db_conn, $select_sumprqty12);
+            $select_sumprqty12 = "select qty, amount from invoice_items where inv_id=? and pr_id=?";
+            $fetch_sumprqty12 = db_q($db_conn,$select_sumprqty12,[$inv_id_cus,$prid_header_cus]);
             $result_sumprqty12 = mysqli_fetch_array($fetch_sumprqty12);
             $row[] = ($result_sumprqty12['qty']!=NULL) ? $result_sumprqty12['qty'] : "0";
             $row[] = ($result_sumprqty12['qty']!=NULL) ? inr_format((float)$result_sumprqty12['amount'], 2) : "";
@@ -241,8 +241,8 @@ if($selected_category == '' || $selected_category == 'territory_partner') {
 
     while($result_tp_list = mysqli_fetch_array($fetch_tp_list)) {
         $tp_id = $result_tp_list['territory_partner_id'];
-        $select_tp = "select name, mobile from territory_partners where id='$tp_id'";
-        $fetch_tp = mysqli_query($db_conn, $select_tp);
+        $select_tp = "select name, mobile from territory_partners where id=?";
+        $fetch_tp = db_q($db_conn,$select_tp,[$tp_id]);
         $result_tp = mysqli_fetch_array($fetch_tp);
         $Cust_NameTP = $result_tp['name'] ? $result_tp['name'] : "Unknown";
         $Cust_MbileTP = $result_tp['mobile'];
@@ -260,8 +260,8 @@ if($selected_category == '' || $selected_category == 'territory_partner') {
         }
         if (!$cmpnameTP && (int)$result_tp_list['source_cp_id'] > 0) {
             $cp_id = $result_tp_list['source_cp_id'];
-            $select_cp = "select name from channel_partners where id='$cp_id'";
-            $fetch_cp = mysqli_query($db_conn, $select_cp);
+            $select_cp = "select name from channel_partners where id=?";
+            $fetch_cp = db_q($db_conn,$select_cp,[$cp_id]);
             $result_cp = mysqli_fetch_array($fetch_cp);
             $cmpnameTP = ($result_cp['name'] ? $result_cp['name'] : 'Channel Partner') . ' (CP)';
         }
@@ -289,8 +289,8 @@ if($selected_category == '' || $selected_category == 'territory_partner') {
         // Add product quantities and prices — tp_invoice_items has an
         // explicit per-unit 'rate' column (amount is the line total instead).
         foreach($products as $prid_header_tp) {
-            $select_sumprqtyTP = "select quantity, rate from tp_invoice_items where tp_invoice_id='$inv_id_tp' and product_id='$prid_header_tp'";
-            $fetch_sumprqtyTP = mysqli_query($db_conn, $select_sumprqtyTP);
+            $select_sumprqtyTP = "select quantity, rate from tp_invoice_items where tp_invoice_id=? and product_id=?";
+            $fetch_sumprqtyTP = db_q($db_conn,$select_sumprqtyTP,[$inv_id_tp,$prid_header_tp]);
             $result_sumprqtyTP = mysqli_fetch_array($fetch_sumprqtyTP);
             $row[] = ($result_sumprqtyTP['quantity']!=NULL) ? $result_sumprqtyTP['quantity'] : "0";
             $row[] = ($result_sumprqtyTP['quantity']!=NULL) ? inr_format((float)$result_sumprqtyTP['rate'], 2) : "";

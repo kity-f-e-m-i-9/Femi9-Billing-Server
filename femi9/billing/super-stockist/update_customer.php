@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 $title="Update Customer";
 error_reporting(0);
@@ -180,8 +180,8 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 			
 			$user_districtID=$result_Customers_list['district_id'];
 			//
-			$select_User_districtName="select * from district where id='$user_districtID'";
-			$fetch_user_districtName=mysqli_query($db_conn,$select_User_districtName);
+			$select_User_districtName="select * from district where id=?";
+			$fetch_user_districtName=db_q($db_conn,$select_User_districtName,[$user_districtID]);
 			$result_user_districtName=mysqli_fetch_array($fetch_user_districtName);
 			$user_districtName=$result_user_districtName['dist_name'];
 			

@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
 
@@ -28,8 +28,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	
 	$name=str_replace("'","&#39;",$_POST["name"]);
 	
-	$select_count_dist="select count(*) as numdist from outlet where temp_id='$temp_id'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+	$select_count_dist="select count(*) as numdist from outlet where temp_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$temp_id]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numdist']==0)
 	{
@@ -43,8 +43,8 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		
 	//plans details
 	$plan_id=$_POST["plan_id"];
-	$select_plans="select * from plans where id='$plan_id'";
-	$fetch_plans=mysqli_query($db_conn,$select_plans);
+	$select_plans="select * from plans where id=?";
+	$fetch_plans=db_q($db_conn,$select_plans,[$plan_id]);
 	$result_plans=mysqli_fetch_array($fetch_plans);
 	$plan_amount="0";//$result_plans["amount"];
 	$valid_months="0";//$result_plans["valid_months"];
@@ -85,13 +85,13 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		ref_number,account_status,merchantOrderId,merchantTransactionId,merchantUserId,gstin,
 		onboard_userTYPE,onboard_userID,address,userid,useridtext)
 
-		values ('$temp_id','$insfilename','$name','$state_id','$district_id',
-		'$taluk_id','$pincode_id','$user_email','$mobile_number',
-		'$username_generate','$user_password','$plan_amount','$valid_months',
-		'$valid_from','$valid_to','phonepe','pending','Nil','active',
-		'$merchantOrderId','$merchantTransactionId','$merchantUserId',
-		'$gstin','$onboard_userTYPE','$onboard_userID','$address','$userid','$useridtext')";
-		mysqli_query($db_conn,$sql);
+		values (?,?,?,?,?,
+		?,?,?,?,
+		?,?,?,?,
+		?,?,'phonepe','pending','Nil','active',
+		?,?,?,
+		?,?,?,?,?,?)";
+		db_q($db_conn,$sql,[$temp_id,$insfilename,$name,$state_id,$district_id,$taluk_id,$pincode_id,$user_email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$gstin,$onboard_userTYPE,$onboard_userID,$address,$userid,$useridtext]);
 		
 
 		echo "<script>window.location='Outlet-manage?distalready';</script>";

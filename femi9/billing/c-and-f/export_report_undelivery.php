@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 error_reporting(0);
@@ -50,15 +50,15 @@ $selectRcd_VLSS1190="select * from stock_request where fromusertype='super_stock
 											$state_id_VLSS1=$resultusers134['state_id'];
 											$district_id_VLSS1=$resultusers134['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$reqid=$resultRcd_VLSS1190['reqid'];
 										//
-										$SltTotalQty190="select sum(qty) from stock_request_items where reqid='$reqid'";
-										$fetchTotalQty190=mysqli_query($db_conn,$SltTotalQty190);
+										$SltTotalQty190="select sum(qty) from stock_request_items where reqid=?";
+										$fetchTotalQty190=db_q($db_conn,$SltTotalQty190,[$reqid]);
 										$resultTotalQty190=mysqli_fetch_array($fetchTotalQty190);
 
     // Prepare CSV row
@@ -101,21 +101,21 @@ $selectRcd_VLSS1="select * from stock_request where fromusertype='stockiest' and
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultusers['taluk_id'];
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
 $reqid=$resultRcd_VLSS1['reqid'];
 										//
-										$SltTotalQty190="select sum(qty) from stock_request_items where reqid='$reqid'";
-										$fetchTotalQty190=mysqli_query($db_conn,$SltTotalQty190);
+										$SltTotalQty190="select sum(qty) from stock_request_items where reqid=?";
+										$fetchTotalQty190=db_q($db_conn,$SltTotalQty190,[$reqid]);
 										$resultTotalQty190=mysqli_fetch_array($fetchTotalQty190);
 
     // Prepare CSV row
@@ -159,21 +159,21 @@ $selectRcd_VLSS1="select * from stock_request where fromusertype='distributor' a
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultusers['taluk_id'];
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
 $reqid=$resultRcd_VLSS1['reqid'];
 										//
-										$SltTotalQty190="select sum(qty) from stock_request_items where reqid='$reqid'";
-										$fetchTotalQty190=mysqli_query($db_conn,$SltTotalQty190);
+										$SltTotalQty190="select sum(qty) from stock_request_items where reqid=?";
+										$fetchTotalQty190=db_q($db_conn,$SltTotalQty190,[$reqid]);
 										$resultTotalQty190=mysqli_fetch_array($fetchTotalQty190);
 
     $csv_content .= '"' . $resultRcd_VLSS1["date"] . '",' .

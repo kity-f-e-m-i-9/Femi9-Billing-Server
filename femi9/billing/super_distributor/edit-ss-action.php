@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -64,10 +64,10 @@ $insfilename=$old_icon;
 	
 	
 	//update process
-	$update_ss="update shop set user_icon='$insfilename',name='$name',
-	email='$email',mobile_number='$mobile_number',address='$address',
-	shop_cat='$shop_cat',gstin='$gstin',country_code='$country_code',landline='$landline' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update shop set user_icon=?,name=?,
+	email=?,mobile_number=?,address=?,
+	shop_cat=?,gstin=?,country_code=?,landline=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,$address,$shop_cat,$gstin,$country_code,$landline,$update_id]);
 	
 	echo "<script>window.location='manage_ss.php?updatedSuccess';</script>";
 	

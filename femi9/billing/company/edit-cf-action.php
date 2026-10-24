@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -59,8 +59,8 @@ $insfilename=$old_icon;
 	
 	
 	//update process
-	$update_ss="update c_and_f set user_icon='$insfilename',name='$name',email='$email',mobile_number='$mobile_number',username='$mobile_number',address='$address',gstin='$gstin',country_code='$country_code',state_id='$state_id' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update c_and_f set user_icon=?,name=?,email=?,mobile_number=?,username=?,address=?,gstin=?,country_code=?,state_id=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,$mobile_number,$address,$gstin,$country_code,$state_id,$update_id]);
 	
 	echo "<script>window.location='manage_cf?updatedSuccess';</script>";
 	

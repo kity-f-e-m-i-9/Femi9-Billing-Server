@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $file = "customer-list.csv";
@@ -9,7 +9,7 @@ header("Content-Disposition: attachment; filename=$file");
 $output = fopen("php://output", "w");
 fputcsv($output, ['Name', 'Mobile', 'Email', 'GSTIN', 'Address', 'Country Code']);
 
-$select_product_list = "select * from customers where user_id='$Login_user_IDvl' order by id asc";
+$select_product_list = "select * from customers where user_id='".db_esc($Login_user_IDvl)."' order by id asc";
 $fetch_product_list = mysqli_query($db_conn, $select_product_list);
 while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
 	fputcsv($output, [

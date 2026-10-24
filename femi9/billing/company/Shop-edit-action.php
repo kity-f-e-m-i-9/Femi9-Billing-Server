@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('shop_edit');
 include("RemoveSpecialChar.php");
 
@@ -76,10 +76,10 @@ $insfilename=$old_icon;
 	
 	
 	//update process
-	$update_ss="update shop set user_icon='$insfilename',name='$name',
-	email='$email',mobile_number='$mobile_number',address='$address',
-	gstin='$gstin',shop_cat='$shop_cat',country_code='$country_code',landline='$landline' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update shop set user_icon=?,name=?,
+	email=?,mobile_number=?,address=?,
+	gstin=?,shop_cat=?,country_code=?,landline=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,$address,$gstin,$shop_cat,$country_code,$landline,$update_id]);
 	
 	echo "<script>window.location='Shop-manage?updatedSuccess';</script>";
 	

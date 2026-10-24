@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 
 include("checksession.php");
 include("config.php"); error_reporting(0);
@@ -15,7 +15,7 @@ while($fetch_user_invoiceGST2=mysqli_fetch_array($exe_user_invoiceGST2))
 	$invoice_id2=$fetch_user_invoiceGST2['inv_id'];
 	$invoice_customer_id=$fetch_user_invoiceGST2['customer_id'];
 
-$selecutomser_dtails2="select * from customers where id='$invoice_customer_id'";
+$selecutomser_dtails2="select * from customers where id='".db_esc($invoice_customer_id)."'";
 $fetchcutomser_dtails2=mysqli_query($db_conn,$selecutomser_dtails2);
 $resultcutomser_dtails2=mysqli_fetch_array($fetchcutomser_dtails2);
 
@@ -24,10 +24,10 @@ $buyer_GSTIN_count2=strlen($buyer_GSTIN2);
 if($buyer_GSTIN_count2==15){ $buyer_gsttype2="register";}else {$buyer_gsttype2="unregister";}
 
 //UPDATE BUYER-GST-TYPE
-$update_invoice_gsttype2="update invoice set buyer_gsttype='$buyer_gsttype2' where inv_id='$invoice_id2'";
+$update_invoice_gsttype2="update invoice set buyer_gsttype='".db_esc($buyer_gsttype2)."' where inv_id='".db_esc($invoice_id2)."'";
 mysqli_query($db_conn,$update_invoice_gsttype2);
 //
-$update_invoice_gsttype23="update invoice_items set buyer_gsttype='$buyer_gsttype2' where inv_id='$invoice_id2'";
+$update_invoice_gsttype23="update invoice_items set buyer_gsttype='".db_esc($buyer_gsttype2)."' where inv_id='".db_esc($invoice_id2)."'";
 mysqli_query($db_conn,$update_invoice_gsttype23);
 	
 }

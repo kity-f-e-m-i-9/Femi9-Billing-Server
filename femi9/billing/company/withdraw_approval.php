@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 error_reporting(0);
 include("RemoveSpecialChar.php");
 
@@ -18,7 +18,7 @@ $remarks = mysqli_real_escape_string($db_conn, $remarks);
 
 // Guard: only approve requests that are currently pending
 $check = mysqli_fetch_assoc(mysqli_query($db_conn,
-    "SELECT req_status FROM wallet_withdraw WHERE id='$request_row_id' LIMIT 1"));
+    "SELECT req_status FROM wallet_withdraw WHERE id='".db_esc($request_row_id)."' LIMIT 1"));
 if (!$check || $check['req_status'] !== 'pending') {
     $_SESSION['errorMessage'] = "Request is not in pending status — cannot approve.";
     echo "<script>window.location='wallet_request';</script>";
@@ -29,11 +29,11 @@ $update_aproved = "UPDATE wallet_withdraw SET
     remarks='$remarks',
     updated_date='$updated_date',
     updated_time='$updated_time',
-    TDS_percentage='$TDS_percentage',
-    TDS_deduction='$TDS_deduction',
-    sent_amount='$sent_amount',
+    TDS_percentage='".db_esc($TDS_percentage)."',
+    TDS_deduction='".db_esc($TDS_deduction)."',
+    sent_amount='".db_esc($sent_amount)."',
     req_status='approved'
-    WHERE id='$request_row_id' AND req_status='pending'";
+    WHERE id='".db_esc($request_row_id)."' AND req_status='pending'";
 mysqli_query($db_conn, $update_aproved);
 
 $_SESSION['successMessage']="Withdraw Request Approved Success";

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
@@ -216,15 +216,15 @@ if (isset($_REQUEST['InvoiceID'])) {
     $Invoice_ID_encode = $_REQUEST['InvoiceID'];
     $Invoice_ID        = base64_decode($_REQUEST['InvoiceID']);
 
-    $res_inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='$Invoice_ID' LIMIT 1"));
+    $res_inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='".db_esc($Invoice_ID)."' LIMIT 1"));
 
     $totalamount         = (float)($res_inv['total'] ?? 0);
-    $Total_Receipt_amount = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(received) FROM receipt WHERE inv_id='$Invoice_ID'"))[0]);
+    $Total_Receipt_amount = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(received) FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."'"))[0]);
     $amount_received_fully = ($Total_Receipt_amount > 0 && $totalamount == $Total_Receipt_amount) ? "1" : "0";
 
     $CustomerID = $res_inv['customer_id'] ?? 0;
     if ($CustomerID != 0) {
-        $res_cust          = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE id='$CustomerID' LIMIT 1"));
+        $res_cust          = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE id='".db_esc($CustomerID)."' LIMIT 1"));
         $inv_customer_name   = $res_cust['name']   ?? '';
         $inv_customer_mobile = $res_cust['mobile']  ?? '';
     } else {
@@ -241,7 +241,7 @@ if (isset($_REQUEST['InvoiceID'])) {
 <div class="col-md-6">
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
 <?php
-$cnt_items = (int)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM invoice_items WHERE inv_id='$Invoice_ID'"))['n']);
+$cnt_items = (int)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM invoice_items WHERE inv_id='".db_esc($Invoice_ID)."'"))['n']);
 ?>
 <select name="customer_id" class="form-control">
 <option value="<?php echo $CustomerID; ?>" hidden><?php echo htmlspecialchars($inv_customer_name); ?>, <?php echo htmlspecialchars($inv_customer_mobile); ?></option>
@@ -337,7 +337,7 @@ while ($rp = mysqli_fetch_array($res_prods)) {
 
 <?php
 $TotalAMount123 = 0;
-$res_items = mysqli_query($db_conn, "SELECT ii.*, p.productName, p.hsn FROM invoice_items ii LEFT JOIN products p ON ii.pr_id=p.id WHERE ii.inv_id='$Invoice_ID' ORDER BY ii.id DESC");
+$res_items = mysqli_query($db_conn, "SELECT ii.*, p.productName, p.hsn FROM invoice_items ii LEFT JOIN products p ON ii.pr_id=p.id WHERE ii.inv_id='".db_esc($Invoice_ID)."' ORDER BY ii.id DESC");
 $CountProducts = mysqli_num_rows($res_items);
 $rd = 0;
 ?>
@@ -382,14 +382,14 @@ $rd = 0;
 
 <?php
 if ($CountProducts == 0 && (float)($res_inv['sub_total'] ?? 0) > 0) {
-    mysqli_query($db_conn, "UPDATE invoice SET sub_total='0',discount='0',total='0' WHERE inv_id='$Invoice_ID'");
+    mysqli_query($db_conn, "UPDATE invoice SET sub_total='0',discount='0',total='0' WHERE inv_id='".db_esc($Invoice_ID)."'");
 }
 $unround_value  = $TotalAMount123 + (float)($res_inv['courier_charges'] ?? 0);
 $roundvalue     = round($unround_value);
 $roundoff       = $roundvalue - $unround_value;
-$already_received = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COALESCE(SUM(received),0) FROM receipt WHERE inv_id='$Invoice_ID'"))[0]);
+$already_received = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COALESCE(SUM(received),0) FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."'"))[0]);
 $balance_due    = max(0, (float)$roundvalue - $already_received);
-$res_receipt    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='$Invoice_ID' ORDER BY id ASC LIMIT 1"));
+$res_receipt    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."' ORDER BY id ASC LIMIT 1"));
 ?>
 
 <div class="invoice-summary-card">

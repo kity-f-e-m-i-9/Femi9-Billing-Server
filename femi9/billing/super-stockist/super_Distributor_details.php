@@ -1,8 +1,8 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from super_distributor where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from super_distributor where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -156,16 +156,16 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
 					<?php
 $sd_id=$result_product_list['temp_id'];
 					
-				$Select_ReferralDetails="select * from super_distributor_referral where sd_id='$sd_id'";
-				$Fetch_ReferralDetails=mysqli_query($db_conn,$Select_ReferralDetails);
+				$Select_ReferralDetails="select * from super_distributor_referral where sd_id=?";
+				$Fetch_ReferralDetails=db_q($db_conn,$Select_ReferralDetails,[$sd_id]);
 				$Result_ReferralDetails=mysqli_fetch_array($Fetch_ReferralDetails);
 				
 				$target_amount=$Result_ReferralDetails['target_amount'];
 				$referred_user_type=$Result_ReferralDetails['ref_by_user_type'];
 				$referred_user_id=$Result_ReferralDetails['ref_by_user_id'];
 				
-				$Select_STcatdetails="select * from super_distributor_category where amount='$target_amount'";
-				$Felect_STcatdetails=mysqli_query($db_conn,$Select_STcatdetails);
+				$Select_STcatdetails="select * from super_distributor_category where amount=?";
+				$Felect_STcatdetails=db_q($db_conn,$Select_STcatdetails,[$target_amount]);
 				$Relect_STcatdetails=mysqli_fetch_array($Felect_STcatdetails);
 				?>
 				<tr>

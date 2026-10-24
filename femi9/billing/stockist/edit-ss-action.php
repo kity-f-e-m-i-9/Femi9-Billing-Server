@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; 
 include("checksession.php");
 include("config.php");
 
@@ -92,7 +92,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     
     // FIX: Added gstin to the update query
     $update_ss = "UPDATE distributor SET 
-        user_icon='$insfilename',
+        user_icon='".db_esc($insfilename)."',
         name='$name',
         email='$email',
         mobile_number='$mobile_number',
@@ -104,7 +104,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         taluk_id='$taluk_id',
         pincode_id='$pincode_id',
         gstin='$gstin',
-        shop_onboard='$shop_onboard' 
+        shop_onboard='".db_esc($shop_onboard)."' 
         WHERE id='$update_id'";
     
     // FIX: Check if query executed successfully

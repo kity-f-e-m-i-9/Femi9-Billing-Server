@@ -1,4 +1,4 @@
-<?php session_start(); include("checksession.php"); include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; session_start(); include("checksession.php"); include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
 
@@ -18,11 +18,11 @@ if (isset($_REQUEST['updateInvoiceNum'])) {
 	if($_REQUEST["tblenme"]==1)
 	{
 		$tablename="user_invoice";
-$Select_Count_Invoice="select * from user_invoice where inv_number='$invnumber' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
+$Select_Count_Invoice="select * from user_invoice where inv_number='$invnumber' and from_user_type='".db_esc($Login_user_TYPEvl)."' and from_user_id='".db_esc($Login_user_IDvl)."'";
 		
 	}else{ 
 	$tablename="invoice";
-$Select_Count_Invoice="select * from invoice where inv_number='$invnumber' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
+$Select_Count_Invoice="select * from invoice where inv_number='$invnumber' and user_type='".db_esc($Login_user_TYPEvl)."' and user_id='".db_esc($Login_user_IDvl)."'";
 	}
 	
 $Fetch_Count_Invoice=mysqli_query($db_conn,$Select_Count_Invoice);

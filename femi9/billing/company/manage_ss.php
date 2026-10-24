@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ss');
 error_reporting(0);
@@ -281,8 +281,8 @@ $canDeleteSs = hasPermission('ss_delete');
                                                 {
                                                     // Get district name
                                                     $district_id=$result_product_list['district_id'];
-                                                    $select_distict="select * from district where id='$district_id'";
-                                                    $fetch_district=mysqli_query($db_conn,$select_distict);
+                                                    $select_distict="select * from district where id=?";
+                                                    $fetch_district=db_q($db_conn,$select_distict,[$district_id]);
                                                     $result_district=mysqli_fetch_array($fetch_district);
                                                     $district_name=$result_district['dist_name'];
                                                     
@@ -290,8 +290,8 @@ $canDeleteSs = hasPermission('ss_delete');
                                                     $taluk_name = '';
                                                     if(isset($result_product_list['taluk_id']) && !empty($result_product_list['taluk_id'])) {
                                                         $taluk_id=$result_product_list['taluk_id'];
-                                                        $select_taluk="select * from taluk where id='$taluk_id'";
-                                                        $fetch_taluk=mysqli_query($db_conn,$select_taluk);
+                                                        $select_taluk="select * from taluk where id=?";
+                                                        $fetch_taluk=db_q($db_conn,$select_taluk,[$taluk_id]);
                                                         $result_taluk=mysqli_fetch_array($fetch_taluk);
                                                         $taluk_name=$result_taluk['taluk'];
                                                     }

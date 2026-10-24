@@ -1,10 +1,10 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 
 $tempid=$_REQUEST['tempid'];
 
-$select_Invoice_Details="select * from demofreedamage where tempid='$tempid'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from demofreedamage where tempid=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$tempid]);
 $countRecords=mysqli_num_rows($fetch_Invoice_Details);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);						
 ?>
@@ -125,8 +125,8 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-		$select_product_list="select * from demofreedamage where tempid='$tempid' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+		$select_product_list="select * from demofreedamage where tempid=? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 										while($ResultRecords=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -134,8 +134,8 @@ $i= $start_from;
 											
 											//product details
 											$product_id=$ResultRecords['product_id'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						$PR_qty=$ResultRecords["qty"];

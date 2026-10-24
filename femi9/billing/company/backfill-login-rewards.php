@@ -24,7 +24,7 @@
  * ============================================================================
  */
 
-declare(strict_types=1);
+declare(strict_types=1); require_once __DIR__ . '/../shared/db-helpers.php';
 
 include("checksession.php");
 include("config.php");
@@ -93,8 +93,8 @@ function fetchMissing($db, string $end): array {
                 inv_id,
                 inv_number
             FROM `invoice`
-            WHERE `date` >= '$start'
-              AND `date` <= '$end'
+            WHERE `date` >= ?
+              AND `date` <= ?
               AND user_type IN ($types)
               AND deleted_at IS NULL
 
@@ -108,8 +108,8 @@ function fetchMissing($db, string $end): array {
                 inv_id,
                 inv_number
             FROM `user_invoice`
-            WHERE `date` >= '$start'
-              AND `date` <= '$end'
+            WHERE `date` >= ?
+              AND `date` <= ?
               AND from_user_type IN ($types)
               AND deleted_at IS NULL
         ) AS src
@@ -124,7 +124,7 @@ function fetchMissing($db, string $end): array {
         ORDER BY DATE(src.bill_date) ASC, src.user_type, src.user_id
     ";
 
-    $res  = mysqli_query($db, $sql);
+    $res  = db_q($db,$sql,[$start,$end,$start,$end]);
     $rows = [];
     if ($res) {
         while ($row = mysqli_fetch_assoc($res)) {
@@ -154,7 +154,7 @@ function fetchBackfillRecords($db): array {
     $tag = BACKFILL_SOURCE;
     $res = mysqli_query($db,
         "SELECT * FROM daily_login_rewards
-         WHERE notes LIKE '%$tag%'
+         WHERE notes LIKE '%".db_esc($tag)."%'
          ORDER BY reward_date DESC, user_type, user_id"
     );
     $rows = [];
@@ -211,8 +211,8 @@ if ($action === 'execute') {
                         (user_type, user_id, reward_date, points_awarded,
                          invoice_id, invoice_number, created_at, notes)
                     VALUES
-                        ('$userType','$userId','$date',$pts,
-                         '$invoiceId','$invoiceNum', NOW(),'$tag')";
+                        ('$userType','$userId','".db_esc($date)."',$pts,
+                         '$invoiceId','$invoiceNum', NOW(),'".db_esc($tag)."')";
             if (!mysqli_query($db_conn, $ins)) {
                 throw new Exception(mysqli_error($db_conn));
             }
@@ -224,8 +224,8 @@ if ($action === 'execute') {
                      (action_type, user_type, user_id, reward_date, points_amount,
                       invoice_id, invoice_number, admin_user, notes, ip_address, created_at)
                  VALUES
-                     ('backfill_run','$userType','$userId','$date',$pts,
-                      '$invoiceId','$invoiceNum','$admin','$tag','$ip', NOW())"
+                     ('backfill_run','$userType','$userId','".db_esc($date)."',$pts,
+                      '$invoiceId','$invoiceNum','".db_esc($admin)."','".db_esc($tag)."','$ip', NOW())"
             );
 
             mysqli_commit($db_conn);
@@ -287,8 +287,8 @@ if ($action === 'rollback') {
                      (action_type, user_type, user_id, reward_date, points_amount,
                       invoice_id, invoice_number, admin_user, notes, ip_address, created_at)
                  VALUES
-                     ('backfill_rollback','$ut','$uid','$rd',$pts,
-                      '$inv','$invn','$admin','Rollback of $tag (reward #$id)','$ip', NOW())"
+                     ('backfill_rollback','$ut','$uid','".db_esc($rd)."',$pts,
+                      '$inv','$invn','".db_esc($admin)."','Rollback of $tag (reward #$id)','$ip', NOW())"
             );
             mysqli_commit($db_conn);
             $deleted++;

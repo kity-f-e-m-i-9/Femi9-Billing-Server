@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $file="stockist-list.xls";
@@ -19,7 +19,7 @@ $html='
                                             </thead>
 											<tbody>';
 											
-				$select_product_list="select * from stockiest where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' order by id desc";
+				$select_product_list="select * from stockiest where onboard_userTYPE='".db_esc($onboard_userTYPE)."' and onboard_userID='".db_esc($onboard_userID)."' order by id desc";
 				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
@@ -27,7 +27,7 @@ $html='
 											
 											//state details
 											$state_id=$result_product_list['state_id'];
-								$select_stateList="select * from state where id='$state_id'";
+								$select_stateList="select * from state where id='".db_esc($state_id)."'";
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];

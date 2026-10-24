@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $user_table=$_REQUEST['usr'] ?? '';
 // Table name must come from a fixed allowlist - it is concatenated into SQL.
@@ -22,8 +22,8 @@ if($user_table=='stockiest')
 	$talukID=$result_stockist_details['taluk_id'];
 	$stockiestID=$result_stockist_details['temp_id'];
 	
-	$update_taluk="update taluk set assigned_SID='$stockiestID' where id='$talukID'";
-	mysqli_query($db_conn,$update_taluk);
+	$update_taluk="update taluk set assigned_SID=? where id=?";
+	db_q($db_conn,$update_taluk,[$stockiestID,$talukID]);
 }
 //-----------------------------------
 

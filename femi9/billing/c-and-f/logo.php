@@ -1,7 +1,7 @@
-<?php //login user details
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; //login user details
 $log_username=$_SESSION['LOGIN_USER'];
 //
-$select_superstock="select * from c_and_f where username='$log_username'";
+$select_superstock="select * from c_and_f where username='".db_esc($log_username)."'";
 $fetch_superstock=mysqli_query($db_conn,$select_superstock);
 $result_superstock=mysqli_fetch_array($fetch_superstock);
 
@@ -18,7 +18,7 @@ $loguser_tempid=$result_superstock['temp_id'];
 
 //State Details
 $loguser_StateID=$result_superstock['state_id'];
-$Select_StateNamevl12="select * from state where id='$loguser_StateID'";
+$Select_StateNamevl12="select * from state where id='".db_esc($loguser_StateID)."'";
 $Fetch_StateNamevl12=mysqli_query($db_conn,$Select_StateNamevl12);
 $Retch_StateNamevl12=mysqli_fetch_array($Fetch_StateNamevl12);
 $loguser_StateNAME=$Retch_StateNamevl12['st_name'];

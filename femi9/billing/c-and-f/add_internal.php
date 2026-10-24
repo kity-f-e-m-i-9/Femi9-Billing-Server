@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 include("config.php"); 
 date_default_timezone_set("Asia/Kolkata");
 ?>
@@ -81,8 +81,8 @@ date_default_timezone_set("Asia/Kolkata");
 									
 <?php if(isset($_REQUEST['InvalidStock'])){?><div class="alert alert-danger">There is no stock for the quantity you entered!</div><?php }?>
 <?php 	 
-$slctcheckstock="select count(*) as numstockcheck from stock where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-$fetch_ProductsPrice=mysqli_query($db_conn,$slctcheckstock);
+$slctcheckstock="select count(*) as numstockcheck from stock where user_type=? and user_id=?";
+$fetch_ProductsPrice=db_q($db_conn,$slctcheckstock,[$Login_user_TYPEvl,$Login_user_IDvl]);
 $Result_ProductsPrice=mysqli_fetch_array($fetch_ProductsPrice);
 if($Result_ProductsPrice['numstockcheck']!=0)
 {
@@ -127,16 +127,16 @@ xmlhttp.send();}
 							   if($_REQUEST['to_usertype']=="super_stockiest")
 							   {
 							   $loginuser_state_id=$result_LoGuserDtails['state_id'];
-							   $select_Godown="select * from super_stockiest where state_id='$loginuser_state_id' order by name asc";
+							   $select_Godown="select * from super_stockiest where state_id='".db_esc($loginuser_state_id)."' order by name asc";
 							   }
 							   else
 							   {
 							   $loginuser_DistrictID=$result_LoGuserDtails['district_id'];
-							   $select_Godown="select * from stockiest where district_id='$loginuser_DistrictID' order by name asc";
+							   $select_Godown="select * from stockiest where district_id=? order by name asc";
 							   }
 							   
 							   
-							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
+							   $fetch_Godown=db_q($db_conn,$select_Godown,[$loginuser_DistrictID]);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
 						  <option value="<?=$result_Godown['temp_id'];?>"><?=strtoupper($result_Godown['name']);?>, <?=$result_Godown['mobile_number'];?></option>

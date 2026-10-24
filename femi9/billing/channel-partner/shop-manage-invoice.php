@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -94,10 +94,10 @@ $i          = $start_from;
                                         <tbody>
 <?php
 $fetch_invoices = mysqli_query($db_conn,
-    "SELECT * FROM user_invoice WHERE from_user_id='$Login_user_IDvl' AND from_user_type='$Login_user_TYPEvl' AND to_user_type='$getinvuser' ORDER BY id DESC");
+    "SELECT * FROM user_invoice WHERE from_user_id='".db_esc($Login_user_IDvl)."' AND from_user_type='".db_esc($Login_user_TYPEvl)."' AND to_user_type='".db_esc($getinvuser)."' ORDER BY id DESC");
 while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
     $CuSTID       = $result_product_list['to_user_id'];
-    $result_cust  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='$CuSTID'"));
+    $result_cust  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='".db_esc($CuSTID)."'"));
     $Cust_Name    = $result_cust['name']          ?? '---';
     $Cust_Mbile   = $result_cust['mobile_number'] ?? '';
     $RowID_encode = base64_encode($result_product_list["id"]);

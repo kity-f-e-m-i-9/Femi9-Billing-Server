@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 
 include("checksession.php");
 include("config.php"); error_reporting(0);
@@ -35,10 +35,10 @@ $buyer_GSTIN_count=strlen($buyer_GSTIN);
 if($buyer_GSTIN_count==15){ $buyer_gsttype="register";}else {$buyer_gsttype="unregister";}
 
 //UPDATE BUYER-GST-TYPE
-$update_invoice_gsttype="update user_invoice set buyer_gsttype='$buyer_gsttype' where inv_id='$invoice_id'";
+$update_invoice_gsttype="update user_invoice set buyer_gsttype='".db_esc($buyer_gsttype)."' where inv_id='".db_esc($invoice_id)."'";
 mysqli_query($db_conn,$update_invoice_gsttype);
 //
-$update_invoice_gsttype2="update user_invoice_items set buyer_gsttype='$buyer_gsttype' where inv_id='$invoice_id'";
+$update_invoice_gsttype2="update user_invoice_items set buyer_gsttype='".db_esc($buyer_gsttype)."' where inv_id='".db_esc($invoice_id)."'";
 mysqli_query($db_conn,$update_invoice_gsttype2);
 	
 }

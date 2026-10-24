@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -161,8 +161,8 @@ $i= $start_from;
 //DISTRICT
 if(is_numeric($district_id_VLSS1))
 {
-$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-	$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+	$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 			$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 $district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 }else{
@@ -174,8 +174,8 @@ if($resultRcd_VLSS1['taluk_id']!=NULL)
 {
 $taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 										
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 }

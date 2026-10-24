@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 
@@ -13,8 +13,8 @@ $file = "Approved-wallet-withdraw-request.csv";
 
 $csv_content .= "Usertype, Userid, Name, District, Mobile Number, Amount, Request Timestamp, Approved Timestamp, TDS(%), TDS Amount, Amount, Remarks \n";
 
-$select_product_list="select * from wallet_withdraw where req_status='approved' and date between '$from_date' and '$to_date' order by id desc";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from wallet_withdraw where req_status='approved' and date between ? and ? order by id desc";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date]);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 
@@ -60,8 +60,8 @@ if ($WD_user_type=="territory_partner") {
 
     //district details
     $district_id=$result_onbaord_user_records['district_id'] ?? 0;
-    $select_distict="select * from district where id='$district_id'";
-    $fetch_district=mysqli_query($db_conn,$select_distict);
+    $select_distict="select * from district where id=?";
+    $fetch_district=db_q($db_conn,$select_distict,[$district_id]);
     $result_district=mysqli_fetch_array($fetch_district);
     $district_name=$result_district['dist_name'] ?? '';
 }

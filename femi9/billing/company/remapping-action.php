@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -18,9 +18,9 @@ for ($i=0; $i<=$number; $i++)
 $stockistid_value = $stockistid_ex[$i];
 if($stockistid_value!=NULL)
 {
-$updatemapping="update stockiest set onboard_userID='$to_user_id',
-onboard_userTYPE='$to_usertype' where id='$stockistid_value'";
-mysqli_query($db_conn,$updatemapping);
+$updatemapping="update stockiest set onboard_userID=?,
+onboard_userTYPE=? where id=?";
+db_q($db_conn,$updatemapping,[$to_user_id,$to_usertype,$stockistid_value]);
 }
 	 
 } 
@@ -47,8 +47,8 @@ for ($i=0; $i<=$number; $i++)
 $distributorid_value = $distributorid_ex[$i];
 if($distributorid_value!=NULL)
 {
-$updatemapping="update distributor set onboard_userID='$to_user_id',stockiest_id='$to_user_id',onboard_userTYPE='$to_usertype' where id='$distributorid_value'";
-mysqli_query($db_conn,$updatemapping);
+$updatemapping="update distributor set onboard_userID=?,stockiest_id=?,onboard_userTYPE=? where id=?";
+db_q($db_conn,$updatemapping,[$to_user_id,$to_user_id,$to_usertype,$distributorid_value]);
 }
 	 
 } 
@@ -74,8 +74,8 @@ for ($i=0; $i<=$number; $i++)
 $distributorid_value = $distributorid_ex[$i];
 if($distributorid_value!=NULL)
 {
-$updatemapping="update super_distributor set onboard_userID='$to_user_id',stockiest_id='$to_user_id',onboard_userTYPE='$to_usertype' where id='$distributorid_value'";
-mysqli_query($db_conn,$updatemapping);
+$updatemapping="update super_distributor set onboard_userID=?,stockiest_id=?,onboard_userTYPE=? where id=?";
+db_q($db_conn,$updatemapping,[$to_user_id,$to_user_id,$to_usertype,$distributorid_value]);
 }
 	 
 } 
@@ -102,8 +102,8 @@ for ($i=0; $i<=$number; $i++)
 $distributorid_value = $distributorid_ex[$i];
 if($distributorid_value!=NULL)
 {
-$updatemapping="update shop set onboard_userID='$to_user_id',distributor_id='$to_user_id',onboard_userTYPE='$to_usertype' where id='$distributorid_value'";
-mysqli_query($db_conn,$updatemapping);
+$updatemapping="update shop set onboard_userID=?,distributor_id=?,onboard_userTYPE=? where id=?";
+db_q($db_conn,$updatemapping,[$to_user_id,$to_user_id,$to_usertype,$distributorid_value]);
 }
 	 
 } 

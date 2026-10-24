@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -70,8 +70,8 @@
 						
 						$se_msid=$_REQUEST['se_msid'];
 						//
-						$select_msDetails12="select * from marketing_staff where id='$se_msid'";
-$fetch_msDetails12=mysqli_query($db_conn,$select_msDetails12);
+						$select_msDetails12="select * from marketing_staff where id=?";
+$fetch_msDetails12=db_q($db_conn,$select_msDetails12,[$se_msid]);
 $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 						?>
 						
@@ -166,15 +166,15 @@ $select_product_list="select * from ms_exp order by id desc";
 }
 if($from_date!=NULL && $se_msid==NULL)
 {
-$select_product_list="select * from ms_exp where date between '$from_date' and '$to_date' order by date asc";
+$select_product_list="select * from ms_exp where date between '".db_esc($from_date)."' and '".db_esc($to_date)."' order by date asc";
 }
 if($from_date!=NULL && $se_msid!=NULL)
 {
-$select_product_list="select * from ms_exp where ms_id='$se_msid' and date between '$from_date' and '$to_date' and ms_id='$se_msid' order by date asc";
+$select_product_list="select * from ms_exp where ms_id=? and date between ? and ? and ms_id=? order by date asc";
 }
 
 
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$fetch_product_list=db_q($db_conn,$select_product_list,[$se_msid,$from_date,$to_date,$se_msid]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {																
 
@@ -189,8 +189,8 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 				
 				//marketing staff details
 $ms_id=$result_product_list['ms_id'];
-$select_msDetails="select * from marketing_staff where id='$ms_id'";
-$fetch_msDetails=mysqli_query($db_conn,$select_msDetails);
+$select_msDetails="select * from marketing_staff where id=?";
+$fetch_msDetails=db_q($db_conn,$select_msDetails,[$ms_id]);
 $result_msDetails=mysqli_fetch_array($fetch_msDetails);
 				
 ?>                                            

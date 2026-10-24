@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");?>
 <!DOCTYPE html>
 <html lang="en">
@@ -103,8 +103,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from input_stock_users where usertype='$Login_user_TYPEvl' and userid='$Login_user_IDvl' order by input_date desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from input_stock_users where usertype=? and userid=? order by input_date desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -112,8 +112,8 @@ $i= $start_from;
 											
 											//
 											$product_id=$result_product_list['product_id'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 											?>
                                             

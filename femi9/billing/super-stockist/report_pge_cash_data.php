@@ -1,8 +1,8 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 //stockist Cash : Today
-$select_market_STCASH_VLSS_TODAY="select sum(received) from receipt where from_user_type='stockiest' and date between '$today_date' and '$today_date'";
+$select_market_STCASH_VLSS_TODAY="select sum(received) from receipt where from_user_type='stockiest' and date between '".db_esc($today_date)."' and '".db_esc($today_date)."'";
 $fetch_market_STCASH_VLSS_TODAY=mysqli_query($db_conn,$select_market_STCASH_VLSS_TODAY);
 $result_market_STCASH_VLSS_TODAY=mysqli_fetch_array($fetch_market_STCASH_VLSS_TODAY);
 
@@ -16,7 +16,7 @@ else
 
 
 //stockist Cash : Yesterday
-$select_market_STCASH_VLSS_YSTRDY="select sum(received) from receipt where from_user_type='stockiest' and date between '$Yesterday_date' and '$Yesterday_date'";
+$select_market_STCASH_VLSS_YSTRDY="select sum(received) from receipt where from_user_type='stockiest' and date between '".db_esc($Yesterday_date)."' and '".db_esc($Yesterday_date)."'";
 $fetch_market_STCASH_VLSS_YSTRDY=mysqli_query($db_conn,$select_market_STCASH_VLSS_YSTRDY);
 $result_market_STCASH_VLSS_YSTRDY=mysqli_fetch_array($fetch_market_STCASH_VLSS_YSTRDY);
 
@@ -30,7 +30,7 @@ else
 
 
 //stockist Cash : This Month
-$select_market_STCASH_VLSS_THISMONTH="select sum(received) from receipt where from_user_type='stockiest' and date between '$start_date' and '$endDate'";
+$select_market_STCASH_VLSS_THISMONTH="select sum(received) from receipt where from_user_type='stockiest' and date between '".db_esc($start_date)."' and '".db_esc($endDate)."'";
 $fetch_market_STCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_STCASH_VLSS_THISMONTH);
 $result_market_STCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_STCASH_VLSS_THISMONTH);
 
@@ -44,7 +44,7 @@ else
 
 
 //stockist Cash : Till Date
-$select_market_STCASH_VLSS_TLLDTE="select sum(received) from receipt where from_user_type='stockiest' and date between '$lastmonth_date_start' and '$lastmonth_date_end'";
+$select_market_STCASH_VLSS_TLLDTE="select sum(received) from receipt where from_user_type='stockiest' and date between '".db_esc($lastmonth_date_start)."' and '".db_esc($lastmonth_date_end)."'";
 $fetch_market_STCASH_VLSS_TLLDTE=mysqli_query($db_conn,$select_market_STCASH_VLSS_TLLDTE);
 $result_market_STCASH_VLSS_TLLDTE=mysqli_fetch_array($fetch_market_STCASH_VLSS_TLLDTE);
 
@@ -62,7 +62,7 @@ else
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 //Distributor Cash : Today
-$select_market_DTCASH_VLSS_TODAY="select sum(received) from receipt where from_user_type='distributor' and date between '$today_date' and '$today_date'";
+$select_market_DTCASH_VLSS_TODAY="select sum(received) from receipt where from_user_type='distributor' and date between '".db_esc($today_date)."' and '".db_esc($today_date)."'";
 $fetch_market_DTCASH_VLSS_TODAY=mysqli_query($db_conn,$select_market_DTCASH_VLSS_TODAY);
 $result_market_DTCASH_VLSS_TODAY=mysqli_fetch_array($fetch_market_DTCASH_VLSS_TODAY);
 
@@ -75,7 +75,7 @@ else
 
 
 //Distributor Cash : Yesterday
-$select_market_DTCASH_VLSS_YSTRDY="select sum(received) from receipt where from_user_type='distributor' and date between '$Yesterday_date' and '$Yesterday_date'";
+$select_market_DTCASH_VLSS_YSTRDY="select sum(received) from receipt where from_user_type='distributor' and date between '".db_esc($Yesterday_date)."' and '".db_esc($Yesterday_date)."'";
 $fetch_market_DTCASH_VLSS_YSTRDY=mysqli_query($db_conn,$select_market_DTCASH_VLSS_YSTRDY);
 $result_market_DTCASH_VLSS_YSTRDY=mysqli_fetch_array($fetch_market_DTCASH_VLSS_YSTRDY);
 $Total_DTCASH_VLSS_YSTRDY=$result_market_DTCASH_VLSS_YSTRDY[0];
@@ -87,7 +87,7 @@ else
 
 
 //Distributor Cash : This Month
-$select_market_DTCASH_VLSS_THISMONTH="select sum(received) from receipt where from_user_type='distributor' and date between '$start_date' and '$endDate'";
+$select_market_DTCASH_VLSS_THISMONTH="select sum(received) from receipt where from_user_type='distributor' and date between '".db_esc($start_date)."' and '".db_esc($endDate)."'";
 $fetch_market_DTCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_DTCASH_VLSS_THISMONTH);
 $result_market_DTCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_DTCASH_VLSS_THISMONTH);
 
@@ -100,7 +100,7 @@ else
 
 
 //Distributor Cash : Till Date
-$select_market_DTCASH_VLSS_TLLDTE="select sum(received) from receipt where from_user_type='distributor' and date between '$lastmonth_date_start' and '$lastmonth_date_end'";
+$select_market_DTCASH_VLSS_TLLDTE="select sum(received) from receipt where from_user_type='distributor' and date between '".db_esc($lastmonth_date_start)."' and '".db_esc($lastmonth_date_end)."'";
 $fetch_market_DTCASH_VLSS_TLLDTE=mysqli_query($db_conn,$select_market_DTCASH_VLSS_TLLDTE);
 $result_market_DTCASH_VLSS_TLLDTE=mysqli_fetch_array($fetch_market_DTCASH_VLSS_TLLDTE);
 

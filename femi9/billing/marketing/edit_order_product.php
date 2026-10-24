@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 include("RemoveSpecialChar.php");
 error_reporting(0);
@@ -9,13 +9,13 @@ $manage_title="Manage Orders";
 $message_title="Orders";
 
 $orderid=$_REQUEST['orderid'];
-$select_product_list="select * from ms_orders where order_id='$orderid'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from ms_orders where order_id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$orderid]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 				
 				$shop_id=$result_product_list['shop_id'];
-$select_shopcatt="select * from ms_shop where id='$shop_id'";
-$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
+$select_shopcatt="select * from ms_shop where id=?";
+$fetch_shopcatt=db_q($db_conn,$select_shopcatt,[$shop_id]);
 $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 
 // ── Assign To TP — same firka/district-based matching as add_order.php's
@@ -112,8 +112,8 @@ if(isset($_REQUEST['update_no_order']))
 	$update_orderid=$_POST["update_orderid"];
 
 	//Delete old order details
-    $delete_old_orders="delete from ms_orders where order_id='$update_orderid'";
-	mysqli_query($db_conn,$delete_old_orders);
+    $delete_old_orders="delete from ms_orders where order_id=?";
+	db_q($db_conn,$delete_old_orders,[$update_orderid]);
 
 	$ms_id=$_POST["ms_id"];
 	$order_date=$_POST["order_date"];
@@ -136,7 +136,7 @@ if(isset($_REQUEST['update_no_order']))
 	$tp_id = (int)($_POST["tp_id"] ?? 0);
 	if ($tp_id > 0) {
 		$tp_id_esc = (int)$tp_id;
-		$tpCheck = mysqli_query($db_conn, "select id from territory_partners where id='$tp_id_esc' and is_active=1 limit 1");
+		$tpCheck = mysqli_query($db_conn, "select id from territory_partners where id='".db_esc($tp_id_esc)."' and is_active=1 limit 1");
 		if (!$tpCheck || mysqli_num_rows($tpCheck) === 0) { $tp_id = 0; }
 	}
 	$tp_id_sql = $tp_id > 0 ? "'".$tp_id."'" : "NULL";
@@ -158,16 +158,16 @@ for ($i=0; $i<=$number; $i++)
 	 if($product_id_value!=NULL)
 	 {
 
-$select_count_dist="select count(*) as numShop from ms_orders where order_id='$update_orderid' and pr_id='$product_id_value'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+$select_count_dist="select count(*) as numShop from ms_orders where order_id=? and pr_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$update_orderid,$product_id_value]);
 $result_count_dist=mysqli_fetch_array($fetc_count_dist);
 if($result_count_dist['numShop']==0)
 	{
 	$lat_sql = $edit_latitude  !== null ? $edit_latitude  : "NULL";
 	$lng_sql = $edit_longitude !== null ? $edit_longitude : "NULL";
-        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,latitude,longitude) values ('$update_orderid','$shop_id','$ms_id',$tp_id_sql,'$order_date','yes','nil','$marketing_tool',
-		'$product_id_value','$qty_value',$lat_sql,$lng_sql)";
-		mysqli_query($db_conn,$sql);
+        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,latitude,longitude) values (?,?,?,$tp_id_sql,?,'yes','nil',?,
+		?,?,$lat_sql,$lng_sql)";
+		db_q($db_conn,$sql,[$update_orderid,$shop_id,$ms_id,$order_date,$marketing_tool,$product_id_value,$qty_value]);
 		$insertedLines[] = ['pr_id' => (int)$product_id_value, 'qty' => (int)$qty_value];
 
 	}
@@ -332,8 +332,8 @@ if($result_count_dist['numShop']==0)
 											<label for="exampleInputEmail1" class="form-label">Shop*</label>
     <select name="shop_id" id="shop_select" class="form-control" required="">
 	<option value="<?=$result_shopcatt['id'];?>" hidden=""><?=$result_shopcatt['name'];?></option>
-	<?php $selectShopCat="select * from ms_shop where ms_id='$markeingSTFID' order by id asc";
-	$fetchShopCat=mysqli_query($db_conn,$selectShopCat);
+	<?php $selectShopCat="select * from ms_shop where ms_id=? order by id asc";
+	$fetchShopCat=db_q($db_conn,$selectShopCat,[$markeingSTFID]);
 	while($resultShopCat=mysqli_fetch_array($fetchShopCat)){?>
 	<option value="<?php echo $resultShopCat['id'];?>"
 		data-district-id="<?=(int)($resultShopCat['district_node_id'] ?? 0)?>"
@@ -368,8 +368,8 @@ if($result_count_dist['numShop']==0)
 			<br/>		
 			
 			<?php 
-			 $select_product_listGETD="select * from ms_orders where order_id='$orderid' order by id asc";
-				$fetch_product_listGETD=mysqli_query($db_conn,$select_product_listGETD);
+			 $select_product_listGETD="select * from ms_orders where order_id=? order by id asc";
+				$fetch_product_listGETD=db_q($db_conn,$select_product_listGETD,[$orderid]);
 				$coun_product_listGETD=mysqli_num_rows($fetch_product_listGETD);
 				?>
 			<script>

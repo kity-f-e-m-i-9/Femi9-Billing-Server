@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -22,8 +22,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	$gstin=str_replace("'","&#39;",$_POST["gstin"]);
 	$address=str_replace("'","&#39;",$_POST["address"]);
 	
-	$select_count_dist="select count(*) as numShop from shop where temp_id='$temp_id'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+	$select_count_dist="select count(*) as numShop from shop where temp_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$temp_id]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numShop']==0)
 	{
@@ -70,13 +70,13 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	
         $sql="insert into shop (state_id,temp_id,user_icon,name,district_id,email,mobile_number,username,password,plan_amount,valid_months,valid_from,valid_to,amount_method,amount_status,ref_number,account_status,merchantOrderId,merchantTransactionId,merchantUserId,taluk_id,distributor_id,pincode_id,gstin,onboard_userTYPE,onboard_userID,address,userid,useridtext,shop_cat,country_code,landline)
 
-		values ('$state_id','$temp_id','$insfilename','$name','$district_id','$user_email','$mobile_number',
-		'$username_generate','$user_password','$plan_amount','$valid_months',
-		'$valid_from','$valid_to','$amount_method','$amount_status',
-		'$merchantTransactionId','$account_status','$merchantOrderId','$merchantTransactionId',
-		'$merchantUserId','$taluk_id','$distributor_id','$pincode_id','$gstin',
-		'$onboard_userTYPE','$onboard_userID','$address','$userid','$useridtext','$shop_cat','$country_code','$landline')";
-		mysqli_query($db_conn,$sql);
+		values (?,?,?,?,?,?,?,
+		?,?,?,?,
+		?,?,?,?,
+		?,?,?,?,
+		?,?,?,?,?,
+		?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$sql,[$state_id,$temp_id,$insfilename,$name,$district_id,$user_email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$amount_method,$amount_status,$merchantTransactionId,$account_status,$merchantOrderId,$merchantTransactionId,$merchantUserId,$taluk_id,$distributor_id,$pincode_id,$gstin,$onboard_userTYPE,$onboard_userID,$address,$userid,$useridtext,$shop_cat,$country_code,$landline]);
 		
 		echo "<script>window.location='Shop-manage.php?addedsuccess';</script>";
 

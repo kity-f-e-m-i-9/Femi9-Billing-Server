@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 $title="Users Network";
 ?>
@@ -101,14 +101,14 @@ $title="Users Network";
 </thead>
 
 <?php 
-$select_product_list="select * from super_stockiest where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID'";
+$select_product_list="select * from super_stockiest where onboard_userTYPE='".db_esc($onboard_userTYPE)."' and onboard_userID='".db_esc($onboard_userID)."'";
 				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 									$district_id=$result_product_list['district_id'];
 //
-$select_distict="select * from district where id='$district_id'";
+$select_distict="select * from district where id='".db_esc($district_id)."'";
 	$fetch_district=mysqli_query($db_conn,$select_distict);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];

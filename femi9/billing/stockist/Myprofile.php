@@ -1,36 +1,36 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
 //fetch profile Details
-$selectcoutprofileDetaiils="select * from users_profile where user_tempid='$Login_user_IDvl' and usertype='$Login_user_TYPEvl'";
-$fetchcountprofileDetails=mysqli_query($db_conn,$selectcoutprofileDetaiils);
+$selectcoutprofileDetaiils="select * from users_profile where user_tempid=? and usertype=?";
+$fetchcountprofileDetails=db_q($db_conn,$selectcoutprofileDetaiils,[$Login_user_IDvl,$Login_user_TYPEvl]);
 $resultcountprofileDetails=mysqli_fetch_array($fetchcountprofileDetails);
 
 //---------------------------------------------------------------------------------------
 //user details
-$select_userdetails234="select * from stockiest where temp_id='$Login_user_IDvl'";
-$fetch_userdetails234=mysqli_query($db_conn,$select_userdetails234);
+$select_userdetails234="select * from stockiest where temp_id=?";
+$fetch_userdetails234=db_q($db_conn,$select_userdetails234,[$Login_user_IDvl]);
 $result_userdetails234=mysqli_fetch_array($fetch_userdetails234);
 
 //state details
 $state_id=$result_userdetails234['state_id'];
-$select_state_dtails="select * from state where id='$state_id'";
-$fetch_state_dtails=mysqli_query($db_conn,$select_state_dtails);
+$select_state_dtails="select * from state where id=?";
+$fetch_state_dtails=db_q($db_conn,$select_state_dtails,[$state_id]);
 $result_state_dtails=mysqli_fetch_array($fetch_state_dtails);
 $state_name=$result_state_dtails['st_name'];
 
 //district details
 $district_id=$result_userdetails234['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 //taluk details
 $taluk_id=$result_userdetails234['taluk_id'];
-$select_distict="select * from taluk where id='$taluk_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from taluk where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$taluk_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $taluk_name=$result_district['taluk'];
 //-------------------------------------------------------------------------------------------
@@ -77,22 +77,22 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 
 	}else{$insfilenameLG=$old_logo;}
 	
-	$selectcoutprofile="select count(*) as numprofile from users_profile where user_tempid='$user_tempid' and usertype='$usertype'";
-	$fetchcountprofile=mysqli_query($db_conn,$selectcoutprofile);
+	$selectcoutprofile="select count(*) as numprofile from users_profile where user_tempid=? and usertype=?";
+	$fetchcountprofile=db_q($db_conn,$selectcoutprofile,[$user_tempid,$usertype]);
 	$resultcountprofile=mysqli_fetch_array($fetchcountprofile);
 	if($resultcountprofile['numprofile']==0)
 	{
 	$insertprofile="insert into users_profile (user_tempid,usertype,companyname,deliveryaddress,acname,acnumber,bankname,branchname,ifsc,upinumber,logo) 
-	values ('$user_tempid','$usertype','$companyname','$deliveryaddress','$acname','$acnumber','$bankname',
-	'$branchname','$ifsc','$upinumber','$insfilenameLG')";
-	mysqli_query($db_conn,$insertprofile);
+	values (?,?,?,?,?,?,?,
+	?,?,?,?)";
+	db_q($db_conn,$insertprofile,[$user_tempid,$usertype,$companyname,$deliveryaddress,$acname,$acnumber,$bankname,$branchname,$ifsc,$upinumber,$insfilenameLG]);
 	}else{
 		
-		$updateprofile="update users_profile set usertype='$usertype',
-	companyname='$companyname',deliveryaddress='$deliveryaddress',acname='$acname',acnumber='$acnumber',
-	bankname='$bankname',branchname='$branchname',ifsc='$ifsc',upinumber='$upinumber',logo='$insfilenameLG' 
-	where user_tempid='$user_tempid'";
-	mysqli_query($db_conn,$updateprofile);
+		$updateprofile="update users_profile set usertype=?,
+	companyname=?,deliveryaddress=?,acname=?,acnumber=?,
+	bankname=?,branchname=?,ifsc=?,upinumber=?,logo=? 
+	where user_tempid=?";
+	db_q($db_conn,$updateprofile,[$usertype,$companyname,$deliveryaddress,$acname,$acnumber,$bankname,$branchname,$ifsc,$upinumber,$insfilenameLG,$user_tempid]);
 		
 	}
 	
@@ -129,8 +129,8 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
 
 	}else{$insfilename=$old_user_icon;}
 	
-	$updateusers="update stockiest set user_icon='$insfilename',name='$name',email='$email',gstin='$gstin',address='$address' where temp_id='$user_tempid'";
-	mysqli_query($db_conn,$updateusers);
+	$updateusers="update stockiest set user_icon=?,name=?,email=?,gstin=?,address=? where temp_id=?";
+	db_q($db_conn,$updateusers,[$insfilename,$name,$email,$gstin,$address,$user_tempid]);
 	//-------------------------------------------------------------------
 	
 	echo "<script>window.location='Myprofile.php?Updatedsuccess';</script>";
@@ -250,8 +250,8 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
 			<label class="form-label">Pincode</label>
             <select disabled multiple="" class="form-control">
 			<?php $StockistID=$result_product_list['temp_id'];
-					$select_STockPincode="select * from pincode where assigned_SID='$Login_user_IDvl' order by pincode asc";
-					$fetch_STockPincode=mysqli_query($db_conn,$select_STockPincode);
+					$select_STockPincode="select * from pincode where assigned_SID=? order by pincode asc";
+					$fetch_STockPincode=db_q($db_conn,$select_STockPincode,[$Login_user_IDvl]);
 					while($result_STockPincode=mysqli_fetch_array($fetch_STockPincode))
 					{
 					?>

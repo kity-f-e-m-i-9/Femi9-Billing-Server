@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
  error_reporting(0);
 
@@ -25,16 +25,16 @@ for ($ops=0; $ops<=$number; $ops++)
 	 $user_type=$Login_user_TYPEvl;
 	 $user_id=$Login_user_IDvl;
 	 
-	 $select_count_opstock="select count(*) as numopstock from stock where product_id='$pr_id_value' and user_type='$user_type' and user_id='$user_id'";
-	 $fetch_count_opstock=mysqli_query($db_conn,$select_count_opstock);
+	 $select_count_opstock="select count(*) as numopstock from stock where product_id=? and user_type=? and user_id=?";
+	 $fetch_count_opstock=db_q($db_conn,$select_count_opstock,[$pr_id_value,$user_type,$user_id]);
 	 $result_count_opstock=mysqli_fetch_array($fetch_count_opstock);
 	 
 	 if($result_count_opstock['numopstock']==0 && $pr_id_value!=NULL && $op_qty_value!=NULL)
 	 {
 		 
 	 $update_stockQty="insert into stock (product_id,opening_qty,opening_date,input_qty,sales_qty,sent_qty,closing_qty,user_type,user_id,returnqty) 
-	 values ('$pr_id_value','$op_qty_value','$opening_stock_date','0','0','0','$op_qty_value','$user_type','$user_id','0')";
-	 mysqli_query($db_conn,$update_stockQty);
+	 values (?,?,?,'0','0','0',?,?,?,'0')";
+	 db_q($db_conn,$update_stockQty,[$pr_id_value,$op_qty_value,$opening_stock_date,$op_qty_value,$user_type,$user_id]);
 	 
 	 }
 } 
@@ -137,8 +137,8 @@ echo "<script>window.location='op-stock.php?StockUpdatedSuccess';</script>";
 										
 	$stock_product_ID=$result_product_list['id'];						
 											
-	$select_count_opstock13="select * from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl' and product_id='$stock_product_ID'";
-	 $fetch_count_opstock13=mysqli_query($db_conn,$select_count_opstock13);
+	$select_count_opstock13="select * from stock where user_type=? and user_id=? and product_id=?";
+	 $fetch_count_opstock13=db_q($db_conn,$select_count_opstock13,[$user_type_Loginvl,$user_id_Loginvl,$stock_product_ID]);
 	 $result_opstock_value=mysqli_fetch_array($fetch_count_opstock13);
 	 $result_count_opstock13=mysqli_num_rows($fetch_count_opstock13);
 		 if($result_count_opstock13==0)
@@ -188,15 +188,15 @@ echo "<script>window.location='op-stock.php?StockUpdatedSuccess';</script>";
 											</thead>
 											
 											<tbody>
-			<?php $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
-										$Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
+			<?php $select_OPStock="select * from stock where user_type=? and user_id=?";
+										$Fetch_OPStock=db_q($db_conn,$select_OPStock,[$user_type_Loginvl,$user_id_Loginvl]);
 										while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
 										{
 											//Get Product Details
 											$StockProductID=$Result_OPStock['product_id'];
 											
-						$select_productDetils="select * from products where id='$StockProductID'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+						$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$StockProductID]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 										
 										$OPQTY=$Result_OPStock['opening_qty'];

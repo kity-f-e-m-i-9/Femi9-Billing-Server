@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php"); 
 error_reporting(0);
@@ -8,16 +8,16 @@ $to_date=$_REQUEST['todate'];
 
 if($from_date!=NULL)
 {
- $select_sum_total_intra_register="select sum(total) from user_invoice where from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_intra_register=mysqli_query($db_conn,$select_sum_total_intra_register);
+ $select_sum_total_intra_register="select sum(total) from user_invoice where from_user_type=? and from_user_id=? and date between ? and ?";
+							   $fetch_sum_total_intra_register=db_q($db_conn,$select_sum_total_intra_register,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_intra_register=mysqli_fetch_array($fetch_sum_total_intra_register);
 							   
 							   if($result_sum_total_intra_register[0]!=NULL)
 							   {$total_intra_register=$result_sum_total_intra_register[0];
 							   }else{$total_intra_register="0";}
 							   
-							   $select_sum_total_intra_register2="select sum(total) from invoice where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_intra_register2=mysqli_query($db_conn,$select_sum_total_intra_register2);
+							   $select_sum_total_intra_register2="select sum(total) from invoice where user_type=? and user_id=? and date between ? and ?";
+							   $fetch_sum_total_intra_register2=db_q($db_conn,$select_sum_total_intra_register2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_intra_register2=mysqli_fetch_array($fetch_sum_total_intra_register2);
 							   
 							   if($result_sum_total_intra_register2[0]!=NULL)

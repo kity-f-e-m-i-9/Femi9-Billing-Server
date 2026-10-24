@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 
 $get_row_id=$_REQUEST['prid'];
 $get_row_id_DECODE=base64_decode($get_row_id);
@@ -9,8 +9,8 @@ if($pageNme=="superstockist")
 	$Display_label="Super Stockist";
 	$updae_table_name="super_stockiest"; //table name
 	
-	$select_candidate_list="select * from super_stockiest where id='$get_row_id_DECODE'";
-	$fetch_candidate_list=mysqli_query($db_conn,$select_candidate_list);
+	$select_candidate_list="select * from super_stockiest where id=?";
+	$fetch_candidate_list=db_q($db_conn,$select_candidate_list,[$get_row_id_DECODE]);
 	$result_candidate_list=mysqli_fetch_array($fetch_candidate_list);
 				
 }
@@ -20,8 +20,8 @@ else if($pageNme=="stockist")
 	$Display_label="Stockist";
 	$updae_table_name="stockiest"; //table name
 	
-	$select_candidate_list="select * from stockiest where id='$get_row_id_DECODE'";
-	$fetch_candidate_list=mysqli_query($db_conn,$select_candidate_list);
+	$select_candidate_list="select * from stockiest where id=?";
+	$fetch_candidate_list=db_q($db_conn,$select_candidate_list,[$get_row_id_DECODE]);
 	$result_candidate_list=mysqli_fetch_array($fetch_candidate_list);
 	
 }
@@ -31,8 +31,8 @@ else
 	$Display_label="Distributor";
 	$updae_table_name="distributor"; //table name
 	
-	$select_candidate_list="select * from distributor where id='$get_row_id_DECODE'";
-	$fetch_candidate_list=mysqli_query($db_conn,$select_candidate_list);
+	$select_candidate_list="select * from distributor where id=?";
+	$fetch_candidate_list=db_q($db_conn,$select_candidate_list,[$get_row_id_DECODE]);
 	$result_candidate_list=mysqli_fetch_array($fetch_candidate_list);
 }
 

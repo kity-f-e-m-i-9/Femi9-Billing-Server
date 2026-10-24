@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -111,7 +111,7 @@ $successMessage = $_SESSION['successMessage'];
            <select required="" name="stockist_tempid" class="form-control">
 							   <option value="" hidden="">Select</option>
 <?php 
-$select_stcatlist="select temp_id,name from stockiest where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' order by name asc";
+$select_stcatlist="select temp_id,name from stockiest where onboard_userTYPE='".db_esc($onboard_userTYPE)."' and onboard_userID='".db_esc($onboard_userID)."' order by name asc";
    $fetch_stcatlist=mysqli_query($db_conn,$select_stcatlist);
 							   while($result_stcatlist=mysqli_fetch_array($fetch_stcatlist))
 							   {?>
@@ -200,7 +200,7 @@ var DistrictID="<?php echo $loguser_DistrictID;?>";
 					<label for="exampleInputEmail1" class="form-label">Taluk Name*</label>
            <select onChange="getState(this.value)" required="" name="taluk_id" class="form-control">
 <option value="" hidden="">Select</option>
-<?php $select_Taluk_list="select * from taluk where state_id='$loguser_StateID' and dist_id='$loguser_DistrictID' and assigned_SID='Nil' order by taluk asc";
+<?php $select_Taluk_list="select * from taluk where state_id='".db_esc($loguser_StateID)."' and dist_id='".db_esc($loguser_DistrictID)."' and assigned_SID='Nil' order by taluk asc";
 										$fetch_Taluk_list=mysqli_query($db_conn,$select_Taluk_list);
 										while($result_Taluk_list=mysqli_fetch_array($fetch_Taluk_list))
 										{

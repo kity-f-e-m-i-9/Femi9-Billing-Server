@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -17,8 +17,8 @@ if ($old_customer_id == $new_customer_id) {
     exit;
 }
 
-mysqli_query($db_conn, "UPDATE invoice SET customer_id='$new_customer_id' WHERE inv_id='$invid'");
-mysqli_query($db_conn, "UPDATE invoice_items SET customer_id='$new_customer_id' WHERE inv_id='$invid'");
-mysqli_query($db_conn, "UPDATE receipt SET to_user_id='$new_customer_id' WHERE inv_id='$invid'");
+mysqli_query($db_conn, "UPDATE invoice SET customer_id='".db_esc($new_customer_id)."' WHERE inv_id='".db_esc($invid)."'");
+mysqli_query($db_conn, "UPDATE invoice_items SET customer_id='".db_esc($new_customer_id)."' WHERE inv_id='".db_esc($invid)."'");
+mysqli_query($db_conn, "UPDATE receipt SET to_user_id='".db_esc($new_customer_id)."' WHERE inv_id='".db_esc($invid)."'");
 
 echo "<script>window.location='update_customer3.php?invuser=$invuser&&InvoiceID=$invid&&updatedsuccess';</script>";

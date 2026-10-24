@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -8,12 +8,12 @@ $to_date   = $_REQUEST['todate'] ?? null;
 
 if ($from_date != NULL) {
     // Intra-state inward supplies (received by TP from another user)
-    $q = "SELECT SUM(total) FROM user_invoice WHERE to_user_type='$Login_user_TYPEvl' AND to_user_id='$Login_user_IDvl' AND gst_type='inner' AND date BETWEEN '$from_date' AND '$to_date'";
-    $show_total_intra = mysqli_fetch_array(mysqli_query($db_conn, $q))[0] ?? 0;
+    $q = "SELECT SUM(total) FROM user_invoice WHERE to_user_type=? AND to_user_id=? AND gst_type='inner' AND date BETWEEN ? AND ?";
+    $show_total_intra = mysqli_fetch_array(db_q($db_conn,$q,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
 
     // Inter-state inward supplies
-    $q2 = "SELECT SUM(total) FROM user_invoice WHERE to_user_type='$Login_user_TYPEvl' AND to_user_id='$Login_user_IDvl' AND gst_type='outer' AND date BETWEEN '$from_date' AND '$to_date'";
-    $show_total_inter = mysqli_fetch_array(mysqli_query($db_conn, $q2))[0] ?? 0;
+    $q2 = "SELECT SUM(total) FROM user_invoice WHERE to_user_type=? AND to_user_id=? AND gst_type='outer' AND date BETWEEN ? AND ?";
+    $show_total_inter = mysqli_fetch_array(db_q($db_conn,$q2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
 }
 ?>
 <!DOCTYPE html>

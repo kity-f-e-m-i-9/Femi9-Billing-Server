@@ -1,4 +1,4 @@
-<?php /* include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; /* include("checksession.php");
 
 $title="Manage Pincode";
 $add_url="add-pincode.php";
@@ -107,8 +107,8 @@ $i= $start_from;
                                             </thead>
 											 <tbody>
 	<?php 
-	$select_picnode_list="select * from pincode where sid='$loguser_tempid' order by id asc";
-	$fetch_picnode_list=mysqli_query($db_conn,$select_picnode_list);
+	$select_picnode_list="select * from pincode where sid=? order by id asc";
+	$fetch_picnode_list=db_q($db_conn,$select_picnode_list,[$loguser_tempid]);
 	while($result_pincode_list=mysqli_fetch_array($fetch_picnode_list))
 	{
 											

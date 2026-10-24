@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('dash');
 require_once("include/GodownAccess.php");
@@ -87,12 +87,12 @@ while($Result_ss_Details=mysqli_fetch_array($fetch_ss_Details))
 	$SS_state_id=$Result_ss_Details['state_id'];
 	$SS_district_id=$Result_ss_Details['district_id'];
 	
-$select_Count_Assigned="select * from district where assigned_SSID='$SS_TempID'";
+$select_Count_Assigned="select * from district where assigned_SSID='".db_esc($SS_TempID)."'";
 $fetch_Count_Assigned=mysqli_query($db_conn,$select_Count_Assigned);
 $result_Count_Assigned=mysqli_num_rows($fetch_Count_Assigned);
 if($result_Count_Assigned==0)
 {
-$Update_assigned_ID="update district set assigned_SSID='$SS_TempID' where state_id='$SS_state_id' and id='$SS_district_id'";
+$Update_assigned_ID="update district set assigned_SSID='".db_esc($SS_TempID)."' where state_id='".db_esc($SS_state_id)."' and id='".db_esc($SS_district_id)."'";
 mysqli_query($db_conn,$Update_assigned_ID);
 }
 	
@@ -175,14 +175,14 @@ if($LoginusertypeGET=="finance"){
 	$pendinshowlink="stock_request_pending_accounts";
 	
 	//FINANCE
-$sltsumqty_request="select count(*) as numcountrequ from stock_request where status='pending' and tousertype='$Login_user_TYPEvl' and touserid='$Login_user_IDvl' and verified='0'";
+$sltsumqty_request="select count(*) as numcountrequ from stock_request where status='pending' and tousertype='".db_esc($Login_user_TYPEvl)."' and touserid='".db_esc($Login_user_IDvl)."' and verified='0'";
 
 
 }else{
 	$pendinshowlink="stock_request_pending";
 	
 	//ADMIN	
-	$sltsumqty_request="select count(*) as numcountrequ from stock_request where status='pending' and tousertype='$Login_user_TYPEvl' and touserid='$Login_user_IDvl' and verified='1'";
+	$sltsumqty_request="select count(*) as numcountrequ from stock_request where status='pending' and tousertype='".db_esc($Login_user_TYPEvl)."' and touserid='".db_esc($Login_user_IDvl)."' and verified='1'";
 	
 }
 
@@ -190,7 +190,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
 						$result_sumqty_request=mysqli_fetch_array($fetch_sumqty_request);
 						$toalqyt=$result_sumqty_request['numcountrequ'];
 
-						$select_count_request="select * from stock_request where status='pending' and tousertype='$Login_user_TYPEvl' and touserid='$Login_user_IDvl'";
+						$select_count_request="select * from stock_request where status='pending' and tousertype='".db_esc($Login_user_TYPEvl)."' and touserid='".db_esc($Login_user_IDvl)."'";
 						$fetch_count_request=mysqli_query($db_conn,$select_count_request);
 						$result_count_request=mysqli_fetch_array($fetch_count_request);
 						//
@@ -481,7 +481,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
                                             </div>
 						<?php
 						//super stockist
-						$select_countSS_SLS="select sum(total) from user_invoice where date='$today_date' and from_user_type='super_stockiest'";
+						$select_countSS_SLS="select sum(total) from user_invoice where date='".db_esc($today_date)."' and from_user_type='super_stockiest'";
 						$fetch_countSS_SLS=mysqli_query($db_conn,$select_countSS_SLS);
 						$result_countSS_SLS=mysqli_fetch_array($fetch_countSS_SLS);
 						if($result_countSS_SLS[0]!=NULL)
@@ -507,7 +507,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
                                             </div>
 											<?php
 						//stockist
-						$select_countST_SLS="select sum(total) from user_invoice where date='$today_date' and from_user_type='stockiest'";
+						$select_countST_SLS="select sum(total) from user_invoice where date='".db_esc($today_date)."' and from_user_type='stockiest'";
 						$fetch_countST_SLS=mysqli_query($db_conn,$select_countST_SLS);
 						$result_countST_SLS=mysqli_fetch_array($fetch_countST_SLS);
 						if($result_countST_SLS[0]!=NULL)
@@ -534,7 +534,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
                                             </div>
 											<?php
 						//Distributors
-						$select_countDT_SLS="select sum(total) from user_invoice where date='$today_date' and from_user_type='distributor'";
+						$select_countDT_SLS="select sum(total) from user_invoice where date='".db_esc($today_date)."' and from_user_type='distributor'";
 						$fetch_countDT_SLS=mysqli_query($db_conn,$select_countDT_SLS);
 						$result_countDT_SLS=mysqli_fetch_array($fetch_countDT_SLS);
 						if($result_countDT_SLS[0]!=NULL)
@@ -562,7 +562,7 @@ $sltsumqty_request="select count(*) as numcountrequ from stock_request where sta
                                             </div>
 											<?php
 						//Super Distributors
-						$select_countDT_SLS12="select sum(total) from user_invoice where date='$today_date' and from_user_type='super_distributor'";
+						$select_countDT_SLS12="select sum(total) from user_invoice where date='".db_esc($today_date)."' and from_user_type='super_distributor'";
 						$fetch_countDT_SLS12=mysqli_query($db_conn,$select_countDT_SLS12);
 						$result_countDT_SLS12=mysqli_fetch_array($fetch_countDT_SLS12);
 						if($result_countDT_SLS12[0]!=NULL)

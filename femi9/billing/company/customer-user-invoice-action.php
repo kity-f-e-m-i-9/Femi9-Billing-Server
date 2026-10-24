@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 include("RemoveSpecialChar.php");
 
@@ -28,8 +28,8 @@ include("RemoveSpecialChar.php");
 	//HIDE AUTO INVOICE NUMBER -> below
 	//---------------	
 	
-$select_count_opstock13="select count(*) as numopstock12 from stock where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-$fetch_count_opstock13=mysqli_query($db_conn,$select_count_opstock13);
+$select_count_opstock13="select count(*) as numopstock12 from stock where user_type=? and user_id=?";
+$fetch_count_opstock13=db_q($db_conn,$select_count_opstock13,[$Login_user_TYPEvl,$Login_user_IDvl]);
 $result_count_opstock13=mysqli_fetch_array($fetch_count_opstock13);
 if($result_count_opstock13['numopstock12']==0)
 {
@@ -52,8 +52,8 @@ $totalamount=$amount*$qty;
 //--------------------------TOTAL, GST, DISCOUNT------------------
 //----------------------------------------------------------------
 //get product gst
-$selectproducts="select gst,gst_type,hsn,rwpoints from products where id='$pr_id'";
-$fetchproducts=mysqli_query($db_conn,$selectproducts);
+$selectproducts="select gst,gst_type,hsn,rwpoints from products where id=?";
+$fetchproducts=db_q($db_conn,$selectproducts,[$pr_id]);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $gst_percentage=$resultproducts['gst'];
 $gst_type_item=$resultproducts['gst_type'] ?: 'exclusive';
@@ -91,8 +91,8 @@ if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
 	$total=$subtotal+$gstamount_total;
 }
 //----------------------------------------------------------------
-$selecutomser_dtails="select * from customers where id='$customer_id'";
-$fetchcutomser_dtails=mysqli_query($db_conn,$selecutomser_dtails);
+$selecutomser_dtails="select * from customers where id=?";
+$fetchcutomser_dtails=db_q($db_conn,$selecutomser_dtails,[$customer_id]);
 $resultcutomser_dtails=mysqli_fetch_array($fetchcutomser_dtails);
 
 $buyer_GSTIN=$resultcutomser_dtails['gstin'];
@@ -103,14 +103,14 @@ $gst_type="inner";
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
 	
-	$select_count_invoice="select count(*) as numInvoice from invoice where inv_id='$inv_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and customer_id='$customer_id'";
-	$fetch_count_invoice=mysqli_query($db_conn,$select_count_invoice);
+	$select_count_invoice="select count(*) as numInvoice from invoice where inv_id=? and user_type=? and user_id=? and customer_id=?";
+	$fetch_count_invoice=db_q($db_conn,$select_count_invoice,[$inv_id,$Login_user_TYPEvl,$Login_user_IDvl,$customer_id]);
 	$result_count_invoice=mysqli_fetch_array($fetch_count_invoice);
 	if($result_count_invoice['numInvoice']==0)
 	{
 		//1. get last id_only (invoice number generate)
-		/*$select_MaxID="select max(id_only) from invoice where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-		$fetch_MaxID=mysqli_query($db_conn,$select_MaxID);
+		/*$select_MaxID="select max(id_only) from invoice where user_type=? and user_id=?";
+		$fetch_MaxID=db_q($db_conn,$select_MaxID,[$Login_user_TYPEvl,$Login_user_IDvl]);
 		$result_MaxID=mysqli_fetch_row($fetch_MaxID);
 		$id_only=$result_MaxID[0]+1;
 		$format_num = str_pad($id_only, 3, '0', STR_PAD_LEFT);
@@ -124,9 +124,9 @@ $gst_type="inner";
 		sub_total,discount,total,user_type,user_id,warehouse_id,
 		gst_type,roundoff,courier_charges,buyer_gsttype)
 		values
-		('$inv_id','$id_only','$inv_number','$customer_id','$date','$inv_year','0','0','0',
-		'$Login_user_TYPEvl','$Login_user_IDvl',$warehouseIdSql,'$gst_type','0','0','$buyer_gsttype')";
-		mysqli_query($db_conn,$insert_Invoice);
+		(?,?,?,?,?,?,'0','0','0',
+		?,?,$warehouseIdSql,?,'0','0',?)";
+		db_q($db_conn,$insert_Invoice,[$inv_id,$id_only,$inv_number,$customer_id,$date,$inv_year,$Login_user_TYPEvl,$Login_user_IDvl,$gst_type,$buyer_gsttype]);
 		
 	}
 	
@@ -148,8 +148,8 @@ $gst_type="inner";
 		//insert product details
 		//-------------------------------------------
 		
-	$select_count_invoiceItem="select count(*) as numInvoiceItem from invoice_items where inv_id='$inv_id' and pr_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and customer_id='$customer_id'";
-	$fetch_count_invoiceItem=mysqli_query($db_conn,$select_count_invoiceItem);
+	$select_count_invoiceItem="select count(*) as numInvoiceItem from invoice_items where inv_id=? and pr_id=? and user_type=? and user_id=? and customer_id=?";
+	$fetch_count_invoiceItem=db_q($db_conn,$select_count_invoiceItem,[$inv_id,$pr_id,$Login_user_TYPEvl,$Login_user_IDvl,$customer_id]);
 	$result_count_invoiceItem=mysqli_fetch_array($fetch_count_invoiceItem);
 	if($result_count_invoiceItem['numInvoiceItem']==0)
 	{
@@ -157,9 +157,9 @@ $gst_type="inner";
 		//1. insert invoice Items
 		$insert_InvoiceItems="insert into invoice_items (inv_id,pr_id,amount,qty,total,user_type,user_id,customer_id,gst_percentage,gstamount_singlepr,gstamount_total,subtotal,discount_percentage,discount_amount,
 		gst_type,hsn,date,buyer_gsttype,rwpoints,rwpoints_sls)
-		values ('$inv_id','$pr_id','$amount','$qty','$total','$Login_user_TYPEvl','$Login_user_IDvl','$customer_id','$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal','$discount_percentage','$discount_amount',
-		'$gst_type','$hsn','$date','$buyer_gsttype','0','0')";
-		mysqli_query($db_conn,$insert_InvoiceItems);
+		values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,
+		?,?,?,?,'0','0')";
+		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$Login_user_TYPEvl,$Login_user_IDvl,$customer_id,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_percentage,$discount_amount,$gst_type,$hsn,$date,$buyer_gsttype]);
 		
 		
 		

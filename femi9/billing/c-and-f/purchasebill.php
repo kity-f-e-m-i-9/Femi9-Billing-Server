@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 $PageTitle="Purchased Bill Copy";
@@ -104,8 +104,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from user_invoice where to_user_type='$Login_user_TYPEvl' and to_user_id='$Login_user_IDvl' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from user_invoice where to_user_type=? and to_user_id=? order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -12,7 +12,7 @@ $invid = $ret['invnumber'];
 $user  = $ret['from_usertype'];
 
 $inv_table = ($user === 'customer') ? 'invoice' : 'user_invoice';
-$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $inv_table WHERE inv_id='$invid'"));
+$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $inv_table WHERE inv_id='".db_esc($invid)."'"));
 
 $displaytitle = "Stock Return (Credit Note) Details";
 ?>

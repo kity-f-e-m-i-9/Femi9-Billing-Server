@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 ob_start();
 
 require_once __DIR__ . '/../shared/env-loader.php';
@@ -54,7 +54,7 @@ while ($r = mysqli_fetch_array($fetch_product_list)) {
     // District name
     $district_id = $r['district_id'];
     if (is_numeric($district_id)) {
-        $d             = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='$district_id'"));
+        $d             = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='".db_esc($district_id)."'"));
         $district_name = $d['dist_name'] ?? $district_id;
     } else {
         $district_name = $district_id;
@@ -63,7 +63,7 @@ while ($r = mysqli_fetch_array($fetch_product_list)) {
     // Taluk name
     $taluk_id = $r['taluk_id'];
     if (is_numeric($taluk_id)) {
-        $t          = mysqli_fetch_array(mysqli_query($db_conn, "SELECT taluk FROM taluk WHERE id='$taluk_id'"));
+        $t          = mysqli_fetch_array(mysqli_query($db_conn, "SELECT taluk FROM taluk WHERE id='".db_esc($taluk_id)."'"));
         $taluk_name = $t['taluk'] ?? $taluk_id;
     } else {
         $taluk_name = $taluk_id;

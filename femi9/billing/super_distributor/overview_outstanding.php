@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -151,15 +151,15 @@ $selectRcd_VLSS2="select * from ".$tblenma." where onboard_userTYPE='$Login_user
 											$district_id_VLSS2=$resultRcd_VLSS2['district_id'];
 											
 
-										$selectrecords_VLSS2="select * from district where state_id='$state_id_VLSS2' and id='$district_id_VLSS2'";
-										$fetchrecords_VLSS2=mysqli_query($db_conn,$selectrecords_VLSS2);
+										$selectrecords_VLSS2="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS2=db_q($db_conn,$selectrecords_VLSS2,[$state_id_VLSS2,$district_id_VLSS2]);
 										$resultrecords_VLSS2=mysqli_fetch_array($fetchrecords_VLSS2);
 										$district_name_VLSS2=$resultrecords_VLSS2['dist_name'];
 										
 										$taluk_id_VLSS2=$resultRcd_VLSS2['taluk_id'];
 										
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS2' and dist_id='$district_id_VLSS2' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS2,$district_id_VLSS2,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
@@ -225,15 +225,15 @@ if($Total_available_stock_VLSS2>0){
 											$state_id_VLSS3=$resultRcd_VLSS3['state_id'];
 											$district_id_VLSS3=$resultRcd_VLSS3['district_id'];
 
-										$selectrecords_VLSS3="select * from district where state_id='$state_id_VLSS3' and id='$district_id_VLSS3'";
-										$fetchrecords_VLSS3=mysqli_query($db_conn,$selectrecords_VLSS3);
+										$selectrecords_VLSS3="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS3=db_q($db_conn,$selectrecords_VLSS3,[$state_id_VLSS3,$district_id_VLSS3]);
 										$resultrecords_VLSS3=mysqli_fetch_array($fetchrecords_VLSS3);
 										$district_name_VLSS3=$resultrecords_VLSS3['dist_name'];
 										
 										$taluk_id_VLSS3=$resultRcd_VLSS3['taluk_id'];
 										
-$selectrecords_VLSS3_taluk="select * from taluk where state_id='$state_id_VLSS3' and dist_id='$district_id_VLSS3' and id='$taluk_id_VLSS3'";
-$fetchrecords_VLSS3_taluk=mysqli_query($db_conn,$selectrecords_VLSS3_taluk);
+$selectrecords_VLSS3_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS3_taluk=db_q($db_conn,$selectrecords_VLSS3_taluk,[$state_id_VLSS3,$district_id_VLSS3,$taluk_id_VLSS3]);
 $resultrecords_VLSS3_taluk=mysqli_fetch_array($fetchrecords_VLSS3_taluk);
 $taluk_name_VLSS3=$resultrecords_VLSS3_taluk['taluk'];
 										
@@ -300,15 +300,15 @@ if($Total_available_stock_VLSS3>0)
 											$state_id_VLSS4=$resultRcd_VLSS4['state_id'];
 											$district_id_VLSS4=$resultRcd_VLSS4['district_id'];
 
-										$selectrecords_VLSS4="select * from district where state_id='$state_id_VLSS4' and id='$district_id_VLSS4'";
-										$fetchrecords_VLSS4=mysqli_query($db_conn,$selectrecords_VLSS4);
+										$selectrecords_VLSS4="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS4=db_q($db_conn,$selectrecords_VLSS4,[$state_id_VLSS4,$district_id_VLSS4]);
 										$resultrecords_VLSS4=mysqli_fetch_array($fetchrecords_VLSS4);
 										$district_name_VLSS4=$resultrecords_VLSS4['dist_name'];
 										
 										$taluk_id_VLSS4=$resultRcd_VLSS4['taluk_id'];
 										
-$selectrecords_VLSS4_taluk="select * from taluk where state_id='$state_id_VLSS4' and dist_id='$district_id_VLSS4' and id='$taluk_id_VLSS4'";
-$fetchrecords_VLSS4_taluk=mysqli_query($db_conn,$selectrecords_VLSS4_taluk);
+$selectrecords_VLSS4_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS4_taluk=db_q($db_conn,$selectrecords_VLSS4_taluk,[$state_id_VLSS4,$district_id_VLSS4,$taluk_id_VLSS4]);
 $resultrecords_VLSS4_taluk=mysqli_fetch_array($fetchrecords_VLSS4_taluk);
 $taluk_name_VLSS4=$resultrecords_VLSS4_taluk['taluk'];
 										

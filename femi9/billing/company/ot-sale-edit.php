@@ -1,15 +1,15 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 include("config.php"); 
 date_default_timezone_set("Asia/Kolkata");
 
 $tempid=base64_decode($_REQUEST['tempid']);
 
-$select_Invoice="select * from ot_sales_invoice where tempid='$tempid'";
-$fetch_Invoice=mysqli_query($db_conn,$select_Invoice);
+$select_Invoice="select * from ot_sales_invoice where tempid=?";
+$fetch_Invoice=db_q($db_conn,$select_Invoice,[$tempid]);
 $result_Invoice=mysqli_fetch_array($fetch_Invoice);
 
-$select_Records="select * from ot_sales where tempid='$tempid'";
-$fetch_Records=mysqli_query($db_conn,$select_Records);
+$select_Records="select * from ot_sales where tempid=?";
+$fetch_Records=db_q($db_conn,$select_Records,[$tempid]);
 $result_Records=mysqli_fetch_array($fetch_Records);
 ?>
 <!DOCTYPE html>
@@ -125,8 +125,8 @@ flatpickr("#bookingDate", {
 $get_stateID=$result_Records['state_id'];
 if($get_stateID!=NULL && $get_stateID!=0)
 {
-$select_stateList12="select * from `state` where id='$get_stateID'";
-$fetch_staeList12=mysqli_query($db_conn,$select_stateList12);
+$select_stateList12="select * from `state` where id=?";
+$fetch_staeList12=db_q($db_conn,$select_stateList12,[$get_stateID]);
 $result_stateList12=mysqli_fetch_array($fetch_staeList12);
 $STName=$result_stateList12['st_name'];
 }else{
@@ -208,8 +208,8 @@ $STName=$result_stateList12['st_name'];
 			    $select_edit_items = "SELECT os.id, os.prid, os.qty, os.price, os.discount, p.productName
 			                           FROM ot_sales os
 			                           JOIN products p ON p.id = os.prid
-			                           WHERE os.tempid='$tempid' ORDER BY os.id ASC";
-			    $fetch_edit_items = mysqli_query($db_conn, $select_edit_items);
+			                           WHERE os.tempid=? ORDER BY os.id ASC";
+			    $fetch_edit_items = db_q($db_conn,$select_edit_items,[$tempid]);
 			    while ($itemRow = mysqli_fetch_assoc($fetch_edit_items)) {
 			    ?>
 			        <tr>

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");
@@ -13,8 +13,8 @@ include("config.php");
 	$invnumber_decode=base64_decode($invnumber);
 	
 	//get invoice details
-	$select_invoicedetails="select * from user_invoice where inv_number='$invnumber_decode'";
-	$fetch_invoicedetails=mysqli_query($db_conn,$select_invoicedetails);
+	$select_invoicedetails="select * from user_invoice where inv_number=?";
+	$fetch_invoicedetails=db_q($db_conn,$select_invoicedetails,[$invnumber_decode]);
 	$result_invoicedtails=mysqli_fetch_array($fetch_invoicedetails);
 	$invid=$result_invoicedtails['inv_id'];
 	
@@ -128,16 +128,16 @@ include("config.php");
                                             </thead>
 											
 											<tbody>
-		<?php $select_product_list="select * from user_invoice_items where inv_id='$invid' order by id asc";
-		$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+		<?php $select_product_list="select * from user_invoice_items where inv_id=? order by id asc";
+		$fetch_product_list=db_q($db_conn,$select_product_list,[$invid]);
 		while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 											$product_id=$result_product_list["pr_id"];
 											
 											//get product dtails
-		$select_prdetails="select * from products where id='$product_id'";
-	$fetch_prdetails=mysqli_query($db_conn,$select_prdetails);
+		$select_prdetails="select * from products where id=?";
+	$fetch_prdetails=db_q($db_conn,$select_prdetails,[$product_id]);
 	$result_prdetails=mysqli_fetch_array($fetch_prdetails);
 	$productname=$result_prdetails['productName'];
 	
@@ -174,15 +174,15 @@ include("config.php");
 <select required="" name="prid" class="form-control">
 <option value="" hidden="">Select</option>
 <?php 
-$select_product_list12="select * from user_invoice_items where inv_id='$invid' order by id asc";
-		$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
+$select_product_list12="select * from user_invoice_items where inv_id=? order by id asc";
+		$fetch_product_list12=db_q($db_conn,$select_product_list12,[$invid]);
 		while($result_product_list12=mysqli_fetch_array($fetch_product_list12))
 										{
 											
 										$product_idshow=$result_product_list12["pr_id"];
 										
-$select_product_list="select * from products where id='$product_idshow'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from products where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$product_idshow]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 										?>
@@ -205,8 +205,8 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 <!----------------------------------------------------------------------------->		
 		
 		<?php 
-		$select_InvoieDetails234="select * from user_return_stock where returnid='$returnid_decode'";
-		$fetch_InvoieDetails234=mysqli_query($db_conn,$select_InvoieDetails234);
+		$select_InvoieDetails234="select * from user_return_stock where returnid=?";
+		$fetch_InvoieDetails234=db_q($db_conn,$select_InvoieDetails234,[$returnid_decode]);
 		$resultReturnDtails=mysqli_fetch_array($fetch_InvoieDetails234);
 		?>
 		
@@ -229,15 +229,15 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
                                                     </thead>
                                                     <tbody>
 													<?php
-	$select_INVProductDetails="select * from user_return_stock_items where returnid='$returnid_decode' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_return_stock_items where returnid=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$returnid_decode]);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['prid'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		$TotalAMount=$result_INVProductDetails['total'];

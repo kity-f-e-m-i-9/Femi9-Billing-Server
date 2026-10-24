@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 /*--------user type------*/
 //company
 //super_stockiest
@@ -43,12 +43,12 @@ $Login_user_IDvl=$result_LoGuserDtails['temp_id']; // user id
 $Login_user_useridtext=$result_LoGuserDtails['useridtext'];
 
 //REFERAL PERSON & CATEGORY DETAILS
-$select_RFRDtailsCNG="select * from stockist_referral where stockist_id='$Login_user_IDvl'";
+$select_RFRDtailsCNG="select * from stockist_referral where stockist_id='".db_esc($Login_user_IDvl)."'";
 $fetch_RFRDtailsCNG=mysqli_query($db_conn,$select_RFRDtailsCNG);
 $result_RFRDtailsCNG=mysqli_fetch_array($fetch_RFRDtailsCNG);
 $CNG_catID=$result_RFRDtailsCNG['st_cat_id'];
 
-$select_RFRDtailsCNG_CAT="select * from stockist_category where id='$CNG_catID'";
+$select_RFRDtailsCNG_CAT="select * from stockist_category where id='".db_esc($CNG_catID)."'";
 $fetch_RFRDtailsCNG_CAT=mysqli_query($db_conn,$select_RFRDtailsCNG_CAT);
 $result_RFRDtailsCNG_CAT=mysqli_fetch_array($fetch_RFRDtailsCNG_CAT);
 $Login_person_CAT=$result_RFRDtailsCNG_CAT['catname'];

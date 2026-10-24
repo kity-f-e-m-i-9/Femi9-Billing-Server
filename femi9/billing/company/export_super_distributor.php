@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 
@@ -10,7 +10,7 @@ include("config.php");
 $file = "Super-Distributors.csv";
 
 // Fetch product data from database
-$select_records = "select * from super_distributor where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' order by id desc";
+$select_records = "select * from super_distributor where onboard_userTYPE='".db_esc($onboard_userTYPE)."' and onboard_userID='".db_esc($onboard_userID)."' order by id desc";
 $fetch_records = mysqli_query($db_conn, $select_records);
 
 // Initialize CSV content

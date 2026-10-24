@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Called from add_order.php right when a DM picks a shop with no saved
 // lat/lng, so the distance warning shows immediately on selection instead
 // of only after they've filled in products and hit Add (order_action_get.php
@@ -16,7 +16,7 @@ if ($shop_id <= 0) {
     exit;
 }
 
-$res = mysqli_query($db_conn, "SELECT address, state_name, district_name, taluk_name, pincode, latitude, longitude FROM ms_shop WHERE id='$shop_id' LIMIT 1");
+$res = mysqli_query($db_conn, "SELECT address, state_name, district_name, taluk_name, pincode, latitude, longitude FROM ms_shop WHERE id='".db_esc($shop_id)."' LIMIT 1");
 $row = $res ? mysqli_fetch_assoc($res) : null;
 if (!$row) {
     echo json_encode(['error' => 'Shop not found']);

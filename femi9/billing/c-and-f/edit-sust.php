@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Edit Super Stockist";
 $manage_url="manage_sust";
@@ -6,21 +6,21 @@ $manage_title="Manage Super Stockist";
 $message_title="Super Stockist";
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from super_stockiest where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from super_stockiest where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 				
 //state dtails
 $display_stid=$result_product_list['state_id'];
-$select_staedetails="select * from state where id='$display_stid'";
-	$fetch_staedetails=mysqli_query($db_conn,$select_staedetails);
+$select_staedetails="select * from state where id=?";
+	$fetch_staedetails=db_q($db_conn,$select_staedetails,[$display_stid]);
 	$result_staedetails=mysqli_fetch_array($fetch_staedetails);
 $display_stname=$result_staedetails['st_name'];
 
 //district dtails
 $display_disid=$result_product_list['district_id'];
-$select_distict="select * from district where id='$display_disid'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$display_disid]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $display_disname=$result_district['dist_name'];
 ?>

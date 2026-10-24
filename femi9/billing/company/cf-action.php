@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
 
@@ -42,8 +42,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	$username_generate=$mobile_number;
 	
 	
-$Select_CNTMoblenm="select count(*) as numMob from c_and_f where mobile_number='$mobile_number'";
-$Fetch_Count_MobilenUmber=mysqli_query($db_conn,$Select_CNTMoblenm);
+$Select_CNTMoblenm="select count(*) as numMob from c_and_f where mobile_number=?";
+$Fetch_Count_MobilenUmber=db_q($db_conn,$Select_CNTMoblenm,[$mobile_number]);
 $Result_Count_MobilenUmber=mysqli_fetch_array($Fetch_Count_MobilenUmber);
 if($Result_Count_MobilenUmber['numMob']==1)
 {
@@ -56,16 +56,16 @@ if($Result_Count_MobilenUmber['numMob']==1)
 	
 	
 	
-	$select_count_dist="select count(*) as numdist from c_and_f where state_id='$state_id' and district_id='$district_id'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+	$select_count_dist="select count(*) as numdist from c_and_f where state_id=? and district_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$state_id,$district_id]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numdist']==0)
 	{
 	
 	//plans details
 	$plan_id=$_POST["plan_id"];
-	$select_plans="select * from plans where id='$plan_id'";
-	$fetch_plans=mysqli_query($db_conn,$select_plans);
+	$select_plans="select * from plans where id=?";
+	$fetch_plans=db_q($db_conn,$select_plans,[$plan_id]);
 	$result_plans=mysqli_fetch_array($fetch_plans);
 	$plan_amount="0";//$result_plans["amount"];
 	$valid_months="0";//$result_plans["valid_months"];
@@ -100,11 +100,11 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	
         $sql="insert into c_and_f (temp_id,user_icon,name,state_id,district_id,email,mobile_number,username,password,plan_amount,valid_months,valid_from,valid_to,amount_method,amount_status,ref_number,account_status,merchantOrderId,merchantTransactionId,merchantUserId,gstin,address,userid,useridtext,country_code)
 
-		values ('$temp_id','$uploadfile','$name','$state_id','$district_id','$user_email','$mobile_number',
-		'$username_generate','$user_password','$plan_amount','$valid_months',
-		'$valid_from','$valid_to','phonepe','pending','Nil','active',
-		'$merchantOrderId','$merchantTransactionId','$merchantUserId','$gstin','$address','$userid','$useridtext','$country_code')";
-		mysqli_query($db_conn,$sql);
+		values (?,?,?,?,?,?,?,
+		?,?,?,?,
+		?,?,'phonepe','pending','Nil','active',
+		?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$sql,[$temp_id,$uploadfile,$name,$state_id,$district_id,$user_email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$gstin,$address,$userid,$useridtext,$country_code]);
 		
 		
 		//-----------------------------------------------------------------------------

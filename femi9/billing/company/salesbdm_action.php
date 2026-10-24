@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage_edit');
 include("config.php");
 include("RemoveSpecialChar.php");
@@ -74,8 +74,8 @@ if(isset($_REQUEST['add-salesbdm']))
 		$db_conn->query("ALTER TABLE sales_bdm_staff ADD COLUMN espo_user_id VARCHAR(24) NULL DEFAULT NULL AFTER monthly_target_amount");
 	}
 
-	$select_count_product="select count(*) as numProducts from sales_bdm_staff where bdm_mobile='$bdm_mobile'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	$select_count_product="select count(*) as numProducts from sales_bdm_staff where bdm_mobile=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$bdm_mobile]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numProducts']==0)
 	{

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -12,7 +12,7 @@ header("Content-Disposition: attachment; filename=$file");
 $output = fopen("php://output", "w");
 fputcsv($output, ['Name', 'Category', 'State', 'District', 'Taluk', 'Pincode', 'Country Code', 'Mobile Number', 'Landline', 'Email ID', 'Address', 'GSTIN']);
 
-$select_product_list = "select s.*, sc.catlable from shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id where s.distributor_id='$loguser_tempid' order by s.id desc";
+$select_product_list = "select s.*, sc.catlable from shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id where s.distributor_id='".db_esc($loguser_tempid)."' order by s.id desc";
 $fetch_product_list = mysqli_query($db_conn, $select_product_list);
 while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
 

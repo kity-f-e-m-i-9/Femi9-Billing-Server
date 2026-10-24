@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php"); 
 
@@ -40,13 +40,13 @@ date_default_timezone_set("Asia/Kolkata");
 $ATTND_date=date("Y-m-d");
 $ATTND_time=date("H:i:s");
 
-$select_AttendanceCount="select * from ms_attendance where ms_id='$markeingSTFID' and date='$ATTND_date'";
-$fetch_AttendanceCount=mysqli_query($db_conn,$select_AttendanceCount);
+$select_AttendanceCount="select * from ms_attendance where ms_id=? and date=?";
+$fetch_AttendanceCount=db_q($db_conn,$select_AttendanceCount,[$markeingSTFID,$ATTND_date]);
 $result_AttendanceCount=mysqli_num_rows($fetch_AttendanceCount);
 if($result_AttendanceCount==0)
 	{
-		$insertATTND="insert into ms_attendance (ms_id,date,time) values ('$markeingSTFID','$ATTND_date','$ATTND_time')";
-		mysqli_query($db_conn,$insertATTND);
+		$insertATTND="insert into ms_attendance (ms_id,date,time) values (?,?,?)";
+		db_q($db_conn,$insertATTND,[$markeingSTFID,$ATTND_date,$ATTND_time]);
 
 	}
 

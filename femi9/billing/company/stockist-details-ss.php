@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 // Load environment variables FIRST (before anything else)
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -12,21 +12,21 @@ $encryption = new EncryptionService();
 error_reporting(0);
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from stockiest where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from stockiest where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 
 //state details
 $state_id=$result_product_list['state_id'];
-$select_stateList="select * from state where id='$state_id'";
-$fetch_staeList=mysqli_query($db_conn,$select_stateList);
+$select_stateList="select * from state where id=?";
+$fetch_staeList=db_q($db_conn,$select_stateList,[$state_id]);
 $result_stateList=mysqli_fetch_array($fetch_staeList);
 $state_name=$result_stateList['st_name'];
 
 //district details
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=$result_district['dist_name'];
 ?>
@@ -120,8 +120,8 @@ $district_name=$result_district['dist_name'];
                 <ol>
                 <?php 
                 $StockistID=$result_product_list['temp_id'];
-                $select_distict="select * from taluk where assigned_SID='$StockistID' order by id asc";
-                $fetch_district=mysqli_query($db_conn,$select_distict);
+                $select_distict="select * from taluk where assigned_SID=? order by id asc";
+                $fetch_district=db_q($db_conn,$select_distict,[$StockistID]);
                 while($result_district=mysqli_fetch_array($fetch_district))
                 {
                     $talukID=$result_district['id'];
@@ -129,8 +129,8 @@ $district_name=$result_district['dist_name'];
                 <li><span style="color:#000;"><?=$result_district['taluk'];?></span><hr>
                     <ol>
                     <?php 
-                    $select_STockPincode="select * from pincode where assigned_SID='$StockistID' and taluk_id='$talukID' order by pincode asc";
-                    $fetch_STockPincode=mysqli_query($db_conn,$select_STockPincode);
+                    $select_STockPincode="select * from pincode where assigned_SID=? and taluk_id=? order by pincode asc";
+                    $fetch_STockPincode=db_q($db_conn,$select_STockPincode,[$StockistID,$talukID]);
                     while($result_STockPincode=mysqli_fetch_array($fetch_STockPincode))
                     {
                     ?>
@@ -231,16 +231,16 @@ $district_name=$result_district['dist_name'];
         <?php
         $stockistID=$result_product_list['temp_id'];
         
-        $Select_ReferralDetails="select * from stockist_referral where stockist_id='$stockistID'";
-        $Fetch_ReferralDetails=mysqli_query($db_conn,$Select_ReferralDetails);
+        $Select_ReferralDetails="select * from stockist_referral where stockist_id=?";
+        $Fetch_ReferralDetails=db_q($db_conn,$Select_ReferralDetails,[$stockistID]);
         $Result_ReferralDetails=mysqli_fetch_array($Fetch_ReferralDetails);
         
         $st_cat_id=$Result_ReferralDetails['st_cat_id'];
         if($st_cat_id!=NULL)
         {
             //
-            $Select_STcatdetails="select * from stockist_category where id='$st_cat_id'";
-            $Felect_STcatdetails=mysqli_query($db_conn,$Select_STcatdetails);
+            $Select_STcatdetails="select * from stockist_category where id=?";
+            $Felect_STcatdetails=db_q($db_conn,$Select_STcatdetails,[$st_cat_id]);
             $Relect_STcatdetails=mysqli_fetch_array($Felect_STcatdetails);
             
             if($Result_ReferralDetails['st_ref_type']=="super_stockiest"){

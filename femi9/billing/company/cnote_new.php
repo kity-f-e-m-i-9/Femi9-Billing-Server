@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 /**
  * Credit Note Creation Page
  * Add return items against an invoice with quantity validation
@@ -207,8 +207,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                             $product_id = $result_product_list["pr_id"];
                                                                             
                                                                             // Get product details
-                                                                            $select_prdetails = "SELECT * FROM products WHERE id='$product_id' LIMIT 1";
-                                                                            $fetch_prdetails = mysqli_query($db_conn, $select_prdetails);
+                                                                            $select_prdetails = "SELECT * FROM products WHERE id=? LIMIT 1";
+                                                                            $fetch_prdetails = db_q($db_conn,$select_prdetails,[$product_id]);
                                                                             $result_prdetails = mysqli_fetch_array($fetch_prdetails);
                                                                             $productname = $result_prdetails['productName'];
                                                                             
@@ -304,8 +304,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                         while ($result_product_list12 = mysqli_fetch_array($fetch_product_list12)) {
                                                             $product_idshow = $result_product_list12["pr_id"];
                                                             
-                                                            $select_product_list = "SELECT * FROM products WHERE id='$product_idshow' LIMIT 1";
-                                                            $fetch_product_list = mysqli_query($db_conn, $select_product_list);
+                                                            $select_product_list = "SELECT * FROM products WHERE id=? LIMIT 1";
+                                                            $fetch_product_list = db_q($db_conn,$select_product_list,[$product_idshow]);
                                                             
                                                             while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
                                                                 // Get availability for this product
@@ -393,8 +393,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                 <?php if ($_REQUEST['returnid'] != NULL) { ?>
                                                 <!-- RETURN ITEMS TABLE -->
                                                 <?php 
-                                                $select_InvoieDetails234 = "SELECT * FROM user_return_stock WHERE returnid='$get_returnid' AND deleted_at IS NULL LIMIT 1";
-                                                $fetch_InvoieDetails234 = mysqli_query($db_conn, $select_InvoieDetails234);
+                                                $select_InvoieDetails234 = "SELECT * FROM user_return_stock WHERE returnid=? AND deleted_at IS NULL LIMIT 1";
+                                                $fetch_InvoieDetails234 = db_q($db_conn,$select_InvoieDetails234,[$get_returnid]);
                                                 $resultReturnDtails = mysqli_fetch_array($fetch_InvoieDetails234);
                                                 ?>
 
@@ -418,8 +418,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                             </thead>
                                                             <tbody>
                                                                 <?php
-                                                                $select_INVProductDetails = "SELECT * FROM user_return_stock_items WHERE returnid='$get_returnid' AND deleted_at IS NULL ORDER BY id DESC";
-                                                                $fetch_INVProductDetails = mysqli_query($db_conn, $select_INVProductDetails);
+                                                                $select_INVProductDetails = "SELECT * FROM user_return_stock_items WHERE returnid=? AND deleted_at IS NULL ORDER BY id DESC";
+                                                                $fetch_INVProductDetails = db_q($db_conn,$select_INVProductDetails,[$get_returnid]);
                                                                 $count_products_return = mysqli_num_rows($fetch_INVProductDetails);
                                                                 $rd = 0;
                                                                 $TotalAMount123 = 0;
@@ -427,8 +427,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                 while ($result_INVProductDetails = mysqli_fetch_array($fetch_INVProductDetails)) {
                                                                     // Product details
                                                                     $InV_Product_ID = $result_INVProductDetails['prid'];
-                                                                    $select_ProductDetails123 = "SELECT * FROM products WHERE id='$InV_Product_ID' LIMIT 1";
-                                                                    $fetch_ProductDetails123 = mysqli_query($db_conn, $select_ProductDetails123);
+                                                                    $select_ProductDetails123 = "SELECT * FROM products WHERE id=? LIMIT 1";
+                                                                    $fetch_ProductDetails123 = db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
                                                                     $result_ProductDetails123 = mysqli_fetch_array($fetch_ProductDetails123);
                                                                     
                                                                     $TotalAMount = $result_INVProductDetails['total'];

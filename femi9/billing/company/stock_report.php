@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -161,8 +161,8 @@ $i= $start_from;
 											$state_id_VLSS1=$resultRcd_VLSS1['state_id'];
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
@@ -184,8 +184,8 @@ $i= $start_from;
 					
 					//SALES QTY — SUM across any per-warehouse rows (a product's stock
 					// can now be split across physical godowns H1/G1/G2)
-					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id='$tempid' and user_type='$usertype_stock' and product_id='$prid_header'";
-					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
+					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id=? and user_type=? and product_id=?";
+					$fetch_SUM_QTY=db_q($db_conn,$select_SUM_QTY,[$tempid,$usertype_stock,$prid_header]);
 					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
 					if($result_SUM_QTY['closing_qty']!=NULL){ $clqty=$result_SUM_QTY['closing_qty']; }else{$clqty="0";}
 
@@ -227,8 +227,8 @@ $i= $start_from;
 //DISTRICT
 if(is_numeric($district_id_VLSS2))
 {
-										$selectrecords_VLSS2="select * from district where state_id='$state_id_VLSS2' and id='$district_id_VLSS2'";
-										$fetchrecords_VLSS2=mysqli_query($db_conn,$selectrecords_VLSS2);
+										$selectrecords_VLSS2="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS2=db_q($db_conn,$selectrecords_VLSS2,[$state_id_VLSS2,$district_id_VLSS2]);
 										$resultrecords_VLSS2=mysqli_fetch_array($fetchrecords_VLSS2);
 										$district_name_VLSS2=$resultrecords_VLSS2['dist_name'];
 }else{
@@ -238,8 +238,8 @@ if(is_numeric($district_id_VLSS2))
 //TALUK										
 if(is_numeric($taluk_id_VLSS2))
 {	
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS2' and dist_id='$district_id_VLSS2' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS2,$district_id_VLSS2,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 }else{
@@ -265,8 +265,8 @@ $taluk_name_VLSS2=$taluk_id_VLSS2;
 					
 					//SALES QTY — SUM across any per-warehouse rows (a product's stock
 					// can now be split across physical godowns H1/G1/G2)
-					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id='$tempid' and user_type='$usertype_stock' and product_id='$prid_header'";
-					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
+					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id=? and user_type=? and product_id=?";
+					$fetch_SUM_QTY=db_q($db_conn,$select_SUM_QTY,[$tempid,$usertype_stock,$prid_header]);
 					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
 					if($result_SUM_QTY['closing_qty']!=NULL){ $clqty=$result_SUM_QTY['closing_qty']; }else{$clqty="0";}
 

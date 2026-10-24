@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -47,7 +47,7 @@ $getinvuser = $_REQUEST['invuser']   ?? 'shop';
 <?php if (isset($_REQUEST['updatedsuccess'])): ?><div class="alert alert-success">Shop updated.</div><?php endif; ?>
 <?php if (isset($_REQUEST['alreadyexists'])): ?><div class="alert alert-danger">This shop is already on the invoice.</div><?php endif; ?>
 <?php
-$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='$invid' LIMIT 1"));
+$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='".db_esc($invid)."' LIMIT 1"));
 $shopRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='{$inv['to_user_id']}' LIMIT 1"));
 ?>
                     <div class="row">
@@ -74,7 +74,7 @@ $shopRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE t
                                         <select required name="new_customer_id" class="js-states form-control">
                                             <option value="" hidden>Select</option>
                                             <?php
-                                            $shops = mysqli_query($db_conn, "SELECT * FROM shop WHERE onboard_userTYPE='$Login_user_TYPEvl' AND onboard_userID='$Login_user_IDvl' ORDER BY name ASC");
+                                            $shops = mysqli_query($db_conn, "SELECT * FROM shop WHERE onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' AND onboard_userID='".db_esc($Login_user_IDvl)."' ORDER BY name ASC");
                                             while ($s = mysqli_fetch_array($shops)) { ?>
                                             <option value="<?php echo $s['temp_id']; ?>"><?php echo strtoupper($s['name']); ?>, <?php echo $s['mobile_number']; ?></option>
                                             <?php } ?>

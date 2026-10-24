@@ -1,8 +1,8 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from c_and_f where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from c_and_f where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -94,8 +94,8 @@ $ex=explode("#",$data);
   foreach ($ex as $key => $value)
    {  
     
-$select_distict="select st_name from state where id='$value'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select st_name from state where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$value]);
 $result_district=mysqli_fetch_array($fetch_district);
 		
 		echo "<li>".ucwords($result_district['st_name'])."</li>";

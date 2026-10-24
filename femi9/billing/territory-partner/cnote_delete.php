@@ -20,11 +20,16 @@ $return = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 // Fetch item
-$stmt = $db_conn->prepare("SELECT prid, qty, total FROM user_return_stock_items WHERE id=? LIMIT 1");
+$stmt = $db_conn->prepare("SELECT prid, qty, total, returnid FROM user_return_stock_items WHERE id=? LIMIT 1");
 $stmt->bind_param('s', $rowid);
 $stmt->execute();
 $item = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+
+// Ownership: the return must be addressed to the logged-in partner and the item must belong to it.
+if ($return && $item && ((string)$return['to_userid'] !== (string)$Login_user_IDvl || (string)$item['returnid'] !== (string)$returnid)) {
+    http_response_code(403); exit('Not allowed');
+}
 
 if ($return && $item) {
     $from_usertype = $return['from_usertype'];

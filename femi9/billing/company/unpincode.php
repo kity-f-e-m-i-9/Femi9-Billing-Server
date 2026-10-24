@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -17,8 +17,8 @@ if(isset($_REQUEST['search-records']))
 //state details
 if($state_id!=NULL)
 {
-							   $select_stateList="select * from `state` where id='$state_id'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+							   $select_stateList="select * from `state` where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$state_id]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];
 }
@@ -26,7 +26,7 @@ if($state_id!=NULL)
 										//district details
 										if($dist_id!=NULL)
 										{
-										$select_Distdetails="select * from district where id=$dist_id";
+										$select_Distdetails="select * from district where id='".db_esc($dist_id)."'";
 										$fetch_Distdetails=mysqli_query($db_conn,$select_Distdetails);
 										$result_Distdetails=mysqli_fetch_array($fetch_Distdetails);
 										$district_name=$result_Distdetails['dist_name'];
@@ -35,7 +35,7 @@ if($state_id!=NULL)
 										//taluk details
 										if($talukid!=NULL)
 										{
-										$select_taluk="select * from taluk where id=$talukid";
+										$select_taluk="select * from taluk where id='".db_esc($talukid)."'";
 										$fetch_taluk=mysqli_query($db_conn,$select_taluk);
 										$result_taluk=mysqli_fetch_array($fetch_taluk);
 										$talukname=$result_taluk['taluk'];
@@ -205,8 +205,8 @@ function getXMLHTTP() { //fuction to return the xml http object
 							   <option value="">--All--</option>
 							   <?php }?>
 							   
-							   <?php $select_product_list233="select * from district where state_id='$state_id' order by dist_name asc";
-										$fetch_product_list233=mysqli_query($db_conn,$select_product_list233);
+							   <?php $select_product_list233="select * from district where state_id=? order by dist_name asc";
+										$fetch_product_list233=db_q($db_conn,$select_product_list233,[$state_id]);
 										while($result_product_list233=mysqli_fetch_array($fetch_product_list233))
 										{
 											?>
@@ -226,8 +226,8 @@ function getXMLHTTP() { //fuction to return the xml http object
 							   <option value="">--All--</option>
 							   <?php }?>
 							   
-				<?php $select_product_list244="select * from taluk where state_id='$state_id' and dist_id='$dist_id' order by taluk asc";
-			$fetch_product_list244=mysqli_query($db_conn,$select_product_list244);
+				<?php $select_product_list244="select * from taluk where state_id=? and dist_id=? order by taluk asc";
+			$fetch_product_list244=db_q($db_conn,$select_product_list244,[$state_id,$dist_id]);
 			while($result_product_list244=mysqli_fetch_array($fetch_product_list244))
 										{
 											?>
@@ -275,25 +275,25 @@ $i= $start_from;
 							<?php 
 							if($state_id!=NULL && $dist_id!=NULL && $talukid!=NULL)
 							{
-							$select_product_list="select * from pincode where state_id='$state_id' and dist_id='$dist_id' and taluk_id='$talukid' order by id asc";
+							$select_product_list="select * from pincode where state_id='".db_esc($state_id)."' and dist_id='".db_esc($dist_id)."' and taluk_id='".db_esc($talukid)."' order by id asc";
 							}
 							else if($state_id!=NULL && $dist_id==NULL && $talukid==NULL)
 							{
-							$select_product_list="select * from pincode where state_id='$state_id' order by id asc";
+							$select_product_list="select * from pincode where state_id='".db_esc($state_id)."' order by id asc";
 							}
 							else
 							{
-							$select_product_list="select * from pincode where state_id='$state_id' and dist_id='$dist_id' order by id asc";
+							$select_product_list="select * from pincode where state_id=? and dist_id=? order by id asc";
 							}
 							
-							$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+							$fetch_product_list=db_q($db_conn,$select_product_list,[$state_id,$dist_id]);
 							while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 											//state details
 											$dis_state_id=$result_product_list['state_id'];
-								$select_stateList12="select * from `state` where id='$dis_state_id'";
-							   $fetch_staeList12=mysqli_query($db_conn,$select_stateList12);
+								$select_stateList12="select * from `state` where id=?";
+							   $fetch_staeList12=db_q($db_conn,$select_stateList12,[$dis_state_id]);
 							   $result_stateList12=mysqli_fetch_array($fetch_staeList12);
 							   $dis_state_name=$result_stateList12['st_name'];
 							   

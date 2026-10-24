@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 include("RemoveSpecialChar.php");
 error_reporting(1);
@@ -42,8 +42,8 @@ if(isset($_REQUEST['add-customer']))
 		$db_conn->query("ALTER TABLE marketing_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
 	}
 
-	$select_count_product="select count(*) as numProducts from marketing_staff where ms_mobile='$ms_mobile'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	$select_count_product="select count(*) as numProducts from marketing_staff where ms_mobile=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$ms_mobile]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numProducts']==0)
 	{

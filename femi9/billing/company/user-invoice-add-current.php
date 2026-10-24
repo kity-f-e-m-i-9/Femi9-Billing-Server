@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 /**
  * Invoice Creation & Management - Enhanced with Advance Payment
  * Femi9 Billing Application
@@ -246,8 +246,8 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                                             $user_districtID = $result_Customers_list['district_id'];
                                                             
                                                             // Get district name
-                                                            $select_User_districtName = "SELECT * FROM district WHERE id='$user_districtID'";
-                                                            $fetch_user_districtName = mysqli_query($db_conn, $select_User_districtName);
+                                                            $select_User_districtName = "SELECT * FROM district WHERE id=?";
+                                                            $fetch_user_districtName = db_q($db_conn,$select_User_districtName,[$user_districtID]);
                                                             $result_user_districtName = mysqli_fetch_array($fetch_user_districtName);
                                                             $user_districtName = $result_user_districtName['dist_name'] ?? '';
                                                             

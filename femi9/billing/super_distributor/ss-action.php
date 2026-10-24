@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; /* include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; /* include("include/db-connect.php");
 
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
@@ -22,8 +22,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	$taluk_id=$_POST["taluk_id"];
 	$pincode_id=$_POST["pincode_id"];
 	
-	$select_count_dist="select count(*) as numdist from shop where district_id='$district_id' and taluk_id='$taluk_id' and pincode_id='$pincode_id'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+	$select_count_dist="select count(*) as numdist from shop where district_id=? and taluk_id=? and pincode_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$district_id,$taluk_id,$pincode_id]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numdist']==0)
 	{
@@ -37,8 +37,8 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		
 	//plans details
 	$plan_id=$_POST["plan_id"];
-	$select_plans="select * from plans where id='$plan_id'";
-	$fetch_plans=mysqli_query($db_conn,$select_plans);
+	$select_plans="select * from plans where id=?";
+	$fetch_plans=db_q($db_conn,$select_plans,[$plan_id]);
 	$result_plans=mysqli_fetch_array($fetch_plans);
 	$plan_amount=$result_plans["amount"];
 	$valid_months=$result_plans["valid_months"];
@@ -161,13 +161,13 @@ $keyIndex =1;
 	
         $sql="insert into shop (temp_id,user_icon,name,district_id,email,mobile_number,username,password,plan_amount,valid_months,valid_from,valid_to,amount_method,amount_status,ref_number,account_status,merchantOrderId,merchantTransactionId,merchantUserId,taluk_id,distributor_id,pincode_id)
 
-		values ('$temp_id','$uploadfile','$name','$district_id','$email','$mobile_number',
-		'$username_generate','$user_password','$plan_amount','$valid_months',
-		'$valid_from','$valid_to','phonepe','pending','$merchantTransactionId','pending',
-		'$merchantOrderId','$merchantTransactionId','$merchantUserId',
-		'$taluk_id','$distributor_id','$pincode_id')";
+		values (?,?,?,?,?,?,
+		?,?,?,?,
+		?,?,'phonepe','pending',?,'pending',
+		?,?,?,
+		?,?,?)";
 
-        if ($conn->query($sql) === TRUE) {
+        if (db_q($conn,$sql,[$temp_id,$uploadfile,$name,$district_id,$email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantTransactionId,$merchantOrderId,$merchantTransactionId,$merchantUserId,$taluk_id,$distributor_id,$pincode_id]) === TRUE) {
             // Redirect to the PhonePe payment URL
             header('Location:' . $payUrl);
         } else {
@@ -215,8 +215,8 @@ $keyIndex =1;
     $ref_number=str_replace("'","&#39;",$_REQUEST['ref_number']);
 	
 	//plans details
-	$select_plans="select * from coupons where coupon_number='$ref_number'";
-	$fetch_plans=mysqli_query($db_conn,$select_plans);
+	$select_plans="select * from coupons where coupon_number=?";
+	$fetch_plans=db_q($db_conn,$select_plans,[$ref_number]);
 	$result_plans=mysqli_fetch_array($fetch_plans);
 	$plan_amount=$result_plans['plan_amount'];
 	$valid_months=$result_plans['valid_months'];

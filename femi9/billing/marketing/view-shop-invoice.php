@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -11,25 +11,46 @@ date_default_timezone_set("Asia/Kolkata");
 
 $Invoice_ID = base64_decode($_REQUEST['invoiceid'] ?? '');
 
-$totalgst = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id='$Invoice_ID'"))[0];
+$totalgst = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."'"))[0];
 $invoice_heading = $totalgst > 0 ? 'Tax Invoice' : 'Bill of Supply';
 
-$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='$Invoice_ID' LIMIT 1"));
+$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='".db_esc($Invoice_ID)."' LIMIT 1"));
+
+// Ownership scoping (same rule as get-tp-shop-mobiles.php / view-tp-shops.php):
+// only invoices sold by a Territory Partner that covers part of THIS staff
+// member's own assigned territory may be viewed - never an arbitrary invoice id.
+require_once("include/AssignedLocations.php");
+$__tpIdChk = (int)($inv['from_user_id'] ?? 0);
+$__allowed = false;
+if ($inv && $__tpIdChk > 0 && ($inv['from_user_type'] ?? '') === 'territory_partner') {
+    $__taluks = [];
+    foreach (getMsAssignedDistricts($db_conn, (int)$markeingSTFID) as $__d) {
+        foreach ($__d['taluks'] as $__t) { $__taluks[] = (int)$__t['id']; }
+    }
+    if ($__taluks) {
+        $__list = implode(',', $__taluks);
+        $__chk = $db_conn->query("SELECT 1 FROM territory_partner_locations tpl
+            JOIN partner_location_nodes n ON n.id = tpl.location_id
+            WHERE tpl.territory_partner_id = $__tpIdChk AND n.parent_id IN ($__list) LIMIT 1");
+        $__allowed = $__chk && $__chk->num_rows > 0;
+    }
+}
+if (!$__allowed) { http_response_code(403); exit('Not allowed'); }
 
 // TP (seller) details
 $tp_id = (int)($inv['from_user_id'] ?? 0);
-$tpRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM territory_partners WHERE id='$tp_id' LIMIT 1"));
+$tpRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM territory_partners WHERE id='".db_esc($tp_id)."' LIMIT 1"));
 
 // Customer (shop) details
 $customer_id = $inv['to_user_id'] ?? '';
-$shop        = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='$customer_id' LIMIT 1"));
+$shop        = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='".db_esc($customer_id)."' LIMIT 1"));
 $state_row   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT st_name FROM state WHERE id='{$shop['state_id']}' LIMIT 1"));
 $state_name  = $state_row['st_name'] ?? '';
 
 $Currency_symbol = "&#8377;";
 
-$dlnote  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM delivery_note WHERE inv_id='$Invoice_ID' LIMIT 1"));
-$profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profile WHERE user_tempid='$tp_id' AND usertype='territory_partner' LIMIT 1"));
+$dlnote  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM delivery_note WHERE inv_id='".db_esc($Invoice_ID)."' LIMIT 1"));
+$profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profile WHERE user_tempid='".db_esc($tp_id)."' AND usertype='territory_partner' LIMIT 1"));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -141,7 +162,7 @@ State: <?php echo $state_name; ?>
 </tr>
 <?php
 $invno = 0; $TotalAMount123 = 0; $Totalquantity123 = 0;
-$items = mysqli_query($db_conn, "SELECT * FROM user_invoice_items WHERE inv_id='$Invoice_ID' ORDER BY id DESC");
+$items = mysqli_query($db_conn, "SELECT * FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."' ORDER BY id DESC");
 while ($ri = mysqli_fetch_array($items)) {
     $pr = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='{$ri['pr_id']}' LIMIT 1"));
     $lineTotal = ($ri['qty'] * $ri['amount']) - $ri['discount_amount'];

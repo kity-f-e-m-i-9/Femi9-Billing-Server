@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -109,8 +109,8 @@ $i= $start_from;
 $district_id=$result_product_list['district_id'];
 if(is_numeric($district_id))
 {
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 }
@@ -123,8 +123,8 @@ $district_name=	$district_id;
 $taluk_id=$result_product_list['taluk_id'];
 if(is_numeric($taluk_id))
 {
-$select_Taluk12="select * from taluk where id='$taluk_id'";
-	$fetch_Taluk12=mysqli_query($db_conn,$select_Taluk12);
+$select_Taluk12="select * from taluk where id=?";
+	$fetch_Taluk12=db_q($db_conn,$select_Taluk12,[$taluk_id]);
 	$result_Taluk12=mysqli_fetch_array($fetch_Taluk12);
 $taluk_name=$result_Taluk12['taluk'];
 }else{

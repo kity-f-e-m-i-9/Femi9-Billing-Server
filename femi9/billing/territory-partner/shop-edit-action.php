@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -23,12 +23,12 @@ $firka_id    = (int)($_POST["firka_id"]    ?? 0);
 
 mysqli_query($db_conn,
     "UPDATE shop SET
-        name='$name', email='$email', mobile_number='$mobile',
-        address='$address', shop_cat='$shop_cat', gstin='$gstin',
-        country_code='$country_code', landline='$landline',
-        state_id='$state_id', district_id='$district_id',
-        taluk_id='$taluk_id', firka_id='$firka_id'
-     WHERE id='$update_id'"
+        name='".db_esc($name)."', email='".db_esc($email)."', mobile_number='".db_esc($mobile)."',
+        address='".db_esc($address)."', shop_cat='".db_esc($shop_cat)."', gstin='".db_esc($gstin)."',
+        country_code='".db_esc($country_code)."', landline='".db_esc($landline)."',
+        state_id='".db_esc($state_id)."', district_id='".db_esc($district_id)."',
+        taluk_id='".db_esc($taluk_id)."', firka_id='".db_esc($firka_id)."'
+     WHERE id='".db_esc($update_id)."'"
 );
 
 echo "<script>window.location='shop-manage.php?updatedSuccess';</script>";

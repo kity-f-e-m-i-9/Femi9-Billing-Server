@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -194,22 +194,22 @@ $i= $start_from;
 											<tbody>
 										<?php									
 										
-$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type='$usertypevl' and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type=? and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
 	$receipt_inv_id=$result_market_SSCASH_VLSS_THISMONTH['inv_id'];
 	
 	//get invoice Number
-	$select_CNT_number="select count(*) as numINVNUM from user_invoice where inv_id='$receipt_inv_id'";
-	$fetch_CNT_number=mysqli_query($db_conn,$select_CNT_number);
+	$select_CNT_number="select count(*) as numINVNUM from user_invoice where inv_id=?";
+	$fetch_CNT_number=db_q($db_conn,$select_CNT_number,[$receipt_inv_id]);
 	$result_CNT_number=mysqli_fetch_array($fetch_CNT_number);
 	
 	if($result_CNT_number['numINVNUM']==1)
 	{
-	$select_inv_number="select * from user_invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from user_invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
@@ -218,8 +218,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$to_user_id=$result_inv_number['to_user_id'];
 	
 	}else{
-	$select_inv_number="select * from invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
@@ -262,15 +262,15 @@ $selectRcd_VLSS1="select * from ".$tablename." where temp_id='$to_user_id'";
 											$state_id_VLSS1=$resultRcd_VLSS1['state_id'];
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 }
 										
-$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id='$receipt_inv_id'";
-$fetch_marketstock_VLDIST_VLSS1=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS1);
+$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id=?";
+$fetch_marketstock_VLDIST_VLSS1=db_q($db_conn,$select_marketstock_VLDIST_VLSS1,[$receipt_inv_id]);
 $result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS1);
 
 if($result_marketstock_VLDIST_VLSS1[0]!=NULL){
@@ -329,22 +329,22 @@ $Total_available_stock123_VLSS1+=$Total_available_stock_VLSS1;
 											<tbody>
 										<?php									
 										
-$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type='$usertypevl' and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type=? and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
 	$receipt_inv_id=$result_market_SSCASH_VLSS_THISMONTH['inv_id'];
 	
 	//get invoice Number
-	$select_CNT_number="select count(*) as numINVNUM from user_invoice where inv_id='$receipt_inv_id'";
-	$fetch_CNT_number=mysqli_query($db_conn,$select_CNT_number);
+	$select_CNT_number="select count(*) as numINVNUM from user_invoice where inv_id=?";
+	$fetch_CNT_number=db_q($db_conn,$select_CNT_number,[$receipt_inv_id]);
 	$result_CNT_number=mysqli_fetch_array($fetch_CNT_number);
 	
 	if($result_CNT_number['numINVNUM']==1)
 	{
-	$select_inv_number="select * from user_invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from user_invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
@@ -353,8 +353,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$to_user_id=$result_inv_number['to_user_id'];
 	
 	}else{
-	$select_inv_number="select * from invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
@@ -394,15 +394,15 @@ $selectRcd_VLSS1="select * from ".$tablename." where temp_id='$to_user_id'";
 											$state_id_VLSS1=$resultRcd_VLSS1['state_id'];
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 }
 										
-$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id='$receipt_inv_id'";
-$fetch_marketstock_VLDIST_VLSS1=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS1);
+$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id=?";
+$fetch_marketstock_VLDIST_VLSS1=db_q($db_conn,$select_marketstock_VLDIST_VLSS1,[$receipt_inv_id]);
 $result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS1);
 
 if($result_marketstock_VLDIST_VLSS1[0]!=NULL){
@@ -461,22 +461,22 @@ $Total_available_stock123_VLSS1+=$Total_available_stock_VLSS1;
 											<tbody>
 										<?php									
 										
-$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type='$usertypevl' and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type=? and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
 	$receipt_inv_id=$result_market_SSCASH_VLSS_THISMONTH['inv_id'];
 	
 	//get invoice Number
-	$select_CNT_number="select count(*) as numINVNUM from user_invoice where inv_id='$receipt_inv_id'";
-	$fetch_CNT_number=mysqli_query($db_conn,$select_CNT_number);
+	$select_CNT_number="select count(*) as numINVNUM from user_invoice where inv_id=?";
+	$fetch_CNT_number=db_q($db_conn,$select_CNT_number,[$receipt_inv_id]);
 	$result_CNT_number=mysqli_fetch_array($fetch_CNT_number);
 	
 	if($result_CNT_number['numINVNUM']==1)
 	{
-	$select_inv_number="select * from user_invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from user_invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
@@ -485,8 +485,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$to_user_id=$result_inv_number['to_user_id'];
 	
 	}else{
-	$select_inv_number="select * from invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
@@ -526,15 +526,15 @@ $selectRcd_VLSS1="select * from ".$tablename." where temp_id='$to_user_id'";
 											$state_id_VLSS1=$resultRcd_VLSS1['state_id'];
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 }
 										
-$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id='$receipt_inv_id'";
-$fetch_marketstock_VLDIST_VLSS1=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS1);
+$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id=?";
+$fetch_marketstock_VLDIST_VLSS1=db_q($db_conn,$select_marketstock_VLDIST_VLSS1,[$receipt_inv_id]);
 $result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS1);
 
 if($result_marketstock_VLDIST_VLSS1[0]!=NULL){

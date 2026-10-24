@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -144,8 +144,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='super_stockiest' and onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl'";
-										$fetchRcd_VLSS1=mysqli_query($db_conn,$selectRcd_VLSS1);
+										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='super_stockiest' and onboard_userTYPE=? and onboard_userID=?";
+										$fetchRcd_VLSS1=db_q($db_conn,$selectRcd_VLSS1,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($resultRcd_VLSS1=mysqli_fetch_array($fetchRcd_VLSS1))
 										{
 											
@@ -158,8 +158,8 @@ $i= $start_from;
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
@@ -198,8 +198,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='stockiest' and onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl'";
-										$fetchRcd_VLSS1=mysqli_query($db_conn,$selectRcd_VLSS1);
+										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='stockiest' and onboard_userTYPE=? and onboard_userID=?";
+										$fetchRcd_VLSS1=db_q($db_conn,$selectRcd_VLSS1,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($resultRcd_VLSS1=mysqli_fetch_array($fetchRcd_VLSS1))
 										{
 											
@@ -212,14 +212,14 @@ $i= $start_from;
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultusers['taluk_id'];
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
@@ -261,24 +261,24 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 											mysqli_query($db_conn,"TRUNCATE TABLE temp_not_purchased");
 											
 //distributor
-$select_nonpurchase_stockiest="select * from distributor where onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl' order by id asc";
-$fetch_nonpurchase_stockiest=mysqli_query($db_conn,$select_nonpurchase_stockiest);
+$select_nonpurchase_stockiest="select * from distributor where onboard_userTYPE=? and onboard_userID=? order by id asc";
+$fetch_nonpurchase_stockiest=db_q($db_conn,$select_nonpurchase_stockiest,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while($result_nonpurchase_stockiest=mysqli_fetch_array($fetch_nonpurchase_stockiest))
 {
 	$NNP_stockiest_ID=$result_nonpurchase_stockiest['temp_id'];
-	$select_count_nonpurchase_stockiest="select count(*) as numnnss from user_invoice where to_user_id='$NNP_stockiest_ID' and to_user_type='$tousertype_non_purcah3' and date between '$get_data4' and '$get_data5'";
-	$fetch_count_nonpurchase_stockiest=mysqli_query($db_conn,$select_count_nonpurchase_stockiest);
+	$select_count_nonpurchase_stockiest="select count(*) as numnnss from user_invoice where to_user_id=? and to_user_type=? and date between ? and ?";
+	$fetch_count_nonpurchase_stockiest=db_q($db_conn,$select_count_nonpurchase_stockiest,[$NNP_stockiest_ID,$tousertype_non_purcah3,$get_data4,$get_data5]);
 	$result_count_nonpurchase_stockiest=mysqli_fetch_array($fetch_count_nonpurchase_stockiest);
 	$Total_purcahse_count_stockiest=$result_count_nonpurchase_stockiest['numnnss'];
 	
-	$SLCT_SS_cnt="select count(*) as numnnss23 from temp_not_purchased where userid='$NNP_stockiest_ID' and usertype='$tousertype_non_purcah3'";
-	$fetch_SS_cnt=mysqli_query($db_conn,$SLCT_SS_cnt);
+	$SLCT_SS_cnt="select count(*) as numnnss23 from temp_not_purchased where userid=? and usertype=?";
+	$fetch_SS_cnt=db_q($db_conn,$SLCT_SS_cnt,[$NNP_stockiest_ID,$tousertype_non_purcah3]);
 	$REsult_SS_cnt=mysqli_fetch_array($fetch_SS_cnt);
 	if($REsult_SS_cnt['numnnss23']==0)
 	{
-		$insert_report_nonpurcahse_stockiest="insert into temp_not_purchased (usertype,userid,purchse_count,searchtype,onboard_userTYPE,onboard_userID) values ('$tousertype_non_purcah3','$NNP_stockiest_ID',
-		'$Total_purcahse_count_stockiest','nil','$Login_user_TYPEvl','$Login_user_IDvl')";
-		mysqli_query($db_conn,$insert_report_nonpurcahse_stockiest);
+		$insert_report_nonpurcahse_stockiest="insert into temp_not_purchased (usertype,userid,purchse_count,searchtype,onboard_userTYPE,onboard_userID) values (?,?,
+		?,'nil',?,?)";
+		db_q($db_conn,$insert_report_nonpurcahse_stockiest,[$tousertype_non_purcah3,$NNP_stockiest_ID,$Total_purcahse_count_stockiest,$Login_user_TYPEvl,$Login_user_IDvl]);
 		
 	}
 	
@@ -288,8 +288,8 @@ while($result_nonpurchase_stockiest=mysqli_fetch_array($fetch_nonpurchase_stocki
 										}
 										
 										
-$select_count_non_DTUSER="select count(*) as numDTUSER from temp_not_purchased where usertype='$tousertype_non_purcah3' and purchse_count='0'";
-$fethc_ount_non_DTUSER=mysqli_query($db_conn,$select_count_non_DTUSER);
+$select_count_non_DTUSER="select count(*) as numDTUSER from temp_not_purchased where usertype=? and purchse_count='0'";
+$fethc_ount_non_DTUSER=db_q($db_conn,$select_count_non_DTUSER,[$tousertype_non_purcah3]);
 $result_count_non_DTUSER=mysqli_fetch_array($fethc_ount_non_DTUSER);
 $show_nonpur_DTUSER=$result_count_non_DTUSER['numDTUSER'];
 
@@ -333,8 +333,8 @@ $show_nonpur_DTUSER=$result_count_non_DTUSER['numDTUSER'];
                                             </thead>
 											
 											<tbody>
-										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='distributor' and onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl'";
-										$fetchRcd_VLSS1=mysqli_query($db_conn,$selectRcd_VLSS1);
+										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='distributor' and onboard_userTYPE=? and onboard_userID=?";
+										$fetchRcd_VLSS1=db_q($db_conn,$selectRcd_VLSS1,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($resultRcd_VLSS1=mysqli_fetch_array($fetchRcd_VLSS1))
 										{
 											
@@ -347,14 +347,14 @@ $show_nonpur_DTUSER=$result_count_non_DTUSER['numDTUSER'];
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultusers['taluk_id'];
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										

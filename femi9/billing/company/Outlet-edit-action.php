@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -32,8 +32,8 @@ $update_id=$_REQUEST['update_id'];
 	
 	
 	//update process
-	$update_ss="update outlet set user_icon='$insfilename',name='$name',email='$email',mobile_number='$mobile_number',password='$password',username='$mobile_number',address='$address' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update outlet set user_icon=?,name=?,email=?,mobile_number=?,password=?,username=?,address=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,$password,$mobile_number,$address,$update_id]);
 	
 	echo "<script>window.location='Outlet-manage?updatedSuccess';</script>";
 	

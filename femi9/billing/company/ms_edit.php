@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
 
 $prid=$_REQUEST['prid'];
@@ -18,8 +18,8 @@ if ($_chkTgt && $_chkTgt->num_rows === 0) {
 }
 
 //fetch product details
-$select_product_list="select * from marketing_staff where id='$prid'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from marketing_staff where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 
 // Currently assigned locations (with names for the picker)

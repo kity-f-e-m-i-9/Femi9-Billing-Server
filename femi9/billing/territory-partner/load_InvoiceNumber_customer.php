@@ -1,10 +1,10 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 
 $invnumber = $_REQUEST['q'] ?? '';
 $cnt = mysqli_num_rows(mysqli_query($db_conn,
-    "SELECT * FROM invoice WHERE inv_number='$invnumber' AND user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl'"));
+    "SELECT * FROM invoice WHERE inv_number='".db_esc($invnumber)."' AND user_type='".db_esc($Login_user_TYPEvl)."' AND user_id='".db_esc($Login_user_IDvl)."'"));
 if ($cnt == 0) {
 ?>
 <input type="hidden" name="invoice_number_accept" value="1">

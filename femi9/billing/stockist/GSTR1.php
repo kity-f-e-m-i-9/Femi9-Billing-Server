@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php"); 
 error_reporting(0);
@@ -9,16 +9,16 @@ $to_date=$_REQUEST['todate'];
 if($from_date!=NULL)
 {
  //instra-state registered person (tamilnadu)
-							   $select_sum_total_intra_register="select sum(total) from user_invoice where from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and buyer_gsttype='register' and gst_type='inner' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_intra_register=mysqli_query($db_conn,$select_sum_total_intra_register);
+							   $select_sum_total_intra_register="select sum(total) from user_invoice where from_user_type=? and from_user_id=? and buyer_gsttype='register' and gst_type='inner' and date between ? and ?";
+							   $fetch_sum_total_intra_register=db_q($db_conn,$select_sum_total_intra_register,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_intra_register=mysqli_fetch_array($fetch_sum_total_intra_register);
 							   
 							   if($result_sum_total_intra_register[0]!=NULL)
 							   {$total_intra_register=$result_sum_total_intra_register[0];
 							   }else{$total_intra_register="0";}
 							   
-							   $select_sum_total_intra_register2="select sum(total) from invoice where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and buyer_gsttype='register' and gst_type='inner' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_intra_register2=mysqli_query($db_conn,$select_sum_total_intra_register2);
+							   $select_sum_total_intra_register2="select sum(total) from invoice where user_type=? and user_id=? and buyer_gsttype='register' and gst_type='inner' and date between ? and ?";
+							   $fetch_sum_total_intra_register2=db_q($db_conn,$select_sum_total_intra_register2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_intra_register2=mysqli_fetch_array($fetch_sum_total_intra_register2);
 							   
 							   if($result_sum_total_intra_register2[0]!=NULL)
@@ -28,16 +28,16 @@ if($from_date!=NULL)
 							   $show_total_intra_register=$total_intra_register+$total_intra_register2;
 							   
 							   //instra-state unregistered person (tamilnadu)
-							   $select_sum_total_intra_unregister="select sum(total) from user_invoice where from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and buyer_gsttype='unregister' and gst_type='inner' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_intra_unregister=mysqli_query($db_conn,$select_sum_total_intra_unregister);
+							   $select_sum_total_intra_unregister="select sum(total) from user_invoice where from_user_type=? and from_user_id=? and buyer_gsttype='unregister' and gst_type='inner' and date between ? and ?";
+							   $fetch_sum_total_intra_unregister=db_q($db_conn,$select_sum_total_intra_unregister,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_intra_unregister=mysqli_fetch_array($fetch_sum_total_intra_unregister);
 							   
 							   if($result_sum_total_intra_unregister[0]!=NULL)
 							   {$total_intra_unregister=$result_sum_total_intra_unregister[0];
 							   }else{$total_intra_unregister="0";}
 							   
-							   $select_sum_total_intra_unregister2="select sum(total) from invoice where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and buyer_gsttype='unregister' and gst_type='inner' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_intra_unregister2=mysqli_query($db_conn,$select_sum_total_intra_unregister2);
+							   $select_sum_total_intra_unregister2="select sum(total) from invoice where user_type=? and user_id=? and buyer_gsttype='unregister' and gst_type='inner' and date between ? and ?";
+							   $fetch_sum_total_intra_unregister2=db_q($db_conn,$select_sum_total_intra_unregister2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_intra_unregister2=mysqli_fetch_array($fetch_sum_total_intra_unregister2);
 							   
 							   if($result_sum_total_intra_unregister2[0]!=NULL)
@@ -49,16 +49,16 @@ if($from_date!=NULL)
 							   
 							   
 							   //inter-state registered person (other state)
-							   $select_sum_total_inter_register="select sum(total) from user_invoice where from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and buyer_gsttype='register' and gst_type='outer' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_inter_register=mysqli_query($db_conn,$select_sum_total_inter_register);
+							   $select_sum_total_inter_register="select sum(total) from user_invoice where from_user_type=? and from_user_id=? and buyer_gsttype='register' and gst_type='outer' and date between ? and ?";
+							   $fetch_sum_total_inter_register=db_q($db_conn,$select_sum_total_inter_register,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_inter_register=mysqli_fetch_array($fetch_sum_total_inter_register);
 							   
 							   if($result_sum_total_inter_register[0]!=NULL)
 							   {$total_inter_register=$result_sum_total_inter_register[0];
 							   }else{$total_inter_register="0";}
 							   
-							   $select_sum_total_inter_register2="select sum(total) from invoice where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and buyer_gsttype='register' and gst_type='outer' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_inter_register2=mysqli_query($db_conn,$select_sum_total_inter_register2);
+							   $select_sum_total_inter_register2="select sum(total) from invoice where user_type=? and user_id=? and buyer_gsttype='register' and gst_type='outer' and date between ? and ?";
+							   $fetch_sum_total_inter_register2=db_q($db_conn,$select_sum_total_inter_register2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_inter_register2=mysqli_fetch_array($fetch_sum_total_inter_register2);
 							   
 							   if($result_sum_total_inter_register2[0]!=NULL)
@@ -68,16 +68,16 @@ if($from_date!=NULL)
 							   $show_total_inter_register=$total_inter_register+$total_inter_register2;
 							   
 							   //instra-state unregistered person (other state)
-							   $select_sum_total_inter_unregister="select sum(total) from user_invoice where from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and buyer_gsttype='unregister' and gst_type='outer' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_inter_unregister=mysqli_query($db_conn,$select_sum_total_inter_unregister);
+							   $select_sum_total_inter_unregister="select sum(total) from user_invoice where from_user_type=? and from_user_id=? and buyer_gsttype='unregister' and gst_type='outer' and date between ? and ?";
+							   $fetch_sum_total_inter_unregister=db_q($db_conn,$select_sum_total_inter_unregister,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_inter_unregister=mysqli_fetch_array($fetch_sum_total_inter_unregister);
 							   
 							   if($result_sum_total_inter_unregister[0]!=NULL)
 							   {$total_inter_unregister=$result_sum_total_inter_unregister[0];
 							   }else{$total_inter_unregister="0";}
 							   
-							   $select_sum_total_inter_unregister2="select sum(total) from invoice where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and buyer_gsttype='unregister' and gst_type='outer' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_inter_unregister2=mysqli_query($db_conn,$select_sum_total_inter_unregister2);
+							   $select_sum_total_inter_unregister2="select sum(total) from invoice where user_type=? and user_id=? and buyer_gsttype='unregister' and gst_type='outer' and date between ? and ?";
+							   $fetch_sum_total_inter_unregister2=db_q($db_conn,$select_sum_total_inter_unregister2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_inter_unregister2=mysqli_fetch_array($fetch_sum_total_inter_unregister2);
 							   
 							   if($result_sum_total_inter_unregister2[0]!=NULL)

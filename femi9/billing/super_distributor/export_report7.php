@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 error_reporting(0);
@@ -38,15 +38,15 @@ $selectRcd_VLSS4="select * from ".$tblenma." where onboard_userTYPE='$Login_user
 											$state_id_VLSS4=$resultRcd_VLSS4['state_id'];
 											$district_id_VLSS4=$resultRcd_VLSS4['district_id'];
 
-										$selectrecords_VLSS4="select * from district where state_id='$state_id_VLSS4' and id='$district_id_VLSS4'";
-										$fetchrecords_VLSS4=mysqli_query($db_conn,$selectrecords_VLSS4);
+										$selectrecords_VLSS4="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS4=db_q($db_conn,$selectrecords_VLSS4,[$state_id_VLSS4,$district_id_VLSS4]);
 										$resultrecords_VLSS4=mysqli_fetch_array($fetchrecords_VLSS4);
 										$district_name_VLSS4=$resultrecords_VLSS4['dist_name'];
 										
 										$taluk_id_VLSS4=$resultRcd_VLSS4['taluk_id'];
 										
-$selectrecords_VLSS4_taluk="select * from taluk where state_id='$state_id_VLSS4' and dist_id='$district_id_VLSS4' and id='$taluk_id_VLSS4'";
-$fetchrecords_VLSS4_taluk=mysqli_query($db_conn,$selectrecords_VLSS4_taluk);
+$selectrecords_VLSS4_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS4_taluk=db_q($db_conn,$selectrecords_VLSS4_taluk,[$state_id_VLSS4,$district_id_VLSS4,$taluk_id_VLSS4]);
 $resultrecords_VLSS4_taluk=mysqli_fetch_array($fetchrecords_VLSS4_taluk);
 $taluk_name_VLSS4=$resultrecords_VLSS4_taluk['taluk'];
 										

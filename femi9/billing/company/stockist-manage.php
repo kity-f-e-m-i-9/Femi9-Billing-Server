@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); 
 require_once("include/PermissionCheck.php"); requirePermission('st');
 error_reporting(0);
@@ -265,15 +265,15 @@ $canDeleteSt = hasPermission('st_delete');
                                                 {
                                                     // Get district name
                                                     $district_id=$result_product_list['district_id'];
-                                                    $select_distict="select * from district where id='$district_id'";
-                                                    $fetch_district=mysqli_query($db_conn,$select_distict);
+                                                    $select_distict="select * from district where id=?";
+                                                    $fetch_district=db_q($db_conn,$select_distict,[$district_id]);
                                                     $result_district=mysqli_fetch_array($fetch_district);
                                                     $district_name=$result_district['dist_name'];
 
                                                     // Get taluk name
                                                     $taluk_id=$result_product_list['taluk_id'];
-                                                    $select_distict="select * from taluk where id='$taluk_id'";
-                                                    $fetch_district=mysqli_query($db_conn,$select_distict);
+                                                    $select_distict="select * from taluk where id=?";
+                                                    $fetch_district=db_q($db_conn,$select_distict,[$taluk_id]);
                                                     $result_district=mysqli_fetch_array($fetch_district);
                                                     $taluk_name=$result_district['taluk'];
                                                     
@@ -285,13 +285,13 @@ $canDeleteSt = hasPermission('st_delete');
                                                     
                                                     // CATEGORY
                                                     $stockistid=$result_product_list['temp_id'];
-                                                    $select_RFRDtailsCNG="select * from stockist_referral where stockist_id='$stockistid'";
-                                                    $fetch_RFRDtailsCNG=mysqli_query($db_conn,$select_RFRDtailsCNG);
+                                                    $select_RFRDtailsCNG="select * from stockist_referral where stockist_id=?";
+                                                    $fetch_RFRDtailsCNG=db_q($db_conn,$select_RFRDtailsCNG,[$stockistid]);
                                                     $result_RFRDtailsCNG=mysqli_fetch_array($fetch_RFRDtailsCNG);
                                                     $CNG_catID=$result_RFRDtailsCNG['st_cat_id'];
 
-                                                    $select_RFRDtailsCNG_CAT="select * from stockist_category where id='$CNG_catID'";
-                                                    $fetch_RFRDtailsCNG_CAT=mysqli_query($db_conn,$select_RFRDtailsCNG_CAT);
+                                                    $select_RFRDtailsCNG_CAT="select * from stockist_category where id=?";
+                                                    $fetch_RFRDtailsCNG_CAT=db_q($db_conn,$select_RFRDtailsCNG_CAT,[$CNG_catID]);
                                                     $result_RFRDtailsCNG_CAT=mysqli_fetch_array($fetch_RFRDtailsCNG_CAT);
                                                     $Login_person_CAT=$result_RFRDtailsCNG_CAT['catname'];
                                                     $target_amount=$result_RFRDtailsCNG_CAT['target_amount'];

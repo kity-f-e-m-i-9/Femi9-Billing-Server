@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
@@ -48,8 +48,8 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
 
     /* Duplicate invoice number check
     $Select_Count_Invoice = "select * from ot_sales_invoice 
-                             where inv_number='$inv_number' and cat='$catname'";
-    $Fetch_Count_Invoice  = mysqli_query($db_conn, $Select_Count_Invoice);
+                             where inv_number=? and cat=?";
+    $Fetch_Count_Invoice  = db_q($db_conn,$Select_Count_Invoice,[$inv_number,$catname]);
 
     if (mysqli_num_rows($Fetch_Count_Invoice) != 0) {
         $_SESSION['errorMessage'] = "Invoice Number already exists this category ($catname)";
@@ -274,8 +274,8 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
 
     // ← CHANGED: Final total UPDATE now deducts wallet_amount
     // Formula: total = round(subtotal + courier_charges) - wallet_amount
-    $select_subtotal = "select sum(total) from ot_sales where tempid='$tempid'";
-    $fetch_subtotal  = mysqli_query($db_conn, $select_subtotal);
+    $select_subtotal = "select sum(total) from ot_sales where tempid=?";
+    $fetch_subtotal  = db_q($db_conn,$select_subtotal,[$tempid]);
     $result_subtotal = mysqli_fetch_array($fetch_subtotal);
 
     if ($result_subtotal[0] != NULL) {
@@ -289,13 +289,13 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
         $net_total    = max(0, $net_total); // cannot go negative
 
         $update_roundvalue = "update ot_sales_invoice 
-            set subtotal='$unroundvalue',
-                round_off='$roundoff',
-                total='$net_total',
-                wallet_amount='$wallet_amount',
-                courier_charges='$courier_charges'
-            where tempid='$tempid'";
-        mysqli_query($db_conn, $update_roundvalue);
+            set subtotal=?,
+                round_off=?,
+                total=?,
+                wallet_amount=?,
+                courier_charges=?
+            where tempid=?";
+        db_q($db_conn,$update_roundvalue,[$unroundvalue,$roundoff,$net_total,$wallet_amount,$courier_charges,$tempid]);
     }
 
     // Coupon commission logic (unchanged) — skipped for a draft, since it's
@@ -313,29 +313,29 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
         elseif ($coupon_usertype == "D")  { $tablenameCP = "distributor";        $usertype_print = "distributor"; }
 
         if ($tablenameCP !== '') {
-            $count12      = "select temp_id from $tablenameCP where useridtext='$coupon_code'";
-            $fetch12      = mysqli_query($db_conn, $count12);
+            $count12      = "select temp_id from $tablenameCP where useridtext=?";
+            $fetch12      = db_q($db_conn,$count12,[$coupon_code]);
 
             if (mysqli_num_rows($fetch12) == 1) {
                 $fetch_coupon_userID = mysqli_fetch_array($fetch12);
                 $userid_print        = $fetch_coupon_userID['temp_id'];
 
-                $select_total_qty = "select sum(qty) from ot_sales where tempid='$tempid'";
-                $fetch_total_qty  = mysqli_query($db_conn, $select_total_qty);
+                $select_total_qty = "select sum(qty) from ot_sales where tempid=?";
+                $fetch_total_qty  = db_q($db_conn,$select_total_qty,[$tempid]);
                 $result_total_qty = mysqli_fetch_array($fetch_total_qty);
                 $qty_total_result = $result_total_qty[0];
 
                 $select_coupon_commission = "select amount from admin_website_coupon_commission 
-                    where usertype='$usertype_print'";
-                $fetch_coupon_commission  = mysqli_query($db_conn, $select_coupon_commission);
+                    where usertype=?";
+                $fetch_coupon_commission  = db_q($db_conn,$select_coupon_commission,[$usertype_print]);
                 $result_coupon_commission = mysqli_fetch_array($fetch_coupon_commission);
                 $cp_amount                = $result_coupon_commission['amount'];
                 $total_coupon_commission  = $cp_amount * $qty_total_result;
 
                 $Remarks_CB = "Invoice Number : " . $inv_number . "<br/>Date : " . date('d/m/Y');
 
-                $count12_cpn = "select id from wallet_monthly_sls_report where user_type='$tempid'";
-                $fetch12_cpn = mysqli_query($db_conn, $count12_cpn);
+                $count12_cpn = "select id from wallet_monthly_sls_report where user_type=?";
+                $fetch12_cpn = db_q($db_conn,$count12_cpn,[$tempid]);
 
                 if (mysqli_num_rows($fetch12_cpn) == 0) {
                     $Insert_wallet_records = "INSERT INTO wallet_monthly_sls_report 
@@ -350,9 +350,9 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
                 }
 
                 $update_ot_sales_invoice = "update ot_sales_invoice 
-                    set coupon_code='$coupon_code', website_commission='$total_coupon_commission' 
-                    where tempid='$tempid'";
-                mysqli_query($db_conn, $update_ot_sales_invoice);
+                    set coupon_code=?, website_commission=? 
+                    where tempid=?";
+                db_q($db_conn,$update_ot_sales_invoice,[$coupon_code,$total_coupon_commission,$tempid]);
             }
         }
     }
@@ -418,12 +418,12 @@ if (isset($_REQUEST['updateRecord'])) {
 
     // ← CHANGED: wallet_amount included in invoice update
     $Update_Invoice = "update ot_sales_invoice
-        set inv_number='$inv_number',
-            courier_charges='$courier_charges',
-            wallet_amount='$wallet_amount',
-            cat='$catname'
-        where tempid='$tempid'";
-    mysqli_query($db_conn, $Update_Invoice);
+        set inv_number=?,
+            courier_charges=?,
+            wallet_amount=?,
+            cat=?
+        where tempid=?";
+    db_q($db_conn,$Update_Invoice,[$inv_number,$courier_charges,$wallet_amount,$catname,$tempid]);
 
     // Per-product qty/rate/discount edit (ot-sale-edit.php's Product Details
     // table) -- adjust `stock` by only the delta between old and new qty for
@@ -521,8 +521,8 @@ if (isset($_REQUEST['updateRecord'])) {
     }
 
     // ← CHANGED: Recalculate total on update to reflect any wallet_amount change
-    $select_subtotal = "select sum(total) from ot_sales where tempid='$tempid'";
-    $fetch_subtotal  = mysqli_query($db_conn, $select_subtotal);
+    $select_subtotal = "select sum(total) from ot_sales where tempid=?";
+    $fetch_subtotal  = db_q($db_conn,$select_subtotal,[$tempid]);
     $result_subtotal = mysqli_fetch_array($fetch_subtotal);
 
     if ($result_subtotal[0] != NULL) {
@@ -533,21 +533,21 @@ if (isset($_REQUEST['updateRecord'])) {
         $net_total    = max(0, $roundvalue - $wallet_amount);
 
         $update_total = "update ot_sales_invoice 
-            set subtotal='$unroundvalue',
-                round_off='$roundoff',
-                total='$net_total'
-            where tempid='$tempid'";
-        mysqli_query($db_conn, $update_total);
+            set subtotal=?,
+                round_off=?,
+                total=?
+            where tempid=?";
+        db_q($db_conn,$update_total,[$unroundvalue,$roundoff,$net_total,$tempid]);
     }
 
     $Update_Records = "update ot_sales set 
-        cat='$catname', date='$date', customer_name='$customer_name',
-        customer_mobile='$customer_mobile', customer_address='$customer_address',
-        order_number='$order_number', shipping_address='$shipping_address',
-        gst_number='$gst_number', order_date='$order_date', ship_date='$ship_date',
-        state_id='$state_id', gst_type='$gst_type' 
-        where tempid='$tempid'";
-    mysqli_query($db_conn, $Update_Records);
+        cat=?, date=?, customer_name=?,
+        customer_mobile=?, customer_address=?,
+        order_number=?, shipping_address=?,
+        gst_number=?, order_date=?, ship_date=?,
+        state_id=?, gst_type=? 
+        where tempid=?";
+    db_q($db_conn,$Update_Records,[$catname,$date,$customer_name,$customer_mobile,$customer_address,$order_number,$shipping_address,$gst_number,$order_date,$ship_date,$state_id,$gst_type,$tempid]);
 
     $_SESSION['sucMessage'] = "Changes Saved Successfully!";
     echo "<script>window.location='ot-sale-view?Updated';</script>";

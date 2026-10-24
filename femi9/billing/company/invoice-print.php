@@ -1,22 +1,22 @@
-<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); date_default_timezone_set("Asia/Kolkata"); error_reporting(0);
 include("config.php");
 $Invoice_ID=$_REQUEST['invoiceid'];
 //
-$select_Invoice_Details="select * from invoice where inv_id='$Invoice_ID'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from invoice where inv_id=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$Invoice_ID]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 
 //customer details
 $customer_id=$result_Invoice_Details['customer_id'];
-$select_Cusotmer_Details="select * from customers where id='$customer_id'";
-$fetch_Customer_Details=mysqli_query($db_conn,$select_Cusotmer_Details);
+$select_Cusotmer_Details="select * from customers where id=?";
+$fetch_Customer_Details=db_q($db_conn,$select_Cusotmer_Details,[$customer_id]);
 $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 
 // GST computed fresh from the product master at print time (inclusive vs
 // exclusive tax treatment), the same convention as tp-invoice-print.php —
 // not trusted from any value frozen at add-time.
-$select_INVProductDetails="select ii.*, p.productName, p.gst as p_gst, p.gst_type as p_gst_type from invoice_items ii join products p on p.id = ii.pr_id where ii.inv_id='$Invoice_ID' order by ii.id desc";
-$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+$select_INVProductDetails="select ii.*, p.productName, p.gst as p_gst, p.gst_type as p_gst_type from invoice_items ii join products p on p.id = ii.pr_id where ii.inv_id=? order by ii.id desc";
+$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
 $invoice_items=[];
 $TotalAMount123=0; $totalgstamount=0;
 while($row=mysqli_fetch_array($fetch_INVProductDetails)){

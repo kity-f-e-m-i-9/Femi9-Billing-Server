@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../../shared/db-helpers.php';
 /**
  * GST totals for TP (territory partner) transfers/returns, for inclusion in the
  * company's GST reports (GST-report.php, GSTR1.php, GSTR3B_D31.php).
@@ -75,7 +75,7 @@ function tp_sales_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
         JOIN tp_invoice_items tpii ON tpii.tp_invoice_id = tpi.id
         JOIN products p ON p.id = tpii.product_id
         JOIN company_godown cg ON cg.id = tpi.source_godown_id
-        WHERE tpi.invoice_date BETWEEN '$from_date' AND '$to_date'
+        WHERE tpi.invoice_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
           AND tpi.source_godown_id > 0
           AND ($godown_where_sql)
     ";
@@ -115,7 +115,7 @@ function tp_credit_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) 
           AND urs.status = 'accept'
           AND urs.deleted_at IS NULL
           AND ursi.deleted_at IS NULL
-          AND ursi.date BETWEEN '$from_date' AND '$to_date'
+          AND ursi.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
           AND tpi.source_godown_id > 0
           AND ($godown_where_sql)
     ";

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");
@@ -9,8 +9,8 @@ include("config.php");
 	$get_req_id=$_REQUEST['reqid'];
 	$get_req_id_DECODE=base64_decode($get_req_id);
 	//
-	$select_reqdetaiis="select * from stock_request where reqid='$get_req_id_DECODE'";
-	$fetch_reqdetaiis=mysqli_query($db_conn,$select_reqdetaiis);
+	$select_reqdetaiis="select * from stock_request where reqid=?";
+	$fetch_reqdetaiis=db_q($db_conn,$select_reqdetaiis,[$get_req_id_DECODE]);
 	$result_reqdetaiis=mysqli_fetch_array($fetch_reqdetaiis);
 	$payment_screenshot=$result_reqdetaiis['screenshot'];
 	
@@ -146,14 +146,14 @@ $imgshow="<img src='screenshot/".$result_reqdetaiis['screenshot2']."' style='wid
                                                     </thead>
                                                     <tbody>
 										<?php 
-					$select_productCurrentst="select * from stock_request_items where reqid='$get_req_id_DECODE' order by id asc";
-					$fetch_productCurrentst=mysqli_query($db_conn,$select_productCurrentst);
+					$select_productCurrentst="select * from stock_request_items where reqid=? order by id asc";
+					$fetch_productCurrentst=db_q($db_conn,$select_productCurrentst,[$get_req_id_DECODE]);
 					while($result_productCurrentst=mysqli_fetch_array($fetch_productCurrentst))
 										{
 											$prid=$result_productCurrentst['prid'];
 											//
-											 $select_pramount="select * from products where id='$prid'";
-	 $fetch_pramount=mysqli_query($db_conn,$select_pramount);
+											 $select_pramount="select * from products where id=?";
+	 $fetch_pramount=db_q($db_conn,$select_pramount,[$prid]);
 	 $result_pramount=mysqli_fetch_array($fetch_pramount);
 											
 											if($result_productCurrentst['qty']>0){

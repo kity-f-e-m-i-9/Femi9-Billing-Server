@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
@@ -18,16 +18,16 @@ if(isset($_REQUEST['add-return']))
 	
 	$prid=$_REQUEST['prid'];
 	//get product gst
-$selectproducts="select * from products where id='$prid'";
-$fetchproducts=mysqli_query($db_conn,$selectproducts);
+$selectproducts="select * from products where id=?";
+$fetchproducts=db_q($db_conn,$selectproducts,[$prid]);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $gst_percentage=$resultproducts['gst'];
 $hsn=$resultproducts['hsn'];
 
 	$returnqty=$_REQUEST['returnqty'];
 	
-	$select_invoicedetails="select * from user_invoice_items where inv_id='$invid' and pr_id='$prid'";
-	$fetch_invoicedetails=mysqli_query($db_conn,$select_invoicedetails);
+	$select_invoicedetails="select * from user_invoice_items where inv_id=? and pr_id=?";
+	$fetch_invoicedetails=db_q($db_conn,$select_invoicedetails,[$invid,$prid]);
 	$result_invoicedtails=mysqli_fetch_array($fetch_invoicedetails);
 	//
 	$invoiceqty=$result_invoicedtails['qty'];
@@ -41,43 +41,43 @@ $hsn=$resultproducts['hsn'];
 	{
 		$return_date=date("Y-m-d");
 		
-		$seletcountreturn="select count(*) as numreturncheck from user_return_stock where returnid='$returnid'";
-		$fetchcountreturn=mysqli_query($db_conn,$seletcountreturn);
+		$seletcountreturn="select count(*) as numreturncheck from user_return_stock where returnid=?";
+		$fetchcountreturn=db_q($db_conn,$seletcountreturn,[$returnid]);
 		$resultcountreturn=mysqli_fetch_array($fetchcountreturn);
 		if($resultcountreturn['numreturncheck']==0)
 		{
 			
 			$insertreturn="insert into user_return_stock (returnid,invnumber,date,subtotal,discount,total,from_usertype,from_userid,
-			to_usertype,to_userid,status) values ('$returnid','$invnumber','$return_date','0','0','0',
-			'$from_usertype','$from_userid','$to_usertype','$to_userid','pending')";
-			mysqli_query($db_conn,$insertreturn);
+			to_usertype,to_userid,status) values (?,?,?,'0','0','0',
+			?,?,?,?,'pending')";
+			db_q($db_conn,$insertreturn,[$returnid,$invnumber,$return_date,$from_usertype,$from_userid,$to_usertype,$to_userid]);
 		}
 		
 		
 		
-		$seletcountreturn2="select count(*) as numreturncheck2 from user_return_stock_items where returnid='$returnid' and prid='$prid'";
-		$fetchcountreturn2=mysqli_query($db_conn,$seletcountreturn2);
+		$seletcountreturn2="select count(*) as numreturncheck2 from user_return_stock_items where returnid=? and prid=?";
+		$fetchcountreturn2=db_q($db_conn,$seletcountreturn2,[$returnid,$prid]);
 		$resultcountreturn2=mysqli_fetch_array($fetchcountreturn2);
 		if($resultcountreturn2['numreturncheck2']==0)
 		{
 			
 			$insertreturn="insert into user_return_stock_items (returnid,invnumber,prid,amount,qty,subtotal,gst_percentage,gstamount_total,total,
 			from_usertype,from_userid,to_usertype,to_userid,date,status,hsn,damaged_qty) values 
-			('$returnid','$invnumber','$prid','$pr_mrp','$returnqty','$subtotal','$gst_percentage',
-			'$gstamount_total','$total','$from_usertype','$from_userid',
-			'$to_usertype','$to_userid','$return_date','pending','$hsn','0')";
-			mysqli_query($db_conn,$insertreturn);
+			(?,?,?,?,?,?,?,
+			?,?,?,?,
+			?,?,?,'pending',?,'0')";
+			db_q($db_conn,$insertreturn,[$returnid,$invnumber,$prid,$pr_mrp,$returnqty,$subtotal,$gst_percentage,$gstamount_total,$total,$from_usertype,$from_userid,$to_usertype,$to_userid,$return_date,$hsn]);
 			
 			
-		$select_stockDetails="select * from stock where product_id='$prid' and user_type='$from_usertype' and user_id='$from_userid'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
+		$select_stockDetails="select * from stock where product_id=? and user_type=? and user_id=?";
+		$fetch_stockDetails=db_q($db_conn,$select_stockDetails,[$prid,$from_usertype,$from_userid]);
 		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
 		
 		$update_returnqty=$result_stockDetails['returnqty']+$returnqty;
 		$update_Closing_stock=$result_stockDetails['closing_qty']-$returnqty;
 		
-		$update_stockDetails="update stock set returnqty='$update_returnqty',closing_qty='$update_Closing_stock' where product_id='$prid' and user_type='$from_usertype' and user_id='$from_userid'";
-		mysqli_query($db_conn,$update_stockDetails);
+		$update_stockDetails="update stock set returnqty=?,closing_qty=? where product_id=? and user_type=? and user_id=?";
+		db_q($db_conn,$update_stockDetails,[$update_returnqty,$update_Closing_stock,$prid,$from_usertype,$from_userid]);
 		
 		echo "<script>window.location='stock_return_add2.php?returnid=".base64_encode($returnid)."&&invnumber=".base64_encode($invnumber)."&&addedsuccess';</script>";
 			

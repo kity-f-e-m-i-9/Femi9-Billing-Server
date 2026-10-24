@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('sdt_edit');
 include("config.php");
 
@@ -10,14 +10,14 @@ $message_title="Super-Distributor";
 $Coupon_category="Super-Distributor";
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from super_distributor where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from super_distributor where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 				
 				$super_distributor_temp_id=$result_product_list['temp_id'];
 				//
-				$select_referral_records="select * from super_distributor_referral where sd_id='$super_distributor_temp_id'";
-				$fetch_referral_records=mysqli_query($db_conn,$select_referral_records);
+				$select_referral_records="select * from super_distributor_referral where sd_id=?";
+				$fetch_referral_records=db_q($db_conn,$select_referral_records,[$super_distributor_temp_id]);
 				$result_referral_records=mysqli_fetch_array($fetch_referral_records);
 ?>
 <!DOCTYPE html>

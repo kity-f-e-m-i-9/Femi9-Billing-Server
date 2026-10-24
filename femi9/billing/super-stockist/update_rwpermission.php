@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 	$invoiceid_encode=$_REQUEST['invoiceid'];
@@ -13,50 +13,50 @@ include("config.php");
 	if($rwst==0)
 	{
 		//ENABLE SECTION
-		$updaterw="update user_invoice set rwpoints_enable='1' where inv_id='$invoiceid'";
-		mysqli_query($db_conn,$updaterw);
+		$updaterw="update user_invoice set rwpoints_enable='1' where inv_id=?";
+		db_q($db_conn,$updaterw,[$invoiceid]);
 		
 		//UPDATE POINTS
-		$selectmultiproduct="select * from user_invoice_items where inv_id='$invoiceid'";
-		$fetchmulti=mysqli_query($db_conn,$selectmultiproduct);
+		$selectmultiproduct="select * from user_invoice_items where inv_id=?";
+		$fetchmulti=db_q($db_conn,$selectmultiproduct,[$invoiceid]);
 		while($resultmulti=mysqli_fetch_array($fetchmulti))
 		{
 $pr_id=$resultmulti['pr_id'];
 $qty=$resultmulti['qty'];
 
-$selectproducts="select * from products where id='$pr_id'";
-$fetchproducts=mysqli_query($db_conn,$selectproducts);
+$selectproducts="select * from products where id=?";
+$fetchproducts=db_q($db_conn,$selectproducts,[$pr_id]);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $rwpoints=$resultproducts['rwpoints']*$qty;
 		
-$updaterwMULTI="update user_invoice_items set rwpoints='$rwpoints' where inv_id='$invoiceid' and pr_id='$pr_id'";
-mysqli_query($db_conn,$updaterwMULTI);		
+$updaterwMULTI="update user_invoice_items set rwpoints=? where inv_id=? and pr_id=?";
+db_q($db_conn,$updaterwMULTI,[$rwpoints,$invoiceid,$pr_id]);		
 		}
 		
-		$selectcount="select rwpoints_enable from user_return_stock where invnumber='$invoiceid'";
-		$fetchcount=mysqli_query($db_conn,$selectcount);
+		$selectcount="select rwpoints_enable from user_return_stock where invnumber=?";
+		$fetchcount=db_q($db_conn,$selectcount,[$invoiceid]);
 		$resultrows=mysqli_num_rows($fetchcount);
 		if($resultrows>0)
 		{
-		$updaterw_rtn="update user_return_stock set rwpoints_enable='1' where invnumber='$invoiceid'";
-		mysqli_query($db_conn,$updaterw_rtn);
+		$updaterw_rtn="update user_return_stock set rwpoints_enable='1' where invnumber=?";
+		db_q($db_conn,$updaterw_rtn,[$invoiceid]);
 		
 		
 		//UPDATE POINTS
-		$selectmultiproduct12="select * from user_return_stock_items where invnumber='$invoiceid'";
-		$fetchmulti12=mysqli_query($db_conn,$selectmultiproduct12);
+		$selectmultiproduct12="select * from user_return_stock_items where invnumber=?";
+		$fetchmulti12=db_q($db_conn,$selectmultiproduct12,[$invoiceid]);
 		while($resultmulti12=mysqli_fetch_array($fetchmulti12))
 		{
 $pr_id2=$resultmulti12['prid'];
 $qty2=$resultmulti12['qty'];
 
-$selectproducts12="select * from products where id='$pr_id2'";
-$fetchproducts12=mysqli_query($db_conn,$selectproducts12);
+$selectproducts12="select * from products where id=?";
+$fetchproducts12=db_q($db_conn,$selectproducts12,[$pr_id2]);
 $resultproducts12=mysqli_fetch_array($fetchproducts12);
 $rwpoints12=$resultproducts12['rwpoints']*$qty2;
 		
-$updaterwMULTI="update user_return_stock_items set rwpoints='$rwpoints12' where invnumber='$invoiceid' and prid='$pr_id2'";
-mysqli_query($db_conn,$updaterwMULTI);		
+$updaterwMULTI="update user_return_stock_items set rwpoints=? where invnumber=? and prid=?";
+db_q($db_conn,$updaterwMULTI,[$rwpoints12,$invoiceid,$pr_id2]);		
 		}
 		}
 		
@@ -67,22 +67,22 @@ echo "<script>window.location='user-manage-invoice?invuser=$invuser';</script>";
 	else
 	{
 		//DISABLED SECTION
-		$updaterw="update user_invoice set rwpoints_enable='0' where inv_id='$invoiceid'";
-		mysqli_query($db_conn,$updaterw);
+		$updaterw="update user_invoice set rwpoints_enable='0' where inv_id=?";
+		db_q($db_conn,$updaterw,[$invoiceid]);
 		
-		$updaterw2="update user_invoice_items set rwpoints='0' where inv_id='$invoiceid'";
-		mysqli_query($db_conn,$updaterw2);
+		$updaterw2="update user_invoice_items set rwpoints='0' where inv_id=?";
+		db_q($db_conn,$updaterw2,[$invoiceid]);
 		
-		$selectcount="select rwpoints_enable from user_return_stock where invnumber='$invoiceid'";
-		$fetchcount=mysqli_query($db_conn,$selectcount);
+		$selectcount="select rwpoints_enable from user_return_stock where invnumber=?";
+		$fetchcount=db_q($db_conn,$selectcount,[$invoiceid]);
 		$resultrows=mysqli_num_rows($fetchcount);
 		if($resultrows>0)
 		{
-		$updaterw_rtn="update user_return_stock set rwpoints_enable='0' where invnumber='$invoiceid'";
-		mysqli_query($db_conn,$updaterw_rtn);
+		$updaterw_rtn="update user_return_stock set rwpoints_enable='0' where invnumber=?";
+		db_q($db_conn,$updaterw_rtn,[$invoiceid]);
 		
-		$updaterw_rtn2="update user_return_stock_items set rwpoints='0' where invnumber='$invoiceid'";
-		mysqli_query($db_conn,$updaterw_rtn2);
+		$updaterw_rtn2="update user_return_stock_items set rwpoints='0' where invnumber=?";
+		db_q($db_conn,$updaterw_rtn2,[$invoiceid]);
 		}
 		
 $_SESSION['successMessage']="Invoice Number ".base64_decode($_REQUEST['invnumber'])."  Reward Points Disabled Success";

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 include("config.php");
 ?>
 <!DOCTYPE html>
@@ -111,29 +111,29 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-<?php $select_product_list="select * from distributor where stockiest_id='$loguser_tempid' order by id desc";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+<?php $select_product_list="select * from distributor where stockiest_id=? order by id desc";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$loguser_tempid]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {											
 									
 //
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 //
 $taluk_id=$result_product_list['taluk_id'];
-$select_taluklist="select * from taluk where id='$taluk_id'";
-	$fetch_taluklist=mysqli_query($db_conn,$select_taluklist);
+$select_taluklist="select * from taluk where id=?";
+	$fetch_taluklist=db_q($db_conn,$select_taluklist,[$taluk_id]);
 	$result_taluklist=mysqli_fetch_array($fetch_taluklist);
 $taluk_name=$result_taluklist['taluk'];
 
 //
 $pincode_id=$result_product_list['pincode_id'];
-$select_pincodelist="select * from pincode where id='$pincode_id'";
-	$fetch_pincodelist=mysqli_query($db_conn,$select_pincodelist);
+$select_pincodelist="select * from pincode where id=?";
+	$fetch_pincodelist=db_q($db_conn,$select_pincodelist,[$pincode_id]);
 	$result_pincodelist=mysqli_fetch_array($fetch_pincodelist);
 $pincodeshow=$result_pincodelist['pincode'];
 											

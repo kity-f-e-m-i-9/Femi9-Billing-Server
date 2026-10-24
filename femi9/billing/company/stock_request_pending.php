@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('stock_request');
 include("config.php");
 error_reporting(0);
@@ -98,8 +98,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from stock_request where touserid='$Login_user_IDvl' and tousertype='$Login_user_TYPEvl' and status='pending' and verified='1' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+					<?php $select_product_list="select * from stock_request where touserid=? and tousertype=? and status='pending' and verified='1' order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_IDvl,$Login_user_TYPEvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											$reqid=$result_product_list['reqid'];
@@ -133,23 +133,23 @@ $i= $start_from;
 				$distributorname=$result_distlist['name'];
 				
 				//godown id
-				$select_invoice_details="select * from user_invoice where inv_id='$reqid'";
-	$fetch_invoice_details=mysqli_query($db_conn,$select_invoice_details);
+				$select_invoice_details="select * from user_invoice where inv_id=?";
+	$fetch_invoice_details=db_q($db_conn,$select_invoice_details,[$reqid]);
 	$result_invoice_details=mysqli_fetch_array($fetch_invoice_details);
 	$godownid=$result_invoice_details['from_user_id'];
 	
 	
 	//get qty total
-				$select_qtytotal="select sum(qty) from stock_request_items where reqid='$reqid'";
-				$fetch_qtytotal=mysqli_query($db_conn,$select_qtytotal);
+				$select_qtytotal="select sum(qty) from stock_request_items where reqid=?";
+				$fetch_qtytotal=db_q($db_conn,$select_qtytotal,[$reqid]);
 				$result_qtytotal=mysqli_fetch_array($fetch_qtytotal);
 				if($result_qtytotal[0]!=NULL){
 				$totalqty=$result_qtytotal[0];
 				}else{$totalqty="0";}
 				
 				//get total amount
-				$select_TotalAMont="select sum(total) from stock_request_items where reqid='$reqid'";
-				$fetch_TotalAMont=mysqli_query($db_conn,$select_TotalAMont);
+				$select_TotalAMont="select sum(total) from stock_request_items where reqid=?";
+				$fetch_TotalAMont=db_q($db_conn,$select_TotalAMont,[$reqid]);
 				$result_TotalAMont=mysqli_fetch_array($fetch_TotalAMont);
 				if($result_TotalAMont[0]!=NULL){
 				$totalAmount=inr_format($result_TotalAMont[0], 2);

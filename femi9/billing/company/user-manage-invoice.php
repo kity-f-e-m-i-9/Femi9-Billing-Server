@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php");
 $__perm_map = array (
   'super_stockiest' => 'ss',
@@ -252,8 +252,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from user_invoice where from_user_type='$Login_user_TYPEvl' and to_user_type='$getinvuser' and date between '$from_date' and '$to_date' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from user_invoice where from_user_type=? and to_user_type=? and date between ? and ? order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$getinvuser,$from_date,$to_date]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											//customer details

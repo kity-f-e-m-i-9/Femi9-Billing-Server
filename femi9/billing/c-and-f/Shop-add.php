@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $title="Add Shop (Retailers)";
@@ -211,8 +211,8 @@ function getXMLHTTP() { //fuction to return the xml http object
   foreach ($exstID as $keyss => $valuess)
    {  
    
-   $select_stateList="select st_name from state where id='$valuess' order by st_name asc";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+   $select_stateList="select st_name from state where id=? order by st_name asc";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$valuess]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   ?>
 	<option value="<?php echo $valuess;?>"><?php echo $result_stateList['st_name'];?></option>

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -12,7 +12,7 @@ $invid = $ret['invnumber'];
 $user  = $ret['from_usertype'];
 
 $inv_table = ($user === 'customer') ? 'invoice' : 'user_invoice';
-$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $inv_table WHERE inv_id='$invid'"));
+$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $inv_table WHERE inv_id='".db_esc($invid)."'"));
 
 $displaytitle = "Stock Return (Credit Note) Details";
 ?>
@@ -172,7 +172,7 @@ while ($item = mysqli_fetch_array($items)) {
     <?php if ($ret['status'] !== 'pending') {
         $cn_receiptid = 'CN-' . $returnid;
         $cn_row = mysqli_fetch_array(mysqli_query($db_conn,
-            "SELECT id FROM receipt WHERE receiptid='$cn_receiptid' AND payment_type='credit_note' LIMIT 1"));
+            "SELECT id FROM receipt WHERE receiptid='".db_esc($cn_receiptid)."' AND payment_type='credit_note' LIMIT 1"));
         if ($cn_row) {
             $cn_print_page = ($user === 'customer') ? 'customer-invoice-print.php' : 'shop-invoice-print.php';
             $cn_dlrow = mysqli_fetch_array(mysqli_query($db_conn,

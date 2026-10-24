@@ -1,4 +1,4 @@
-<?php include("checksession.php"); include("config.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); include("config.php");
 
 $title="Manage Pincode";
 $add_url="add-pincode.php";
@@ -108,15 +108,15 @@ $i= $start_from;
                                             </thead>
 											 <tbody>
 	<?php 
-	$select_picnode_list="select * from pincode where usertype='$Login_user_TYPEvl' and userid='$Login_user_IDvl' order by id asc";
-	$fetch_picnode_list=mysqli_query($db_conn,$select_picnode_list);
+	$select_picnode_list="select * from pincode where usertype=? and userid=? order by id asc";
+	$fetch_picnode_list=db_q($db_conn,$select_picnode_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 	while($result_pincode_list=mysqli_fetch_array($fetch_picnode_list))
 	{
 		
 		//state details
 											$state_id=$result_pincode_list['state_id'];
-								$select_stateList="select * from `state` where id='$state_id'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+								$select_stateList="select * from `state` where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$state_id]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];
 											

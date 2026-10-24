@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $userid=$_GET['q']; 
 $invuser=$_GET['invuser']; 
 $oldcustomerid=$_GET['oldcustomerid'];
@@ -7,8 +7,8 @@ $oldcustomerid=$_GET['oldcustomerid'];
 
 $displaytitle="Distributor";
 	
-$slctcheckstock="select * from stock where user_type='$invuser' and user_id='$userid'";
-$fetch_ProductsPrice=mysqli_query($db_conn,$slctcheckstock);
+$slctcheckstock="select * from stock where user_type=? and user_id=?";
+$fetch_ProductsPrice=db_q($db_conn,$slctcheckstock,[$invuser,$userid]);
 $Result_ProductsPrice=mysqli_num_rows($fetch_ProductsPrice);
 
 if($oldcustomerid==$userid)

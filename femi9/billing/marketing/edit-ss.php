@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Edit Shop";
 $manage_url="manage_ss.php";
@@ -13,8 +13,8 @@ require_once __DIR__ . "/../shared/ShopLocationChangeRequest.php";
 ensureShopLocationChangeRequestsTable($db_conn);
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from ms_shop where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from ms_shop where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 $recaptureCount = (int)($result_product_list['location_recapture_count'] ?? 0);
 $recaptureLimitReached = $recaptureCount >= 2;
@@ -22,7 +22,7 @@ $recaptureLimitReached = $recaptureCount >= 2;
 $pendingLocationRequest = null;
 if ($recaptureLimitReached) {
 	$get_id_esc = (int)$get_id;
-	$pendingRes = mysqli_query($db_conn, "SELECT id, requested_at FROM ms_shop_location_requests WHERE shop_id='$get_id_esc' AND status='pending' ORDER BY id DESC LIMIT 1");
+	$pendingRes = mysqli_query($db_conn, "SELECT id, requested_at FROM ms_shop_location_requests WHERE shop_id='".db_esc($get_id_esc)."' AND status='pending' ORDER BY id DESC LIMIT 1");
 	$pendingLocationRequest = $pendingRes ? mysqli_fetch_assoc($pendingRes) : null;
 }
 ?>
@@ -112,8 +112,8 @@ if ($recaptureLimitReached) {
 											<?php
 					//shop category
 				$shop_cat=$result_product_list['shop_cat'];
-$select_shopcatt="select * from shop_category where id='$shop_cat'";
-	$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
+$select_shopcatt="select * from shop_category where id=?";
+	$fetch_shopcatt=db_q($db_conn,$select_shopcatt,[$shop_cat]);
 	$result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 $shopcat_name=$result_shopcatt['catlable'];
 ?>		

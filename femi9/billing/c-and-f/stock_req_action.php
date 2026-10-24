@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -19,8 +19,8 @@ if(isset($_REQUEST['sendrequest']))
 	$tousertype=$_REQUEST['tousertype'];
 	$touserid=$_REQUEST['touserid'];
 	
-	$select_count_invoice="select count(*) as numrequest from stock_request where reqid='$reqid'";
-	$fetch_count_invoice=mysqli_query($db_conn,$select_count_invoice);
+	$select_count_invoice="select count(*) as numrequest from stock_request where reqid=?";
+	$fetch_count_invoice=db_q($db_conn,$select_count_invoice,[$reqid]);
 	$result_count_invoice=mysqli_fetch_array($fetch_count_invoice);
 	if($result_count_invoice['numrequest']==0)
 	{
@@ -108,9 +108,9 @@ $filenameINS_SCR5="".$datefile."".$timefile."SCR5".$filename_SCR5."";
 		
 		$insert_Invoice="insert into stock_request (reqid,date,fromusertype,fromuserid,tousertype,touserid,status,inv_id,
 		screenshot,screenshot2,verified,reqtype,delivery_address,amount,utr)
-		values ('$reqid','$date','$fromusertype','$fromuserid','$tousertype','$touserid','pending','nil',
-		'$filenameINS_SCR1','$filenameINS_SCR2','0','$reqtype','$delivery_address','$amount','$utr')";
-		mysqli_query($db_conn,$insert_Invoice);
+		values (?,?,?,?,?,?,'pending','nil',
+		?,?,'0',?,?,?,?)";
+		db_q($db_conn,$insert_Invoice,[$reqid,$date,$fromusertype,$fromuserid,$tousertype,$touserid,$filenameINS_SCR1,$filenameINS_SCR2,$reqtype,$delivery_address,$amount,$utr]);
 		
 	}
 	
@@ -128,8 +128,8 @@ for ($i=0; $i<=$number; $i++)
      $prid_value = $prid_ex[$i]; 
 	 
 	 //get product amount
-	 $select_pramount="select * from products where id='$prid_value'";
-	 $fetch_pramount=mysqli_query($db_conn,$select_pramount);
+	 $select_pramount="select * from products where id=?";
+	 $fetch_pramount=db_q($db_conn,$select_pramount,[$prid_value]);
 	 $result_pramount=mysqli_fetch_array($fetch_pramount);
 	 
 	 $gst=$result_pramount['gst'];
@@ -143,16 +143,16 @@ for ($i=0; $i<=$number; $i++)
 	 $gsttotal=number_format($gsttotal,2,'.','');
 	 $total=$subtotal+$gsttotal;
 	 
-	 $select_count_invoice12="select count(*) as numrequest2 from stock_request_items where reqid='$reqid' and prid='$prid_value'";
-	$fetch_count_invoice12=mysqli_query($db_conn,$select_count_invoice12);
+	 $select_count_invoice12="select count(*) as numrequest2 from stock_request_items where reqid=? and prid=?";
+	$fetch_count_invoice12=db_q($db_conn,$select_count_invoice12,[$reqid,$prid_value]);
 	$result_count_invoice12=mysqli_fetch_array($fetch_count_invoice12);
 	if($result_count_invoice12['numrequest2']==0 && $prid_value!=NULL)
 	{
 		
 		$insert_Invoice12="insert into stock_request_items (reqid,prid,amount,qty,total,fromusertype,fromuserid,tousertype,touserid,subtotal,gst,gsttotal,hsn)
 		values 
-		('$reqid','$prid_value','$pramount','$qty_value','$total','$fromusertype','$fromuserid','$tousertype','$touserid','$subtotal','$gst','$gsttotal','$hsn')";
-		mysqli_query($db_conn,$insert_Invoice12);
+		(?,?,?,?,?,?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$insert_Invoice12,[$reqid,$prid_value,$pramount,$qty_value,$total,$fromusertype,$fromuserid,$tousertype,$touserid,$subtotal,$gst,$gsttotal,$hsn]);
 		
 	}
 	

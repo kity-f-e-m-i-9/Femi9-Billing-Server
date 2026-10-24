@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 $title="Update Customer";
 error_reporting(0);
@@ -97,14 +97,14 @@ $lablenamedisplay="Shop Name";
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from user_invoice where inv_id='$invid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+					<?php $select_product_list="select * from user_invoice where inv_id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$invid]);
 										$result_product_list=mysqli_fetch_array($fetch_product_list);
 											
 										$CuSTID=$result_product_list['to_user_id'];
 										
-										$select_Customers="select * from shop where temp_id='$CuSTID'";
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+										$select_Customers="select * from shop where temp_id=?";
+										$fetch_Customers=db_q($db_conn,$select_Customers,[$CuSTID]);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 										$Cust_Name=$result_Customers['name'];
 										$Cust_Mbile=$result_Customers['mobile_number'];
@@ -139,14 +139,14 @@ $lablenamedisplay="Shop Name";
 <select required="" name="new_customer_id" class="js-states form-control" tabindex="-1" style="display: none; width: 100%">
 <option value="" hidden="">Select</option>
 <?php 
-$selectCusList="select * from shop where onboard_userTYPE='$onboard_userTYPE' order by name asc";
-$fetch_Customers_list=mysqli_query($db_conn,$selectCusList);
+$selectCusList="select * from shop where onboard_userTYPE=? order by name asc";
+$fetch_Customers_list=db_q($db_conn,$selectCusList,[$onboard_userTYPE]);
 while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 		{
 			
 			$user_districtID=$result_Customers_list['district_id'];
-			$select_User_districtName="select * from district where id='$user_districtID'";
-			$fetch_user_districtName=mysqli_query($db_conn,$select_User_districtName);
+			$select_User_districtName="select * from district where id=?";
+			$fetch_user_districtName=db_q($db_conn,$select_User_districtName,[$user_districtID]);
 			$result_user_districtName=mysqli_fetch_array($fetch_user_districtName);
 			$user_districtName=$result_user_districtName['dist_name'];
 			

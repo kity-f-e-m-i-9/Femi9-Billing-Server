@@ -1,4 +1,4 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php");
 require_once("include/PermissionCheck.php"); requirePermission('products');
 require_once("include/DatewiseStockReport.php");
 error_reporting(0);
@@ -156,9 +156,9 @@ while ($whRes && ($whRow = $whRes->fetch_assoc())) {
                             <div class="col">
                                 <div class="page-description">
 								<?php
-								$select_sumclosing12="select sum(closing_qty) from stock where user_type='$user_type_Loginvl'
+								$select_sumclosing12="select sum(closing_qty) from stock where user_type=?
 										and product_id in (select id from products where temp_id not like 'NKS-%' or temp_id is null)";
-										$Fetch_sumclosing12=mysqli_query($db_conn,$select_sumclosing12);
+										$Fetch_sumclosing12=db_q($db_conn,$select_sumclosing12,[$user_type_Loginvl]);
 										$Result_sumclosing12=mysqli_fetch_array($Fetch_sumclosing12);
 										?>
                                     <h1>
@@ -283,9 +283,9 @@ foreach ($warehouseNames as $whId => $whLabel) {
 // something any company-facing stock report should surface; the mapped
 // normal company product is what should show here (see NeksomoStockBridge.php).
 $select_OPStock="select product_id, warehouse_id, opening_qty, opening_date, input_qty, sales_qty, closing_qty, extra_pieces
-    from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'
+    from stock where user_type=? and user_id=?
     and product_id in (select id from products where temp_id not like 'NKS-%' or temp_id is null)";
-$Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
+$Fetch_OPStock=db_q($db_conn,$select_OPStock,[$user_type_Loginvl,$user_id_Loginvl]);
 while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
 {
     $StockProductID=$Result_OPStock['product_id'];
@@ -347,8 +347,8 @@ $total_sent_other=0;
 $total_dfd=0;
 $total_return=0;
 foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
-    $select_productDetils="select * from products where id='$StockProductID'";
-    $Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+    $select_productDetils="select * from products where id=?";
+    $Fetch_productDetils=db_q($db_conn,$select_productDetils,[$StockProductID]);
     $Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
     if ($Result_productDetils["productName"]==NULL) continue;
 
@@ -386,8 +386,8 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
     if ($isUnassignedBucket) {
         // Demo/Free/Damage — shown in its own column (see $DfdQty below),
         // only attributable to the Unassigned bucket for the reason above.
-        $select_dfdQty="select sum(qty) from demofreedamage where product_id='$StockProductID' and userid='$user_id_Loginvl'";
-        $Fetch_dfdQty=mysqli_query($db_conn,$select_dfdQty);
+        $select_dfdQty="select sum(qty) from demofreedamage where product_id=? and userid=?";
+        $Fetch_dfdQty=db_q($db_conn,$select_dfdQty,[$StockProductID,$user_id_Loginvl]);
         $DfdQty=(int)(mysqli_fetch_row($Fetch_dfdQty)[0] ?? 0);
         $total_dfd+=$DfdQty;
     }

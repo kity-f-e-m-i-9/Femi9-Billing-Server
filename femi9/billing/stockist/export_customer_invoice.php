@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -11,7 +11,7 @@ header("Content-Disposition: attachment; filename=$file");
 $output = fopen("php://output", "w");
 fputcsv($output, ['Invoice Number', 'Customer Name', 'Invoice Date', 'Invoice Amount']);
 
-$select_product_list="select * from invoice where user_id='$Login_user_IDvl' order by id desc";
+$select_product_list="select * from invoice where user_id='".db_esc($Login_user_IDvl)."' order by id desc";
 $fetch_product_list=mysqli_query($db_conn,$select_product_list);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {

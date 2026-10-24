@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 header("Location: dashboard.php"); exit;
 include("config.php");
 
@@ -146,8 +146,8 @@ $tempID="".$randum_number."FSHP".$temp_date."".$temp_time."";?>
 <select required="" name="pincode_id" class="form-control">
 <option value="" hidden="">Select</option>
 <?php 
-$SelectPincodeList="select * from pincode where assigned_SID='$Login_user_IDvl' order by pincode asc";
-$FetchPincodeList=mysqli_query($db_conn,$SelectPincodeList);
+$SelectPincodeList="select * from pincode where assigned_SID=? order by pincode asc";
+$FetchPincodeList=db_q($db_conn,$SelectPincodeList,[$Login_user_IDvl]);
 while($ResultPincodeList=mysqli_fetch_array($FetchPincodeList))
 {
 ?>

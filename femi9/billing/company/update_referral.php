@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 
 $stockistid=$_REQUEST['stockistid'];
 
@@ -89,8 +89,8 @@ function closerefresh()
 		if($st_ref_type=="company")
 		{
 		    
-		    $UPDATE_REFERED="update stockist_referral set st_ref_type='$st_ref_type',st_ref_userid='company',updated='1' where stockist_id='$stockist_id'";
-			mysqli_query($db_conn,$UPDATE_REFERED);
+		    $UPDATE_REFERED="update stockist_referral set st_ref_type=?,st_ref_userid='company',updated='1' where stockist_id=?";
+			db_q($db_conn,$UPDATE_REFERED,[$st_ref_type,$stockist_id]);
 					
 					$_SESSION['successMessage']="Referral Details Updated Success!";
 			echo "<script> opener.location.reload(true);
@@ -104,8 +104,8 @@ function closerefresh()
 		if($result_count_REFERID==1)
 		{
 							
-							$UPDATE_REFERED="update stockist_referral set st_ref_type='$st_ref_type',st_ref_userid='$st_ref_userid_conc',updated='1' where stockist_id='$stockist_id'";
-							mysqli_query($db_conn,$UPDATE_REFERED);
+							$UPDATE_REFERED="update stockist_referral set st_ref_type=?,st_ref_userid=?,updated='1' where stockist_id=?";
+							db_q($db_conn,$UPDATE_REFERED,[$st_ref_type,$st_ref_userid_conc,$stockist_id]);
 							
 							$_SESSION['successMessage']="Referral Details Updated Success!";
 			echo "<script> opener.location.reload(true);

@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
@@ -9,8 +9,8 @@ if (!is_godown_allowed($db_conn, (int)$prid)) {
 	header("Location: godown?unauthorized"); exit;
 }
 
-$select_product_list="select * from company_godown where id='$prid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from company_godown where id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 										$result_product_list=mysqli_fetch_array($fetch_product_list);
 							
 include("RemoveSpecialChar.php");
@@ -91,12 +91,12 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	}else{$insfilenameLG=$old_logo;}
 	//--------------------------------
 	
-		$insertrecords="update company_godown set gname='$gname',address_line1='$address_line1',
-		address_line2='$address_line2',gstin='$gstin',state='$state',state_code='$state_code',
-		contact='$contact',email='$email',logo='$insfilenameLG',
-		acname='$acname',acnumber='$acnumber',bankname='$bankname',
-		branchname='$branchname',ifsc='$ifsc',upinumber='$upinumber' where id='$updateid'";
-		mysqli_query($db_conn,$insertrecords);
+		$insertrecords="update company_godown set gname=?,address_line1=?,
+		address_line2=?,gstin=?,state=?,state_code=?,
+		contact=?,email=?,logo=?,
+		acname=?,acnumber=?,bankname=?,
+		branchname=?,ifsc=?,upinumber=? where id=?";
+		db_q($db_conn,$insertrecords,[$gname,$address_line1,$address_line2,$gstin,$state,$state_code,$contact,$email,$insfilenameLG,$acname,$acnumber,$bankname,$branchname,$ifsc,$upinumber,$updateid]);
 
 	echo "<script>window.location='godown?updatedSuccess';</script>";
 }

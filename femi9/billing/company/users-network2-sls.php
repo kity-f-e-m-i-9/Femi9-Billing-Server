@@ -1,11 +1,11 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 
 $title="Users Network";
 $get_state_id=$_REQUEST['state_id'];
 //
-$select_stateList="select * from `state` where id='$get_state_id'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+$select_stateList="select * from `state` where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$get_state_id]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];
 							   
@@ -115,8 +115,8 @@ $select_stateList="select * from `state` where id='$get_state_id'";
 </thead>
 
 <?php 
-$select_product_list="select * from super_stockiest where state_id='$get_state_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from super_stockiest where state_id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_state_id]);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -125,8 +125,8 @@ $select_product_list="select * from super_stockiest where state_id='$get_state_i
 											
 									$district_id=$result_product_list['district_id'];
 //
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 ?>
@@ -143,35 +143,35 @@ $district_name=	$result_district['dist_name'];
 <td colspan="2">
 <?php 
 //total sales invoice Count
-$select_totalsls_invcount="select count(*) as numslscount from user_invoice where from_user_type='$usertype_invoice' and from_user_id='$userid_invoice' and date between '$get_from_date' and '$get_to_date'";
-$fetch_totalsls_invcount=mysqli_query($db_conn,$select_totalsls_invcount);
+$select_totalsls_invcount="select count(*) as numslscount from user_invoice where from_user_type=? and from_user_id=? and date between ? and ?";
+$fetch_totalsls_invcount=db_q($db_conn,$select_totalsls_invcount,[$usertype_invoice,$userid_invoice,$get_from_date,$get_to_date]);
 $result_totalsls_invcount=mysqli_fetch_array($fetch_totalsls_invcount);
 $Total_invoice_count=$result_totalsls_invcount['numslscount'];
 
 //total sales product qty
-$select_totalsls_invcount234="select * from user_invoice where from_user_type='$usertype_invoice' and from_user_id='$userid_invoice' and date between '$get_from_date' and '$get_to_date'";
-$fetch_totalsls_invcount234=mysqli_query($db_conn,$select_totalsls_invcount234);
+$select_totalsls_invcount234="select * from user_invoice where from_user_type=? and from_user_id=? and date between ? and ?";
+$fetch_totalsls_invcount234=db_q($db_conn,$select_totalsls_invcount234,[$usertype_invoice,$userid_invoice,$get_from_date,$get_to_date]);
 while($result_totalsls_invcount234=mysqli_fetch_array($fetch_totalsls_invcount234))
 {
 	$get_inv_id=$result_totalsls_invcount234['inv_id'];
 	$get_inv_date=$result_totalsls_invcount234['date'];
 	
-$select_totalsls_invcount_qty="select * from user_invoice_items where from_user_type='$usertype_invoice' and from_user_id='$userid_invoice' and inv_id='$get_inv_id'";
-$fetch_totalsls_invcount_qty=mysqli_query($db_conn,$select_totalsls_invcount_qty);
+$select_totalsls_invcount_qty="select * from user_invoice_items where from_user_type=? and from_user_id=? and inv_id=?";
+$fetch_totalsls_invcount_qty=db_q($db_conn,$select_totalsls_invcount_qty,[$usertype_invoice,$userid_invoice,$get_inv_id]);
 while($result_totalsls_invcount_qty=mysqli_fetch_array($fetch_totalsls_invcount_qty))
 {
 
 	$invoice_product_id=$result_totalsls_invcount_qty['pr_id'];
 	$invoice_qty=$result_totalsls_invcount_qty['qty'];
 	
-	$selectcountDUP="select count(*) as numDUP from temp_report where usertype='$usertype_invoice' and userid='$userid_invoice' and inv_id='$get_inv_id' and pr_id='$invoice_product_id'";
-	$fetchcountDUP=mysqli_query($db_conn,$selectcountDUP);
+	$selectcountDUP="select count(*) as numDUP from temp_report where usertype=? and userid=? and inv_id=? and pr_id=?";
+	$fetchcountDUP=db_q($db_conn,$selectcountDUP,[$usertype_invoice,$userid_invoice,$get_inv_id,$invoice_product_id]);
 	$resultcountDUP=mysqli_fetch_array($fetchcountDUP);
 	if($resultcountDUP['numDUP']==0)
 	{
 		
-		$insertRecords="insert into temp_report (inv_id,date,pr_id,qty,usertype,userid) values ('$get_inv_id','$get_inv_date','$invoice_product_id','$invoice_qty','$usertype_invoice','$userid_invoice')";
-		mysqli_query($db_conn,$insertRecords);
+		$insertRecords="insert into temp_report (inv_id,date,pr_id,qty,usertype,userid) values (?,?,?,?,?,?)";
+		db_q($db_conn,$insertRecords,[$get_inv_id,$get_inv_date,$invoice_product_id,$invoice_qty,$usertype_invoice,$userid_invoice]);
 	}
 	
 }
@@ -186,8 +186,8 @@ while($result_totalsls_invcount_qty=mysqli_fetch_array($fetch_totalsls_invcount_
 </tr>
 
 <?php
-$select_totalsls_invcount_qty123="select sum(qty) from temp_report where usertype='$usertype_invoice' and userid='$userid_invoice' and date between '$get_from_date' and '$get_to_date'";
-$fetch_totalsls_invcount_qty123=mysqli_query($db_conn,$select_totalsls_invcount_qty123);
+$select_totalsls_invcount_qty123="select sum(qty) from temp_report where usertype=? and userid=? and date between ? and ?";
+$fetch_totalsls_invcount_qty123=db_q($db_conn,$select_totalsls_invcount_qty123,[$usertype_invoice,$userid_invoice,$get_from_date,$get_to_date]);
 $result_totalsls_invcount_qty123=mysqli_fetch_array($fetch_totalsls_invcount_qty123);
 if($result_totalsls_invcount_qty123[0]!=NULL){
 $Total_invoice_count_qty123=$result_totalsls_invcount_qty123[0];

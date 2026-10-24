@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -8,7 +8,7 @@ $shop   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE id
 if (!$shop) { header("Location: shop-manage.php"); exit; }
 
 $shop_cat_id = $shop['shop_cat'];
-$cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_category WHERE id='$shop_cat_id' LIMIT 1"));
+$cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_category WHERE id='".db_esc($shop_cat_id)."' LIMIT 1"));
 ?>
 <!DOCTYPE html>
 <html lang="en">

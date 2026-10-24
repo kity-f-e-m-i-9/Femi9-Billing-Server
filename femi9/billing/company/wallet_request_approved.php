@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -202,8 +202,8 @@ $i= $start_from;
 											
 											<tbody>
 				<?php 
-				$select_product_list="select * from wallet_withdraw where req_status='approved' and updated_date between '$from_date' and '$to_date' order by id desc";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+				$select_product_list="select * from wallet_withdraw where req_status='approved' and updated_date between ? and ? order by id desc";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date]);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 
@@ -251,7 +251,7 @@ if ($WD_user_type === 'territory_partner') {
 
     $district_id = $result_onbaord_user_records['district_id'] ?? 0;
     if ($district_id) {
-        $r_dist = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='$district_id'"));
+        $r_dist = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='".db_esc($district_id)."'"));
         $district_name = $r_dist['dist_name'] ?? '';
     }
 }

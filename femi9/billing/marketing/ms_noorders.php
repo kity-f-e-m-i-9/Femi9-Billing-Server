@@ -1,4 +1,4 @@
-<?php include("checksession.php"); include 'config.php'; error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); include 'config.php'; error_reporting(0);
 if($result_LoGuserDtails['user_position']==0){
 	echo "<script>window.location='dashboard.php';</script>";exit;
 }
@@ -18,8 +18,8 @@ $se_taluk = $_REQUEST['se_taluk'] ?? '';
 // Marketing staff selected name for dropdown
 $result_msDetails12 = [];
 if(!empty($se_msid)) {
-    $select_msDetails12 = "SELECT * FROM marketing_staff WHERE id='$se_msid'";
-    $fetch_msDetails12  = mysqli_query($db_conn, $select_msDetails12);
+    $select_msDetails12 = "SELECT * FROM marketing_staff WHERE id=?";
+    $fetch_msDetails12  = db_q($db_conn,$select_msDetails12,[$se_msid]);
     $result_msDetails12 = mysqli_fetch_array($fetch_msDetails12);
 }
 

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 
@@ -16,17 +16,17 @@ if(isset($_POST["Import"])){
 				$taluk_id=$getData[2];
 				$pincode=$getData[3];
 				
-$select_count_product="select count(*) as numpincode from pincode where state_id='$state_id' and dist_id='$dist_id' and taluk_id='$taluk_id' and pincode='$pincode'";
-$fech_count_duplicate=mysqli_query($db_conn,$select_count_product);
+$select_count_product="select count(*) as numpincode from pincode where state_id=? and dist_id=? and taluk_id=? and pincode=?";
+$fech_count_duplicate=db_q($db_conn,$select_count_product,[$state_id,$dist_id,$taluk_id,$pincode]);
 $result_count_duplicate=mysqli_fetch_array($fech_count_duplicate);
 if($result_count_duplicate['numpincode']==0)
 {
 				   
 				  $insert_products="insert into pincode 
 		(state_id,dist_id,taluk_id,pincode,usertype,userid,assigned_SID,assigned_DID) values 
-		('$state_id','$dist_id','$taluk_id','$pincode',
-		'$Login_user_TYPEvl','$Login_user_IDvl','Nil','Nil')";
-                 $result = mysqli_query($db_conn, $insert_products);
+		(?,?,?,?,
+		?,?,'Nil','Nil')";
+                 $result = db_q($db_conn,$insert_products,[$state_id,$dist_id,$taluk_id,$pincode,$Login_user_TYPEvl,$Login_user_IDvl]);
 					   
 }   
 			

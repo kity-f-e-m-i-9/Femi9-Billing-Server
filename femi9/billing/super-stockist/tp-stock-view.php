@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -13,7 +13,7 @@ if ($prod_res) while ($pr = mysqli_fetch_assoc($prod_res)) $products[$pr['id']] 
 // that onboarded them — same link the dashboard's "Territory Partner wise"
 // card totals against).
 $tp_rows = [];
-$tp_res = mysqli_query($db_conn, "SELECT id, tp_id, name, mobile FROM territory_partners WHERE onboard_ss_id='$Login_user_IDvl' ORDER BY name ASC");
+$tp_res = mysqli_query($db_conn, "SELECT id, tp_id, name, mobile FROM territory_partners WHERE onboard_ss_id='".db_esc($Login_user_IDvl)."' ORDER BY name ASC");
 if ($tp_res) while ($row = mysqli_fetch_assoc($tp_res)) $tp_rows[] = $row;
 
 // Stock quantities for these TPs, one query for all of them.

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('manage_return');
 include("config.php");
 error_reporting(0);
@@ -135,8 +135,8 @@ $i= $start_from;
 		// (tp-cnote-manage.php) with the correct territory_partners/
 		// tp_invoices joins — excluded here to avoid the blank name/
 		// invoice cells this page's generic lookup produced for them.
-		$select_product_list="select * from user_return_stock where to_usertype='$Login_user_TYPEvl' and from_usertype!='territory_partner' and deleted_at is null order by id desc";
-		$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+		$select_product_list="select * from user_return_stock where to_usertype=? and from_usertype!='territory_partner' and deleted_at is null order by id desc";
+		$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl]);
 		while($result_product_list=mysqli_fetch_array($fetch_product_list))
 		{
 		//customer details
@@ -190,8 +190,8 @@ else if($getinvuser=="shop")
 		$CuSTID=$result_product_list['from_userid'];
 		if($CuSTID!=0)
 		{
-		$select_Customers="select * from customers where id='$CuSTID'";
-									$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+		$select_Customers="select * from customers where id=?";
+									$fetch_Customers=db_q($db_conn,$select_Customers,[$CuSTID]);
 									$result_Customers=mysqli_fetch_array($fetch_Customers);
 										$Cust_Name=$result_Customers['name'];
 										$Cust_Mbile=$result_Customers['mobile'];
@@ -215,11 +215,11 @@ else if($getinvuser=="shop")
 										$invid=$result_product_list['invnumber'];
 										if($getinvuser=="customer")
 	{
-		$select_userinvoice="select * from invoice where inv_id='$invid'";
+		$select_userinvoice="select * from invoice where inv_id='".db_esc($invid)."'";
 	}else{
-										$select_userinvoice="select * from user_invoice where inv_id='$invid'";
+										$select_userinvoice="select * from user_invoice where inv_id=?";
 										}
-									$fetch_userinvoice=mysqli_query($db_conn,$select_userinvoice);
+									$fetch_userinvoice=db_q($db_conn,$select_userinvoice,[$invid]);
 									$result_userinvoice=mysqli_fetch_array($fetch_userinvoice);
 											
 ?>

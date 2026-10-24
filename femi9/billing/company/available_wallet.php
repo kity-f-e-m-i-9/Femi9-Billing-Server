@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $title="Available Wallet";
@@ -182,14 +182,14 @@ $user_det_Mobile=$result_USER_Records133['mobile_number'];
 									
 									<?php
 								//Total wallet amount
-$select_wallet_amount_ST="select sum(commission_amount) from wallet_monthly_sls_report where refer_by_usertype='$se_usertype' and refer_by_userid='$se_userID'";
-$fetch_wallet_amount_ST=mysqli_query($db_conn,$select_wallet_amount_ST);
+$select_wallet_amount_ST="select sum(commission_amount) from wallet_monthly_sls_report where refer_by_usertype=? and refer_by_userid=?";
+$fetch_wallet_amount_ST=db_q($db_conn,$select_wallet_amount_ST,[$se_usertype,$se_userID]);
 $result_wallet_amount_ST=mysqli_fetch_array($fetch_wallet_amount_ST);
 $Total_wallet_amount_ST=$result_wallet_amount_ST[0] ?? '0';
 
 //Total Withdraw Amount
-$select_wallet_withdraw_amount_ST="select sum(amount) from wallet_withdraw where user_type='$se_usertype' and user_id='$se_userID' and req_status='approved'";
-$fetch_wallet_withdraw_amount_ST=mysqli_query($db_conn,$select_wallet_withdraw_amount_ST);
+$select_wallet_withdraw_amount_ST="select sum(amount) from wallet_withdraw where user_type=? and user_id=? and req_status='approved'";
+$fetch_wallet_withdraw_amount_ST=db_q($db_conn,$select_wallet_withdraw_amount_ST,[$se_usertype,$se_userID]);
 $result_wallet_withdraw_amount_ST=mysqli_fetch_array($fetch_wallet_withdraw_amount_ST);
 $Total_withdraw_amount_ST=$result_wallet_withdraw_amount_ST[0] ?? '0';
 
@@ -214,8 +214,8 @@ $Average_available_walletAmount_ST=$Total_wallet_amount_ST-$Total_withdraw_amoun
 							  <h5 class="todo-menu-title">Last 10 Credit</h5>
                                     <ul class="list-unstyled">		
 <?php 
-$select_wallet_History1234="select * from wallet_monthly_sls_report where refer_by_usertype='$se_usertype' and refer_by_userid='$se_userID' order by from_date desc LIMIT 0,10";
-$fetch_wallet_History1234=mysqli_query($db_conn,$select_wallet_History1234);
+$select_wallet_History1234="select * from wallet_monthly_sls_report where refer_by_usertype=? and refer_by_userid=? order by from_date desc LIMIT 0,10";
+$fetch_wallet_History1234=db_q($db_conn,$select_wallet_History1234,[$se_usertype,$se_userID]);
 while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 {
 
@@ -260,8 +260,8 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
                                                 <ul class="list-unstyled">
 												
 <?php 
-$select_wallet_History1234="select * from wallet_withdraw where user_type='$se_usertype' and user_id='$se_userID' order by date desc LIMIT 0,10";
-$fetch_wallet_History1234=mysqli_query($db_conn,$select_wallet_History1234);
+$select_wallet_History1234="select * from wallet_withdraw where user_type=? and user_id=? order by date desc LIMIT 0,10";
+$fetch_wallet_History1234=db_q($db_conn,$select_wallet_History1234,[$se_usertype,$se_userID]);
 while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 {
 ?>

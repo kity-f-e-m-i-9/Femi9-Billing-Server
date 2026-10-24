@@ -1,4 +1,4 @@
-<?php /* include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; /* include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -159,8 +159,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from user_invoice where date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and sub_total>0 order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from user_invoice where date between ? and ? and from_user_type=? and sub_total>0 order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date,$Login_user_TYPEvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -185,8 +185,8 @@ $select_Customers="select * from ".$tablename." where temp_id='$CuSTID'";
 //product Qty
 $inv_id=$result_product_list['inv_id'];
 
-$select_sumprqty="select sum(qty) from user_invoice_items where inv_id='$inv_id'";
-$fetch_sumprqty=mysqli_query($db_conn,$select_sumprqty);
+$select_sumprqty="select sum(qty) from user_invoice_items where inv_id=?";
+$fetch_sumprqty=db_q($db_conn,$select_sumprqty,[$inv_id]);
 $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 ?>
                                             
@@ -223,8 +223,8 @@ $discount=$result_product_list["discount"]+$result_product_list["credit"];
 <!----------------------------------CUSTOMER INVOICE------------------------------------>	
 <!-------------------------------------------------------------------------------------->				
 										
-										<?php $select_product_listcUSTOMER="select * from invoice where date between '$from_date' and '$to_date' and user_type='$Login_user_TYPEvl' and sub_total>0 order by id asc";
-			$fetch_product_listCUTOMER=mysqli_query($db_conn,$select_product_listcUSTOMER);
+										<?php $select_product_listcUSTOMER="select * from invoice where date between ? and ? and user_type=? and sub_total>0 order by id asc";
+			$fetch_product_listCUTOMER=db_q($db_conn,$select_product_listcUSTOMER,[$from_date,$to_date,$Login_user_TYPEvl]);
 			while($result_product_listCUSTOMER=mysqli_fetch_array($fetch_product_listCUTOMER))
 										{
 											
@@ -235,8 +235,8 @@ $discount=$result_product_list["discount"]+$result_product_list["credit"];
 											$Cust_Name123="Walking Customer";
 											
 										}else{
-$select_Customers="select * from customers where id='$CuSTID'";
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+$select_Customers="select * from customers where id=?";
+										$fetch_Customers=db_q($db_conn,$select_Customers,[$CuSTID]);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 										//
 										$Cust_Name123=$result_Customers['name'];
@@ -246,8 +246,8 @@ $select_Customers="select * from customers where id='$CuSTID'";
 //product Qty
 $inv_id=$result_product_listCUSTOMER['inv_id'];
 
-$select_sumprqty="select sum(qty) from invoice_items where inv_id='$inv_id'";
-$fetch_sumprqty=mysqli_query($db_conn,$select_sumprqty);
+$select_sumprqty="select sum(qty) from invoice_items where inv_id=?";
+$fetch_sumprqty=db_q($db_conn,$select_sumprqty,[$inv_id]);
 $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 ?>
                                             

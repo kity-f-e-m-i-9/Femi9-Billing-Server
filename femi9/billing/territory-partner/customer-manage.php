@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -73,8 +73,8 @@ $i = $start_from;
                                             </thead>
                                             <tbody>
 <?php
-$select_customers = "SELECT * FROM customers WHERE user_id='$Login_user_IDvl' ORDER BY id ASC";
-$fetch_customers = mysqli_query($db_conn, $select_customers);
+$select_customers = "SELECT * FROM customers WHERE user_id=? ORDER BY id ASC";
+$fetch_customers = db_q($db_conn,$select_customers,[$Login_user_IDvl]);
 while ($result_cust = mysqli_fetch_array($fetch_customers)) {
     $product_id = base64_encode($result_cust["id"]);
 ?>

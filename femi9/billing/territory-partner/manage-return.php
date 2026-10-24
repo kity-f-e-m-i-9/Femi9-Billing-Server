@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -81,8 +81,8 @@ $i = $start_from;
                                             </thead>
                                             <tbody>
 <?php
-$select_returns = "SELECT * FROM user_return_stock WHERE to_usertype='$Login_user_TYPEvl' AND to_userid='$Login_user_IDvl' ORDER BY id DESC";
-$fetch_returns = mysqli_query($db_conn, $select_returns);
+$select_returns = "SELECT * FROM user_return_stock WHERE to_usertype=? AND to_userid=? ORDER BY id DESC";
+$fetch_returns = db_q($db_conn,$select_returns,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while ($result_ret = mysqli_fetch_array($fetch_returns)) {
     $getinvuser = $result_ret['from_usertype'];
 
@@ -99,8 +99,8 @@ while ($result_ret = mysqli_fetch_array($fetch_returns)) {
     if ($getinvuser == "customer") {
         $CuSTID = $result_ret['from_userid'];
         if ($CuSTID != 0) {
-            $sel_cust = "SELECT * FROM customers WHERE id='$CuSTID'";
-            $res_cust = mysqli_fetch_array(mysqli_query($db_conn, $sel_cust));
+            $sel_cust = "SELECT * FROM customers WHERE id=?";
+            $res_cust = mysqli_fetch_array(db_q($db_conn,$sel_cust,[$CuSTID]));
             $Cust_Name = $res_cust['name'];
             $Cust_Mobile = $res_cust['mobile'];
         } else {

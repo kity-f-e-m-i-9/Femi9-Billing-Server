@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -176,14 +176,14 @@ $i= $start_from;
                                             </thead>
 											
 										<tbody>
-										<?php $select_product_list="select * from user_invoice where date between '$from_date' and '$to_date' and to_user_type='shop' and sub_total>0 and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from user_invoice where date between ? and ? and to_user_type='shop' and sub_total>0 and from_user_type=? and from_user_id=? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date,$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											//customer details
 											$CuSTID=$result_product_list['to_user_id'];
-$select_Customers="select * from shop where temp_id='$CuSTID'";
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+$select_Customers="select * from shop where temp_id=?";
+										$fetch_Customers=db_q($db_conn,$select_Customers,[$CuSTID]);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 										//
 										$Cust_Name=$result_Customers['name'];
@@ -192,8 +192,8 @@ $select_Customers="select * from shop where temp_id='$CuSTID'";
 //product Qty
 $inv_id=$result_product_list['inv_id'];
 
-$select_sumprqty="select sum(qty) from user_invoice_items where inv_id='$inv_id'";
-$fetch_sumprqty=mysqli_query($db_conn,$select_sumprqty);
+$select_sumprqty="select sum(qty) from user_invoice_items where inv_id=?";
+$fetch_sumprqty=db_q($db_conn,$select_sumprqty,[$inv_id]);
 $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 ?>
                                             

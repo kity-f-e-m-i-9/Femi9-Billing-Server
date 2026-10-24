@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 ?>
@@ -129,21 +129,21 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-									$select_product_list12="select distinct`tempid` from `demofreedamage` where usertype='$Login_user_TYPEvl' and userid='$Login_user_IDvl'";
-										$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
+									$select_product_list12="select distinct`tempid` from `demofreedamage` where usertype=? and userid=?";
+										$fetch_product_list12=db_q($db_conn,$select_product_list12,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($ResultRecords12=mysqli_fetch_array($fetch_product_list12))
 										{
 											
 											$tempid=$ResultRecords12["tempid"];
 											
-										$select_product_list="select * from demofreedamage where tempid='$tempid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										$select_product_list="select * from demofreedamage where tempid=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 										$ResultRecords=mysqli_fetch_array($fetch_product_list);
 											
 											//product details
 											$product_id=$ResultRecords['product_id'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 											?>
                                             
@@ -161,8 +161,8 @@ $i= $start_from;
 					$prid_header=$result_prdetails_header['id'];
 					
 					//SALES QTY
-					$select_SUM_QTY="select qty from demofreedamage where tempid='$tempid' and product_id='$prid_header'";
-					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
+					$select_SUM_QTY="select qty from demofreedamage where tempid=? and product_id=?";
+					$fetch_SUM_QTY=db_q($db_conn,$select_SUM_QTY,[$tempid,$prid_header]);
 					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
 					if($result_SUM_QTY['qty']!=NULL){ $slsqty=$result_SUM_QTY['qty'];} else{ $slsqty="0";}
 					

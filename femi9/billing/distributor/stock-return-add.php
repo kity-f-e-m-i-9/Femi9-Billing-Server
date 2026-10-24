@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");
@@ -86,8 +86,8 @@ if(isset($_REQUEST['sendreturn']))
 	$returnid=$_REQUEST['returnid'];
 	$invnumber=$_REQUEST['invnumber'];
 	
-	$selectcountinvoice="select count(*) as numinvvalid from user_invoice where to_user_type='$Login_user_TYPEvl' and to_user_id='$Login_user_IDvl' and inv_number='$invnumber'";
-	$fetchcountinvoice=mysqli_query($db_conn,$selectcountinvoice);
+	$selectcountinvoice="select count(*) as numinvvalid from user_invoice where to_user_type=? and to_user_id=? and inv_number=?";
+	$fetchcountinvoice=db_q($db_conn,$selectcountinvoice,[$Login_user_TYPEvl,$Login_user_IDvl,$invnumber]);
 	$resultcountinvoice=mysqli_fetch_array($fetchcountinvoice);
 	if($resultcountinvoice['numinvvalid']==1)
 	{

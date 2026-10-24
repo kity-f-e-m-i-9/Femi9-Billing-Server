@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 include("config.php");
 //
 $Coupon_category="Super-Distributor";
@@ -135,8 +135,8 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 //
 $district_id=$result_product_list['district_id'];
 if (is_numeric($district_id)) {
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 }
@@ -145,8 +145,8 @@ else{$district_name=$result_product_list['district_id'];}
 //
 $taluk_id=$result_product_list['taluk_id'];
 if (is_numeric($taluk_id)) {
-$select_taluklist="select * from taluk where id='$taluk_id'";
-	$fetch_taluklist=mysqli_query($db_conn,$select_taluklist);
+$select_taluklist="select * from taluk where id=?";
+	$fetch_taluklist=db_q($db_conn,$select_taluklist,[$taluk_id]);
 	$result_taluklist=mysqli_fetch_array($fetch_taluklist);
 $taluk_name=$result_taluklist['taluk'];
 }else{$taluk_name=$result_product_list['taluk_id'];}

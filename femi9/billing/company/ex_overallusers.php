@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 
@@ -20,13 +20,13 @@ $select_product_list="select * from stockiest order by id desc";
 										{
 											
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
+$select_distict="select * from district where id='".db_esc($district_id)."'";
 	$fetch_district=mysqli_query($db_conn,$select_distict);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 	$taluk_id=$result_product_list['taluk_id'];
-$select_taluk="select * from taluk where id='$taluk_id'";
+$select_taluk="select * from taluk where id='".db_esc($taluk_id)."'";
 	$fetch_taluk=mysqli_query($db_conn,$select_taluk);
 	$result_taluk=mysqli_fetch_array($fetch_taluk);
 $taluk_name=	$result_taluk['taluk'];

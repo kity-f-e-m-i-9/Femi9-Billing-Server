@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -56,15 +56,15 @@ $insfilename=$old_icon;
 	}else{$uploadfile=$old_icon;}*/
 	
 	//UPDATE STOCKIST DETAILS
-	$update_ss="update stockiest set user_icon='$insfilename',name='$name',email='$email',mobile_number='$mobile_number',username='$mobile_number',address='$address',country_code='$country_code' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update stockiest set user_icon=?,name=?,email=?,mobile_number=?,username=?,address=?,country_code=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,$mobile_number,$address,$country_code,$update_id]);
 	
 	//UPDATE STOCKIST CATEGORY
 	$stockistid=$_REQUEST['stockistid'];
     $st_cat_id=$_REQUEST['st_cat_id'];
 
-	$update_ssRFR="update stockist_referral set st_cat_id='$st_cat_id' where stockist_id='$stockistid'";
-	mysqli_query($db_conn,$update_ssRFR);
+	$update_ssRFR="update stockist_referral set st_cat_id=? where stockist_id=?";
+	db_q($db_conn,$update_ssRFR,[$st_cat_id,$stockistid]);
 	
 
 	echo "<script>window.location='manage_ss.php?updatedSuccess';</script>";

@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); require_once("include/GodownAccess.php");
 include("config.php"); 
 error_reporting(0);
@@ -15,8 +15,8 @@ if (!empty($get_godown_id) && !is_godown_allowed($db_conn, (int)$get_godown_id))
     header("Location: overall-stock?unauthorized"); exit;
 }
 //
-$select_Godown_details="select * from company_godown where id='$get_godown_id'";
-$fetch_Godown_details=mysqli_query($db_conn,$select_Godown_details);
+$select_Godown_details="select * from company_godown where id=?";
+$fetch_Godown_details=db_q($db_conn,$select_Godown_details,[$get_godown_id]);
 $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);	   
 ?>
 <!DOCTYPE html>

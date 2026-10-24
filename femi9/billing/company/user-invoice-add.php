@@ -1,4 +1,4 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); 
 require_once("include/PermissionCheck.php");
 $__perm_map = array (
   'super_stockiest' => 'ss',
@@ -775,8 +775,8 @@ function totalkm(){
 		$Invoice_ID=base64_decode($_REQUEST['InvoiceID']);
 					
 		//get invoice details
-		$select_InvoieDetails="select * from user_invoice where inv_id='$Invoice_ID'";
-		$fetch_InvoieDetails=mysqli_query($db_conn,$select_InvoieDetails);
+		$select_InvoieDetails="select * from user_invoice where inv_id=?";
+		$fetch_InvoieDetails=db_q($db_conn,$select_InvoieDetails,[$Invoice_ID]);
 		$result_InvoieDetails=mysqli_fetch_array($fetch_InvoieDetails);
 		
 //RECEIPT AMOUNT		
@@ -837,8 +837,8 @@ else{ $amount_received_fully="0";}
             <label class="form-label"><?=$lablenamedisplay;?> <span class="required">*</span></label>
             
             <?php
-            $select_countitems="select count(*) as numitemscount from user_invoice_items where inv_id='$Invoice_ID'";
-            $fetch_countitems=mysqli_query($db_conn,$select_countitems);
+            $select_countitems="select count(*) as numitemscount from user_invoice_items where inv_id=?";
+            $fetch_countitems=db_q($db_conn,$select_countitems,[$Invoice_ID]);
             $result_countitems=mysqli_fetch_array($fetch_countitems);
             $totalcountitems=$result_countitems['numitemscount'];
             ?>
@@ -855,8 +855,8 @@ else{ $amount_received_fully="0";}
                     $fetch_Customers_list=mysqli_query($db_conn,$selectCusList);
                     while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list)) {
                         $user_districtID=$result_Customers_list['district_id'];
-                        $select_User_districtName="select * from district where id='$user_districtID'";
-                        $fetch_user_districtName=mysqli_query($db_conn,$select_User_districtName);
+                        $select_User_districtName="select * from district where id=?";
+                        $fetch_user_districtName=db_q($db_conn,$select_User_districtName,[$user_districtID]);
                         $result_user_districtName=mysqli_fetch_array($fetch_user_districtName);
                         $user_districtName=$result_user_districtName['dist_name'];
                         
@@ -988,8 +988,8 @@ else{ $amount_received_fully="0";}
         </thead>
         <tbody>
         <?php
-        $select_INVProductDetails="select * from user_invoice_items where inv_id='$Invoice_ID' order by id desc";
-        $fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+        $select_INVProductDetails="select * from user_invoice_items where inv_id=? order by id desc";
+        $fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
         $CountProducts=mysqli_num_rows($fetch_INVProductDetails);
         
         if($CountProducts==0) {
@@ -1005,8 +1005,8 @@ else{ $amount_received_fully="0";}
         
         while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails)) {
             $InV_Product_ID=$result_INVProductDetails['pr_id'];
-            $select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-            $fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+            $select_ProductDetails123="select * from products where id=?";
+            $fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
             $result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
             
             $TotalAMount=$result_INVProductDetails['total'];
@@ -1027,8 +1027,8 @@ else{ $amount_received_fully="0";}
                 <?php if($amount_received_fully==0){?>
                 <td>
                 <?php 
-                $select_count_return="select * from user_return_stock_items where invnumber='$Invoice_ID' and prid='$InV_Product_ID'";
-                $fetch_count_return=mysqli_query($db_conn,$select_count_return);
+                $select_count_return="select * from user_return_stock_items where invnumber=? and prid=?";
+                $fetch_count_return=db_q($db_conn,$select_count_return,[$Invoice_ID,$InV_Product_ID]);
                 $result_count_return=mysqli_num_rows($fetch_count_return);
                 if($result_count_return==0){
                 ?>
@@ -1111,8 +1111,8 @@ else{ $amount_received_fully="0";}
                 $usertype=$result_InvoieDetails['to_user_type'];
                 $userid=$result_InvoieDetails['to_user_id'];
                 
-                $selectcredit_amount="select * from return_credit where usertype='$usertype' and userid='$userid'";
-                $fetchcredit_amount=mysqli_query($db_conn,$selectcredit_amount);
+                $selectcredit_amount="select * from return_credit where usertype=? and userid=?";
+                $fetchcredit_amount=db_q($db_conn,$selectcredit_amount,[$usertype,$userid]);
                 $resultcredit_amount=mysqli_fetch_array($fetchcredit_amount);
                 $creditamount="0";
                 if($creditamount!=NULL) {
@@ -1181,8 +1181,8 @@ else{ $amount_received_fully="0";}
                 
                 <?php 
                 if($CountProducts==0 && $result_InvoieDetails['sub_total']>0) {
-                    $update_zero_invoice="update user_invoice set sub_total='0',discount='0',total='0' where inv_id='$Invoice_ID'";
-                    mysqli_query($db_conn,$update_zero_invoice);		
+                    $update_zero_invoice="update user_invoice set sub_total='0',discount='0',total='0' where inv_id=?";
+                    db_q($db_conn,$update_zero_invoice,[$Invoice_ID]);		
                 }
                 ?>
                 
@@ -1247,7 +1247,7 @@ else{ $amount_received_fully="0";}
                     
                         if ($get_action === 'edit') {
                             $sel_rcpt = mysqli_query($db_conn,
-                                "SELECT COALESCE(SUM(received), 0) AS total_received FROM receipt WHERE inv_id = '$Invoice_ID'"
+                                "SELECT COALESCE(SUM(received), 0) AS total_received FROM receipt WHERE inv_id = '".db_esc($Invoice_ID)."'"
                             );
                             $res_rcpt        = mysqli_fetch_assoc($sel_rcpt);
                             $already_received = (float)$res_rcpt['total_received'];
@@ -1523,8 +1523,8 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
                 $fetch_Customers_list=mysqli_query($db_conn,$selectCusList);
                 while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list)) {
                     $user_districtID=$result_Customers_list['district_id'];
-                    $select_User_districtName="select * from district where id='$user_districtID'";
-                    $fetch_user_districtName=mysqli_query($db_conn,$select_User_districtName);
+                    $select_User_districtName="select * from district where id=?";
+                    $fetch_user_districtName=db_q($db_conn,$select_User_districtName,[$user_districtID]);
                     $result_user_districtName=mysqli_fetch_array($fetch_user_districtName);
                     $user_districtName=$result_user_districtName['dist_name'];
                     

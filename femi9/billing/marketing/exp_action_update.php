@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("RemoveSpecialChar.php");
 error_reporting(0);
 
@@ -31,8 +31,8 @@ unlink("bill_copy_photos/".$old_icon."");
 	
 	
 	//update process
-	$update_ss="update ms_exp set amount='$amount',remarks='$remarks',photos='$filename_bill' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update ms_exp set amount=?,remarks=?,photos=? where id=?";
+	db_q($db_conn,$update_ss,[$amount,$remarks,$filename_bill,$update_id]);
 	
 echo "<script>window.location='exp_manage.php?updatedSuccess';</script>";
 	

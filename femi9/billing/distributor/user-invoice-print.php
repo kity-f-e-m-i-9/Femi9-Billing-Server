@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 include("config.php");
@@ -29,15 +29,15 @@ if(empty($Invoice_ID)) {
 
 // Needed early for the Tax Invoice / Bill of Supply heading, as well as
 // later in the GST summary section — computed once here rather than twice.
-$select_sum_gstamount = "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id='$Invoice_ID'";
-$fetch_sum_gstamount = mysqli_query($db_conn, $select_sum_gstamount);
+$select_sum_gstamount = "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id=?";
+$fetch_sum_gstamount = db_q($db_conn,$select_sum_gstamount,[$Invoice_ID]);
 $result_sum_gstamount = mysqli_fetch_array($fetch_sum_gstamount);
 $totalgstamount = $result_sum_gstamount[0];
 $invoice_heading = $totalgstamount > 0 ? 'Tax Invoice' : 'Bill of Supply';
 
 // Fetch Invoice Details
-$select_Invoice_Details = "SELECT * FROM user_invoice WHERE inv_id='$Invoice_ID'";
-$fetch_Invoice_Details = mysqli_query($db_conn, $select_Invoice_Details);
+$select_Invoice_Details = "SELECT * FROM user_invoice WHERE inv_id=?";
+$fetch_Invoice_Details = db_q($db_conn,$select_Invoice_Details,[$Invoice_ID]);
 
 // Check if query was successful
 if(!$fetch_Invoice_Details) {
@@ -52,8 +52,8 @@ if(!$result_Invoice_Details) {
 }
 
 //-----------GET USER PROFILE DETAILS---------------------------
-$select_UserProfiles = "SELECT * FROM users_profile WHERE user_tempid='$Login_user_IDvl' AND usertype='$Login_user_TYPEvl'";
-$fetch_UserProfiles = mysqli_query($db_conn, $select_UserProfiles);
+$select_UserProfiles = "SELECT * FROM users_profile WHERE user_tempid=? AND usertype=?";
+$fetch_UserProfiles = db_q($db_conn,$select_UserProfiles,[$Login_user_IDvl,$Login_user_TYPEvl]);
 $result_UserProfiles = mysqli_fetch_array($fetch_UserProfiles);
 
 if(!$result_UserProfiles) {
@@ -93,8 +93,8 @@ $business_address = $result_UserdETAILS['address'];
 
 //state details
 $state_id_Invoice = $result_UserdETAILS['state_id'];
-$select_state_dtailsINV = "SELECT * FROM state WHERE id='$state_id_Invoice'";
-$fetch_state_dtailsINV = mysqli_query($db_conn, $select_state_dtailsINV);
+$select_state_dtailsINV = "SELECT * FROM state WHERE id=?";
+$fetch_state_dtailsINV = db_q($db_conn,$select_state_dtailsINV,[$state_id_Invoice]);
 $result_state_dtailsINV = mysqli_fetch_array($fetch_state_dtailsINV);
 $state_nameINV = $result_state_dtailsINV['st_name'];
 //--------------------------------------------------------------
@@ -147,15 +147,15 @@ if(!$result_Customer_Details) {
 
 //state details
 $state_id = $result_Customer_Details['state_id'];
-$select_state_dtails = "SELECT * FROM state WHERE id='$state_id'";
-$fetch_state_dtails = mysqli_query($db_conn, $select_state_dtails);
+$select_state_dtails = "SELECT * FROM state WHERE id=?";
+$fetch_state_dtails = db_q($db_conn,$select_state_dtails,[$state_id]);
 $result_state_dtails = mysqli_fetch_array($fetch_state_dtails);
 $state_name = $result_state_dtails['st_name'];
 
 //district details
 $district_id = $result_Customer_Details['district_id'];
-$select_distict = "SELECT * FROM district WHERE id='$district_id'";
-$fetch_district = mysqli_query($db_conn, $select_distict);
+$select_distict = "SELECT * FROM district WHERE id=?";
+$fetch_district = db_q($db_conn,$select_distict,[$district_id]);
 $result_district = mysqli_fetch_array($fetch_district);
 $district_name = $result_district['dist_name'];
 
@@ -164,9 +164,9 @@ $buyer_business_address = $result_Customer_Details['address']; // This is from s
 // STEP 2: Get buyer's DELIVERY ADDRESS from users_profile (for Consignee To)
 $select_userprofile = "SELECT companyname, deliveryaddress 
                        FROM users_profile 
-                       WHERE user_tempid='$customer_id' 
-                       AND usertype='$getinvuser'";
-$fetch_userprofile = mysqli_query($db_conn, $select_userprofile);
+                       WHERE user_tempid=? 
+                       AND usertype=?";
+$fetch_userprofile = db_q($db_conn,$select_userprofile,[$customer_id,$getinvuser]);
 $result_userprofile = mysqli_fetch_array($fetch_userprofile);
 ?>
 <!DOCTYPE html>
@@ -249,8 +249,8 @@ if($get_ccode == "Default" || $get_ccode == NULL) {
 } else {
     $get_ccode = base64_decode($get_ccode);
     
-    $select_currency223 = "SELECT * FROM country WHERE id='$get_ccode'";
-    $fetch_currency223 = mysqli_query($db_conn, $select_currency223);
+    $select_currency223 = "SELECT * FROM country WHERE id=?";
+    $fetch_currency223 = db_q($db_conn,$select_currency223,[$get_ccode]);
     $result_currency223 = mysqli_fetch_array($fetch_currency223);
     
     if($result_currency223) {
@@ -383,8 +383,8 @@ if($get_ccode == "Default" || $get_ccode == NULL) {
 
 <?php 
 // Fetch stock request for delivery address
-$selectstockreq = "SELECT * FROM stock_request WHERE reqid='$Invoice_ID'";
-$fetchstockreq = mysqli_query($db_conn, $selectstockreq);
+$selectstockreq = "SELECT * FROM stock_request WHERE reqid=?";
+$fetchstockreq = db_q($db_conn,$selectstockreq,[$Invoice_ID]);
 $resultstockreq = mysqli_fetch_array($fetchstockreq);
 
 if($resultstockreq && $resultstockreq['delivery_address'] != NULL) {
@@ -421,8 +421,8 @@ State: <?php echo $state_name; ?>, District: <?php echo $district_name; ?>
 <td>Invoice Date:<br/><b><?php echo date("d M Y", strtotime($result_Invoice_Details['date']));?></b></td>
 </tr>
 <?php 
-$Select_DLDetails = "SELECT * FROM delivery_note WHERE inv_id='$Invoice_ID'";
-$Fetch_DLDetails = mysqli_query($db_conn, $Select_DLDetails);
+$Select_DLDetails = "SELECT * FROM delivery_note WHERE inv_id=?";
+$Fetch_DLDetails = db_q($db_conn,$Select_DLDetails,[$Invoice_ID]);
 $Result_DLDetails = mysqli_fetch_array($Fetch_DLDetails);
 ?>
 
@@ -479,14 +479,14 @@ $TotalAMount123 = 0;
 $Totalquantity123 = 0;
 $invno = 0;
 
-$select_INVProductDetails = "SELECT * FROM user_invoice_items WHERE inv_id='$Invoice_ID' ORDER BY id DESC";
-$fetch_INVProductDetails = mysqli_query($db_conn, $select_INVProductDetails);
+$select_INVProductDetails = "SELECT * FROM user_invoice_items WHERE inv_id=? ORDER BY id DESC";
+$fetch_INVProductDetails = db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
 
 while($result_INVProductDetails = mysqli_fetch_array($fetch_INVProductDetails)) {
     //product details
     $InV_Product_ID = $result_INVProductDetails['pr_id'];
-    $select_ProductDetails123 = "SELECT * FROM products WHERE id='$InV_Product_ID'";
-    $fetch_ProductDetails123 = mysqli_query($db_conn, $select_ProductDetails123);
+    $select_ProductDetails123 = "SELECT * FROM products WHERE id=?";
+    $fetch_ProductDetails123 = db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
     $result_ProductDetails123 = mysqli_fetch_array($fetch_ProductDetails123);
     
     $TotalAMount = $result_INVProductDetails['qty'] * $result_INVProductDetails['amount'];
@@ -708,15 +708,15 @@ $result = implode('', $str);
 <td align="right">Taxable Value</td>
 </tr>
 <?php 
-$selecthsn = "SELECT DISTINCT hsn FROM user_invoice_items WHERE inv_id='$Invoice_ID'";
-$fetchhsn = mysqli_query($db_conn, $selecthsn);
+$selecthsn = "SELECT DISTINCT hsn FROM user_invoice_items WHERE inv_id=?";
+$fetchhsn = db_q($db_conn,$selecthsn,[$Invoice_ID]);
 
 while($resulthsn = mysqli_fetch_array($fetchhsn)) {
     $hsncode = $resulthsn['hsn'];
     
     // sum hsn taxable Amount
-    $selecthsnTaxamount = "SELECT SUM(total) FROM user_invoice_items WHERE inv_id='$Invoice_ID' AND hsn='$hsncode'";
-    $fetchhsnTaxamount = mysqli_query($db_conn, $selecthsnTaxamount);
+    $selecthsnTaxamount = "SELECT SUM(total) FROM user_invoice_items WHERE inv_id=? AND hsn=?";
+    $fetchhsnTaxamount = db_q($db_conn,$selecthsnTaxamount,[$Invoice_ID,$hsncode]);
     $resulthsnTaxamount = mysqli_fetch_array($fetchhsnTaxamount);
 ?>
 <tr>
@@ -727,8 +727,8 @@ while($resulthsn = mysqli_fetch_array($fetchhsn)) {
 }
 
 // sum hsn taxable Amount
-$selecthsnTaxamount12 = "SELECT SUM(total) FROM user_invoice_items WHERE inv_id='$Invoice_ID'";
-$fetchhsnTaxamount12 = mysqli_query($db_conn, $selecthsnTaxamount12);
+$selecthsnTaxamount12 = "SELECT SUM(total) FROM user_invoice_items WHERE inv_id=?";
+$fetchhsnTaxamount12 = db_q($db_conn,$selecthsnTaxamount12,[$Invoice_ID]);
 $resulthsnTaxamount12 = mysqli_fetch_array($fetchhsnTaxamount12);
 ?>
 <tr>

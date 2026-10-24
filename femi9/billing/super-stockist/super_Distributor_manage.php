@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 include("config.php");
 //
 $Coupon_category="Super-Distributor";
@@ -109,8 +109,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody> 
-<?php $select_product_list="select * from super_distributor where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' AND account_status = 'active' order by id desc";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+<?php $select_product_list="select * from super_distributor where onboard_userTYPE=? and onboard_userID=? AND account_status = 'active' order by id desc";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$onboard_userTYPE,$onboard_userID]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {											
 											

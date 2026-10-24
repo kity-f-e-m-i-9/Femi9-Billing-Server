@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 
 $usertype=$_REQUEST['usertype'];
 $userid=$_REQUEST['userid'];
@@ -85,22 +85,22 @@ function closerefresh()
 											
 											<tbody>
 				<?php 
-				$select_tslsDetails="select * from temp_report where usertype='$usertype' and userid='$userid' and date between '$fromdate' and '$todate' order by id asc";
-$fetch_tslsDetails=mysqli_query($db_conn,$select_tslsDetails);
+				$select_tslsDetails="select * from temp_report where usertype=? and userid=? and date between ? and ? order by id asc";
+$fetch_tslsDetails=db_q($db_conn,$select_tslsDetails,[$usertype,$userid,$fromdate,$todate]);
 while($result_tslsDetails=mysqli_fetch_array($fetch_tslsDetails))
 {
 											
 //
 $pr_id=$result_tslsDetails['pr_id'];
-$select_distict="select * from products where id='$pr_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from products where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$pr_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $productName=$result_district['productName'];
 
 //
 $inv_id=$result_tslsDetails['inv_id'];
-$select_distict12="select * from user_invoice where inv_id='$inv_id'";
-$fetch_district12=mysqli_query($db_conn,$select_distict12);
+$select_distict12="select * from user_invoice where inv_id=?";
+$fetch_district12=db_q($db_conn,$select_distict12,[$inv_id]);
 $result_district12=mysqli_fetch_array($fetch_district12);
 $invnumber=$result_district12['inv_number'];
 											

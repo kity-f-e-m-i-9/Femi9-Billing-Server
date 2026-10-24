@@ -1,4 +1,4 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");
@@ -6,8 +6,8 @@ include("config.php");
 $get_req_id=$_REQUEST['reqid'];
 	$get_req_id_DECODE=base64_decode($get_req_id);
 	//
-	 $select_requestdetails="select * from stock_request where reqid='$get_req_id_DECODE'";
-	 $fetch_requestdetails=mysqli_query($db_conn,$select_requestdetails);
+	 $select_requestdetails="select * from stock_request where reqid=?";
+	 $fetch_requestdetails=db_q($db_conn,$select_requestdetails,[$get_req_id_DECODE]);
 	 $result_requestdetails=mysqli_fetch_array($fetch_requestdetails);
 	 
 	 $verified_accounts=$result_requestdetails['verified'];
@@ -72,8 +72,8 @@ $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 		$fetch_CUSTDetails=mysqli_query($db_conn,$select_CUSTDetails);
 		$result_CUSTDetails=mysqli_fetch_array($fetch_CUSTDetails);
 		
-	$select_invoice_details="select * from user_invoice where inv_id='$get_req_id_DECODE'";
-	$fetch_invoice_details=mysqli_query($db_conn,$select_invoice_details);
+	$select_invoice_details="select * from user_invoice where inv_id=?";
+	$fetch_invoice_details=db_q($db_conn,$select_invoice_details,[$get_req_id_DECODE]);
 	$result_invoice_details=mysqli_fetch_array($fetch_invoice_details);
 												
 ?>
@@ -207,8 +207,8 @@ select:focus, input[type=number]:focus{background:#fffa8f;}
 
 
 <?php 
-$select_INVProductDetails="select * from user_invoice_items where inv_id='$get_req_id_DECODE' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+$select_INVProductDetails="select * from user_invoice_items where inv_id=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$get_req_id_DECODE]);
 	$numitemsCheck=mysqli_num_rows($fetch_INVProductDetails);
 	?>
 
@@ -267,8 +267,8 @@ xmlhttp.send();}
 </script>
 
 <?php 
-$select_countadditems="select count(*) as numitems from user_invoice_items where inv_id='$get_req_id_DECODE'";
-$fetch_countadditems=mysqli_query($db_conn,$select_countadditems);
+$select_countadditems="select count(*) as numitems from user_invoice_items where inv_id=?";
+$fetch_countadditems=db_q($db_conn,$select_countadditems,[$get_req_id_DECODE]);
 $result_countadditems=mysqli_fetch_array($fetch_countadditems);
 		?>
 	
@@ -373,15 +373,15 @@ xmlhttp.send();}
 <?php }?>
 <option value="" hidden="">Select Product</option>
 <?php 
-$select_requestdetails12="select * from stock_request_items where reqid='$get_req_id_DECODE' and qty>0";
-	 $fetch_requestdetails12=mysqli_query($db_conn,$select_requestdetails12);
+$select_requestdetails12="select * from stock_request_items where reqid=? and qty>0";
+	 $fetch_requestdetails12=db_q($db_conn,$select_requestdetails12,[$get_req_id_DECODE]);
 	 while($result_requestdetails12=mysqli_fetch_array($fetch_requestdetails12))
 		 {
 			 
 			 $getprid=$result_requestdetails12['prid'];
 	 
-	    $select_Products_list="select * from products where id='$getprid'";
-		$fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
+	    $select_Products_list="select * from products where id=?";
+		$fetch_Products_list=db_q($db_conn,$select_Products_list,[$getprid]);
 		$result_Products_list=mysqli_fetch_array($fetch_Products_list);
 										
 											?>
@@ -452,8 +452,8 @@ $select_requestdetails12="select * from stock_request_items where reqid='$get_re
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['pr_id'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		$TotalAMount=$result_INVProductDetails['total'];
@@ -506,8 +506,8 @@ $usertype=$result_invoice_details['to_user_type'];
 		$userid=$result_invoice_details['to_user_id'];
 		
 		//get credit amount
-		$selectcredit_amount="select * from return_credit where usertype='$usertype' and userid='$userid'";
-		$fetchcredit_amount=mysqli_query($db_conn,$selectcredit_amount);
+		$selectcredit_amount="select * from return_credit where usertype=? and userid=?";
+		$fetchcredit_amount=db_q($db_conn,$selectcredit_amount,[$usertype,$userid]);
 		$resultcredit_amount=mysqli_fetch_array($fetchcredit_amount);
 		$creditamount=$resultcredit_amount['credit_amount'];
 		if($creditamount!=NULL)

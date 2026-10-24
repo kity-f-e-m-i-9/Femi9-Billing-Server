@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 error_reporting(0);
@@ -40,15 +40,15 @@ $csv_content .= "Inv Num, Date, Type,ID,Name,Mobile, District,Amount\n";
 
 
 
-$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type='$usertypevl' and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type=? and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
 	$receipt_inv_id=$result_market_SSCASH_VLSS_THISMONTH['inv_id'];
 	//
-	$select_ReceiptDetails="select * from receipt where inv_id='$receipt_inv_id'";
-	$fetch_ReceiptDetails=mysqli_query($db_conn,$select_ReceiptDetails);
+	$select_ReceiptDetails="select * from receipt where inv_id=?";
+	$fetch_ReceiptDetails=db_q($db_conn,$select_ReceiptDetails,[$receipt_inv_id]);
 	$result_ReceiptDetails=mysqli_fetch_array($fetch_ReceiptDetails);
 	$to_user_type=$result_ReceiptDetails['to_user_type'];
 	$to_user_id=$result_ReceiptDetails['to_user_id'];
@@ -63,8 +63,8 @@ else{$tablename="shop";}
 	//get invoice Number
 	if($to_user_type=="stockiest" || $to_user_type=="distributor" || $to_user_type=="shop")
 	{
-	$select_inv_number="select * from user_invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from user_invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
@@ -80,22 +80,22 @@ else{$tablename="shop";}
 	$state_id_VLSS1=$resultRcd_VLSS1['state_id'];
 	$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 	
 	}else{
 		//CUSTOMER
-	$select_inv_number="select * from invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
 	$inv_date=$result_inv_number['date'];
 	
-	$selectRcd_VLSS1="select * from customers where id='$to_user_id'";
-										$fetchRcd_VLSS1=mysqli_query($db_conn,$selectRcd_VLSS1);
+	$selectRcd_VLSS1="select * from customers where id=?";
+										$fetchRcd_VLSS1=db_q($db_conn,$selectRcd_VLSS1,[$to_user_id]);
 										$resultRcd_VLSS1=mysqli_fetch_array($fetchRcd_VLSS1);
 										
 	$useridtext="---";
@@ -104,8 +104,8 @@ else{$tablename="shop";}
 	$mobilenumber=$resultRcd_VLSS1["mobile"];
 	}
 										
-$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id='$receipt_inv_id'";
-$fetch_marketstock_VLDIST_VLSS1=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS1);
+$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id=?";
+$fetch_marketstock_VLDIST_VLSS1=db_q($db_conn,$select_marketstock_VLDIST_VLSS1,[$receipt_inv_id]);
 $result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS1);
 
 if($result_marketstock_VLDIST_VLSS1[0]!=NULL){

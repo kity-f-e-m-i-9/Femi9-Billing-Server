@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -6,8 +6,8 @@ include("config.php");
 
 $get_id=base64_decode($_REQUEST['prid']);
 
-$select_product_list="select * from offers_manage where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from offers_manage where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 
 if($result_product_list["offer_img"]!=NULL){
@@ -48,9 +48,9 @@ else
 	
 	$usertype=$_REQUEST['usertype'];
 		
-		$insertrecords="UPDATE offers_manage SET usertype='$usertype',offer_title='$offer_title',
-		offer_img='$filename_PRPH4',expired_date='$expired_date' WHERE tempid='$tempid'";
-		mysqli_query($db_conn,$insertrecords);
+		$insertrecords="UPDATE offers_manage SET usertype=?,offer_title=?,
+		offer_img=?,expired_date=? WHERE tempid=?";
+		db_q($db_conn,$insertrecords,[$usertype,$offer_title,$filename_PRPH4,$expired_date,$tempid]);
 
 	echo "<script>window.location='offers_manage?updatedSuccess';</script>";
 }

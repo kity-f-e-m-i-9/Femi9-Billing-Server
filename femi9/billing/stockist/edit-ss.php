@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $title="Edit Distributor";
@@ -7,14 +7,14 @@ $manage_title="Manage Distributor";
 $message_title="Distributor";
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from distributor where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from distributor where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 				
 				//REFERRAL DETAILS
 				$distributor_temp_id=$result_product_list['temp_id'];
-				$select_referral_records="select * from distributor_referral where distributor_id='$distributor_temp_id'";
-				$fetch_referral_records=mysqli_query($db_conn,$select_referral_records);
+				$select_referral_records="select * from distributor_referral where distributor_id=?";
+				$fetch_referral_records=db_q($db_conn,$select_referral_records,[$distributor_temp_id]);
 				$result_referral_records=mysqli_fetch_array($fetch_referral_records);
 ?>
 <!DOCTYPE html>

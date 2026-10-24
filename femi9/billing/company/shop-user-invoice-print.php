@@ -1,10 +1,10 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata"); error_reporting(0);
 include("config.php");
 $Invoice_ID=$_REQUEST['invoiceid'];
 $Invoice_ID=base64_decode($Invoice_ID);
 //
-$select_Invoice_Details="select * from user_invoice where inv_id='$Invoice_ID'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from user_invoice where inv_id=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$Invoice_ID]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 
 //customer details
@@ -19,15 +19,15 @@ $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 
 //state details
 $state_id=$result_Customer_Details['state_id'];
-$select_state_dtails="select * from state where id='$state_id'";
-$fetch_state_dtails=mysqli_query($db_conn,$select_state_dtails);
+$select_state_dtails="select * from state where id=?";
+$fetch_state_dtails=db_q($db_conn,$select_state_dtails,[$state_id]);
 $result_state_dtails=mysqli_fetch_array($fetch_state_dtails);
 $state_name=$result_state_dtails['st_name'];
 
 //district details
 $district_id=$result_Customer_Details['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
@@ -45,8 +45,8 @@ function fmt_gst_pct($v) {
 $select_INVProductDetails = "select uii.*, p.productName, p.hsn as p_hsn, p.mrp as p_mrp, p.gst as p_gst, p.gst_type as p_gst_type
     from user_invoice_items uii
     join products p on p.id = uii.pr_id
-    where uii.inv_id='$Invoice_ID' order by uii.id desc";
-$fetch_INVProductDetails = mysqli_query($db_conn, $select_INVProductDetails);
+    where uii.inv_id=? order by uii.id desc";
+$fetch_INVProductDetails = db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
 $invoice_items = [];
 $TotalAMount123 = 0; $Totalquantity123 = 0; $totalgstamount = 0;
 $hsn_totals = []; $hsn_gst_totals = []; $hsn_gst_pct = []; $__inv_gst_pct = 0;
@@ -176,8 +176,8 @@ $Currency_Name="INR";
 else{
 $get_ccode=base64_decode($_REQUEST['crcode']);
 //
-$select_currency223="select * from country where id='$get_ccode'";
-$fetch_currency223=mysqli_query($db_conn,$select_currency223);
+$select_currency223="select * from country where id=?";
+$fetch_currency223=db_q($db_conn,$select_currency223,[$get_ccode]);
 $result_currency223=mysqli_fetch_array($fetch_currency223);
 //
 $Currency_symbol="&#".$result_currency223['currency_ascii_code'].";";
@@ -343,8 +343,8 @@ State : <?=$state_name;?>, District: <?=$district_name?>
 </tr>
 
 <?php
-$Select_DLDetails="select * from delivery_note where inv_id='$Invoice_ID'";
-$Fetch_DLDetails=mysqli_query($db_conn,$Select_DLDetails);
+$Select_DLDetails="select * from delivery_note where inv_id=?";
+$Fetch_DLDetails=db_q($db_conn,$Select_DLDetails,[$Invoice_ID]);
 $Result_DLDetails=mysqli_fetch_array($Fetch_DLDetails);
 ?>
 <tr id="border_nbottom" valign="top">

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 ?>
 <!DOCTYPE html>
@@ -116,14 +116,14 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from invoice where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from invoice where user_type=? and user_id=? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											//customer details
 											$CuSTID=$result_product_list['customer_id'];
-										$select_Customers="select * from customers where id='$CuSTID'";
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+										$select_Customers="select * from customers where id=?";
+										$fetch_Customers=db_q($db_conn,$select_Customers,[$CuSTID]);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 										//
 										$Cust_Name=$result_Customers['name'];

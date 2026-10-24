@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php");
 
@@ -55,10 +55,10 @@ if(isset($_REQUEST['addInvoice2']))
 	error_log("[SS-ACTION2] Invoice: $inv_id, Customer: $customer_id, SS: $Login_user_IDvl");
 		
 	// Update invoice header (customer, date)
-	$update_Invoice = "update user_invoice set to_user_id='$customer_id', date='$date', inv_year='$inv_year' 
+	$update_Invoice = "update user_invoice set to_user_id='$customer_id', date='".db_esc($date)."', inv_year='".db_esc($inv_year)."' 
 	                   where inv_id='$inv_id' 
-	                   and from_user_type='$Login_user_TYPEvl' 
-	                   and from_user_id='$Login_user_IDvl' 
+	                   and from_user_type='".db_esc($Login_user_TYPEvl)."' 
+	                   and from_user_id='".db_esc($Login_user_IDvl)."' 
 	                   and to_user_type='$invuser' 
 	                   and to_user_id='$customer_id'";
 	mysqli_query($db_conn, $update_Invoice);
@@ -157,7 +157,7 @@ if(isset($_REQUEST['addInvoice2']))
 	//--------------------------------------------------------------------------------
 	$select_count_invoiceItem = "select count(*) as numInvoiceItem from user_invoice_items 
 	                             where inv_id='$inv_id' and pr_id='$pr_id' 
-	                             and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' 
+	                             and from_user_type='".db_esc($Login_user_TYPEvl)."' and from_user_id='".db_esc($Login_user_IDvl)."' 
 	                             and to_user_type='$invuser' and to_user_id='$customer_id'";
 	$fetch_count_invoiceItem = mysqli_query($db_conn, $select_count_invoiceItem);
 	$result_count_invoiceItem = mysqli_fetch_array($fetch_count_invoiceItem);
@@ -173,11 +173,11 @@ if(isset($_REQUEST['addInvoice2']))
 		                        gstamount_total, subtotal, discount_percentage, discount_amount, 
 		                        gst_type, hsn, date, rwpoints, buyer_gsttype)
 		                        values (
-		                        '$inv_id', '$pr_id', '$amount', '$qty', '$total', 
-		                        '$invuser', '$customer_id', '$Login_user_TYPEvl', '$Login_user_IDvl', 
-		                        '$gst_percentage', '$gstamount_singlepr', '$gstamount_total', 
-		                        '$subtotal', '$discount_percentage', '$discount_amount', 
-		                        '$gst_type', '$hsn', '$date', '$rwpoints', '$buyer_gsttype')";
+		                        '$inv_id', '$pr_id', '".db_esc($amount)."', '".db_esc($qty)."', '".db_esc($total)."', 
+		                        '$invuser', '$customer_id', '".db_esc($Login_user_TYPEvl)."', '".db_esc($Login_user_IDvl)."', 
+		                        '".db_esc($gst_percentage)."', '".db_esc($gstamount_singlepr)."', '".db_esc($gstamount_total)."', 
+		                        '".db_esc($subtotal)."', '".db_esc($discount_percentage)."', '".db_esc($discount_amount)."', 
+		                        '".db_esc($gst_type)."', '".db_esc($hsn)."', '".db_esc($date)."', '".db_esc($rwpoints)."', '".db_esc($buyer_gsttype)."')";
 		
 		if (!mysqli_query($db_conn, $insert_InvoiceItems)) {
 			error_log("[SS-ACTION2] ERROR: Failed to insert invoice item: " . mysqli_error($db_conn));

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $title="GST Report";
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");
@@ -120,27 +120,27 @@ error_reporting(0);
                                             </thead>
 											 <tbody>
 										<?php 
-		$select_picnode_list="select * from user_invoice where date between '$get_from_date' and '$get_to_date' order by id asc";
-		$fetch_picnode_list=mysqli_query($db_conn,$select_picnode_list);
+		$select_picnode_list="select * from user_invoice where date between ? and ? order by id asc";
+		$fetch_picnode_list=db_q($db_conn,$select_picnode_list,[$get_from_date,$get_to_date]);
 		while($result_pincode_list=mysqli_fetch_array($fetch_picnode_list))
 							{
 											$inv_id=$result_pincode_list['inv_id'];
 											$gst_type=$result_pincode_list['gst_type'];
 											
 											//get product details
-$select_productsitems="select sum(qty) from stock_request_items where reqid='$reqid'";
-$fetch_productsitems=mysqli_query($db_conn,$select_productsitems);
+$select_productsitems="select sum(qty) from stock_request_items where reqid=?";
+$fetch_productsitems=db_q($db_conn,$select_productsitems,[$reqid]);
 $result_prodcutsitems=mysqli_fetch_array($fetch_productsitems);
 
 //Total Amount
-$select_sum_amount="select sum(total) from user_invoice_items where inv_id='$inv_id'";
-$fetch_sum_amount=mysqli_query($db_conn,$select_sum_amount);
+$select_sum_amount="select sum(total) from user_invoice_items where inv_id=?";
+$fetch_sum_amount=db_q($db_conn,$select_sum_amount,[$inv_id]);
 $result_sum_amount=mysqli_fetch_array($fetch_sum_amount);
 $Totalbillamount=$result_sum_amount[0];
 
 //Total gst Amount
-$select_sum_amountGST="select sum(gstamount_total) from user_invoice_items where inv_id='$inv_id'";
-$fetch_sum_amountGST=mysqli_query($db_conn,$select_sum_amountGST);
+$select_sum_amountGST="select sum(gstamount_total) from user_invoice_items where inv_id=?";
+$fetch_sum_amountGST=db_q($db_conn,$select_sum_amountGST,[$inv_id]);
 $result_sum_amountGST=mysqli_fetch_array($fetch_sum_amountGST);
 $TotalbillamountGST=$result_sum_amountGST[0];
 

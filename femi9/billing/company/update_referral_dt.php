@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 
 $sdid=$_REQUEST['distributorid'];
 
@@ -90,8 +90,8 @@ function closerefresh()
 		{
 		    
 		    $UPDATE_REFERED="update distributor_referral set ref_by_user_type='company',
-			ref_by_user_id='company',updated='1' where distributor_id='$sdid'";
-			mysqli_query($db_conn,$UPDATE_REFERED);
+			ref_by_user_id='company',updated='1' where distributor_id=?";
+			db_q($db_conn,$UPDATE_REFERED,[$sdid]);
 					
 					$_SESSION['successMessage']="Referral Details Updated Success!";
 			echo "<script> opener.location.reload(true);
@@ -106,9 +106,9 @@ function closerefresh()
 		if($result_count_REFERID==1)
 		{
 							
-	$UPDATE_REFERED="update distributor_referral set ref_by_user_type='$st_ref_type',
-	ref_by_user_id='$st_ref_userid_conc',updated='1' where distributor_id='$sdid'";
-							mysqli_query($db_conn,$UPDATE_REFERED);
+	$UPDATE_REFERED="update distributor_referral set ref_by_user_type=?,
+	ref_by_user_id=?,updated='1' where distributor_id=?";
+							db_q($db_conn,$UPDATE_REFERED,[$st_ref_type,$st_ref_userid_conc,$sdid]);
 							
 							$_SESSION['successMessage']="Referral Details Updated Success!";
 			echo "<script> opener.location.reload(true);

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -87,11 +87,11 @@ $i          = $start_from;
                             <tbody>
 <?php
 $fetch_invoices = mysqli_query($db_conn,
-    "SELECT * FROM invoice WHERE user_id='$Login_user_IDvl' AND user_type='$Login_user_TYPEvl' ORDER BY id DESC");
+    "SELECT * FROM invoice WHERE user_id='".db_esc($Login_user_IDvl)."' AND user_type='".db_esc($Login_user_TYPEvl)."' ORDER BY id DESC");
 while ($result_inv = mysqli_fetch_array($fetch_invoices)) {
     $CuSTID = $result_inv['customer_id'];
     if ($CuSTID != 0) {
-        $resCust = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE id='$CuSTID' LIMIT 1"));
+        $resCust = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE id='".db_esc($CuSTID)."' LIMIT 1"));
         $Cust_Name  = htmlspecialchars($resCust['name']   ?? '---');
         $Cust_Mbile = htmlspecialchars($resCust['mobile'] ?? '');
     } else {

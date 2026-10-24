@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 ob_start();
 
 include("checksession.php");
@@ -1391,7 +1391,7 @@ $qparam = urlencode($search ?? '');
                                                     WHERE rs.invnumber IN ($inv_list)
                                                       AND rs.total > 0
                                                       AND rs.deleted_at IS NULL
-                                                      AND rs.date BETWEEN '$from_date' AND '$to_date'
+                                                      AND rs.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
                                                 ");
                                             
                                                 $return_ids = [];

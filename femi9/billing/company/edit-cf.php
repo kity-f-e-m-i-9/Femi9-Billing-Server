@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Edit C&F";
 $manage_url="manage_cf";
@@ -6,8 +6,8 @@ $manage_title="Manage C&F";
 $message_title="C&F";
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from c_and_f where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from c_and_f where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -123,8 +123,8 @@ $ex=explode("#",$data);
   foreach ($ex as $key => $value)
    {  
     
-$select_distict123="select * from state where id='$value'";
-	$fetch_district123=mysqli_query($db_conn,$select_distict123);
+$select_distict123="select * from state where id=?";
+	$fetch_district123=db_q($db_conn,$select_distict123,[$value]);
 $result_st123=mysqli_fetch_array($fetch_district123);
 		
 		?>

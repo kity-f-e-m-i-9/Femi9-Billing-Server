@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 ?>
@@ -81,12 +81,12 @@ error_reporting(0);
 			  
 			  $acman_ID=$result_LoGuserDtails['onboard_userID'];
 		   
-		   $select_StockistDetails="select * from c_and_f where temp_id='$acman_ID'";
+		   $select_StockistDetails="select * from c_and_f where temp_id='".db_esc($acman_ID)."'";
 		   $fetch_StockDetails=mysqli_query($db_conn,$select_StockistDetails);
 		   $result_StockDetails=mysqli_fetch_array($fetch_StockDetails);
 		   
 $state_id=$result_StockDetails['state_id'];
-$select_stae="select * from state where id='$state_id'";
+$select_stae="select * from state where id='".db_esc($state_id)."'";
 	$fetch_stae=mysqli_query($db_conn,$select_stae);
 	$result_stae=mysqli_fetch_array($fetch_stae);
 ?>
@@ -118,7 +118,7 @@ $select_stae="select * from state where id='$state_id'";
 										 
 										 $acman_ID=$result_LoGuserDtails['onboard_userID'];
 		   
-		   $select_StockistDetails="select * from super_stockiest where temp_id='$acman_ID'";
+		   $select_StockistDetails="select * from super_stockiest where temp_id='".db_esc($acman_ID)."'";
 		   $fetch_StockDetails=mysqli_query($db_conn,$select_StockistDetails);
 		   $result_StockDetails=mysqli_fetch_array($fetch_StockDetails);
 		   
@@ -164,7 +164,7 @@ $taluk_name=$result_taluklist['taluk'];
 										
 		   $acman_ID=$result_LoGuserDtails['onboard_userID'];
 		   
-		   $select_StockistDetails="select * from stockiest where temp_id='$acman_ID'";
+		   $select_StockistDetails="select * from stockiest where temp_id='".db_esc($acman_ID)."'";
 		   $fetch_StockDetails=mysqli_query($db_conn,$select_StockistDetails);
 		   $result_StockDetails=mysqli_fetch_array($fetch_StockDetails);
 		   
@@ -232,7 +232,7 @@ $taluk_name=$result_taluklist['taluk'];
 		$get_stateID=$result_count_REFERID['state_id'];
 		$get_districtID=$result_count_REFERID['district_id'];
 		//
-		$select_DistDetails="select * from district where state_id='$get_stateID' and id='$get_districtID'";
+		$select_DistDetails="select * from district where state_id='".db_esc($get_stateID)."' and id='".db_esc($get_districtID)."'";
 		$fetch_DistDetails=mysqli_query($db_conn,$select_DistDetails);
 		$result_DistDetails=mysqli_fetch_array($fetch_DistDetails);
 		

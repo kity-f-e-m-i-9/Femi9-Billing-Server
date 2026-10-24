@@ -1,15 +1,15 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
 $tempid=$_REQUEST['tempid'];
 
-$select_Invoice="select * from ot_sales_invoice where tempid='$tempid'";
-$fetch_Invoice=mysqli_query($db_conn,$select_Invoice);
+$select_Invoice="select * from ot_sales_invoice where tempid=?";
+$fetch_Invoice=db_q($db_conn,$select_Invoice,[$tempid]);
 $result_Invoice=mysqli_fetch_array($fetch_Invoice);
 
-$select_Invoice_Details="select * from ot_sales where tempid='$tempid'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from ot_sales where tempid=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$tempid]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 
 //SEND FROM
@@ -19,13 +19,13 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 						$result_godowndetails=mysqli_fetch_array($fetch_godowndetails);
 						
 //DELETE INVOICE Number
-$select_Count_Invoice="select * from ot_sales where tempid='$tempid'";
-$fetch_Count_Invoice=mysqli_query($db_conn,$select_Count_Invoice);
+$select_Count_Invoice="select * from ot_sales where tempid=?";
+$fetch_Count_Invoice=db_q($db_conn,$select_Count_Invoice,[$tempid]);
 $result_Count_Invoice=mysqli_num_rows($fetch_Count_Invoice);	
 if($result_Count_Invoice==0)
 {
-   $deletInovice="delete from ot_sales_invoice where tempid='$tempid'";
-   mysqli_query($db_conn,$deletInovice);
+   $deletInovice="delete from ot_sales_invoice where tempid=?";
+   db_q($db_conn,$deletInovice,[$tempid]);
    
    $_SESSION['sucMessage']="One OT Sales Details Deleted Successfully!";
    echo "<script>window.location='ot-sale-view?alldeleted';</script>";
@@ -187,8 +187,8 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-		$select_product_list="select * from ot_sales where tempid='$tempid' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+		$select_product_list="select * from ot_sales where tempid=? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 										while($ResultRecords=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -196,8 +196,8 @@ $i= $start_from;
 											
 											//product details
 											$product_id=$ResultRecords['prid'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						$PR_qty=$ResultRecords["qty"];

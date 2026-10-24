@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
  error_reporting(0);
  
@@ -109,14 +109,14 @@ $successMessage = $_SESSION['successMessage'];
                                             </thead>
 											
 											<tbody>
-			<?php $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
+			<?php $select_OPStock="select * from stock where user_type='".db_esc($user_type_Loginvl)."' and user_id='".db_esc($user_id_Loginvl)."'";
 										$Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
 										while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
 										{
 											//Get Product Details
 											$StockProductID=$Result_OPStock['product_id'];
 											
-						$select_productDetils="select * from products where id='$StockProductID'";
+						$select_productDetils="select * from products where id='".db_esc($StockProductID)."'";
 						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						

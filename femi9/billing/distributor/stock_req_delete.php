@@ -1,11 +1,11 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 
 $reqid=$_REQUEST['reqid'];
 $reqid_decode=base64_decode($reqid);
 
-$select_reqdetaiis="select * from stock_request where reqid='$reqid_decode'";
-	$fetch_reqdetaiis=mysqli_query($db_conn,$select_reqdetaiis);
+$select_reqdetaiis="select * from stock_request where reqid=?";
+	$fetch_reqdetaiis=db_q($db_conn,$select_reqdetaiis,[$reqid_decode]);
 	$result_reqdetaiis=mysqli_fetch_array($fetch_reqdetaiis);
 	
 	if($result_reqdetaiis['screenshot']!="Nil")
@@ -17,11 +17,11 @@ $select_reqdetaiis="select * from stock_request where reqid='$reqid_decode'";
 	unlink("screenshot/".$result_reqdetaiis['screenshot2']."");
 	}
 	
-$del_product="delete from stock_request where reqid='$reqid_decode'";
-mysqli_query($db_conn,$del_product);
+$del_product="delete from stock_request where reqid=?";
+db_q($db_conn,$del_product,[$reqid_decode]);
 
-$del_product12="delete from stock_request_items where reqid='$reqid_decode'";
-mysqli_query($db_conn,$del_product12);
+$del_product12="delete from stock_request_items where reqid=?";
+db_q($db_conn,$del_product12,[$reqid_decode]);
 
 echo "<script>window.location='stock-request-manage.php?deletedDone';</script>";
 ?>

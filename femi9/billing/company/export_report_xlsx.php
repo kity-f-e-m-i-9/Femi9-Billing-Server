@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 /**
  * B2B Sales Report Excel Export
  * Exports invoice data with products in PhpSpreadsheet format
@@ -594,7 +594,7 @@ if (!empty($all_inv_ids)) {
         LEFT JOIN customers         c2 ON rs.from_usertype='customer'           AND c2.id=rs.from_userid
         WHERE rs.total > 0
           AND rs.deleted_at IS NULL
-          AND rs.date BETWEEN '$from_date' AND '$to_date'
+          AND rs.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
     ");
     
     $return_ids = [];

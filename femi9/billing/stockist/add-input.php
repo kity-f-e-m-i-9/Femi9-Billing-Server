@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 include("config.php"); 
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
@@ -81,8 +81,8 @@ error_reporting(0);
 									
 									
 <?php
-$select_count_opstock13="select count(*) as numopstock12 from stock where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-$fetch_count_opstock13=mysqli_query($db_conn,$select_count_opstock13);
+$select_count_opstock13="select count(*) as numopstock12 from stock where user_type=? and user_id=?";
+$fetch_count_opstock13=db_q($db_conn,$select_count_opstock13,[$Login_user_TYPEvl,$Login_user_IDvl]);
 $result_count_opstock13=mysqli_fetch_array($fetch_count_opstock13);
 if($result_count_opstock13['numopstock12']==0)
 {

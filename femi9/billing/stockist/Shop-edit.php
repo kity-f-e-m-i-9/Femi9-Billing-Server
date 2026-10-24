@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 
 $title="Edit Shop";
@@ -7,8 +7,8 @@ $manage_title="Manage Shop";
 $message_title="Shop";
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from shop where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from shop where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -97,8 +97,8 @@ $select_product_list="select * from shop where id='$get_id'";
 											<?php
 					//shop category
 				$shop_cat=$result_product_list['shop_cat'];
-$select_shopcatt="select * from shop_category where id='$shop_cat'";
-	$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
+$select_shopcatt="select * from shop_category where id=?";
+	$fetch_shopcatt=db_q($db_conn,$select_shopcatt,[$shop_cat]);
 	$result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 $shopcat_name=$result_shopcatt['catlable'];
 ?>		

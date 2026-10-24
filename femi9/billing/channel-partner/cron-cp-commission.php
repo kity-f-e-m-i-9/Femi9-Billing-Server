@@ -1,5 +1,5 @@
 #!/usr/bin/env php
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 /**
  * CP Monthly Commission Cron Job — DISABLED
  *
@@ -94,7 +94,7 @@ while ($cp = mysqli_fetch_assoc($cpResult)) {
     // Dedup — already credited this CP for this month?
     $dup = (int)(mysqli_fetch_array(mysqli_query($db_conn,
         "SELECT COUNT(*) FROM wallet_monthly_sls_report
-         WHERE user_type='$utype' AND user_id='$cpEsc'
+         WHERE user_type='".db_esc($utype)."' AND user_id='$cpEsc'
            AND from_date='$fromEsc' AND to_date='$toEsc'
            AND commission_type='CP Commission'"))[0] ?? 0);
     if ($dup > 0) {
@@ -159,11 +159,11 @@ while ($cp = mysqli_fetch_assoc($cpResult)) {
           refer_by_usertype, refer_by_userid, commission_percentage,
           commission_amount, commission_type, remarks)
          VALUES
-         ('$utype','$cpEsc',
-          '$fromEsc','$toEsc','$monthName','$year',
-          '$sales','$deposit','yes',
-          '$utype','$cpEsc','$pct',
-          '$commission','CP Commission','$remarks')"
+         ('".db_esc($utype)."','$cpEsc',
+          '$fromEsc','$toEsc','".db_esc($monthName)."','".db_esc($year)."',
+          '".db_esc($sales)."','".db_esc($deposit)."','yes',
+          '".db_esc($utype)."','$cpEsc','".db_esc($pct)."',
+          '".db_esc($commission)."','CP Commission','$remarks')"
     );
 
     if ($ok) {

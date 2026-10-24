@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 
@@ -112,8 +112,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-			<?php $select_product_list="select * from stock_request where fromusertype='$Login_user_TYPEvl' and fromuserid='$Login_user_IDvl' order by date desc";
-			$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+			<?php $select_product_list="select * from stock_request where fromusertype=? and fromuserid=? order by date desc";
+			$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 			while($result_product_list=mysqli_fetch_array($fetch_product_list))
 						{
 							
@@ -121,13 +121,13 @@ $i= $start_from;
 							$reqstatus=$result_product_list['status'];
 							
 							//Total qty
-							$select_totalqty="select sum(qty) from stock_request_items where reqid='$reqid'";
-							$fetch_totalqty=mysqli_query($db_conn,$select_totalqty);
+							$select_totalqty="select sum(qty) from stock_request_items where reqid=?";
+							$fetch_totalqty=db_q($db_conn,$select_totalqty,[$reqid]);
 							$result_totalqty=mysqli_fetch_array($fetch_totalqty);	
 
 							//Total Amount
-							$select_totalAmount="select sum(total) from stock_request_items where reqid='$reqid'";
-							$fetch_totalAmount=mysqli_query($db_conn,$select_totalAmount);
+							$select_totalAmount="select sum(total) from stock_request_items where reqid=?";
+							$fetch_totalAmount=db_q($db_conn,$select_totalAmount,[$reqid]);
 							$result_totalAmount=mysqli_fetch_array($fetch_totalAmount);							
 							?>
                                             

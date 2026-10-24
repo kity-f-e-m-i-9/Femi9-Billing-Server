@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -25,7 +25,7 @@ $pr_id  = (int)($_REQUEST['pr_id']  ?? 0);
 $amount = (float)($_REQUEST['amount'] ?? 0);
 $qty    = (int)($_REQUEST['qty']    ?? 0);
 
-$prod            = mysqli_fetch_array(mysqli_query($db_conn, "SELECT gst,gst_type,hsn,rwpoints FROM products WHERE id='$pr_id'"));
+$prod            = mysqli_fetch_array(mysqli_query($db_conn, "SELECT gst,gst_type,hsn,rwpoints FROM products WHERE id='".db_esc($pr_id)."'"));
 $gst_percentage  = $prod['gst']      ?? 0;
 $gst_type_item   = $prod['gst_type'] ?: 'exclusive';
 $hsn             = $prod['hsn']      ?? '';
@@ -58,20 +58,20 @@ if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
 $gstamount_singlepr = '0';
 
 // Buyer GSTIN type
-$custRow      = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE id='$customer_id' LIMIT 1"));
+$custRow      = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE id='".db_esc($customer_id)."' LIMIT 1"));
 $buyer_GSTIN  = $custRow['gstin'] ?? '';
 $buyer_gsttype = strlen($buyer_GSTIN) === 15 ? 'register' : 'unregister';
 $gst_type     = 'inner';
 
 // Create invoice if not exists
 $chk = mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COUNT(*) AS n FROM invoice WHERE inv_id='$inv_id' AND user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl' AND customer_id='$customer_id'"));
+    "SELECT COUNT(*) AS n FROM invoice WHERE inv_id='".db_esc($inv_id)."' AND user_type='".db_esc($Login_user_TYPEvl)."' AND user_id='".db_esc($Login_user_IDvl)."' AND customer_id='".db_esc($customer_id)."'"));
 if ((int)$chk['n'] === 0) {
     mysqli_query($db_conn, "INSERT INTO invoice
         (inv_id,id_only,inv_number,customer_id,date,inv_year,sub_total,discount,total,
          user_type,user_id,gst_type,roundoff,courier_charges,buyer_gsttype)
-        VALUES ('$inv_id','0','$inv_number','$customer_id','$date','$inv_year','0','0','0',
-        '$Login_user_TYPEvl','$Login_user_IDvl','$gst_type','0','0','$buyer_gsttype')");
+        VALUES ('".db_esc($inv_id)."','0','".db_esc($inv_number)."','".db_esc($customer_id)."','".db_esc($date)."','".db_esc($inv_year)."','0','0','0',
+        '".db_esc($Login_user_TYPEvl)."','".db_esc($Login_user_IDvl)."','".db_esc($gst_type)."','0','0','".db_esc($buyer_gsttype)."')");
 }
 
 // Check TP stock
@@ -89,7 +89,7 @@ if ($available < $qty) {
 
 // Check duplicate item
 $dupChk = mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COUNT(*) AS n FROM invoice_items WHERE inv_id='$inv_id' AND pr_id='$pr_id' AND user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl' AND customer_id='$customer_id'"));
+    "SELECT COUNT(*) AS n FROM invoice_items WHERE inv_id='".db_esc($inv_id)."' AND pr_id='".db_esc($pr_id)."' AND user_type='".db_esc($Login_user_TYPEvl)."' AND user_id='".db_esc($Login_user_IDvl)."' AND customer_id='".db_esc($customer_id)."'"));
 if ((int)$dupChk['n'] > 0) {
     echo "<script>window.location='customer-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&ItemAlreadyExists&&AlertMessage';</script>";
     exit;
@@ -100,9 +100,9 @@ mysqli_query($db_conn, "INSERT INTO invoice_items
     (inv_id,pr_id,amount,qty,total,user_type,user_id,customer_id,
      gst_percentage,gstamount_singlepr,gstamount_total,subtotal,
      discount_percentage,discount_amount,gst_type,hsn,date,buyer_gsttype,rwpoints,rwpoints_sls)
-    VALUES ('$inv_id','$pr_id','$amount','$qty','$total',
-    '$Login_user_TYPEvl','$Login_user_IDvl','$customer_id',
-    '$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal',
-    '$discount_percentage','$discount_amount','$gst_type','$hsn','$date','$buyer_gsttype','$rwpoints','$rwpoints')");
+    VALUES ('".db_esc($inv_id)."','".db_esc($pr_id)."','".db_esc($amount)."','".db_esc($qty)."','".db_esc($total)."',
+    '".db_esc($Login_user_TYPEvl)."','".db_esc($Login_user_IDvl)."','".db_esc($customer_id)."',
+    '".db_esc($gst_percentage)."','".db_esc($gstamount_singlepr)."','".db_esc($gstamount_total)."','".db_esc($subtotal)."',
+    '".db_esc($discount_percentage)."','".db_esc($discount_amount)."','".db_esc($gst_type)."','".db_esc($hsn)."','".db_esc($date)."','".db_esc($buyer_gsttype)."','".db_esc($rwpoints)."','".db_esc($rwpoints)."')");
 
 echo "<script>window.location='customer-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&AddedSuccess&&FemiAdded';</script>";

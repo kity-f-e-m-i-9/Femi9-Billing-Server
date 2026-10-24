@@ -1,4 +1,4 @@
-<?php session_start(); error_reporting(0); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; session_start(); error_reporting(0); 
 include("include/db-connect.php");
 include("../company/whatsapp-settins.php");
 
@@ -84,17 +84,17 @@ mail($ToEmail, $subject, $message123, $header);
 $updatepassword="update ".$forgottable." set password='$randumpassword' where mobile_number='$frmobilenumber'";
 mysqli_query($db_conn,$updatepassword);
 
-$selectcountrows="select count(*) as numfrpass from forgotpassword where mobilenumber='$frmobilenumber'";
-$fetchcountrows=mysqli_query($db_conn,$selectcountrows);
+$selectcountrows="select count(*) as numfrpass from forgotpassword where mobilenumber=?";
+$fetchcountrows=db_q($db_conn,$selectcountrows,[$frmobilenumber]);
 $resultcountrows=mysqli_fetch_array($fetchcountrows);
 if($resultcountrows['numfrpass']==0)
 {
 	$insertfrpass="insert into forgotpassword (usertype,mobilenumber,reset) 
-	values ('$frusertype','$frmobilenumber','0')";
-	mysqli_query($db_conn,$insertfrpass);
+	values (?,?,'0')";
+	db_q($db_conn,$insertfrpass,[$frusertype,$frmobilenumber]);
 }else{
-	$updatefrpass="update forgotpassword set reset='0' where usertype='$frusertype' and mobilenumber='$frmobilenumber'";
-	mysqli_query($db_conn,$updatefrpass);
+	$updatefrpass="update forgotpassword set reset='0' where usertype=? and mobilenumber=?";
+	db_q($db_conn,$updatefrpass,[$frusertype,$frmobilenumber]);
 }
 
 

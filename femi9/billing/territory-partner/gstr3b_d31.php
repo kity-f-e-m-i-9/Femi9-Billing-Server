@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -8,12 +8,12 @@ $to_date   = $_REQUEST['todate'] ?? null;
 
 if ($from_date != NULL) {
     // Total outward supplies (shop invoices created by TP)
-    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type='$Login_user_TYPEvl' AND from_user_id='$Login_user_IDvl' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total1 = mysqli_fetch_array(mysqli_query($db_conn, $q))[0] ?? 0;
+    $q = "SELECT SUM(total) FROM user_invoice WHERE from_user_type=? AND from_user_id=? AND date BETWEEN ? AND ?";
+    $total1 = mysqli_fetch_array(db_q($db_conn,$q,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
 
     // Total outward supplies (customer invoices created by TP)
-    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl' AND date BETWEEN '$from_date' AND '$to_date'";
-    $total2 = mysqli_fetch_array(mysqli_query($db_conn, $q2))[0] ?? 0;
+    $q2 = "SELECT SUM(total) FROM invoice WHERE user_type=? AND user_id=? AND date BETWEEN ? AND ?";
+    $total2 = mysqli_fetch_array(db_q($db_conn,$q2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
 
     $show_total_outward = $total1 + $total2;
 }

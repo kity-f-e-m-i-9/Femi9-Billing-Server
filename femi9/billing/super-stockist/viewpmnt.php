@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $title="Receipt";
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");
@@ -90,8 +90,8 @@ $title="Invoice Payment Details";
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from user_invoice where inv_id='$invid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+					<?php $select_product_list="select * from user_invoice where inv_id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$invid]);
 										$result_product_list=mysqli_fetch_array($fetch_product_list);
 											//customer details
 											$CuSTID=$result_product_list['to_user_id'];
@@ -129,8 +129,8 @@ $discount=$result_product_list["discount"]+$result_product_list["credit"];
                                             </thead>
 											 <tbody>
 										<?php 
-		$select_picnode_list="select * from receipt where inv_id='$invid' order by id asc";
-		$fetch_picnode_list=mysqli_query($db_conn,$select_picnode_list);
+		$select_picnode_list="select * from receipt where inv_id=? order by id asc";
+		$fetch_picnode_list=db_q($db_conn,$select_picnode_list,[$invid]);
 		while($result_pincode_list=mysqli_fetch_array($fetch_picnode_list))
 							{
 								$receiptamount=$result_pincode_list['received'];
@@ -158,8 +158,8 @@ if($receiptamount>0){
 									
 									<?php
 		//total received Amount
-		$selectsumreceiptamont="select sum(received) from receipt where inv_id='$invid'";
-		$fetchsumreceiptamont=mysqli_query($db_conn,$selectsumreceiptamont);
+		$selectsumreceiptamont="select sum(received) from receipt where inv_id=?";
+		$fetchsumreceiptamont=db_q($db_conn,$selectsumreceiptamont,[$invid]);
 		$resultsumreceiptamont=mysqli_fetch_array($fetchsumreceiptamont);
 									$TotalReceivedAmount=$resultsumreceiptamont[0];
 									$balanceAmount=$result_product_list["total"]-$TotalReceivedAmount;

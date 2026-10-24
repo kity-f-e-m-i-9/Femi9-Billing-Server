@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; 
 include("checksession.php");
 include("config.php"); // Make sure this is included!
 
@@ -97,7 +97,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     
     // Update process
     $update_ss = "UPDATE super_distributor SET 
-        user_icon='$insfilename',
+        user_icon='".db_esc($insfilename)."',
         name='$name',
         email='$email',
         address='$address',
@@ -107,7 +107,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         district_id='$district_id',
         taluk_id='$taluk_id',
         pincode_id='$pincode_id',
-        shop_onboard='$shop_onboard' 
+        shop_onboard='".db_esc($shop_onboard)."' 
         WHERE id='$update_id'";
     
     if(!mysqli_query($db_conn, $update_ss)) {

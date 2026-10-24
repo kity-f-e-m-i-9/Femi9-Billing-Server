@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -38,15 +38,15 @@ else
 	$login_usertype=$Result_Log_users_Dtails134['usertype'];
 	$usertype=$_REQUEST['usertype'];
 		
-	$selectcount="select count(*) as num from offers_manage where tempid='$tempid'";
-	$fetchcount=mysqli_query($db_conn,$selectcount);
+	$selectcount="select count(*) as num from offers_manage where tempid=?";
+	$fetchcount=db_q($db_conn,$selectcount,[$tempid]);
 	$resultcount=mysqli_fetch_array($fetchcount);
 	if($resultcount['num']==0)
 	{
 		$insertrecords="insert into offers_manage (tempid,usertype,offer_title,offer_img,expired_date,posted_date,login_username,login_usertype) values 
-		('$tempid','$usertype','$offer_title','$filename_PRPH4','$expired_date','$posted_date',
-		'$login_username','$login_usertype')";
-		mysqli_query($db_conn,$insertrecords);
+		(?,?,?,?,?,?,
+		?,?)";
+		db_q($db_conn,$insertrecords,[$tempid,$usertype,$offer_title,$filename_PRPH4,$expired_date,$posted_date,$login_username,$login_usertype]);
 	}
 	echo "<script>window.location='offers_manage?addedsuccess';</script>";
 }

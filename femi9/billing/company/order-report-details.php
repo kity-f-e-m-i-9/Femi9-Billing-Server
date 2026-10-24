@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $reqid=$_REQUEST['reqid'];
 ?>
 <!DOCTYPE html>
@@ -56,14 +56,14 @@ $reqid=$_REQUEST['reqid'];
 		<th>Order Qty</th>
 		</tr>	
 <?php
-$select_picnode_list="select * from stock_request_items where reqid='$reqid' order by id asc";
-		$fetch_picnode_list=mysqli_query($db_conn,$select_picnode_list);
+$select_picnode_list="select * from stock_request_items where reqid=? order by id asc";
+		$fetch_picnode_list=db_q($db_conn,$select_picnode_list,[$reqid]);
 		while($result_pincode_list=mysqli_fetch_array($fetch_picnode_list))
 							{
 								$prid=$result_pincode_list['prid'];
 								//
-								$select_products="select * from products where id='$prid'";
-$fetch_products=mysqli_query($db_conn,$select_products);
+								$select_products="select * from products where id=?";
+$fetch_products=db_q($db_conn,$select_products,[$prid]);
 $result_products=mysqli_fetch_array($fetch_products);
 $productname=strtoupper($result_products['productName']);
 								?>

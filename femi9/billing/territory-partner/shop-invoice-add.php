@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
@@ -214,11 +214,11 @@ select:focus, input[type=number]:focus { background:#fff; }
     $Invoice_ID_encode = $_REQUEST['InvoiceID'];
     $Invoice_ID = base64_decode($_REQUEST['InvoiceID']);
 
-    $result_InvoieDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='$Invoice_ID'"));
+    $result_InvoieDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='".db_esc($Invoice_ID)."'"));
 
     // Receipt check
     $totalamount = $result_InvoieDetails["total"];
-    $Total_Receipt_amount = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(received) FROM receipt WHERE inv_id='$Invoice_ID'"))[0];
+    $Total_Receipt_amount = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(received) FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."'"))[0];
     $amount_received_fully = ($Total_Receipt_amount > 0 && $totalamount == $Total_Receipt_amount) ? "1" : "0";
 
     // order-to-invoice.php (the "Invoice" button on manage-orders.php) creates
@@ -253,7 +253,7 @@ select:focus, input[type=number]:focus { background:#fff; }
     $needs_inv_number = $isFromFieldOrder && !$hasReceipt;
 
     $CustomerID = $result_InvoieDetails['to_user_id'];
-    $result_CUSTDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='$CustomerID'"));
+    $result_CUSTDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='".db_esc($CustomerID)."'"));
 ?>
 
 <form action="shop-invoice-action2.php" method="post" enctype="multipart/form-data">
@@ -266,12 +266,12 @@ select:focus, input[type=number]:focus { background:#fff; }
 <div class="col-md-6">
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
 <?php
-$totalcountitems = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id='$Invoice_ID'"))['n'];
+$totalcountitems = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."'"))['n'];
 ?>
 <select name="customer_id" class="form-control">
 <option value="<?php echo $CustomerID; ?>" hidden><?php echo $result_CUSTDetails['name']; ?>, <?php echo $result_CUSTDetails['mobile_number']; ?></option>
 <?php if ($totalcountitems == 0) {
-    $res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userID='$Login_user_IDvl' AND onboard_userTYPE='$Login_user_TYPEvl' ORDER BY name ASC");
+    $res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userID='".db_esc($Login_user_IDvl)."' AND onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' ORDER BY name ASC");
     while ($r = mysqli_fetch_array($res_shops)) { ?>
 <option value="<?php echo $r['temp_id']; ?>"><?php echo ucwords($r['name']); ?>, <?php echo $r['mobile_number']; ?></option>
 <?php } } ?>
@@ -387,11 +387,11 @@ function discamount() {
     <tbody>
 <?php
 $TotalAMount123 = 0; $CountProducts = 0; $rd = 0;
-$res_items = mysqli_query($db_conn, "SELECT * FROM user_invoice_items WHERE inv_id='$Invoice_ID' ORDER BY id DESC");
+$res_items = mysqli_query($db_conn, "SELECT * FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."' ORDER BY id DESC");
 $CountProducts = mysqli_num_rows($res_items);
 while ($ri = mysqli_fetch_array($res_items)) {
     $InV_Product_ID = $ri['pr_id'];
-    $pr = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='$InV_Product_ID'"));
+    $pr = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='".db_esc($InV_Product_ID)."'"));
     $TotalAMount = $ri['total'];
     $TotalAMount123 += $TotalAMount;
     $ItemRowid = base64_encode($ri['id']);
@@ -455,7 +455,7 @@ while ($ri = mysqli_fetch_array($res_items)) {
         <?php if ($amount_received_fully == 0) { ?>
         <td>
         <?php
-        $cnt_ret = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='$Invoice_ID' AND prid='$InV_Product_ID'"));
+        $cnt_ret = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='".db_esc($Invoice_ID)."' AND prid='".db_esc($InV_Product_ID)."'"));
         // Still a draft (never submitted) — Remove is the TP's own call, no BDM approval needed.
         if ($cnt_ret > 0) { echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>"; }
         elseif (!$hasReceipt) { ?>
@@ -593,7 +593,7 @@ $roundoff      = $roundvalue - $unround_value;
 
 // Zero out invoice if items removed
 if ($CountProducts == 0 && $result_InvoieDetails['sub_total'] > 0) {
-    mysqli_query($db_conn, "UPDATE user_invoice SET sub_total='0',discount='0',total='0' WHERE inv_id='$Invoice_ID'");
+    mysqli_query($db_conn, "UPDATE user_invoice SET sub_total='0',discount='0',total='0' WHERE inv_id='".db_esc($Invoice_ID)."'");
 }
 ?>
 
@@ -632,8 +632,8 @@ function totalamount() {
 </p>
 
 <?php
-$result_ReceiptDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='$Invoice_ID' ORDER BY id ASC"));
-$already_received = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COALESCE(SUM(received),0) AS total_received FROM receipt WHERE inv_id='$Invoice_ID'"))['total_received']);
+$result_ReceiptDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."' ORDER BY id ASC"));
+$already_received = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COALESCE(SUM(received),0) AS total_received FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."'"))['total_received']);
 $balance_due = max(0, (float)$roundvalue - $already_received);
 ?>
 
@@ -764,13 +764,13 @@ function showInvoiceDuplicate(str) {
 // this dropdown (rather than just disabled) so a TP can't submit one anyway
 // via a stale/edited option.
 $pendingOrderShops = [];
-$res_pending_shops = mysqli_query($db_conn, "SELECT DISTINCT shop_id FROM tp_orders WHERE tp_id='$Login_user_IDvl' AND new_order='yes' AND voided_at IS NULL AND (invoiced_inv_id IS NULL OR invoiced_inv_id='')");
+$res_pending_shops = mysqli_query($db_conn, "SELECT DISTINCT shop_id FROM tp_orders WHERE tp_id='".db_esc($Login_user_IDvl)."' AND new_order='yes' AND voided_at IS NULL AND (invoiced_inv_id IS NULL OR invoiced_inv_id='')");
 while ($rp2 = mysqli_fetch_array($res_pending_shops)) { $pendingOrderShops[$rp2['shop_id']] = true; }
 ?>
 <select required name="customer_id" class="form-control" autofocus>
 <option value="" hidden>Select</option>
 <?php
-$res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userTYPE='$Login_user_TYPEvl' AND onboard_userID='$Login_user_IDvl' ORDER BY name ASC");
+$res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' AND onboard_userID='".db_esc($Login_user_IDvl)."' ORDER BY name ASC");
 while ($r = mysqli_fetch_array($res_shops)) {
     if (isset($pendingOrderShops[$r['id']])) { continue; }
 ?>

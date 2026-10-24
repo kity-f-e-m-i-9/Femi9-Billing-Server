@@ -1,8 +1,8 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 //1. get last id_only (invoice number generate)
 		/*
-		$select_MaxID="select max(id_only) from user_invoice where from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-		$fetch_MaxID=mysqli_query($db_conn,$select_MaxID);
+		$select_MaxID="select max(id_only) from user_invoice where from_user_type=? and from_user_id=?";
+		$fetch_MaxID=db_q($db_conn,$select_MaxID,[$Login_user_TYPEvl,$Login_user_IDvl]);
 		$result_MaxID=mysqli_fetch_row($fetch_MaxID);
 		$id_only=$result_MaxID[0]+1;
 		$format_num = str_pad($id_only, 3, '0', STR_PAD_LEFT);

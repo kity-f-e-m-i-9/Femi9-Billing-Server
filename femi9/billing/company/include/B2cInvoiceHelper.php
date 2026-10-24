@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../../shared/db-helpers.php';
 /**
  * Table 7 (GSTR-1) B2C (Others) invoice-wise computation, shared between
  * GSTR1.php (the aggregate summary row) and gst_b2c_invoice_report.php (the
@@ -61,8 +61,8 @@ function compute_b2c_invoices($db_conn, $Login_user_TYPEvl, $get_godown_id, $fro
         LEFT JOIN stockiest       st ON uii.to_user_type='stockiest'       AND st.temp_id=uii.to_user_id
         LEFT JOIN distributor     dt ON uii.to_user_type='distributor'     AND dt.temp_id=uii.to_user_id
         LEFT JOIN shop            sh ON uii.to_user_type='shop'            AND sh.temp_id=uii.to_user_id
-        WHERE uii.from_user_type='$Login_user_TYPEvl' AND uii.from_user_id='$get_godown_id'
-          AND uii.buyer_gsttype='unregister' AND uii.gst_percentage>0 AND uii.date BETWEEN '$from_date' AND '$to_date'
+        WHERE uii.from_user_type='".db_esc($Login_user_TYPEvl)."' AND uii.from_user_id='".db_esc($get_godown_id)."'
+          AND uii.buyer_gsttype='unregister' AND uii.gst_percentage>0 AND uii.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY uii.to_user_type, ui.inv_number, uii.date, uii.gst_type, ss.name, st.name, dt.name, sh.name, ss.mobile_number, st.mobile_number, dt.mobile_number, sh.mobile_number
     ";
     $res = mysqli_query($db_conn, $q);
@@ -82,8 +82,8 @@ function compute_b2c_invoices($db_conn, $Login_user_TYPEvl, $get_godown_id, $fro
         FROM invoice_items ii
         LEFT JOIN invoice i ON i.inv_id = ii.inv_id
         LEFT JOIN customers c ON c.id = ii.customer_id
-        WHERE ii.user_type='$Login_user_TYPEvl' AND ii.user_id='$get_godown_id'
-          AND ii.buyer_gsttype='unregister' AND ii.gst_percentage>0 AND ii.date BETWEEN '$from_date' AND '$to_date'
+        WHERE ii.user_type='".db_esc($Login_user_TYPEvl)."' AND ii.user_id='".db_esc($get_godown_id)."'
+          AND ii.buyer_gsttype='unregister' AND ii.gst_percentage>0 AND ii.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY i.inv_number, ii.date, ii.gst_type, c.name, c.mobile
     ";
     $res = mysqli_query($db_conn, $q);
@@ -101,7 +101,7 @@ function compute_b2c_invoices($db_conn, $Login_user_TYPEvl, $get_godown_id, $fro
                SUM(s.total-s.gst_amount) AS taxable, SUM(s.gst_amount) AS gst_amt
         FROM ot_sales s
         LEFT JOIN ot_sales_invoice i ON i.tempid = s.tempid
-        WHERE s.godownid='$get_godown_id' AND s.buyer_gsttype='unregister' AND s.gst>0 AND s.date BETWEEN '$from_date' AND '$to_date'
+        WHERE s.godownid='".db_esc($get_godown_id)."' AND s.buyer_gsttype='unregister' AND s.gst>0 AND s.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY i.inv_number, s.date, s.gst_type, s.customer_name, s.customer_mobile
     ";
     $res = mysqli_query($db_conn, $q);
@@ -127,7 +127,7 @@ function compute_b2c_invoices($db_conn, $Login_user_TYPEvl, $get_godown_id, $fro
     // Credit notes/returns — negative-value rows so the on-screen total still
     // ties out to compute_b2c_totals()'s aggregate net figure. gst_percentage>0
     // only, matching the rated-only base being netted.
-    $q = "select rsi.gst_type, rsi.from_userid, rsi.date, sum(rsi.total-rsi.gstamount_total) as taxable, sum(rsi.gstamount_total) as gst_amt from user_return_stock_items rsi where rsi.to_usertype='$Login_user_TYPEvl' and rsi.to_userid='$get_godown_id' and (rsi.buyer_gsttype='unregister' or rsi.buyer_gsttype not in ('register','unregister')) and rsi.gst_percentage>0 and rsi.date between '$from_date' and '$to_date' group by rsi.gst_type, rsi.from_userid, rsi.date";
+    $q = "select rsi.gst_type, rsi.from_userid, rsi.date, sum(rsi.total-rsi.gstamount_total) as taxable, sum(rsi.gstamount_total) as gst_amt from user_return_stock_items rsi where rsi.to_usertype='".db_esc($Login_user_TYPEvl)."' and rsi.to_userid='".db_esc($get_godown_id)."' and (rsi.buyer_gsttype='unregister' or rsi.buyer_gsttype not in ('register','unregister')) and rsi.gst_percentage>0 and rsi.date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by rsi.gst_type, rsi.from_userid, rsi.date";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
         $push($invoices, [
@@ -137,7 +137,7 @@ function compute_b2c_invoices($db_conn, $Login_user_TYPEvl, $get_godown_id, $fro
         ], $r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']));
     }
 
-    $q = "select osr.gst_type, osr.tempid, osr.return_date, sum(osr.total) as taxable from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$get_godown_id' and osr.buyer_gsttype='unregister' and p.gst>0 and osr.return_date between '$from_date' and '$to_date' group by osr.gst_type, osr.tempid, osr.return_date";
+    $q = "select osr.gst_type, osr.tempid, osr.return_date, sum(osr.total) as taxable from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='".db_esc($get_godown_id)."' and osr.buyer_gsttype='unregister' and p.gst>0 and osr.return_date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by osr.gst_type, osr.tempid, osr.return_date";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) {
         $push($invoices, [
@@ -182,15 +182,15 @@ function compute_b2c_totals($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
         else { $t['igst'] += $gst_amt; }
     };
 
-    $q = "select gst_type, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and buyer_gsttype='unregister' and gst_percentage>0 and date between '$from_date' and '$to_date' group by gst_type";
+    $q = "select gst_type, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from user_invoice_items where from_user_type='".db_esc($Login_user_TYPEvl)."' and from_user_id='".db_esc($get_godown_id)."' and buyer_gsttype='unregister' and gst_percentage>0 and date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by gst_type";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) { $add('', $r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), (float)$r['taxable'], (float)$r['gst_amt']); }
 
-    $q = "select gst_type, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and buyer_gsttype='unregister' and gst_percentage>0 and date between '$from_date' and '$to_date' group by gst_type";
+    $q = "select gst_type, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from invoice_items where user_type='".db_esc($Login_user_TYPEvl)."' and user_id='".db_esc($get_godown_id)."' and buyer_gsttype='unregister' and gst_percentage>0 and date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by gst_type";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) { $add('', $r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), (float)$r['taxable'], (float)$r['gst_amt']); }
 
-    $q = "select gst_type, sum(total-gst_amount) as taxable, sum(gst_amount) as gst_amt from ot_sales where godownid='$get_godown_id' and buyer_gsttype='unregister' and gst>0 and date between '$from_date' and '$to_date' group by gst_type";
+    $q = "select gst_type, sum(total-gst_amount) as taxable, sum(gst_amount) as gst_amt from ot_sales where godownid='".db_esc($get_godown_id)."' and buyer_gsttype='unregister' and gst>0 and date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by gst_type";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) { $add('', $r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), (float)$r['taxable'], (float)$r['gst_amt']); }
 
@@ -201,11 +201,11 @@ function compute_b2c_totals($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_
 
     // Net out B2C credit notes (returns) — blank/NULL buyer_gsttype defaults
     // to unregister here too, matching gst_details_credit.php's own convention.
-    $q = "select gst_type, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and (buyer_gsttype='unregister' or buyer_gsttype not in ('register','unregister')) and gst_percentage>0 and date between '$from_date' and '$to_date' group by gst_type";
+    $q = "select gst_type, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from user_return_stock_items where to_usertype='".db_esc($Login_user_TYPEvl)."' and to_userid='".db_esc($get_godown_id)."' and (buyer_gsttype='unregister' or buyer_gsttype not in ('register','unregister')) and gst_percentage>0 and date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by gst_type";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) { $add('', $r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), -(float)$r['taxable'], -(float)$r['gst_amt']); }
 
-    $q = "select osr.gst_type, sum(osr.total) as taxable from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$get_godown_id' and osr.buyer_gsttype='unregister' and p.gst>0 and osr.return_date between '$from_date' and '$to_date' group by osr.gst_type";
+    $q = "select osr.gst_type, sum(osr.total) as taxable from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='".db_esc($get_godown_id)."' and osr.buyer_gsttype='unregister' and p.gst>0 and osr.return_date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by osr.gst_type";
     $res = mysqli_query($db_conn, $q);
     while ($r = mysqli_fetch_assoc($res)) { $add('', $r['gst_type']=='inner' || !in_array($r['gst_type'],['inner','outer']), -(float)$r['taxable'], 0); }
 

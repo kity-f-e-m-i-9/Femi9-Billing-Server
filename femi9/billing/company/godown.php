@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('company_profile');
 require_once("include/GodownAccess.php");
 error_reporting(0);
@@ -77,16 +77,16 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	$upinumber=str_replace("'","&#39;",$_REQUEST['upinumber']);
 	$upinumber = RemoveSpecialChar($upinumber);
      	
-	$selectcount="select count(*) as num from company_godown where gname='$gname'";
-	$fetchcount=mysqli_query($db_conn,$selectcount);
+	$selectcount="select count(*) as num from company_godown where gname=?";
+	$fetchcount=db_q($db_conn,$selectcount,[$gname]);
 	$resultcount=mysqli_fetch_array($fetchcount);
 	if($resultcount['num']==0)
 	{
 		$insertrecords="insert into company_godown (gname,address_line1,address_line2,gstin,state,state_code,contact,email,logo,acname,acnumber,
-		bankname,branchname,ifsc,upinumber) values ('$gname','$address_line1','$address_line2',
-		'$gstin','$state','$state_code','$contact','$email','$insfilenameLG',
-		'$acname','$acnumber','$bankname','$branchname','$ifsc','$upinumber')";
-		mysqli_query($db_conn,$insertrecords);
+		bankname,branchname,ifsc,upinumber) values (?,?,?,
+		?,?,?,?,?,?,
+		?,?,?,?,?,?)";
+		db_q($db_conn,$insertrecords,[$gname,$address_line1,$address_line2,$gstin,$state,$state_code,$contact,$email,$insfilenameLG,$acname,$acnumber,$bankname,$branchname,$ifsc,$upinumber]);
 	}
 	echo "<script>window.location='godown?addedsuccess';</script>";
 }

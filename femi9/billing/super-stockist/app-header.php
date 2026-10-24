@@ -72,7 +72,7 @@
 
 							<table id="logoTablevl">
 				<tr valign="top">
-				<td><img src="<?php echo $usericon_concat;?>" class="usericon"></td>
+				<td><img src="<?php require_once __DIR__ . '/../shared/db-helpers.php'; echo $usericon_concat;?>" class="usericon"></td>
 				<td><h1><?=strtoupper($result_superstock['name']);?></h1>
 				<h3><?=$result_superstock['useridtext'];?></h3>
 				<h2><?=$result_distname12['dist_name'];?></h2>
@@ -87,13 +87,13 @@
 								
 								<?php 
 								//Total wallet amount
-$select_wallet_amount_ST="select sum(commission_amount) from wallet_monthly_sls_report where refer_by_usertype='$Login_user_TYPEvl' and refer_by_userid='$Login_user_IDvl'";
+$select_wallet_amount_ST="select sum(commission_amount) from wallet_monthly_sls_report where refer_by_usertype='".db_esc($Login_user_TYPEvl)."' and refer_by_userid='".db_esc($Login_user_IDvl)."'";
 $fetch_wallet_amount_ST=mysqli_query($db_conn,$select_wallet_amount_ST);
 $result_wallet_amount_ST=mysqli_fetch_array($fetch_wallet_amount_ST);
 $Total_wallet_amount_ST=$result_wallet_amount_ST[0] ?? '0';
 
 //Total Withdraw Amount
-$select_wallet_withdraw_amount_ST="select sum(amount) from wallet_withdraw where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and req_status='approved'";
+$select_wallet_withdraw_amount_ST="select sum(amount) from wallet_withdraw where user_type='".db_esc($Login_user_TYPEvl)."' and user_id='".db_esc($Login_user_IDvl)."' and req_status='approved'";
 $fetch_wallet_withdraw_amount_ST=mysqli_query($db_conn,$select_wallet_withdraw_amount_ST);
 $result_wallet_withdraw_amount_ST=mysqli_fetch_array($fetch_wallet_withdraw_amount_ST);
 $Total_withdraw_amount_ST=$result_wallet_withdraw_amount_ST[0] ?? '0';

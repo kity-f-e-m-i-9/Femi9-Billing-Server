@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
@@ -33,8 +33,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	$mobile_number=str_replace("'","&#39;",$_POST["mobile_number"]);
 	$usertype=$_POST["usertype"];
 	
-	$Select_CNTMoblenm="select count(*) as numMob from distributor where mobile_number='$mobile_number'";
-$Fetch_Count_MobilenUmber=mysqli_query($db_conn,$Select_CNTMoblenm);
+	$Select_CNTMoblenm="select count(*) as numMob from distributor where mobile_number=?";
+$Fetch_Count_MobilenUmber=db_q($db_conn,$Select_CNTMoblenm,[$mobile_number]);
 $Result_Count_MobilenUmber=mysqli_fetch_array($Fetch_Count_MobilenUmber);
 if($Result_Count_MobilenUmber['numMob']==1)
 {
@@ -49,8 +49,8 @@ if($Result_Count_MobilenUmber['numMob']==1)
 	
 	$name=str_replace("'","&#39;",$_POST["name"]);
 	
-	$select_count_dist="select count(*) as numdist from distributor where temp_id='$temp_id'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+	$select_count_dist="select count(*) as numdist from distributor where temp_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$temp_id]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numdist']==0)
 	{
@@ -62,8 +62,8 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	
 	//plans details
 	$plan_id=$_POST["plan_id"];
-	$select_plans="select * from plans where id='$plan_id'";
-	$fetch_plans=mysqli_query($db_conn,$select_plans);
+	$select_plans="select * from plans where id=?";
+	$fetch_plans=db_q($db_conn,$select_plans,[$plan_id]);
 	$result_plans=mysqli_fetch_array($fetch_plans);
 	$plan_amount="0";//$result_plans["amount"];
 	$valid_months="0";//$result_plans["valid_months"];
@@ -95,14 +95,14 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		ref_number,account_status,merchantOrderId,merchantTransactionId,merchantUserId,gstin,
 		onboard_userTYPE,onboard_userID,address,userid,useridtext,usertype,country_code,shop_onboard)
 
-		values ('$DummyStockistID','$temp_id','$insfilename','$name','$state_id','$district_id',
-		'$taluk_id','$pincode_id','$user_email','$mobile_number',
-		'$username_generate','$user_password','$plan_amount','$valid_months',
-		'$valid_from','$valid_to','phonepe','pending','Nil','pending',
-		'$merchantOrderId','$merchantTransactionId','$merchantUserId',
-		'$gstin','$onboard_userTYPE','$onboard_userID','$address','0','Nil',
-		'$usertype','$country_code','$shop_onboard')";
-		mysqli_query($db_conn,$sql);
+		values (?,?,?,?,?,?,
+		?,?,?,?,
+		?,?,?,?,
+		?,?,'phonepe','pending','Nil','pending',
+		?,?,?,
+		?,?,?,?,'0','Nil',
+		?,?,?)";
+		db_q($db_conn,$sql,[$DummyStockistID,$temp_id,$insfilename,$name,$state_id,$district_id,$taluk_id,$pincode_id,$user_email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$gstin,$onboard_userTYPE,$onboard_userID,$address,$usertype,$country_code,$shop_onboard]);
 		
 		
 		// Insert Referral & Target Amount Details:-
@@ -110,8 +110,8 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		$ref_by_user_type=$_REQUEST['st_ref_type'];
 		
 		$insert_referral="insert into distributor_referral (distributor_id,target_amount,ref_by_user_type,ref_by_user_id,updated) values 
-		('$temp_id','$target_amount','$ref_by_user_type','','0')";
-		mysqli_query($db_conn,$insert_referral);
+		(?,?,?,'','0')";
+		db_q($db_conn,$insert_referral,[$temp_id,$target_amount,$ref_by_user_type]);
 		
 //-----------------------SA***open----------------------------		
 		/*if($usertype=="Distributor")
@@ -121,8 +121,8 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
   foreach ($ex as $key => $value)
    {  
     //DISTRIBUTOR ASSIGNED TO PINCODE
-$UPTassignedID="update pincode set assigned_DID='$temp_id' where state_id='$state_id' and dist_id='$district_id' and taluk_id='$taluk_id' and id='$value'";
-mysqli_query($db_conn,$UPTassignedID);   
+$UPTassignedID="update pincode set assigned_DID=? where state_id=? and dist_id=? and taluk_id=? and id=?";
+db_q($db_conn,$UPTassignedID,[$temp_id,$state_id,$district_id,$taluk_id,$value]);   
    }
 		}*/
 //-----------------------SA***close----------------------------	

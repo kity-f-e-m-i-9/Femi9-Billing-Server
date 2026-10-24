@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -189,8 +189,8 @@ $i= $start_from;
 											
 											<tbody>
 										<?php
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype=? and deleted_at is null and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
@@ -198,15 +198,15 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid=? and deleted_at is null";
+	$fetch_sumqty=db_q($db_conn,$select_sumqty,[$returnid]);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	if($result_sumqty[0]!=NULL){$TotalReturnQTY=$result_sumqty[0];}
 	else{$TotalReturnQTY="0";}
 	
 	//Total stock return (Rs.)
-	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$Fetch_sumreturnamount=mysqli_query($db_conn,$Select_sumreturnamount);
+	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid=? and deleted_at is null";
+	$Fetch_sumreturnamount=db_q($db_conn,$Select_sumreturnamount,[$returnid]);
 	$Result_sumreturnamount=mysqli_fetch_array($Fetch_sumreturnamount);
 	if($Result_sumreturnamount[0]!=NULL){$TotalReturnAmount=$Result_sumreturnamount[0];}
 	else{$TotalReturnAmount="0";}
@@ -223,8 +223,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 											$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 								
@@ -272,8 +272,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											
 											<tbody>
 										<?php
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype=? and deleted_at is null and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
@@ -281,15 +281,15 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid=? and deleted_at is null";
+	$fetch_sumqty=db_q($db_conn,$select_sumqty,[$returnid]);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	if($result_sumqty[0]!=NULL){$TotalReturnQTY=$result_sumqty[0];}
 	else{$TotalReturnQTY="0";}
 	
 	//Total stock return (Rs.)
-	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$Fetch_sumreturnamount=mysqli_query($db_conn,$Select_sumreturnamount);
+	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid=? and deleted_at is null";
+	$Fetch_sumreturnamount=db_q($db_conn,$Select_sumreturnamount,[$returnid]);
 	$Result_sumreturnamount=mysqli_fetch_array($Fetch_sumreturnamount);
 	if($Result_sumreturnamount[0]!=NULL){$TotalReturnAmount=$Result_sumreturnamount[0];}
 	else{$TotalReturnAmount="0";}
@@ -306,14 +306,14 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 											$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
-										$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+										$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
@@ -360,8 +360,8 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 											
 											<tbody>
 										<?php
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype=? and deleted_at is null and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
@@ -369,15 +369,15 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid=? and deleted_at is null";
+	$fetch_sumqty=db_q($db_conn,$select_sumqty,[$returnid]);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	if($result_sumqty[0]!=NULL){$TotalReturnQTY=$result_sumqty[0];}
 	else{$TotalReturnQTY="0";}
 	
 	//Total stock return (Rs.)
-	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$Fetch_sumreturnamount=mysqli_query($db_conn,$Select_sumreturnamount);
+	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid=? and deleted_at is null";
+	$Fetch_sumreturnamount=db_q($db_conn,$Select_sumreturnamount,[$returnid]);
 	$Result_sumreturnamount=mysqli_fetch_array($Fetch_sumreturnamount);
 	if($Result_sumreturnamount[0]!=NULL){$TotalReturnAmount=$Result_sumreturnamount[0];}
 	else{$TotalReturnAmount="0";}
@@ -394,14 +394,14 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 											$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
-										$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+										$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										

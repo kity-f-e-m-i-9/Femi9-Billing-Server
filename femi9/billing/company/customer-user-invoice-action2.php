@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 require_once("include/GodownAccess.php");
 
@@ -10,8 +10,8 @@ if(isset($_REQUEST['addInvoice']))
 	}
 
 	$inv_id=$_REQUEST['inv_id'];
-	$select_INVProductDetails="select * from invoice where inv_id='$inv_id'";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from invoice where inv_id=?";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$inv_id]);
 	$result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails);
 	$gst_type=$result_INVProductDetails['gst_type'];
 	$buyer_gsttype=$result_INVProductDetails['buyer_gsttype'];
@@ -28,8 +28,8 @@ if(isset($_REQUEST['addInvoice']))
 	$Login_user_IDvl=$godownid;
 		
 		//3. update invoice
-		$update_Invoice="update invoice set customer_id='$customer_id',date='$date',inv_year='$inv_year' where inv_id='$inv_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-		mysqli_query($db_conn,$update_Invoice);
+		$update_Invoice="update invoice set customer_id=?,date=?,inv_year=? where inv_id=? and user_type=? and user_id=?";
+		db_q($db_conn,$update_Invoice,[$customer_id,$date,$inv_year,$inv_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 		
 		//-------------------------------------------
 		//insert product details
@@ -46,8 +46,8 @@ $totalamount=$amount*$qty;
 //--------------------------TOTAL, GST, DISCOUNT------------------
 //----------------------------------------------------------------
 //get product gst
-$selectproducts="select gst,gst_type,hsn,rwpoints from products where id='$pr_id'";
-$fetchproducts=mysqli_query($db_conn,$selectproducts);
+$selectproducts="select gst,gst_type,hsn,rwpoints from products where id=?";
+$fetchproducts=db_q($db_conn,$selectproducts,[$pr_id]);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $gst_percentage=$resultproducts['gst'];
 $gst_type_item=$resultproducts['gst_type'] ?: 'exclusive';
@@ -102,8 +102,8 @@ if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
 		
 	}else{
 	
-	$select_count_invoiceItem="select count(*) as numInvoiceItem from invoice_items where inv_id='$inv_id' and pr_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and customer_id='$customer_id'";
-	$fetch_count_invoiceItem=mysqli_query($db_conn,$select_count_invoiceItem);
+	$select_count_invoiceItem="select count(*) as numInvoiceItem from invoice_items where inv_id=? and pr_id=? and user_type=? and user_id=? and customer_id=?";
+	$fetch_count_invoiceItem=db_q($db_conn,$select_count_invoiceItem,[$inv_id,$pr_id,$Login_user_TYPEvl,$Login_user_IDvl,$customer_id]);
 	$result_count_invoiceItem=mysqli_fetch_array($fetch_count_invoiceItem);
 	if($result_count_invoiceItem['numInvoiceItem']==0)
 	{
@@ -112,10 +112,10 @@ if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
 		gst_percentage,gstamount_singlepr,gstamount_total,
 		subtotal,discount_percentage,discount_amount,gst_type,hsn,date,
 		buyer_gsttype,rwpoints,rwpoints_sls)
-		values ('$inv_id','$pr_id','$amount','$qty','$total','$Login_user_TYPEvl','$Login_user_IDvl',
-		'$customer_id','$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal','$discount_percentage','$discount_amount','$gst_type','$hsn','$date',
-		'$buyer_gsttype','$rwpoints','$rwpoints')";
-		mysqli_query($db_conn,$insert_InvoiceItems);
+		values (?,?,?,?,?,?,?,
+		?,?,?,?,?,?,?,?,?,?,
+		?,?,?)";
+		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$Login_user_TYPEvl,$Login_user_IDvl,$customer_id,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_percentage,$discount_amount,$gst_type,$hsn,$date,$buyer_gsttype,$rwpoints,$rwpoints]);
 		
 		echo "<script>window.location='customer-user-invoice-add?InvoiceID=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded&&gid=".$godownid."';</script>";
 		exit;

@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 // Load environment variables FIRST
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -318,7 +318,7 @@ $xlurl = "ex_overallusers";
                                                         // District
                                                         $district_id = $result_product_list['district_id'];
                                                         if (is_numeric($district_id)) {
-                                                            $fetch_district  = mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='$district_id'");
+                                                            $fetch_district  = mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='".db_esc($district_id)."'");
                                                             $result_district = mysqli_fetch_array($fetch_district);
                                                             $district_name   = $result_district['dist_name'];
                                                         } else {
@@ -328,7 +328,7 @@ $xlurl = "ex_overallusers";
                                                         // Taluk
                                                         $Taluk_id = $result_product_list['taluk_id'];
                                                         if (is_numeric($Taluk_id)) {
-                                                            $fetch_taluk  = mysqli_query($db_conn, "SELECT taluk FROM taluk WHERE id='$Taluk_id'");
+                                                            $fetch_taluk  = mysqli_query($db_conn, "SELECT taluk FROM taluk WHERE id='".db_esc($Taluk_id)."'");
                                                             $result_taluk = mysqli_fetch_array($fetch_taluk);
                                                             $taluk_name   = $result_taluk['taluk'];
                                                         } else {

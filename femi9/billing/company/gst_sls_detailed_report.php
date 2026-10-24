@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); require_once("include/GodownAccess.php");
 include("config.php"); 
 error_reporting(0);
@@ -56,7 +56,7 @@ $select_Report = "
     LEFT JOIN stockiest        st ON uii.to_user_type='stockiest'       AND st.temp_id = uii.to_user_id
     LEFT JOIN distributor      dt ON uii.to_user_type='distributor'     AND dt.temp_id = uii.to_user_id
     LEFT JOIN shop             sh ON uii.to_user_type='shop'            AND sh.temp_id = uii.to_user_id
-    WHERE uii.from_user_type  = '$Login_user_TYPEvl'
+    WHERE uii.from_user_type  = '".db_esc($Login_user_TYPEvl)."'
       AND uii.from_user_id    = '$get_godown_id'
       AND uii.buyer_gsttype   = '$buyer_gsttype'
       AND uii.gst_type        = '$gst_type'
@@ -90,7 +90,7 @@ $select_Report2 = "
     FROM invoice_items ii
     LEFT JOIN invoice i ON i.inv_id = ii.inv_id
     LEFT JOIN customers c ON c.id = ii.customer_id
-    WHERE ii.user_type = '$Login_user_TYPEvl'
+    WHERE ii.user_type = '".db_esc($Login_user_TYPEvl)."'
       AND ii.user_id   = '$get_godown_id'
       AND ii.buyer_gsttype = '$buyer_gsttype'
       AND ii.gst_type      = '$gst_type'

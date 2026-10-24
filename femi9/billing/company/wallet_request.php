@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -218,7 +218,7 @@ if ($WD_user_type === 'territory_partner') {
 
     $district_id = $result_onbaord_user_records['district_id'] ?? 0;
     if ($district_id) {
-        $r_dist = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='$district_id'"));
+        $r_dist = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='".db_esc($district_id)."'"));
         $district_name = $r_dist['dist_name'] ?? '';
     }
 }
@@ -294,8 +294,8 @@ $sent_amount=inr_format($sent_amount, 2);
   </div>
   
 <?php 
-/*$selectcoutprofileDetaiils223="select * from users_profile where user_tempid='$WD_user_id' and usertype='$WD_user_type'";
-$fetchcountprofileDetails223=mysqli_query($db_conn,$selectcoutprofileDetaiils223);
+/*$selectcoutprofileDetaiils223="select * from users_profile where user_tempid=? and usertype=?";
+$fetchcountprofileDetails223=db_q($db_conn,$selectcoutprofileDetaiils223,[$WD_user_id,$WD_user_type]);
 $resultcountprofileDetails223=mysqli_fetch_array($fetchcountprofileDetails223);*/
 ?>
 

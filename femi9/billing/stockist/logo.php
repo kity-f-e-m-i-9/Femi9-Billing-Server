@@ -1,7 +1,7 @@
-<?php //login user details
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; //login user details
 $log_username=$_SESSION['LOGIN_USER'];
 //
-$select_superstock="select * from stockiest where username='$log_username'";
+$select_superstock="select * from stockiest where username='".db_esc($log_username)."'";
 $fetch_superstock=mysqli_query($db_conn,$select_superstock);
 $result_superstock=mysqli_fetch_array($fetch_superstock);
 
@@ -16,21 +16,21 @@ $usericon_concat="".$usericon_path."".$usericon."";
 
 //State Details
 $loguser_StateID=$result_superstock['state_id'];
-$Select_StateNamevl12="select * from state where id='$loguser_StateID'";
+$Select_StateNamevl12="select * from state where id='".db_esc($loguser_StateID)."'";
 $Fetch_StateNamevl12=mysqli_query($db_conn,$Select_StateNamevl12);
 $Retch_StateNamevl12=mysqli_fetch_array($Fetch_StateNamevl12);
 $loguser_StateNAME=$Retch_StateNamevl12['st_name'];
 
 //District Details
 $loguser_DistrictID=$result_superstock['district_id'];
-$select_distname12="select * from district where id='$loguser_DistrictID'";
+$select_distname12="select * from district where id='".db_esc($loguser_DistrictID)."'";
 $fetch_distname12=mysqli_query($db_conn,$select_distname12);
 $result_distname12=mysqli_fetch_array($fetch_distname12);
 $loguser_DistrictNAME=$result_distname12['dist_name'];
 
 //Taluk Details
 $TalukIDvl=$result_superstock['taluk_id'];
-$select_taluk12="select * from taluk where id='$TalukIDvl'";
+$select_taluk12="select * from taluk where id='".db_esc($TalukIDvl)."'";
 $fetch_taluk12=mysqli_query($db_conn,$select_taluk12);
 $result_taluk12=mysqli_fetch_array($fetch_taluk12);
 $taluk_name_log=$result_taluk12['taluk'];

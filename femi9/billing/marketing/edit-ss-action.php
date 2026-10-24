@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("RemoveSpecialChar.php");
 error_reporting(0);
 
@@ -45,8 +45,8 @@ $update_id=$_REQUEST['update_id'];
 	$latitude=isset($_POST["latitude"]) && $_POST["latitude"]!=='' ? floatval($_POST["latitude"]) : null;
 	$longitude=isset($_POST["longitude"]) && $_POST["longitude"]!=='' ? floatval($_POST["longitude"]) : null;
 
-	$select_existing_latlng="select latitude, longitude from ms_shop where id='$update_id'";
-	$fetch_existing_latlng=mysqli_query($db_conn,$select_existing_latlng);
+	$select_existing_latlng="select latitude, longitude from ms_shop where id=?";
+	$fetch_existing_latlng=db_q($db_conn,$select_existing_latlng,[$update_id]);
 	$existing_latlng=mysqli_fetch_assoc($fetch_existing_latlng);
 	$existing_lat = $existing_latlng['latitude'] !== null ? (float)$existing_latlng['latitude'] : null;
 	$existing_lng = $existing_latlng['longitude'] !== null ? (float)$existing_latlng['longitude'] : null;
@@ -76,7 +76,7 @@ $update_id=$_REQUEST['update_id'];
 		// through. affected_rows()===0 means the limit was already reached
 		// (by this request or one that beat it to the row) at the instant
 		// this ran, not from a stale count read earlier in the request.
-		mysqli_query($db_conn, "update ms_shop set location_recapture_count = location_recapture_count + 1 where id='$update_id' and location_recapture_count < 2");
+		mysqli_query($db_conn, "update ms_shop set location_recapture_count = location_recapture_count + 1 where id='".db_esc($update_id)."' and location_recapture_count < 2");
 		if (mysqli_affected_rows($db_conn) === 0) {
 			// Limit reached — keep the shop's existing, locked location and
 			// ignore whatever new coordinates were just submitted.
@@ -124,12 +124,12 @@ $insfilename=$old_icon;
 	
 	
 	//update process
-	$update_ss="update ms_shop set user_icon='$insfilename',name='$name',
-	state_name='$state_name',district_name='$district_name',taluk_name='$taluk_name',
-	pincode='$pincode',email='$email',gstin='$gstin',address='$address',shop_cat='$shop_cat',
-country_code='$country_code',landline='$landline',google_location='$google_location',
-latitude=$latitude_sql,longitude=$longitude_sql where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update ms_shop set user_icon=?,name=?,
+	state_name=?,district_name=?,taluk_name=?,
+	pincode=?,email=?,gstin=?,address=?,shop_cat=?,
+country_code=?,landline=?,google_location=?,
+latitude=$latitude_sql,longitude=$longitude_sql where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$state_name,$district_name,$taluk_name,$pincode,$email,$gstin,$address,$shop_cat,$country_code,$landline,$google_location,$update_id]);
 	
 	echo "<script>window.location='manage_ss.php?updatedSuccess';</script>";
 	

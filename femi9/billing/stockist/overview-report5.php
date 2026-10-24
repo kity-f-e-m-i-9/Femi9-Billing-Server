@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -178,8 +178,8 @@ $i= $start_from;
 											
 											<tbody>
 										
-										<?php $select_product_list="select * from user_invoice where date between '$from_date' and '$to_date' and to_user_type='$Login_user_TYPEvl' and to_user_id='$Login_user_IDvl' and sub_total>0 order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from user_invoice where date between ? and ? and to_user_type=? and to_user_id=? and sub_total>0 order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date,$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -187,8 +187,8 @@ $i= $start_from;
 //product Qty
 $inv_id=$result_product_list['inv_id'];
 
-$select_sumprqty="select sum(qty) from user_invoice_items where inv_id='$inv_id'";
-$fetch_sumprqty=mysqli_query($db_conn,$select_sumprqty);
+$select_sumprqty="select sum(qty) from user_invoice_items where inv_id=?";
+$fetch_sumprqty=db_q($db_conn,$select_sumprqty,[$inv_id]);
 $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 ?>
                                             

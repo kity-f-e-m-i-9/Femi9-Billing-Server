@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -6,8 +6,8 @@ $from_date=$_REQUEST['frd'];
 $to_date=$_REQUEST['tod'];
 $se_msid=$_REQUEST['se_msid'];
 //
-$select_msDetails12="select * from marketing_staff where id='$se_msid'";
-$fetch_msDetails12=mysqli_query($db_conn,$select_msDetails12);
+$select_msDetails12="select * from marketing_staff where id=?";
+$fetch_msDetails12=db_q($db_conn,$select_msDetails12,[$se_msid]);
 $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 ?>
 <!DOCTYPE html>
@@ -52,27 +52,27 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 <?php 
 if($_REQUEST['frd']!=NULL && $se_msid==NULL)
 {
-$select_product_list="select * from ms_orders where new_order='no' and order_date between '$from_date' and '$to_date' order by id desc";
+$select_product_list="select * from ms_orders where new_order='no' and order_date between '".db_esc($from_date)."' and '".db_esc($to_date)."' order by id desc";
 }
 if($_REQUEST['frd']!=NULL && $se_msid!=NULL)
 {
-$select_product_list="select * from ms_orders where new_order='no' and order_date between '$from_date' and '$to_date' and ms_id='$se_msid' order by id desc";
+$select_product_list="select * from ms_orders where new_order='no' and order_date between ? and ? and ms_id=? order by id desc";
 }
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date,$se_msid]);
 while($result_product_list12=mysqli_fetch_array($fetch_product_list))
 {						
 
 
 //shop category
 $shop_id=$result_product_list12['shop_id'];
-$select_shopcatt="select * from ms_shop where id='$shop_id'";
-$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
+$select_shopcatt="select * from ms_shop where id=?";
+$fetch_shopcatt=db_q($db_conn,$select_shopcatt,[$shop_id]);
 $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 
 //marketing staff details
 $ms_id=$result_product_list12['ms_id'];
-$select_msDetails="select * from marketing_staff where id='$ms_id'";
-$fetch_msDetails=mysqli_query($db_conn,$select_msDetails);
+$select_msDetails="select * from marketing_staff where id=?";
+$fetch_msDetails=db_q($db_conn,$select_msDetails,[$ms_id]);
 $result_msDetails=mysqli_fetch_array($fetch_msDetails);
 ?>
                                             

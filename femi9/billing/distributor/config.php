@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 /*--------user type------*/
 //company
 //super_stockiest
@@ -46,14 +46,14 @@ $onboard_userID=$result_LoGuserDtails['temp_id'];
 $Login_user_useridtext=$result_LoGuserDtails['useridtext'];
 
 //REFERAL PERSON & CATEGORY DETAILS
-$select_RFRDtailsCNG="select * from distributor_referral where distributor_id='$Login_user_IDvl'";
+$select_RFRDtailsCNG="select * from distributor_referral where distributor_id='".db_esc($Login_user_IDvl)."'";
 $fetch_RFRDtailsCNG=mysqli_query($db_conn,$select_RFRDtailsCNG);
 if(mysqli_num_rows($fetch_RFRDtailsCNG)==1)
 {
 $result_RFRDtailsCNG=mysqli_fetch_array($fetch_RFRDtailsCNG);
 $target_amount=$result_RFRDtailsCNG['target_amount'];
 
-$select_RFRDtailsCNG_CAT="select * from distributor_category where amount='$target_amount'";
+$select_RFRDtailsCNG_CAT="select * from distributor_category where amount='".db_esc($target_amount)."'";
 $fetch_RFRDtailsCNG_CAT=mysqli_query($db_conn,$select_RFRDtailsCNG_CAT);
 $result_RFRDtailsCNG_CAT=mysqli_fetch_array($fetch_RFRDtailsCNG_CAT);
 $Login_person_CAT=$result_RFRDtailsCNG_CAT['amount'];

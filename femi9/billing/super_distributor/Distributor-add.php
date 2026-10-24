@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $title="Add Distributor";
@@ -360,8 +360,8 @@ xmlhttp.send();}
 			<label class="form-label">Choose Plan</label>
             <select required="" name="plan_id" class="form-control">
 												<option value="" hidden="">Select</option>
-												<?php $select_plans="select * from plans where cat='$Coupon_category' order by amount asc";
-												$fetch_plans=mysqli_query($db_conn,$select_plans);
+												<?php $select_plans="select * from plans where cat=? order by amount asc";
+												$fetch_plans=db_q($db_conn,$select_plans,[$Coupon_category]);
 												while($result_plans=mysqli_fetch_array($fetch_plans))
 												{?>
 											<option value="<?php echo $result_plans['id'];?>">&#8377; <?php echo $result_plans['amount'];?> / <?php echo $result_plans['valid_months'];?> Days</option>

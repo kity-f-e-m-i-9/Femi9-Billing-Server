@@ -1,4 +1,4 @@
-<?php include("checksession.php"); include 'config.php'; error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); include 'config.php'; error_reporting(0);
 if($result_LoGuserDtails['user_position']==0){
 	echo "<script>window.location='dashboard.php';</script>";exit;
 }
@@ -139,14 +139,14 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from user_invoice where from_user_type='stockiest' and date between '$from_date' and '$to_date' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from user_invoice where from_user_type='stockiest' and date between ? and ? order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											//Stockist details
 											$from_user_id=$result_product_list['from_user_id'];
-										$select_From2="select * from stockiest where temp_id='$from_user_id'";
-										$fetch_From2=mysqli_query($db_conn,$select_From2);
+										$select_From2="select * from stockiest where temp_id=?";
+										$fetch_From2=db_q($db_conn,$select_From2,[$from_user_id]);
 										$result_From2=mysqli_fetch_array($fetch_From2);
 										//
 										$Cust_Name=$result_From2['name'];

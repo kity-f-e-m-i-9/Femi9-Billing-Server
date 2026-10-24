@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 include("config.php");
 error_reporting(0); 
 
@@ -13,20 +13,20 @@ if($_REQUEST['update_invoice_date']!=NULL)
 $update_invoice_date=date("Y-m-d",strtotime($_REQUEST['update_invoice_date']));
 
 //1
-$update_invoice12="update user_invoice set date='$update_invoice_date' where inv_id='$invoice_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-mysqli_query($db_conn,$update_invoice12);
+$update_invoice12="update user_invoice set date=? where inv_id=? and from_user_type=? and from_user_id=?";
+db_q($db_conn,$update_invoice12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
 //2	
-$update_invoice_ITEMS12="update user_invoice_items set date='$update_invoice_date' where inv_id='$invoice_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-mysqli_query($db_conn,$update_invoice_ITEMS12);
+$update_invoice_ITEMS12="update user_invoice_items set date=? where inv_id=? and from_user_type=? and from_user_id=?";
+db_q($db_conn,$update_invoice_ITEMS12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
 	}
 //--------------------------------------------
 
 
 	//
-	$selectdetails="select * from user_invoice where inv_id='$invoice_id'";
-	$fetchdetails=mysqli_query($db_conn,$selectdetails);
+	$selectdetails="select * from user_invoice where inv_id=?";
+	$fetchdetails=db_q($db_conn,$selectdetails,[$invoice_id]);
 	$resultdetails=mysqli_fetch_array($fetchdetails);
 	//
 	$usertype=$resultdetails['to_user_type'];
@@ -45,13 +45,13 @@ mysqli_query($db_conn,$update_invoice_ITEMS12);
 	//DELETE RECEIPT DETAILS IF EDIT FUNCTION
 	if($_SESSION['ACTIONEDIT']=="edit"){
 		
-		$delReceipt="delete from receipt where inv_id='$invoice_id'";
-		mysqli_query($db_conn,$delReceipt);
+		$delReceipt="delete from receipt where inv_id=?";
+		db_q($db_conn,$delReceipt,[$invoice_id]);
 	}
 	
 	//insert receipt
-	$insertreceiptcount="select count(*) as numreceipt from receipt where receiptid='$invoice_id'";
-	$fetchreceipt=mysqli_query($db_conn,$insertreceiptcount);
+	$insertreceiptcount="select count(*) as numreceipt from receipt where receiptid=?";
+	$fetchreceipt=db_q($db_conn,$insertreceiptcount,[$invoice_id]);
 	$resultreceipt=mysqli_fetch_array($fetchreceipt);
 	if($resultreceipt['numreceipt']==0)
 	{
@@ -82,21 +82,21 @@ mysqli_query($db_conn,$update_invoice_ITEMS12);
 			if($_SESSION['ACTIONEDIT']==NULL)
 			{
 	//LESS CREDIT AMOUNT - IF NEW INVOICE ONLY
-	/*$selectcountcredit12="select * from return_credit where usertype='$usertype' and userid='$userid'";
-	$fetchcountcredit12=mysqli_query($db_conn,$selectcountcredit12);
+	/*$selectcountcredit12="select * from return_credit where usertype=? and userid=?";
+	$fetchcountcredit12=db_q($db_conn,$selectcountcredit12,[$usertype,$userid]);
 	$resultcountcredit12=mysqli_fetch_array($fetchcountcredit12);
 	$creditamount=$resultcountcredit12['credit_amount']-$credit;
 		
-	$updatecredit="update return_credit set credit_amount='$creditamount' where usertype='$usertype' and userid='$userid'";
-	mysqli_query($db_conn,$updatecredit);*/
+	$updatecredit="update return_credit set credit_amount=? where usertype=? and userid=?";
+	db_q($db_conn,$updatecredit,[$creditamount,$usertype,$userid]);*/
 			}
 		}
 		
 		unset($_SESSION['INVOICEFINISH']);
 	
 	//UPDATE USER-INVOICE TABLE
-	$update_invoice="update user_invoice set credit='$credit',sub_total='$SubTotal',discount='$discount',total='$total_amount',roundoff='$roundoff',courier_charges='$courier_charges' where inv_id='$invoice_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-	mysqli_query($db_conn,$update_invoice);
+	$update_invoice="update user_invoice set credit=?,sub_total=?,discount=?,total=?,roundoff=?,courier_charges=? where inv_id=? and from_user_type=? and from_user_id=?";
+	db_q($db_conn,$update_invoice,[$credit,$SubTotal,$discount,$total_amount,$roundoff,$courier_charges,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 	
 	}
 	

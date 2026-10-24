@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $title="Receipt";
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");
@@ -64,8 +64,8 @@ $invtable_name="invoice";
     if(isset($_REQUEST['delreceiptact']))
 	{
 		$rcptid=base64_decode($_REQUEST['rcptid']);
-		$delreceipt="delete from receipt where id='$rcptid'";
-		mysqli_query($db_conn,$delreceipt);
+		$delreceipt="delete from receipt where id=?";
+		db_q($db_conn,$delreceipt,[$rcptid]);
 		
 		echo "<script>window.location='add-receipt.php?invid=".$_REQUEST['invid']."&&invuser=".$_REQUEST['invuser']."&&DeletedSuccess';</script>";
 		
@@ -206,8 +206,8 @@ $select_Customers="select * from ".$tablename." where id='$CuSTID'";
 
 
 <?php 
-$select_picnode_list="select * from receipt where inv_id='$invid' and received>0 order by id asc";
-		$fetch_picnode_list=mysqli_query($db_conn,$select_picnode_list);
+$select_picnode_list="select * from receipt where inv_id=? and received>0 order by id asc";
+		$fetch_picnode_list=db_q($db_conn,$select_picnode_list,[$invid]);
 		$count_receipt_details=mysqli_num_rows($fetch_picnode_list);
 		if($count_receipt_details>0)
 		{
@@ -267,8 +267,8 @@ if($receiptamount>0){
 	<?php
 									
 		//total received Amount
-		$selectsumreceiptamont="select sum(received) from receipt where inv_id='$invid'";
-		$fetchsumreceiptamont=mysqli_query($db_conn,$selectsumreceiptamont);
+		$selectsumreceiptamont="select sum(received) from receipt where inv_id=?";
+		$fetchsumreceiptamont=db_q($db_conn,$selectsumreceiptamont,[$invid]);
 		$resultsumreceiptamont=mysqli_fetch_array($fetchsumreceiptamont);
 									$TotalReceivedAmount=$resultsumreceiptamont[0];
 									$balanceAmount=$result_product_list["total"]-$TotalReceivedAmount;
@@ -280,8 +280,8 @@ if($receiptamount>0){
 										$receiptid=$_REQUEST['receiptid'];
 										$invid=$_REQUEST['invid'];
 										
-										$select_invoice_Dtils22="select * from user_invoice where inv_id='$invid'";
-										$FETCH_invoice_Dtils22=mysqli_query($db_conn,$select_invoice_Dtils22);
+										$select_invoice_Dtils22="select * from user_invoice where inv_id=?";
+										$FETCH_invoice_Dtils22=db_q($db_conn,$select_invoice_Dtils22,[$invid]);
 										$Result_invoice_Dtils22=mysqli_fetch_array($FETCH_invoice_Dtils22);
 										
 										$from_user_type=$Result_invoice_Dtils22['from_user_type'];
@@ -299,8 +299,8 @@ if($receiptamount>0){
 										{
 										
 										//insert receipt
-	$insertreceiptcount="select count(*) as numreceipt from receipt where receiptid='$receiptid'";
-	$fetchreceipt=mysqli_query($db_conn,$insertreceiptcount);
+	$insertreceiptcount="select count(*) as numreceipt from receipt where receiptid=?";
+	$fetchreceipt=db_q($db_conn,$insertreceiptcount,[$receiptid]);
 	$resultreceipt=mysqli_fetch_array($fetchreceipt);
 	if($resultreceipt['numreceipt']==0)
 	{
@@ -311,9 +311,9 @@ if($receiptamount>0){
 		$insertreceipt="insert into receipt (receiptid,inv_id,invoice_amount,received,receivable,date,
 		from_user_type,from_user_id,to_user_type,to_user_id,receipt_method,receipt_remarks) 
 		values 
-		('$receiptid','$invid','$receivableamount','$receivedamount','$balanceamountvl','$receiptdate',
-		'$from_user_type','$from_user_id','$to_user_type','$to_user_id','$receipt_method','$receipt_remarks')";
-		mysqli_query($db_conn,$insertreceipt);
+		(?,?,?,?,?,?,
+		?,?,?,?,?,?)";
+		db_q($db_conn,$insertreceipt,[$receiptid,$invid,$receivableamount,$receivedamount,$balanceamountvl,$receiptdate,$from_user_type,$from_user_id,$to_user_type,$to_user_id,$receipt_method,$receipt_remarks]);
 	}
 	
 	echo "<script>window.location='add-receipt.php?invid=$invid&&invuser=$invuser&&ReceiptAddedSuc';</script>";

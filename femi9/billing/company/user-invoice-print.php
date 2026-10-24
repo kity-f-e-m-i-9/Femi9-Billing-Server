@@ -1,11 +1,11 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
 $Invoice_ID=$_REQUEST['invoiceid'];
 $Invoice_ID=base64_decode($Invoice_ID);
 
-$select_Invoice_Details="select * from user_invoice where inv_id='$Invoice_ID'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from user_invoice where inv_id=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$Invoice_ID]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 // Needed early (before the item table) as well as in the GST summary
 // section further down, so it's pulled up here rather than declared once
@@ -14,8 +14,8 @@ $gsttype=$result_Invoice_Details['gst_type'];
 
 // Also needed early for the Tax Invoice / Bill of Supply heading below —
 // same query the GST summary section further down reuses via $totalgstamount.
-$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
-$fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
+$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id=?";
+$fetch_sum_gstamount=db_q($db_conn,$select_sum_gstamount,[$Invoice_ID]);
 $result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
 $totalgstamount=$result_sum_gstamount[0];
 $invoice_heading = $totalgstamount > 0 ? 'Tax Invoice' : 'Bill of Supply';
@@ -71,22 +71,22 @@ $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 
 //state details
 $state_id=$result_Customer_Details['state_id'];
-$select_state_dtails="select * from state where id='$state_id'";
-$fetch_state_dtails=mysqli_query($db_conn,$select_state_dtails);
+$select_state_dtails="select * from state where id=?";
+$fetch_state_dtails=db_q($db_conn,$select_state_dtails,[$state_id]);
 $result_state_dtails=mysqli_fetch_array($fetch_state_dtails);
 $state_name=$result_state_dtails['st_name'];
 
 //district details
 $district_id=$result_Customer_Details['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 //Taluk details
 $taluk_id=$result_Customer_Details['taluk_id'];
-$select_taluk="select * from taluk where id='$taluk_id'";
-$fetch_taluk=mysqli_query($db_conn,$select_taluk);
+$select_taluk="select * from taluk where id=?";
+$fetch_taluk=db_q($db_conn,$select_taluk,[$taluk_id]);
 $result_taluk=mysqli_fetch_array($fetch_taluk);
 $taluk_name =	$result_taluk['taluk'];
 
@@ -181,8 +181,8 @@ $Currency_Name="INR";
 else{
 $get_ccode=base64_decode($_REQUEST['crcode']);
 //
-$select_currency223="select * from country where id='$get_ccode'";
-$fetch_currency223=mysqli_query($db_conn,$select_currency223);
+$select_currency223="select * from country where id=?";
+$fetch_currency223=db_q($db_conn,$select_currency223,[$get_ccode]);
 $result_currency223=mysqli_fetch_array($fetch_currency223);
 //
 $Currency_symbol="&#".$result_currency223['currency_ascii_code'].";";
@@ -320,12 +320,12 @@ $result_Godown=mysqli_fetch_array($fetch_Godown);
 
 <?php 
 //fetch user profile
-$select_userprofile="select * from users_profile where user_tempid='$customer_id' and usertype='$getinvuser'";
-$fetch_userprofile=mysqli_query($db_conn,$select_userprofile);
+$select_userprofile="select * from users_profile where user_tempid=? and usertype=?";
+$fetch_userprofile=db_q($db_conn,$select_userprofile,[$customer_id,$getinvuser]);
 $result_userprofile=mysqli_fetch_array($fetch_userprofile);
 
-$selectstockreq="select * from stock_request where reqid='$Invoice_ID'";
-$fetchstockreq=mysqli_query($db_conn,$selectstockreq);
+$selectstockreq="select * from stock_request where reqid=?";
+$fetchstockreq=db_q($db_conn,$selectstockreq,[$Invoice_ID]);
 $resultstockreq=mysqli_fetch_array($fetchstockreq);
 
 if($resultstockreq['delivery_address']!=NULL){$deliveryaddress=$resultstockreq['delivery_address'];}
@@ -357,8 +357,8 @@ State : <?=$state_name;?>, District: <?=$district_name?>, Taluk : <?=$taluk_name
 </tr>
 
 <?php 
-$Select_DLDetails="select * from delivery_note where inv_id='$Invoice_ID'";
-$Fetch_DLDetails=mysqli_query($db_conn,$Select_DLDetails);
+$Select_DLDetails="select * from delivery_note where inv_id=?";
+$Fetch_DLDetails=db_q($db_conn,$Select_DLDetails,[$Invoice_ID]);
 $Result_DLDetails=mysqli_fetch_array($Fetch_DLDetails);
 ?>
 
@@ -412,15 +412,15 @@ Terms of Delivery<br/>
 </tr>
 
 <?php
-	$select_INVProductDetails="select * from user_invoice_items where inv_id='$Invoice_ID' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_invoice_items where inv_id=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['pr_id'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		// Taxable (excl.-of-tax) line value, derived from the stored total/
@@ -489,7 +489,7 @@ if($totalgstamount>0)
 // an average, since a mixed-rate invoice has no single correct "the" rate;
 // MAX at least reflects a real line on the invoice rather than a blended
 // number that matches nothing on it.
-$__gst_pct_row = mysqli_fetch_assoc(mysqli_query($db_conn, "SELECT MAX(gst_percentage) AS pct FROM user_invoice_items WHERE inv_id='$Invoice_ID'"));
+$__gst_pct_row = mysqli_fetch_assoc(mysqli_query($db_conn, "SELECT MAX(gst_percentage) AS pct FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."'"));
 $__inv_gst_pct = (float)($__gst_pct_row['pct'] ?? 0);
 
 if($gsttype=="inner"){
@@ -694,15 +694,15 @@ $number = $result_Invoice_Details['total'];
 </tr>
 <?php } ?>
 <?php
-$selecthsn="select distinct hsn from user_invoice_items where inv_id='$Invoice_ID'";
-$fetchhsn=mysqli_query($db_conn,$selecthsn);
+$selecthsn="select distinct hsn from user_invoice_items where inv_id=?";
+$fetchhsn=db_q($db_conn,$selecthsn,[$Invoice_ID]);
 $hsn_grand_taxable=0; $hsn_grand_gst=0;
 while($resulthsn=mysqli_fetch_array($fetchhsn)){
 
 	$hsncode=$resulthsn['hsn'];
 	// total-gstamount_total = taxable value regardless of whether GST was added on top or carved out (see the GST fix in user-invoice-action2.php etc.)
-	$selecthsnTaxamount="select sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst, max(gst_percentage) as pct from user_invoice_items where inv_id='$Invoice_ID' and hsn='$hsncode'";
-	$fetchhsnTaxamount=mysqli_query($db_conn,$selecthsnTaxamount);
+	$selecthsnTaxamount="select sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst, max(gst_percentage) as pct from user_invoice_items where inv_id=? and hsn=?";
+	$fetchhsnTaxamount=db_q($db_conn,$selecthsnTaxamount,[$Invoice_ID,$hsncode]);
 	$resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
 	$hsn_taxable = (float)$resulthsnTaxamount['taxable'];
 	$hsn_gst     = (float)$resulthsnTaxamount['gst'];

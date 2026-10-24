@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
@@ -249,21 +249,21 @@ $i= $start_from;
 										: ($se_billType==='napkin' ? "AND (p.category IS NULL OR p.category='napkin')" : '');
 									$select_product_list12="select distinct it.`tempid` from `internal_transfer` it
 										join products p on p.id = it.product_id
-										where it.date between '$se_fromDate' and '$se_toDate' {$__billTypeJoinCond}";
-										$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
+										where it.date between ? and ? {$__billTypeJoinCond}";
+										$fetch_product_list12=db_q($db_conn,$select_product_list12,[$se_fromDate,$se_toDate]);
 										while($ResultRecords12=mysqli_fetch_array($fetch_product_list12))
 										{
 											
 											$tempid=$ResultRecords12["tempid"];
 											
-										$select_product_list="select * from internal_transfer where tempid='$tempid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										$select_product_list="select * from internal_transfer where tempid=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 										$ResultRecords=mysqli_fetch_array($fetch_product_list);
 											
 											//product details
 											$product_id=$ResultRecords['product_id'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						//SEND FROM
@@ -278,13 +278,13 @@ $i= $start_from;
 						$fetch_godowndetails2=mysqli_query($db_conn,$select_godowndetails2);
 						$result_godowndetails2=mysqli_fetch_array($fetch_godowndetails2);
 						
-						$select_INVOICE="select * from internal_transfer_invoice where tempid='$tempid'";
-										$fetch_INVOICE=mysqli_query($db_conn,$select_INVOICE);
+						$select_INVOICE="select * from internal_transfer_invoice where tempid=?";
+										$fetch_INVOICE=db_q($db_conn,$select_INVOICE,[$tempid]);
 										$result_INVOICE=mysqli_fetch_array($fetch_INVOICE);
 										
 										//TOTAL qty
-										$select_sUM_QTY="select sum(qty) from internal_transfer where tempid='$tempid'";
-										$fetch_sUM_QTY=mysqli_query($db_conn,$select_sUM_QTY);
+										$select_sUM_QTY="select sum(qty) from internal_transfer where tempid=?";
+										$fetch_sUM_QTY=db_q($db_conn,$select_sUM_QTY,[$tempid]);
 										$result_sUM_QTY=mysqli_fetch_array($fetch_sUM_QTY);
 											?>
                                             
@@ -303,8 +303,8 @@ $i= $start_from;
 					$prid_header=$result_prdetails_header['id'];
 					
 					//SALES QTY
-					$select_SUM_QTY="select qty from internal_transfer where tempid='$tempid' and product_id='$prid_header'";
-					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
+					$select_SUM_QTY="select qty from internal_transfer where tempid=? and product_id=?";
+					$fetch_SUM_QTY=db_q($db_conn,$select_SUM_QTY,[$tempid,$prid_header]);
 					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
 					if($result_SUM_QTY['qty']!=NULL){ $slsqty=$result_SUM_QTY['qty'];} else{ $slsqty="0";}
 					

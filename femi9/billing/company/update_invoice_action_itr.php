@@ -1,4 +1,4 @@
-<?php include("checksession.php"); include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
 
@@ -11,13 +11,13 @@ if (isset($_REQUEST['updateInvoiceNum'])) {
 	$invnumber = RemoveSpecialChar($_POST["invnumber"]);
 	$invnumber=str_replace("'","",$invnumber);
 	
-$Select_Count_Invoice="select * from internal_transfer_invoice where inv_number='$invnumber'";
-$Fetch_Count_Invoice=mysqli_query($db_conn,$Select_Count_Invoice);
+$Select_Count_Invoice="select * from internal_transfer_invoice where inv_number=?";
+$Fetch_Count_Invoice=db_q($db_conn,$Select_Count_Invoice,[$invnumber]);
 $Result_Count_Invoice=mysqli_num_rows($Fetch_Count_Invoice);
 if($Result_Count_Invoice==0){
 	
-	$update_DLNote="update internal_transfer_invoice set inv_number='$invnumber' where tempid='$tempid'";
-	mysqli_query($db_conn,$update_DLNote);
+	$update_DLNote="update internal_transfer_invoice set inv_number=? where tempid=?";
+	db_q($db_conn,$update_DLNote,[$invnumber,$tempid]);
 	
 	echo "<script>window.location='internal_transfer_details?tempid=$tempid&&InvoiceUpdatedSuccess';</script>";
 	

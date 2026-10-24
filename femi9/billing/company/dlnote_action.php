@@ -1,4 +1,4 @@
-<?php include("checksession.php"); include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
 
@@ -24,21 +24,21 @@ if (isset($_REQUEST['UpdateDlNote'])) {
 	$destination = RemoveSpecialChar($_POST["destination"]);
 	$terms = RemoveSpecialChar($_POST["terms"]);
 	
-	$Seleccount="select count(*) as numdl from delivery_note where inv_id='$inv_id'";
-	$fetchCount=mysqli_query($db_conn,$Seleccount);
+	$Seleccount="select count(*) as numdl from delivery_note where inv_id=?";
+	$fetchCount=db_q($db_conn,$Seleccount,[$inv_id]);
 	$ResultCount=mysqli_fetch_array($fetchCount);
 	if($ResultCount['numdl']==0)
 	{
-		$insertRecords="insert into delivery_note (inv_id,inv_number,inv_table,dl_note,mode_pmnt,ref_no,ref_date,ot_ref,order_no,dated,dispatch_doc_no,dlnote_date,dispatch_through,destination,terms) values ('$inv_id','$inv_number','$inv_table','$dl_note','$mode_pmnt','$ref_no','$ref_date','$ot_ref','$order_no','$dated','$dispatch_doc_no','$dlnote_date','$dispatch_through','$destination','$terms')";
-		mysqli_query($db_conn,$insertRecords);
+		$insertRecords="insert into delivery_note (inv_id,inv_number,inv_table,dl_note,mode_pmnt,ref_no,ref_date,ot_ref,order_no,dated,dispatch_doc_no,dlnote_date,dispatch_through,destination,terms) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$insertRecords,[$inv_id,$inv_number,$inv_table,$dl_note,$mode_pmnt,$ref_no,$ref_date,$ot_ref,$order_no,$dated,$dispatch_doc_no,$dlnote_date,$dispatch_through,$destination,$terms]);
 	}
 	else{
 	
 	$update_DLNote="update delivery_note set 
-	dl_note='$dl_note',mode_pmnt='$mode_pmnt',ref_no='$ref_no',ref_date='$ref_date',ot_ref='$ot_ref',
-	order_no='$order_no',dated='$dated',dispatch_doc_no='$dispatch_doc_no',dlnote_date='$dlnote_date',
-	dispatch_through='$dispatch_through',destination='$destination',terms='$terms' where inv_id='$inv_id'";
-	mysqli_query($db_conn,$update_DLNote);
+	dl_note=?,mode_pmnt=?,ref_no=?,ref_date=?,ot_ref=?,
+	order_no=?,dated=?,dispatch_doc_no=?,dlnote_date=?,
+	dispatch_through=?,destination=?,terms=? where inv_id=?";
+	db_q($db_conn,$update_DLNote,[$dl_note,$mode_pmnt,$ref_no,$ref_date,$ot_ref,$order_no,$dated,$dispatch_doc_no,$dlnote_date,$dispatch_through,$destination,$terms,$inv_id]);
 	
 	}
 	

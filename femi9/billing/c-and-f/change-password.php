@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $title="Change Password";
 include("config.php");
 ?>
@@ -63,8 +63,8 @@ include("config.php");
 	echo "<script>window.location='change-password.php?oldpasswordnotsupported';</script>";	
 	}else{
 	
-	$select_old_password="select count(*) as num from c_and_f where password='$oldpassword' and username='$log_username'";
-		$exe_adminselect=mysqli_query($db_conn,$select_old_password);
+	$select_old_password="select count(*) as num from c_and_f where password=? and username=?";
+		$exe_adminselect=db_q($db_conn,$select_old_password,[$oldpassword,$log_username]);
 		$fetch_old_password=mysqli_fetch_array($exe_adminselect);
 		
 		$confirm_old_pass=$fetch_old_password['num'];
@@ -74,8 +74,8 @@ include("config.php");
 			if($newpassword==$confirmpassword)
 			{
  
- $update_news_password="update c_and_f set password='$confirmpassword' where username='$log_username'";
- mysqli_query($db_conn,$update_news_password);
+ $update_news_password="update c_and_f set password=? where username=?";
+ db_q($db_conn,$update_news_password,[$confirmpassword,$log_username]);
  
  $update_password1790="update forgotpassword set reset='1' where usertype='$Login_user_TYPEvl' and mobilenumber='".$_SESSION['LOGIN_USER']."'";
  mysqli_query($db_conn,$update_password1790);

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -201,8 +201,8 @@ $i= $start_from;
 											
 											<tbody>
 				<?php 
-				$select_product_list="select * from wallet_monthly_sls_report where commission_type='Refferral' and from_date between '$from_date' and '$to_date' order by id desc";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+				$select_product_list="select * from wallet_monthly_sls_report where commission_type='Refferral' and from_date between ? and ? order by id desc";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date]);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 
@@ -237,8 +237,8 @@ $result_onbaord_user_records_whom=mysqli_fetch_array($fetch_onbaord_user_records
 
 //district details		
 $district_id=$result_onbaord_user_records['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 

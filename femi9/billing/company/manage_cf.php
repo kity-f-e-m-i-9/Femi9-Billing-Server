@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -200,8 +200,8 @@ $ex=explode("#",$data);
   foreach ($ex as $key => $value)
    {  
     
-$select_distict="select st_name from state where id='$value'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select st_name from state where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$value]);
 $result_district=mysqli_fetch_array($fetch_district);
 		
 		echo "<li>".ucwords($result_district['st_name'])."</li>";

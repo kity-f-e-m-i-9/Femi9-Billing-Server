@@ -1,12 +1,12 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
  error_reporting(0);
  
  $returnid=$_REQUEST['returnid'];
  $returnid_decode=base64_decode($returnid);
  //
- $select_details123="select * from user_return_stock where returnid='$returnid_decode' and deleted_at is null";
-				$fetch_details123=mysqli_query($db_conn,$select_details123);
+ $select_details123="select * from user_return_stock where returnid=? and deleted_at is null";
+				$fetch_details123=db_q($db_conn,$select_details123,[$returnid_decode]);
 				$result_details123=mysqli_fetch_array($fetch_details123);
 				
 				$urlname=$_REQUEST['pagename'];
@@ -131,15 +131,15 @@ $i= $start_from;
 											<tbody>
 											
 													<?php
-	$select_INVProductDetails="select * from user_return_stock_items where returnid='$returnid_decode' and deleted_at is null order by id asc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_return_stock_items where returnid=? and deleted_at is null order by id asc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$returnid_decode]);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['prid'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		$TotalAMount=$result_INVProductDetails['total'];

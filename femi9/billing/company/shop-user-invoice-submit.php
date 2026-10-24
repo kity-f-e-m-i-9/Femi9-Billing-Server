@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
 error_reporting(0);
@@ -10,8 +10,8 @@ if(isset($_REQUEST['invoice-submit']))
 
 
 //get invoice details
-	$select_invoicedtails="select * from user_invoice where inv_id='$invoice_id'";
-	$fetch_invoicedtails=mysqli_query($db_conn,$select_invoicedtails);
+	$select_invoicedtails="select * from user_invoice where inv_id=?";
+	$fetch_invoicedtails=db_q($db_conn,$select_invoicedtails,[$invoice_id]);
 	$result_invoicedetails=mysqli_fetch_array($fetch_invoicedtails);
 	
 	$Login_user_IDvl=$result_invoicedetails['from_user_id'];
@@ -24,12 +24,12 @@ if($_REQUEST['update_invoice_date']!=NULL)
 $update_invoice_date=date("Y-m-d",strtotime($_REQUEST['update_invoice_date']));
 
 //1
-$update_invoice12="update user_invoice set date='$update_invoice_date' where inv_id='$invoice_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-mysqli_query($db_conn,$update_invoice12);
+$update_invoice12="update user_invoice set date=? where inv_id=? and from_user_type=? and from_user_id=?";
+db_q($db_conn,$update_invoice12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
 //2	
-$update_invoice_ITEMS12="update user_invoice_items set date='$update_invoice_date' where inv_id='$invoice_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-mysqli_query($db_conn,$update_invoice_ITEMS12);
+$update_invoice_ITEMS12="update user_invoice_items set date=? where inv_id=? and from_user_type=? and from_user_id=?";
+db_q($db_conn,$update_invoice_ITEMS12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
 	}
 //--------------------------------------------
@@ -38,8 +38,8 @@ mysqli_query($db_conn,$update_invoice_ITEMS12);
 	//DELETE RECEIPT DETAILS IF EDIT FUNCTION
 	if($_SESSION['ACTIONEDIT']=="edit"){
 		
-		$delReceipt="delete from receipt where inv_id='$invoice_id'";
-		mysqli_query($db_conn,$delReceipt);
+		$delReceipt="delete from receipt where inv_id=?";
+		db_q($db_conn,$delReceipt,[$invoice_id]);
 	}
 
 	
@@ -53,8 +53,8 @@ mysqli_query($db_conn,$update_invoice_ITEMS12);
 	$total_amount=round($total_amount);
 	
 	//insert receipt
-	$insertreceiptcount="select count(*) as numreceipt from receipt where receiptid='$invoice_id'";
-	$fetchreceipt=mysqli_query($db_conn,$insertreceiptcount);
+	$insertreceiptcount="select count(*) as numreceipt from receipt where receiptid=?";
+	$fetchreceipt=db_q($db_conn,$insertreceiptcount,[$invoice_id]);
 	$resultreceipt=mysqli_fetch_array($fetchreceipt);
 	if($resultreceipt['numreceipt']==0)
 	{
@@ -83,8 +83,8 @@ mysqli_query($db_conn,$update_invoice_ITEMS12);
 	
 	if($_REQUEST['invoice_id']!=NULL)
 	{
-	$update_invoice="update user_invoice set sub_total='$SubTotal',discount='$discount',total='$total_amount',roundoff='$roundoff',courier_charges='$courier_charges' where inv_id='$invoice_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-	mysqli_query($db_conn,$update_invoice);
+	$update_invoice="update user_invoice set sub_total=?,discount=?,total=?,roundoff=?,courier_charges=? where inv_id=? and from_user_type=? and from_user_id=?";
+	db_q($db_conn,$update_invoice,[$SubTotal,$discount,$total_amount,$roundoff,$courier_charges,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 	}
 	
 	$shopid=$result_invoicedetails['to_user_id'];

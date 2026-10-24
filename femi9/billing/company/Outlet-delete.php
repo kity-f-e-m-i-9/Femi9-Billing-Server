@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 //
 $Coupon_category="Outlet";
@@ -9,8 +9,8 @@ $prid=base64_decode($prid);
 $couponcategory=$_REQUEST['couponcat'];
 
 //user details
-$select_userdetails="select * from outlet where id='$prid'";
-$fetch_userdtails=mysqli_query($db_conn,$select_userdetails);
+$select_userdetails="select * from outlet where id=?";
+$fetch_userdtails=db_q($db_conn,$select_userdetails,[$prid]);
 $result_useradetails=mysqli_fetch_array($fetch_userdtails);
 
 $usericon=$result_useradetails['user_icon'];
@@ -25,14 +25,14 @@ unlink("".$usericon."");
 
 if($amount_method=="coupon")
 {
-	$update_cpnsstus="update coupons set coupon_status='none' where coupon_number='$ref_number' and category='$Coupon_category' and user_type='$Login_user_TYPEvl'";
-	mysqli_query($db_conn,$update_cpnsstus);
+	$update_cpnsstus="update coupons set coupon_status='none' where coupon_number=? and category=? and user_type=?";
+	db_q($db_conn,$update_cpnsstus,[$ref_number,$Coupon_category,$Login_user_TYPEvl]);
 }
 
 
 //delete outlet details
-$del_product="delete from outlet where id='$prid'";
-mysqli_query($db_conn,$del_product);
+$del_product="delete from outlet where id=?";
+db_q($db_conn,$del_product,[$prid]);
 
 
 echo "<script>window.location='Outlet-manage?deletedDone';</script>";

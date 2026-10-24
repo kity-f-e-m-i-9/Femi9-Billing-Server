@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
@@ -14,8 +14,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	
 	$mobile_number=str_replace("'","&#39;",$_POST["mobile_number"]);
 	
-	$Select_CNTMoblenm="select count(*) as numMob from stockiest where mobile_number='$mobile_number'";
-$Fetch_Count_MobilenUmber=mysqli_query($db_conn,$Select_CNTMoblenm);
+	$Select_CNTMoblenm="select count(*) as numMob from stockiest where mobile_number=?";
+$Fetch_Count_MobilenUmber=db_q($db_conn,$Select_CNTMoblenm,[$mobile_number]);
 $Result_Count_MobilenUmber=mysqli_fetch_array($Fetch_Count_MobilenUmber);
 if($Result_Count_MobilenUmber['numMob']==1)
 {
@@ -33,8 +33,8 @@ if($Result_Count_MobilenUmber['numMob']==1)
 	$district_id=$_POST["dist_id"];
 	$taluk_id=$_POST["taluk_id"];
 	
-	$select_count_dist="select count(*) as numdist from stockiest where state_id='$state_id' and district_id='$district_id' and taluk_id='$taluk_id'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+	$select_count_dist="select count(*) as numdist from stockiest where state_id=? and district_id=? and taluk_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$state_id,$district_id,$taluk_id]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numdist']==0)
 	{
@@ -47,8 +47,8 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		
 	//plans details
 	/*$plan_id=$_POST["plan_id"];
-	$select_plans="select * from plans where id='$plan_id'";
-	$fetch_plans=mysqli_query($db_conn,$select_plans);
+	$select_plans="select * from plans where id=?";
+	$fetch_plans=db_q($db_conn,$select_plans,[$plan_id]);
 	$result_plans=mysqli_fetch_array($fetch_plans);*/
 	$plan_amount="0";//$result_plans["amount"];
 	$valid_months="0";//$result_plans["valid_months"];
@@ -75,13 +75,13 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
         $sql="insert into stockiest (state_id,temp_id,user_icon,name,district_id,email,mobile_number,username,password,plan_amount,valid_months,valid_from,valid_to,amount_method,amount_status,ref_number,account_status,merchantOrderId,merchantTransactionId,merchantUserId,taluk_id,ss_id,pincode_id,gstin,onboard_userTYPE,onboard_userID,
 		address,userid,useridtext,country_code)
 
-		values ('$state_id','$temp_id','$uploadfile','$name','$district_id','$user_email','$mobile_number',
-		'$username_generate','$user_password','$plan_amount','$valid_months',
-		'$valid_from','$valid_to','phonepe','pending','Nil','pending',
-		'$merchantOrderId','$merchantTransactionId','$merchantUserId','$taluk_id','$Login_user_IDvl',
-		'0','$gstin','$onboard_userTYPE','$onboard_userID',
-		'$address','0','Nil','$country_code')";
-		mysqli_query($db_conn,$sql);
+		values (?,?,?,?,?,?,?,
+		?,?,?,?,
+		?,?,'phonepe','pending','Nil','pending',
+		?,?,?,?,?,
+		'0',?,?,?,
+		?,'0','Nil',?)";
+		db_q($db_conn,$sql,[$state_id,$temp_id,$uploadfile,$name,$district_id,$user_email,$mobile_number,$username_generate,$user_password,$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$taluk_id,$Login_user_IDvl,$gstin,$onboard_userTYPE,$onboard_userID,$address,$country_code]);
 		
 		
 		//INSERT REFERRAL DETAILS
@@ -97,23 +97,23 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	    $st_ref_userid = RemoveSpecialChar($st_ref_userid_conc);
 	
 		$Insref="insert into stockist_referral (stockist_id,st_cat_id,st_ref_type,st_ref_userid,updated) 
-		values ('$temp_id','$st_cat_id','$st_ref_type','$st_ref_userid','0')";
-		mysqli_query($db_conn,$Insref);
+		values (?,?,?,?,'0')";
+		db_q($db_conn,$Insref,[$temp_id,$st_cat_id,$st_ref_type,$st_ref_userid]);
 		
 		
 //ASSIGNED STOCKIST TO TALUK
-$UPTassignedID="update taluk set assigned_SID='$temp_id' where state_id='$state_id' and dist_id='$district_id' and id='$taluk_id'";
-mysqli_query($db_conn,$UPTassignedID);
+$UPTassignedID="update taluk set assigned_SID=? where state_id=? and dist_id=? and id=?";
+db_q($db_conn,$UPTassignedID,[$temp_id,$state_id,$district_id,$taluk_id]);
 
 //ASSIGNED STOCKIST TO PINCODE
-$selectPincode="select * from pincode where state_id='$state_id' and dist_id='$district_id' and taluk_id='$taluk_id'";
-$fethPincode=mysqli_query($db_conn,$selectPincode);
+$selectPincode="select * from pincode where state_id=? and dist_id=? and taluk_id=?";
+$fethPincode=db_q($db_conn,$selectPincode,[$state_id,$district_id,$taluk_id]);
 while($resultPincode=mysqli_fetch_array($fethPincode))
 {
 	$pinCodeID=$resultPincode['id'];
 
-$update_pincode_user="update pincode set assigned_SID='$temp_id' where id='$pinCodeID'";	
-mysqli_query($db_conn,$update_pincode_user);
+$update_pincode_user="update pincode set assigned_SID=? where id=?";	
+db_q($db_conn,$update_pincode_user,[$temp_id,$pinCodeID]);
 
 }
 

@@ -1,8 +1,8 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 $prid = (int)base64_decode($_REQUEST['prid'] ?? '');
-$res  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE id='$prid'"));
+$res  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE id='".db_esc($prid)."'"));
 ?>
 <!DOCTYPE html>
 <html lang="en">

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $invtype=$_REQUEST['invtype'];
 $invuser=$_REQUEST['invuser'];
@@ -8,17 +8,17 @@ $invid=base64_decode($_REQUEST['invid']);
 if($invtype=="noncustomer")
 {
 	
-	$select_count_items="select * from user_invoice_items where inv_id='$invid'";
-	$fethc_count_items=mysqli_query($db_conn,$select_count_items);
+	$select_count_items="select * from user_invoice_items where inv_id=?";
+	$fethc_count_items=db_q($db_conn,$select_count_items,[$invid]);
 	$result_count_items=mysqli_num_rows($fethc_count_items);
 	if($result_count_items==0)
 	{
 
-$del_inv1="delete from user_invoice where inv_id='$invid'";
-mysqli_query($db_conn,$del_inv1);
+$del_inv1="delete from user_invoice where inv_id=?";
+db_q($db_conn,$del_inv1,[$invid]);
 
-$del_receipt="delete from receipt where inv_id='$invid'";
-mysqli_query($db_conn,$del_receipt);
+$del_receipt="delete from receipt where inv_id=?";
+db_q($db_conn,$del_receipt,[$invid]);
 
 $_SESSION['successMessage']="One Invoice Deleted!";
 echo "<script>window.location='user-manage-invoice?deletedsuccess&&invuser=$invuser';</script>";
@@ -32,17 +32,17 @@ echo "<script>window.location='user-manage-invoice?deletedsuccess&&invuser=$invu
 if($invtype=="shop")
 {
 	
-	$select_count_items="select * from user_invoice_items where inv_id='$invid'";
-	$fethc_count_items=mysqli_query($db_conn,$select_count_items);
+	$select_count_items="select * from user_invoice_items where inv_id=?";
+	$fethc_count_items=db_q($db_conn,$select_count_items,[$invid]);
 	$result_count_items=mysqli_num_rows($fethc_count_items);
 	if($result_count_items==0)
 	{
 
-$del_inv1="delete from user_invoice where inv_id='$invid'";
-mysqli_query($db_conn,$del_inv1);
+$del_inv1="delete from user_invoice where inv_id=?";
+db_q($db_conn,$del_inv1,[$invid]);
 
-$del_receipt="delete from receipt where inv_id='$invid'";
-mysqli_query($db_conn,$del_receipt);
+$del_receipt="delete from receipt where inv_id=?";
+db_q($db_conn,$del_receipt,[$invid]);
 
 $_SESSION['successMessage']="One Invoice Deleted!";
 echo "<script>window.location='shop-user-manage-invoice?deletedsuccess';</script>";
@@ -60,17 +60,17 @@ echo "<script>window.location='shop-user-manage-invoice?deletedsuccess';</script
 if($invtype=="customer")
 {
 	
-	$select_count_items="select * from invoice_items where inv_id='$invid'";
-	$fethc_count_items=mysqli_query($db_conn,$select_count_items);
+	$select_count_items="select * from invoice_items where inv_id=?";
+	$fethc_count_items=db_q($db_conn,$select_count_items,[$invid]);
 	$result_count_items=mysqli_num_rows($fethc_count_items);
 	if($result_count_items==0)
 	{
 
-$del_inv1="delete from invoice where inv_id='$invid'";
-mysqli_query($db_conn,$del_inv1);
+$del_inv1="delete from invoice where inv_id=?";
+db_q($db_conn,$del_inv1,[$invid]);
 
-$del_receipt="delete from receipt where inv_id='$invid'";
-mysqli_query($db_conn,$del_receipt);
+$del_receipt="delete from receipt where inv_id=?";
+db_q($db_conn,$del_receipt,[$invid]);
 
 $_SESSION['successMessage']="One Invoice Deleted!";
 echo "<script>window.location='customer-user-manage-invoice?deletedsuccess';</script>";

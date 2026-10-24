@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 
@@ -35,8 +35,8 @@ $to_date=$_REQUEST['todate'];
 $file = "".$Report_LABLE."".$from_date."(to)".$to_date.".csv";
 
 // Fetch product data from database
-$select_records = "select * from user_invoice where date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and sub_total>0 order by id asc";
-$fetch_records = mysqli_query($db_conn, $select_records);
+$select_records = "select * from user_invoice where date between ? and ? and from_user_type=? and sub_total>0 order by id asc";
+$fetch_records = db_q($db_conn,$select_records,[$from_date,$to_date,$Login_user_TYPEvl]);
 
 // Initialize CSV content
 $csv_content = '';
@@ -69,8 +69,8 @@ $select_Customers="select * from ".$tablename." where temp_id='$CuSTID'";
 //product Qty
 $inv_id=$result_product_list['inv_id'];
 
-$select_sumprqty="select sum(qty) from user_invoice_items where inv_id='$inv_id'";
-$fetch_sumprqty=mysqli_query($db_conn,$select_sumprqty);
+$select_sumprqty="select sum(qty) from user_invoice_items where inv_id=?";
+$fetch_sumprqty=db_q($db_conn,$select_sumprqty,[$inv_id]);
 $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 
 $TotalAmount=number_format($result_product_list["total"],2,'.','');
@@ -94,8 +94,8 @@ $TotalAmount=number_format($result_product_list["total"],2,'.','');
 
 
 
-$select_product_listcUSTOMER="select * from invoice where date between '$from_date' and '$to_date' and user_type='$Login_user_TYPEvl' and sub_total>0 order by id asc";
-			$fetch_product_listCUTOMER=mysqli_query($db_conn,$select_product_listcUSTOMER);
+$select_product_listcUSTOMER="select * from invoice where date between ? and ? and user_type=? and sub_total>0 order by id asc";
+			$fetch_product_listCUTOMER=db_q($db_conn,$select_product_listcUSTOMER,[$from_date,$to_date,$Login_user_TYPEvl]);
 			while($result_product_listCUSTOMER=mysqli_fetch_array($fetch_product_listCUTOMER))
 										{
 											
@@ -106,8 +106,8 @@ $select_product_listcUSTOMER="select * from invoice where date between '$from_da
 											$Cust_Name123="Walking Customer";
 											
 										}else{
-$select_Customers="select * from customers where id='$CuSTID'";
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+$select_Customers="select * from customers where id=?";
+										$fetch_Customers=db_q($db_conn,$select_Customers,[$CuSTID]);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 										//
 										$Cust_Name123=$result_Customers['name'];
@@ -117,8 +117,8 @@ $select_Customers="select * from customers where id='$CuSTID'";
 //product Qty
 $inv_id=$result_product_listCUSTOMER['inv_id'];
 
-$select_sumprqty="select sum(qty) from invoice_items where inv_id='$inv_id'";
-$fetch_sumprqty=mysqli_query($db_conn,$select_sumprqty);
+$select_sumprqty="select sum(qty) from invoice_items where inv_id=?";
+$fetch_sumprqty=db_q($db_conn,$select_sumprqty,[$inv_id]);
 $result_sumprqty=mysqli_fetch_array($fetch_sumprqty);
 
 $TotalAmountCUS=$result_product_listCUSTOMER["total"];

@@ -1,4 +1,4 @@
-<?php /* include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; /* include("checksession.php");
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -12,28 +12,28 @@ $old_taluk_id=$_REQUEST['old_taluk_id'];
 	
 	
 	//TALUK ID UPDATE TO STOCKIST TABLE
-$SELECTTALUKLIST="SELECT * FROM taluk WHERE assigned_SID='$stockistid'";
-$FETCHTALUIKLIST=mysqli_query($db_conn,$SELECTTALUKLIST);
+$SELECTTALUKLIST="SELECT * FROM taluk WHERE assigned_SID=?";
+$FETCHTALUIKLIST=db_q($db_conn,$SELECTTALUKLIST,[$stockistid]);
 while($RESULTTALUKLIST=mysqli_fetch_array($FETCHTALUIKLIST))
 {
 	$implodeTalukidGET[]=$RESULTTALUKLIST['id'];
 }
 $implodedValues = implode(',',$implodeTalukidGET);
 	
-		$updateLocation="update stockiest set state_id='$state_id',district_id='$district_id',
-		taluk_id='$implodedValues' where id='$update_id'";
-		mysqli_query($db_conn,$updateLocation);
+		$updateLocation="update stockiest set state_id=?,district_id=?,
+		taluk_id=? where id=?";
+		db_q($db_conn,$updateLocation,[$state_id,$district_id,$implodedValues,$update_id]);
 		
 
 //ASSIGNED STOCKIST TO PINCODE
-$selectPincode="select * from pincode where state_id='$state_id' and dist_id='$district_id' and taluk_id='$taluk_id'";
-$fethPincode=mysqli_query($db_conn,$selectPincode);
+$selectPincode="select * from pincode where state_id=? and dist_id=? and taluk_id=?";
+$fethPincode=db_q($db_conn,$selectPincode,[$state_id,$district_id,$taluk_id]);
 while($resultPincode=mysqli_fetch_array($fethPincode))
 {
 	$pinCodeID=$resultPincode['id'];
 
-$update_pincode_user="update pincode set assigned_SID='$stockistid' where id='$pinCodeID'";	
-mysqli_query($db_conn,$update_pincode_user);
+$update_pincode_user="update pincode set assigned_SID=? where id=?";	
+db_q($db_conn,$update_pincode_user,[$stockistid,$pinCodeID]);
 
 } 
 		

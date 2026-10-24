@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); require_once("include/GodownAccess.php");
 include("config.php"); 
 error_reporting(0);
@@ -15,15 +15,15 @@ if (!empty($get_godown_id) && !is_godown_allowed($db_conn, (int)$get_godown_id))
     header("Location: overall-stock?unauthorized"); exit;
 }
 //
-$select_Godown_details="select * from company_godown where id='$get_godown_id'";
-$fetch_Godown_details=mysqli_query($db_conn,$select_Godown_details);
+$select_Godown_details="select * from company_godown where id=?";
+$fetch_Godown_details=db_q($db_conn,$select_Godown_details,[$get_godown_id]);
 $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 if($from_month!=NULL)
 {
  //instra-state registered person (tamilnadu)
-$select_sum_total_intra_register="select sum(total) from internal_transfer where date between '$from_date' and '$to_date' and send_to='$get_godown_id'";
-$fetch_sum_total_intra_register=mysqli_query($db_conn,$select_sum_total_intra_register);
+$select_sum_total_intra_register="select sum(total) from internal_transfer where date between ? and ? and send_to=?";
+$fetch_sum_total_intra_register=db_q($db_conn,$select_sum_total_intra_register,[$from_date,$to_date,$get_godown_id]);
 							   $result_sum_total_intra_register=mysqli_fetch_array($fetch_sum_total_intra_register);
 							   
 							   if($result_sum_total_intra_register[0]!=NULL)

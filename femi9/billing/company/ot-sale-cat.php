@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
 error_reporting(1);
 ini_set('display_error','1');
@@ -14,8 +14,8 @@ $message_title="Other Channel Category";
 if(isset($_REQUEST['actiondelete']))
 {
 	$DELID=$_REQUEST['prid'];
-	$delrecord="delete from ot_cat where id='$DELID'";
-	mysqli_query($db_conn,$delrecord);
+	$delrecord="delete from ot_cat where id=?";
+	db_q($db_conn,$delrecord,[$DELID]);
 	echo "<script>window.location='ot-sale-cat?deletedDone';</script>";
 }
 ?>

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
 
@@ -20,12 +20,12 @@ $__manageQS = http_build_query(array_filter([
     'billtype' => $_GET['billtype'] ?? '',
 ]));
 
-$select_Invoice="select * from internal_transfer_invoice where tempid='$tempid'";
-$fetch_Invoice=mysqli_query($db_conn,$select_Invoice);
+$select_Invoice="select * from internal_transfer_invoice where tempid=?";
+$fetch_Invoice=db_q($db_conn,$select_Invoice,[$tempid]);
 $result_Invoice=mysqli_fetch_array($fetch_Invoice);
 
-$select_Invoice_Details="select * from internal_transfer where tempid='$tempid'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from internal_transfer where tempid=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$tempid]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 ?>
 <!DOCTYPE html>
@@ -221,8 +221,8 @@ GSTIN: <?=$result_customer['gstin'];?><br/>
 </tr>
 
 <?php 
-$Select_DLDetails="select * from delivery_note where inv_id='$Invoice_ID'";
-$Fetch_DLDetails=mysqli_query($db_conn,$Select_DLDetails);
+$Select_DLDetails="select * from delivery_note where inv_id=?";
+$Fetch_DLDetails=db_q($db_conn,$Select_DLDetails,[$Invoice_ID]);
 $Result_DLDetails=mysqli_fetch_array($Fetch_DLDetails);
 ?>
 
@@ -277,15 +277,15 @@ Terms of Delivery<br/>
 
 <?php
 	$TotalAMount123 = 0; $Totalquantity123 = 0; $__gst_running = 0;
-	$select_INVProductDetails="select * from internal_transfer where tempid='$tempid' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from internal_transfer where tempid=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$tempid]);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['product_id'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		// GST presentation mirrors the company-login TP invoice print
@@ -539,16 +539,16 @@ $number = $Total_amount_show;
 <td align="right">Taxable Value</td>
 </tr>
 <?php 
-$selecthsn="select distinct hsn from internal_transfer where tempid='$tempid'";
-$fetchhsn=mysqli_query($db_conn,$selecthsn);
+$selecthsn="select distinct hsn from internal_transfer where tempid=?";
+$fetchhsn=db_q($db_conn,$selecthsn,[$tempid]);
 while($resulthsn=mysqli_fetch_array($fetchhsn)){
 	
 	$hsncode=$resulthsn['hsn'];
 
 //sum hsn taxable Amount (taxable_value = pre-GST; total would include GST for
 //exclusive lines and, for inclusive lines, equals the gross so is overstated)
-$selecthsnTaxamount="select sum(taxable_value) from internal_transfer where tempid='$tempid' and hsn='$hsncode'";
-$fetchhsnTaxamount=mysqli_query($db_conn,$selecthsnTaxamount);
+$selecthsnTaxamount="select sum(taxable_value) from internal_transfer where tempid=? and hsn=?";
+$fetchhsnTaxamount=db_q($db_conn,$selecthsnTaxamount,[$tempid,$hsncode]);
 $resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
 ?>
 <tr>
@@ -557,8 +557,8 @@ $resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
 </tr>
 <?php }
 
-$selecthsnTaxamount12="select sum(taxable_value) from internal_transfer where tempid='$tempid'";
-$fetchhsnTaxamount12=mysqli_query($db_conn,$selecthsnTaxamount12);
+$selecthsnTaxamount12="select sum(taxable_value) from internal_transfer where tempid=?";
+$fetchhsnTaxamount12=db_q($db_conn,$selecthsnTaxamount12,[$tempid]);
 $resulthsnTaxamount12=mysqli_fetch_array($fetchhsnTaxamount12);
 ?>
 <tr>

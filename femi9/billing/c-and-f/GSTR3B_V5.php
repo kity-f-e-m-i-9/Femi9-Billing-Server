@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php"); 
 error_reporting(0);
@@ -9,8 +9,8 @@ $to_date=$_REQUEST['todate'];
 if($from_date!=NULL)
 {
  
-							   $select_sum_total_intra_register="select sum(total) from user_invoice where to_user_type='$Login_user_TYPEvl' and to_user_id='$Login_user_IDvl' and gst_type='inner' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_intra_register=mysqli_query($db_conn,$select_sum_total_intra_register);
+							   $select_sum_total_intra_register="select sum(total) from user_invoice where to_user_type=? and to_user_id=? and gst_type='inner' and date between ? and ?";
+							   $fetch_sum_total_intra_register=db_q($db_conn,$select_sum_total_intra_register,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_intra_register=mysqli_fetch_array($fetch_sum_total_intra_register);
 							   
 							   if($result_sum_total_intra_register[0]!=NULL)
@@ -21,8 +21,8 @@ if($from_date!=NULL)
 							   
 							   
 							   //inter-state registered person (other state)
-							   $select_sum_total_inter_register="select sum(total) from user_invoice where to_user_type='$Login_user_TYPEvl' and to_user_id='$Login_user_IDvl' and gst_type='outer' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_inter_register=mysqli_query($db_conn,$select_sum_total_inter_register);
+							   $select_sum_total_inter_register="select sum(total) from user_invoice where to_user_type=? and to_user_id=? and gst_type='outer' and date between ? and ?";
+							   $fetch_sum_total_inter_register=db_q($db_conn,$select_sum_total_inter_register,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_inter_register=mysqli_fetch_array($fetch_sum_total_inter_register);
 							   
 							   if($result_sum_total_inter_register[0]!=NULL)

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 /**
  * READ-ONLY diagnostic for the cnote_manage "incomplete loading" issue.
  * Upload this into femi9/billing/company/ next to cnote_manage.php,
@@ -50,7 +50,7 @@ echo "\n";
 
 $loginType = $Login_user_TYPEvl ?? 'company';
 echo "--- rows where to_usertype='$loginType' (what the page actually queries) ---\n";
-$select_product_list = "select * from user_return_stock where to_usertype='$loginType' order by id desc";
+$select_product_list = "select * from user_return_stock where to_usertype='".db_esc($loginType)."' order by id desc";
 $fetch_product_list = mysqli_query($db_conn, $select_product_list);
 if (!$fetch_product_list) {
     echo "QUERY ERROR: " . mysqli_error($db_conn) . "\n";
@@ -88,7 +88,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
     if ($getinvuser == "customer") {
         $CuSTID = $result_product_list['from_userid'];
         if ($CuSTID != 0) {
-            $q = "select * from customers where id='$CuSTID'";
+            $q = "select * from customers where id='".db_esc($CuSTID)."'";
             $res = mysqli_query($db_conn, $q);
             if (!$res) { echo "  ROW $rowNum: customers QUERY ERROR: " . mysqli_error($db_conn) . "\n"; $errors++; $custOk = false; }
             elseif (mysqli_num_rows($res) == 0) { echo "  ROW $rowNum (returnid=$returnid): customers id=$CuSTID NOT FOUND (orphaned)\n"; }
@@ -107,9 +107,9 @@ while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
 
     // invoice join
     if ($getinvuser == "customer") {
-        $qi = "select * from invoice where inv_id='$invid'";
+        $qi = "select * from invoice where inv_id='".db_esc($invid)."'";
     } else {
-        $qi = "select * from user_invoice where inv_id='$invid'";
+        $qi = "select * from user_invoice where inv_id='".db_esc($invid)."'";
     }
     $resi = mysqli_query($db_conn, $qi);
     if (!$resi) {

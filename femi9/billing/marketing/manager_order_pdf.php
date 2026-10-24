@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -47,21 +47,21 @@ $from_date=$_REQUEST['frd'];
 											
 											<tbody>
 <?php 
-$select_product_list="select distinct order_id from ms_orders where ms_id='$markeingSTFID' and new_order='yes' and order_date between '$from_date' and '$to_date'";	
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select distinct order_id from ms_orders where ms_id=? and new_order='yes' and order_date between ? and ?";	
+$fetch_product_list=db_q($db_conn,$select_product_list,[$markeingSTFID,$from_date,$to_date]);
 while($result_product_list12=mysqli_fetch_array($fetch_product_list))
 {						
 
 $orderid=$result_product_list12['order_id'];
-$select_shopcatt12="select * from ms_orders where order_id='$orderid'";
-$fetch_shopcatt12=mysqli_query($db_conn,$select_shopcatt12);
+$select_shopcatt12="select * from ms_orders where order_id=?";
+$fetch_shopcatt12=db_q($db_conn,$select_shopcatt12,[$orderid]);
 $result_product_list=mysqli_fetch_array($fetch_shopcatt12);										
 
 					
 //shop category
 $shop_id=$result_product_list['shop_id'];
-$select_shopcatt="select * from ms_shop where id='$shop_id'";
-$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
+$select_shopcatt="select * from ms_shop where id=?";
+$fetch_shopcatt=db_q($db_conn,$select_shopcatt,[$shop_id]);
 $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 ?>
                                             

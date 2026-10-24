@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0); require_once("include/PermissionCheck.php"); requirePermission('manage_input_stock_users'); $canEditInputStockUsers = hasPermission('manage_input_stock_users_edit'); $canDeleteInputStockUsers = hasPermission('manage_input_stock_users_delete');?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0); require_once("include/PermissionCheck.php"); requirePermission('manage_input_stock_users'); $canEditInputStockUsers = hasPermission('manage_input_stock_users_edit'); $canDeleteInputStockUsers = hasPermission('manage_input_stock_users_delete');?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -141,16 +141,16 @@ $i= $start_from;
                                             </thead>
 											
 										<tbody>
-										<?php $select_product_list="select * from input_stock_users where input_date between '$from_date' and '$to_date' and still_maintain='1' order by input_date desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from input_stock_users where input_date between ? and ? and still_maintain='1' order by input_date desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 						$RowID=base64_encode($result_product_list["id"]);
 						//
 						$product_id=$result_product_list['product_id'];
-						$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+						$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						//User Details 
 						$st_user_type=$result_product_list['usertype'];
@@ -188,8 +188,8 @@ $user_name=$result_userdetails['name'];
 
 if(is_numeric($usr_district_id))
 {	
-$select_distict="select * from district where id='$usr_district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$usr_district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'] ?? 'Nil';
 }else{
@@ -203,8 +203,8 @@ if($st_user_type!="super_stockiest")
 $usr_taluk_id=$result_userdetails['taluk_id'] ?? 0;
 if(is_numeric($usr_taluk_id))
 {	
-$select_taluk="select taluk from taluk where id='$usr_taluk_id'";
-$fetch_taluk=mysqli_query($db_conn,$select_taluk);
+$select_taluk="select taluk from taluk where id=?";
+$fetch_taluk=db_q($db_conn,$select_taluk,[$usr_taluk_id]);
 $result_taluk=mysqli_fetch_array($fetch_taluk);
 $talk_name=	$result_taluk['taluk'] ?? 'Nil';
 }

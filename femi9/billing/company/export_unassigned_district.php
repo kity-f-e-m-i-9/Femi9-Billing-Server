@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 
@@ -25,7 +25,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_records)) {
 	
 	//state details
 											$state_id=$result_product_list['state_id'];
-								$select_stateList="select * from `state` where id='$state_id'";
+								$select_stateList="select * from `state` where id='".db_esc($state_id)."'";
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];

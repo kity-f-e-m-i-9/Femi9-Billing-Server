@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -10,7 +10,7 @@ $backlink   = ($getinvuser === 'shop') ? 'shop-manage-invoice.php' : 'customer-m
 
 // Fetch invoice (shop invoices use user_invoice; customer invoices use invoice)
 if ($getinvuser === 'customer') {
-    $inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='$invid' LIMIT 1"));
+    $inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='".db_esc($invid)."' LIMIT 1"));
     if (!$inv) { header("Location: $backlink"); exit; }
     $invoice_total   = (float)$inv['total'];
     $courier_charges = (float)($inv['courier_charges'] ?? 0);
@@ -18,7 +18,7 @@ if ($getinvuser === 'customer') {
     $cust_name   = $cust['name']   ?? 'Walking Customer';
     $cust_mobile = $cust['mobile'] ?? '';
 } else {
-    $inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='$invid' LIMIT 1"));
+    $inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='".db_esc($invid)."' LIMIT 1"));
     if (!$inv) { header("Location: $backlink"); exit; }
     $invoice_total   = (float)$inv['total'];
     $courier_charges = (float)($inv['courier_charges'] ?? 0);
@@ -42,11 +42,11 @@ $balance_due = max(0, $invoice_total - $total_received);
 if (isset($_REQUEST['delreceiptact'])) {
     $rcptid = (int)base64_decode($_REQUEST['rcptid'] ?? '');
     $receiptCount = (int)(mysqli_fetch_array(mysqli_query($db_conn,
-        "SELECT COUNT(*) AS n FROM receipt WHERE inv_id='$invid'"))['n']);
+        "SELECT COUNT(*) AS n FROM receipt WHERE inv_id='".db_esc($invid)."'"))['n']);
     if ($receiptCount <= 1) {
-        mysqli_query($db_conn, "UPDATE receipt SET received=0, receivable=invoice_amount WHERE id='$rcptid'");
+        mysqli_query($db_conn, "UPDATE receipt SET received=0, receivable=invoice_amount WHERE id='".db_esc($rcptid)."'");
     } else {
-        mysqli_query($db_conn, "DELETE FROM receipt WHERE id='$rcptid'");
+        mysqli_query($db_conn, "DELETE FROM receipt WHERE id='".db_esc($rcptid)."'");
     }
     echo "<script>window.location='add-receipt.php?invid=" . urlencode($invid) . "&invuser=$getinvuser&DeletedSuccess';</script>";
     exit;
@@ -86,8 +86,8 @@ if (isset($_POST['addreceipt'])) {
     if ($received > 0 && $received <= $balance_due) {
         mysqli_query($db_conn, "INSERT INTO receipt
             (receiptid,inv_id,invoice_amount,received,receivable,date,from_user_type,from_user_id,to_user_type,to_user_id,receipt_method,receipt_remarks,payment_type)
-            VALUES ('$receiptid','$invid','$invoice_total','$received','$balance','$receipt_date',
-            '$from_utype','$from_uid','$to_utype','$to_uid',
+            VALUES ('".db_esc($receiptid)."','".db_esc($invid)."','".db_esc($invoice_total)."','".db_esc($received)."','".db_esc($balance)."','".db_esc($receipt_date)."',
+            '".db_esc($from_utype)."','".db_esc($from_uid)."','".db_esc($to_utype)."','".db_esc($to_uid)."',
             '$receipt_method','$receipt_remarks','regular')");
         echo "<script>window.location='add-receipt.php?invid=" . urlencode($invid) . "&invuser=$getinvuser&ReceiptAddedSuc';</script>";
     } else {
@@ -100,7 +100,7 @@ if (isset($_POST['addreceipt'])) {
 $total_received = (float)(mysqli_fetch_array(mysqli_query($db_conn,
     "SELECT COALESCE(SUM(received),0) AS s FROM receipt WHERE inv_id='$invid'"))['s']);
 $balance_due = max(0, $invoice_total - $total_received);
-$receipts    = mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='$invid' ORDER BY id ASC");
+$receipts    = mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='".db_esc($invid)."' ORDER BY id ASC");
 ?>
 <!DOCTYPE html>
 <html lang="en">

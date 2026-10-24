@@ -1,4 +1,4 @@
-<?php include("checksession.php");  include("config.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");  include("config.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -133,14 +133,14 @@ $i= $start_from;
 										{
 
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 $taluk_id=$result_product_list['taluk_id'];
-$select_distict="select * from taluk where id='$taluk_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from taluk where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$taluk_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $taluk_name=$result_district['taluk'];
 											

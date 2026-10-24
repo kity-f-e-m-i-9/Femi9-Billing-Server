@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 
@@ -15,14 +15,14 @@ if(isset($_POST["Import"])){
 				$dist_id=$getData[1];
 				$taluk_name=$getData[2];
 				
-$selec_count_duplicate=mysqli_query($db_conn,"select count(*) as numitem from taluk where state_id='$state_id' and dist_id='$dist_id' and taluk='$taluk_name'");
+$selec_count_duplicate=mysqli_query($db_conn,"select count(*) as numitem from taluk where state_id='".db_esc($state_id)."' and dist_id='".db_esc($dist_id)."' and taluk='".db_esc($taluk_name)."'");
 $fech_count_duplicate=mysqli_fetch_array($selec_count_duplicate);
 if($fech_count_duplicate['numitem']==0)
 {
 				   
 				  $insert_products="insert into taluk (state_id,dist_id,taluk,usertype,userid,assigned_SID) values 
-		('$state_id','$dist_id','$taluk_name','$Login_user_TYPEvl','$Login_user_IDvl','Nil')";
-                 $result = mysqli_query($db_conn, $insert_products);
+		(?,?,?,?,?,'Nil')";
+                 $result = db_q($db_conn,$insert_products,[$state_id,$dist_id,$taluk_name,$Login_user_TYPEvl,$Login_user_IDvl]);
 					   
 }   
 			

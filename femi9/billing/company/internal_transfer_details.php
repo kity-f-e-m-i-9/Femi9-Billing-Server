@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
@@ -11,12 +11,12 @@ if ($__usertype !== 'finance') {
 
 $tempid=$_REQUEST['tempid'];
 
-$select_Invoice="select * from internal_transfer_invoice where tempid='$tempid'";
-$fetch_Invoice=mysqli_query($db_conn,$select_Invoice);
+$select_Invoice="select * from internal_transfer_invoice where tempid=?";
+$fetch_Invoice=db_q($db_conn,$select_Invoice,[$tempid]);
 $result_Invoice=mysqli_fetch_array($fetch_Invoice);
 
-$select_Invoice_Details="select * from internal_transfer where tempid='$tempid'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from internal_transfer where tempid=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$tempid]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 //SEND FROM
 						$send_from=$result_Invoice_Details['send_from'];
@@ -31,13 +31,13 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 						$result_godowndetails2=mysqli_fetch_array($fetch_godowndetails2);
 						
 //DELETE INVOICE Number
-$select_Count_Invoice="select * from internal_transfer where tempid='$tempid'";
-$fetch_Count_Invoice=mysqli_query($db_conn,$select_Count_Invoice);
+$select_Count_Invoice="select * from internal_transfer where tempid=?";
+$fetch_Count_Invoice=db_q($db_conn,$select_Count_Invoice,[$tempid]);
 $result_Count_Invoice=mysqli_num_rows($fetch_Count_Invoice);	
 if($result_Count_Invoice==0)
 {
-   $deletInovice="delete from internal_transfer_invoice where tempid='$tempid'";
-   mysqli_query($db_conn,$deletInovice);
+   $deletInovice="delete from internal_transfer_invoice where tempid=?";
+   db_q($db_conn,$deletInovice,[$tempid]);
    
    $_SESSION['sucMessage']="One Internal Stock Transfer Details Deleted Successfully!";
    echo "<script>window.location='internal_transfer_manage?alldeleted';</script>";
@@ -242,8 +242,8 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-		$select_product_list="select * from internal_transfer where tempid='$tempid' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+		$select_product_list="select * from internal_transfer where tempid=? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 										while($ResultRecords=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -251,8 +251,8 @@ $i= $start_from;
 											
 											//product details
 											$product_id=$ResultRecords['product_id'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						$PR_qty=$ResultRecords["qty"];

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -11,7 +11,7 @@ if (isset($_GET['delid'])) {
         $uid   = mysqli_real_escape_string($db_conn, $Login_user_IDvl);
         $utype = mysqli_real_escape_string($db_conn, $Login_user_TYPEvl);
         mysqli_query($db_conn,
-            "DELETE FROM wallet_withdraw WHERE id='$del_id' AND user_type='$utype' AND user_id='$uid' AND req_status='pending'"
+            "DELETE FROM wallet_withdraw WHERE id='".db_esc($del_id)."' AND user_type='$utype' AND user_id='$uid' AND req_status='pending'"
         );
         $_SESSION['successMessage'] = "Withdraw request cancelled.";
     }
@@ -68,7 +68,7 @@ if (isset($_REQUEST['sent_money_request'])) {
         mysqli_query($db_conn,
             "INSERT INTO wallet_withdraw (amount, req_id, req_status, user_type, user_id, date, time, remarks,
              updated_date, updated_time, TDS_percentage, TDS_deduction, sent_amount, acname, acnumber, bankname, ifsc, pannumber)
-             VALUES ('$request_amount','$req_id','$req_status','$user_type','$user_id','$date','$time',
+             VALUES ('".db_esc($request_amount)."','$req_id','".db_esc($req_status)."','$user_type','$user_id','".db_esc($date)."','".db_esc($time)."',
              'Nil','1970-01-01','12:12:12','0','0','0','$acname','$acnumber','$bankname','$ifsc','$pannumber')"
         );
 

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
 
@@ -12,8 +12,8 @@ if(isset($_REQUEST['inv_id']))
 	$rowid_decode=base64_decode($rowid_encode);
 	
 	//
-	$select_INVProductDetails="select * from user_invoice_items where id='$rowid_decode'";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_invoice_items where id=?";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$rowid_decode]);
 	$result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails);
 	if($result_INVProductDetails['pr_id']!=NULL)
 	{
@@ -50,8 +50,8 @@ if(isset($_REQUEST['inv_id']))
 
 	}
 	
-	$delRecord="delete from user_invoice_items where id='$rowid_decode'";
-	mysqli_query($db_conn,$delRecord);
+	$delRecord="delete from user_invoice_items where id=?";
+	db_q($db_conn,$delRecord,[$rowid_decode]);
 	
 	echo "<script>window.location='stock_request_details?reqid=".$invoice_id_encode."&&DeleteSuccess&&invuser=".$invuser."&&ActionRemove&&gid=".$Login_user_IDvl."';</script>";
 	
