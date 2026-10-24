@@ -338,6 +338,14 @@ foreach (['Date* (YYYY-MM-DD)', 'Order Date (YYYY-MM-DD)', 'Ship Date (YYYY-MM-D
     $sheet->getStyle($dateColLetter . '2:' . $dateColLetter . $dataRowsEnd)->getNumberFormat()->setFormatCode('YYYY-MM-DD');
 }
 
+// Wrap Text on the header row (so long headers like "Wallet Amount
+// (Website/ID Concept only)" wrap to multiple lines instead of overflowing
+// into neighbouring cells) and on every data row (so long typed values like
+// Customer Address/Shipping Address stay visible within their own cell
+// instead of being visually cut off by the next column).
+$sheet->getStyle('A1:' . Coordinate::stringFromColumnIndex($lastCol) . '1')->getAlignment()->setWrapText(true);
+$sheet->getStyle('A2:' . Coordinate::stringFromColumnIndex($lastCol) . $dataRowsEnd)->getAlignment()->setWrapText(true);
+
 foreach (range(1, $lastCol) as $i) {
     $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
 }
