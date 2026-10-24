@@ -13,7 +13,7 @@
 
 session_start();
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('payment_entry');
 include("config.php");
 require_once("include/GodownAccess.php");
 

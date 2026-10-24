@@ -1,5 +1,5 @@
 <?php require_once __DIR__ . '/../shared/safe-upload.php';
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('channel_partner');
 require_once("include/GodownAccess.php");
 require_once __DIR__ . '/../shared/AgreementService.php';
 include("config.php");

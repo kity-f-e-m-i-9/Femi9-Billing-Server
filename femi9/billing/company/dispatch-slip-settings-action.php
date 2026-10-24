@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('products');
 include("config.php");
 require_once __DIR__ . '/../shared/DispatchSlipSettings.php';
 error_reporting(0);

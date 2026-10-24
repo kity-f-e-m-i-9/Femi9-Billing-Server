@@ -6,7 +6,7 @@
 // entries in the global machine_code_master list, and list them so the
 // modal and every row's dropdown can refresh after a change.
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 require_once("include/GodownAccess.php");
 require_once("include/MachineCodes.php");
 include("config.php");

@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
 error_reporting(0);
 date_default_timezone_set("Asia/kolkata");
 $today=date("Y-m-d");

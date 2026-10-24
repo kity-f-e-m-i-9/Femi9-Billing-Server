@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('st');
 $state_id=$_REQUEST['subcourseID'];
 ?>
 <select required="" name="dist_id" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onChange="showTaluk(<?php echo $state_id;?>,this.value)">

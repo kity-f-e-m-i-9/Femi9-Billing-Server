@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['cus','shop','ss']);
 include("config.php");
 require_once("include/StockService.php");
 

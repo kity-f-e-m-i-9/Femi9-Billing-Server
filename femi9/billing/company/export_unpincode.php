@@ -3,7 +3,7 @@
 ob_start();
 
 // Include session check
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('unassigned');
 include("config.php");
 
 $state_id=$_REQUEST['stid'];

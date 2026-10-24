@@ -6,7 +6,7 @@
  * SECURITY: Prepared statements, input validation, CSRF protection
  */
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['manage_return_delete','report']);
 include("config.php");
 include("advance-payment-functions.php");
 

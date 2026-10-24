@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('cus');
 include("config.php");
 require_once("include/StockService.php");
 

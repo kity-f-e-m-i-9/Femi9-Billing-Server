@@ -1,5 +1,5 @@
 <?php require_once __DIR__ . '/../shared/db-helpers.php'; 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 error_reporting(0);
 
 $rowid=$_REQUEST['rowid'];

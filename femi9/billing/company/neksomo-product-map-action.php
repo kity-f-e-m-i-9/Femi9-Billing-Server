@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('report');
 require_once("include/GodownAccess.php");
 require_once("include/NeksomoProductMapping.php");
 include("config.php");

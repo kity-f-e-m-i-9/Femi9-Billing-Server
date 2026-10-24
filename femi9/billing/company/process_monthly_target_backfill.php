@@ -11,7 +11,7 @@
  * @location /company/process_monthly_target_backfill.php
  */
 
-declare(strict_types=1); include("checksession.php");
+declare(strict_types=1); include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 
 // Security: Only allow Company users
 session_start();

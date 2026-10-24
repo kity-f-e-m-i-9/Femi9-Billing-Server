@@ -1,5 +1,5 @@
 <?php require_once __DIR__ . '/../shared/db-helpers.php';
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('cus');
 include("config.php");
 require_once("include/StockService.php");
 error_reporting(E_ALL);

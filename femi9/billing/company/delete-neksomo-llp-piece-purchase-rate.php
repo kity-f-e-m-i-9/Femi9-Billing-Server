@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 require_once("include/GodownAccess.php");
 include("config.php");
 

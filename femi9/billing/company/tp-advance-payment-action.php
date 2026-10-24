@@ -1,6 +1,6 @@
 <?php
 ob_start();
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('territory_partner_edit');
 require_once("include/GodownAccess.php");
 require_once __DIR__ . '/../shared/TpProductType.php';
 error_reporting(0);

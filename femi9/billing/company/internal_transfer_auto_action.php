@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['internal_transfer','stock_transfers']);
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/NeksomoStockBridge.php");

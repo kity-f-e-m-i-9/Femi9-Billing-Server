@@ -1,6 +1,6 @@
 <?php require_once __DIR__ . '/../shared/db-helpers.php';
 ob_start();
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('report');
 include("config.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);

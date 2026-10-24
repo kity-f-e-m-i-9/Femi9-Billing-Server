@@ -1,6 +1,6 @@
 <?php
 ob_start();
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['report','territory_partner_edit']);
 error_reporting(0);
 require_once __DIR__ . '/../shared/TpAdvanceService.php';
 require_once __DIR__ . '/../shared/TpInvoiceNumberService.php';

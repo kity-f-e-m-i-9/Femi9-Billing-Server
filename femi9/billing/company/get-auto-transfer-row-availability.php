@@ -7,7 +7,7 @@
 // transfer-design.md). Mirrors get-piece-pack-stock.php's shape, but for
 // two entities (Neksomo + Healthcare) instead of one.
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['internal_transfer','stock_transfers']);
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/NeksomoStockBridge.php");

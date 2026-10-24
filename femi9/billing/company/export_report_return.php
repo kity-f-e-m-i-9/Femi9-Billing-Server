@@ -4,7 +4,7 @@ ob_start();
 error_reporting(0);
 
 // Include session check
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('report');
 include("config.php");
 
 $Report_LABLE="RETURN STOCK REPORTS";

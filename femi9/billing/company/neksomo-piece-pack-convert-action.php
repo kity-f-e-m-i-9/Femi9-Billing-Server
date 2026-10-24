@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/NeksomoStockBridge.php");

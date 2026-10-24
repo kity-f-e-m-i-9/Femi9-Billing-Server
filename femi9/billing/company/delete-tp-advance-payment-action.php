@@ -11,7 +11,7 @@ header("Content-Type: application/json; charset=utf-8");
 
 session_start();
 
-require_once("checksession.php");
+require_once("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('territory_partner_delete');
 require_once("config.php");
 require_once("include/GodownAccess.php");
 

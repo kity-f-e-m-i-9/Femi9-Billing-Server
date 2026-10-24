@@ -10,7 +10,7 @@
 
 session_start();
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('report');
 include("config.php");
 require_once("include/GodownAccess.php");
 require '../../../vendor/autoload.php';

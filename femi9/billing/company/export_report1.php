@@ -3,7 +3,7 @@
 ob_start();
 
 // Include session check
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('report');
 include("config.php");
 
 if($_REQUEST['lable']==1 && $_REQUEST['rptlable']==1)

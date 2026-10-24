@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('territory_partner_delete');
 include("config.php");
 error_reporting(0);
 

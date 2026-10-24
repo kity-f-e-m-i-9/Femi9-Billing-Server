@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['products','products_edit','location','st','ot_channels']);
 include("config.php");
 include("RemoveSpecialChar.php");
 

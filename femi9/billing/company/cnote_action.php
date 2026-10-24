@@ -7,7 +7,7 @@
  * PERFORMANCE: Optimized queries with proper indexing
  */
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['cus','shop','ss']);
 include("config.php");
 include("advance-payment-functions.php");
 

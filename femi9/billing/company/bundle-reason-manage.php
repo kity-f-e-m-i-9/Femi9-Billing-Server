@@ -8,7 +8,7 @@
 // `type` (damage|extra) so one file serves both lists rather than
 // duplicating this whole CRUD file twice. Mirrors machine-code-manage.php.
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 require_once("include/GodownAccess.php");
 require_once("include/RawMaterialBundles.php");
 include("config.php");

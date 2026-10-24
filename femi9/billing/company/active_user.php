@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['dt','sdt','ss','st']);
 
 $user_table=$_REQUEST['usr'] ?? '';
 // Table name must come from a fixed allowlist - it is concatenated into SQL.

@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('location');
 $state_id=$_REQUEST['q'];
 ?>
 <select required="" name="dist_id" onchange="showsuperstockist('<?=$state_id;?>',this.value)" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp">

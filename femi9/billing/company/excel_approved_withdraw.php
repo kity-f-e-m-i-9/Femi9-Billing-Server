@@ -3,7 +3,7 @@
 ob_start();
 
 // Include session check
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 include("config.php");
 
 $from_date=$_REQUEST['frd'];

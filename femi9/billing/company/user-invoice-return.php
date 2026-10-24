@@ -12,7 +12,7 @@
 
 declare(strict_types=1);
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['ss','st','dt','sdt','shop','cus','stock_request','ot_channels','debit_note','manage_return','demo_free','report','payment_entry','manage_payment_entry','territory_partner']);
 include("config.php");
 include("advance-payment-functions.php");
 require_once("include/StockService.php");

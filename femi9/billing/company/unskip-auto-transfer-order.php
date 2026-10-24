@@ -13,7 +13,7 @@
 // order.php's "Delete Selected") the same way — that button never touched
 // stock either, so re-adding it here is identical: just make the order
 // count as outstanding demand again.
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 require_once("include/GodownAccess.php");
 require_once("include/AutoTransferDemand.php");
 include("config.php");

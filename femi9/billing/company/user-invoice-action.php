@@ -15,7 +15,7 @@
 
 declare(strict_types=1);
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ss');
 include("config.php");
 require_once("advance-payment-functions.php");
 require_once("include/GodownAccess.php");

@@ -10,7 +10,7 @@
  * outbound Wati notification via triggerWaPoPaymentApprovalNotification().
  * On reject: just records the rejection reason.
  */
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 include("config.php");
 error_reporting(0);
 
