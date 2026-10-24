@@ -223,7 +223,7 @@ function newPopup(url) {
 			
 						<td>
 			    <div class="actions-group">
-			        <a href="delete_stockist_approval.php?rowid=<?=$rowid;?>&&talukID=<?=$taluk_id;?>&&userid=<?=base64_encode($result_product_list['temp_id']);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm this Stockist (<?php echo ucwords($result_product_list["><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+			        <a href="delete_stockist_approval.php?rowid=<?=$rowid;?>&&talukID=<?=$taluk_id;?>&&userid=<?=base64_encode($result_product_list['temp_id']);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm this Stockist (<?php echo ucwords($result_product_list["name"]);?>)')"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 			    </div>
 			</td>
 													
