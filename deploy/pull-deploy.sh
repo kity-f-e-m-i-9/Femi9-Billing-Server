@@ -29,10 +29,11 @@ LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse "origin/$BRANCH")
 [ "$LOCAL" = "$REMOTE" ] && [ -z "${FORCE:-}" ] && exit 0
 
-echo "[$(date '+%F %T')] deploying ${LOCAL:0:7} -> ${REMOTE:0:7}" >> "$LOG"
+echo "[$(date '+%F %T')] deploying${DRY:+ (DRY RUN)} ${LOCAL:0:7} -> ${REMOTE:0:7}" >> "$LOG"
 git reset -q --hard "origin/$BRANCH"
 
-rsync -rlptD \
+RSYNC_FLAGS="-rlptD"; [ -n "${DRY:-}" ] && RSYNC_FLAGS="-rlptDn --itemize-changes"   # DRY=1 shows what would change
+rsync $RSYNC_FLAGS \
   --exclude='.git' --exclude='.github' --exclude='deploy' --exclude='.cpanel.yml' \
   --exclude='.claude' --exclude='docs' --exclude='sql' \
   --exclude='.env' --exclude='.env.*' \
