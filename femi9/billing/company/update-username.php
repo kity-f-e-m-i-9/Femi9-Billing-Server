@@ -42,6 +42,7 @@ if(isset($_REQUEST['update-username-action']))
 	$update_id=$_REQUEST['update_id'];
 	$page_name=$_REQUEST['page_name'];
 	$update_table=$_REQUEST['update_table'];
+	if (!in_array($update_table, ['stockiest','super_stockiest','distributor','super_distributor','shop','c_and_f','marketing_staff','sales_bdm_staff','outlet'], true)) { http_response_code(400); exit('Invalid request'); } // table name goes into SQL: allowlist only
 	$usrname=str_replace("'","&#39;",$_REQUEST['usrname']);
 	
 	$select_count_Username="select count(*) as numUsrname from ".$update_table." where username='$usrname'";

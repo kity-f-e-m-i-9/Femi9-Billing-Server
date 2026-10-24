@@ -290,6 +290,7 @@ db_q($db_conn,$update_reward_points234,[$rwpoints_zero_update2,$zero_row_id2]);
 		$st_ref_userid_conc="".$st_ref_userid."".$st_ref_userid2."";
 		
 		$tblename=$_REQUEST['tblename'];
+		if (!in_array($tblename, ['distributor','super_stockiest','stockiest','super_distributor'], true)) { http_response_code(400); exit('Invalid request'); } // table name goes into SQL: allowlist only
 		
 		if($st_ref_type=="company")
 		{

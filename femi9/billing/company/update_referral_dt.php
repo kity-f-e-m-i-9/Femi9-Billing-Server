@@ -85,6 +85,7 @@ function closerefresh()
 		$st_ref_userid_conc="".$st_ref_userid."".$st_ref_userid2."";
 		
 		$tblename=$_REQUEST['tblename'];
+		if (!in_array($tblename, ['distributor','super_stockiest','stockiest','super_distributor'], true)) { http_response_code(400); exit('Invalid request'); } // table name goes into SQL: allowlist only
 		
 		if($st_ref_type=="company")
 		{

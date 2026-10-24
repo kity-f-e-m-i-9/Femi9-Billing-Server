@@ -8,8 +8,7 @@ require_once __DIR__ . '/../shared/EncryptionService.php';
 $_enc = new EncryptionService();
 function decryptPassword($enc, $hash) {
     if (!$hash) return '';
-    if (password_get_info($hash)['algo']) return null; // bcrypt — cannot reverse
-    try { return $enc->decrypt($hash); } catch (Exception $e) { return $hash; }
+    return null; // passwords are one-way hashed / never displayed (use Reset password)
 }
 
 if (empty($_SESSION['csrf_token'])) {

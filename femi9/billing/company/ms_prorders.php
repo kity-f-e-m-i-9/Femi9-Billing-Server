@@ -99,8 +99,8 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 								<?php
 								if($_REQUEST['frdate']!=NULL)
 								{
-						$from_date=$_REQUEST['frdate'];
-						$to_date=$_REQUEST['todate'];
+						$from_date=(preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_REQUEST['frdate'])) ? (string)($_REQUEST['frdate']) : '');
+						$to_date=(preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_REQUEST['todate'])) ? (string)($_REQUEST['todate']) : '');
 								}
 								else
 								{

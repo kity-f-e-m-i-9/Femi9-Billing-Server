@@ -11,8 +11,8 @@ error_reporting(0);
 $selected_branch_state = trim($_REQUEST['branch_state'] ?? '');
 $selected_pincode      = trim($_REQUEST['branch_pincode'] ?? '');
 $selected_buyer_type   = trim($_REQUEST['buyer_type'] ?? '');
-$from_date             = $_REQUEST['frdate'] ?? '';
-$to_date               = $_REQUEST['todate'] ?? '';
+$from_date             = (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_REQUEST['frdate'] ?? '')) ? (string)($_REQUEST['frdate'] ?? '') : '');
+$to_date               = (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_REQUEST['todate'] ?? '')) ? (string)($_REQUEST['todate'] ?? '') : '');
 
 if ($selected_branch_state === '' || $from_date === '' || $to_date === '') {
     header("Location: Report-TP-First-Page.php");
