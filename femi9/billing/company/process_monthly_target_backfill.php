@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php
 /**
  * Monthly Target Rewards Backfill Processor
  * 
@@ -11,7 +11,7 @@
  * @location /company/process_monthly_target_backfill.php
  */
 
-declare(strict_types=1);
+declare(strict_types=1); include("checksession.php");
 
 // Security: Only allow Company users
 session_start();

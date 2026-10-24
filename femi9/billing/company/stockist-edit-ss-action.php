@@ -9,7 +9,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     
     // Get form data
     $update_id = isset($_REQUEST['update_id']) ? intval($_REQUEST['update_id']) : 0;
-    $old_icon = isset(safe_old_file_param($_REQUEST['old_icon'])) ? safe_old_file_param($_REQUEST['old_icon']) : '';
+    $old_icon = isset($_REQUEST['old_icon']) ? safe_old_file_param($_REQUEST['old_icon']) : '';
     $stockistid = isset($_REQUEST['stockistid']) ? $_REQUEST['stockistid'] : '';
     $current_taluk_id = isset($_REQUEST['current_taluk_id']) ? intval($_REQUEST['current_taluk_id']) : 0;
     

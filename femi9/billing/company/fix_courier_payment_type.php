@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php
 /**
  * fix_courier_payment_type.php
  *
@@ -24,7 +24,7 @@
  * @version 1.0.0
  */
 
-declare(strict_types=1);
+declare(strict_types=1); include("checksession.php");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 // !! Move these to an .env file or a config outside webroot in production !!
