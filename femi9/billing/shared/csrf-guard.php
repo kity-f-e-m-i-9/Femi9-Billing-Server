@@ -34,6 +34,11 @@ if (!function_exists('femi_csrf_guard')) {
             if ($https) { @ini_set('session.cookie_secure', '1'); }
         }
 
+        // Payment-gateway return pages (success_*.php) are entered by the gateway
+        // redirecting the customer's browser back, which is cross-site by design.
+        $self_script = strtolower(basename((string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH)));
+        if (strpos($self_script, 'success_') === 0) { return; }
+
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         if (!in_array($method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], true)) { return; }
 
