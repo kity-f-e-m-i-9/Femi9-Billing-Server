@@ -48,10 +48,12 @@ $filter_tp   = (int)($_GET['tp_id'] ?? 0);
 $filter_company = isset($_GET['company_id']) ? (int)$_GET['company_id'] : $default_company_id;
 $filter_status = $_GET['status'] ?? '';
 $filter_type   = $_GET['type_filter'] ?? '';
+$filter_mode   = $_GET['mode_filter'] ?? '';
 
 $allowed_statuses = ['active','partially_adjusted','fully_adjusted',''];
 if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = '';
 if (!in_array($filter_type, ['napkin','diaper'], true)) $filter_type = '';
+if (!in_array($filter_mode, ['Cash','Bank Transfer',''], true)) $filter_mode = '';
 
 // Build query
 $where = ["tap.deleted_at IS NULL", "tap.payment_date BETWEEN ? AND ?"];
@@ -77,6 +79,14 @@ if ($filter_type !== '') {
     $where[] = "tap.product_type = ?";
     $params[] = $filter_type;
     $types .= "s";
+}
+if ($filter_mode === 'Cash') {
+    $where[] = "tap.payment_mode = 'Cash'";
+} elseif ($filter_mode === 'Bank Transfer') {
+    // Everything non-Cash counts as "Bank Transfer" for this filter — UPI,
+    // NEFT, RTGS, IMPS, Cheque etc. are all bank-routed, same grouping the
+    // receipt page uses to decide whether to show a proof screenshot.
+    $where[] = "tap.payment_mode != 'Cash'";
 }
 if ($filter_zone_id > 0) {
     if (empty($zoneTpIds)) { $zoneTpIds = [0]; }
@@ -334,6 +344,14 @@ $i = 0;
                                                 <option value="fully_adjusted" <?php echo $filter_status==='fully_adjusted' ? 'selected' : ''; ?>>Fully Adjusted</option>
                                             </select>
                                         </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Receipt / Mode</label>
+                                            <select name="mode_filter" class="form-control">
+                                                <option value="">All Modes</option>
+                                                <option value="Cash" <?php echo $filter_mode==='Cash' ? 'selected' : ''; ?>>Cash</option>
+                                                <option value="Bank Transfer" <?php echo $filter_mode==='Bank Transfer' ? 'selected' : ''; ?>>Bank Transfer</option>
+                                            </select>
+                                        </div>
                                         <div class="col-md-2 d-flex gap-2">
                                             <button type="submit" class="btn btn-light font-weight-bold">
                                                 <i class="material-icons" style="vertical-align:middle;font-size:17px;">filter_list</i> Filter
@@ -410,6 +428,9 @@ $i = 0;
                                                     </td>
                                                     <td><?php echo htmlspecialchars($p['created_by']); ?></td>
                                                     <td>
+                                                        <a href="tp-advance-payment-receipt.php?id=<?php echo $p['id']; ?>" target="_blank" class="btn btn-sm btn-info text-white btn-action me-1" title="View Receipt">
+                                                            <i class="material-icons" style="font-size:16px;vertical-align:middle;">receipt_long</i>
+                                                        </a>
                                                         <button type="button" class="btn btn-sm btn-warning btn-action edit-btn me-1" data-id="<?php echo $p['id']; ?>" title="Edit Payment">
                                                             <i class="material-icons" style="font-size:16px;vertical-align:middle;">edit</i>
                                                         </button>
