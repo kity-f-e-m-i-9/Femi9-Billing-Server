@@ -103,7 +103,7 @@ $title = "Import OT Channel Sales";
                                         <ol class="mb-2">
                                             <li>Two sample templates, depending on the category you're importing — pick the one matching your rows:
                                                 <ul class="mb-1">
-                                                    <li><strong>Marketplace orders</strong> (Amazon, Flipkart, Blinkit, Jio, etc.) — leaves out Coupon Code, Customer Mobile, GST Number, Order Date and Ship Date, which don't apply to these. Invoice Number is always typed in manually (your own order number).</li>
+                                                    <li><strong>Marketplace orders</strong> (Amazon, Flipkart, Blinkit, Jio, etc.) — leaves out Coupon Code, Customer Mobile and GST Number, which don't apply to these. Invoice Number is always typed in manually (your own order number).</li>
                                                     <li><strong>Website / ID Concept / WhatsApp Sales / Digital Orders</strong> — keeps every field, and its Invoice Number column additionally accepts the word <strong>NEXT</strong> (see below).</li>
                                                 </ul>
                                             </li>

@@ -5,12 +5,14 @@
  * Two variants, picked by ?group=marketplace|tracked (defaults to
  * marketplace): marketplace categories (Amazon, Flipkart, Blinkit, etc. —
  * everything outside OT_TRACKED_INVOICE_CATS) don't need Coupon Code,
- * Customer Mobile, GST Number, Order Date or Ship Date, so those columns are
- * left out entirely; tracked categories (Website, ID Concept, WhatsApp
- * Sales, Digital Orders) keep every column, and their Invoice Number column
- * additionally accepts the literal word "NEXT" (see ot-sale-import-action.php)
- * to auto-generate that category's next sequential number instead of typing
- * one in.
+ * Customer Mobile or GST Number, so those columns are left out entirely;
+ * tracked categories (Website, ID Concept, WhatsApp Sales, Digital Orders)
+ * keep every column, and their Invoice Number column additionally accepts
+ * the literal word "NEXT" (see ot-sale-import-action.php) to auto-generate
+ * that category's next sequential number instead of typing one in.
+ * Order Date / Ship Date are not on either template — ot-sale-import-action.php
+ * still accepts and maps them if present (defaulting to 1991-01-01 when
+ * absent), so a sheet carried over from before this change keeps working.
  *
  * One row = one product line, not one invoice. To put several products on
  * the same invoice, repeat the same Invoice Number (and the rest of that
@@ -23,14 +25,14 @@
  * actually types for that row's chosen product ever applies to it; nothing
  * is pre-filled for the other products.
  *
- * Every invoice-level column (Company Profile .. Wallet Amount — everything
- * except Product/Qty/Rate/Discount) is pre-filled from row 3 onward with a
- * formula that copies the cell directly above it. Typing a value directly
- * into one of those cells overwrites the formula with that value (normal
- * Excel behaviour), and the chain continues from there — so filling an
- * invoice's details once on its first row and adding more product rows below
- * it carries those details down automatically; starting a new invoice is
- * just typing its own Invoice Number (etc.) on that row to break the chain.
+ * To put a second product on the SAME invoice (row 3 in the example), repeat
+ * that invoice's own typed values (Company Profile .. Wallet Amount) on the
+ * new row — copy-paste or Ctrl+D the row above, or just retype them. Rows
+ * 4-500 are left completely blank with no pre-filled formula: an earlier
+ * version auto-carried those values down via a live "=IF(...)" formula in
+ * every cell, but that made every one of those cells open Excel's formula
+ * editor on click/double-click instead of behaving like a normal blank
+ * cell, and made Ctrl+D fill-down copy the formula instead of the data.
  */
 
 declare(strict_types=1);
@@ -127,7 +129,7 @@ if ($isTracked) {
     $fixedHeaders = [
         'Company Profile*', 'Warehouse Code', 'Category*', 'Date* (YYYY-MM-DD)', $invNumberHeader,
         'Customer Name', 'Customer Mobile', 'Customer Address', 'Shipping Address',
-        'GST Number', 'Order Number', 'Order Date (YYYY-MM-DD)', 'Ship Date (YYYY-MM-DD)',
+        'GST Number', 'Order Number',
         'Courier Charges', 'State', 'Coupon Code',
         'Wallet Amount (Website/ID Concept only)',
         'Product*', 'Qty*', 'Rate*', 'Discount',
@@ -223,13 +225,15 @@ $exampleFixedValues = [
     'Wallet Amount (Website/ID Concept only)' => 0,
 ];
 
-// Row 2 is fully typed (the only row with no formula above it to copy from).
-// Row 3 demonstrates the auto-carry: its invoice-level columns are left to
-// the formula below (copying row 2's values) and only its own Product/Qty
-// get set here, same as a real second product line on the same invoice.
+// Row 2 is fully typed. Row 3 demonstrates a second product line on the
+// SAME invoice by literally repeating row 2's invoice-level values (typed,
+// not a formula — see note below) alongside its own Product/Qty.
 foreach ($fixedHeaders as $colIdx => $h) {
     if (array_key_exists($h, $exampleFixedValues)) {
         $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx + 1) . '2', $exampleFixedValues[$h]);
+        if ($h !== $invNumberHeader || !$isTracked) {
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIdx + 1) . '3', $exampleFixedValues[$h]);
+        }
     }
 }
 foreach ([2, 3] as $i => $rowNum) {
@@ -242,39 +246,18 @@ foreach ([2, 3] as $i => $rowNum) {
     }
 }
 
-// ── Auto-carry formulas: every invoice-level column (everything before the
-//    Product column), from row 3 down, stays BLANK until THIS row's own
-//    Product cell gets a value — the moment a product is picked, that row
-//    copies the invoice-level details from the row directly above. This
-//    keeps an unused row looking empty (not repeating the last invoice's
-//    text hundreds of rows down) and only "arrives" once a product is
-//    actually chosen on it. Typing a value directly into one of those cells
-//    (instead of leaving the formula) overwrites it, same as before — so a
-//    new invoice starts the moment its own Invoice Number (etc.) is typed.
-//
-//    Tracked categories (Website/ID Concept/WhatsApp Sales/Digital Orders)
-//    are the one exception: their Invoice Number column is EXCLUDED from
-//    this carry-down on purpose, so it stays genuinely blank on a
-//    continuation row instead of repeating a value — ot-sale-import-action.php
-//    reads a blank Invoice Number as "another product on the invoice
-//    directly above" and reads the literal word NEXT as "auto-generate this
-//    category's next invoice number", neither of which would work if a
-//    carried-down value were silently sitting in the cell already. ─────────
-$invNumberColIdx = array_search($invNumberHeader, $fixedHeaders, true) + 1;
+// Rows 4-500 for every invoice-level column are left genuinely blank — no
+// pre-filled "=IF(...)" carry-down formula. An earlier version filled every
+// one of those cells with a live formula so a second product line on the
+// same invoice would auto-repeat the invoice's details; in practice a cell
+// holding a formula meant a click/double-click there opened Excel's formula
+// editor instead of a plain blank cell ready to type into, and Ctrl+D
+// fill-down then copied the FORMULA (whose relative references shifted per
+// row) rather than the data the user expected, sometimes leaving a cell
+// looking empty. To repeat an invoice's details on a second product row,
+// copy-paste (or Ctrl+D) the actual typed row-2 values down, or just retype
+// them — same as any other spreadsheet.
 $dataRowsEnd = 500;
-for ($rowNum = 3; $rowNum <= $dataRowsEnd; $rowNum++) {
-    $aboveRow = $rowNum - 1;
-    for ($colIdx = 1; $colIdx < $productColIdx; $colIdx++) {
-        if ($isTracked && $colIdx === $invNumberColIdx) {
-            continue;
-        }
-        $colLetter = Coordinate::stringFromColumnIndex($colIdx);
-        $sheet->setCellValue(
-            "{$colLetter}{$rowNum}",
-            "=IF({$productColLetter}{$rowNum}=\"\",\"\",{$colLetter}{$aboveRow})"
-        );
-    }
-}
 
 // ── Product dropdown (data validation) on every data row down to 500. ─────
 for ($rowNum = 2; $rowNum <= $dataRowsEnd; $rowNum++) {
@@ -348,7 +331,6 @@ $sheet->getStyle('A2:' . Coordinate::stringFromColumnIndex($lastCol) . $dataRows
 foreach (range(1, $lastCol) as $i) {
     $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
 }
-$sheet->freezePane('E4');
 $spreadsheet->setActiveSheetIndex(0);
 
 ob_end_clean();
