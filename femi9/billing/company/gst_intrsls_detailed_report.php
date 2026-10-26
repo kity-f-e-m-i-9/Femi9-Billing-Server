@@ -28,7 +28,8 @@ $select_Report = "
         MAX(cg.gname)         AS gname,
         MAX(cg.gstin)         AS company_gstin,
         SUM(it.total)         AS total_sls_amount,
-        SUM(it.gst_amount)    AS gst_amount
+        SUM(it.gst_amount)    AS gst_amount,
+        GROUP_CONCAT(DISTINCT CASE WHEN it.gst > 0 THEN it.gst END) AS nonzero_gst_rates
     FROM internal_transfer it
     LEFT JOIN internal_transfer_invoice iti ON iti.tempid = it.tempid
     LEFT JOIN company_godown cg ON cg.id = (
@@ -60,16 +61,25 @@ while ($row = mysqli_fetch_assoc($fetch_Report)) {
     $rows[] = $row;
 }
 
-// Effective GST% for a row = gst_amount / taxable_value * 100 — same helper
-// convention as gst_sls_detailed_report.php.
-$gst_slabs = [0, 5, 12, 18, 28];
-function gst_percentage_label($taxable_value, $gst_amount, $gst_slabs) {
-    if ((float)$taxable_value == 0.0) return $gst_amount == 0 ? '0%' : 'Mixed';
-    $rate = round(($gst_amount / $taxable_value) * 100, 1);
-    foreach ($gst_slabs as $slab) {
-        if (abs($rate - $slab) <= 0.3) return $slab . '%';
+// GST% label for a row — taken from the DISTINCT non-zero product GST rates
+// actually present on that invoice's lines (nonzero_gst_rates, a
+// GROUP_CONCAT from the main query), never from gst_amount/taxable_value.
+// That blended-ratio approach used to badly mislabel a mixed-HSN invoice:
+// e.g. 11 napkin lines at 0% GST plus one Lumi9 diaper line at 5% GST
+// produces a blended rate of ~0.2%-1.4% (the 0%-rated lines dilute the
+// denominator), which is close to none of the real GST slabs and printed a
+// meaningless "1.4% (Mixed)" even though the invoice is really just "a 0%
+// item sold alongside a 5% item" — CGST/SGST themselves were always
+// correct, only this label was wrong. A single non-zero rate present (any
+// number of 0%-rated lines alongside it) now labels as that one rate; two or
+// more distinct non-zero rates on the same invoice is a genuine mix.
+function gst_percentage_label(?string $nonzero_gst_rates, $gst_amount) {
+    if ($nonzero_gst_rates === null || $nonzero_gst_rates === '') {
+        return ((float)$gst_amount == 0.0) ? '0%' : 'Mixed';
     }
-    return $rate . '% (Mixed)';
+    $rates = array_values(array_unique(array_map('intval', explode(',', $nonzero_gst_rates))));
+    if (count($rates) > 1) return 'Mixed';
+    return $rates[0] . '%';
 }
 
 function split_gst($gst_amount, $is_intra) {
@@ -97,7 +107,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
         $csv_rows[] = [
             $sn, $row['gname'], $row['company_gstin'], $row['inv_number'],
             date("d/m/Y", strtotime($row['transfer_date'])),
-            gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs),
+            gst_percentage_label($row['nonzero_gst_rates'], $row['gst_amount']),
             number_format($row['taxable_value'], 2, '.', ''),
             number_format($cgst, 2, '.', ''),
             number_format($sgst, 2, '.', ''),
@@ -217,7 +227,7 @@ if (isset($_REQUEST['export']) && $_REQUEST['export'] == 'csv') {
                                         <td><?= htmlspecialchars($row['company_gstin']) ?></td>
                                         <td><?= htmlspecialchars($row['inv_number']) ?></td>
                                         <td><?= date("d/m/Y", strtotime($row['transfer_date'])) ?></td>
-                                        <td align="center"><?= gst_percentage_label($row['taxable_value'], $row['gst_amount'], $gst_slabs) ?></td>
+                                        <td align="center"><?= gst_percentage_label($row['nonzero_gst_rates'], $row['gst_amount']) ?></td>
                                         <td align="right"><?= inr_format($row['taxable_value'], 2) ?></td>
                                         <td align="right"><?= inr_format($cgst, 2) ?></td>
                                         <td align="right"><?= inr_format($sgst, 2) ?></td>

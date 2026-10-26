@@ -5,6 +5,18 @@ if (session_status() === PHP_SESSION_NONE) {
     if (!is_dir(session_save_path()) || !is_writable(session_save_path())) {
         session_save_path(sys_get_temp_dir());
     }
+    // Set explicitly in code, not just via .htaccess/.user.ini's php_value
+    // session.name — confirmed on production (2026-10-26) that this portal
+    // and territory-partner/ were BOTH silently falling back to the same
+    // default PHPSESSID cookie there (the ini directive wasn't taking
+    // effect under that host's PHP handler), so "Login as TP" from here
+    // was overwriting this very company session's data in place: the admin
+    // got bounced to "User account not found" on their next company page,
+    // because checksession.php then found the TP's mobile number sitting in
+    // LOGIN_USER instead of the admin's username. Calling session_name()
+    // here guarantees the cookie name regardless of whether the host honors
+    // those ini files.
+    session_name('femi9_company_sess');
     session_start();
 }
 
@@ -98,6 +110,24 @@ if (!empty($_COOKIE['femi9_bdm_bridge']) && !$_hasRealCompanySession && in_array
 // Check if user is logged in
 if (!isset($_SESSION['LOGIN_USER']) || $_SESSION['LOGIN_USER'] === '') {
     $_SESSION['errorMessage'] = 'Session Expired. Please login again.';
+    header('Location: index.php?sessionexpiry');
+    exit;
+}
+
+// Defense-in-depth against the cookie-collision class of bug fixed above
+// (session_name() call): if a non-company portal's session ever ends up
+// read here again in the future, LOGIN_USER won't be an admin_log username
+// and the lookup below would fail with the confusing "User account not
+// found" message. Catch that case directly with a clear "please login
+// again" instead. Not set at all (plain company login never sets this
+// field) is still treated as fine — only a concrete OTHER portal type is
+// rejected. Mirrors territory-partner/checksession.php's own equivalent
+// guard.
+if (isset($_SESSION['LOGIN_USER_TYPE']) && $_SESSION['LOGIN_USER_TYPE'] !== 'company') {
+    session_unset();
+    session_destroy();
+    session_start();
+    $_SESSION['errorMessage'] = 'Invalid session. Please login again.';
     header('Location: index.php?sessionexpiry');
     exit;
 }

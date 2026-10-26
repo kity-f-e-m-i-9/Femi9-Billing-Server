@@ -75,10 +75,27 @@ function render_tp_digi_card(mysqli $db_conn, int $tpId)
         }
     }
 
+    // Admin-set photo (Manage Territory Partner → Edit) takes priority since
+    // it's the official record; if the TP never got one, fall back to the
+    // self-uploaded invoice logo from their own My Profile page (same image
+    // the TP already sees as "their" picture) rather than showing nothing
+    // but the initial-letter placeholder.
     $photoPath = null;
     if (!empty($tp['photo'])) {
         $candidate = __DIR__ . '/../company/tp_photo/' . $tp['photo'];
         if (is_file($candidate)) { $photoPath = $candidate; }
+    }
+    if ($photoPath === null) {
+        $stmtLogo = $db_conn->prepare("SELECT logo FROM users_profile WHERE user_tempid = ? AND usertype = 'territory_partner'");
+        $tpIdStr = (string) $tpId;
+        $stmtLogo->bind_param('s', $tpIdStr);
+        $stmtLogo->execute();
+        $logoRow = $stmtLogo->get_result()->fetch_assoc();
+        $stmtLogo->close();
+        if (!empty($logoRow['logo'])) {
+            $candidate = __DIR__ . '/../territory-partner/bussiness_logo/' . $logoRow['logo'];
+            if (is_file($candidate)) { $photoPath = $candidate; }
+        }
     }
 
     return _dcRenderPartnerCard([

@@ -4,6 +4,14 @@ if (session_status() === PHP_SESSION_NONE) {
     if (!is_dir(session_save_path()) || !is_writable(session_save_path())) {
         session_save_path(sys_get_temp_dir());
     }
+    // Set explicitly in code, not just via .htaccess/.user.ini's php_value
+    // session.name — confirmed on production (2026-10-26) that this portal
+    // and company/ were both silently falling back to the same default
+    // PHPSESSID cookie there, so opening a TP session from company's
+    // "Login as TP" bridge was overwriting the admin's own company session
+    // in place. Calling session_name() here guarantees the cookie name
+    // regardless of whether the host honors those ini files.
+    session_name('femi9_territory_partner_sess');
     session_start();
 }
 

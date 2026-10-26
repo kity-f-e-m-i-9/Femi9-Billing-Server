@@ -2,6 +2,9 @@
 if (!is_dir(session_save_path()) || !is_writable(session_save_path())) {
     session_save_path(sys_get_temp_dir());
 }
+// See checksession.php for why this is set explicitly rather than left to
+// .htaccess/.user.ini's php_value session.name.
+session_name('femi9_territory_partner_sess');
 session_start();
 error_reporting(0);
 
