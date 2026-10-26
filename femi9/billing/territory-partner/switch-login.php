@@ -20,7 +20,14 @@
 // "session failed" — a login that looks like it logs you right back out.
 // Same root cause and fix as company/switch-login.php's own documented
 // history of this exact bug.
-$_hadExistingTpSession = isset($_COOKIE[session_name() ?: 'PHPSESSID']);
+// Set explicitly in code, not just via .htaccess/.user.ini's php_value
+// session.name — confirmed on production (2026-10-26) that this portal and
+// company/ were both silently falling back to the same default PHPSESSID
+// cookie there, so landing here from company's "Login as TP" bridge
+// overwrote the admin's own company session in place instead of opening an
+// isolated one. See company/checksession.php for the fuller writeup.
+session_name('femi9_territory_partner_sess');
+$_hadExistingTpSession = isset($_COOKIE[session_name()]);
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
