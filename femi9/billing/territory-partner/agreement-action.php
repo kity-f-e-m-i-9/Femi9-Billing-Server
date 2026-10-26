@@ -1,6 +1,7 @@
 <?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 require_once __DIR__ . '/../shared/AgreementService.php';
+require_once __DIR__ . '/../shared/KycImageCompressor.php';
 include("config.php");
 error_reporting(0);
 
@@ -62,9 +63,19 @@ if (!empty($_FILES['pan_card']['name'])) {
     }
     $uploadDir = __DIR__ . '/kyc_documents/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-    $newName = 'pan_tp_' . $tp_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-    if (safe_move_uploaded_file($_FILES['pan_card']['tmp_name'], $uploadDir . $newName)) {
-        $panCardPath = $newName;
+    $tmpName = $_FILES['pan_card']['tmp_name'];
+    if ($ext === 'pdf') {
+        $newName = 'pan_tp_' . $tp_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.pdf';
+        if (safe_move_uploaded_file($tmpName, $uploadDir . $newName)) {
+            $panCardPath = $newName;
+        }
+    } else {
+        // Re-encoded to JPEG regardless of source format, so the stored
+        // extension is always .jpg here.
+        $newName = 'pan_tp_' . $tp_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.jpg';
+        if (compressKycImage($tmpName, $uploadDir . $newName)) {
+            $panCardPath = $newName;
+        }
     }
 }
 if (empty($panCardPath)) {

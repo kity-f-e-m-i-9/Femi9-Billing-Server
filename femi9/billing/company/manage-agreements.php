@@ -16,6 +16,16 @@ $settings = get_agreement_settings($db_conn);
 $cps = $db_conn->query("SELECT id, cp_id, name, company_name FROM channel_partners ORDER BY name ASC")->fetch_all(MYSQLI_ASSOC);
 $tps = $db_conn->query("SELECT id, tp_id, name, company_name FROM territory_partners WHERE deleted_at IS NULL ORDER BY name ASC")->fetch_all(MYSQLI_ASSOC);
 
+// Signed-vs-pending counts for the tab badges below — total CP/TP count
+// against how many of their *_agreements rows are is_locked=1 (a row only
+// exists once that partner has opened the Agreement page at least once, so
+// counting locked rows directly, not joining, correctly treats "never
+// opened the page" the same as "opened but not signed").
+$cpSignedCount = (int) ($db_conn->query("SELECT COUNT(*) c FROM channel_partner_agreements WHERE is_locked=1")->fetch_assoc()['c'] ?? 0);
+$tpSignedCount = (int) ($db_conn->query("SELECT COUNT(*) c FROM territory_partner_agreements tpa JOIN territory_partners tp ON tp.id = tpa.territory_partner_id WHERE tpa.is_locked=1 AND tp.deleted_at IS NULL")->fetch_assoc()['c'] ?? 0);
+$cpTotalCount = count($cps);
+$tpTotalCount = count($tps);
+
 // Partners with a per-partner custom wording override set -- shown as a
 // checklist inside "Edit Agreement Wording" (the shared/common template
 // editor) so the admin can see who the common change WON'T reach (custom
@@ -290,8 +300,8 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     </div>
 
                     <ul class="nav nav-tabs mb-3" role="tablist">
-                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'cp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#cpPane" type="button">Channel Partners</button></li>
-                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'tp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#tpPane" type="button">Territory Partners</button></li>
+                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'cp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#cpPane" type="button">Channel Partners <span class="badge bg-success ms-1" role="button" onclick="event.stopPropagation(); openAgreementSignersModal('cp','signed');"><?php echo $cpSignedCount; ?> signed</span> <span class="badge bg-secondary" role="button" onclick="event.stopPropagation(); openAgreementSignersModal('cp','pending');"><?php echo $cpTotalCount - $cpSignedCount; ?> pending</span></button></li>
+                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'tp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#tpPane" type="button">Territory Partners <span class="badge bg-success ms-1" role="button" onclick="event.stopPropagation(); openAgreementSignersModal('tp','signed');"><?php echo $tpSignedCount; ?> signed</span> <span class="badge bg-secondary" role="button" onclick="event.stopPropagation(); openAgreementSignersModal('tp','pending');"><?php echo $tpTotalCount - $tpSignedCount; ?> pending</span></button></li>
                     </ul>
 
                     <div class="tab-content">
@@ -653,6 +663,105 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
     </div>
 </div>
 <?php endif; ?>
+
+<!-- Behind the "N signed" / "N pending" badges on each tab -- same list,
+     just filtered by status, so one modal + one AJAX endpoint
+     (agreement-signers-list.php) serves all four badges. -->
+<div class="modal fade" id="agreementSignersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="agreementSignersModalTitle">&nbsp;</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="agreementSignersLoading" class="text-center text-muted py-4" style="display:none;">Loading…</div>
+                <div id="agreementSignersEmpty" class="text-center text-muted py-4" style="display:none;">No partners in this list.</div>
+                <table class="table table-sm table-hover" id="agreementSignersTable" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>ID</th>
+                            <th>Company</th>
+                            <th id="agreementSignersDateCol">Signed On</th>
+                        </tr>
+                    </thead>
+                    <tbody id="agreementSignersTbody"></tbody>
+                </table>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <span class="text-muted" id="agreementSignersCount" style="font-size:12.5px;"></span>
+                <nav><ul class="pagination pagination-sm mb-0" id="agreementSignersPagination"></ul></nav>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    var agreementSignersState = { type: 'cp', status: 'signed', page: 1 };
+
+    function openAgreementSignersModal(type, status) {
+        agreementSignersState = { type: type, status: status, page: 1 };
+        var modalEl = document.getElementById('agreementSignersModal');
+        // This page's Bootstrap build is v5.0.0-beta3 -- Modal.getOrCreateInstance()
+        // was only added in 5.2, so it's not a function here and threw silently
+        // (no console-visible crash from an inline onclick), which is why the
+        // modal never opened. Modal.getInstance() (present since 5.0) + manual
+        // fallback does the same job on this version.
+        var modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        modalInstance.show();
+        loadAgreementSignersPage();
+    }
+
+    function loadAgreementSignersPage() {
+        var typeLabel = agreementSignersState.type === 'cp' ? 'Channel Partner' : 'Territory Partner';
+        var statusLabel = agreementSignersState.status === 'signed' ? 'Signed' : 'Pending';
+        document.getElementById('agreementSignersModalTitle').textContent = typeLabel + 's — ' + statusLabel;
+        document.getElementById('agreementSignersDateCol').textContent = agreementSignersState.status === 'signed' ? 'Signed On' : 'Status';
+
+        var $loading = $('#agreementSignersLoading'), $empty = $('#agreementSignersEmpty'), $table = $('#agreementSignersTable');
+        $table.hide(); $empty.hide(); $loading.show();
+        $('#agreementSignersTbody').empty();
+        $('#agreementSignersPagination').empty();
+        $('#agreementSignersCount').text('');
+
+        $.getJSON('agreement-signers-list.php', { type: agreementSignersState.type, status: agreementSignersState.status, page: agreementSignersState.page })
+            .done(function (data) {
+                $loading.hide();
+                if (!data.rows || !data.rows.length) { $empty.show(); return; }
+
+                var $tbody = $('#agreementSignersTbody');
+                data.rows.forEach(function (r) {
+                    var dateCell = agreementSignersState.status === 'signed'
+                        ? (r.signed_at || '-')
+                        : '<span class="badge bg-secondary">Not signed yet</span>';
+                    $tbody.append(
+                        '<tr>' +
+                        '<td><a href="' + r.edit_url + '">' + $('<div>').text(r.name || '-').html() + '</a></td>' +
+                        '<td>' + $('<div>').text(r.code || '-').html() + '</td>' +
+                        '<td>' + $('<div>').text(r.company_name || '-').html() + '</td>' +
+                        '<td>' + dateCell + '</td>' +
+                        '</tr>'
+                    );
+                });
+                $table.show();
+
+                $('#agreementSignersCount').text('Showing ' + ((data.page - 1) * data.per_page + 1) + '-' + Math.min(data.page * data.per_page, data.total) + ' of ' + data.total);
+
+                var $pg = $('#agreementSignersPagination');
+                for (var p = 1; p <= data.total_pages; p++) {
+                    $pg.append(
+                        '<li class="page-item' + (p === data.page ? ' active' : '') + '">' +
+                        '<a class="page-link" href="#" onclick="event.preventDefault(); agreementSignersState.page=' + p + '; loadAgreementSignersPage();">' + p + '</a>' +
+                        '</li>'
+                    );
+                }
+            })
+            .fail(function () {
+                $loading.hide();
+                $empty.text('Failed to load — please try again.').show();
+            });
+    }
+</script>
 
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>

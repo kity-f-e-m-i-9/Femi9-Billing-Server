@@ -378,6 +378,43 @@ ob_start();
     }
     wireSigReuseToggle('sigChoiceReuse', 'sigChoiceNew', 'cpSigContainer', 'cp_signature_input');
 
+    // Re-encodes an image file as JPEG at progressively lower quality until
+    // it's under maxBytes, entirely in-browser — so a phone camera photo
+    // (often 3-8MB) never hits the server's upload_max_filesize limit in the
+    // first place. Dimensions are left untouched, only JPEG quality drops.
+    // PDFs are passed through unchanged (onDone called with the original file).
+    function compressImageFile(file, maxBytes, onDone) {
+        if (!file.type || file.type.indexOf('image/') !== 0) { onDone(file); return; }
+        if (!window.File || !window.URL || typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype.toBlob) {
+            onDone(file); return; // unsupported browser — fall back to the original file untouched
+        }
+        var img = new Image();
+        var url = URL.createObjectURL(file);
+        img.onload = function () {
+            var canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            (function tryQuality(q) {
+                canvas.toBlob(function (blob) {
+                    if (!blob) { onDone(file); return; }
+                    if (blob.size <= maxBytes || q <= 0.4) {
+                        var newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+                        onDone(new File([blob], newName, { type: 'image/jpeg' }));
+                    } else {
+                        tryQuality(q - 0.08);
+                    }
+                }, 'image/jpeg', q);
+            })(0.88);
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); onDone(file); };
+        img.src = url;
+    }
+
     function prepareSignaturesAndValidate() {
         var cpSig = document.getElementById('cp_signature_input').value;
         if (!cpSig) { alert('Please provide your signature (draw or type) before submitting.'); return false; }
@@ -389,7 +426,28 @@ ob_start();
             return false;
         }
 
-        return confirm('Once submitted, this agreement cannot be edited. Do you want to submit it now?');
+        var form = document.getElementById('agreementForm');
+        function confirmAndSubmit() {
+            if (confirm('Once submitted, this agreement cannot be edited. Do you want to submit it now?')) {
+                form.submit();
+            }
+        }
+        if (panInput && panInput.files.length) {
+            compressImageFile(panInput.files[0], 1.5 * 1024 * 1024, function (compressedFile) {
+                try {
+                    var dt = new DataTransfer();
+                    dt.items.add(compressedFile);
+                    panInput.files = dt.files;
+                } catch (e) {
+                    // DataTransfer unsupported on this browser — submit with
+                    // the original, uncompressed file rather than block signing.
+                }
+                confirmAndSubmit();
+            });
+        } else {
+            confirmAndSubmit();
+        }
+        return false; // actual submission happens via form.submit() above, once ready
     }
 </script>
 <?php endif; ?>
