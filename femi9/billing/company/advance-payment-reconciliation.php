@@ -27,6 +27,7 @@ ini_set('log_errors', 1);
 
 // Start session only if not already started
 if (session_status() === PHP_SESSION_NONE) {
+    session_name('femi9_company_sess');
     session_start();
 }
 

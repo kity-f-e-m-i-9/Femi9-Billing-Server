@@ -39,6 +39,7 @@ const DB_PORT = 3306;
 const AUDIT_TABLE = 'fix_courier_payment_type_audit';
 
 // ─── BOOTSTRAP ───────────────────────────────────────────────────────────────
+session_name('femi9_company_sess');
 session_start();
 
 // CSRF token

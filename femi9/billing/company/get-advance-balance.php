@@ -19,6 +19,7 @@
 declare(strict_types=1);
 
 // Start session before any output
+session_name('femi9_company_sess');
 session_start();
 
 // Security headers

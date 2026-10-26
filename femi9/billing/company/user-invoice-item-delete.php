@@ -9,6 +9,7 @@
  * @date 2026-01-02
  */
 
+session_name('femi9_company_sess');
 session_start();
 include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['ss','st','dt','sdt','shop','cus','stock_request','ot_channels','debit_note','manage_return','demo_free','report','payment_entry','manage_payment_entry','territory_partner']);
 include("config.php");

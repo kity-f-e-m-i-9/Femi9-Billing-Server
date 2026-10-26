@@ -11,6 +11,7 @@
 
 declare(strict_types=1);
 
+session_name('femi9_company_sess');
 session_start();
 require_once("config.php");
 

@@ -11,6 +11,7 @@
  * @date 2025-12-29
  */
 
+session_name('femi9_company_sess');
 session_start();
 
 include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('payment_entry');

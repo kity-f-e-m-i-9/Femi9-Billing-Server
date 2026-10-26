@@ -1,5 +1,5 @@
 <?php require_once __DIR__ . '/../shared/db-helpers.php';
-session_start(); include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('cus');
+session_name('femi9_company_sess'); session_start(); include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('cus');
 include("include/db-connect.php");
 include("config.php");
 error_reporting(0);

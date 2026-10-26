@@ -9,6 +9,7 @@ header("X-Frame-Options: SAMEORIGIN");
 header("X-Content-Type-Options: nosniff");
 header("Content-Type: application/json; charset=utf-8");
 
+session_name('femi9_company_sess');
 session_start();
 
 require_once("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('territory_partner_delete');
