@@ -1,15 +1,22 @@
 <?php
 // TEMPORARY diagnostic — "Accept & Sign Agreement" is throwing a 500 for
-// real users. The usual causes for an uncaught mysqli_sql_exception here
-// (mysqli is in exception-report mode) are: a schema column this code
+// real TP/CP users. The usual causes for an uncaught mysqli_sql_exception
+// here (mysqli is in exception-report mode) are: a schema column this code
 // expects that's missing on this install (e.g. a self-healing ALTER that
 // silently failed because the DB user lost ALTER privilege after a
 // reimport — see _diag_login_speed.php), or something else blowing up.
 // This checks schema + ALTER privilege, then does a REAL UPDATE wrapped in
 // a transaction that's always rolled back, so nothing is actually saved,
 // to surface the exact error if one happens.
+//
+// Lives under company/ (not territory-partner/) specifically so a Company
+// login — which has no "must sign the agreement first" gate — can reach it;
+// an unsigned TP/CP login gets redirected to agreement.php by
+// checksession.php's enforcement gate before this file's own code ever runs.
+//
 // Delete this file after use.
 include("checksession.php");
+require_once("include/PermissionCheck.php"); requirePermission('report');
 require_once __DIR__ . '/../shared/AgreementService.php';
 include("config.php");
 error_reporting(0);
@@ -19,7 +26,15 @@ header('Content-Type: text/plain; charset=utf-8');
 echo "=== Agreement signing diagnostic ===\n";
 echo "Run at: " . date('Y-m-d H:i:s') . "\n\n";
 
-echo "--- Can this DB user ALTER TABLE? ---\n";
+echo "--- PHP / server limits (a large signature-pad data URI or PAN photo could hit these) ---\n";
+echo "PHP version:         " . PHP_VERSION . "\n";
+echo "upload_max_filesize: " . ini_get('upload_max_filesize') . "\n";
+echo "post_max_size:       " . ini_get('post_max_size') . "\n";
+echo "memory_limit:        " . ini_get('memory_limit') . "\n";
+echo "max_execution_time:  " . ini_get('max_execution_time') . "\n";
+echo "max_input_time:      " . ini_get('max_input_time') . "\n";
+
+echo "\n--- Can this DB user ALTER TABLE? ---\n";
 $testRes = @$db_conn->query("ALTER TABLE territory_partner_agreements ADD COLUMN _diag_tmp_col INT NULL");
 if ($testRes) {
     echo "YES\n";
@@ -49,7 +64,7 @@ foreach ($expectedCols as $c) {
     echo str_pad($c2, 25) . " : " . (isset($present2[$c2]) ? $present2[$c2] : "**MISSING**") . "\n";
 }
 
-echo "\n--- Does agreement_settings table/row exist (checksession.php's enforcement gate reads it on EVERY page)? ---\n";
+echo "\n--- Does agreement_settings table/row exist (checksession.php's enforcement gate reads it on EVERY TP/CP page)? ---\n";
 $res3 = @$db_conn->query("SELECT * FROM agreement_settings WHERE id=1");
 if ($res3 && $row3 = $res3->fetch_assoc()) {
     echo json_encode($row3) . "\n";
