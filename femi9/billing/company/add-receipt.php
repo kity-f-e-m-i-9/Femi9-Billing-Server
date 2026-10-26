@@ -39,7 +39,7 @@ require_once("advance-payment-functions.php");
 require_once("receipt-stock-reversal.php");
 
 // ── CSRF ──────────────────────────────────────────────────────────────────────
-if (session_status() === PHP_SESSION_NONE) session_start();
+if (session_status() === PHP_SESSION_NONE) { session_name('femi9_company_sess'); session_start(); }
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }

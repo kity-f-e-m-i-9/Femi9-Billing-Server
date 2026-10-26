@@ -9,6 +9,7 @@
  * @date 2026-01-02
  */
 
+session_name('femi9_company_sess');
 session_start();
 include("checksession.php");
 include("config.php");

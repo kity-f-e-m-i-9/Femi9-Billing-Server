@@ -14,6 +14,7 @@
 declare(strict_types=1);
 
 // Security: Only allow Company users
+session_name('femi9_company_sess');
 session_start();
 if (!isset($_SESSION['usertype']) || $_SESSION['usertype'] !== 'company') {
     http_response_code(403);

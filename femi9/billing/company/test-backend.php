@@ -4,6 +4,7 @@
  * This file helps diagnose the Ajax error
  */
 
+session_name('femi9_company_sess');
 session_start();
 
 // Show all errors for debugging

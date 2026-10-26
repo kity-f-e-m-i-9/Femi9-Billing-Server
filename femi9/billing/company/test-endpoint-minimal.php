@@ -9,6 +9,7 @@ ob_start();
 
 header('Content-Type: application/json; charset=utf-8');
 
+session_name('femi9_company_sess');
 session_start();
 
 // Simple test response

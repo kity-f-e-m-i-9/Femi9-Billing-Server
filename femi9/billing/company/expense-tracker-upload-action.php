@@ -8,6 +8,7 @@
  * "Grand Total" row.
  */
 
+session_name('femi9_company_sess');
 session_start();
 
 include("checksession.php");

@@ -19,6 +19,7 @@
  * the actual format from file content, not just the extension.
  */
 
+session_name('femi9_company_sess');
 session_start();
 
 include("checksession.php");

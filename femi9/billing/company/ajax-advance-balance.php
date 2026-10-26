@@ -12,6 +12,7 @@
 declare(strict_types=1);
 
 // Start session and include dependencies
+session_name('femi9_company_sess');
 session_start();
 require_once("config.php");
 require_once("advance-payment-functions.php");

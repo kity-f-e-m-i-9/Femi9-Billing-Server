@@ -1,4 +1,5 @@
 <?php
+session_name('femi9_company_sess');
 session_start();
 
 // Load dependencies

@@ -80,6 +80,7 @@ try {
     
     // Verify session is active
     if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_name('femi9_company_sess');
         session_start();
     }
     

@@ -11,6 +11,7 @@
  * period that falls in an already-covered month.
  */
 
+session_name('femi9_company_sess');
 session_start();
 
 include("checksession.php");

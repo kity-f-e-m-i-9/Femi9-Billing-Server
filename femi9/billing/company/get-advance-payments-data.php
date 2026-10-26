@@ -26,6 +26,7 @@ header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 1; mode=block');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
+session_name('femi9_company_sess');
 session_start();
 
 if (!file_exists(__DIR__ . '/checksession.php') || !file_exists(__DIR__ . '/config.php')) {

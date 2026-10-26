@@ -14,6 +14,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 header('Content-Type: application/json');
 
+session_name('femi9_company_sess');
 session_start();
 
 include("checksession.php");

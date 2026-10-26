@@ -2,6 +2,7 @@
 if (!is_dir(session_save_path()) || !is_writable(session_save_path())) {
     session_save_path(sys_get_temp_dir());
 }
+session_name('femi9_territory_partner_sess');
 session_start();
 error_reporting(0);
 

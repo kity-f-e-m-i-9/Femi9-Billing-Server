@@ -1,4 +1,11 @@
 <?php
+// See checksession.php for why this is set explicitly rather than left to
+// .htaccess/.user.ini's php_value session.name. Missing this here (while
+// index.php/checksession.php had it) was itself a regression: login would
+// write LOGIN_USER into the default-named session while every other page
+// read back the femi9_company_sess-named one, so a correct password still
+// bounced straight to "session expired" right after signing in.
+session_name('femi9_company_sess');
 session_start();
 error_reporting(0);
 
