@@ -16,6 +16,16 @@ $settings = get_agreement_settings($db_conn);
 $cps = $db_conn->query("SELECT id, cp_id, name, company_name FROM channel_partners ORDER BY name ASC")->fetch_all(MYSQLI_ASSOC);
 $tps = $db_conn->query("SELECT id, tp_id, name, company_name FROM territory_partners WHERE deleted_at IS NULL ORDER BY name ASC")->fetch_all(MYSQLI_ASSOC);
 
+// Signed-vs-pending counts for the tab badges below — total CP/TP count
+// against how many of their *_agreements rows are is_locked=1 (a row only
+// exists once that partner has opened the Agreement page at least once, so
+// counting locked rows directly, not joining, correctly treats "never
+// opened the page" the same as "opened but not signed").
+$cpSignedCount = (int) ($db_conn->query("SELECT COUNT(*) c FROM channel_partner_agreements WHERE is_locked=1")->fetch_assoc()['c'] ?? 0);
+$tpSignedCount = (int) ($db_conn->query("SELECT COUNT(*) c FROM territory_partner_agreements tpa JOIN territory_partners tp ON tp.id = tpa.territory_partner_id WHERE tpa.is_locked=1 AND tp.deleted_at IS NULL")->fetch_assoc()['c'] ?? 0);
+$cpTotalCount = count($cps);
+$tpTotalCount = count($tps);
+
 // Partners with a per-partner custom wording override set -- shown as a
 // checklist inside "Edit Agreement Wording" (the shared/common template
 // editor) so the admin can see who the common change WON'T reach (custom
@@ -290,8 +300,8 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     </div>
 
                     <ul class="nav nav-tabs mb-3" role="tablist">
-                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'cp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#cpPane" type="button">Channel Partners</button></li>
-                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'tp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#tpPane" type="button">Territory Partners</button></li>
+                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'cp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#cpPane" type="button">Channel Partners <span class="badge bg-success ms-1"><?php echo $cpSignedCount; ?> signed</span> <span class="badge bg-secondary"><?php echo $cpTotalCount - $cpSignedCount; ?> pending</span></button></li>
+                        <li class="nav-item"><button class="nav-link<?php echo $activeTab === 'tp' ? ' active' : ''; ?>" data-bs-toggle="tab" data-bs-target="#tpPane" type="button">Territory Partners <span class="badge bg-success ms-1"><?php echo $tpSignedCount; ?> signed</span> <span class="badge bg-secondary"><?php echo $tpTotalCount - $tpSignedCount; ?> pending</span></button></li>
                     </ul>
 
                     <div class="tab-content">
