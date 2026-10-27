@@ -39,11 +39,16 @@ $userType    = 'company';
 $createdBy   = $_SESSION['LOGIN_USER'] ?? 'system';
 
 $corrections = [
-    ['product_id' => 4,  'qty' => 7,  'label' => '180mm (30 PCS)', 'ref' => 'manual_corr_20261027_1'],
-    ['product_id' => 51, 'qty' => 12, 'label' => '330mm XL (DW-9 PCS)', 'ref' => 'manual_corr_20261027_2'],
-    ['product_id' => 3,  'qty' => 8,  'label' => '280mm L', 'ref' => 'manual_corr_20261027_3'],
-    ['product_id' => 11, 'qty' => 8,  'label' => '290mm L (SW-9 PCS)', 'ref' => 'manual_corr_20261027_4'],
+    ['product_id' => 4,  'qty' => 7,  'label' => '180mm (30 PCS)', 'ref' => 'manual_corr_20261026_1'],
+    ['product_id' => 51, 'qty' => 12, 'label' => '330mm XL (DW-9 PCS)', 'ref' => 'manual_corr_20261026_2'],
+    ['product_id' => 3,  'qty' => 8,  'label' => '280mm L', 'ref' => 'manual_corr_20261026_3'],
+    ['product_id' => 11, 'qty' => 8,  'label' => '290mm L (SW-9 PCS)', 'ref' => 'manual_corr_20261026_4'],
 ];
+// Written as today's ledger entries by otDeductUndo() below, then dated back
+// to 2026-10-26 (the original deleted invoices' real date) immediately after
+// — same two-step approach already verified locally, just done in one visit
+// instead of a separate backdate script.
+$backdateTo = '2026-10-26 18:00:00';
 
 echo "=== Manual stock correction (deleted OT invoices never credited back) ===\n";
 echo "Mode: " . ($apply ? "APPLY (will commit)" : "DRY RUN (nothing written — add ?apply=1 to commit)") . "\n";
@@ -88,6 +93,14 @@ foreach ($corrections as $c) {
         }
     }
     echo "\n";
+}
+
+if ($apply) {
+    $stmt = $db_conn->prepare("UPDATE stock_ledger SET created_at = ? WHERE ref_id LIKE 'manual_corr_20261026_%'");
+    $stmt->bind_param('s', $backdateTo);
+    $stmt->execute();
+    echo "Backdated {$stmt->affected_rows} ledger row(s) to $backdateTo.\n";
+    $stmt->close();
 }
 
 echo $apply ? "Done applying. Verify stock above, then delete this file.\n" : "Dry run only — review the Before/After numbers, then revisit with ?apply=1.\n";
