@@ -5,6 +5,7 @@
 // risk double-crediting stock by re-running a correction that's already
 // been applied. Delete this file after use.
 include("checksession.php");
+require_once("include/GodownAccess.php");
 include("config.php");
 error_reporting(0);
 
