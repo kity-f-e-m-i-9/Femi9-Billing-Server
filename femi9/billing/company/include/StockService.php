@@ -795,8 +795,14 @@ class StockService
         try {
             $row = $this->lockStockRow($productId, $userType, $userId, $warehouseId);
             if ($row === null) {
+                // Throws, like otDeduct()/otReverseUndo() both already do for
+                // the same missing-row case — this used to return
+                // ['success' => false, ...] instead, which a caller could
+                // (and did: ot-sale-delete.php) simply never check, silently
+                // deleting the sale record without ever crediting its qty
+                // back. Confirmed 2026-10-27.
                 if (!$externalTransaction) $this->db->rollback();
-                return ['success' => false, 'reason' => 'no_stock_row'];
+                throw new StockException("No stock row for product=$productId type=$userType id=$userId");
             }
             $before = (int)$row['closing_qty'];
             $after  = $before + $qty;

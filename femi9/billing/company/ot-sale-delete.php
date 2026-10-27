@@ -36,14 +36,31 @@ if ($item) {
         // back out of Sales Qty entirely rather than show up as a same-size
         // Return next to an unchanged Sales figure. See StockService.php's
         // otDeductUndo() docblock.
+        //
+        // otDeductUndo() used to return success=false (reason: no_stock_row)
+        // instead of throwing on a missing stock row, and this ignored that
+        // return value entirely — the OT sale got deleted either way,
+        // silently leaving the qty never credited back (confirmed
+        // 2026-10-27, two invoices' worth of stock went missing this way).
+        // It now throws StockException like otDeduct()/otReverseUndo()
+        // already do, so a missing row refuses the deletion here instead of
+        // deleting it with stock left wrong.
         $stockService->otDeductUndo(
             $productId, $usertype, $godownid,
             $qty, (string)$rowid, $createdBy,
             false, // externalTransaction
             $warehouseId
         );
+    } catch (StockException $e) {
+        error_log("ot-sale-delete otDeductUndo failed: " . $e->getMessage());
+        $_SESSION['errorMessage'] = "Could not delete this item — no matching stock record was found to credit the quantity back to, so deleting it would have left stock wrong. Please contact support before deleting this item.";
+        echo "<script>window.location='ot-sale-details?tempid=" . urlencode($tempid) . "';</script>";
+        exit;
     } catch (\Throwable $e) {
         error_log("ot-sale-delete otDeductUndo error: " . $e->getMessage());
+        $_SESSION['errorMessage'] = "Could not delete this item — an error occurred while reversing its stock. Please contact support.";
+        echo "<script>window.location='ot-sale-details?tempid=" . urlencode($tempid) . "';</script>";
+        exit;
     }
 }
 
